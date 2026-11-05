@@ -6318,15 +6318,36 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   position: relative;
   left: 16px;
   top: -52px;
-  /* (small and light, the owner's: the line under the name kept short, never a long banner over the room) */
-  max-width: 240px;
-  padding: 6px 12px;
+  /* (small and light, the owner's: the line under the name kept short, never a long banner over the room; a longer one wraps inside the
+     tag, never out past its edges (it ran out both sides of the drinks' storage's)) */
+  width: max-content;
+  max-width: 320px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  white-space: normal;
   /* (it fades in, a little up into place) */
   animation: tip-in 120ms ease-out;
 }
 
 /* (over a small thing the tag stands just above its top (HoverTip places the whole of it), not off to the pointer's side) */
 /* (and fades out as the pointer leaves) */
+.hover-tip .tool-tag .tip-title {
+  font-weight: inherit;
+  white-space: nowrap;
+}
+
+.hover-tip .tool-tag small {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  text-align: center;
+}
+
+.hover-tip .tool-tag small.tip-act {
+  font-size: 9px;
+  opacity: 0.72;
+}
+
 .hover-tip.is-leaving .tool-tag {
   opacity: 0;
   transition: opacity 110ms ease-in;

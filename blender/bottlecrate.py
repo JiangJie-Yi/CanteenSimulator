@@ -2,7 +2,7 @@
 not painted on black, and plastic to look at): bottlecrate.glb, node "BottleCrate".
 
 A tray of moulded plastic 0.36 x 0.29 x 0.2 (the game's frame: y up, x along its long sides, z across; its floor's middle at the origin):
-walls 12 mm thick with a hand-hold slot cut through each, a rounded slot near the top; a lip round the rim; vertical ribs standing out along
+walls 12 mm thick with a hand-hold opening near the top of each (each wall four plain boxes round it: no boolean cut); a lip round the rim; vertical ribs standing out along
 the walls' lower band, and on each long side a smooth panel above them where the brewer's name is moulded ("BottleCrateLetters": two planes
 just off the panels, the game's white lettering on them); inside, a grid of thin walls making twenty cells for the bottles (5 x 4).
 "CratePlastic" all of it but the lettering (the game gives it a glossy red).
@@ -52,85 +52,55 @@ def box(name, x0, x1, y0, y1, z0, z1):
     return o
 
 
-def slot_cutter(name, along_x, at, length, height, depth=0.08, segs=8):
-    """a rounded slot (a capsule's outline, `length` long, `height` high) pushed through a wall: along x for the long sides, along z for the
-    ends; its middle at `at`"""
-    bm = bmesh.new()
-    r = height / 2
-    half = length / 2 - r
-    outline = []
-    for k in range(segs + 1):
-        a = -math.pi / 2 + math.pi * k / segs
-        outline.append((half + r * math.cos(a), r * math.sin(a)))
-    for k in range(segs + 1):
-        a = math.pi / 2 + math.pi * k / segs
-        outline.append((-half + r * math.cos(a), r * math.sin(a)))
-    rings = []
-    for side in (-1, 1):
-        ring = []
-        for u, v in outline:
-            if along_x:
-                p = (at[0] + u, at[1] + v, at[2] + side * depth / 2)
-            else:
-                p = (at[0] + side * depth / 2, at[1] + v, at[2] + u)
-            ring.append(bm.verts.new(P(*p)))
-        rings.append(ring)
-    n = len(outline)
-    for k in range(n):
-        bm.faces.new((rings[0][k], rings[0][(k + 1) % n], rings[1][(k + 1) % n], rings[1][k]))
-    bm.faces.new(rings[0][::-1])
-    bm.faces.new(rings[1])
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    o = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(o)
-    return o
-
-
-def cut(target, cutter):
-    m = target.modifiers.new("cut", "BOOLEAN")
-    m.operation = "DIFFERENCE"
-    m.solver = "EXACT"
-    m.object = cutter
-    bpy.context.view_layer.objects.active = target
-    bpy.ops.object.modifier_apply(modifier=m.name)
-    bpy.data.objects.remove(cutter, do_unlink=True)
-
-
-# ---- the tray: the outer box less its inside, less a slot through each wall
-tray = box("BottleCrateTray", -W / 2, W / 2, 0.0, H, -D / 2, D / 2)
-cut(tray, box("inside", -W / 2 + T, W / 2 - T, FLOOR, H + 0.05, -D / 2 + T, D / 2 - T))
-for sd in (-1, 1):
-    cut(tray, slot_cutter(f"slotL{sd}", True, (0.0, SLOT_Y, sd * D / 2), 0.12, SLOT_H))
-    cut(tray, slot_cutter(f"slotE{sd}", False, (sd * W / 2, SLOT_Y, 0.0), 0.09, SLOT_H))
-parts.append(tray)
-# ---- the lip round the rim, standing out a little
+# (every piece a plain box, one quad to a face (the owner's: the hand-holds were cut through with booleans, leaving long slivers of triangles
+# fanned across the walls and floor): each wall four boxes round its hand-hold, so the hole's still a real opening, square-cornered)
 rim = []
-LIP = 0.005
-# (what stands out of the walls starts a millimetre inside them: no face of it lies in a wall's face, to flicker against it)
 IN = 0.001
+LIP_H = 0.014
 def out_of(sd, half, by):
     a, b = sd * (half - IN), sd * (half + by)
     return min(a, b), max(a, b)
+def wall(name, along_x, sd, hole_w):
+    """a wall, its outer face at sd * half, built round a hand-hold `hole_w` long from SLOT_Y - SLOT_H/2 to SLOT_Y + SLOT_H/2"""
+    half_len = W / 2 if along_x else D / 2 - T
+    t0, t1 = (sd * (D / 2 - T), sd * D / 2) if along_x else (sd * (W / 2 - T), sd * W / 2)
+    t0, t1 = min(t0, t1), max(t0, t1)
+    y0, y1 = SLOT_Y - SLOT_H / 2, SLOT_Y + SLOT_H / 2
+    def b(n, a0, a1, yy0, yy1):
+        if along_x:
+            rim.append(box(f"{name}{n}", a0, a1, yy0, yy1, t0, t1))
+        else:
+            rim.append(box(f"{name}{n}", t0, t1, yy0, yy1, a0, a1))
+    b("Low", -half_len, half_len, 0.0, y0)
+    # (up to the lip, which caps the wall's top: no two faces in one plane to flicker)
+    b("High", -half_len, half_len, y1, H - LIP_H)
+    b("Left", -half_len, -hole_w / 2, y0, y1)
+    b("Right", hole_w / 2, half_len, y0, y1)
 for sd in (-1, 1):
-    rim.append(box(f"lipL{sd}", -W / 2 - LIP, W / 2 + LIP, H - 0.014, H, *out_of(sd, D / 2, LIP)))
-    rim.append(box(f"lipE{sd}", *out_of(sd, W / 2, LIP), H - 0.014, H, -D / 2, D / 2))
-# ---- ribs along the walls' lower band (the long sides' panels above them left smooth for the name; the ends' ribs up to the slots)
-RIB, RIB_OUT = 0.007, 0.004
-n_l = 11
+    wall(f"wallL{sd}", True, sd, 0.12)
+    wall(f"wallE{sd}", False, sd, 0.09)
+rim.append(box("floor", -W / 2 + T - IN, W / 2 - T + IN, 0.0, FLOOR, -D / 2 + T - IN, D / 2 - T + IN))
+# ---- the lip round the rim and the band round the foot, standing out a little
+LIP = 0.005
+def over(sd, half, by):
+    # (the lip over the whole of the wall's thickness, out past it)
+    a, b = sd * (half - T), sd * (half + by)
+    return min(a, b), max(a, b)
 for sd in (-1, 1):
-    for k in range(n_l):
-        x = -W / 2 + 0.025 + (W - 0.05) * k / (n_l - 1)
-        rim.append(box(f"ribL{sd}{k}", x - RIB / 2, x + RIB / 2, 0.006, 0.07, *out_of(sd, D / 2, RIB_OUT)))
-    n_e = 8
-    for k in range(n_e):
-        z = -D / 2 + 0.025 + (D - 0.05) * k / (n_e - 1)
-        rim.append(box(f"ribE{sd}{k}", *out_of(sd, W / 2, RIB_OUT), 0.006, SLOT_Y - SLOT_H / 2 - 0.012, z - RIB / 2, z + RIB / 2))
-    # (a band round the foot, standing out as the lip does)
+    rim.append(box(f"lipL{sd}", -W / 2 - LIP, W / 2 + LIP, H - LIP_H, H, *over(sd, D / 2, LIP)))
+    rim.append(box(f"lipE{sd}", *over(sd, W / 2, LIP), H - LIP_H, H, -D / 2 + T, D / 2 - T))
     rim.append(box(f"footL{sd}", -W / 2 - LIP * 0.6, W / 2 + LIP * 0.6, 0.0, 0.008, *out_of(sd, D / 2, LIP * 0.6)))
-    rim.append(box(f"footE{sd}", *out_of(sd, W / 2, LIP * 0.6), 0.0, 0.008, -D / 2, D / 2))
+    rim.append(box(f"footE{sd}", *out_of(sd, W / 2, LIP * 0.6), 0.0, 0.008, -D / 2 + IN, D / 2 - IN))
+# ---- a few ribs along the walls' lower band, evenly spaced and the same on every side (the long sides' panels above them left smooth for
+# the name)
+RIB, RIB_OUT = 0.009, 0.004
+for sd in (-1, 1):
+    for k in range(5):
+        x = -W / 2 + 0.04 + (W - 0.08) * k / 4
+        rim.append(box(f"ribL{sd}{k}", x - RIB / 2, x + RIB / 2, 0.008, 0.07, *out_of(sd, D / 2, RIB_OUT)))
+    for k in range(3):
+        z = -D / 2 + 0.05 + (D - 0.1) * k / 2
+        rim.append(box(f"ribE{sd}{k}", *out_of(sd, W / 2, RIB_OUT), 0.008, SLOT_Y - SLOT_H / 2 - 0.012, z - RIB / 2, z + RIB / 2))
 # ---- the cells' walls inside
 for c in range(1, COLS):
     x = -W / 2 + T + (W - 2 * T) * c / COLS
@@ -138,8 +108,9 @@ for c in range(1, COLS):
 for r in range(1, ROWS):
     z = -D / 2 + T + (D - 2 * T) * r / ROWS
     rim.append(box(f"cellR{r}", -W / 2 + T, W / 2 - T, FLOOR, H * 0.88, z - 0.0025, z + 0.0025))
+tray = rim[0]
 bpy.ops.object.select_all(action="DESELECT")
-for o in rim + [tray]:
+for o in rim:
     o.select_set(True)
 bpy.context.view_layer.objects.active = tray
 bpy.ops.object.join()

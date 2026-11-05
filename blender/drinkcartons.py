@@ -1,8 +1,8 @@
 """Cardboard cases of drinks (段ボール), stacked by the crates at the back of the drinks: drinkcartons.glb, node "DrinkCartons".
 
 Nine cases (the owner: bigger cases, more of them, stacked up high): two side by side to a layer, four layers each a little askew on the
-last, one on top turned across, about 1.1 tall. Each a box of kraft board, bulging a hair, its
-top flaps shut under a strip of brown tape running over and down the ends, its edges eased; its long sides and one end printed (material
+last, one on top turned across, about 1.1 tall. Each a plain box of kraft board (one quad to a face, no bottom), its
+top flaps shut under a strip of tape running over and down the ends (one strip of three quads); its long sides and one end printed (material
 "CartonPrint<k>", the picture laid once over each printed face: the game draws each its own drink's print on it), the rest plain board
 ("CartonKraft"). The game's frame: y up, the stack standing on y = 0, its middle at the origin; each case 0.40 long, 0.21 tall, 0.28 deep
 (a case of 24 cans; they were 0.30 x 0.14 x 0.20). The five prints shared round the nine (CartonPrint0..4).
@@ -60,10 +60,12 @@ def carton(idx, k, at, turn):
     """one case (the idx-th), its print material k, standing at `at` (its foot's middle, the game's frame), turned `turn` about the upright"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    n = 4                                                  # (each face in n x n, so it can bulge)
+    # (each face one quad, flat (the owner's: each face was 4 x 4 to bulge a hair, 192 triangles a case, and the bottom one's underside
+    # sagged into a jagged edge); no bottom (it stands on the floor or the case under it): 10 triangles a case)
+    n = 1
     faces = []
     # (each face: its axis, side, and the two in-face axes; printed: the long sides (z) and one end (+x))
-    for ax, side, printed in ((0, 1, True), (0, -1, False), (1, 1, False), (1, -1, False), (2, 1, True), (2, -1, True)):
+    for ax, side, printed in ((0, 1, True), (0, -1, False), (1, 1, False), (2, 1, True), (2, -1, True)):
         others = [a for a in range(3) if a != ax]
         half = (L / 2, H / 2, D / 2)
         grid = []
@@ -74,9 +76,6 @@ def carton(idx, k, at, turn):
                 p[ax] = side * half[ax]
                 p[others[0]] = -half[others[0]] + 2 * half[others[0]] * i / n
                 p[others[1]] = -half[others[1]] + 2 * half[others[1]] * j / n
-                # (the board bulging a hair at the middle of each face)
-                s = math.sin(math.pi * i / n) * math.sin(math.pi * j / n)
-                p[ax] += side * 0.0025 * s
                 row.append((bm.verts.new(P(p[0], p[1] + H / 2, p[2])), (i / n, j / n)))
             grid.append(row)
         for i in range(n):
@@ -107,16 +106,25 @@ def carton(idx, k, at, turn):
     # (crisp, as board is: its faces flat, only the faintest swell)
     for f in o.data.polygons:
         f.use_smooth = False
-    # (the tape: over the flaps' seam along the top and down both ends)
-    tw = 0.045
-    tape = []
-    for (sx, sy, sz, px, py, pz) in ((L + 0.004, 0.002, tw, 0, H + 0.007, 0), (0.002, 0.06, tw, L / 2 + 0.007, H - 0.03, 0), (0.002, 0.06, tw, -L / 2 - 0.007, H - 0.03, 0)):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=P(px, py, pz))
-        t = bpy.context.view_layer.objects.active
-        t.scale = (sx, sz, sy)
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        t.data.materials.append(M["tape"])
-        tape.append(t)
+    # (the tape: one strip over the flaps' seam along the top and down both ends, three quads lying a hair off the board)
+    tw, drop, off = 0.045, 0.06, 0.0015
+    bm = bmesh.new()
+    pts = [(-L / 2 - off, H - drop), (-L / 2 - off, H + off), (L / 2 + off, H + off), (L / 2 + off, H - drop)]
+    rows = [[bm.verts.new(P(x, y, z)) for (x, y) in pts] for z in (-tw / 2, tw / 2)]
+    for k in range(3):
+        bm.faces.new((rows[0][k], rows[0][k + 1], rows[1][k + 1], rows[1][k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces:
+        c = f.calc_center_median()
+        if f.normal.dot(Vector((c.x, c.y, c.z - H / 2 - 0.0))) < 0:
+            f.normal_flip()
+    me = bpy.data.meshes.new(f"CartonTape{idx}")
+    bm.to_mesh(me)
+    bm.free()
+    t = bpy.data.objects.new(f"CartonTape{idx}", me)
+    bpy.context.collection.objects.link(t)
+    t.data.materials.append(M["tape"])
+    tape = [t]
     for t in tape:
         t.parent = o
     o.matrix_world = Matrix.Translation(P(*at)) @ Matrix.Rotation(turn, 4, "Z")

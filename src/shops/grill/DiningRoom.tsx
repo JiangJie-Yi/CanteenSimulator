@@ -3,7 +3,7 @@ import { TISSUE } from '@/game/tissues'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
 import { coolerDoorSound, lightSwitchSound, slideDoorSound } from './restroomSound'
-import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -5707,22 +5707,52 @@ const SAKE_HIT: [number, number, number] = [0.9, 1.1, 0.76]
  * keep to the floor (laid along the wall they ran on past the wall's end and the floor's edge) */
 /** (the stack bigger now (nine cases, 0.83 by 0.42, 1.1 high): drawn 0.08 further from the crates, which it ran 6 cm into) */
 const CARTONS_AT: [number, number, number] = [-0.44, 0, 0.173]
+/**
+ * The beer bottles standing in the crates' cells: only their tops show over the crates' walls, so only the tops are made (the owner's: each
+ * was a whole bottle, 12 round): the shoulder, the neck and its lip in brown glass, 8 round, open below where the cells hide it; the foil
+ * round the neck and the crown cap in gold; all of them in both crates one instanced mesh each (the beer bottle's own size, 1.2 times)
+ */
+const UP_AXIS = new THREE.Vector3(0, 1, 0)
+const CRATE_NECK = new THREE.LatheGeometry([[0.0275, 0.1], [0.0275, 0.12], [0.0235, 0.145], [0.0145, 0.17], [0.0125, 0.2], [0.0135, 0.206], [0.0135, 0.21]]
+  .map(([x, y]) => new THREE.Vector2(x * 1.2, y * 1.2)), 8)
+const CRATE_CAP = (() => {
+  const foil = new THREE.CylinderGeometry(0.0138 * 1.2, 0.0155 * 1.2, 0.04 * 1.2, 8, 1, true).translate(0, 0.18 * 1.2, 0)
+  const cap = new THREE.CylinderGeometry(0.0145 * 1.2, 0.0145 * 1.2, 0.008 * 1.2, 8).translate(0, 0.213 * 1.2, 0)
+  const g = mergeGeometries([foil.toNonIndexed(), cap.toNonIndexed()])!
+  foil.dispose(); cap.dispose()
+  return g
+})()
+const CRATE_GLASS_MAT = new THREE.MeshToonMaterial({ color: '#5a3010' })
+const CRATE_CAP_MAT = new THREE.MeshToonMaterial({ color: '#c9a24a', side: THREE.DoubleSide })
 function BottleCrates() {
   const W = 0.36, D = 0.29
   const cols = 5, rows = 4
+  // (where each bottle stands: the lower crate full, the top one with a few gone; in the crates' frame)
+  const at = useMemo(() => {
+    const out: THREE.Matrix4[] = []
+    for (const k of [0, 1]) {
+      const crate = new THREE.Matrix4().compose(new THREE.Vector3(k * 0.03 - 0.015, k * 0.272, 0), new THREE.Quaternion().setFromAxisAngle(UP_AXIS, k * 0.1), new THREE.Vector3(1, 1, 1))
+      for (let n = 0; n < cols * rows; n++) {
+        if (k === 1 && (n % 7 === 3 || n === 11)) continue
+        const x = -W / 2 + (W / cols) * ((n % cols) + 0.5), z = -D / 2 + (D / rows) * (Math.floor(n / cols) + 0.5)
+        out.push(crate.clone().multiply(new THREE.Matrix4().makeTranslation(x, 0.012, z)))
+      }
+    }
+    return out
+  }, [])
+  const place = useCallback((m: THREE.InstancedMesh | null) => {
+    if (!m) return
+    at.forEach((mx, i) => m.setMatrixAt(i, mx))
+    m.instanceMatrix.needsUpdate = true
+    m.computeBoundingSphere()
+  }, [at])
   return (
     <group>
       {[0, 1].map((k) => (
-        <group key={k} position={[k * 0.03 - 0.015, k * 0.272, 0]} rotation-y={k * 0.1}>
-          <CrateModel />
-          {/* (the bottles: the lower crate full, the top one with a few gone) */}
-          {Array.from({ length: cols * rows }, (_, n) => {
-            if (k === 1 && (n % 7 === 3 || n === 11)) return null
-            const x = -W / 2 + (W / cols) * ((n % cols) + 0.5), z = -D / 2 + (D / rows) * (Math.floor(n / cols) + 0.5)
-            return <group key={n} position={[x, 0.012, z]} rotation-y={n * 1.3}><DrinkBottle id="beer" /></group>
-          })}
-        </group>
+        <group key={k} position={[k * 0.03 - 0.015, k * 0.272, 0]} rotation-y={k * 0.1}><CrateModel /></group>
       ))}
+      <instancedMesh ref={place} args={[CRATE_NECK, CRATE_GLASS_MAT, at.length]} castShadow={false} />
+      <instancedMesh ref={place} args={[CRATE_CAP, CRATE_CAP_MAT, at.length]} castShadow={false} />
     </group>
   )
 }
