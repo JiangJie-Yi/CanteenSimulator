@@ -458,7 +458,28 @@ def washstand():
     # ---- the counter, its edges eased, its grain along it
     fin(box_uv(rbox("WashTop", (DP, TH, W), (-DP / 2, T - TH / 2, 0), 0.006, 2), 2.2), "WashTop", M["hinoki"], parts)
     # ---- the cabinet under it, the plinth set back in shadow
-    fin(box_uv(rbox("WashCabinet", (CD, T - TH - PL, CW), (-CD / 2, PL + (T - TH - PL) / 2, 0), 0.004, 1), 2.2, up=True), "WashCabinet", M["sugi"], parts)
+    # (hollow, its front open behind the sliding doors (the owner's: they open, and there's something kept in it): its two sides, back,
+    # floor and top of sugi, a shelf across its middle, dark inside; on the shelf and the floor the washroom's spare rolls and towels)
+    CH, PT = T - TH - PL, 0.012
+    cy = PL + CH / 2
+    fin(box_uv(rbox("WashCabSideL", (CD, CH, PT), (-CD / 2, cy, -CW / 2 + PT / 2), 0.003, 1), 2.2, up=True), "WashCabSideL", M["sugi"], parts)
+    fin(box_uv(rbox("WashCabSideR", (CD, CH, PT), (-CD / 2, cy, CW / 2 - PT / 2), 0.003, 1), 2.2, up=True), "WashCabSideR", M["sugi"], parts)
+    fin(box_uv(rbox("WashCabBack", (PT, CH, CW - 2 * PT), (-PT / 2, cy, 0), 0.0, 1), 2.2, up=True), "WashCabBack", M["sugi"], parts)
+    fin(box_uv(rbox("WashCabFloor", (CD, PT, CW - 2 * PT), (-CD / 2, PL + PT / 2, 0), 0.0, 1), 2.2), "WashCabFloor", M["sugi"], parts)
+    fin(box_uv(rbox("WashCabRoof", (CD, PT, CW - 2 * PT), (-CD / 2, T - TH - PT / 2, 0), 0.0, 1), 2.2), "WashCabRoof", M["sugi"], parts)
+    SHELF = PL + CH * 0.52
+    fin(box_uv(rbox("WashCabShelf", (CD - 0.03, PT, CW - 2 * PT), (-(CD - 0.03) / 2, SHELF, 0), 0.002, 1), 2.2), "WashCabShelf", M["sugi"], parts)
+    # (the inside's dark: a sheet over its back, a little off it)
+    fin(rbox("WashCabDark", (0.002, CH - 2 * PT, CW - 2 * PT - 0.002), (-PT - 0.002, cy, 0), 0.0, 1), "WashCabDark", M["shadow"], parts)
+    # (spare rolls: two stood on the floor, two on the shelf, turned on the lathe, their ends laddered shut)
+    M["paper"] = pbr("WashPaper", lin("#f4f1ea"), rough=0.85)
+    M["towel"] = pbr("WashTowel", lin("#8fb3cc"), rough=0.9)
+    RR, RH = 0.05, 0.1
+    for j, (cxx, czz, yy) in enumerate(((-0.16, -0.12, PL + PT), (-0.16, -0.01, PL + PT), (-0.15, -0.14, SHELF + PT / 2), (-0.15, -0.03, SHELF + PT / 2))):
+        fin(lathe_oval(f"WashRoll{j}", [(0.0, yy), (RR, yy), (RR, yy + RH), (0.0, yy + RH)], 1, 1, 12, cxx, czz), f"WashRoll{j}", M["paper"], parts)
+    # (a stack of folded hand towels on the shelf's other end)
+    for j in range(3):
+        fin(rbox(f"WashTowelFold{j}", (0.17, 0.028, 0.15), (-0.15, SHELF + PT / 2 + 0.014 + j * 0.03, 0.1), 0.008, 2), f"WashTowelFold{j}", M["towel"], parts)
     fin(rbox("WashPlinth", (CD - 0.05, PL, CW - 0.06), (-(CD - 0.05) / 2, PL / 2, 0), 0.0, 1), "WashPlinth", M["shadow"], parts)
     # ---- its two sliding doors, one on each of two tracks, the front one over the back's edge: a frame of hinoki and upright slats, a dark
     # panel behind them, a little notch of a pull in each outer stile

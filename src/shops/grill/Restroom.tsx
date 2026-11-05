@@ -9,6 +9,7 @@ import { toonOf } from './BarFurnish'
 import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
 import { roundMirror } from './mirror'
+import { shrineDoor } from './shrineSound'
 import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
 
 /**
@@ -489,7 +490,7 @@ export function WcPads() {
 }
 
 /** how long a guest's hand wash runs the tap (ms) */
-export const HAND_MS = 2600
+export const HAND_MS = 1500
 const WASH_STREAM = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.62, depthWrite: false, toneMapped: false })
 /**
  * The washroom's washstand (blender/wc.py: its back to +x, against the back wall facing the door, so it's the first thing seen as the door
@@ -497,8 +498,9 @@ const WASH_STREAM = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent:
  * it's metered by the minute: App), and turned and running by itself while a guest washes their hands (metered as a hand wash); a stream
  * from the spout's mouth down into the bowl, wavering, a ring spreading where it lands; heard running, as loud as it's near.
  */
-/** `mirrored`: laid out the other way about, as the washroom it stands in is (the soap bottle on the other side of the bowl) */
-export function WashstandLive({ who, mirrored = false }: { who: Who; mirrored?: boolean }) {
+/** the cabinet's doors: how long they take to swing open or shut (s), and how far (a little past square) */
+const CAB_S = 0.35, CAB_SWING = 1.75
+export function WashstandLive({ who }: { who: Who }) {
   const gltf = useGLTF(WASH_URL) as unknown as { scene: THREE.Group }
   const parts = useMemo(() => {
     const root = toonOf(WASH_URL, gltf.scene)
@@ -506,20 +508,23 @@ export function WashstandLive({ who, mirrored = false }: { who: Who; mirrored?: 
     const handle = root.getObjectByName('WashTapHandle')!
     handle.removeFromParent()
     root.updateMatrixWorld(true)
-    // (in the mirrored washroom the soap bottle stands on the bowl's other side (the owner's: the two washrooms alike, mirrored; it stood
-    // behind the vase there): turned on the lathe and its pump pointing straight out, it's mirrored by moving it across)
-    if (mirrored) {
-      const soap = ['WashSoapBottle', 'WashPumpNeck', 'WashPumpHead', 'WashPumpNozzle'].map((n) => root.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o)
+    // (the cabinet's two doors each a piece of its own, hinged at its outer edge (the owner's: click, and they swing open on what's kept in
+    // it; again, shut): their frames, slats, panels and pulls gathered round each hinge, out of the rest's merging)
+    const doors = [0, 1].map((k) => {
+      const bits: THREE.Object3D[] = []
+      root.traverse((o) => { if (new RegExp(`^Wash(DoorBack|Stile|Rail|Slat|Pull)${k}`).test(o.name) && (o as THREE.Mesh).isMesh) bits.push(o) })
       const box = new THREE.Box3()
-      for (const o of soap) box.expandByObject(o)
-      const cz = root.worldToLocal(box.getCenter(new THREE.Vector3())).z
-      for (const o of soap) {
-        const p = o.parent!
-        const a = p.worldToLocal(root.localToWorld(new THREE.Vector3())), b = p.worldToLocal(root.localToWorld(new THREE.Vector3(0, 0, -2 * cz)))
-        o.position.add(b.sub(a))
-      }
-      root.updateMatrixWorld(true)
-    }
+      for (const o of bits) box.expandByObject(o)
+      const hinge = root.worldToLocal(new THREE.Vector3(box.max.x, 0, k === 0 ? box.min.z : box.max.z))
+      const g = new THREE.Group()
+      g.name = `WashCabDoor${k}`
+      g.position.copy(hinge)
+      root.add(g)
+      g.updateMatrixWorld(true)
+      for (const o of bits) g.attach(o)
+      return g
+    })
+    root.updateMatrixWorld(true)
     const at = (n: string) => root.worldToLocal(root.getObjectByName(n)!.getWorldPosition(new THREE.Vector3()))
     const tip = at('WashSpoutTip'), floor = at('WashBowlFloor')
     // (the mirror's glass: where its face is (the stand's back is to +x, the glass faces -x), for the mirror that shows the room)
@@ -528,15 +533,17 @@ export function WashstandLive({ who, mirrored = false }: { who: Who; mirrored?: 
     const toRoot = root.matrixWorld.clone().invert()
     const face = new THREE.Vector3(box.min.x, mid.y, mid.z).applyMatrix4(toRoot)
     plainColours(root)
-    mergeByMaterial(root)
+    mergeByMaterial(root, (o) => doors.includes(o as THREE.Group))
+    for (const d of doors) mergeByMaterial(d)
     mergeByMaterial(handle)
     let plain: THREE.Object3D | null = null
     root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && (m.material as THREE.Material).name === 'WashMirror') plain = m })
     const mirror = roundMirror((box.max.y - box.min.y) / 2)
     mirror.glass.position.copy(face).add(new THREE.Vector3(-0.0006, 0, 0))
     mirror.glass.rotation.y = -Math.PI / 2
-    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null }
-  }, [gltf, mirrored])
+    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null, doors }
+  }, [gltf])
+  const cab = useRef({ open: false, k: 0 })
   useEffect(() => () => { parts.mirror.glass.getRenderTarget().dispose(); (parts.mirror.glass.material as THREE.Material).dispose() }, [parts])
   const frame = useRef(0)
   const st = useRef({ turn: 0, lastHand: -1e9, was: false })
@@ -566,11 +573,31 @@ export function WashstandLive({ who, mirrored = false }: { who: Who; mirrored?: 
       if (on) { const r = 1 + ((k * 2.4) % 1) * 1.6; ring.current.scale.set(r, r, r); (ring.current.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - ((k * 2.4) % 1)) }
     }
     tapRunning(`wc-${who}`, on ? nearOf(parts.root, camera) : 0)
+    // (the cabinet's doors swinging, eased in and out over CAB_S; the left one out round its left edge, the right round its right)
+    const c = cab.current
+    c.k = Math.min(1, Math.max(0, c.k + (c.open ? 1 : -1) * Math.min(dt, 0.1) / CAB_S))
+    const e = c.k * c.k * (3 - 2 * c.k)
+    parts.doors[0].rotation.y = -e * CAB_SWING
+    parts.doors[1].rotation.y = e * CAB_SWING
   })
+  const onDoor = (o: THREE.Object3D) => { for (let q: THREE.Object3D | null = o; q; q = q.parent) if (parts.doors.includes(q as THREE.Group)) return true; return false }
+  const cabSays = () => (cab.current.open ? '點擊關上' : '點擊打開・備用的衛生紙與毛巾')
   const says = () => (TOILETS[who].tap ? '點一下關水' : '點一下開水（開著會一直計水費）')
   return (
     <group>
-      <primitive object={parts.root} />
+      {/* (the cabinet's doors pointed at through the stand's own model: only they answer) */}
+      <group onClick={(e) => {
+        if (!onDoor(e.object)) return
+        e.stopPropagation()
+        if (getEdit().on) return
+        cab.current.open = !cab.current.open
+        shrineDoor(cab.current.open)
+        setTip({ title: '收納櫃', hint: cabSays() })
+      }}
+        onPointerOver={(e) => { if (!onDoor(e.object) || getEdit().on) return; e.stopPropagation(); document.body.style.cursor = 'pointer'; setTip({ title: '收納櫃', hint: cabSays() }) }}
+        onPointerOut={(e) => { if (!onDoor(e.object)) return; document.body.style.cursor = ''; setTip(null) }}>
+        <primitive object={parts.root} />
+      </group>
       <primitive object={parts.mirror.glass} />
       {/* (the tap's handle: pointed at it lights and says so; clicked, the water's turned on, or off) */}
       <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].tap = !TOILETS[who].tap; setTip({ title: '洗手台水龍頭', hint: says() }) }}

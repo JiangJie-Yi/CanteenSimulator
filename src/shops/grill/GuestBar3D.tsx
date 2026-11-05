@@ -2062,6 +2062,8 @@ const HER = new Set(['officeLady', 'schoolgirl', 'yukataLady', 'grandma', 'maidC
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
 const WC_RATE = 1 / 240
 const WC_STAY = 6
+/** how long each one's in the toilet: 4 to 6 seconds, their own (the owner's) */
+const wcStayOf = (id: number) => WC_STAY - 2 + ((id * 7919) % 100) / 50
 /** and how long they wash their hands at the washstand after, the tap running (Restroom's HAND_MS) */
 const HAND_S = HAND_MS / 1000
 /** and to go and get themselves a drink from the fridge (once), and how long they stand choosing */
@@ -2621,6 +2623,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.wc = { who, path, len: pathLength(path) }
           s.phase = 'wcGo'
           s.t = 0
+          // (a word as they get up (the owner's): off to the restroom a moment)
+          if (!SICK.has(s.id)) onSay?.('guest', LINES[lang].wcGo(s.id, s.id + Math.floor(performance.now() / 7000)))
         }
       } else if (s.phase === 'wcGo' || s.phase === 'wcBack') {
         // to the door, which slides open as they come up to it, in, and later back out to their stool
@@ -2639,7 +2643,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       } else if (s.phase === 'wcIn') {
         // (at the fridge: facing it, choosing; then their drink in hand, back to their stool)
         if (s.wc?.who === 'drink' && g && fridges) g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
-        if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : WC_STAY)) {
+        if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : wcStayOf(s.id))) {
           // (out of the toilet: it flushes behind them, and they say what they thought of it, if it's worth saying)
           if (s.wc && s.wc.who !== 'drink') {
             const t = TOILETS[s.wc.who]
@@ -2649,9 +2653,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             t.flushAt = performance.now()
             if (u.complaint) WC_GRUMBLE.set(s.id, Math.max(WC_GRUMBLE.get(s.id) ?? 0, penaltyOf(u.complaint)))
             const L = LINES[lang]
+            // (no complaint: relieved, as they come out (the owner's); a clean one said so now and then)
             if (u.complaint === 'paper') onSay?.('guest', L.wcPaper(s.id))
             else if (u.complaint === 'dirty') onSay?.('guest', L.wcDirty(s.id))
-            else if (was === 'fresh' && Math.random() < 0.3) onSay?.('guest', L.wcNice(s.id))
+            else if (was === 'fresh' && Math.random() < 0.4) onSay?.('guest', L.wcNice(s.id))
+            else onSay?.('guest', L.wcBack(s.id, s.id + Math.floor(performance.now() / 5000)))
           }
           if (s.wc?.who === 'drink' && !s.drink) {
             s.drink = s.wc.pick ?? drinkFor(kindOf(s.id).kind, s.id)
