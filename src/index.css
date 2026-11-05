@@ -276,6 +276,24 @@ button {
   background: #7a6a3e;
 }
 
+/* the money a customer's just paid, rising green over their head (GuestBar3D's PayFloat) */
+.pay-float {
+  display: inline-block;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 15px;
+  color: #4fff85;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.85), 0 1px 0 #0a2a14;
+  animation: pay-float 1.6s ease-out forwards;
+}
+
+@keyframes pay-float {
+  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  15% { opacity: 1; transform: translateY(0) scale(1.05); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-14px) scale(1); }
+}
+
 /* the staff's goodbyes and good mornings, and the owner's answers (game/commute) */
 .ai-staff .ai-who {
   background: #4f6b52;

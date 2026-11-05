@@ -36,7 +36,11 @@ function Word({ word }: { word: StaffWord }) {
     if (!who.current?.parent) {
       who.current = null
       if (word.id === 'owner') who.current = scene.getObjectByName('BossFollow') ?? null
-      else scene.traverse((q) => { if (!who.current && q.userData.staffId === word.id) who.current = q })
+      // (whoever's at the till: the cashier, the owner where there's none)
+      else if (word.id === 'role:cashier') {
+        scene.traverse((q) => { if (!who.current && q.userData.staffRole === 'cashier') who.current = q.parent })
+        who.current ??= scene.getObjectByName('BossFollow') ?? null
+      } else scene.traverse((q) => { if (!who.current && q.userData.staffId === word.id) who.current = q })
     }
     const t = who.current
     o.visible = !!t && t.visible

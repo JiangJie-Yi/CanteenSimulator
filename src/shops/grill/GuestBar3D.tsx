@@ -16,6 +16,7 @@ import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '
 import { delayOf, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, type Trip } from './commuteWalk'
 import { StaffWords } from './StaffWords'
+import { STAFF_TALK } from '@/game/shopState'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
@@ -1971,6 +1972,8 @@ function Counter({ length }: { length: number }) {
 }
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
+  /** (leaving) how long they've stood in the queue for the till; what's been said on the way out (getting up, paying, thanks) */
+  hold?: number; said?: number
   /** how far along their way they'd come last frame, and whether they've stood still since (a pause: shoes, paying, getting up) */
   lastD?: number; still?: boolean
   /** (off to the toilet, or to the fridge for a drink) where, and the way there from their stool; told to go home
@@ -1987,8 +1990,28 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   slippers?: boolean }
 /** how long they stand at the genkan's step changing their shoes */
 const SHOES_S = 1.2
+/** the money a customer's just paid, over their head: rising a hand's width and fading in 1.6 s, following them */
+function PayFloat({ text, follow, done }: { text: string; follow: () => THREE.Object3D | undefined; done: () => void }) {
+  const g = useRef<THREE.Group>(null)
+  const t = useRef(0)
+  const at = useMemo(() => new THREE.Vector3(), [])
+  useFrame((_, dt) => {
+    const o = g.current, who = follow()
+    t.current += Math.min(dt, 0.1)
+    if (t.current > 1.6) { done(); return }
+    if (!o || !who || !o.parent) return
+    o.position.copy(o.parent.worldToLocal(who.getWorldPosition(at))).add(new THREE.Vector3(0, 0.62 + t.current * 0.12, 0))
+  })
+  return (
+    <group ref={g}>
+      <Html center zIndexRange={LABEL_Z} style={LABEL_STYLE}><span className="pay-float">{text}</span></Html>
+    </group>
+  )
+}
 /** how long they stand at the till paying: the bill rung up, the drawer out and in, the change given */
 const PAY_S = 5.6
+/** how far back the next one waits while someone's paying */
+const QUEUE_GAP = 0.6
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
 const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
 /** what's set at a customer's place (their soy, their drink) and their shoes left in the genkan: shared shapes */
@@ -2338,6 +2361,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const readyFor = useRef<number[]>(Array.from({ length: READY_SLOTS }, () => 0))
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
   const [moving, setMoving] = useState<boolean[]>([])
+  /** the money just paid, rising over the one who paid it (the owner's: +NT$ in green) */
+  const [payFloats, setPayFloats] = useState<{ key: number; id: number; text: string }[]>([])
   useEffect(() => {
     ownerHome.current = null
     // (no server: the owner, from his place)
@@ -2688,8 +2713,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // a moment to get up, then off the way they came, by the till: they stop there to pay, and again at the genkan's step
         const lp = leavePaths[s.seat]
         const v = SPEED * walkSpeedOf(kindOf(s.id).kind)
-        const raw = Math.max(0, (s.t - 0.8) * v)
+        const raw = Math.max(0, (s.t - 0.8 - (s.hold ?? 0)) * v)
         const payAt = lp.len - lp.payD
+        // (in the queue for the till (the owner's): someone else at it paying, they wait a body's length back till it's free)
+        if (lp.payD && TILL_STATE.k >= 0 && TILL_STATE.payer !== s.id && raw >= payAt - QUEUE_GAP && raw < payAt) s.hold = (s.hold ?? 0) + dt
+        // (a word getting up, if they ate; at the till, the cashier's thanks and the bill; the money handed over, theirs)
+        const said = s.said ?? 0
+        if (said < 1 && s.t > 0.3) {
+          s.said = 1
+          if (guestsRef.current.find((x) => x.id === s.id)?.state !== 'angry') onSay?.('guest', LINES[lang].payGo(s.id, s.id))
+        }
         const d = Math.max(0, Math.min(lp.len, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v)))
         const { p, dir } = alongPath(lp.path, lp.len - d)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
@@ -2703,6 +2736,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (lp.payD && raw >= payAt && raw < payAt + PAY_S * v) {
           if (g) g.rotation.y = Math.atan2(counters[0].lay.x, counters[0].lay.z)
           paying = { s, k: (raw - payAt) / (PAY_S * v) }
+          const k = paying.k
+          // (once the register's on their bill: the frame they step up it's still the last one's)
+          if ((s.said ?? 0) < 2 && k > 0.12 && TILL_STATE.payer === s.id) {
+            s.said = 2
+            const bill = TILL_STATE.bill
+            STAFF_TALK.push({ key: performance.now() + s.id, id: 'role:cashier', text: LINES[lang].cashierThanks(`NT$${yen(bill)}`), until: performance.now() + 3800 })
+          }
+          if ((s.said ?? 0) < 3 && k > 0.62 && TILL_STATE.payer === s.id) {
+            s.said = 3
+            setPayFloats((all) => [...all, { key: performance.now() + s.id, id: s.id, text: `+NT$${yen(TILL_STATE.bill)}` }])
+          }
+          if ((s.said ?? 0) < 4 && k > 0.86) {
+            s.said = 4
+            onSay?.('guest', LINES[lang].payThanks(s.id, s.id + 1))
+          }
         }
         // (and if they've somehow not got out in all the time it can take, they're gone all the same)
         if (d >= lp.len || raw > lp.len + (PAY_S + SHOES_S + 8) * v) done.push(s.id)
@@ -3515,6 +3563,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && fridges && stocker && <Stocker counters={counters} fridges={fridges} who={stocker} />}
       {/* (what the staff and the owner say as the day ends and begins, over their heads) */}
       {given && <StaffWords />}
+      {/* (what's just been paid, rising green over the one who paid it, and gone) */}
+      {payFloats.map((f) => <PayFloat key={f.key} text={f.text} follow={() => groups.current.get(f.id)} done={() => setPayFloats((all) => all.filter((x) => x.key !== f.key))} />)}
       {ownerServes && (
         <group ref={(o) => {
           const was = waiterObjs.current[0]
