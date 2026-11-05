@@ -40,7 +40,7 @@ import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { SHOP, STAFF_TALK } from '@/game/shopState'
+import { SHOP, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -1845,6 +1845,22 @@ export default function App() {
   const phone = usePhone()
   phoneRef.current = phone
   const [lang, setLang] = useState<Lang>(() => SAVED?.lang ?? 'zh')
+  // (each speaker's tag over their bubbles: the role and the name, in the game's language; the till's whoever's at it, the owner if nobody)
+  {
+    const crew = staffOf(DISHES[active].id)
+    const roleName: Record<Role, [string, string, string]> = { chef: ['主廚', '板長', 'Chef'], sous: ['二廚', '二番手', 'Cook'], server: ['外場', 'ホール', 'Server'],
+      cashier: ['收銀', 'レジ', 'Cashier'], stock: ['倉儲', '仕入れ', 'Stock'] }
+    const tag = (r: Role, name: string) => `${roleName[r]?.[lang === 'ja' ? 1 : lang === 'en' ? 2 : 0] ?? ''} ${name}`.trim()
+    SPEAKERS.clear()
+    const bossRole = lang === 'ja' ? '店主' : lang === 'en' ? 'Owner' : '老闆'
+    // (the owner's own name after it, unless they've kept the default (老闆 老闆))
+    const boss = owner && owner !== '老闆' ? `${bossRole} ${owner}` : bossRole
+    SPEAKERS.set('owner', boss)
+    for (const w of crew) SPEAKERS.set(w.id, tag(w.role, lang === 'ja' ? w.ja : w.zh))
+    SPEAKERS.set('house-server', tag('server', ''))
+    const cashier = crew.find((w) => w.role === 'cashier')
+    SPEAKERS.set('role:cashier', cashier ? tag('cashier', lang === 'ja' ? cashier.ja : cashier.zh) : boss)
+  }
   // (what a customer says at the till with no receipt to be had)
   useEffect(() => {
     const add = LATE_GRIPE.add

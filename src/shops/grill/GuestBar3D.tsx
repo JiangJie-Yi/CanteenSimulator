@@ -3457,7 +3457,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const rt = routeTo(w.seat, wi)
         rt.path[0] = w.pos.clone()
         go(rt.path, 'go')
-      } else if (w.phase === 'go') walk(() => { w.phase = 'set'; face(plateAt(w.seat)) })
+      } else if (w.phase === 'go') walk(() => {
+        w.phase = 'set'; face(plateAt(w.seat))
+        const id = servers[wi]?.id
+        if (id && Math.random() < 0.5) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].serveSay(Math.floor(Math.random() * 3)), until: performance.now() + 2600 })
+      })
       else if (w.phase === 'set' && w.t > 0.4) {
         // (down at their place: the plate, and what's on it with it)
         const r = run()
@@ -3521,6 +3525,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         redraw()
       } else if (w.phase === 'washGo' || w.phase === 'unloadGo') walk(() => {
         face(inBar('SinkBasinFloor', endOf(1)))
+        if (w.phase === 'washGo' && servers[wi]?.id && Math.random() < 0.6) STAFF_TALK.push({ key: performance.now() + wi, id: servers[wi].id, text: LINES[lang].washSay(Math.floor(Math.random() * 3)), until: performance.now() + 2600 })
         w.phase = w.phase === 'washGo' ? 'wash' : 'unloadTake'
       })
       else if (w.phase === 'wash' && w.t >= WASH_EACH) {
@@ -3940,7 +3945,7 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
 })
 
 /** a short line at a time, so a long one says itself in turn over their head rather than in a tall thin column */
-function Say({ text }: { text: string }) {
+function Say({ text, who }: { text: string; who: string }) {
   const chunks = useMemo(() => sayChunks(text), [text])
   const [i, setI] = useState(0)
   useEffect(() => {
@@ -3948,7 +3953,7 @@ function Say({ text }: { text: string }) {
     const h = window.setTimeout(() => setI(i + 1), SAY_EACH * 1000)
     return () => window.clearTimeout(h)
   }, [i, chunks.length])
-  return <span key={i} className="g3-bubble g3-say">{chunks[i]}{i < chunks.length - 1 ? '…' : ''}</span>
+  return <span key={i} className="g3-bubble g3-say"><b className="say-who">{who}</b>{chunks[i]}{i < chunks.length - 1 ? '…' : ''}</span>
 }
 
 const LABEL_STYLE = { pointerEvents: 'none' } as const
@@ -3963,9 +3968,9 @@ const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, p
   return (
     <Html position={at} center zIndexRange={LABEL_Z} style={LABEL_STYLE}>
       <div className="g3-label" ref={(el) => onEl(id, el)}>
-        {say ? <Say key={say.key} text={say.text} /> : dots && <span className="g3-bubble">…</span>}
+        {say ? <Say key={say.key} text={say.text} who={`#${id} ${name}`} /> : dots && <span className="g3-bubble">…</span>}
         {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
-        <span>{partner && <i className="g3-heart">♥</i>}{name}</span>
+        {!say && <span className="g3-name">{partner && <i className="g3-heart">♥</i>}{name}</span>}
       </div>
     </Html>
   )

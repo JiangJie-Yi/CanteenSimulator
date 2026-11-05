@@ -12,6 +12,7 @@ import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
+import { SPEAKERS } from '@/game/shopState'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -578,7 +579,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       {/* (what he's muttering, over his head) */}
       {say && !getEdit().on && (
         <Html position={[0, 1.42, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
-          <span key={say.key} className="g3-bubble g3-say boss-say">{say.text}</span>
+          <span key={say.key} className="g3-bubble g3-say boss-say"><b className="say-who">{SPEAKERS.get('owner') ?? '老闆'}</b>{say.text}</span>
         </Html>
       )}
       {gulu > 0 && !getEdit().on && (

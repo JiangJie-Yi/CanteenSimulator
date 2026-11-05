@@ -11,3 +11,6 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }
 export const STAFF_TALK: StaffWord[] = []
+/** each speaker's tag over their words (the owner's: every bubble says who): a staff member's id, 'owner', 'role:cashier' (whoever's at the
+ * till) to their role and name (老闆 江老闆, 外場 小美…); App keeps it up to date with who's hired and the owner's name */
+export const SPEAKERS = new Map<string, string>()

@@ -5,7 +5,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { STAFF_TALK, type StaffWord } from '@/game/shopState'
+import { SPEAKERS, STAFF_TALK, type StaffWord } from '@/game/shopState'
 
 const STYLE = { pointerEvents: 'none' } as const
 const Z = [21, 11]
@@ -19,6 +19,8 @@ export const StaffWords = memo(function StaffWords() {
     const t = window.setInterval(() => {
       const now = performance.now()
       for (let i = STAFF_TALK.length - 1; i >= 0; i--) if (STAFF_TALK[i].until < now) STAFF_TALK.splice(i, 1)
+      // (one bubble a speaker: a newer word takes an older one's place, never two stacked over one head)
+      for (let i = STAFF_TALK.length - 1; i >= 0; i--) if (STAFF_TALK.findIndex((w, k) => k > i && w.id === STAFF_TALK[i].id) >= 0) STAFF_TALK.splice(i, 1)
       setWords((was) => (was.length === STAFF_TALK.length && was.every((w, i) => w.key === STAFF_TALK[i].key) ? was : [...STAFF_TALK]))
     }, 250)
     return () => window.clearInterval(t)
@@ -50,7 +52,7 @@ function Word({ word }: { word: StaffWord }) {
   return (
     <group ref={g} visible={false}>
       <Html center zIndexRange={Z} style={STYLE}>
-        <div className="g3-label"><span className="g3-bubble g3-say staff-say">{word.text}</span></div>
+        <div className="g3-label"><span className="g3-bubble g3-say staff-say"><b className="say-who">{SPEAKERS.get(word.id) ?? ''}</b>{word.text}</span></div>
       </Html>
     </group>
   )

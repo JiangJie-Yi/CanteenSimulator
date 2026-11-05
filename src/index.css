@@ -4011,7 +4011,8 @@ button {
   white-space: nowrap;
 }
 
-.g3-label > span:last-child {
+/* (the name tag under a figure: its own class, not whatever's last (a bubble left last, its name hidden, took this look)) */
+.g3-label > .g3-name {
   padding: 0 6px;
   border-radius: 4px;
   background: rgb(43 33 25 / 0.72);
@@ -4025,13 +4026,29 @@ button {
 }
 
 .g3-bubble {
-  padding: 0 7px;
-  border: 1px solid #3b2a20;
-  border-radius: 9px 9px 9px 2px;
-  background: #fff;
-  color: #3b2a20;
+  /* (every speaker's alike, the owner's: dark smoked glass, white words, rounded, a soft shadow; the speaker's tag over them) */
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 10px 5px;
+  border-radius: 10px;
+  background: rgb(25 25 25 / 0.88);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.35);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  color: #fbf7ef;
   font: 700 12px/1.3 var(--brush);
   animation: gc-dots 1.4s ease-in-out infinite;
+}
+
+.g3-bubble .say-who {
+  font-size: 10px;
+  font-weight: 600;
+  color: #e6c27a;
+  white-space: nowrap;
+  border-bottom: 1px solid rgb(230 194 122 / 0.3);
+  padding-bottom: 1px;
 }
 
 /* ---- before a shop is opened its controls are put away (only the view reset stays); opening it, they pop out,
@@ -6699,13 +6716,9 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .fridge-toggle svg.fridge-icon { width: 34px; height: 40px; margin-top: 6px; }
 .fridge-toggle.is-on { border-color: #3d8fd0; box-shadow: 0 0 12px rgb(61 143 208 / 0.6); }
 
-/* the owner's muttering over his head: a little larger than a customer's, on warm paper */
+/* the owner's muttering over his head: a little larger than a customer's (the same dark glass as everyone's) */
 .boss-say {
-  display: inline-block;
-  padding: 2px 9px;
   font-size: 13px;
-  background: #fffaf0;
-  box-shadow: 0 2px 6px rgba(59, 42, 32, 0.18);
 }
 
 /* ---- the top left: the fire (the grill's view) and the owner's hunger (his view) take the rows over the office and auto buttons; with one
