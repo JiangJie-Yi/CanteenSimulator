@@ -820,6 +820,22 @@ export const CHEF_TRIP = {
   hand: new THREE.Vector3(),
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __chefTrip?: typeof CHEF_TRIP }).__chefTrip = CHEF_TRIP
+/**
+ * What the head chef has in his hands (the owner's: nothing flies across the kitchen by itself): a piece taken off the board to the fire,
+ * or off the fire to the plating place. Its steps: reaching for it where it is, carrying it in his hands as he turns and steps to where
+ * it's going, setting it there leaning in (the skewer pushed into the ash, or laid on the plate), and back to his place. Roasting moves the
+ * piece and says where he stands and how far he leans (its frame); his CrewWalk stands him there and says where his hands are.
+ */
+export const CHEF_CARRY = {
+  key: null as string | null, kind: 'toFire' as 'toFire' | 'toPlate', phase: 'idle' as 'idle' | 'reach' | 'carry' | 'place' | 'back', t: 0,
+  from: new THREE.Vector3(), fromQ: new THREE.Quaternion(), heldQ: new THREE.Quaternion(),
+  stand: new THREE.Vector3(), face: new THREE.Vector3(), lean: 0, hold: false,
+}
+/** each step's seconds: reaching, carrying (a turn and a step or two), setting it down, back */
+const CARRY_S = { reach: 0.3, carry: 0.5, place: 0.35, back: 0.3, idle: 0 }
+/** how far he steps from his place toward what he's at (he's in the notch: the fire's right before him), and how far he leans setting it */
+const CARRY_STEP = 0.08, CARRY_LEAN = 0.26
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __chefCarry?: typeof CHEF_CARRY }).__chefCarry = CHEF_CARRY
 /** the Movable each store is, to find where it's been put (the cubby has none: it's the cook table's) */
 const STORE_PIECE: Record<Exclude<Store, 'cubby'>, string> = { freezer: 'freezer', ricetub: 'ricetub', sacks: 'produce' }
 /**
@@ -866,6 +882,20 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     const T = CHEF_TRIP
     T.seenAt = performance.now()
     o.userData.fetcher = true
+    // (carrying a piece between the board, the fire and the plating place: stood where the carry has him, turned to it, leaning)
+    const C = CHEF_CARRY
+    o.userData.lean = C.phase === 'idle' ? 0 : C.lean
+    if (C.phase !== 'idle' && (T.phase === 'idle' || T.phase === 'prepping')) {
+      o.position.lerp(C.stand.clone().setY(at.y), Math.min(1, dt * 12))
+      const want = Math.atan2(C.face.x - o.position.x, C.face.z - o.position.z)
+      o.rotation.y += Math.atan2(Math.sin(want - o.rotation.y), Math.cos(want - o.rotation.y)) * Math.min(1, dt * 10)
+      o.userData.carry = C.hold
+      o.userData.prep = false
+      o.userData.fanNow = false
+      o.updateMatrixWorld()
+      T.hand.set(...TRAY_AT).applyMatrix4(o.matrixWorld)
+      return true
+    }
     o.userData.carry = T.phase === 'toBoard' || (T.phase === 'taking' && T.t > TAKE_S * 0.5)
     o.userData.prep = T.phase === 'prepping'
     o.userData.fanNow = performance.now() < T.fanUntil
@@ -4259,7 +4289,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const say = chefSay
     // (the head chef's next trip, first come first fetched, while he's at his place: with something on the fire he goes meanwhile)
     const T = CHEF_TRIP
-    if (T.phase === 'idle' && performance.now() - T.seenAt < 1000) {
+    // (the chef walking the orders and carrying what's cooked: one thing at a time with his hands; away fetching, or carrying, nothing else
+    // is put on or taken off till he's back (with nobody walking (shut, a phone) pieces go across by themselves, as they did))
+    const chefLive = performance.now() - T.seenAt < 1000
+    // (asked each time: a trip begun just now, or a piece taken up just now, makes him busy for what comes after in the same step)
+    const busy = () => chefLive && (T.phase === 'toStore' || T.phase === 'taking' || T.phase === 'toBoard' || CHEF_CARRY.key !== null)
+    const carry = (p: Piece, kind: 'toFire' | 'toPlate') => {
+      const C = CHEF_CARRY
+      C.key = p.key; C.kind = kind; C.phase = 'reach'; C.t = 0
+      C.from.copy(p.node.position); C.fromQ.copy(p.node.quaternion)
+    }
+    if (T.phase === 'idle' && chefLive && CHEF_CARRY.key === null) {
       const trip = nextTrip(pieces.current.filter((p) => p.fetching && present(p)).map((p) => ({ key: p.key, id: p.id, at: p.stagedAt })))
       if (trip) { T.store = trip.store; T.keys = trip.keys; T.t = 0; T.phase = 'toStore' }
     }
@@ -4354,8 +4394,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       emit(k, p.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
       say(L().seasoned(nameOfP(p), k))
     }
-    if (ready) {
+    if (ready && !busy()) {
       collect(ready)
+      // (off the fire in his hands to the plating place, when it's going there and has a place)
+      if (chefLive && ready.collected && ready.via === 'plated' && ready.readyAt !== undefined) carry(ready, 'toPlate')
       say(L().done(nameOfP(ready)))
       for (const k of planOf(ready)) if (!ready.dabs[k] && bestStage(k) === 'after') dab(ready, k)
       return
@@ -4388,7 +4430,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (the sous chef puts things on; with no sous chef, the second chef does it too)
     const next = hasSous || hasChef ? live.filter((p) => p.staged && !p.fetching && !((p.prepUntil ?? 0) > performance.now()))
       .sort((a, b) => a.stagedAt - b.stagedAt)[0] : undefined
-    if (next && putOnFire(next)) say(L().onFire(nameOfP(next)))
+    if (next && !busy() && putOnFire(next)) {
+      // (in his hands from the board to its place in the fire)
+      if (chefLive) carry(next, 'toFire')
+      say(L().onFire(nameOfP(next)))
+    }
   }
 
   /**
@@ -6195,6 +6241,69 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
     }
 
+    // (what the chef's carrying: where it is through each step, and where he stands; it holds still in its own flight meanwhile)
+    {
+      const C = CHEF_CARRY
+      const p = C.key ? pieces.current.find((q) => q.key === C.key) : undefined
+      if (C.key && (!p || !present(p) || p.eaten || p.trash >= 0 || performance.now() - CHEF_TRIP.seenAt > 1000)) {
+        // (gone meanwhile, or nobody to carry it: let go, it goes on by itself)
+        C.key = null; C.phase = 'idle'; C.lean = 0; C.hold = false
+      } else if (p && C.phase !== 'idle') {
+        C.t += dt
+        // (where it's going: its place in the fire (on the net, if it's one for the net), or where it lands at the plating place)
+        const dest = C.kind === 'toFire'
+          ? new THREE.Vector3(p.netSpot !== null ? spots[p.netSpot][0] : p.homeP.x, p.homeP.y, p.netSpot !== null ? spots[p.netSpot][1] : p.homeP.z)
+          : (p.container ? containerAt(p.container).add(p.local) : p.toP.clone())
+        const destQ = C.kind === 'toFire' ? p.homeQ : p.toQ
+        if (C.kind === 'toFire') { p.homeFlight = 0; p.node.userData.onPlate = true } else p.flight = 0
+        const home = CHEF_AT.clone().setY(CHEF_AT.y + NOTCH_STEP.h)
+        // (to the nearest he can stand to it in the notch: along it either way as far as it's wide, and hardly forward (the seasoning ledge
+        // hangs before him there))
+        const toward = (v: THREE.Vector3) => {
+          const fs = FIRE_SHIFT.dot(ALONG)
+          const a = THREE.MathUtils.clamp(v.dot(ALONG), COOK_NOTCH.along[0] + 0.32 - fs, COOK_NOTCH.along[1] - 0.32 - fs)
+          const l = THREE.MathUtils.clamp(v.dot(LAY), home.dot(LAY) - CARRY_STEP, home.dot(LAY))
+          return new THREE.Vector3().addScaledVector(ALONG, a).addScaledVector(LAY, l).setY(home.y)
+        }
+        const hand = p.node.parent ? p.node.parent.worldToLocal(CHEF_TRIP.hand.clone()) : CHEF_TRIP.hand.clone()
+        const k = Math.min(1, C.t / CARRY_S[C.phase]), e = k * k * (3 - 2 * k)
+        if (C.phase === 'reach') {
+          // (his hands to it where it is: on the board, or standing in the fire)
+          p.node.position.copy(C.from); p.node.quaternion.copy(C.fromQ)
+          // (leaning in further the further it is from him)
+          const far = Math.min(1, C.from.clone().sub(home).setY(0).length() / 1.2)
+          C.stand.copy(toward(C.from)); C.face.copy(C.from); C.lean = CARRY_LEAN * (0.6 + 0.8 * far) * Math.sin(Math.PI * k); C.hold = false
+          C.heldQ.copy(p.homeQ)
+        } else if (C.phase === 'carry') {
+          // (in his hands, upright on its stick, as he turns and steps to where it's going)
+          p.node.position.lerpVectors(C.from, hand, Math.min(1, e * 2.2))
+          p.node.quaternion.slerpQuaternions(C.fromQ, C.heldQ, e)
+          C.stand.copy(toward(dest)); C.face.copy(dest); C.lean = 0; C.hold = true
+        } else if (C.phase === 'place') {
+          // (leaning in, the skewer pushed into the ash at its place, or the fish laid on the plate)
+          p.node.position.lerpVectors(hand, dest, e)
+          p.node.quaternion.slerpQuaternions(C.heldQ, destQ, e)
+          C.lean = CARRY_LEAN * Math.sin(Math.PI * Math.min(1, k * 1.2)); C.hold = true
+        } else {
+          // (set: it's in its place; he straightens and steps back)
+          p.node.position.copy(dest); p.node.quaternion.copy(destQ)
+          C.stand.copy(home); C.lean = 0; C.hold = false
+        }
+        if (k >= 1) {
+          C.t = 0
+          if (C.phase === 'reach') C.phase = 'carry'
+          else if (C.phase === 'carry') C.phase = 'place'
+          else if (C.phase === 'place') {
+            C.phase = 'back'
+            // (it's where it goes now: on the fire it begins to cook; on the plating place it lands (the steam, the plate's count))
+            if (C.kind === 'toFire') { p.homeFlight = 1; p.node.userData.onPlate = false } else p.flight = 0.999
+            // (a puff of ash and sparks where the skewer goes in)
+            if (C.kind === 'toFire') emit('salt', dest.clone().add(new THREE.Vector3(0, 0.05, 0)), 8)
+          } else { C.phase = 'idle'; C.key = null; C.lean = 0; C.hold = false }
+        }
+        if (C.phase === 'back' || C.phase === 'idle') { if (C.kind === 'toFire') p.homeFlight = 1 }
+      }
+    }
     if (ai && active) {
       aiClock.current += dt
       chefClock.current += dt

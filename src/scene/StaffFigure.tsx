@@ -244,7 +244,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
-    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number } | undefined
+    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line, a
     // solid colour, put away meanwhile (as the customers' is))
     const fade = job?.fade ?? 1
@@ -278,7 +278,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false }
     fig.body.position.y = walk * Math.abs(Math.sin(ph)) * 0.035
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
     // (a bow of the head and shoulders at the door)
-    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28
+    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0)
     fig.body.scale.y = 1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
