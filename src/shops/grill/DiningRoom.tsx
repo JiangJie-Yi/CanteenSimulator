@@ -2345,9 +2345,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       )}
       {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch plain>
       {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl) */}
-      {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)); on the bowl's right as the men's moss ball is, the soap on
-          its left (the owner's: swapped), the two washstands the same way round (mirrored for a while, they read as turned about) */}
-      <group position={[D - 0.14, 0.764, 0.19]}>
+      {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)); in the women's on the bowl's left, its soap on the right; the
+          men's the other way round, its moss ball on the right (the owner's, 2026-11-06) */}
+      <group position={[D - 0.14, 0.764, -0.19]}>
         <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
         {/* (its nodes: each ring lying round the tube (they stood upright, cutting through it in a jagged dark seam down its side), a little
             its inside just clear of it where it is (it tapers, 0.026 at its foot to 0.03 at its top)) */}
@@ -2361,16 +2361,16 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         ))}
       </group>
       </StaticBatch></Movable>}
-      {/* (no towel on a rod: a paper towel dispenser and a hand dryer on the wall beside the washstand (the owner's), the dryer next to it,
+      {/* (no towel on a rod: a paper towel dispenser by the washstand and a hand dryer past it toward the door (the owner's: swapped), on the wall beside it,
           where hands are held out after washing (GuestBar3D steps them over to it, its marker wc-dryer-<who>)) */}
       <Movable id={`wc2-${who}-dryer`} label={`烘手機（${name}）`}>
-        <group position={[D - 0.26, 1.02, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
+        <group position={[D - 0.56, 1.02, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
           <WcDryer who={who} />
           <group name={`wc-dryer-${who}`} position={[0, -1.02, 0.4]} />
         </group>
       </Movable>
       <Movable id={`wc2-${who}-towelbox`} label={`擦手紙盒（${name}）`}>
-        <group position={[D - 0.56, 1.14, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}><WcTowelBox /></group>
+        <group position={[D - 0.26, 1.14, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}><WcTowelBox /></group>
       </Movable>
       {/* (no お手洗い plaque on the wall: the owner's, the wall kept clean) */}
       <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch plain>

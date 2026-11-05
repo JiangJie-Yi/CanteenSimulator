@@ -3,9 +3,11 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { reflectStudio } from '@/scene/studio'
+import { glowOff, glowOn } from '@/scene/hoverGlow'
+import { tissuePull } from './paperSound'
 import * as THREE from 'three'
 import { setTip } from '@/scene/hoverTip'
-import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, ROLL_USES } from '@/game/restroom'
+import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, pullSheet, ROLL_USES } from '@/game/restroom'
 import { mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
 import { handOver, TOILETS, meterWater } from './bar'
@@ -425,24 +427,58 @@ export function WcRemote({ who, flushAt = 0.14 }: { who: Who; flushAt?: number }
  * it), and a hand dryer (white, rounded, a dark outlet under it, a little lamp): it blows 1.5 s after a guest's washed their hands (TOILETS'
  * dryAt, GuestBar3D steps them to it), or at a click: the lamp lit cyan, a soft whir, a tremble
  */
-const TOWEL_BODY = new RoundedBoxGeometry(0.24, 0.3, 0.1, 2, 0.02).translate(0, 0, 0.05)
-const TOWEL_WINDOW = new RoundedBoxGeometry(0.08, 0.05, 0.004, 1, 0.008)
-const TOWEL_SLOT = new RoundedBoxGeometry(0.17, 0.012, 0.03, 1, 0.004)
-const TOWEL_SHEET = new THREE.PlaneGeometry(0.15, 0.05).translate(0, -0.025, 0)
-const DRYER_BODY = new RoundedBoxGeometry(0.2, 0.22, 0.12, 3, 0.045).translate(0, 0, 0.06)
-const DRYER_OUTLET = new RoundedBoxGeometry(0.13, 0.014, 0.07, 1, 0.006)
-const DRYER_LAMP = new THREE.CircleGeometry(0.008, 12)
-const STEEL = (() => { const m = new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.85, roughness: 0.35, envMapIntensity: 0.9 }); reflectStudio(m); return m })()
+const TOWEL_BODY = new RoundedBoxGeometry(0.24, 0.3, 0.1, 3, 0.026).translate(0, 0, 0.05)
+const TOWEL_SEAM = new THREE.BoxGeometry(0.236, 0.003, 0.004)
+const TOWEL_WINDOW = new RoundedBoxGeometry(0.09, 0.05, 0.004, 1, 0.008)
+const TOWEL_SLOT = new RoundedBoxGeometry(0.18, 0.016, 0.05, 1, 0.006)
+const TOWEL_EDGE = new THREE.PlaneGeometry(0.15, 0.03).translate(0, -0.015, 0)
+const TOWEL_SHEET = new THREE.PlaneGeometry(0.15, 0.13).translate(0, -0.065, 0)
+const DRYER_BODY = new RoundedBoxGeometry(0.2, 0.16, 0.11, 4, 0.05).translate(0, 0.035, 0.055)
+const DRYER_HOOD = new RoundedBoxGeometry(0.17, 0.07, 0.13, 3, 0.03).translate(0, -0.07, 0.065)
+const DRYER_OUTLET = new RoundedBoxGeometry(0.13, 0.012, 0.075, 1, 0.005)
+const DRYER_LED = new RoundedBoxGeometry(0.06, 0.006, 0.003, 1, 0.002)
+const STEEL = (() => { const m = new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.85, roughness: 0.38, envMapIntensity: 0.9 }); reflectStudio(m); return m })()
+const PAPER_MAT = new THREE.MeshToonMaterial({ color: '#fbfaf6', side: THREE.DoubleSide })
+/**
+ * The paper towel dispenser: brushed stainless, its lid's seam across the front, a little window showing the stack inside, a slot sunk
+ * under it with a thin edge of paper showing. Pointed at it lights; clicked, a sheet's drawn down out of the slot and away (a paper sound)
+ */
 export function WcTowelBox() {
+  const g = useRef<THREE.Group>(null)
+  const sheet = useRef<THREE.Mesh>(null)
+  const pulled = useRef(-1e9)
+  useFrame(() => {
+    const u = (now() - pulled.current) / 1000
+    const m = sheet.current
+    if (!m) return
+    m.visible = u >= 0 && u < 0.7
+    if (!m.visible) return
+    // (drawn down out of the slot, then away toward the hands, fading)
+    const k = Math.min(1, u / 0.3), away = Math.max(0, (u - 0.3) / 0.4)
+    m.scale.set(1, Math.max(0.05, k), 1)
+    m.position.set(0, -0.155 - away * 0.04, 0.07 + away * 0.12)
+    m.rotation.x = -0.2 - away * 0.6
+    ;(m.material as THREE.MeshToonMaterial).opacity = 1 - away
+  })
   return (
-    <group {...nameOverWc('擦手紙盒', '從下方的出紙口抽一張擦手')}>
+    <group ref={g} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; pulled.current = now(); tissuePull() }}
+      {...hover('擦手紙盒', () => '點一下抽一張擦手紙')}>
       <mesh geometry={TOWEL_BODY} material={STEEL} castShadow />
-      <mesh geometry={TOWEL_WINDOW} position={[0, 0.06, 0.101]}><meshToonMaterial color="#e8eef2" /></mesh>
-      <mesh geometry={TOWEL_SLOT} position={[0, -0.14, 0.07]}><meshToonMaterial color="#2a2c30" /></mesh>
-      <mesh geometry={TOWEL_SHEET} position={[0, -0.146, 0.072]} rotation-x={-0.25}><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={TOWEL_SEAM} position={[0, 0.09, 0.1015]}><meshToonMaterial color="#5a5e64" /></mesh>
+      <mesh geometry={TOWEL_WINDOW} position={[0, 0.03, 0.101]}><meshToonMaterial color="#dfe7ea" /></mesh>
+      <mesh geometry={TOWEL_SLOT} position={[0, -0.145, 0.06]}><meshToonMaterial color="#202226" /></mesh>
+      <mesh geometry={TOWEL_EDGE} position={[0, -0.153, 0.075]} rotation-x={-0.18} material={PAPER_MAT} />
+      <mesh ref={sheet} geometry={TOWEL_SHEET} visible={false} raycast={() => {}}>
+        <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} transparent />
+      </mesh>
     </group>
   )
 }
+/**
+ * The hand dryer: a rounded white body, its hood swelling out below with the dark outlet slot under it, a thin LED strip on the hood's front
+ * (lit cyan while it blows). It blows 1.5 s after a guest's washed their hands (TOILETS' dryAt: GuestBar3D steps them to it), or at a click:
+ * a soft whir, a tremble
+ */
 export function WcDryer({ who }: { who: 'm' | 'f' }) {
   const g = useRef<THREE.Group>(null)
   const lamp = useMemo(() => new THREE.MeshBasicMaterial({ color: '#3a4048' }), [])
@@ -459,16 +495,12 @@ export function WcDryer({ who }: { who: 'm' | 'f' }) {
     <group ref={g} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].dryAt = now() }}
       {...hover('烘手機', () => '點一下吹風；客人洗完手會自己來烘乾')}>
       <mesh geometry={DRYER_BODY} castShadow><meshToonMaterial color="#f3f1ec" /></mesh>
-      <mesh geometry={DRYER_OUTLET} position={[0, -0.106, 0.07]}><meshToonMaterial color="#3a3d42" /></mesh>
-      <mesh geometry={DRYER_LAMP} position={[0.06, 0.07, 0.1205]} material={lamp} />
+      <mesh geometry={DRYER_HOOD} castShadow><meshToonMaterial color="#e9e6df" /></mesh>
+      <mesh geometry={DRYER_OUTLET} position={[0, -0.104, 0.075]}><meshToonMaterial color="#2c2f34" /></mesh>
+      <mesh geometry={DRYER_LED} position={[0, -0.05, 0.1305]} material={lamp} />
     </group>
   )
 }
-/** named when pointed at, nothing to do with it (bar.ts's nameOver, kept here so this file needn't take all of bar.ts's) */
-const nameOverWc = (title: string, hint: string) => ({
-  onPointerOver: (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title, hint }) },
-  onPointerOut: () => setTip(null),
-})
 
 /** the Otohime on the wall (the wall at z=0, facing +z): a stream and birdsong at a click, and by itself while a woman's in */
 export function WcOtohime({ who }: { who: Who }) {
@@ -496,24 +528,35 @@ export function WcOtohime({ who }: { who: Who }) {
 export function WcPaper({ who }: { who: Who }) {
   const b = useBits()
   const roll = useRef<THREE.Group>(null)
-  const sheet = useRef<THREE.Mesh>(null)
-  const st = useRef({ uses: -1, fold: true })
+  const tail = useRef<THREE.Mesh>(null)
+  const flakes = useRef<THREE.Group>(null)
+  const st = useRef({ spun: -1e9 })
   useFrame(() => {
     const t = TOILETS[who]
     const p = t.room.paper
-    // (a guest's been since it was seen to: the point's gone, a sheet hangs loose)
-    if (t.room.uses !== st.current.uses) { if (st.current.uses >= 0) st.current.fold = false; st.current.uses = t.room.uses }
-    if (t.rollAt > 0 && now() - t.rollAt < 100) st.current.fold = true
-    const r = 0.022 + 0.034 * p
+    // (a size that sits between the holder's arms with a little room either side (the owner's: it ran into them): 86% as long, and at most
+    // 0.046 round, thinning as it's used to the core)
+    const r = 0.021 + 0.025 * p
+    const u = (now() - st.current.spun) / 1000
+    const spin = u >= 0 && u < 0.3 ? (u / 0.3) * (u / 0.3) * (3 - 2 * (u / 0.3)) : 0
     if (roll.current) {
-      b.roll.scale.set(1, r, r)
+      b.roll.scale.set(PAPER_LONG, r, r)
+      b.core.scale.x = PAPER_LONG
       b.roll.visible = p > 0.001
-      b.fold.visible = p > 0.001 && st.current.fold
-      b.fold.position.set(0, -r * 0.35, r + 0.002)
+      b.fold.visible = false
+      // (turned once forward as a sheet's pulled)
+      roll.current.rotation.x = spin * Math.PI * 2
     }
-    if (sheet.current) {
-      sheet.current.visible = p > 0.001 && !st.current.fold
-      sheet.current.position.set(0, -0.03 - r * 0.3, r + 0.001)
+    if (tail.current) {
+      // (a flat strip hanging down off its front, flicking as it turns)
+      tail.current.visible = p > 0.001
+      tail.current.position.set(0, -r * 0.2 - 0.03, r + 0.001)
+      tail.current.rotation.x = u >= 0 && u < 0.6 ? Math.sin(u * 22) * 0.5 * (1 - u / 0.6) : 0
+    }
+    const f = flakes.current
+    if (f) {
+      f.visible = u >= 0 && u < 0.9
+      if (f.visible) f.children.forEach((c, k) => { c.position.set((k ? 0.03 : -0.02) + Math.sin(u * 6 + k) * 0.01, -0.06 - u * 0.18, r + 0.02 + u * 0.05); c.rotation.z = u * (k ? 7 : -5); ((c as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 1 - u / 0.9 })
     }
   })
   return (
@@ -521,27 +564,40 @@ export function WcPaper({ who }: { who: Who }) {
       e.stopPropagation()
       if (getEdit().on) return
       const t = TOILETS[who]
-      t.room = newRoll(t.room)
-      t.rollAt = now()
-      rollSound(nearOf(roll.current, e.camera))
+      if (t.room.paper <= 0.001) {
+        // (used up: a new roll)
+        t.room = newRoll(t.room)
+        t.rollAt = now()
+        rollSound(nearOf(roll.current, e.camera))
+        return
+      }
+      // (a sheet pulled: the roll turns once, a scrap or two of paper falling, the paper's sound; it's thinner)
+      t.room = pullSheet(t.room)
+      st.current.spun = now()
+      tissuePull()
     }} {...hover('衛生紙架', () => {
       const p = TOILETS[who].room.paper
       const left = Math.round(p * ROLL_USES)
-      return left >= ROLL_USES ? '新的一捲' : left > 0 ? `還夠 ${left} 位客人用・點一下換新捲` : '用完了！點一下換新捲'
+      return p <= 0.001 ? '用完了！點一下換新捲' : `抽取衛生紙 / 轉動紙捲・還夠 ${left} 位客人用`
     })}>
       <primitive object={b.holder} />
       <group ref={roll} position={[0, 0, 0.065]}>
         <primitive object={b.roll} />
         <primitive object={b.core} />
         <primitive object={b.fold} />
-        <mesh ref={sheet} raycast={() => {}}>
-          <planeGeometry args={[0.1, 0.06]} />
-          <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} />
-        </mesh>
+      </group>
+      <group position={[0, 0, 0.065]}>
+        <mesh ref={tail} raycast={() => {}} geometry={PAPER_TAIL} material={PAPER_MAT} />
+        <group ref={flakes} visible={false}>
+          {[0, 1].map((k) => <mesh key={k} raycast={() => {}}><planeGeometry args={[0.012, 0.01]} /><meshBasicMaterial color="#fbfaf6" transparent side={THREE.DoubleSide} /></mesh>)}
+        </group>
       </group>
     </group>
   )
 }
+/** the roll's length against the model's (the holder's arms 0.02-0.03 clear either side), and its tail: a flat strip down off its front */
+const PAPER_LONG = 0.86
+const PAPER_TAIL = new THREE.PlaneGeometry(0.1, 0.06).translate(0, -0.03, 0)
 
 /** the brush in its pot on the floor at `at`; scrubbing, it goes over into the bowl (at `bowl`, in the room) and round, and back */
 export function WcBrush({ who, at, bowl }: { who: Who; at: [number, number, number]; bowl: [number, number, number] }) {
@@ -636,8 +692,17 @@ export function WashstandLive({ who }: { who: Who }) {
     const box = new THREE.Box3().setFromObject(pane), mid = box.getCenter(new THREE.Vector3())
     const toRoot = root.matrixWorld.clone().invert()
     const face = new THREE.Vector3(box.min.x, mid.y, mid.z).applyMatrix4(toRoot)
+    // (the soap and its pump, on the bowl's left as modelled; in the women's mirrored to its right, the flowers on its left (the owner's))
+    const soap = new THREE.Group()
+    soap.name = 'WashSoap'
+    root.add(soap)
+    const soapBits: THREE.Object3D[] = []
+    root.traverse((o) => { if (/^Wash(SoapBottle|Pump)/.test(o.name) && (o as THREE.Mesh).isMesh) soapBits.push(o) })
+    for (const o of soapBits) soap.attach(o)
+    if (who === 'f') soap.scale.z = -1
     plainColours(root)
-    mergeByMaterial(root, (o) => doors.includes(o as THREE.Group))
+    mergeByMaterial(root, (o) => doors.includes(o as THREE.Group) || o === soap)
+    mergeByMaterial(soap)
     for (const d of doors) mergeByMaterial(d)
     mergeByMaterial(handle)
     let plain: THREE.Object3D | null = null
@@ -646,7 +711,7 @@ export function WashstandLive({ who }: { who: Who }) {
     mirror.glass.position.copy(face).add(new THREE.Vector3(-0.0006, 0, 0))
     mirror.glass.rotation.y = -Math.PI / 2
     return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null, doors }
-  }, [gltf])
+  }, [gltf, who])
   const cab = useRef({ open: false, k: 0 })
   useEffect(() => () => { parts.mirror.glass.getRenderTarget().dispose(); (parts.mirror.glass.material as THREE.Material).dispose() }, [parts])
   const frame = useRef(0)
@@ -685,7 +750,7 @@ export function WashstandLive({ who }: { who: Who }) {
     parts.doors[1].rotation.y = e * CAB_SWING
   })
   const onDoor = (o: THREE.Object3D) => { for (let q: THREE.Object3D | null = o; q; q = q.parent) if (parts.doors.includes(q as THREE.Group)) return true; return false }
-  const cabSays = () => (cab.current.open ? '點擊關上' : '點擊打開・備用的衛生紙與毛巾')
+  const cabSays = () => (cab.current.open ? '點擊關上' : '點擊打開・備用的衛生紙、擦手紙與洗手乳補充包')
   const says = () => (TOILETS[who].tap ? '點一下關水' : '點一下開水（開著會一直計水費）')
   return (
     <group>
@@ -698,8 +763,8 @@ export function WashstandLive({ who }: { who: Who }) {
         shrineDoor(cab.current.open)
         setTip({ title: '收納櫃', hint: cabSays() })
       }}
-        onPointerOver={(e) => { if (!onDoor(e.object) || getEdit().on) return; e.stopPropagation(); document.body.style.cursor = 'pointer'; setTip({ title: '收納櫃', hint: cabSays() }) }}
-        onPointerOut={(e) => { if (!onDoor(e.object)) return; document.body.style.cursor = ''; setTip(null) }}>
+        onPointerOver={(e) => { if (!onDoor(e.object) || getEdit().on) return; e.stopPropagation(); document.body.style.cursor = 'pointer'; for (const d of parts.doors) glowOn(d); setTip({ title: '收納櫃', hint: cabSays() }) }}
+        onPointerOut={(e) => { if (!onDoor(e.object)) return; document.body.style.cursor = ''; for (const d of parts.doors) glowOff(d); setTip(null) }}>
         <primitive object={parts.root} />
       </group>
       <primitive object={parts.mirror.glass} />

@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { freshRoom, visitRoom, cleanRoom, newRoll, penaltyOf, looksOf, openRoom, DIRTY_AT, ROLL_USES } from '@/game/restroom'
+import { freshRoom, visitRoom, cleanRoom, newRoll, penaltyOf, looksOf, openRoom, pullSheet, DIRTY_AT, ROLL_USES, SHEET } from '@/game/restroom'
 
 feature('廁所的清潔與衛生紙', () => {
   scenario('剛打掃好的廁所，客人用完沒有怨言，但會變髒一點、衛生紙少一點', ({ given, when, then, and }) => {
@@ -57,5 +57,12 @@ feature('廁所的清潔與衛生紙', () => {
     when('今天開店', (w) => { w.r = openRoom(w.r) })
     then('廁所是乾淨的', (w) => { expect(w.r.clean).toBe(1) })
     and('衛生紙還是剩一點，要老闆自己換', (w) => { expect(w.r.paper).toBeCloseTo(0.2, 6) })
+  })
+})
+
+feature('抽一張衛生紙：紙捲會變細，用完才換新捲', () => {
+  scenario('每抽一張用掉一點，不會變成負的', ({ then, and }) => {
+    then('新的一捲抽一張，剩下少一張的量', () => { expect(pullSheet({ clean: 1, paper: 1, uses: 0 }).paper).toBeCloseTo(1 - SHEET) })
+    and('沒紙了再抽還是沒紙', () => { expect(pullSheet({ clean: 1, paper: 0, uses: 0 }).paper).toBe(0) })
   })
 })

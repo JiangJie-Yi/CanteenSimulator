@@ -491,9 +491,17 @@ def washstand():
     RR, RH = 0.05, 0.1
     for j, (cxx, czz, yy) in enumerate(((-0.16, -0.12, PL + PT), (-0.16, -0.01, PL + PT), (-0.15, -0.14, SHELF + PT / 2), (-0.15, -0.03, SHELF + PT / 2))):
         fin(lathe_oval(f"WashRoll{j}", [(0.0, yy), (RR, yy), (RR, yy + RH), (0.0, yy + RH)], 1, 1, 12, cxx, czz), f"WashRoll{j}", M["paper"], parts)
-    # (a stack of folded hand towels on the shelf's other end)
-    for j in range(3):
-        fin(rbox(f"WashTowelFold{j}", (0.17, 0.028, 0.15), (-0.15, SHELF + PT / 2 + 0.014 + j * 0.03, 0.1), 0.008, 2), f"WashTowelFold{j}", M["towel"], parts)
+    # (the hand dryer's and the paper towels' room (the owner's): on the shelf's other end two packs of paper towels for the dispenser, white,
+    # a blue band round each; on the floor below them two standing pouches of hand-soap refill, celadon green, a white label)
+    M["band"] = pbr("WashPackBand", lin("#3a6ea8"), rough=0.6)
+    M["refill"] = pbr("WashRefill", lin("#7fae98"), rough=0.35)
+    for j in range(2):
+        y = SHELF + PT / 2 + 0.036 + j * 0.073
+        fin(rbox(f"WashTowelPack{j}", (0.16, 0.07, 0.12), (-0.15, y, 0.1), 0.006, 1), f"WashTowelPack{j}", M["paper"], parts)
+        fin(rbox(f"WashTowelBand{j}", (0.162, 0.072, 0.03), (-0.15, y, 0.1), 0.006, 1), f"WashTowelBand{j}", M["band"], parts)
+    for j, z in enumerate((0.07, 0.15)):
+        fin(rbox(f"WashRefill{j}", (0.035, 0.13, 0.07), (-0.13, PL + PT + 0.065, z), 0.012, 2), f"WashRefill{j}", M["refill"], parts)
+        fin(rbox(f"WashRefillLabel{j}", (0.002, 0.05, 0.05), (-0.13 - 0.0185, PL + PT + 0.06, z), 0.0, 1), f"WashRefillLabel{j}", M["paper"], parts)
     fin(rbox("WashPlinth", (CD - 0.05, PL, CW - 0.06), (-(CD - 0.05) / 2, PL / 2, 0), 0.0, 1), "WashPlinth", M["shadow"], parts)
     # ---- its two sliding doors, one on each of two tracks, the front one over the back's edge: a frame of hinoki and upright slats, a dark
     # panel behind them, a little notch of a pull in each outer stile
