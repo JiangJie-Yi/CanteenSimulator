@@ -199,7 +199,9 @@ bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 rim.name = "WcPullRim"
 rim.data.materials.append(M["brass"])
 pp.append(rim)
-bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.024, depth=0.0045, location=P(-0.0079, 0.8, LZ))
+# (the black well 2 mm proud of the brass rim's face (they were 0.65 mm apart: from a distance they fought for the same depth, flickering at
+# the door's edge, the owner's))
+bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.024, depth=0.004, location=P(-0.0095, 0.8, LZ))
 well = bpy.context.view_layer.objects.active
 well.rotation_euler = (0, math.pi / 2, 0)
 well.scale = (1, 1, 1)

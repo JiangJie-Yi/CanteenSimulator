@@ -314,6 +314,52 @@ export function WcMarks({ who, at, size }: { who: Who; at: [number, number, numb
   )
 }
 
+/**
+ * The washlet remote's face and the flush unit's, painted (wc.py lays each a single quad): the remote's dark face in an ivory frame, its round
+ * keys each shaded like a domed button (a soft shadow under it, a lit top, a white glint): the big orange stop, the rear wash (blue) and
+ * the front wash (pink) beside it, the water's strength (− +) by the screen (the screen itself a quad of its own, lit), the seat's warmth
+ * (two small keys) under; the flush unit's two chrome keys, 大 and 小, and a strip naming them
+ */
+function paintKey(g: CanvasRenderingContext2D, x: number, y: number, r: number, base: string, label = '') {
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.arc(x + r * 0.08, y + r * 0.14, r * 1.04, 0, Math.PI * 2); g.fill()
+  const gr = g.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r)
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.18, base); gr.addColorStop(1, base)
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill()
+  g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.arc(x, y + r * 0.1, r, 0.15 * Math.PI, 0.85 * Math.PI); g.arc(x, y - r * 0.05, r * 0.92, 0.85 * Math.PI, 0.15 * Math.PI, true); g.fill()
+  g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath(); g.ellipse(x - r * 0.32, y - r * 0.42, r * 0.3, r * 0.16, -0.5, 0, Math.PI * 2); g.fill()
+  if (label) { g.fillStyle = 'rgba(255,255,255,0.92)'; g.font = `700 ${Math.round(r * 0.75)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, x, y + r * 0.05) }
+}
+const REMOTE_ART = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas'); c.width = 512; c.height = 304
+  const g = c.getContext('2d')!
+  g.fillStyle = '#efe8da'; g.fillRect(0, 0, 512, 304)
+  const round = (x: number, y: number, w: number, h: number, r: number) => { g.beginPath(); g.roundRect(x, y, w, h, r) }
+  round(14, 14, 484, 276, 26); g.fillStyle = '#c9c1b1'; g.fill()
+  round(22, 22, 468, 260, 22); g.fillStyle = '#353a42'; g.fill()
+  // (where the lit screen's quad lies (wc.py: 0.07 x 0.022 at (-0.03, 0.026) on the 0.172 x 0.102 face), a recess round it)
+  round(55, 34, 224, 80, 8); g.fillStyle = '#1c1f24'; g.fill()
+  paintKey(g, 400, 86, 17, '#8f949b', '−'); paintKey(g, 452, 86, 17, '#8f949b', '+')
+  paintKey(g, 256, 186, 46, '#e8762c', '止'); paintKey(g, 132, 186, 32, '#3a7ac8'); paintKey(g, 380, 186, 32, '#e07aa0')
+  paintKey(g, 210, 254, 15, '#8f949b'); paintKey(g, 302, 254, 15, '#8f949b')
+  g.fillStyle = '#c9ced6'; g.font = '600 15px sans-serif'; g.textAlign = 'center'
+  g.fillText('おしり', 132, 238); g.fillText('ビデ', 380, 238); g.fillText('水勢', 426, 122); g.fillText('便座', 256, 282)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.flipY = false
+  return t
+})()
+const FLUSH_ART = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas'); c.width = 192; c.height = 284
+  const g = c.getContext('2d')!
+  g.fillStyle = '#efe8da'; g.fillRect(0, 0, 192, 284)
+  g.fillStyle = '#d8d0c0'; g.beginPath(); g.roundRect(10, 10, 172, 264, 18); g.fill()
+  g.fillStyle = '#353a42'; g.beginPath(); g.roundRect(36, 26, 120, 22, 6); g.fill()
+  g.fillStyle = '#e8ecef'; g.font = '700 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('洗浄', 96, 38)
+  paintKey(g, 96, 128, 50, '#b9bec5', '大'); paintKey(g, 96, 226, 32, '#b9bec5', '小')
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.flipY = false
+  return t
+})()
+
 /** a node of wcbits.glb, drawn in the room's toon light (each room its own copy) */
 function useBits() {
   const gltf = useGLTF(BITS_URL) as unknown as { scene: THREE.Group }
@@ -331,6 +377,11 @@ function useBits() {
     }
     const lcd = r.remote.getObjectByName('RemLcd') as THREE.Mesh | undefined
     lit(lcd, '#7fe2ee')
+    // (the faces' keys, frame and words: painted, not modelled (the owner's: the pair 30 triangles))
+    for (const [n, tex] of [['RemFace', REMOTE_ART], ['FlushFace', FLUSH_ART]] as const) {
+      const m = r.remote.getObjectByName(n) ?? r.flush.getObjectByName(n)
+      if (m && (m as THREE.Mesh).isMesh) (m as THREE.Mesh).material = new THREE.MeshToonMaterial({ color: '#ffffff', map: tex })
+    }
     const ledMat = lit(r.led.getObjectByName('OtoLed') as THREE.Mesh, '#5ab4ff')
     // (the parts that never move on their own, their buttons and ink lines, folded into a mesh or two per material: the remote and the
     // Otohime were near thirty draws apiece, in each of the two toilets; the lit screen keeps its own)

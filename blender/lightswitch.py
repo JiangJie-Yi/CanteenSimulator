@@ -89,7 +89,9 @@ def slab(name, w, h, d, z0, r, mat, bow=0.0, bevel=True):
 parts = []
 # (the plate: its frame round the edge, the face set in a touch inside it)
 frame = slab("SwitchPlate", W, H, T, 0.0, 0.008 if SLIM or DOUBLE else 0.01, M["frame"])
-face = slab("SwitchPlateFace", W - (0.008 if SLIM or DOUBLE else 0.012), H - (0.008 if SLIM or DOUBLE else 0.012), T + 0.0008, 0.0, 0.004 if SLIM or DOUBLE else 0.006, M["plate"])
+# (2 mm proud of the frame (it was 0.8 mm: from across the room the two fought for the same depth, a flickering dark seam by the doors, the
+# owner's))
+face = slab("SwitchPlateFace", W - (0.008 if SLIM or DOUBLE else 0.012), H - (0.008 if SLIM or DOUBLE else 0.012), T + 0.002, 0.0, 0.004 if SLIM or DOUBLE else 0.006, M["plate"])
 bpy.ops.object.select_all(action="DESELECT")
 frame.select_set(True); face.select_set(True)
 bpy.context.view_layer.objects.active = frame

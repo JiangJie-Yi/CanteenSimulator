@@ -197,6 +197,8 @@ def bits():
     M = {"ivory": pbr("BitIvory", lin("#f1ece0"), rough=0.3, coat=0.4),
          "panel": pbr("BitPanel", lin("#3b4048"), rough=0.25, coat=0.6),
          "lcd": pbr("BitLcd", lin("#8fb8a8"), rough=0.2, emit=lin("#9fd8c0"), emit_strength=0.6),
+         "remart": pbr("RemFaceArt", (1, 1, 1), rough=0.3),
+         "flushart": pbr("FlushArt", (1, 1, 1), rough=0.3),
          "stop": pbr("BitStop", lin("#e8762c"), rough=0.35),
          "blue": pbr("BitBlue", lin("#3a7ac8"), rough=0.35),
          "pink": pbr("BitPink", lin("#e07aa0"), rough=0.35),
@@ -235,35 +237,34 @@ def bits():
         return active()
     # (a cylinder's axis is blender z, three y: turned to blender -y, three +z, out of the wall)
     FRONT = (math.pi / 2, 0, 0)
-    # ---- the washlet's wall remote (the owner's: finer, even quads): a rounded ivory base, a dark face set into it, a wide LCD (lit faint
-    # cyan by the game), round raised keys: the big orange stop, the rear wash (blue) and the front wash (pink) either side, the water's
-    # strength (- and +) by the screen, a row of two small keys for the seat's warmth; every key 16 round with a little bevel to its rim
-    def key(name, r, at, mat, d=0.007):
-        o = cyl(r, d, at, FRONT, 16)
-        bv = bevel(o, min(0.0018, r * 0.2), 1)
-        bv.limit_method = "NONE"
-        add("WcRemote", o, name, mat)
+    # ---- the washlet's wall remote and its flush unit, as lean as can be (the owner's: 50-80 triangles the pair; the round keys' sides, each
+    # cut in sixteen, crossed every which way): each a plain box (12 triangles), its face one quad laid a millimetre proud with the keys, the
+    # frame and the words painted on it by the game (RemFaceArt, FlushArt: their shading and highlights in the picture), and the remote's
+    # screen a quad of its own, lit by the game (RemLcd): 30 triangles in all
+    def quad(name, w, h, at, mat, g):
+        bm = bmesh.new()
+        uvl = bm.loops.layers.uv.new()
+        x, y, z = at
+        vs = [bm.verts.new(P(x - w / 2, y - h / 2, z)), bm.verts.new(P(x + w / 2, y - h / 2, z)), bm.verts.new(P(x + w / 2, y + h / 2, z)), bm.verts.new(P(x - w / 2, y + h / 2, z))]
+        f = bm.faces.new(vs)
+        for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+            lp[uvl].uv = uv
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        if f.normal.y > 0:
+            f.normal_flip()
+        me = bpy.data.meshes.new(name)
+        bm.to_mesh(me)
+        bm.free()
+        o = bpy.data.objects.new(name, me)
+        bpy.context.collection.objects.link(o)
+        add(g, o, name, mat, smooth=False)
     node("WcRemote")
-    add("WcRemote", rbox("RemBody", (0.18, 0.11, 0.02), (0, 0, 0.01), 0.008, 3), "RemBody", M["ivory"])
-    add("WcRemote", rbox("RemFace", (0.162, 0.092, 0.004), (0, 0, 0.021), 0.004, 2), "RemFace", M["panel"])
-    add("WcRemote", rbox("RemLcd", (0.07, 0.022, 0.003), (-0.03, 0.026, 0.0235), 0.0015, 1), "RemLcd", M["lcd"])
-    key("RemPowerDown", 0.006, (0.034, 0.026, 0.025), M["grey"], 0.005)
-    key("RemPowerUp", 0.006, (0.054, 0.026, 0.025), M["grey"], 0.005)
-    key("RemStop", 0.015, (0.0, -0.008, 0.026), M["stop"], 0.008)
-    key("RemWash", 0.011, (-0.042, -0.008, 0.025), M["blue"])
-    key("RemBidet", 0.011, (0.042, -0.008, 0.025), M["pink"])
-    key("RemWarm0", 0.006, (-0.016, -0.034, 0.025), M["grey"], 0.005)
-    key("RemWarm1", 0.006, (0.016, -0.034, 0.025), M["grey"], 0.005)
-    # ---- the flush unit apart beside it: its own rounded box, the big (大) and small (小) chrome keys, a strip naming them; its own node to
-    # press in
+    add("WcRemote", rbox("RemBody", (0.18, 0.11, 0.02), (0, 0, 0.01), 0.0, 1), "RemBody", M["ivory"], smooth=False)
+    quad("RemFace", 0.172, 0.102, (0.0, 0.0, 0.021), M["remart"], "WcRemote")
+    quad("RemLcd", 0.07, 0.022, (-0.03, 0.026, 0.022), M["lcd"], "WcRemote")
     node("WcFlushKey")
-    add("WcFlushKey", rbox("FlushPlate", (0.058, 0.084, 0.016), (0.0, 0.0, 0.008), 0.006, 3), "FlushPlate", M["ivory"])
-    add("WcFlushKey", rbox("FlushLabel", (0.04, 0.008, 0.002), (0.0, 0.032, 0.0165), 0.001, 1), "FlushLabel", M["panel"])
-    for name, r, y in (("FlushBig", 0.017, 0.004), ("FlushSmall", 0.01, -0.026)):
-        o = cyl(r, 0.008, (0.0, y, 0.018), FRONT, 16)
-        bv = bevel(o, 0.002, 1)
-        bv.limit_method = "NONE"
-        add("WcFlushKey", o, name, M["chrome"])
+    add("WcFlushKey", rbox("FlushPlate", (0.058, 0.084, 0.016), (0.0, 0.0, 0.008), 0.0, 1), "FlushPlate", M["ivory"], smooth=False)
+    quad("FlushFace", 0.054, 0.08, (0.0, 0.0, 0.017), M["flushart"], "WcFlushKey")
     # ---- the Otohime (音姫): a little white box, a sakura flower on its face, a speaker grille, a round sensor with a blue ring that lights
     node("WcOtohime")
     add("WcOtohime", rbox("OtoBody", (0.095, 0.13, 0.035), (0, 0, 0.0175), 0.012, 4), "OtoBody", M["oto"])
@@ -499,7 +500,8 @@ def washstand():
     y0, y1 = PL + 0.022, T - TH - 0.022
     for k, (za, zb, x0) in enumerate(((-CW / 2 + 0.02, 0.006, -CD - 0.001), (-0.006, CW / 2 - 0.02, -CD - 0.017))):
         zc, dw = (za + zb) / 2, zb - za
-        fin(rbox(f"WashDoorBack{k}", (0.004, y1 - y0, dw), (x0 - 0.004, (y0 + y1) / 2, zc), 0.0, 1), f"WashDoorBack{k}", M["shadow"], parts)
+        # (the dark panel back between the rails' faces, not in the plane of their fronts: they flickered against each other, the owner's)
+        fin(rbox(f"WashDoorBack{k}", (0.003, y1 - y0, dw - 0.004), (x0 - 0.0055, (y0 + y1) / 2, zc), 0.0, 1), f"WashDoorBack{k}", M["shadow"], parts)
         st, rl = 0.02, 0.028
         for sd in (-1, 1):
             fin(box_uv(rbox(f"WashStile{k}{sd}", (0.012, y1 - y0, st), (x0 - 0.008, (y0 + y1) / 2, zc + sd * (dw - st) / 2), 0.002, 1), 2.2, up=True), f"WashStile{k}{sd}", M["hinoki"], parts)
