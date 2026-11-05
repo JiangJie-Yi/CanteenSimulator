@@ -59,7 +59,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -4279,6 +4279,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }, [ai])
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
+  // (a customer dragged to another stool (GuestBar3D asks): only while they're waiting with nothing cooked tied to their stool yet, and
+  // the stool's nobody's)
+  useFrame(() => {
+    const a = SEAT_MOVE.ask
+    if (!a) return
+    SEAT_MOVE.ask = null
+    const g = guests.current.find((x) => x.id === a.guest)
+    const held = pieces.current.some((q) => q.guest === a.guest && (q.collected || q.seat >= 0) && !q.eaten)
+    const taken = guests.current.some((x) => x.id !== a.guest && x.seat === a.to && (x.state === 'waiting' || x.state === 'eating' || !x.cleared))
+    const ok = !!g && g.state === 'waiting' && g.seat === a.from && !held && !taken
+    if (ok) { g.seat = a.to; report() }
+    SEAT_MOVE.answer = { guest: a.guest, to: a.to, ok }
+  })
   /** the customers who've said how dark it is (once each) */
   const darkSaid = useRef(new Set<number>())
   /** what's been ordered off the menu and not yet brought out: each food, as which dish */

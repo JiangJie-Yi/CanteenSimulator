@@ -85,7 +85,7 @@ export function HoverTip({ hidden = false }: { hidden?: boolean }) {
     <div ref={el} className={`hover-tip${leaving ? ' is-leaving' : ''}`} aria-hidden="true">
       {/* (the name on one line; what it says under it, and after a ｜ what to do, on a line of its own, smaller and fainter (the owner's: a
           long line ran out past the tag's edges)) */}
-      <span className={`tool-tag${tip.warn ? ' is-warn' : ''}`}>
+      <span className={`tool-tag${tip.warn ? ' is-warn' : ''}${tip.who ? ' is-who' : ''}`}>
         <b className="tip-title">{tip.title}</b>
         {tip.hint.split('｜').map((line, i) => line && <small key={i} className={i ? 'tip-act' : undefined}>{line}</small>)}
       </span>

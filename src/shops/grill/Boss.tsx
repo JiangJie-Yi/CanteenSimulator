@@ -13,6 +13,9 @@ import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
+import { FigureHit } from '@/scene/FigureHit'
+/** his name tag's words: his role, and his name when he's been given one */
+const bossName = () => SPEAKERS.get('owner') ?? '老闆'
 import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
 
 /**
@@ -628,6 +631,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   return (
     <group ref={mover} name="BossFollow">
       {children}
+      {/* (named as the pointer's over him; never to be dragged) */}
+      <FigureHit title={bossName} />
       {/* (what he's muttering, over his head) */}
       {say && !getEdit().on && (
         <Html position={[0, 1.42, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>

@@ -10,7 +10,8 @@ import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
 import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
-import { RUSH, STAFF_TALK } from '@/game/shopState'
+import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
+import { FigureHit } from './FigureHit'
 
 /*
  * The staff, made as the boss is (blender/boss.py with CREW=<variant>): an Overcooked cook's big round head on a short plump body rounding
@@ -35,6 +36,7 @@ const variantOf = (role: Role, female: boolean): Variant =>
 /** the head and what's on it, which take no shadow (as the customers' don't): the face's and the glasses' patches are see-through
  * rectangles off the face, and the shadow pass (no alphaTest: they're hashed) cast them whole, black blocks over the eyes (the owner saw) */
 const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
+const ROLE_TAG: Record<Role, string> = { chef: '主廚', sous: '二廚', server: '外場', cashier: '收銀', stock: '倉儲' }
 const UNINKED = /(Face|Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
@@ -219,6 +221,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       return true
     })
   }, [fig, h, who.age])
+  // (their name tag's words (App keeps who's who); their role alone before it's known)
+  const nameTag = useMemo(() => () => SPEAKERS.get(id) ?? ROLE_TAG[role], [id, role])
   // (their face (setExpression): what they're doing says it; a squash and stretch as it changes, or as they start to say something)
   const faceWas = useRef<{ face: CrewFace; at: number; said: number; carry: boolean }>({ face: 'idle', at: -1e9, said: 0, carry: false })
   // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
@@ -343,6 +347,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>
+      {/* (named as the pointer's over them: their role and name; never to be dragged, they keep to their work. Not in the viewer) */}
+      {!id.startsWith('viewer-') && <FigureHit title={nameTag} />}
       {/* (a server's tray with a cup of tea on it, the stock keeper's clipboard: parts of the one mesh, shown as they're held) */}
       <primitive object={fig.root} />
     </group>

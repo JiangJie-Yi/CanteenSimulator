@@ -139,6 +139,12 @@ const printerSubs = new Set<() => void>()
 export const onPrinter = (f: () => void) => { printerSubs.add(f); return () => { printerSubs.delete(f) } }
 export function setPrinter(slips: number) { if (PRINTER.slips === slips) return; PRINTER.slips = slips; PRINTER.ver++; printerSubs.forEach((f) => f()) }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __printer?: typeof PRINTER }).__printer = PRINTER
+/**
+ * A customer dragged to another stool (the owner's: customers can be, the owner and the staff can't): GuestBar3D asks (`ask`), Roasting
+ * answers (`answer`): yes only while they're sat waiting with nothing cooked theirs yet (a dish is tied to a stool once it's off the fire)
+ * and the stool's free; then both move them, Roasting's guest and GuestBar3D's figure.
+ */
+export const SEAT_MOVE: { ask: { guest: number; from: number; to: number } | null; answer: { guest: number; to: number; ok: boolean } | null } = { ask: null, answer: null }
 /** the owner out on the floor serving (no server hired: he carries the plates, clears them and takes the washed ones back himself, the
  * owner's: nothing flies): GuestBar3D walks a figure of him; Roasting's, at his place in the kitchen, is hidden meanwhile */
 export const OWNER_OUT = { on: false }

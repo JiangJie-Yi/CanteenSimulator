@@ -1,7 +1,8 @@
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { FigureHit } from '@/scene/FigureHit'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, stockerChore, type StockChore } from '@/game/stocker'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -62,7 +63,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -2739,6 +2740,76 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     })
   }, [guests])
 
+  // ---- a customer dragged to another stool (the owner's: customers only; the owner and the staff keep to their work): picked up off
+  // their stool while they wait, carried under the pointer over the floor, set down on a free stool if nothing's on the way to them yet
+  // (Roasting answers: SEAT_MOVE), else back onto their own
+  const getThree = useThree((st) => st.get)
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __guestGroups: groups, __barSeats: seats })
+  const drag = useRef<{ id: number; at: THREE.Vector3; asked: number } | null>(null)
+  const canMove = (s: Shown) => {
+    const g = guestsRef.current.find((x) => x.id === s.id)
+    return s.phase === 'sit' && !s.leaving && g?.state === 'waiting' && !runs.current.some((r) => r.seat === s.seat) && !PLATES_SET.has(s.seat)
+      && !PLATING.slots.some((sl) => sl?.seat === s.seat) && ![...SERVICE.waiting.values()].includes(s.seat)
+  }
+  const grab = (s: Shown) => (e: ThreeEvent<PointerEvent>) => {
+    if (getEdit().on || e.button !== 0 || drag.current || !canMove(s)) return
+    const grp = groups.current.get(s.id)
+    if (!grp?.parent) return
+    e.stopPropagation()
+    const st = getThree()
+    const ctl = st.controls as unknown as { enabled: boolean } | null
+    if (ctl) ctl.enabled = false
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -grp.getWorldPosition(new THREE.Vector3()).y)
+    drag.current = { id: s.id, at: grp.position.clone(), asked: 0 }
+    const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3()
+    const el = st.gl.domElement
+    el.style.cursor = 'grabbing'
+    const move = (ev: PointerEvent) => {
+      const r = el.getBoundingClientRect()
+      ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1)
+      ray.setFromCamera(ndc, st.camera)
+      const d = drag.current
+      if (d && !d.asked && grp.parent && ray.ray.intersectPlane(plane, hit)) d.at.copy(grp.parent.worldToLocal(hit))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      if (ctl) ctl.enabled = true
+      el.style.cursor = ''
+      const d = drag.current
+      if (!d) return
+      // (the nearest stool to where they're let go, if it's close; free of anyone, their plate, their bones)
+      let to = -1, best = 0.5
+      seats.forEach((p, i) => { const k = Math.hypot(p.stool.x - d.at.x, p.stool.z - d.at.z); if (k < best) { best = k; to = i } })
+      const free = to >= 0 && to !== s.seat && !shownRef.current.some((x) => x.seat === to) && !runs.current.some((r) => r.seat === to)
+        && !PLATES_SET.has(to) && !guestsRef.current.some((x) => x.id !== s.id && x.seat === to && (x.state === 'waiting' || x.state === 'eating'))
+      if (free && canMove(s)) { SEAT_MOVE.ask = { guest: s.id, from: s.seat, to }; d.asked = performance.now() }
+      else drag.current = null
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+  useFrame(() => {
+    const d = drag.current
+    if (!d) return
+    const s = shownRef.current.find((x) => x.id === d.id)
+    const a = SEAT_MOVE.answer
+    if (d.asked && a?.guest === d.id) {
+      SEAT_MOVE.answer = null
+      drag.current = null
+      if (a.ok && s) {
+        // (their shoes into the cubby of the stool they're on now: they're taken out of it on the way home)
+        const shoes = SHOE_CELLS.shoes.get(s.seat % 9)
+        if (shoes) { SHOE_CELLS.shoes.delete(s.seat % 9); SHOE_CELLS.shoes.set(a.to % 9, shoes) }
+        s.seat = a.to
+      }
+      return
+    }
+    if (d.asked && performance.now() - d.asked > 1500) { drag.current = null; return }
+    // (held up a little under the pointer, over the floor, while they're carried; their stool's frame put back by the bar's clock once let go)
+    if (!s || s.phase !== 'sit') { drag.current = null; return }
+    groups.current.get(d.id)?.position.set(d.at.x, d.at.y + 0.18, d.at.z)
+  })
   useFrame(({ camera: cam }, dt) => {
     clock.current += Math.min(dt, 0.1)
     // (the room's murmur: by how many are sat at the bar; louder with the camera among them)
@@ -3903,6 +3974,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <group scale={PEOPLE_SCALE}>
               <PersonClock s={s} phase={s.phase} drink={s.drink} eating={s.phase === 'sit' && guestsRef.current.find((x) => x.id === s.id)?.state === 'eating'}
                 clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} />
+              {/* (named as the pointer's over them; picked up and carried to another stool while they wait) */}
+              <FigureHit title={() => guestLabel(s.id, lang)} hint={() => (canMove(s) ? (lang === 'ja' ? 'ドラッグして空席へ' : lang === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : '')}
+                onPointerDown={grab(s)} />
             </group>
             {/* (their label just over their head, sat up on the seat or standing) */}
             <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15}

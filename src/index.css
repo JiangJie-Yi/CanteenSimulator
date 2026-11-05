@@ -6363,6 +6363,21 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   opacity: 0.72;
 }
 
+/* (a person's name (scene/FigureHit): the speech bubbles' dark glass, the name in their speakers' yellow) */
+.hover-tip .tool-tag.is-who {
+  min-width: 0;
+  padding: 5px 12px;
+  background: rgb(25 25 25 / 0.88);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.35);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  color: #ffcc00;
+}
+
+.hover-tip .tool-tag.is-who small {
+  color: #fbf7ef;
+}
+
 .hover-tip.is-leaving .tool-tag {
   opacity: 0;
   transition: opacity 110ms ease-in;

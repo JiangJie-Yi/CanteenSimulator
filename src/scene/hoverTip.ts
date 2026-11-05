@@ -4,8 +4,8 @@ import { useSyncExternalStore } from 'react'
 import type * as THREE from 'three'
 import { HOVER } from './hoverGlow'
 
-/** `warn`: a no (no entry, can't be used): its hint in red */
-export type Tip = { title: string; hint: string; warn?: boolean } | null
+/** `warn`: a no (no entry, can't be used): its hint in red; `who`: a person's name (dark glass, the name in the speakers' yellow) */
+export type Tip = { title: string; hint: string; warn?: boolean; who?: boolean } | null
 let tip: Tip = null
 const subs = new Set<() => void>()
 /**
@@ -22,9 +22,28 @@ export const aimTip = (e: { eventObject?: THREE.Object3D; camera?: THREE.Camera;
 export const setTip = (t: Tip) => {
   if (t && HOVER.paused) t = null
   if (!t) TIP_AIM.obj = null
-  if (t?.title === tip?.title && t?.hint === tip?.hint && t?.warn === tip?.warn) return
+  if (t?.title === tip?.title && t?.hint === tip?.hint && t?.warn === tip?.warn && t?.who === tip?.who) return
   tip = t
   subs.forEach((f) => f())
 }
 export const useTip = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f) } }, () => tip)
+/**
+ * A person under the pointer (scene/FigureHit): their name tag, the pointer a hand. The event's let through: what's behind them (the food on
+ * the fire behind the owner) still answers, and its own tag, set after, wins; leaving, it takes down only a person's tag.
+ */
+export const whoOver = (title: () => string, hint: () => string = () => '') => ({
+  onPointerOver: (e: { eventObject?: THREE.Object3D; camera?: THREE.Camera; nativeEvent?: Event }) => {
+    if (HOVER.paused) return
+    aimTip(e)
+    setTip({ title: title(), hint: hint(), who: true })
+    const el = e.nativeEvent?.target as HTMLElement | null
+    if (el?.style) el.style.cursor = 'pointer'
+  },
+  onPointerOut: (e: { nativeEvent?: Event }) => {
+    if (HOVER.paused) return
+    if (tip?.who) setTip(null)
+    const el = e.nativeEvent?.target as HTMLElement | null
+    if (el?.style && el.style.cursor === 'pointer') el.style.cursor = ''
+  },
+})
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __tip?: typeof setTip }).__tip = setTip
