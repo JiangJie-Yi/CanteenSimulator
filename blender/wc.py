@@ -235,22 +235,35 @@ def bits():
         return active()
     # (a cylinder's axis is blender z, three y: turned to blender -y, three +z, out of the wall)
     FRONT = (math.pi / 2, 0, 0)
-    # ---- the washlet's wall remote: a slim dark panel framed in ivory, a little screen, the big orange stop, the wash and bidet keys
-    # either side, a row of small keys under them
+    # ---- the washlet's wall remote (the owner's: finer, even quads): a rounded ivory base, a dark face set into it, a wide LCD (lit faint
+    # cyan by the game), round raised keys: the big orange stop, the rear wash (blue) and the front wash (pink) either side, the water's
+    # strength (- and +) by the screen, a row of two small keys for the seat's warmth; every key 16 round with a little bevel to its rim
+    def key(name, r, at, mat, d=0.007):
+        o = cyl(r, d, at, FRONT, 16)
+        bv = bevel(o, min(0.0018, r * 0.2), 1)
+        bv.limit_method = "NONE"
+        add("WcRemote", o, name, mat)
     node("WcRemote")
-    add("WcRemote", rbox("RemBody", (0.17, 0.1, 0.02), (0, 0, 0.01), 0.008, 3), "RemBody", M["ivory"])
-    add("WcRemote", rbox("RemFace", (0.15, 0.08, 0.004), (0, 0, 0.021), 0.003, 2), "RemFace", M["panel"])
-    add("WcRemote", rbox("RemLcd", (0.05, 0.016, 0.003), (-0.035, 0.022, 0.024), 0.001, 1), "RemLcd", M["lcd"])
-    add("WcRemote", cyl(0.016, 0.008, (0.0, -0.002, 0.026), FRONT), "RemStop", M["stop"])
-    add("WcRemote", cyl(0.011, 0.007, (-0.038, -0.004, 0.025), FRONT), "RemWash", M["blue"])
-    add("WcRemote", cyl(0.011, 0.007, (0.038, -0.004, 0.025), FRONT), "RemBidet", M["pink"])
-    for k in range(4):
-        add("WcRemote", rbox(f"RemKey{k}", (0.018, 0.008, 0.004), (-0.045 + k * 0.03, -0.03, 0.025), 0.002, 1), f"RemKey{k}", M["grey"])
-    # ---- the flush keys apart beside it (大 and 小), their own node to press in
+    add("WcRemote", rbox("RemBody", (0.18, 0.11, 0.02), (0, 0, 0.01), 0.008, 3), "RemBody", M["ivory"])
+    add("WcRemote", rbox("RemFace", (0.162, 0.092, 0.004), (0, 0, 0.021), 0.004, 2), "RemFace", M["panel"])
+    add("WcRemote", rbox("RemLcd", (0.07, 0.022, 0.003), (-0.03, 0.026, 0.0235), 0.0015, 1), "RemLcd", M["lcd"])
+    key("RemPowerDown", 0.006, (0.034, 0.026, 0.025), M["grey"], 0.005)
+    key("RemPowerUp", 0.006, (0.054, 0.026, 0.025), M["grey"], 0.005)
+    key("RemStop", 0.015, (0.0, -0.008, 0.026), M["stop"], 0.008)
+    key("RemWash", 0.011, (-0.042, -0.008, 0.025), M["blue"])
+    key("RemBidet", 0.011, (0.042, -0.008, 0.025), M["pink"])
+    key("RemWarm0", 0.006, (-0.016, -0.034, 0.025), M["grey"], 0.005)
+    key("RemWarm1", 0.006, (0.016, -0.034, 0.025), M["grey"], 0.005)
+    # ---- the flush unit apart beside it: its own rounded box, the big (大) and small (小) chrome keys, a strip naming them; its own node to
+    # press in
     node("WcFlushKey")
-    add("WcFlushKey", rbox("FlushPlate", (0.05, 0.07, 0.012), (0.0, 0.0, 0.006), 0.006, 3), "FlushPlate", M["ivory"])
-    add("WcFlushKey", cyl(0.016, 0.008, (0.0, 0.006, 0.014), FRONT), "FlushBig", M["chrome"])
-    add("WcFlushKey", cyl(0.009, 0.008, (0.0, -0.022, 0.014), FRONT), "FlushSmall", M["chrome"])
+    add("WcFlushKey", rbox("FlushPlate", (0.058, 0.084, 0.016), (0.0, 0.0, 0.008), 0.006, 3), "FlushPlate", M["ivory"])
+    add("WcFlushKey", rbox("FlushLabel", (0.04, 0.008, 0.002), (0.0, 0.032, 0.0165), 0.001, 1), "FlushLabel", M["panel"])
+    for name, r, y in (("FlushBig", 0.017, 0.004), ("FlushSmall", 0.01, -0.026)):
+        o = cyl(r, 0.008, (0.0, y, 0.018), FRONT, 16)
+        bv = bevel(o, 0.002, 1)
+        bv.limit_method = "NONE"
+        add("WcFlushKey", o, name, M["chrome"])
     # ---- the Otohime (音姫): a little white box, a sakura flower on its face, a speaker grille, a round sensor with a blue ring that lights
     node("WcOtohime")
     add("WcOtohime", rbox("OtoBody", (0.095, 0.13, 0.035), (0, 0, 0.0175), 0.012, 4), "OtoBody", M["oto"])

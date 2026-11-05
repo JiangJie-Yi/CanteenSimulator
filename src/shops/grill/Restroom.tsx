@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { reflectStudio } from '@/scene/studio'
 import * as THREE from 'three'
 import { setTip } from '@/scene/hoverTip'
 import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, ROLL_USES } from '@/game/restroom'
@@ -10,7 +12,7 @@ import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
 import { roundMirror } from './mirror'
 import { shrineDoor } from './shrineSound'
-import { flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
+import { dryerSound, flushSound, knockSound, otohimeNear, otohimeSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
 
 /**
  * The toilet rooms' live parts (blender/wc.py): the washlet that lifts its lid as someone comes in and flushes as they go (the water
@@ -328,7 +330,7 @@ function useBits() {
       core: of('WcCore'), fold: of('WcFold'), pot: of('WcBrushPot'), brush: of('WcBrush'), bin: of('WcBin'), pads: of('WcPads'),
     }
     const lcd = r.remote.getObjectByName('RemLcd') as THREE.Mesh | undefined
-    lit(lcd, '#a8e0c8')
+    lit(lcd, '#7fe2ee')
     const ledMat = lit(r.led.getObjectByName('OtoLed') as THREE.Mesh, '#5ab4ff')
     // (the parts that never move on their own, their buttons and ink lines, folded into a mesh or two per material: the remote and the
     // Otohime were near thirty draws apiece, in each of the two toilets; the lit screen keeps its own)
@@ -343,7 +345,7 @@ const hover = (title: string, hint: () => string) => ({
 })
 
 /** the washlet's remote and flush keys, on the side wall by the toilet (their own frame: the wall at z=0, the room toward +z) */
-export function WcRemote({ who }: { who: Who }) {
+export function WcRemote({ who, flushAt = 0.14 }: { who: Who; flushAt?: number }) {
   const b = useBits()
   const key = useRef<THREE.Group>(null)
   useFrame(() => {
@@ -356,7 +358,7 @@ export function WcRemote({ who }: { who: Who }) {
         {...hover('免治馬桶遙控器', () => '點一下：溫水洗淨')}>
         <primitive object={b.remote} />
       </group>
-      <group position={[0.14, 0, 0]}>
+      <group position={[flushAt, 0, 0]}>
         <group ref={key} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].flushAt = now() }}
           {...hover('沖水鈕', () => '點一下沖水')}>
           <primitive object={b.flush} />
@@ -365,6 +367,57 @@ export function WcRemote({ who }: { who: Who }) {
     </group>
   )
 }
+
+/**
+ * The washroom's hand drying (the owner's: no towel on a rod; a modern izakaya's), on the side wall by the washstand, their own frame the
+ * wall at z=0 facing +z: a paper towel dispenser (brushed stainless, a little window in its front, a white sheet showing at the slot under
+ * it), and a hand dryer (white, rounded, a dark outlet under it, a little lamp): it blows 1.5 s after a guest's washed their hands (TOILETS'
+ * dryAt, GuestBar3D steps them to it), or at a click: the lamp lit cyan, a soft whir, a tremble
+ */
+const TOWEL_BODY = new RoundedBoxGeometry(0.24, 0.3, 0.1, 2, 0.02).translate(0, 0, 0.05)
+const TOWEL_WINDOW = new RoundedBoxGeometry(0.08, 0.05, 0.004, 1, 0.008)
+const TOWEL_SLOT = new RoundedBoxGeometry(0.17, 0.012, 0.03, 1, 0.004)
+const TOWEL_SHEET = new THREE.PlaneGeometry(0.15, 0.05).translate(0, -0.025, 0)
+const DRYER_BODY = new RoundedBoxGeometry(0.2, 0.22, 0.12, 3, 0.045).translate(0, 0, 0.06)
+const DRYER_OUTLET = new RoundedBoxGeometry(0.13, 0.014, 0.07, 1, 0.006)
+const DRYER_LAMP = new THREE.CircleGeometry(0.008, 12)
+const STEEL = (() => { const m = new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.85, roughness: 0.35, envMapIntensity: 0.9 }); reflectStudio(m); return m })()
+export function WcTowelBox() {
+  return (
+    <group {...nameOverWc('擦手紙盒', '從下方的出紙口抽一張擦手')}>
+      <mesh geometry={TOWEL_BODY} material={STEEL} castShadow />
+      <mesh geometry={TOWEL_WINDOW} position={[0, 0.06, 0.101]}><meshToonMaterial color="#e8eef2" /></mesh>
+      <mesh geometry={TOWEL_SLOT} position={[0, -0.14, 0.07]}><meshToonMaterial color="#2a2c30" /></mesh>
+      <mesh geometry={TOWEL_SHEET} position={[0, -0.146, 0.072]} rotation-x={-0.25}><meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} /></mesh>
+    </group>
+  )
+}
+export function WcDryer({ who }: { who: 'm' | 'f' }) {
+  const g = useRef<THREE.Group>(null)
+  const lamp = useMemo(() => new THREE.MeshBasicMaterial({ color: '#3a4048' }), [])
+  useEffect(() => () => lamp.dispose(), [lamp])
+  const was = useRef(-1e9)
+  useFrame(({ camera }) => {
+    const t = TOILETS[who], u = now() - t.dryAt
+    if (t.dryAt !== was.current) { was.current = t.dryAt; if (u < 300) dryerSound(nearOf(g.current, camera)) }
+    const on = u >= 0 && u < 1500
+    lamp.color.set(on ? '#7fe2ee' : '#3a4048')
+    if (g.current) g.current.position.x = on ? Math.sin(now() * 0.09) * 0.0015 : 0
+  })
+  return (
+    <group ref={g} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].dryAt = now() }}
+      {...hover('烘手機', () => '點一下吹風；客人洗完手會自己來烘乾')}>
+      <mesh geometry={DRYER_BODY} castShadow><meshToonMaterial color="#f3f1ec" /></mesh>
+      <mesh geometry={DRYER_OUTLET} position={[0, -0.106, 0.07]}><meshToonMaterial color="#3a3d42" /></mesh>
+      <mesh geometry={DRYER_LAMP} position={[0.06, 0.07, 0.1205]} material={lamp} />
+    </group>
+  )
+}
+/** named when pointed at, nothing to do with it (bar.ts's nameOver, kept here so this file needn't take all of bar.ts's) */
+const nameOverWc = (title: string, hint: string) => ({
+  onPointerOver: (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title, hint }) },
+  onPointerOut: () => setTip(null),
+})
 
 /** the Otohime on the wall (the wall at z=0, facing +z): a stream and birdsong at a click, and by itself while a woman's in */
 export function WcOtohime({ who }: { who: Who }) {

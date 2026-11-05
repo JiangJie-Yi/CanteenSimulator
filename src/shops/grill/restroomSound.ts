@@ -81,6 +81,24 @@ export function scrubSound(near: number) {
   }
 }
 
+/** the hand dryer: its fan spinning up, a soft breathy whir for `seconds` (air through its nozzle, a low hum of its motor under it), and
+ * winding down: quiet (the owner's: a faint blow) */
+export function dryerSound(near: number, seconds = 1.5) {
+  const a = ctx()
+  if (!a || near < 0.02) return
+  const t = a.currentTime
+  const air = noise(a, seconds + 0.3, (x) => Math.min(1, x * (seconds + 0.3) / 0.18) * Math.min(1, (1 - x) * (seconds + 0.3) / 0.3), 0.55)
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.6
+  air.connect(f).connect(out(a, 0.22 * near))
+  air.start(t)
+  const hum = a.createOscillator(); hum.type = 'triangle'
+  hum.frequency.setValueAtTime(70, t); hum.frequency.linearRampToValueAtTime(118, t + 0.2); hum.frequency.setValueAtTime(118, t + seconds); hum.frequency.linearRampToValueAtTime(60, t + seconds + 0.3)
+  const hg = out(a, 0)
+  hg.gain.setValueAtTime(0, t); hg.gain.linearRampToValueAtTime(0.04 * near, t + 0.2); hg.gain.setValueAtTime(0.04 * near, t + seconds); hg.gain.linearRampToValueAtTime(0, t + seconds + 0.3)
+  hum.connect(hg)
+  hum.start(t); hum.stop(t + seconds + 0.35)
+}
+
 /** a knock at a locked door (コンコン), and nobody coming out */
 export function knockSound(near: number) {
   const a = ctx()

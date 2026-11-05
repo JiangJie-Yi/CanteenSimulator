@@ -1,7 +1,7 @@
 import { blessingChime, pourSake, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
 import { BambooHit, BambooModel } from './BarFurnish'
-import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote } from './Restroom'
+import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
 import { coolerDoorSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -1873,7 +1873,7 @@ const wcStallNoren = (who: 'm' | 'f') => {
     const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646 }
     g.save()
     const gr = g.createLinearGradient(0, 0, 0, H)
-    if (who === 'm') { gr.addColorStop(0, '#22385e'); gr.addColorStop(1, '#162540') } else { gr.addColorStop(0, '#4b3c68'); gr.addColorStop(1, '#2f2546') }
+    if (who === 'm') { gr.addColorStop(0, '#22385e'); gr.addColorStop(1, '#162540') } else { gr.addColorStop(0, '#b22222'); gr.addColorStop(1, '#8b0000') }
     g.fillStyle = gr; g.fillRect(0, 0, 512, H)
     if (who === 'm') {
       // (indigo (the owner's: the men's a deep navy with a traditional pattern; it was green bamboo on linen): waves of seigaiha rising over
@@ -2006,7 +2006,7 @@ const wcStallNoren = (who: 'm' | 'f') => {
         g.restore()
       }
       blossom(140, H * 0.4, 92, { deep: '#d55a74', mid: '#ec8fa1', pale: '#fbd5dc', line: 'rgba(140,40,60,0.5)' })
-      blossom(380, H * 0.6, 104, { deep: '#8f1a27', mid: '#c93744', pale: '#f0807f', line: 'rgba(80,10,20,0.55)' })
+      blossom(380, H * 0.6, 104, { deep: '#e9d9d2', mid: '#f7eee8', pale: '#ffffff', line: 'rgba(120,40,40,0.45)' })
       blossom(158, H * 0.8, 76, { deep: '#e3a88c', mid: '#f4d7c4', pale: '#fffaf1', line: 'rgba(150,105,80,0.45)' })
     }
     // (the linen's weave over it all)
@@ -2016,9 +2016,9 @@ const wcStallNoren = (who: 'm' | 'f') => {
     g.fillStyle = '#000000'
     for (let y = 0; y < H; y += 3) g.fillRect(0, y, 512, 1)
     g.globalAlpha = 1
-    // (the women's a deep wisteria (藤色), answering the men's indigo (the owner's: its pale pink linen stood out from the wood), its
-    // band along the top a deep madder)
-    g.fillStyle = who === 'm' ? '#0f1a2e' : '#5a1a2c'; g.fillRect(0, 0, 512, 40)
+    // (the women's a deep crimson (緋色), as the women's door noren is red (the owner's: it was a deep wisteria, reading as the men's
+    // indigo), its peonies pink and white over it; its band along the top a darker red)
+    g.fillStyle = who === 'm' ? '#0f1a2e' : '#5a0c12'; g.fillRect(0, 0, 512, 40)
     g.fillStyle = '#f4efe4'; g.fillRect(0, H - 20, 512, 4)
     g.restore()
   })
@@ -2061,23 +2061,6 @@ const WC_CEDAR = canvasTex(64, 128, (g) => {
     }
   }
 }, true)
-/** a hand towel (手拭い) of dyed cotton with a wave pattern, white at both ends: indigo in the men's, a deep madder (茜色) in the women's
- * (the owner's: a colour of its own there, as calm as the men's) */
-const tenugui = (base: string) => canvasTex(48, 96, (g) => {
-  g.fillStyle = base
-  g.fillRect(0, 0, 48, 96)
-  g.strokeStyle = 'rgba(244,239,226,0.7)'
-  g.lineWidth = 1.2
-  for (let row = 0; row < 7; row++) for (let col = -1; col < 3; col++) for (const r of [8, 5, 2]) {
-    g.beginPath()
-    g.arc(col * 16 + (row % 2) * 8, 20 + row * 8, r, Math.PI, 0)
-    g.stroke()
-  }
-  g.fillStyle = '#f4efe2'
-  g.fillRect(0, 0, 48, 6)
-  g.fillRect(0, 90, 48, 6)
-}, false)
-const WC_TENUGUI = { m: tenugui('#1f3a68'), f: tenugui('#7e2634') }
 const WC_GEO = {
   bowl: new THREE.SphereGeometry(0.12, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
   foot: new THREE.CylinderGeometry(0.07, 0.09, 0.28, 16),
@@ -2378,14 +2361,17 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         ))}
       </group>
       </StaticBatch></Movable>}
-      <Movable id={`wc2-${who}-towel`} label={`手巾架（${name}）`}><StaticBatch plain>
-      {/* (the indigo hand towel on a bamboo rod on the wall beside the washstand) */}
-      <group position={[D - 0.24, 0.98, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
-        <mesh position-z={0.022} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.007, 0.007, 0.18, 8]} /><meshToonMaterial color="#b89a52" /></mesh>
-        {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.08, 0, 0.011]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.005, 0.005, 0.022, 6]} /><meshToonMaterial color="#5a3d22" /></mesh>)}
-        <mesh position={[0, -0.11, 0.03]}><planeGeometry args={[0.12, 0.22]} /><meshToonMaterial color="#ffffff" map={WC_TENUGUI[who]} side={THREE.DoubleSide} /></mesh>
-      </group>
-      </StaticBatch></Movable>
+      {/* (no towel on a rod: a paper towel dispenser and a hand dryer on the wall beside the washstand (the owner's), the dryer next to it,
+          where hands are held out after washing (GuestBar3D steps them over to it, its marker wc-dryer-<who>)) */}
+      <Movable id={`wc2-${who}-dryer`} label={`烘手機（${name}）`}>
+        <group position={[D - 0.26, 1.02, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
+          <WcDryer who={who} />
+          <group name={`wc-dryer-${who}`} position={[0, -1.02, 0.4]} />
+        </group>
+      </Movable>
+      <Movable id={`wc2-${who}-towelbox`} label={`擦手紙盒（${name}）`}>
+        <group position={[D - 0.56, 1.14, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}><WcTowelBox /></group>
+      </Movable>
       {/* (no お手洗い plaque on the wall: the owner's, the wall kept clean) */}
       <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch plain>
       {/* the slatted duckboard (簀の子) before the washstand, where hands are washed */}
@@ -2440,10 +2426,11 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           <planeGeometry args={[0.5, 0.5]} />
           <meshBasicMaterial map={WC_WINDOW_FALL ?? undefined} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
         </mesh>
-        {/* (the remote on the left-hand wall (+z), turned to face the room, a little forward of the seat: clear of the pads' shelf over the
-            cistern in the women's) */}
-        <Movable id={`wc2-${who}-remote2`} label={`免治馬桶遙控器（${name}）`}>
-          <group position={[E - 0.74, 0.9, W2]} rotation-y={Math.PI}><WcRemote who={who} /></group>
+        {/* (the remote over the wainscot's rail (it sat on it, the rail through it), along toward the toilet, clear of the doorway's post (it
+            was half behind it), its flush unit on the toilet's side of it; on the wall the camera sees (the men's room's turned the other
+            way: on its left-hand wall, the cut-away one, it was seen from behind; the owner's)) */}
+        <Movable id={`wc2-${who}-remote3`} label={`免治馬桶遙控器（${name}）`}>
+          <group position={[E - 0.55, 1.06, who === 'f' ? W2 : -W2]} rotation-y={who === 'f' ? Math.PI : 0}><WcRemote who={who} flushAt={who === 'f' ? -0.15 : 0.15} /></group>
         </Movable>
         {/* (the Otohime in the women's only: the owner's) */}
         {who === 'f' && (
@@ -2452,7 +2439,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           </Movable>
         )}
         <Movable id={`wc2-${who}-brush`} label={`馬桶刷（${name}）`}>
-          <WcBrush who={who} at={[E - 0.08, 0, -W2 + 0.08]} bowl={[E - 0.43, 0.31, 0]} />
+          {/* (in the corner by the cistern on the side the camera sees: the men's room's turned the other way, its brush was behind the
+              toilet (the owner's: "the men's has none")) */}
+          <WcBrush who={who} at={[E - 0.08, 0, who === 'f' ? -W2 + 0.08 : W2 - 0.08]} bowl={[E - 0.43, 0.31, 0]} />
         </Movable>
         <Movable id={`wc2-${who}-paper`} label={`衛生紙架（${name}）`}>
           {/* the paper, on its walnut holder on the wall by the toilet (Restroom: thinning with use, a new roll at a click) */}
@@ -2467,7 +2456,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {who === 'f' && (
           <Movable id="wc2-f-pads" label="衛生棉（女廁）">
             {/* (the sanitary pads, free to take, on their shelf on the wall across from the paper) */}
-            <group position={[E - 0.42, 0.98, W2]} rotation-y={Math.PI}><WcPads /></group>
+            {/* (along toward the cistern, clear of the remote (the owner's)) */}
+            <group position={[E - 0.22, 0.98, W2]} rotation-y={Math.PI}><WcPads /></group>
           </Movable>
         )}
         <Movable id={`wc2-${who}-lamp2`} label={`隔間紙燈（${name}）`}>

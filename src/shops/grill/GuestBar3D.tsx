@@ -2150,6 +2150,8 @@ const WC_STAY = 6
 const wcStayOf = (id: number) => WC_STAY - 2 + ((id * 7919) % 100) / 50
 /** and how long they wash their hands at the washstand after, the tap running (Restroom's HAND_MS) */
 const HAND_S = HAND_MS / 1000
+/** after washing, their hands held under the hand dryer on the wall by the washstand (the owner's: no towel; Restroom's WcDryer blows) */
+const HAND_DRY_S = 1.5
 /** and to go and get themselves a drink from the fridge (once), and how long they stand choosing */
 const DRINK_RATE = 1 / 70
 /** (in development, `__drinkRate` in the console makes them thirstier, for watching it) */
@@ -2870,7 +2872,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(w.basin)
         if (g) g.rotation.y = w.basinYaw
         s.still = true
-        if (s.t > HAND_S) { s.phase = 'wcBack'; s.t = 0; s.still = false }
+        if (s.t > HAND_S) {
+          // (then a step to the hand dryer on the wall beside, turned to it, hands under it while it blows)
+          const who = s.wc!.who as 'm' | 'f'
+          if (s.t - dt <= HAND_S) TOILETS[who].dryAt = performance.now()
+          const dry = inBar(`wc-dryer-${who}`, w.basin)
+          const k = Math.min(1, (s.t - HAND_S) / 0.3)
+          const to = w.basin.clone().lerp(dry.clone().setY(w.basin.y), 0.55)
+          g?.position.lerpVectors(w.basin, to, k * k * (3 - 2 * k))
+          if (g) g.rotation.y = w.basinYaw + Math.atan2(Math.sin(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw), Math.cos(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw)) * k
+        }
+        if (s.t > HAND_S + HAND_DRY_S) { s.phase = 'wcBack'; s.t = 0; s.still = false }
       } else {
         // a moment to get up, then off the way they came, by the till: they stop there to pay, and again at the genkan's step
         const lp = leavePaths[s.seat]

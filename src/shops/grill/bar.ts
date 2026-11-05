@@ -480,9 +480,9 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
 /** each toilet: how many are going through its door just now and whether someone's inside, locked (GuestBar3D); whether the player's
  * opened it; its upkeep (game/restroom: how clean, how much paper); whether its washstand's tap's been turned on by hand (metered by the
  * minute, App); and when it last flushed, was scrubbed, played its Otohime, was knocked at, or a guest last washed their hands at its
- * washstand (performance.now() ms, for the room's animations and sounds) */
+ * washstand, or dried them at its hand dryer (performance.now() ms, for the room's animations and sounds) */
 const wcOf = () => ({ passing: 0, inside: 0, open: false, room: freshRoom(), tap: false, flushAt: -1e9, scrubAt: -1e9, otoAt: -1e9, knockAt: -1e9,
-  rollAt: -1e9, washAt: -1e9, handAt: -1e9 })
+  rollAt: -1e9, washAt: -1e9, handAt: -1e9, dryAt: -1e9 })
 export const TOILETS = { m: wcOf(), f: wcOf() }
 /** points off the taste of what each guest eats, for what they found in the toilet (Roasting reads it) */
 export const WC_GRUMBLE = new Map<number, number>()
