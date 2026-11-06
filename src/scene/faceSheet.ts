@@ -168,29 +168,24 @@ function solidify(c: HTMLCanvasElement) {
 /** a canvas whose see-through parts stay see-through when it's packed into an atlas (scene/atlasMerge) */
 export type SeeThrough = HTMLCanvasElement & { seeThrough?: boolean }
 
-// ---- the owner's and the staff's: a sheet of four by two frames over their face patch (blender/boss.py: x ±0.16, y 0.13 to −0.17 from
-// the head's middle, on a head 0.27 round)
-const HEAD_R = 0.27
-const PATCH = { x: 0.16, top: 0.13, bottom: -0.17 }
-const CELL = { w: 192, h: 180 }
+// ---- the owner's and the staff's: a sheet of four by two frames, each the front of the head itself (blender/boss.py: the head's faces within
+// 45 degrees of its middle are the face, their UVs by bearing and elevation, az -45..45 across a frame, el 45..-45 down it)
+const SPAN = 45
+const CELL = 243
 const crewSheets = new Map<FaceKind, THREE.CanvasTexture>()
 /** the sheet of faces for the owner (`boss`) or the staff (`male`, `female`) */
 export function crewFaceSheet(kind: FaceKind) {
   let t = crewSheets.get(kind)
   if (t) return t
   const c = document.createElement('canvas') as SeeThrough
-  c.width = CELL.w * 4
-  c.height = CELL.h * 2
+  c.width = CELL * 4
+  c.height = CELL * 2
   c.seeThrough = true
   const g = c.getContext('2d')!
-  const k = (Math.PI / 180) * HEAD_R
+  const k = CELL / (2 * SPAN)
   FACES.forEach((face, i) => {
-    const ox = (i % 4) * CELL.w, oy = Math.floor(i / 4) * CELL.h
-    const w = CELL.w / (2 * PATCH.x), h = CELL.h / (PATCH.top - PATCH.bottom)
-    paintFace(g, {
-      place: (az, el) => [ox + (PATCH.x + HEAD_R * Math.sin((az * Math.PI) / 180)) * w, oy + (PATCH.top - HEAD_R * Math.sin(((el + EYE_EL_OFFSET) * Math.PI) / 180)) * h],
-      sx: k * w, sy: k * h,
-    }, kind, face)
+    const ox = (i % 4) * CELL, oy = Math.floor(i / 4) * CELL
+    paintFace(g, { place: (az, el) => [ox + (az + SPAN) * k, oy + (SPAN - el) * k], sx: k, sy: k }, kind, face)
   })
   solidify(c)
   t = new THREE.CanvasTexture(c)
@@ -198,49 +193,6 @@ export function crewFaceSheet(kind: FaceKind) {
   t.flipY = false
   crewSheets.set(kind, t)
   return t
-}
-/** the eyes' line on the patch (blender/boss.py's EY, 0.015 up from the head's middle) as degrees, the painter's 3.2 there */
-const EYE_EL_OFFSET = (Math.asin(0.015 / HEAD_R) * 180) / Math.PI - EYE_EL
-
-// ---- the glasses' frames (blender/boss.py: their patch x ±0.165, y ±0.07 about the eyes' line, standing off the face)
-const GLASS = { x: 0.165, dy: 0.07 }
-let glassesPic: THREE.CanvasTexture | null = null
-export function glassesSheet() {
-  if (glassesPic) return glassesPic
-  const c = document.createElement('canvas') as SeeThrough
-  c.width = 512
-  c.height = Math.round((512 * GLASS.dy * 2) / (GLASS.x * 2))
-  c.seeThrough = true
-  const g = c.getContext('2d')!
-  const k = 512 / (2 * GLASS.x)
-  const px = (x: number, y: number): [number, number] => [(x + GLASS.x) * k, (GLASS.dy - y) * k]
-  g.strokeStyle = '#2a1e18'
-  g.lineWidth = 0.011 * k
-  g.lineJoin = 'round'
-  g.lineCap = 'round'
-  for (const sd of [-1, 1]) {
-    // (each lens a rounded square, the old frames' shape, big enough round the bigger eyes)
-    g.beginPath()
-    for (let i = 0; i <= 24; i++) {
-      const t = (2 * Math.PI * i) / 24 + Math.PI / 8
-      const c_ = Math.cos(t), s_ = Math.sin(t)
-      const [x, y] = px(sd * 0.09 + 0.062 * Math.sign(c_) * Math.abs(c_) ** 0.6, 0.062 * Math.sign(s_) * Math.abs(s_) ** 0.6)
-      if (i) g.lineTo(x, y); else g.moveTo(x, y)
-    }
-    g.stroke()
-    // (the arm's start out to the patch's edge)
-    g.beginPath(); g.moveTo(...px(sd * 0.152, 0.008)); g.lineTo(...px(sd * 0.163, 0.006)); g.stroke()
-    // (a glint across the lens)
-    g.save(); g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 0.006 * k
-    g.beginPath(); g.moveTo(...px(sd * 0.09 + 0.026, 0.04)); g.lineTo(...px(sd * 0.09 + 0.042, 0.022)); g.stroke(); g.restore()
-  }
-  // (the bridge)
-  g.beginPath(); g.moveTo(...px(-0.03, 0.014)); g.quadraticCurveTo(...px(0, 0.03), ...px(0.03, 0.014)); g.stroke()
-  solidify(c)
-  glassesPic = new THREE.CanvasTexture(c)
-  glassesPic.colorSpace = THREE.SRGBColorSpace
-  glassesPic.flipY = false
-  return glassesPic
 }
 
 // ---- the customers': a strip of eight frames 256 square each, painted in degrees (az −62 to 62 across, el 42 down to −52; blender/folk.py)

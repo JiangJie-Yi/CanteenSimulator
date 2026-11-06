@@ -9,7 +9,7 @@ import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } fr
 import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
-import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
+import { crewFaceSheet, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { FigureHit } from './FigureHit'
 
@@ -37,7 +37,7 @@ const variantOf = (role: Role, female: boolean): Variant =>
  * rectangles off the face, and the shadow pass (no alphaTest: they're hashed) cast them whole, black blocks over the eyes (the owner saw) */
 const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
 const ROLE_TAG: Record<Role, string> = { chef: '主廚', sous: '二廚', server: '外場', cashier: '收銀', stock: '倉儲' }
-const UNINKED = /(Face|Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
+const UNINKED = /(Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
@@ -108,12 +108,12 @@ function build(scene: THREE.Group, v: Variant): Built {
     if (!m.isMesh || Array.isArray(m.material)) return
     const n = (m.material as THREE.Material).name
     m.userData.flat = /White|Dark/.test(n)
-    m.userData.tint = /CrewSkin/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : /CrewNose/.test(n) ? 'nose' : undefined
+    m.userData.tint = /CrewSkin|CrewFace/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : /CrewNose/.test(n) ? 'nose' : undefined
     // (the face's sheet of expressions and the glasses' frames painted, for the atlas to take in)
-    if (n === 'BossFace') (m.material as THREE.MeshStandardMaterial).map = crewFaceSheet(v === 'chefF' || v === 'serverF' ? 'female' : 'male')
-    else if (n === 'BossGlassPic') (m.material as THREE.MeshStandardMaterial).map = glassesSheet()
+    // (the face is the head's own front: its sheet over each person's skin (their tint), where nothing's drawn the skin)
+    if (n === 'CrewFace') (m.material as THREE.MeshStandardMaterial).map = crewFaceSheet(v === 'chefF' || v === 'serverF' ? 'female' : 'male')
   })
-  const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap, alphaHash: true }))))!
+  const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap, alphaHash: true })), { decal: true }))!
   // (every piece of it in the figure's frame, its part, inked or not, flat or not, skin or hair)
   const pieces: (SkinPiece & { tint?: Tint['tint'] })[] = []
   let face = -1
@@ -124,7 +124,7 @@ function build(scene: THREE.Group, v: Variant): Built {
     if (part === 'drop' || (part === 'fan' && !holds.includes('fan'))) return
     if (m.name === 'BossFace') face = pieces.length
     pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: BONES.indexOf(part),
-      inked: !UNINKED.test(m.name), flat: !!m.userData.flat, shadowless: HEAD.test(m.name), tint: m.userData.tint })
+      inked: !UNINKED.test(m.name), flat: !!m.userData.flat, shadowless: HEAD.test(m.name), decal: m.name === 'BossFace', tint: m.userData.tint })
   })
   for (const h of heldPieces()) {
     if (holds.includes(h.part)) pieces.push({ geo: h.geo, bone: BONES.indexOf(h.part) })

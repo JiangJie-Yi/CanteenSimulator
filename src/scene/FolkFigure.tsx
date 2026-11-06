@@ -119,7 +119,7 @@ export const SEAT = 0.31
 /** how tall the figure stands, to the top of its head (blender/folk.py: the head's top), in its own frame */
 export const FOLK_HEIGHT = 1.07
 /** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers) */
-const UNINKED = /FolkFace|FolkFrame|FolkGold|FolkRed/
+const UNINKED = /FolkFrame|FolkGold|FolkRed/
 /** which picture a vertex is painted from (its `paint`'s z): its colour alone, the clothes', the face's strip over the skin's colour, the knit's */
 const PIC = { none: 0, outfit: 1, face: 2, knit: 3 } as const
 /** the parts that move, in the order the vertices name them: the body, the head and the hands, what's in the hands, the briefcase by the stool */

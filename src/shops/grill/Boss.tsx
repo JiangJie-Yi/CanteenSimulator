@@ -14,9 +14,15 @@ import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { FigureHit } from '@/scene/FigureHit'
+/** the skin's own colour on a figure (its BossSkin material's) */
+const skinOf = (r: THREE.Object3D) => {
+  let c: THREE.Color | null = null
+  r.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (!c && m?.name === 'BossSkin') c = m.color.clone() })
+  return c ?? new THREE.Color('#d99a68')
+}
 /** his name tag's words: his role, and his name when he's been given one */
 const bossName = () => SPEAKERS.get('owner') ?? '老闆'
-import { crewFaceSheet, faceRange, glassesSheet, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
+import { crewFaceSheet, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -34,7 +40,7 @@ const URL = import.meta.env.BASE_URL + 'models/boss.glb'
 /** the head and what's on it, which take no shadow (as the customers' don't): the face's and the glasses' patches are see-through
  * rectangles off the face, and the shadow pass (no alphaTest: they're hashed) cast them whole, black blocks over the eyes (the owner saw) */
 const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
-const UNINKED = /(Face|Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan|Sideburn|Pencil|Pin|Towel)/
+const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan|Sideburn|Pencil|Pin|Towel)/
 let made: THREE.Object3D | null = null
 
 /** where his hands hang at rest (as modelled, the node's own frame) */
@@ -121,11 +127,11 @@ function styledBoss(scene: THREE.Group) {
     // ---- his face's sheet of expressions and his glasses' frames painted, for the atlas to take in
     r.traverse((o) => {
       const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
-      if (mm?.name === 'BossFace') mm.map = crewFaceSheet('boss')
-      else if (mm?.name === 'BossGlassPic') mm.map = glassesSheet()
+      // (the face is the head's own front: its sheet over the skin's colour, where nothing's drawn the skin)
+      if (mm?.name === 'BossFace') { mm.map = crewFaceSheet('boss'); mm.color.copy(skinOf(r)) }
     })
     // ---- all of him one material, his face's sheet in it too
-    atlasModel(r, () => true, (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap }))))
+    atlasModel(r, () => true, (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap })), { decal: true }))
     // ---- each piece of him in his frame, with its part, inked or not, flat or not
     r.updateMatrixWorld(true)
     const inv = r.matrixWorld.clone().invert()
@@ -142,7 +148,7 @@ function styledBoss(scene: THREE.Group) {
     for (const m of meshes) {
       mat = m.material as THREE.Material
       if (m.name === 'BossFace') face = pieces.length
-      pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m), inked: !UNINKED.test(m.name), shadowless: HEAD.test(m.name) })
+      pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m), inked: !UNINKED.test(m.name), shadowless: HEAD.test(m.name), decal: m.name === 'BossFace' })
       m.removeFromParent()
       m.geometry.dispose()
     }
@@ -171,7 +177,8 @@ export function BossModel({ face = 'idle' }: { face?: CrewFace }) {
     if (t0.current.face !== face) t0.current = { face, at: T }
     setFace(obj, face === 'idle' && T % 3.4 < 0.15 ? 'blink' : face)
     const moustache = obj.getObjectByName('BossMoustache')
-    if (moustache) moustache.position.y = Math.sin(T * 1.6) * 0.003
+    // (from where it sits, not from the figure's feet: set outright, it fell to the stand (the owner saw it there))
+    if (moustache) { moustache.userData.rest ??= moustache.position.y; moustache.position.y = moustache.userData.rest + Math.sin(T * 1.6) * 0.003 }
     const [w, h] = jelly(T - t0.current.at)
     obj.scale.set(w, h, w)
   })

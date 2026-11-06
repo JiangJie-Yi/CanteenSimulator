@@ -367,7 +367,7 @@ C = Vector((0.0, 0.68 + DY, 0.0))
 R = 0.27
 # (the owner's head 22 round, the staff's 20: what of it the tenugui, the hair and the body hide is culled at the end)
 # (the owner's lean head (the owner's: his head 300 to 500 triangles): 16 round, 9 rings; the staff's as before)
-ring_ball(radius=R, segs=12, rings=7, location=P(*C))
+ring_ball(radius=R, segs=16, rings=8, location=P(*C))
 head = fin(active(), "BossHead", M["skin"])
 
 
@@ -512,7 +512,7 @@ for sd in (-1, 1):
 # its two corners sticking out
 BE = math.asin(0.12 / R)
 CAPPED = WEAR in ("boss", "cap")
-ring_ball(radius=R + 0.02, segs=12, rings=8, location=P(*C))
+ring_ball(radius=R + 0.03, segs=12, rings=8, location=P(*C))
 cap = active()
 bm = bmesh.new(); bm.from_mesh(cap.data)
 gone = []
@@ -830,6 +830,182 @@ fin(fp, "BossFanPaper", M["fan"], smooth=False).parent = fan
 tube("BossFanHandle", [Vector((0, -0.03, 0)), Vector((0, 0.035, 0))], 0.006, M["bamboo"]).parent = fan
 props.append(fan)
 
+
+# ==================================================================== the clean figure (the owner's, 2026-11-06: no patches over the face, no
+# boxes stuck on the chest, nothing left inside the head): what's painted is painted on the shape it's on
+_drop = ("BossObiCord", "BossFace", "BossGlass", "BossSideburn", "BossPencil", "BossPin", "BossCollar", "BossHem", "BossCord", "BossApron", "BossTenuguiRoll",
+         "BossPants", "BossBody", "BossTowel1", "BossTowel2")
+for o in [x for x in parts if (x.name.startswith(_drop) or x.name == "BossObi") and not x.name.startswith("BossGlassArm")]:
+    parts.remove(o)
+    bpy.data.objects.remove(o)
+
+# ---- the body: one turned shape, 16 round; the trousers, the coat (its creases), the apron with 聞野 on it, the cord round the waist and
+# its bow, the crossed collar and (the owner's) the gold fish pin all one picture on it
+BODY_TOP = 0.6
+_TW, _TH = 1024, 512
+_bu = np.tile((np.arange(_TW) + 0.5) / _TW, (_TH, 1))
+_bv = np.tile(((np.arange(_TH) + 0.5) / _TH)[:, None], (1, _TW))
+_by_ = _bv * BODY_TOP
+_aw = ((_bu * 2 * math.pi + math.pi) % (2 * math.pi)) - math.pi
+_rb = np.vectorize(rb)(_by_)
+_bx = _rb * np.sin(_aw)
+_front = np.cos(_aw) > 0
+
+
+def _sample(img, u, v):
+    """img (rows up, columns round) at u, v (0..1)"""
+    h, w = img.shape[:2]
+    return img[np.clip((v * h).astype(int), 0, h - 1), np.clip((u * w).astype(int) % w, 0, w - 1)]
+
+
+_coat = _sample(_ct, _bu, _by_ / 1.64)
+_pant = _sample(_weave_at(PANTS, 256, 256, 0.1), _bu, _by_ / 1.64)
+_body = np.where((_by_ < HEM)[..., None], _pant, _coat)
+# (the coat's hem: a soft shade just over it, where it stood off the trousers)
+_body = _body * np.where(((_by_ >= HEM) & (_by_ < HEM + 0.01))[..., None], 0.84, 1.0)
+if CREW not in ("serverF", "stock"):
+    _ain = (np.abs(_aw) < AP_A) & (_by_ >= AP[0][0]) & (_by_ <= AP[-1][0])
+    _apc = _sample(_ap, (_aw + AP_A) / (2 * AP_A), (_by_ - AP[0][0]) / AP_H)
+    # (its sides a touch darker, as a cloth's edge turning away)
+    _edge = np.clip((AP_A - np.abs(_aw)) / 0.08, 0.75, 1.0)
+    _body = np.where(_ain[..., None], _apc * _edge[..., None], _body)
+
+
+def _seg(x, y, p0, p1):
+    """each point's distance from the segment p0-p1 (x, y on the body's front)"""
+    (x0, y0), (x1, y1) = p0, p1
+    dx, dy = x1 - x0, y1 - y0
+    t = np.clip(((x - x0) * dx + (y - y0) * dy) / (dx * dx + dy * dy), 0, 1)
+    return np.hypot(x - x0 - t * dx, y - y0 - t * dy)
+
+
+def _band(img, mask_d, w, col):
+    """a band of `col` where mask_d < w / 2 (on the front), a darker line along its edges"""
+    inside = _front & (mask_d < w / 2)
+    edge = _front & (np.abs(mask_d - w / 2) < 0.004)
+    img = np.where(inside[..., None], np.array(col, np.float32), img)
+    return np.where(edge[..., None], img * 0.72, img)
+
+
+_cc = tuple(c for c in M["collar"].diffuse_color[:3])
+_cc = tuple(float(c) ** (1 / 2.2) for c in _cc)
+# (the crossed collar: the dark under-collar at the neck, the right side under, the left over it, as a kappōgi's)
+_body = _band(_body, np.minimum(_seg(_bx, _by_, (-0.08, 0.44 + DY), (0.0, 0.385 + DY)), _seg(_bx, _by_, (0.0, 0.385 + DY), (0.08, 0.44 + DY))), 0.03, PANTS)
+_body = _band(_body, _seg(_bx, _by_, (0.1, 0.43 + DY), (0.0, 0.32 + DY)), 0.05, _cc)
+_body = _band(_body, _seg(_bx, _by_, (-0.1, 0.43 + DY), (0.14, 0.24 + DY)), 0.055, _cc)
+if CREW != "serverF":
+    # (the apron's cord round the waist, and its bow at his left side with two short tails)
+    CORD = (0.91, 0.86, 0.75)
+    _cord = np.abs(_by_ - BELT) < 0.009
+    _body = np.where(_cord[..., None], np.array(CORD, np.float32) * (1 - 0.25 * np.abs(_by_ - BELT)[..., None] / 0.009), _body)
+    _bs = (_aw - math.radians(60)) * rb(BELT)
+    for sd in (-1, 1):
+        _lp = np.hypot((_bs - sd * 0.022) / 0.022, (_by_ - BELT - 0.004) / 0.014)
+        _body = np.where(((_lp > 0.55) & (_lp < 1.0))[..., None], np.array(CORD, np.float32), _body)
+        _body = np.where((np.abs(_lp - 1.0) < 0.12)[..., None], _body * 0.7, _body)
+        _tl = _seg(_bs, _by_, (sd * 0.006, BELT), (sd * 0.016, BELT - 0.05)) < 0.004
+        _body = np.where(_tl[..., None], np.array(CORD, np.float32) * 0.92, _body)
+if not CREW:
+    # (his gold fish pin on his chest, painted (it was a lump stuck on him))
+    _px, _py = 0.12, 0.33 * BH + 0.06
+    _fish = _front & (np.hypot((_bx - _px) / 0.026, (_by_ - _py) / 0.012) < 1)
+    _tail = _front & (_bx > _px + 0.02) & (_bx < _px + 0.036) & (np.abs(_by_ - _py) < (_bx - _px - 0.02) * 0.8)
+    _body = np.where((_fish | _tail)[..., None], np.array((0.88, 0.69, 0.25), np.float32) * (1 + 0.25 * ((_by_ - _py) / 0.012)[..., None]).clip(0.7, 1.2), _body)
+    _body = np.where((_front & (np.hypot(_bx - _px + 0.014, _by_ - _py - 0.003) < 0.0035))[..., None], np.array((0.12, 0.08, 0.06), np.float32), _body)
+if CREW == "serverF":
+    # (her kimono's obi, gold with a woven sheen and darker edges, and the red obijime across its middle, painted on (the band and the cord
+    # round her were shapes))
+    _ob = np.abs(_by_ - BELT) < 0.06
+    _gold = np.array((0.85, 0.66, 0.25), np.float32) * (0.92 + 0.08 * np.sin(_bu * 2 * math.pi * 90))[..., None]
+    _body = np.where(_ob[..., None], _gold, _body)
+    _body = np.where((np.abs(np.abs(_by_ - BELT) - 0.058) < 0.004)[..., None], _body * 0.7, _body)
+    _body = np.where((np.abs(_by_ - BELT) < 0.006)[..., None], np.array((0.78, 0.19, 0.16), np.float32), _body)
+M["body"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_body", np.clip(_body, 0, 1).astype(np.float32)), rough=0.8)
+_bm = bmesh.new()
+_uvl = _bm.loops.layers.uv.new()
+_prof = PROFILE[1:]
+_SEG = 16
+_rows = [[_bm.verts.new(P(math.sin(2 * math.pi * i / _SEG) * rr, yy, math.cos(2 * math.pi * i / _SEG) * rr)) for i in range(_SEG)] for (yy, rr) in _prof]
+for j in range(len(_rows) - 1):
+    for i in range(_SEG):
+        f = _bm.faces.new((_rows[j][i], _rows[j][(i + 1) % _SEG], _rows[j + 1][(i + 1) % _SEG], _rows[j + 1][i]))
+        for lp, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
+            lp[_uvl].uv = (ii / _SEG, _prof[jj][0] / BODY_TOP)
+for f in ladder_fill(_bm, _rows[0][::-1]):
+    for lp in f.loops:
+        lp[_uvl].uv = (_rows[0].index(lp.vert) / _SEG, _prof[0][0] / BODY_TOP)
+bmesh.ops.recalc_face_normals(_bm, faces=_bm.faces)
+_me = bpy.data.meshes.new("BossBody"); _bm.to_mesh(_me); _bm.free()
+_o = bpy.data.objects.new("BossBody", _me); bpy.context.collection.objects.link(_o)
+fin(_o, "BossBody", M["body"])
+
+# ---- the face: the head's own front faces (16 round: the four columns and four rows within 45 degrees of its middle), their UVs on the
+# first frame of the game's sheet of expressions (scene/faceSheet: az -45..45 across a quarter of it, el 45..-45 down half), split off as
+# their own mesh; head and face given the ball's own normals, so the join doesn't show
+_hd = next(x for x in parts if x.name == "BossHead")
+_c = Vector(P(*C)) - _hd.location
+_hb = bmesh.new(); _hb.from_mesh(_hd.data)
+
+
+def _ae(co):
+    """a point's bearing and elevation (degrees) on the head (three's frame: x across, y up, z forward)"""
+    d = co - _c
+    x, y, z = d.x, d.z, -d.y
+    return math.degrees(math.atan2(x, z)), math.degrees(math.asin(max(-1.0, min(1.0, y / d.length))))
+
+
+_ff = [f for f in _hb.faces if all(abs(v) < 45 for v in _ae(f.calc_center_median()))]
+_fb = bmesh.new()
+_fuv = _fb.loops.layers.uv.new()
+_map = {}
+for f in _ff:
+    vs = []
+    for v in f.verts:
+        if v not in _map:
+            _map[v] = _fb.verts.new(v.co)
+        vs.append(_map[v])
+    nf = _fb.faces.new(vs)
+    for lp in nf.loops:
+        a_, e_ = _ae(lp.vert.co)
+        lp[_fuv].uv = ((a_ + 45) / 90 * 0.25, 1 - (45 - e_) / 90 * 0.5)
+bmesh.ops.delete(_hb, geom=_ff, context="FACES_ONLY")
+_hb.to_mesh(_hd.data); _hb.free()
+_fme = bpy.data.meshes.new("BossFace"); _fb.to_mesh(_fme); _fb.free()
+_fo = bpy.data.objects.new("BossFace", _fme); bpy.context.collection.objects.link(_fo)
+_fo.location = _hd.location
+# (the face's own material, the one made with the face's section (a second of the same name would be BossFace.001, and the game finds it by
+# its name); a cook's or a server's named for the game to give it their skin)
+M["face"].name = "BossFace" if not CREW else "CrewFace"
+fin(_fo, "BossFace", M["face"])
+for _o in (_hd, _fo):
+    _o.data.normals_split_custom_set_from_vertices([(v.co - _c).normalized() for v in _o.data.vertices])
+
+# ---- the glasses: two thin black frames standing off the face (a flat rim and its edge, 8 round each), the bridge, the arms back to the ears
+_gb = bmesh.new()
+for sd in (-1, 1):
+    ring_o, ring_i, ring_b = [], [], []
+    for i in range(8):
+        t = 2 * math.pi * i / 8 + math.pi / 8
+        c_, s_ = math.cos(t), math.sin(t)
+        ox, oy = 0.062 * math.copysign(abs(c_) ** 0.6, c_), 0.062 * math.copysign(abs(s_) ** 0.6, s_)
+        ring_o.append(_gb.verts.new(P(*on_head(sd * 0.09 + ox, EY + oy, 0.03)[0])))
+        ring_i.append(_gb.verts.new(P(*on_head(sd * 0.09 + ox * 0.82, EY + oy * 0.82, 0.03)[0])))
+        ring_b.append(_gb.verts.new(P(*on_head(sd * 0.09 + ox, EY + oy, 0.022)[0])))
+    for i in range(8):
+        k = (i + 1) % 8
+        _gb.faces.new((ring_o[i], ring_o[k], ring_i[k], ring_i[i]))
+        _gb.faces.new((ring_b[i], ring_b[k], ring_o[k], ring_o[i]))
+_br = [P(*on_head(x, EY + 0.012 + dy, 0.03)[0]) for x in (-0.03, 0.03) for dy in (-0.005, 0.005)]
+_bv4 = [_gb.verts.new(q) for q in _br]
+_gb.faces.new((_bv4[0], _bv4[2], _bv4[3], _bv4[1]))
+# (each face turned to look away from the head)
+for f in _gb.faces:
+    if f.normal.dot(f.calc_center_median() - Vector(P(*C))) < 0:
+        f.normal_flip()
+_gme = bpy.data.meshes.new("BossGlass"); _gb.to_mesh(_gme); _gb.free()
+_go = bpy.data.objects.new("BossGlass", _gme); bpy.context.collection.objects.link(_go)
+fin(_go, "BossGlass", M["frame"], smooth=False)
+
 from mathutils.bvhtree import BVHTree  # noqa: E402
 
 
@@ -869,11 +1045,10 @@ def cull_hidden(o, covers, reach=0.07):
 bpy.context.view_layer.update()
 _by = {o.name: o for o in parts}
 _cut = {}
-_cut["BossHead"] = cull_hidden(_by.get("BossHead"), [_by.get(n) for n in ("BossTenugui", "BossTenuguiRoll", "BossHair", "BossHairTop", "BossHairBun",
-                                                                         "BossBody", "BossPants", "BossEar1", "BossEar-1", "BossSideburn1", "BossSideburn-1", "BossKnot")])
-_cut["BossPants"] = cull_hidden(_by.get("BossPants"), [_by.get(n) for n in ("BossBody", "BossHem", "BossApron")])
-_cut["BossBody"] = cull_hidden(_by.get("BossBody"), [_by.get(n) for n in ("BossHead", "BossApron", "BossCollarOver", "BossCollarUnder")])
-_cut["BossHair"] = cull_hidden(_by.get("BossHair"), [_by.get(n) for n in ("BossTenugui", "BossTenuguiRoll", "BossHairTop", "BossEar1", "BossEar-1")])
+_cut["BossHead"] = cull_hidden(_by.get("BossHead"), [_by.get(n) for n in ("BossTenugui", "BossHair", "BossHairTop", "BossHairBun",
+                                                                         "BossBody", "BossEar1", "BossEar-1", "BossKnot")])
+_cut["BossBody"] = cull_hidden(_by.get("BossBody"), [_by.get(n) for n in ("BossHead", "BossFace")])
+_cut["BossHair"] = cull_hidden(_by.get("BossHair"), [_by.get(n) for n in ("BossTenugui", "BossHairTop", "BossEar1", "BossEar-1")])
 print("CULLED", _cut)
 root = bpy.data.objects.new("Crew" if CREW else "Boss", None)
 bpy.context.collection.objects.link(root)

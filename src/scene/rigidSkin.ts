@@ -12,7 +12,9 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 
 /** a piece of the figure: its shape (not indexed, in the figure's frame at rest), the part that moves it (an index into the bones), inked or
  * not, flat or lit, shadowed or not, and which picture (0: none, its colour only) */
-export type SkinPiece = { geo: THREE.BufferGeometry; bone: number; inked?: boolean; flat?: boolean; shadowless?: boolean; pic?: number }
+export type SkinPiece = { geo: THREE.BufferGeometry; bone: number; inked?: boolean; flat?: boolean; shadowless?: boolean; pic?: number
+  /** painted over its own colour (the face on the head itself): where its picture's clear, its colour (the skin) shows, never a hole */
+  decal?: boolean }
 
 const ones = (n: number, k: number) => new THREE.Float32BufferAttribute(new Float32Array(n * k).fill(1), k)
 
@@ -25,7 +27,7 @@ export function skinShape(pieces: SkinPiece[]) {
     for (let i = 0; i < n; i++) {
       si[i * 4] = p.bone
       sw[i * 4] = 1
-      paint[i * 3] = p.flat ? 1 : 0
+      paint[i * 3] = p.decal ? 2 : p.flat ? 1 : 0
       paint[i * 3 + 1] = p.shadowless ? 0 : 1
       paint[i * 3 + 2] = p.pic ?? 0
     }
@@ -105,20 +107,23 @@ export function skinHull(width: number) {
 /** the least a figure's lit by, of its own colour (all of them: the owner, the staff, the guests) */
 export const FIGURE_FLOOR = 0.32
 
-export function paintable<M extends THREE.Material>(m: M): M {
+export function paintable<M extends THREE.Material>(m: M, { decal = false }: { decal?: boolean } = {}): M {
   const before = m.onBeforeCompile
   m.onBeforeCompile = (sh, r) => {
     before.call(m, sh, r)
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 paint;\nvarying vec3 vPaint;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaint = paint;')
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPaint;')
+      // (a decal vertex (paint x 2): the picture over the vertex's colour by the picture's alpha, the whole of it there (the face drawn on the
+      // head itself: where nothing's drawn, the skin))
+      .replace('#include <color_fragment>', decal ? '#include <color_fragment>\nif (vPaint.x > 1.5) { diffuseColor.rgb = mix(vColor.rgb, sampledDiffuseColor.rgb, step(0.5, sampledDiffuseColor.a)) * diffuse; diffuseColor.a = opacity; }' : '#include <color_fragment>')
       .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replaceAll('&& receiveShadow )', '&& receiveShadow && vPaint.y > 0.5 )'))
       // (never under a third of its own colour (the owner's: at night with the lights off the owner was a lump of charcoal): a figure
       // still reads in the dark, its colours its own; in light it's above that and nothing changes)
-      .replace('#include <opaque_fragment>', `outgoingLight = mix(outgoingLight, diffuseColor.rgb, vPaint.x);\noutgoingLight = max(outgoingLight, diffuseColor.rgb * ${FIGURE_FLOOR.toFixed(2)});\n#include <opaque_fragment>`)
+      .replace('#include <opaque_fragment>', `outgoingLight = mix(outgoingLight, diffuseColor.rgb, step(0.5, vPaint.x) * step(vPaint.x, 1.5));\noutgoingLight = max(outgoingLight, diffuseColor.rgb * ${FIGURE_FLOOR.toFixed(2)});\n#include <opaque_fragment>`)
   }
   const key = m.customProgramCacheKey.bind(m)
-  m.customProgramCacheKey = () => `${key()}|paint`
+  m.customProgramCacheKey = () => `${key()}|paint${decal ? '|decal' : ''}`
   return m
 }
 

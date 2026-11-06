@@ -300,30 +300,46 @@ body = lathe("FolkBody", [q for k, q in enumerate(PROFILE) if k not in (0, 2, 5)
 
 # (the head: a ball, a button nose, ears; one mesh in their skin)
 # (14 round by 8: 20 by 11 before; the face sheet stays clear of its flats, 4.2 mm off the round)
-h = sphere("hd", C, R, M["skin"], seg=14, rings=8)
+h = sphere("hd", C, R, M["skin"], seg=16, rings=8)
 nose = sphere("nose", on_head(0.0, -0.035, 0.002)[0], 0.022, M["skin"], seg=6, rings=3)
 ears = [sphere(f"ear{sd}", Vector((sd * (R + 0.006), C.y - 0.005, -0.015)), 0.048, M["skin"], seg=6, rings=3, scale=(0.45, 0.85, 0.95)) for sd in (-1, 1)]
-join([h, nose] + ears, "FolkHead")
 
-# (the face: a shell just off the front of the head, its picture a strip of eight; this one's UVs over the first)
+# (the face: the head's own front faces (16 round by 8: the four columns and four rows within 45 degrees of its middle), split off with their
+# UVs on the first frame of the strip of eight (painted in degrees: az -62..62 across a frame, el -52..42 up it), no shell over the head
+# (the owner's: a patch off the face was a black block when anything went wrong with it); the ball's own normals on both, so the join
+# doesn't show)
 FACE_AZ, FACE_EL = (-62.0, 62.0), (-52.0, 42.0)
+_c = Vector(P(*C)) - h.location
+_hb = bmesh.new(); _hb.from_mesh(h.data)
+
+
+def _ae(co):
+    d = co - _c
+    x, y, z = d.x, d.z, -d.y
+    return math.degrees(math.atan2(x, z)), math.degrees(math.asin(max(-1.0, min(1.0, y / d.length))))
+
+
+_ff = [f for f in _hb.faces if all(abs(v) < 45 for v in _ae(f.calc_center_median()))]
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
-NA, NE = 6, 4
-grid = []
-for j in range(NE + 1):
-    row = []
-    for i in range(NA + 1):
-        az = math.radians(FACE_AZ[0] + (FACE_AZ[1] - FACE_AZ[0]) * i / NA)
-        el = math.radians(FACE_EL[0] + (FACE_EL[1] - FACE_EL[0]) * j / NE)
-        row.append(bm.verts.new(P(*head_at(az, el, 0.0042))))
-    grid.append(row)
-for j in range(NE):
-    for i in range(NA):
-        f = bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
-        for lp, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
-            lp[uvl].uv = ((ii / NA) / 8.0, jj / NE)
-from_bm("FolkFace", bm, M["face"])
+_map = {}
+for f in _ff:
+    vs = []
+    for v in f.verts:
+        if v not in _map:
+            _map[v] = bm.verts.new(v.co)
+        vs.append(_map[v])
+    nf = bm.faces.new(vs)
+    for lp in nf.loops:
+        a_, e_ = _ae(lp.vert.co)
+        lp[uvl].uv = ((a_ - FACE_AZ[0]) / (FACE_AZ[1] - FACE_AZ[0]) / 8.0, (e_ - FACE_EL[0]) / (FACE_EL[1] - FACE_EL[0]))
+bmesh.ops.delete(_hb, geom=_ff, context="FACES_ONLY")
+_hb.to_mesh(h.data); _hb.free()
+_fo = from_bm("FolkFace", bm, M["face"])
+_fo.location = h.location
+for _o in (h, _fo):
+    _o.data.normals_split_custom_set_from_vertices([(v.co - _c).normalized() for v in _o.data.vertices])
+join([h, nose] + ears, "FolkHead")
 
 # (hands: floating mittens, a plump paddle and a thumb, each its own mesh about where it hangs)
 for sd, at in HAND_AT.items():
