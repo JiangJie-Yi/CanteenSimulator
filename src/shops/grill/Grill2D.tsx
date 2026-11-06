@@ -73,7 +73,7 @@ export type Grill2DProps = {
   research?: boolean
   onOrder?: (id: string, guest?: number, reuse?: boolean) => boolean
   onAddCharcoal?: () => boolean
-  onSay?: (who: 'chef' | 'guest', text: string) => void
+  onSay?: (who: 'chef' | 'guest', text: string, guest?: number) => void
   space?: 'closed' | 'open'
   lang?: Lang
   names?: Record<string, string>
@@ -313,8 +313,8 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
         if (orders.length) {
           used.add(seatFor)
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat: seatFor, partner: couple ? ids[1 - k] : undefined })
-          cb.current.onSay?.('guest', L().order(id, said))
-        } else cb.current.onSay?.('guest', L().nothing(id))
+          cb.current.onSay?.('guest', L().order(id, said), id)
+        } else cb.current.onSay?.('guest', L().nothing(id), id)
       }
       if (couple && !ids.every((x) => guests.current.some((g) => g.id === x))) for (const g of guests.current) if (ids.includes(g.id)) g.partner = undefined
       guests.current = guests.current.filter((g, i, all) => g.state === 'waiting' || g.state === 'eating' || !g.cleared || i >= all.length - 12)
@@ -326,7 +326,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
         cb.current.onWalkOut?.(owed, g.id)
-        cb.current.onSay?.('guest', L().angry(g.id))
+        cb.current.onSay?.('guest', L().angry(g.id), g.id)
         report()
       }
     }
@@ -357,7 +357,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
       g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
       const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
       window.setTimeout(() => {
-        cb.current.onSay?.('guest', L().verdict(g.id, dish.want?.name ?? nameOf(dish.id), stars))
+        cb.current.onSay?.('guest', L().verdict(g.id, dish.want?.name ?? nameOf(dish.id), stars), g.id)
         report()
       }, EAT_SECONDS * 1000)
       return

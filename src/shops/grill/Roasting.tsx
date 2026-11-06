@@ -3103,7 +3103,7 @@ type RoastingProps = {
   onOrder?: (id: string, guest?: number, reuse?: boolean) => boolean
   onAddCharcoal?: (sticks?: number, byHand?: boolean) => boolean
   /** something the chef or a customer says */
-  onSay?: (who: 'chef' | 'guest', text: string) => void
+  onSay?: (who: 'chef' | 'guest', text: string, guest?: number) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
   space?: 'closed' | 'open'
   /** draw the bar (with the shop open) the food is served onto; a phone shows its customers in 2D, without it */
@@ -4500,7 +4500,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       for (const g of seated) {
         if (darkSaid.current.has(g.id)) continue
         darkSaid.current.add(g.id)
-        onSay?.('guest', L().dark(g.id))
+        onSay?.('guest', L().dark(g.id), g.id)
         break
       }
     }
@@ -4568,9 +4568,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           const seat = seatFor
           used.add(seat)
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat, partner: couple ? ids[1 - k] : undefined })
-          onSay?.('guest', L().order(id, said))
+          onSay?.('guest', L().order(id, said), id)
         } else {
-          onSay?.('guest', L().nothing(id))
+          onSay?.('guest', L().nothing(id), id)
           // (came in and found nothing they could have: a visit of its own, and not a happy one)
           onVisit?.({ id, taste: null, waited: 0, walkedOut: true, gripes: ['nothing'] })
         }
@@ -4593,7 +4593,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
         onWalkOut?.(owed, g.id)
-        onSay?.('guest', mood === 'dark' ? L().darkGone(g.id) : L().angry(g.id))
+        onSay?.('guest', mood === 'dark' ? L().darkGone(g.id) : L().angry(g.id), g.id)
         report()
       }
     }
@@ -4651,7 +4651,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const stars = taste >= 80 ? 5 : taste >= 65 ? 4 : taste >= 45 ? 3 : taste >= 25 ? 2 : 1
       window.setTimeout(() => {
         if (sick) SICK.add(g.id)
-        onSay?.('guest', sick ? L().sick(g.id, nameOfP(dish)) : L().verdict(g.id, nameOfP(dish), stars))
+        onSay?.('guest', sick ? L().sick(g.id, nameOfP(dish)) : L().verdict(g.id, nameOfP(dish), stars), g.id)
         report()
       }, EAT_SECONDS * 1000)
       return

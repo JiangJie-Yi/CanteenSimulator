@@ -2318,7 +2318,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** what's dyed on the noren at the door (its first character in the middle) */
     mark?: string
     /** a guest's word (what they made of the toilet) */
-    onSay?: (who: 'chef' | 'guest', text: string) => void
+    onSay?: (who: 'chef' | 'guest', text: string, guest?: number) => void
     /** the height of the bar top, where the plates go */
     top?: number
     /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
@@ -2632,7 +2632,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (at !== undefined && at >= 0) {
       const t = takeSheets(tissuesAt(at), sheetsFor(guest))
       setTissues(at, t.box)
-      if (t.short) { gripe(guest, 'tissue'); onSay?.('guest', LINES[lang].noTissue(guest)) }
+      if (t.short) { gripe(guest, 'tissue'); onSay?.('guest', LINES[lang].noTissue(guest), guest) }
     }
   }
   /** a plate done with: left at the seat for a server to clear (the owner's: nobody's plates fly), or, with none, away to the sink by itself */
@@ -2884,7 +2884,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.phase = 'wcGo'
           s.t = 0
           // (a word as they get up (the owner's): off to the restroom a moment)
-          if (!SICK.has(s.id)) onSay?.('guest', LINES[lang].wcGo(s.id, s.id + Math.floor(performance.now() / 7000)))
+          if (!SICK.has(s.id)) onSay?.('guest', LINES[lang].wcGo(s.id, s.id + Math.floor(performance.now() / 7000)), s.id)
         }
       } else if (s.phase === 'wcGo' || s.phase === 'wcBack') {
         // to the door, which slides open as they come up to it, in, and later back out to their stool
@@ -2914,10 +2914,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             if (u.complaint) WC_GRUMBLE.set(s.id, Math.max(WC_GRUMBLE.get(s.id) ?? 0, penaltyOf(u.complaint)))
             const L = LINES[lang]
             // (no complaint: relieved, as they come out (the owner's); a clean one said so now and then)
-            if (u.complaint === 'paper') onSay?.('guest', L.wcPaper(s.id))
-            else if (u.complaint === 'dirty') onSay?.('guest', L.wcDirty(s.id))
-            else if (was === 'fresh' && Math.random() < 0.4) onSay?.('guest', L.wcNice(s.id))
-            else onSay?.('guest', L.wcBack(s.id, s.id + Math.floor(performance.now() / 5000)))
+            if (u.complaint === 'paper') onSay?.('guest', L.wcPaper(s.id), s.id)
+            else if (u.complaint === 'dirty') onSay?.('guest', L.wcDirty(s.id), s.id)
+            else if (was === 'fresh' && Math.random() < 0.4) onSay?.('guest', L.wcNice(s.id), s.id)
+            else onSay?.('guest', L.wcBack(s.id, s.id + Math.floor(performance.now() / 5000)), s.id)
           }
           if (s.wc?.who === 'drink' && !s.drink) {
             s.drink = s.wc.pick ?? drinkFor(kindOf(s.id).kind, s.id)
@@ -2966,7 +2966,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const said = s.said ?? 0
         if (said < 1 && s.t > 0.3) {
           s.said = 1
-          if (guestsRef.current.find((x) => x.id === s.id)?.state !== 'angry') onSay?.('guest', LINES[lang].payGo(s.id, s.id))
+          if (guestsRef.current.find((x) => x.id === s.id)?.state !== 'angry') onSay?.('guest', LINES[lang].payGo(s.id, s.id), s.id)
         }
         const d = Math.max(0, Math.min(lp.len, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v)))
         const { p, dir } = alongPath(lp.path, lp.len - d)
@@ -2998,7 +2998,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
           if ((s.said ?? 0) < 4 && k > 0.86) {
             s.said = 4
-            onSay?.('guest', LINES[lang].payThanks(s.id, s.id + 1))
+            onSay?.('guest', LINES[lang].payThanks(s.id, s.id + 1), s.id)
           }
         }
         // (and if they've somehow not got out in all the time it can take, they're gone all the same)

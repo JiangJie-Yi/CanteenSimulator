@@ -373,7 +373,7 @@ type SceneProps = {
   research: boolean
   onOrder: (id: string, guest?: number, reuse?: boolean) => boolean
   onAddCharcoal: (sticks?: number, byHand?: boolean) => boolean
-  onSay: (who: 'chef' | 'guest', text: string) => void
+  onSay: (who: 'chef' | 'guest', text: string, guest?: number) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
   /** the view menu's open: its numbered spots shown in the room */
@@ -1769,22 +1769,21 @@ export default function App() {
   /** what each customer's saying just now (over their head) */
   const [speech, setSpeech] = useState<Record<number, { key: number; text: string }>>({})
   const chatId = useRef(0)
-  const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner', raw: string) => {
-    // what a customer says is shown in a bubble over their head, where there's a 3D bar to show it on
-    const said = /^#(\d+) (.*)$/.exec(raw)
-    if (who === 'guest' && said && !phoneRef.current) {
-      const gid = +said[1]
+  const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner', raw: string, guest?: number) => {
+    // what a customer says is shown in a bubble over their head, where there's a 3D bar to show it on: whose it is passed with it (their
+    // words carry no number now: the bubble's yellow tag says who)
+    if (who === 'guest' && guest !== undefined && !phoneRef.current) {
+      const gid = guest
       const key = ++chatId.current
-      setSpeech((sp) => ({ ...sp, [gid]: { key, text: said[2] } }))
+      setSpeech((sp) => ({ ...sp, [gid]: { key, text: raw } }))
       // (long enough for a long line to be said a piece at a time)
-      const ms = Math.max(4500, sayChunks(said[2]).length * SAY_EACH * 1000 + 1500)
+      const ms = Math.max(4500, sayChunks(raw).length * SAY_EACH * 1000 + 1500)
       window.setTimeout(() => setSpeech((sp) => (sp[gid]?.key === key ? Object.fromEntries(Object.entries(sp).filter(([k]) => +k !== gid)) : sp)), ms)
       return
     }
-    // customers are named by how they look (上班族, 老奶奶…), not by number
+    // customers are named by how they look (上班族, 老奶奶…), not by number: their name before their words in the log
     const lg = langRef.current
-    const text = raw.replace(/^#(\d+) /, (_, n) => `${guestLabel(+n, lg)}${lg === 'ja' ? '「' : '：'}`)
-      .replace(/#(\d+) ?/g, (_, n) => guestLabel(+n, lg)) + (lg === 'ja' && /^#\d+ /.test(raw) ? '」' : '')
+    const text = guest !== undefined ? `${guestLabel(guest, lg)}${lg === 'ja' ? '「' : '：'}${raw}${lg === 'ja' ? '」' : ''}` : raw
     const id = ++chatId.current
     setChat((all) => [...all.slice(-4), { id, who, text }])
     window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
@@ -1864,7 +1863,7 @@ export default function App() {
   // (what a customer says at the till with no receipt to be had)
   useEffect(() => {
     const add = LATE_GRIPE.add
-    LATE_GRIPE.add = (id, g) => { add(id, g); if (g === 'receipt') talk('guest', LINES[lang].noReceipt(id)) }
+    LATE_GRIPE.add = (id, g) => { add(id, g); if (g === 'receipt') talk('guest', LINES[lang].noReceipt(id), id) }
     return () => { LATE_GRIPE.add = add }
   }, [talk, lang])
   langRef.current = lang
@@ -1967,7 +1966,7 @@ export default function App() {
       const key = ++feedSeq.current
       setFeed((f) => [...f.slice(-2), { key, id, guest }])
       const it = findItem(dish, id)
-      talk('order', `#${guest} ${tl(lang, '點了', 'から', ' ordered ')} ${it ? nameIn(lang, it) : id}`)
+      talk('order', `${tl(lang, '點了', 'から', ' ordered ')} ${it ? nameIn(lang, it) : id}`, guest)
       window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
     }
     return ok
@@ -2495,7 +2494,7 @@ export default function App() {
     setEntryCount((c) => ({ ...c, [e.key]: (c[e.key] ?? 0) + 1 }))
     const key = ++feedSeq.current
     setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
-    talk('order', `#${guest} ${tl(lang, '點了', 'から', ' ordered ')} ${nameIn(lang, e)}`)
+    talk('order', `${tl(lang, '點了', 'から', ' ordered ')} ${nameIn(lang, e)}`, guest)
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }
@@ -2505,7 +2504,7 @@ export default function App() {
     if (!d) return
     book('revenue', d.price)
     book('food', Math.round(d.price * 0.35))
-    talk('order', `#${guest} ${tl(lang, '從冰箱拿了', 'が冷蔵庫から', ' took from the fridge ')} ${lang === 'ja' ? d.ja : lang === 'en' ? (d as { en?: string }).en ?? d.zh : d.zh}`)
+    talk('order', `${tl(lang, '從冰箱拿了', 'が冷蔵庫から', ' took from the fridge ')} ${lang === 'ja' ? d.ja : lang === 'en' ? (d as { en?: string }).en ?? d.zh : d.zh}`, guest)
   }
   const sellDrinkRef = useRef(sellDrink)
   sellDrinkRef.current = sellDrink
