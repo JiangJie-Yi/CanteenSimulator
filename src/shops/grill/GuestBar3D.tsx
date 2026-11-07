@@ -1,4 +1,5 @@
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { getClock } from '@/ui/clockStore'
 import { FigureHit } from '@/scene/FigureHit'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, stockerChore, type StockChore } from '@/game/stocker'
@@ -56,7 +57,6 @@ import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore,
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { SCOOP_S, WASH_S, kamaTick, riceGoes, scoopIn, setOn } from '@/game/rice'
-import { SAY_EACH, sayChunks } from '@/game/say'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
@@ -2990,7 +2990,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if ((s.said ?? 0) < 2 && k > 0.12 && TILL_STATE.payer === s.id) {
             s.said = 2
             const bill = TILL_STATE.bill
-            STAFF_TALK.push({ key: performance.now() + s.id, id: 'role:cashier', text: LINES[lang].cashierThanks(`NT$${yen(bill)}`), until: performance.now() + 3800 })
+            STAFF_TALK.push({ key: performance.now() + s.id, id: 'role:cashier', text: LINES[lang].cashierThanks(`NT$${yen(bill)}`, Math.floor(getClock().minute / 60)), until: performance.now() + 3800 })
           }
           if ((s.said ?? 0) < 3 && k > 0.62 && TILL_STATE.payer === s.id) {
             s.said = 3
@@ -4018,16 +4018,9 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
   )
 })
 
-/** a short line at a time, so a long one says itself in turn over their head rather than in a tall thin column */
-function Say({ text, who }: { text: string; who: string }) {
-  const chunks = useMemo(() => sayChunks(text), [text])
-  const [i, setI] = useState(0)
-  useEffect(() => {
-    if (i >= chunks.length - 1) return
-    const h = window.setTimeout(() => setI(i + 1), SAY_EACH * 1000)
-    return () => window.clearTimeout(h)
-  }, [i, chunks.length])
-  return <span key={i} className="g3-bubble g3-say"><b className="say-who">{who}</b>{chunks[i]}{i < chunks.length - 1 ? '…' : ''}</span>
+/** the whole line at once (the owner's: said a piece at a time, each piece ended in …, and looked cut short), wrapping inside the bubble */
+function Say({ text, who, heart }: { text: string; who: string; heart?: boolean }) {
+  return <span className="g3-bubble g3-say"><b className="say-who">{heart && <i className="say-heart">♥</i>}{who}</b>{text}</span>
 }
 
 const LABEL_STYLE = { pointerEvents: 'none' } as const
@@ -4044,8 +4037,8 @@ const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, p
       <div className="g3-label" ref={(el) => onEl(id, el)}>
         {/* (a bubble only while there's something to say (the owner's): a line, or the dots of waiting to order; their kind over it in
             yellow, no number; nothing at all over someone just sitting there, not even their name) */}
-        {say ? <Say key={say.key} text={say.text} who={`${partner ? '♥ ' : ''}${name}`} />
-          : dots && <span className="g3-bubble"><b className="say-who">{partner ? '♥ ' : ''}{name}</b>…</span>}
+        {say ? <Say key={say.key} text={say.text} who={name} heart={partner} />
+          : dots && <span className="g3-bubble"><b className="say-who">{partner && <i className="say-heart">♥</i>}{name}</b>…</span>}
         {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
       </div>
     </Html>

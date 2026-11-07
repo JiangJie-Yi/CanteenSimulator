@@ -1,6 +1,9 @@
 // What the chefs and the customers say, in three languages.
 import type { Lang } from './i18n'
 
+/** the part of the day an hour (0..23) is in, for what's said at the till: morning 6 to 13, afternoon 14 to 17, night the rest */
+export const partOfDay = (hour: number): 'morning' | 'afternoon' | 'night' => (hour >= 6 && hour < 14 ? 'morning' : hour >= 14 && hour < 18 ? 'afternoon' : 'night')
+
 const ZH = {
   // 炭火與料理動作
   addCharcoal: '炭火有點弱了，補兩塊備長炭！',
@@ -78,7 +81,9 @@ const ZH = {
     '多謝款待！烤魚油脂豐厚超下酒，下次一定揪朋友來！',
     'ごちそうさまでした！水準真的高，太美味了！',
   ][Math.abs(k) % 2],
-  cashierThanks: (bill: string) => `非常感謝您的捧場！一共是 ${bill}，夜深了路上小心慢走喔！`,
+  // (by the game's hour (the owner's: "late at night, mind the road" at half past eight in the morning): morning to 13:59, afternoon to
+  // 17:59, night the rest)
+  cashierThanks: (bill: string, hour = 20) => `非常感謝您的捧場！一共是 ${bill}，${partOfDay(hour) === 'morning' ? '祝您今天用餐愉快、上班加油喔！' : partOfDay(hour) === 'afternoon' ? '午後微風正好，慢走喔！' : '夜深了路上小心慢走喔！'}`,
   wcBack: (_id: number, k: number) => [
     '呼～神清氣爽！滿血復活，繼續開吃！',
     '洗完手了，這撲鼻的炭烤香氣真受不了！',
@@ -178,7 +183,7 @@ const JA: typeof ZH = {
     'ごちそうさま！焼き魚の脂の乗りが最高だったよ、また来るね！',
     '大将、絶品だったよ！今度は仲間を連れて食べに来るよ！',
   ][Math.abs(k) % 2],
-  cashierThanks: (bill) => `ありがとうございました！お会計は${bill}になります。お足元に気をつけて！`,
+  cashierThanks: (bill, hour = 20) => `ありがとうございました！お会計は${bill}になります。${partOfDay(hour) === 'morning' ? 'いってらっしゃいませ、良い一日を！' : partOfDay(hour) === 'afternoon' ? '午後もどうぞお気をつけて！' : '夜道お気をつけて！'}`,
   wcBack: (_id, k) => [
     'ふぅ～すっきりした！さあ、焼き魚の続きを平らげるぞ！',
     'さっぱりした！香ばしい匂いに胃袋がまた刺激されるな！',
@@ -278,7 +283,7 @@ const EN: typeof ZH = {
     'Thanks for the feast! The fish was grilled to perfection, definitely coming back!',
     'Gochisousama! Top-notch grilling, bringing the whole crew next time!',
   ][Math.abs(k) % 2],
-  cashierThanks: (bill) => `Thank you so much! Your total comes to ${bill}. Have a wonderful night!`,
+  cashierThanks: (bill, hour = 20) => `Thank you so much! Your total comes to ${bill}. ${partOfDay(hour) === 'morning' ? 'Have a great day!' : partOfDay(hour) === 'afternoon' ? 'Enjoy the rest of your afternoon!' : 'Get home safe tonight!'}`,
   wcBack: (_id, k) => [
     'Whew, refreshed and recharged! Back to the grilled fish feast!',
     'All washed up! That charcoal smoke aroma has my appetite roaring again!',
