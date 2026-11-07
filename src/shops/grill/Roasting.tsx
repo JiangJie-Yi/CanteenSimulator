@@ -3794,6 +3794,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
   /** since when the fire's run past HOT_AT (seconds), for the third cook's water */
   const hotSince = useRef<number | null>(null)
+  /** when the grill last asked the third cook for charcoal (seconds) */
+  const coalAsked = useRef(0)
   // (with the shop open nothing goes in the basket or on the side dishes: it's all served at the bar, unwrapped)
   /** while the shop's closed and the cook's at it by hand, everything that comes off the fire goes into the tasting bowl */
   const inBowl = (p: Piece) => (p.collected ? !!p.container?.startsWith('bowl') : (space !== 'open' && byHandRef.current) || (space === 'open' && !!p.keepWarm))
@@ -4411,7 +4413,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (no more than the sack has: none left, the chef says so now and then)
       const left = SUPPLIES.coal()
       if (left < 1) { say(L().noCharcoal); return }
-      if (!tend) {
+      // (asked a while back and the third cook still off on something long (the rice, the plates) with the fire nearly out: the grill's own cook
+      // drops a handful in himself, as the fire mustn't die)
+      if (tend && FIRE_TEND.want === 'coal' && fire.current < 0.12 && nowS - coalAsked.current > 20) FIRE_TEND.want = null
+      else if (tend && FIRE_TEND.want !== 'coal') coalAsked.current = nowS
+      if (!tend || (FIRE_TEND.want === null && fire.current < 0.12 && nowS - coalAsked.current > 20)) {
         const placed = dropCoals(undefined, Math.min(left, coalPortion()))
         if (!placed || onAddCharcoal?.(placed) === false) return
         say(L().addCharcoal)
