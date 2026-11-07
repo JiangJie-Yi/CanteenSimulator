@@ -1062,8 +1062,9 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
                 <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
                   servers={dish.roast && ai ? (() => { const hired = crewOf(dish.id).filter((w) => w.role === 'server'); return hired.length ? hired : [HOUSE_SERVER] })() : []}
                   plater={dish.roast && ai ? (() => {
-                    // (who plates at the pass, fetching its plates from the racks: the third cook, else the second; neither, the owner does)
-                    const c = crewOf(dish.id), m = c.find((w) => w.role === 'sous') ?? c.find((w) => w.role === 'chef')
+                    // (who plates at the pass, fetching its plates from the racks, and keeps the fire: the third cook; with none, the owner does
+                    // (the second cook is the one at the grill, fetching and cooking: sent off on these he left it with nobody at it))
+                    const c = crewOf(dish.id), m = c.find((w) => w.role === 'sous')
                     return m ? { id: m.id, role: m.role as 'chef' | 'sous', look: m.look } : null
                   })() : null}
                   stocker={dish.roast && ai ? crewOf(dish.id).find((w) => w.role === 'stock') ?? null : null}
