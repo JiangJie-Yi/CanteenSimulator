@@ -4196,7 +4196,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.body = null
     for (const u of Object.values(p.looks)) u.value = 0
     p.stickOnly = false
-    for (const m of p.food) m.visible = true
+    for (const m of p.food) if (m !== p.node) m.visible = true
     p.bites.uBiteCount.value = 0
     p.landed = -1
     p.collected = false
@@ -6087,7 +6087,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.body = null
         for (const u of Object.values(p.looks)) u.value = 0
         p.stickOnly = false
-        for (const m of p.food) m.visible = true
+        // (its bitten-away parts back; not the piece itself where it's a single mesh (the daikon, the onion, the mochi): that's Dish's to show
+        // or hide, and set shown here every frame it was drawn shrunk to nothing on the net, never ordered)
+        for (const m of p.food) if (m !== p.node) m.visible = true
         if (p.bites.uBiteCount.value) {
           p.bites.uBiteCount.value = 0
           for (const { mat, foil } of p.mats) if (!foil && mat.side !== THREE.FrontSide) {
