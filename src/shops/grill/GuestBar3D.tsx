@@ -38,7 +38,7 @@ import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { HAND_MS } from './Restroom'
-import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, ShopProps } from './DiningRoom'
+import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps } from './DiningRoom'
 import { Koban } from './Koban'
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
@@ -4188,7 +4188,7 @@ const Fridges = memo(function Fridges({ fridges }: { fridges: NonNullable<Return
   return (
     <>
       {fridges.map((f) => (
-        <Movable key={f.n} id={`drinkfridge${f.n}`} label={`飲料櫃 ${f.n + 1}`}><group name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} /></group></Movable>
+        <Movable key={f.n} id={`drinkfridge${f.n}`} label={`飲料櫃 ${f.n + 1}`}><group name={f.n ? 'look-fridge-b' : 'look-fridge'} position={f.at} rotation-y={f.yaw}><DrinkFridge n={f.n} /><FridgeStock n={f.n} /><FridgeDoor n={f.n} />{f.n === 0 && <DrinkWarm />}</group></Movable>
       ))}
     </>
   )

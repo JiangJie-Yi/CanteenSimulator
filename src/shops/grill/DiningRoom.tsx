@@ -6,6 +6,7 @@ import { coolerDoorSound, lightSwitchSound, slideDoorSound } from './restroomSou
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { warmLater } from '@/scene/Prewarm'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
@@ -4662,6 +4663,20 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
  * before the fridge, and back in again later.
  */
 export const FridgeStock = memo(FridgeStockImpl)
+/**
+ * Every drink as it is in a hand, on a table or lifted on its shelf (DrinkBottle, lit and wet): none of them stand in the scene as it loads
+ * now that the shelves' are the plain ones (DrinkBottleLite), so their programs were made the first time a customer took one (a 317 ms
+ * frame); made here unseen, once, and handed to the prewarm (warmLater) instead
+ */
+export const DrinkWarm = memo(function DrinkWarm() {
+  const g = useRef<THREE.Group>(null)
+  useEffect(() => { if (g.current) warmLater(g.current) }, [])
+  return (
+    <group ref={g} visible={false}>
+      {DRINKS.map((d) => <group key={d.id}><DrinkBottle id={d.id} lit /><DrinkBottle id={d.id} wet /></group>)}
+    </group>
+  )
+})
 /** where a drink's held, up from its foot (its middle: the pointer stays on it) */
 const GRAB = 0.11
 const HELD_MID = new THREE.Vector3(0, -GRAB, 0)
