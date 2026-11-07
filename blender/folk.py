@@ -302,7 +302,14 @@ body = lathe("FolkBody", [q for k, q in enumerate(PROFILE) if k not in (0, 2, 5)
 # (14 round by 8: 20 by 11 before; the face sheet stays clear of its flats, 4.2 mm off the round)
 h = sphere("hd", C, R, M["skin"], seg=16, rings=8)
 nose = sphere("nose", on_head(0.0, -0.035, 0.002)[0], 0.022, M["skin"], seg=6, rings=3)
-ears = [sphere(f"ear{sd}", Vector((sd * (R + 0.006), C.y - 0.005, -0.015)), 0.048, M["skin"], seg=6, rings=3, scale=(0.45, 0.85, 0.95)) for sd in (-1, 1)]
+ears = [sphere(f"ear{sd}", Vector((sd * (R + 0.012), C.y - 0.005, -0.015)), 0.048, M["skin"], seg=6, rings=3, scale=(0.45, 0.85, 0.95)) for sd in (-1, 1)]
+# (what of each ear is inside the head taken away: half of it was sunk in the skull (the owner saw it in the wireframe))
+for _e in ears:
+    _bm = bmesh.new(); _bm.from_mesh(_e.data)
+    _mw = _e.matrix_world
+    _in = [f for f in _bm.faces if all((_mw @ v.co - Vector(P(*C))).length < R - 0.002 for v in f.verts)]
+    bmesh.ops.delete(_bm, geom=_in, context="FACES")
+    _bm.to_mesh(_e.data); _bm.free()
 
 # (the face: the head's own front faces (16 round by 8: the four columns and four rows within 45 degrees of its middle), split off with their
 # UVs on the first frame of the strip of eight (painted in degrees: az -62..62 across a frame, el -52..42 up it), no shell over the head
@@ -358,7 +365,9 @@ for sd, at in HAND_AT.items():
     join([hm, th], f"FolkHand{'L' if sd < 0 else 'R'}")
 
 # ===================================================================== hairstyles
-HT = 0.012
+# (the hair this far off the scalp: its shells are coarse (10 round), and their faces sag in between their corners nearer the head than their
+# corners are; at 0.012 the head's own points came through the back of the hair (the owner saw black lines starting out of it))
+HT = 0.02
 
 
 def back_shell(name="back", nape=-0.15):
@@ -435,7 +444,8 @@ style("bob", [back_shell(), crown(fringe=True), bob])
 style("bunLow", [back_shell(nape=-0.2), crown(fringe=True), sphere("bunlo", head_at(math.pi, -0.05, 0.03), 0.075, M["hair"], seg=8, rings=4)] + side_locks())
 style("bunHigh", [back_shell(nape=-0.2), crown(fringe=True), sphere("bunhi", head_at(math.pi, 0.62, 0.05), 0.085, M["hair"], seg=8, rings=4, scale=(1.1, 0.9, 0.85))] + side_locks())
 # (twin tails, tied high either side)
-twin = [tuft(f"tail{sd}", head_at(sd * 1.35, 0.42, 0.0), Vector((sd * 0.45, -1, -0.2)), 0.05, 0.3, M["hair"], 0.75) for sd in (-1, 1)]
+# (falling a little away from the head: close in, the side of the head came through them by the ears)
+twin = [tuft(f"tail{sd}", head_at(sd * 1.35, 0.42, 0.012), Vector((sd * 0.65, -1, -0.2)), 0.05, 0.3, M["hair"], 0.75) for sd in (-1, 1)]
 ties = [sphere(f"tie{sd}", head_at(sd * 1.35, 0.42, 0.012), 0.022, M["red"], seg=6, rings=3) for sd in (-1, 1)]
 style("twin", [back_shell(), crown(fringe=True)] + twin + ties)
 pony = tuft("pony", head_at(math.pi, 0.45, 0.02), Vector((0, -1, -0.35)), 0.06, 0.32, M["hair"], 0.75)
@@ -501,7 +511,7 @@ def perm_shell(name="perm"):
 
 style("perm", [perm_shell()])
 # (bald on top: a ring of hair round the back and the sides only)
-ring = lathe("baldring", [(C.y + 0.07, R + 0.008), (C.y + 0.03, R + 0.016), (C.y - 0.06, R + 0.014), (C.y - 0.11, R - 0.01)],
+ring = lathe("baldring", [(C.y + 0.07, R + 0.016), (C.y + 0.03, R + 0.024), (C.y - 0.06, R + 0.022), (C.y - 0.11, R - 0.004)],
              M["hair"], seg=10, a0=math.pi * 0.4, a1=math.pi * 1.6, solid=0.012)
 style("bald", [ring])
 # (a pompadour: the quiff rolled up and forward over the brow)
@@ -551,7 +561,7 @@ SPIKY = (
 spikes = [clump(f"spike{k}", frm, to, r) for k, (frm, to, r) in enumerate(SPIKY)]
 style("spiky", [back_shell(), crown()] + spikes)
 style("kid", [back_shell(), crown(fringe=True), tuft("ahoge", head_at(0.0, 1.3, -0.006), Vector((0.1, 1, 0.75)), 0.032, 0.1, M["hair"], 0.45)])
-def hair_cap(name, hairline, seg=10, rings=4, full=0.02):
+def hair_cap(name, hairline, seg=14, rings=4, full=0.02):
     """a cap of hair in clean quads: every column from the crown down to the hairline (`hairline(bearing)` its elevation there, bearing 0 the
     front), a little off the head and fuller over the top, drawn in to the scalp along its edge so it sits on the head there; a ring of
     thin triangles only round the very top of the crown. (The other styles' shells are balls cut by planes, which leaves slivers and odd
@@ -566,7 +576,7 @@ def hair_cap(name, hairline, seg=10, rings=4, full=0.02):
         for i in range(1, rings + 1):
             t = i / rings
             e = math.pi / 2 - (math.pi / 2 - e_h) * t
-            hug = 1 - 0.8 * t ** 4
+            hug = 1 - 0.55 * t ** 4
             col.append(bm.verts.new(P(*head_at(a, e, (HT * 1.4 + full * max(0.0, math.sin(e)) + 0.008) * hug + 0.002))))
         cols.append(col)
     for j in range(seg):
@@ -616,7 +626,8 @@ def drill(name, top, down, length, r0, turns=2.2, sides=5, rings=7):
 long_back2 = lathe("longback2", [(C.y + 0.05, R + 0.016), (C.y - 0.08, R + 0.018), (C.y - 0.2, 0.25), (C.y - 0.4, 0.22)],
                    M["hair"], seg=7, a0=math.pi * 0.58, a1=math.pi * 1.42, solid=0.018)
 gyaru_cap = hair_cap("gyarucap", lambda a: 0.35 - 0.95 * (lambda x: x * x * (3 - 2 * x))(min(1.0, abs(a) / math.pi)), full=0.03)
-ringlets = [drill(f"ringlet{sd}", head_at(sd * 1.32, -0.1, 0.03), Vector((sd * 0.14, -1, 0.06)), 0.3, 0.056) for sd in (-1, 1)]
+# (from behind the ear (100 degrees round), not before it: it was in among the ear and the earring)
+ringlets = [drill(f"ringlet{sd}", head_at(sd * 1.75, -0.1, 0.035), Vector((sd * 0.12, -1, -0.04)), 0.3, 0.056) for sd in (-1, 1)]
 style("gyaru", [gyaru_cap, long_back2] + ringlets)
 
 # ===================================================================== what some of them have about them
@@ -708,7 +719,8 @@ acc("hachimaki", [hb, sun])
 # (hoop earrings, gold)
 hoops = []
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.035, minor_radius=0.005, major_segments=8, minor_segments=3, location=P(sd * (R + 0.02), C.y - 0.07, 0.0))
+    # (hung from the lobe, below the ear: it was up in the ear itself)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.035, minor_radius=0.005, major_segments=8, minor_segments=3, location=P(sd * (R + 0.026), C.y - 0.1, -0.012))
     t = active()
     t.rotation_euler = (math.pi / 2, 0, math.pi / 2)
     hoops.append(fin(t, f"hoop{sd}", M["gold"]))
