@@ -41,7 +41,7 @@ const ZH = {
   fanned: (n: string) => `${n}火力全開！啪嗒啪嗒搧起炭香！`,
   stickAway: '燙燙燙！竹籤俐落收掉！',
   burntAway: '哎呀焦黑了！這份不能砸了招牌，丟掉重烤！',
-  orphanAway: '客人等不及先走了…涼掉就走味了，撤掉吧。',
+  orphanAway: '客人等不及先走了…先放進大碗保溫，等下一位點的客人！',
   orphanAgain: (n: string) => `運氣太好了！這份熱騰騰的${n}剛好有客人點，直接送上！`,
 
   // 客人點餐與反應（移除前置編號 #ID）
@@ -143,7 +143,7 @@ const JA: typeof ZH = {
   fanned: (n: string) => `${n}、パタパタ扇いで炭火の火力を引き上げる！`,
   stickAway: 'アチチッ！串を手早く片付けるぞ！',
   burntAway: 'あちゃー、焦げちまった！店の看板に関わる、焼き直しだ！',
-  orphanAway: 'お客さん待ちきれずに帰っちゃったか…冷めたし下げよう。',
+  orphanAway: 'お客さん帰っちゃったか…大鉢で保温して、次の注文に回そう！',
   orphanAgain: (n: string) => `ツイてる！${n}の注文がちょうど入った、出来立てをそのまま出そう！`,
 
   // 客の注文と反応（ID番号除去）
@@ -243,7 +243,7 @@ const EN: typeof ZH = {
   fanned: (n: string) => `Fanning the embers for ${n}! Fanning up the aroma!`,
   stickAway: 'Hot skewers cleared with chef speed!',
   burntAway: 'Blast, it charred! Can’t serve this to valued guests—toss it and restart!',
-  orphanAway: 'The patron left waiting... It has gone cold, clear it off.',
+  orphanAway: 'The patron left... Into the big bowl to keep warm for the next order!',
   orphanAgain: (n: string) => `What luck! An order just rolled in for ${n}—send it out piping hot!`,
 
   // Customer Ordering & Feedback (Stripped #ID prefix)

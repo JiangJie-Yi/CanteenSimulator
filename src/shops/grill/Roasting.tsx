@@ -2929,6 +2929,8 @@ function crumpleFoil(mesh: THREE.Mesh, rand: () => number) {
 
 type Piece = {
   key: string
+  /** cooked for nobody (its customer gone) and kept warm in the big bowl for the next who orders one, never binned */
+  keepWarm?: boolean
   id: string
   copy: number
   loose: boolean
@@ -3767,7 +3769,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
   // (with the shop open nothing goes in the basket or on the side dishes: it's all served at the bar, unwrapped)
   /** while the shop's closed and the cook's at it by hand, everything that comes off the fire goes into the tasting bowl */
-  const inBowl = (p: Piece) => (p.collected ? !!p.container?.startsWith('bowl') : space !== 'open' && byHandRef.current)
+  const inBowl = (p: Piece) => (p.collected ? !!p.container?.startsWith('bowl') : (space !== 'open' && byHandRef.current) || (space === 'open' && !!p.keepWarm))
   const inBasket = (p: Piece) => !inBowl(p) && space !== 'open' && !!roast.basket && !!roast.basketItems?.includes(p.id)
   // onigiri and mochi off the grill net go on little side dishes of their own
   const onDish = (p: Piece) => !inBowl(p) && space !== 'open' && !!roast.dish && !!roast.net?.includes(p.id)
@@ -3858,7 +3860,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const row = pieces.current.filter((q) => q !== p && q.via === 'plated' && q.readyAt === k && !q.eaten && q.trash < 0 &&
       !SERVICE.claimed.has(q.key) && !SERVICE.carried.has(q.key)).length
     p.readyAt = k
-    p.toP.copy(readyFoodAt(k, row, PLATING.slots[k]!.plate))
+    // (a plate under it always: the seat's own, or for a later dish (the seat's plate gone out) a carrier dish (GuestBar3D's), never the bare
+    // table (the owner saw a skewer lying on the wood))
+    p.toP.copy(readyFoodAt(k, row, true))
     p.local.copy(p.toP).sub(containerAt('bar'))
     return true
   }
@@ -3868,6 +3872,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * the floor only carries)
    */
   const serveTo = (p: Piece, owner: Guest) => {
+    p.keepWarm = false
     const seat = owner.seat
     p.guest = owner.id
     p.seat = seat
@@ -3892,17 +3897,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       onSay?.('chef', text)
     }
   }
-  /** into the bin with it: a short arc down into the cook table's bin (the frame loop flies it), and gone */
-  const binIt = (p: Piece) => {
-    SERVICE.waiting.delete(p.key)
-    p.via = undefined
-    p.readyAt = undefined
-    p.trashFrom.copy(p.node.position)
-    p.trash = 0
-    p.node.userData.onPlate = true
-  }
   const collect = (p: Piece) => {
     if (p.collected || !present(p)) return
+    // (the shop open and cooked for nobody (its customer gone): into the big bowl to keep, for the next customer who orders one (the owner's:
+    // food's never thrown out but burnt; the bin is for the sticks and the burnt))
+    if (space === 'open' && !ownerOf(p) && !roast.basketItems?.includes(p.id)) p.keepWarm = true
     const bowl = inBowl(p)
     const basket = inBasket(p)
     const dish = onDish(p)
@@ -3929,13 +3928,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const owner = space === 'open' ? ownerOf(p) : undefined
     if (space === 'open' && owner) {
       serveTo(p, owner)
-      return
-    }
-    // (the shop open and cooked for nobody, its customer gone before it was done: straight into the bin (the owner's: what nobody wants is
-    // thrown away), not onto a plate on the cook's table, where it looked as if someone were eating there, tasting it)
-    if (space === 'open' && roast.trash) {
-      binIt(p)
-      chefSay(L().orphanAway)
       return
     }
     if (bowl) {
@@ -4369,7 +4361,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (space === 'open') {
       const here = (id: number) => guests.current.some((g) => g.id === id && (g.state === 'waiting' || g.state === 'eating'))
       const stray = live.find((p) => p.collected && (p.flight >= 1 || (p.via === 'plated' && p.readyAt === undefined)) && !p.stickOnly &&
-        !SERVICE.claimed.has(p.key) && !SERVICE.carried.has(p.key) && (p.container !== 'bar' || (p.via === 'plated' && !here(p.guest))))
+        !SERVICE.claimed.has(p.key) && !SERVICE.carried.has(p.key) && (p.container !== 'bar' || (p.via === 'plated' && !here(p.guest))) &&
+        // (one kept warm in the bowl waits there till someone orders it: it's not to be picked up again and again ahead of the rest)
+        !(p.keepWarm && p.container?.startsWith('bowl') && !ownerOf(p)))
       if (stray) {
         const was = stray.guest
         stray.guest = -1
@@ -4387,8 +4381,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           return
         }
         stray.guest = was
-        if (roast.trash) {
-          binIt(stray)
+        // (nobody's: kept warm in the big bowl (out of the plating place, which the next seat needs), never binned)
+        if (!stray.container?.startsWith('bowl')) {
+          SERVICE.waiting.delete(stray.key)
+          stray.via = undefined
+          stray.readyAt = undefined
+          stray.collected = false
+          stray.slot = null
+          stray.keepWarm = true
+          collect(stray)
           say(L().orphanAway)
           return
         }
@@ -6050,7 +6051,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (lying along the tray's long side, which runs across the front)
         flatQ(p, p.node.quaternion, STACK_DIR)
       } else if (!p.collected) {
-        if (active && !waiting(p) && p.homeFlight >= 1) p.progress += dt * roastRate(fire?.current ?? 0.55)
+        if (active && !waiting(p) && !p.carried && p.homeFlight >= 1) p.progress += dt * roastRate(fire?.current ?? 0.55)
         p.node.quaternion.copy(p.homeQ)
         p.node.position.x = p.homeP.x
         p.node.position.z = p.homeP.z

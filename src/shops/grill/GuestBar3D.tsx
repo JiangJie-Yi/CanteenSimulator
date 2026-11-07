@@ -2604,6 +2604,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const [, setTick] = useState(0)
   const redraw = () => setTick((n) => n + 1)
   const runs = useRef<PlateRun[]>([])
+  /** the plating place's carrier dishes (one a slot) */
+  const carriers = useRef<(THREE.Group | null)[]>([])
   const runSeq = useRef(0)
   const runObjs = useRef(new Map<number, THREE.Group>())
   /** the dirty plates in the sink, and the washing (time since the last plate came out; null while the tap's off) */
@@ -3195,6 +3197,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         runs.current = runs.current.filter((x) => x !== r)
         redraw()
       }
+      // (a later dish's carrier dish while it waits there)
+      const cr = carriers.current[k]
+      if (cr) cr.visible = !!sl && !sl.plate && sl.landed + sl.flying > 0
       // (how long it's been ready to go: what's for it all down on it, nothing more on its way)
       readyFor.current[k] = sl && sl.landed > 0 && sl.flying === 0 ? readyFor.current[k] + step : 0
     }
@@ -3858,6 +3863,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
       {Array.from({ length: dirty.current }, (_, i) => (
         <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}><Plate dirty design={i} /></group>
+      ))}
+      {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
+          of the shop's plates, it goes with the food) */}
+      {given && Array.from({ length: READY_SLOTS }, (_, k) => (
+        <group key={`carrier${k}`} name={`plating-carrier-${k}`} ref={(o) => { carriers.current[k] = o }} position={platingPlace(readyAlong(k))} scale={ON_TABLE * 0.8} visible={false}><Plate design={k + 3} /></group>
       ))}
       {/* the plating place's stack of clean plates (the kitchen brings them from the racks; one's laid for a seat as its first food comes off the fire) */}
       {given && (
