@@ -10,8 +10,6 @@ export const CREDITS: { what: Words; title: string; author: string; licence: str
     changed: { zh: '揮手動作烘成幾個固定姿勢、手臂上的肉球貼圖抹掉、貼圖縮小', ja: '手招きを数ポーズに焼き込み、腕の肉球を消し、テクスチャを縮小', en: 'its wave baked into a few poses, the paw pads on its arm painted out, textures made smaller' } },
   { what: { zh: '招財貓模型', ja: '招き猫のモデル', en: 'Lucky cat model' }, title: 'Lucky cat maneki neko', author: 'Rice & Soy Sauce (@rice_soysauce)', licence: 'CC BY 4.0', from: 'Sketchfab', changed: SHRUNK },
   { what: { zh: '招財貓模型', ja: '招き猫のモデル', en: 'Lucky cat model' }, title: 'Maneki neko', author: 'Ramujiro (@Ramzus)', licence: 'CC BY 4.0', from: 'Sketchfab', changed: SHRUNK },
-  { what: { zh: '飲料冷藏櫃模型', ja: '飲料冷蔵庫のモデル', en: 'Drinks fridge model' }, title: 'medium freezer', author: 'ALEXPROXY', licence: 'CC BY 4.0', from: 'Sketchfab',
-    changed: { zh: '縮放、重新上材質、門加上鉸鏈、燈箱改畫和紙招牌、機身紅色改深鐵色', ja: '縮尺の変更、マテリアルの付け直し、扉に蝶番、看板を和紙の行灯に描き替え、赤い筐体を黒鉄色に', en: 'scaled, re-materialled, its door given a hinge, its light box repainted as a washi sign, its red body made dark iron' } },
 ]
 /** the licence's own page */
 export const CC_BY_URL = 'https://creativecommons.org/licenses/by/4.0/'

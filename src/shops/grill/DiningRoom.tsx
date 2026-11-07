@@ -4416,19 +4416,12 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
   )
 }
 
+const FRIDGE_URL = import.meta.env.BASE_URL + 'models/drinkfridge.glb'
 /**
- * A drinks fridge: the downloaded "medium freezer" model (a tall glass-doored cabinet with three wire shelves), scaled to the
- * fridge's size and stood with its middle at the origin, its front toward +z, with the shop's sign over its glass. The model's
- * door is its own node: FridgeDoor swings it. Each fridge gets its own copy.
+ * The drink fridges' cabinet (blender/drinkfridge.py: made in place of the downloaded one, the owner's: its parts and outlines were some 8,500
+ * triangles and nine draws a fridge): a commercial one-door cooler, black, its light box over the door the washi sign (冷やし・ドリンク on
+ * the drinks', 銘酒・厳選地酒 on the sake's, lit warm), a white liner, four wire shelves, a glass door on a long silver handle
  */
-const FREEZER_URL = import.meta.env.BASE_URL + 'models/medium_freezer.glb'
-/**
- * The downloaded fridge's picture, repainted for the shop (the owner's: a flat dead red all over its top and a cola maker's light box, a
- * modern bar's look): its red panels a dark iron, a little grain in it; the light box over the door (its place in the picture, turned on
- * its side as the model has it) a washi lantern sign in a dark wooden edge, brushed black letters and a little red seal: 冷やし・ドリンク
- * on the drinks', 銘酒・厳選地酒 on the sake's, lit warm (the emissive picture: the same sign, the rest dark)
- */
-const FRIDGE_LIGHTBOX = { x: 0.42, y: 0.384, w: 0.1, h: 0.298 }
 const FRIDGE_WORDS: [string, string][] = [['冷やし', 'ドリンク'], ['銘酒', '厳選地酒']]
 function fridgeSignCanvas(n: number) {
   const c = document.createElement('canvas')
@@ -4456,113 +4449,75 @@ function fridgeSignCanvas(n: number) {
   g.fillStyle = '#fbe9d6'; g.font = '700 22px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('聞', 583, 146)
   return c
 }
-function fridgeAtlas(src: THREE.Texture, n: number, lit: boolean) {
-  const img = src.image as CanvasImageSource & { width: number; height: number }
-  if (typeof document === 'undefined' || !img?.width) return src
-  const c = document.createElement('canvas')
-  c.width = img.width; c.height = img.height
-  const g = c.getContext('2d', { willReadFrequently: true })!
-  g.drawImage(img, 0, 0)
-  if (!lit) {
-    // (every red panel a dark iron: the cabinet's top, its sides and the light box's frame)
-    const d = g.getImageData(0, 0, c.width, c.height), px = d.data
-    for (let i = 0; i < px.length; i += 4) {
-      const r = px[i], gg = px[i + 1], b = px[i + 2]
-      if (r > 120 && r > gg * 2.2 && r > b * 2.2) {
-        const k = (r / 255) * 0.9 + 0.1, grain = ((i * 2654435761) >>> 0) % 7
-        px[i] = 38 * k + grain; px[i + 1] = 35 * k + grain; px[i + 2] = 33 * k + grain
-      }
-    }
-    g.putImageData(d, 0, 0)
-  }
-  // (the light box: the washi sign, turned on its side as the model's picture has it)
-  const L = FRIDGE_LIGHTBOX, x = L.x * c.width, y = L.y * c.height, w = L.w * c.width, h = L.h * c.height
-  g.save()
-  g.translate(x + w / 2, y + h / 2)
-  g.rotate(FRIDGE_SIGN_TURN.a)
-  g.scale(FRIDGE_SIGN_TURN.sx, FRIDGE_SIGN_TURN.sy)
-  g.drawImage(fridgeSignCanvas(n), -h / 2, -w / 2, h, w)
-  g.restore()
-  const t = new THREE.CanvasTexture(c)
-  t.flipY = src.flipY
-  t.colorSpace = src.colorSpace
-  t.wrapS = src.wrapS; t.wrapT = src.wrapT
-  t.anisotropy = 4
-  return t
-}
-/** how the sign's turned into the picture's light box (the model's has it on its side) */
-const FRIDGE_SIGN_TURN = { a: -Math.PI / 2, sx: 1, sy: -1 }
-/** its size as modelled (0.866 wide, 2.24 tall, 0.774 deep), its middle and the door's hinge, and how it's scaled to the shop */
-const FREEZER = { scale: 0.97, cx: 0.21, cz: 0.045, base: -0.013 }
 const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; door: THREE.Group }>()
+/** the wire shelves' and the glass's materials, and the sign's, made once (the sign's for each fridge) */
+const FRIDGE_GLASS = new THREE.MeshToonMaterial({ color: '#cfe4ec', transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
+const fridgeSign = (n: number) => {
+  const t = new THREE.CanvasTexture(fridgeSignCanvas(n))
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 4
+  // (lit from inside: as bright by night as by day)
+  return new THREE.MeshBasicMaterial({ map: t, toneMapped: false })
+}
 function useFreezer(n: number) {
-  const gltf = useGLTF(FREEZER_URL) as unknown as { scene: THREE.Group }
+  const gltf = useGLTF(FRIDGE_URL) as unknown as { scene: THREE.Group }
   return useMemo(() => {
     const hit = freezers.get(n)
     if (hit) return hit
-    const root = gltf.scene.clone(true)
-    const toon = new Map<THREE.Material, THREE.Material>()
+    const root = (gltf.scene.getObjectByName('DrinkFridge') ?? gltf.scene).clone(true)
+    root.position.set(0, 0, 0)
+    const sign = fridgeSign(n)
+    const mats = new Map<THREE.Material, THREE.Material>()
     const conv = (m: THREE.Material) => {
-      let t = toon.get(m)
+      let t = mats.get(m)
       if (!t) {
         const src = m as THREE.MeshStandardMaterial
-        // (the glass clearer than the model has it, so the drinks show; the sign's light box keeps the model's own glow, brightened)
-        const toonMat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? fridgeAtlas(src.map, n, false) : null, transparent: src.transparent,
-          opacity: src.transparent ? src.opacity * 0.4 : src.opacity, side: src.transparent ? THREE.DoubleSide : THREE.FrontSide, depthWrite: !src.transparent })
-        if (src.emissiveMap) {
-          toonMat.emissive = new THREE.Color('#ffffff')
-          toonMat.emissiveMap = fridgeAtlas(src.emissiveMap, n, true)
-          toonMat.emissiveIntensity = 1.5
-        }
-        t = toonMat
-        toon.set(m, t)
+        if (src.name === 'FridgeSign') t = sign
+        else if (src.name === 'FridgeGlass') t = FRIDGE_GLASS
+        // (the wire grid: its gaps cut away)
+        else if (src.name === 'FridgeWire') t = new THREE.MeshToonMaterial({ color: '#eceeee', map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })
+        else t = new THREE.MeshToonMaterial({ color: src.color.clone() })
+        t.name = src.name
+        mats.set(m, t)
       }
       return t
     }
     root.traverse((o) => {
       const m = o as THREE.Mesh
-      if (m.isMesh) {
-        m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material)
-        // (the glass neither casts a shadow nor takes one: the door's pane, swung open, threw a solid one across the floor and the cabinet's
-        // side, and shadows lay on the glass itself, hanging in the air)
-        const glass = (Array.isArray(m.material) ? m.material : [m.material]).some((x) => x.transparent)
-        m.castShadow = !glass
-        m.receiveShadow = !glass
-      }
+      if (!m.isMesh) return
+      m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material)
+      // (the glass neither casts a shadow nor takes one: swung open, its pane threw a solid one across the floor; nor the wire)
+      const see = (Array.isArray(m.material) ? m.material : [m.material]).some((x) => x.transparent || x.alphaTest > 0)
+      m.castShadow = !see
+      m.receiveShadow = !see
     })
-    inkModel(root, (m) => !!(m.material as THREE.Material).transparent)
+    // (an outline round the cabinet and the door, not the sign, the shelves' wire or the glass)
+    inkModel(root, (m) => { const x = m.material as THREE.Material; return x.transparent || x.alphaTest > 0 || x === sign })
     root.updateMatrixWorld(true)
-    const door = root.getObjectByName('Door_6')
+    const door = root.getObjectByName('FridgeDoor')
     const body = new THREE.Group()
     const pivot = new THREE.Group()
+    body.add(root)
     if (door) {
       // (the door swings on its left edge: a pivot there, the door moved onto it without moving)
       const box = new THREE.Box3().setFromObject(door)
       pivot.position.set(box.min.x, 0, box.max.z)
-      body.add(root)
       body.updateMatrixWorld(true)
       pivot.updateMatrixWorld(true)
       pivot.attach(door)
-    } else body.add(root)
-    // (the cabinet never moves and the door swings as one: each's parts and ink folded together by material (some ten draws a fridge))
+    }
+    // (the cabinet never moves and the door swings as one: each folded together by material)
     plainColours(root)
     mergeByMaterial(root)
     mergeByMaterial(pivot)
-    // (stood in the shop: scaled, its middle at the origin, its base on the floor)
-    const place = new THREE.Group()
-    place.scale.setScalar(FREEZER.scale)
-    place.position.set(-FREEZER.cx * FREEZER.scale, -FREEZER.base * FREEZER.scale, -FREEZER.cz * FREEZER.scale)
-    place.add(body)
-    // (the door's pivot stands in its own copy of the same placing, so the door sits on the cabinet when it's shut)
     const doorRoot = new THREE.Group()
-    doorRoot.scale.copy(place.scale)
-    doorRoot.position.copy(place.position)
     doorRoot.add(pivot)
-    const out = { body: place, doorRoot, door: pivot }
+    const out = { body, doorRoot, door: pivot }
     freezers.set(n, out)
     return out
   }, [gltf, n])
 }
+useGLTF.preload(FRIDGE_URL)
 /** what stands on the fridges' tops: a 一升瓶 (turned: a round shoulder, a long neck), a tokkuri (a round body, a narrow neck, a lip), a beer
  * glass upturned (open at its foot), and the crate's burnt-in stamp */
 const ISSHO_GEO = new THREE.LatheGeometry([[0.0, 0], [0.046, 0], [0.05, 0.01], [0.05, 0.2], [0.044, 0.24], [0.026, 0.28], [0.02, 0.31], [0.02, 0.37], [0.0, 0.372]].map(([x, y]) => new THREE.Vector2(x, y)), 16)
@@ -4962,11 +4917,11 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     const sp = new THREE.Vector3((k - (sh[r].ids.length - 1) / 2) * sh[r].pitch, sh[r].y, 0.16), step = sh[r].pitch * 1.02
     const deep = Math.max(1, Math.floor(RANK_DEPTH / step))
     return [
-      <group key={`f${r}-${k}`} position={sp.toArray()} userData={{ batchPart: `f${r}-${k}` }}><DrinkBottle id={id} lit /></group>,
+      <group key={`f${r}-${k}`} position={sp.toArray()} userData={{ batchPart: `f${r}-${k}` }}><DrinkBottleLite id={id} /></group>,
       <group key={`b${r}-${k}`} userData={{ batchPart: `b${r}-${k}` }}>
         {Array.from({ length: deep }, (_, j) => (
           <group key={j} position={[sp.x + (((k * 7 + j * 3) % 5) - 2) * 0.003, sp.y, sp.z - step * (j + 1)]} rotation-y={((k + j) % 3 - 1) * 0.25}>
-            <DrinkBottle id={id} lit />
+            <DrinkBottleLite id={id} />
           </group>
         ))}
       </group>,
@@ -5035,6 +4990,37 @@ const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.
 /** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */
 /** (`wet`: out of the fridge, misted over with beads of condensation, a few run down) */
 export const DrinkBottle = memo(DrinkBottleImpl)
+/**
+ * A drink as it stands on a fridge's shelf among the hundred and sixty (the owner's: the fridges were the heaviest thing in the room): its
+ * bottle or can in a few turned rings, opaque, its glass's and its drink's colour in its points; its label, and its cap. Two materials for
+ * all of them (PARTS and the label's), so a fridge's whole stock is two draws; the one taken up, pointed at or carried is the full one.
+ */
+const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
+  const d = DRINKS.find((x) => x.id === id)!
+  const kind = KIND_OF[id]
+  const shaped = id === 'beer' ? 'beer' : id === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'cola' || id === 'greenTea' || id === 'sports' ? 'pet500'
+    : id === 'milk' ? 'milk' : id === 'ramune' ? 'ramune' : null
+  // (its body's colour: the beer's brown glass, the ramune's aqua, the milk white; a clear bottle the colour of what's in it, paled by the glass)
+  const body = id === 'beer' ? '#4a2a10' : id === 'ramune' ? '#bfe6f0' : id === 'milk' ? '#f4f2ea' : id === 'sake' ? '#e4ece6'
+    : `#${new THREE.Color(d.color).lerp(new THREE.Color('#ffffff'), 0.25).getHexString()}`
+  return (
+    <group scale={DRINK_SCALE[id]}>
+      <group rotation-y={-Math.PI / 2}>
+        {kind === 'can' && id !== 'cola' && id !== 'greenTea' ? <>
+          <mesh geometry={labelGeo(LITE_GEO.canLabel, id)} position-y={0.045} material={LABEL_LIT} />
+          <mesh geometry={tinted(LITE_GEO.canTop, '#c4c8cc')} position-y={0.089} material={PARTS} />
+        </> : kind === 'small' ? <>
+          <mesh geometry={labelGeo(BOTTLE_GEO.small, id)} position-y={0.036} material={LABEL_LIT} />
+          <mesh geometry={tinted(BOTTLE_GEO.smallTop, d.cap)} position-y={0.074} material={PARTS} />
+        </> : shaped && <>
+          <mesh geometry={tinted(LITE_GEO[shaped].body, body)} material={PARTS} />
+          <mesh geometry={labelGeo(LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={LABEL_LIT} />
+          <mesh geometry={tinted(LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={PARTS} />
+        </>}
+      </group>
+    </group>
+  )
+})
 function DrinkBottleImpl({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
   return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} wet={wet} /></group>
 }
@@ -5161,6 +5147,25 @@ const BOTTLE_DRINK = {
   pet500: liquidOf([[0, 0], [0.019, 0], [0.0235, 0.006], [0.0235, 0.1], [0.021, 0.125], [0.0135, 0.145], [0.0105, 0.152], [0, 0.158]], 0.9),
   sake: liquidOf([[0, 0], [0.022, 0], [0.0245, 0.004], [0.0245, 0.12], [0.0225, 0.15], [0.014, 0.178], [0.0105, 0.2], [0, 0.206]], 0.8),
   pet: liquidOf([[0, 0], [0.026, 0], [0.032, 0.008], [0.032, 0.17], [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0, 0.246]], 0.88),
+}
+/** the shelf's plain bottles (DrinkBottleLite): each body a few rings (its foot, its shoulder, its neck), 8 round; a label band; a cap */
+const liteBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 8)
+const LITE_GEO = {
+  beer: { body: liteBody([[0.012, 0], [0.0275, 0.003], [0.0275, 0.12], [0.0145, 0.17], [0.0125, 0.21], [0.004, 0.211]]),
+    label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 8, 1, true), labelY: 0.065, capY: 0.212, capR: 1.1 },
+  sake: { body: liteBody([[0.012, 0], [0.0245, 0.003], [0.0245, 0.12], [0.014, 0.178], [0.0105, 0.206], [0.004, 0.207]]),
+    label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 8, 1, true), labelY: 0.07, capY: 0.208, capR: 0.95 },
+  pet500: { body: liteBody([[0.012, 0], [0.0235, 0.004], [0.0235, 0.1], [0.0135, 0.145], [0.0105, 0.158], [0.004, 0.159]]),
+    label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 8, 1, true), labelY: 0.07, capY: 0.162, capR: 0.9 },
+  pet: { body: liteBody([[0.014, 0], [0.032, 0.006], [0.032, 0.17], [0.017, 0.225], [0.0135, 0.246], [0.004, 0.247]]),
+    label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 8, 1, true), labelY: 0.1, capY: 0.25, capR: 1.1 },
+  milk: { body: liteBody([[0.012, 0], [0.0225, 0.004], [0.0225, 0.085], [0.0175, 0.106], [0.0175, 0.118], [0.004, 0.119]]),
+    label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 8, 1, true), labelY: 0.05, capY: 0.12, capR: 1.5 },
+  ramune: { body: liteBody([[0.012, 0], [0.025, 0.006], [0.025, 0.085], [0.0115, 0.122], [0.0152, 0.146], [0.0098, 0.16], [0.0122, 0.178], [0.004, 0.179]]),
+    label: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 8, 1, true), labelY: 0.055, capY: 0.181, capR: 1.0 },
+  cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 8),
+  canLabel: new THREE.CylinderGeometry(0.0212, 0.0212, 0.088, 8, 1, true),
+  canTop: new THREE.CylinderGeometry(0.0178, 0.0205, 0.006, 8),
 }
 const BOTTLE_GEO = {
   body: new THREE.CylinderGeometry(0.026, 0.028, 0.13, 9),
