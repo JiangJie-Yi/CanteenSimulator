@@ -128,12 +128,15 @@ const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
 const PLATING_FRAME = platingOf()
 /** the skewers' holder and used tray drawn at the cook table's size (the fire's drawn big) */
 const SKEWER_SCALE = 2.2
-/** the used skewers' tray: beside the plating place, the other side from its stack of plates */
-const skewerTrayAt = () => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, 0.3)).sub(FIRE_SHIFT)
-const skewerTrayYaw = (() => {
-  const a = toGrillScene(PLATING_FRAME.at.clone()), b = toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, 1))
-  return Math.atan2(b.x - a.x, b.z - a.z) + Math.PI / 2
-})()
+/** the used skewers' channel: let into the top of the hearth's frame on the cook's side, to his right past the seasonings' ledge (the
+ * owner's: pulled out hot, dropped straight in to cool), along the frame (the frame's top, IRORI_H high, and its middle, a frame's width in from
+ * its edge, as drawn: PIT_SCALE over blender/grilledfish.py's) */
+const skewerTrayAt = () => new THREE.Vector3().addScaledVector(ALONG, 1.05).addScaledVector(LAY, HEARTH_HALF - 0.13 * PIT_SCALE / 2).setY(0.15 * PIT_SCALE + 0.004)
+const skewerTrayYaw = Math.atan2(-ALONG.z, ALONG.x)
+/** the clean skewers' holder: hung on the cook table's front, on the strip of table right of the notch (right of the knives: the owner's red
+ * box), its rim a little below the table's top, so the skewers stand up out of it past the edge */
+const skewerHolderAt = () => new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[1] + CUBBY.along[0]) / 2 - FIRE_SHIFT.dot(ALONG))
+  .addScaledVector(LAY, COOK_NOTCH.lay[1] + 0.06 * SKEWER_SCALE).setY(-0.22 * SKEWER_SCALE)
 const PLATING_TOP = PLATING_FRAME.top * GRILL_SCALE + GRILL_OFFSET.y
 const PLATING_ACROSS = PLATING_FRAME.across.clone()
 /** where a piece goes at the plating place: side by side in its slot (on the plate laid there, or loose on the table, for a plate already out),
@@ -253,13 +256,18 @@ const UP = new THREE.Vector3(0, 1, 0)
 const ZERO = new THREE.Vector3()
 /** the pinching hand is drawn a little above the pinch of salt it holds */
 const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
-/** the water bucket (bare sticks and burnt food go in it too) */
-const BIN_R = 0.27 * 1.65
-/** the water bucket drawn this much bigger than modelled */
-const BUCKET_SCALE = 1.65
-/** the trash bin for bare sticks and burnt food (the water bucket is only for water) */
-const TRASH_R = 0.24
-const TRASH_H = 0.36
+/** the water bucket, drawn this much bigger than modelled (its water is for damping the fire down, not for the food: the owner's); and its
+ * footprint. Down on the floor by the cook's left foot (the owner's), at a bucket's own size: on the table it was drawn three times as big,
+ * nearly a metre across */
+const BUCKET_SCALE = 0.55
+const BIN_R = 0.27 * BUCKET_SCALE
+/** the trash bin for bare sticks, burnt scraps and the like (the water bucket is only for water), on the floor by the cook's right foot */
+const TRASH_R = 0.15
+const TRASH_H = 0.3
+/** where they stand: on the floor in front of the strips of table either side of the cook's notch, his step between them (the notch is only
+ * as wide as the step; past the strips, the fridges' doors swing out). Along (the bar's, as COOK_NOTCH) and out (lay) */
+const FLOOR_BIN = { along: -0.19, lay: 2.27 }
+const FLOOR_TRASH = { along: 1.43, lay: 2.26 }
 
 /** split bamboo in a 2-over-2 twill (網代編み), honey-coloured and a little smoked, wrapped round the basket */
 const TRASH_WEAVE = (() => {
@@ -470,7 +478,7 @@ const FAN_PEG = { along: -LEDGE_L / 2 + 0.045, up: 0.365 - 0.19 }
 /** the fan hung on its peg: its paper's middle this far below the peg (its handle's length, 1.6 times its own, and the loop) */
 const FAN_DROP = -0.4
 /** the containers that stay where they're set, whatever's beside them: the ledge, fixed to the hearth */
-const FIXED = new Set(['box'])
+const FIXED = new Set(['box', 'bin', 'trash'])
 /** how many of the floating 美味 words can be up at once, and where an unused place waits */
 const POP_SLOTS = 8
 const POP_AWAY: [number, number, number] = [0, -50, 0]
@@ -3798,10 +3806,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // fire and of each other where it stands — at the start, and whenever another plate or basket is put out
   useLayoutEffect(() => {
     // (the seasoning box starts beside the cook, in the table's corner by where they stand, not out against the counter's edge)
-    if (carriers.bin && !moved.current.has('bin')) {
-      // (the water bucket stands where the lantern was, along the back)
+    // (the water bucket and the trash bin on the floor either side of the cook's step, whatever was kept from before (they stood on the table))
+    const floorY = CHEF_AT.y
+    if (carriers.bin) {
       const h = carriers.bin[0].home
-      moved.current.set('bin', new THREE.Vector3(1.35 - h.x, 0, -1.45 - h.z))
+      const want = new THREE.Vector3().addScaledVector(ALONG, FLOOR_BIN.along - FIRE_SHIFT.dot(ALONG)).addScaledVector(LAY, FLOOR_BIN.lay)
+      moved.current.set('bin', new THREE.Vector3(want.x - h.x, floorY - h.y, want.z - h.z))
+    }
+    if (roast.trash) {
+      const t = roast.trash
+      const want = new THREE.Vector3().addScaledVector(ALONG, FLOOR_TRASH.along - FIRE_SHIFT.dot(ALONG)).addScaledVector(LAY, FLOOR_TRASH.lay)
+      moved.current.set('trash', new THREE.Vector3(want.x - t[0], floorY - t[1], want.z - t[2]))
     }
     // (and back on its hearth if it was ever let fall off the table, as it could be before it was fixed in place)
     const ledge = moved.current.get('box')
@@ -3814,7 +3829,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
         // (a stack stays where it was put; what's kept in the cubby under the table stays there till it's taken out)
-        if (stackOn.current.has(key) || key === 'bin' || key === 'tray' || outsideTable(containerAt(key), footprint(key))) continue
+        if (stackOn.current.has(key) || FIXED.has(key) || key === 'tray' || outsideTable(containerAt(key), footprint(key))) continue
         const at = containerAt(key)
         const ok = settle(key, at.clone())
         const shift = ok.sub(at)
@@ -6535,7 +6550,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {/* (the iron skewers' holder by the board and their used tray by the plating place) */}
       {roast.tray && bar && <group scale={SKEWER_SCALE}><SkewerStore lang={lang}
-        holderAt={trayAt().add(new THREE.Vector3(TRAY_W / 2 + 0.18, 0, -TRAY_D / 4)).divideScalar(SKEWER_SCALE).toArray() as [number, number, number]}
+        holderAt={skewerHolderAt().divideScalar(SKEWER_SCALE).toArray() as [number, number, number]} holderYaw={Math.atan2(LAY.x, LAY.z)}
         trayAt={skewerTrayAt().divideScalar(SKEWER_SCALE).toArray() as [number, number, number]} trayYaw={skewerTrayYaw} /></group>}
       {/* (edit mode's boxes for what the nudge moves: an unseen block the size of each, in a group the edit moves; the pieces themselves follow by the nudge) */}
       {roast.tray && <EditProxy id="cutboard" label="大砧板" at={containerAt('tray')} size={[TRAY_W, 0.12, TRAY_D]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
@@ -6616,7 +6631,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       ))}
       {active && toolLabel && (
         <Html position={toolLabel.at} center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
-          <span className="tool-tag">{TOOL_NAMES[toolLabel.kind]}<small>拖到食物上</small></span>
+          <span className="tool-tag">{toolLabel.kind === 'water' ? '水（退火用）' : TOOL_NAMES[toolLabel.kind]}<small>{toolLabel.kind === 'water' ? '拖至炭火／爐心' : '拖到食物上'}</small></span>
         </Html>
       )}
       {wisps.map((w) => (
