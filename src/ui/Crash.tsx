@@ -26,7 +26,7 @@ export class Crash extends Component<{ children: ReactNode; inline?: boolean }, 
       return (
         <div className={`crash${this.props.inline ? ' is-inline' : ''}`} role="alert">
           <b>這個瀏覽器現在打不開 3D 畫面</b>
-          <p>多半是先前手機記憶體不足、3D 當掉過幾次，瀏覽器就暫時停用了這個網站的 3D。請把 Chrome（或這個 App）完全關掉再打開；不行的話重開手機，或改用「在 Chrome 中開啟」。菜單一樣可以點。</p>
+          <p>多半是先前記憶體不足、3D 當掉過幾次，瀏覽器就暫時停用了這個網站的 3D（重新整理沒有用）。請把瀏覽器完全結束再打開：電腦按 ⌘Q（Mac）或關掉所有 Chrome 視窗，手機把 App 完全滑掉；還是不行就確認瀏覽器設定裡的「使用圖形加速」有開，或重開機。菜單一樣可以點。</p>
           <code>{webglReport()}</code>
           <button type="button" onClick={() => window.location.replace(window.location.pathname + '?v=' + Date.now())}>重新載入</button>
         </div>
