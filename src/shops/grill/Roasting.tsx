@@ -63,7 +63,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -646,6 +646,8 @@ export const PIT_LIFT = 0
 const PIT_PARTS = /^(FirePit|Stone|Robuchi|Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE
+/** the fire run this hot (0..1) for HOT_S seconds: the third cook splashes it down */
+const HOT_AT = 0.9, HOT_S = 6
 /** the square hearth's frame (炉縁, blender/grilledfish.py IRORI_IN + IRORI_W), its outer half-width as drawn: square to the table, along
  * ALONG and LAY; nothing is set down on it or inside it (sized so the table's front row of plates, bowls and the board stand clear of it) */
 const HEARTH_HALF = (0.8 + 0.13) * PIT_SCALE
@@ -3790,6 +3792,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   const [basketCount, setBasketCount] = useState(1)
   const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
+  /** since when the fire's run past HOT_AT (seconds), for the third cook's water */
+  const hotSince = useRef<number | null>(null)
   // (with the shop open nothing goes in the basket or on the side dishes: it's all served at the bar, unwrapped)
   /** while the shop's closed and the cook's at it by hand, everything that comes off the fire goes into the tasting bowl */
   const inBowl = (p: Piece) => (p.collected ? !!p.container?.startsWith('bowl') : (space !== 'open' && byHandRef.current) || (space === 'open' && !!p.keepWarm))
@@ -4371,16 +4375,50 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // done, seasons them), the sous chef does the rest (keeps the fire up, puts what's waiting on, clears away)
     // (with the shop open the kitchen cooks by itself: the owner's own cook does all of it, a hired chef or sous chef working alongside)
     const hasChef = true, hasSous = true
+    // (the fire kept by the third cook when there's one walking (bar.ts's FIRE_TEND): the grill asks, he fetches, and only when he's at
+    // the hearth do the sticks go in or the water on; with no one, it's done at once, as it always was)
+    const tend = space === 'open' && FIRE_TEND.tender
+    if (FIRE_TEND.done === 'coal') {
+      FIRE_TEND.done = null; FIRE_TEND.want = null
+      const left = SUPPLIES.coal()
+      if (fire && left >= 1 && roomForCoal()) {
+        const placed = dropCoals(undefined, Math.min(left, coalPortion()))
+        if (placed && onAddCharcoal?.(placed) !== false) say(L().addCharcoal)
+      }
+      return
+    }
+    if (FIRE_TEND.done === 'water') {
+      FIRE_TEND.done = null; FIRE_TEND.want = null
+      if (fire) fire.current = Math.max(0, fire.current - 0.3)
+      meterWater('dipper')
+      setWisps((all) => [...all.filter((w) => w.key !== 'douse'), { key: 'douse', at: [0, 0.15, 0] }])
+      return
+    }
+    if (!tend && FIRE_TEND.want) FIRE_TEND.want = null
+    // (run too hot for a while (past HOT_AT for HOT_S): a splash of water to calm it, by the third cook only: no one walking, it's left be)
+    const nowS = performance.now() / 1000
+    if (fire && fire.current > HOT_AT) { if (hotSince.current === null) hotSince.current = nowS }
+    else hotSince.current = null
+    if (tend && !FIRE_TEND.want && hotSince.current !== null && nowS - hotSince.current > HOT_S) {
+      hotSince.current = null
+      FIRE_TEND.want = 'water'
+      say(L().tooHot)
+      return
+    }
     if (fire && fire.current < 0.35) {
       // (a handful out of the crate, as many as the bed takes; paid for only those, and none at all when it's full)
       if (!roomForCoal()) return
       // (no more than the sack has: none left, the chef says so now and then)
       const left = SUPPLIES.coal()
       if (left < 1) { say(L().noCharcoal); return }
-      const placed = dropCoals(undefined, Math.min(left, coalPortion()))
-      if (!placed || onAddCharcoal?.(placed) === false) return
-      say(L().addCharcoal)
-      return
+      if (!tend) {
+        const placed = dropCoals(undefined, Math.min(left, coalPortion()))
+        if (!placed || onAddCharcoal?.(placed) === false) return
+        say(L().addCharcoal)
+        return
+      }
+      // (asked once; the grill gets on with the food while the third cook fetches it)
+      if (!FIRE_TEND.want) FIRE_TEND.want = 'coal'
     }
     const live = pieces.current.filter((p) => present(p) && !p.eaten && p.trash < 0 && !p.carried)
     const stageOfP = (p: Piece) => stageOf(p.progress / roast.times[p.id]).key

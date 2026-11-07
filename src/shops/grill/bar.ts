@@ -666,6 +666,14 @@ export const SEAT_BONES = new Map<number, number>()
  * takes a portion for each rice ball)
  */
 export const RICE: { tub: number; kama: Kama; washing: boolean } = { tub: TUB_FULL, kama: emptyKama(), washing: false }
+/**
+ * The fire kept by the third cook (三廚, the plater: the owner's, a robata's kitchen split three ways): the grill (Roasting) asks for charcoal
+ * when the fire's low or for water when it's run too hot (`want`); the third cook, walking (GuestBar3D's platerRun), takes it from the crate
+ * or the bucket on the floor to the hearth's far side, and says it's done (`done`), and only then does the grill drop the sticks in or damp
+ * it down. `tender`: whether there's anyone to send (the plater's there); with none, the grill does it itself at once, as it used to.
+ */
+export const FIRE_TEND: { want: null | 'coal' | 'water'; done: null | 'coal' | 'water'; tender: boolean } = { want: null, done: null, tender: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fireTend?: typeof FIRE_TEND }).__fireTend = FIRE_TEND
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __rice: RICE })
 export const WHOLE_FISH = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Hokke', 'Nodoguro'])
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plating: PLATING, __dryer: DRYER, __sinkBin: SINK_BIN })

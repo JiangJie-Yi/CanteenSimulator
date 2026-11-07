@@ -219,7 +219,7 @@ function Crate() {
     if (CRATE.left !== left) setLeft(CRATE.left)
   })
   return (
-    <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35}>
+    <group position={[DECOR.crate.at[0], 0, DECOR.crate.at[1]]} rotation-y={-0.35} name="coal-crate">
       <StaticBatch plain>
       <Inked geometry={geo.side} map={weave} position={[0, H / 2, D / 2 - T / 2]}>
         {/* the tag faces out of the front */}
@@ -938,7 +938,7 @@ function MisoPot() {
   const p = new THREE.Vector3().addScaledVector(ALONG, MISO_AT.along).addScaledVector(LAY, MISO_AT.lay)
   const s = stand.clone()
   return (
-    <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+    <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} name="miso-pot">
       <primitive object={s} position-y={floor} scale={[0.6, (MISO_TOP - floor) / 1.08, 0.6]} />
       {/* (nothing to do with it: named when pointed at, no glow, no pointing hand (bar.ts's nameOver)) */}
       <group position-y={MISO_TOP} scale={MISO_SCALE} {...nameOver('味噌湯鍋', '一直保溫著的味噌湯（豆腐、海帶芽、蔥）')}>

@@ -8,6 +8,7 @@ const ZH = {
   // 炭火與料理動作
   addCharcoal: '炭火有點弱了，補兩塊備長炭！',
   noCharcoal: '木炭全空了！麻袋見底了，快叫貨啊！',
+  tooHot: '火太旺了！舀點水灑一下，退個火。',
   outOf: (k: string) => {
     const map: Record<string, string> = {
       salt: '岩鹽',
@@ -112,6 +113,7 @@ const JA: typeof ZH = {
   // 炭火と調理
   addCharcoal: '火が落ちてきたな、備長炭を足そう！',
   noCharcoal: '炭が完全に切れた！袋も底をついた、早く発注しないと！',
+  tooHot: '火が強すぎる！水を少し打って落ち着かせよう。',
   outOf: (k: string) => {
     const map: Record<string, string> = {
       salt: '天然塩',
@@ -214,6 +216,7 @@ const EN: typeof ZH = {
   // Grilling & Kitchen Action
   addCharcoal: 'The flame is dying down. Adding two fresh Binchotan coals!',
   noCharcoal: 'We’re completely out of charcoal! The sack is empty—place an order quick!',
+  tooHot: 'Too hot! A splash of water to calm the coals down.',
   outOf: (k: string) => {
     const map: Record<string, string> = {
       salt: 'rock salt',
