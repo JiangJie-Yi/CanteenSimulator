@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
 import { TUB_FULL, emptyKama, type Kama } from '@/game/rice'
 import type { Gripe } from '@/game/reputation'
@@ -145,6 +146,10 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * and the stool's free; then both move them, Roasting's guest and GuestBar3D's figure.
  */
 export const SEAT_MOVE: { ask: { guest: number; from: number; to: number } | null; answer: { guest: number; to: number; ok: boolean } | null } = { ask: null, answer: null }
+/** the shop's fifty iron skewers (game/skewers): clean in the holder, dirty in the used tray, carried to the sink; `inUse`, those on food now
+ * (Roasting counts them each frame) */
+export const SKEWERS: { s: Skewers; inUse: number } = { s: startSkewers(), inUse: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __skewers?: typeof SKEWERS }).__skewers = SKEWERS
 /** the owner out on the floor serving (no server hired: he carries the plates, clears them and takes the washed ones back himself, the
  * owner's: nothing flies): GuestBar3D walks a figure of him; Roasting's, at his place in the kitchen, is hidden meanwhile */
 export const OWNER_OUT = { on: false }

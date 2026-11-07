@@ -1,4 +1,6 @@
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes } from '@/game/skewers'
+import { rattleSound } from './skewerSound'
 import { getClock } from '@/ui/clockStore'
 import { FigureHit } from '@/scene/FigureHit'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
@@ -63,7 +65,7 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -2491,6 +2493,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // electric cooker to set it on ('toSink', 'wash', 'toKama', 'load'); cooked,
   // to the stove to scoop it out and to the tub with it ('toCooked', 'scoop', 'toTub', 'fill'))
   const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'toSack' | 'scoopRaw' | 'toSink' | 'wash' | 'toKama' | 'load' | 'toCooked' | 'scoop' | 'toTub' | 'fill'
+    | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
     t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   const platerObj = useRef<THREE.Group | null>(null)
@@ -2498,6 +2501,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const platerStack = useRef<THREE.Group>(null)
   /** the bowl of rice in the plater's hands (washing it, carrying it to the pot, and the cooked rice to the tub) */
   const platerBowl = useRef<THREE.Group>(null)
+  /** the bundle of iron skewers the plater carries to the sink and back to the holder */
+  const platerSkewers = useRef<THREE.Group>(null)
   /** the plates stacked at the plating place, and those standing in the dryer (drawn as many as there are) */
   const plateStack = useRef<THREE.Group>(null)
   const dryerPlates = useRef<THREE.Group>(null)
@@ -3248,6 +3253,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         return { at, edge, front: at.clone().add(edge.clone().sub(at).setY(0).setLength(0.34)) }
       }
       const tubSpot = () => { marks.current.delete('ricetub-mid'); return inBar('ricetub-mid', home()).add(kamaSpot().sub(kamaTop()).setY(0)).setY(0) }
+      /** where they stand at the used skewers' tray (the plating place's own spot) and at the holder by the board (on the floor below it) */
+      const skTraySpot = () => plating.in.clone().setY(0)
+      const skHolderSpot = () => { marks.current.delete('skewer-holder'); return inBar('skewer-holder', home()).setY(0) }
       const faceTo = (v: THREE.Vector3) => { pl.yaw = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
       const setOff = (to: THREE.Vector3, phase: typeof pl.phase) => {
         pl.path = kitchenRoute(pl.pos, to)
@@ -3261,6 +3269,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (open && PLATING.stock < STACK_CAP && PLATE_RACK.n > 0) { PLATING.stock += 1; PLATE_RACK.n -= 1 }
         if (open && riceGoes(RICE.tub, RICE.kama)) RICE.kama = setOn()
         if (RICE.kama.state === 'done') { const r = scoopIn(RICE.tub); RICE.tub = r.tub; RICE.kama = r.kama }
+        if (open && washGoes(SKEWERS.s)) SKEWERS.s = washAll(SKEWERS.s)
       } else if (pl.phase === 'idle') {
         if (pl.t > 0.5) {
           pl.t = 0
@@ -3268,6 +3277,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             // (the pot's cooked: to it, to scoop the rice out into the tub)
             pl.pos.copy(home())
             setOff(kamaSpot(), 'toCooked')
+            away(true)
+          } else if (open && !SHOP.leaving && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n))) {
+            // (the used skewers piling up, or the holder nearly empty: to the used tray by the plating place for all of them)
+            pl.pos.copy(home())
+            setOff(skTraySpot(), 'toSkTray')
             away(true)
           } else if (open && !SHOP.leaving && riceGoes(RICE.tub, RICE.kama) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
             // (the tub's running low: to the open sack for the next pot's rice, over the kitchen's edge to it, then to the sink to wash it)
@@ -3318,6 +3332,27 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         away(false)
       })
       else if (pl.phase === 'toSack') walk(() => { pl.phase = 'scoopRaw'; faceTo(sackSpots().at) })
+      // ---- the iron skewers (game/skewers): the used tray's all picked up, washed at the sink, put back in the holder by the board
+      else if (pl.phase === 'toSkTray') walk(() => { pl.phase = 'takeSk'; faceTo(inBar('skewer-tray', pl.pos)) })
+      else if (pl.phase === 'takeSk' && pl.t > 0.6) {
+        SKEWERS.s = pickUpDirty(SKEWERS.s)
+        setOff(sinkFront(), 'toSkSink')
+      } else if (pl.phase === 'toSkSink') walk(() => {
+        pl.phase = 'washSk'
+        SINK.washing = true
+        faceTo(inBar('SinkBasinFloor', endOf(1)))
+        if (plater) STAFF_TALK.push({ key: performance.now() + 0.7, id: plater.id, text: LINES[lang].skewerWash, until: performance.now() + 2400 })
+      })
+      else if (pl.phase === 'washSk' && pl.t > SKEWER_WASH_S) {
+        SINK.washing = false
+        meterWater('dish')
+        setOff(skHolderSpot(), 'toHolder')
+      } else if (pl.phase === 'toHolder') walk(() => { pl.phase = 'putSk'; faceTo(inBar('skewer-holder', pl.pos)) })
+      else if (pl.phase === 'putSk' && pl.t > 0.5) {
+        SKEWERS.s = putBackClean(SKEWERS.s)
+        rattleSound()
+        setOff(home(), 'home')
+      }
       else if (pl.phase === 'scoopRaw' && pl.t > SCOOP_S) {
         // (a pot's worth scooped into the bowl; back up onto the kitchen's floor and to the sink with it)
         const sk = sackSpots()
@@ -3347,6 +3382,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         setOff(home(), 'home')
       }
       const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama' || pl.phase === 'toCooked' || pl.phase === 'toTub'
+        || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder'
       if (mv !== platerMoving) setPlaterMoving(mv)
       const o = platerObj.current
       if (o) {
@@ -3377,6 +3413,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           pb.rotation.z = pl.phase === 'load' || pl.phase === 'fill' ? Math.sin(Math.PI * k) * 1.1 : 0
           const rice = pb.getObjectByName('bowl-rice')
           if (rice) rice.scale.setScalar(pl.phase === 'load' || pl.phase === 'fill' ? Math.max(0.01, 1 - k) : pl.phase === 'scoop' || pl.phase === 'scoopRaw' ? Math.max(0.01, k) : 1)
+        }
+      }
+      // (the bundle of skewers in their hands, from the tray to the holder; scrubbed to and fro at the sink)
+      const sk = platerSkewers.current
+      if (sk && o) {
+        const has = pl.phase === 'toSkSink' || pl.phase === 'washSk' || pl.phase === 'toHolder' || pl.phase === 'putSk' || (pl.phase === 'takeSk' && pl.t > 0.3)
+        sk.visible = has
+        if (has) {
+          o.userData.carry = true
+          sk.position.copy(o.position).add(new THREE.Vector3(pl.phase === 'washSk' ? Math.sin(pl.t * 12) * 0.03 : 0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
+          sk.rotation.set(0, pl.yaw, 0)
         }
       }
       // (the plates in their hands, out in front of them)
@@ -3908,6 +3955,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }} scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.17} />
           {plater ? <StaffFigure id={plater.id} role={plater.role} look={plater.look} moving={platerMoving} /> : <OwnerWalker moving={platerMoving} />}
+        </group>
+      )}
+      {given && (
+        <group ref={platerSkewers} visible={false}>
+          {/* (a bundle of iron skewers held across the hands) */}
+          {Array.from({ length: 7 }, (_, i) => (
+            <mesh key={i} position={[(i - 3) * 0.008, (i % 2) * 0.006, 0]} rotation={[Math.PI / 2, 0, (i - 3) * 0.03]}>
+              <cylinderGeometry args={[0.0022, 0.0022, 0.17, 5]} /><meshStandardMaterial color="#c9ccd1" metalness={0.85} roughness={0.35} />
+            </mesh>
+          ))}
         </group>
       )}
       {given && (

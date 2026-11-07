@@ -1,4 +1,7 @@
 import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
+import { SkewerStore } from './SkewerStore'
+import { clinkSound, pierceSound } from './skewerSound'
 import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
@@ -59,7 +62,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -122,6 +125,14 @@ const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
  * a server comes into the kitchen to him for it (the owner's: no pass on the bar between them any more); the table's top in the scene, and
  * the way across the table */
 const PLATING_FRAME = platingOf()
+/** the skewers' holder and used tray drawn at the cook table's size (the fire's drawn big) */
+const SKEWER_SCALE = 2.2
+/** the used skewers' tray: beside the plating place, the other side from its stack of plates */
+const skewerTrayAt = () => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, 0.3)).sub(FIRE_SHIFT)
+const skewerTrayYaw = (() => {
+  const a = toGrillScene(PLATING_FRAME.at.clone()), b = toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, 1))
+  return Math.atan2(b.x - a.x, b.z - a.z) + Math.PI / 2
+})()
 const PLATING_TOP = PLATING_FRAME.top * GRILL_SCALE + GRILL_OFFSET.y
 const PLATING_ACROSS = PLATING_FRAME.across.clone()
 /** where a piece goes at the plating place: side by side in its slot (on the plate laid there, or loose on the table, for a plate already out),
@@ -2931,6 +2942,10 @@ type Piece = {
   key: string
   /** cooked for nobody (its customer gone) and kept warm in the big bowl for the next who orders one, never binned */
   keepWarm?: boolean
+  /** its iron skewer (game/skewers): pushed through it on the board (when, performance.now()), pulled out as it's plated (when); none before
+   * the one and after the other (the raw food from the fridge has none: the owner's) */
+  skewerAt?: number
+  pullAt?: number
   id: string
   copy: number
   loose: boolean
@@ -4138,6 +4153,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       stacks: new Map(stackOn.current) }
   }
   const fresh = (p: Piece) => {
+    p.skewerAt = undefined
+    p.pullAt = undefined
     p.wasPresent = false
     p.staged = false
     p.homeFlight = 1
@@ -4293,6 +4310,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner })))
   const chefSaid = useRef(0)
+  /** when the chef last said there's no clean skewer */
+  const noSkewerSaid = useRef(-1e9)
+  // (the shop shut: every used skewer washed and back in the holder (the staff wash them as they close))
+  useEffect(() => { if (space !== 'open') SKEWERS.s = washAll(SKEWERS.s) }, [space])
 
   /** the best seasoning for a food by the PAIRING table (null if nothing suits it) */
   const bestSeasoning = (id: string) => {
@@ -4350,6 +4371,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const stageOfP = (p: Piece) => stageOf(p.progress / roast.times[p.id]).key
     const scrapIt = live.find((p) => p.stickOnly || (!p.collected && !p.staged && stageOfP(p) === 'burnt'))
     if (scrapIt && roast.trash && (hasSous || !hasChef)) {
+      if (scrapIt.skewerAt !== undefined && scrapIt.pullAt === undefined) { scrapIt.pullAt = performance.now(); SKEWERS.s = usedSkewer(SKEWERS.s) }
       scrapIt.trashFrom.copy(scrapIt.node.position)
       scrapIt.trash = 0
       scrapIt.node.userData.onPlate = true
@@ -4465,7 +4487,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     // (the sous chef puts things on; with no sous chef, the second chef does it too)
-    const next = hasSous || hasChef ? live.filter((p) => p.staged && !p.fetching && !((p.prepUntil ?? 0) > performance.now()))
+    const next = hasSous || hasChef ? live.filter((p) => p.staged && !p.fetching && !((p.prepUntil ?? 0) > performance.now()) && (!p.sticks.length || p.skewerAt !== undefined))
       .sort((a, b) => a.stagedAt - b.stagedAt)[0] : undefined
     if (next && !busy() && putOnFire(next)) {
       // (in his hands from the board to its place in the fire)
@@ -5915,6 +5937,45 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const inFridge = new Set([...boardSticks.slice(TRAY_CAP), ...boardLoose.slice(LOOSE_CAP)])
     if (inFridge.size !== trayMore) setTrayMore(inFridge.size)
 
+    // ---- the iron skewers (the owner's: fifty of them, game/skewers): a piece's pushed onto one from the holder in the last of its preparing on
+    // the board (none clean: it waits there, said once); pulled out as it lands on its plate (the shop open) into the used tray; its rod drawn
+    // growing in as it's pushed through, shrinking out as it's pulled. And how many are on food, for the count; the pool kept whole
+    {
+      const now = performance.now()
+      let inUse = 0
+      for (const p of pieces.current) {
+        if (!p.sticks.length) continue
+        const here = present(p) && p.trash < 0 && !p.eaten
+        if (here && p.skewerAt === undefined && !p.fetching) {
+          const ready = !p.staged || p.prepUntil === undefined || now >= p.prepUntil - 600
+          if (ready) {
+            let t = takeSkewer(SKEWERS.s)
+            // (the shop shut, the owner on his own: he washes the used ones himself when the holder's empty)
+            if (!t && space !== 'open' && SKEWERS.s.dirty + SKEWERS.s.carrying > 0) { SKEWERS.s = washAll(SKEWERS.s); t = takeSkewer(SKEWERS.s) }
+            if (t) { SKEWERS.s = t; p.skewerAt = now; pierceSound() }
+            else {
+              p.prepUntil = Math.max(p.prepUntil ?? 0, now + 800)
+              if (now - noSkewerSaid.current > 15000) { noSkewerSaid.current = now; chefSay(L().noSkewer) }
+            }
+          }
+        }
+        if (here && space === 'open' && p.skewerAt !== undefined && p.pullAt === undefined && p.collected && p.flight >= 1) {
+          p.pullAt = now
+          SKEWERS.s = usedSkewer(SKEWERS.s)
+          clinkSound()
+        }
+        if (here && p.skewerAt !== undefined && p.pullAt === undefined) inUse++
+        // (the rod: in as it's pushed, out as it's pulled; none before or after)
+        const grow = p.skewerAt === undefined ? 0 : p.pullAt !== undefined ? 1 - Math.min(1, (now - p.pullAt) / 450) : Math.min(1, (now - p.skewerAt) / 600)
+        for (const m of p.sticks) {
+          m.visible = grow > 0.001 && !p.stickOnly ? true : p.stickOnly && p.pullAt === undefined
+          m.scale.setScalar(p.stickOnly ? 1 : Math.max(0.001, grow))
+        }
+      }
+      SKEWERS.inUse = inUse
+      const lost = SKEWER_POOL - skewerTotal(SKEWERS.s, inUse)
+      if (lost !== 0) SKEWERS.s = { ...SKEWERS.s, clean: Math.max(0, SKEWERS.s.clean + lost) }
+    }
     pieces.current.forEach((p, n) => {
       bindMaterials(p)
       // (its one ink line shown while its food is)
@@ -6085,7 +6146,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           if (SERVICE.delivered.has(p.key)) {
             SERVICE.delivered.delete(p.key)
             // (its stick left on the plate once it's eaten: cleared with it, into the bin by the sink)
-            if (!p.loose) SEAT_STICKS.set(p.seat, (SEAT_STICKS.get(p.seat) ?? 0) + 1)
+            if (!p.loose && p.skewerAt !== undefined && p.pullAt === undefined) SEAT_STICKS.set(p.seat, (SEAT_STICKS.get(p.seat) ?? 0) + 1)
             if (WHOLE_FISH.has(p.id)) SEAT_BONES.set(p.seat, (SEAT_BONES.get(p.seat) ?? 0) + 1)
             const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === p.seat && !q.via && present(q) && !q.eaten).length
             p.fromP.copy(p.node.position)
@@ -6231,7 +6292,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.byBoss = false
           // (what an AI customer eats fills their stomach, not yours)
           if (!p.node.userData.byGuest) onEat?.(p.id, tasteOf(p), { doneness: p.progress / roast.times[p.id], dabs: { ...p.dabs }, steps: [...p.steps] })
-          if (p.sticks.length) {
+          if (p.sticks.length && p.pullAt === undefined) {
             p.stickOnly = true
             for (const m of p.food) m.visible = false
           } else {
@@ -6472,6 +6533,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </Html>
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
+      {/* (the iron skewers' holder by the board and their used tray by the plating place) */}
+      {roast.tray && bar && <group scale={SKEWER_SCALE}><SkewerStore lang={lang}
+        holderAt={trayAt().add(new THREE.Vector3(TRAY_W / 2 + 0.18, 0, -TRAY_D / 4)).divideScalar(SKEWER_SCALE).toArray() as [number, number, number]}
+        trayAt={skewerTrayAt().divideScalar(SKEWER_SCALE).toArray() as [number, number, number]} trayYaw={skewerTrayYaw} /></group>}
       {/* (edit mode's boxes for what the nudge moves: an unseen block the size of each, in a group the edit moves; the pieces themselves follow by the nudge) */}
       {roast.tray && <EditProxy id="cutboard" label="大砧板" at={containerAt('tray')} size={[TRAY_W, 0.12, TRAY_D]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
       {carriers.box && <EditProxy id="seasoning" label="調味架" at={containerAt('box').add(new THREE.Vector3(0, -0.12, 0))} size={[LEDGE_L, 0.42, 0.22]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
