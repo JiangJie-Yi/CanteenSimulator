@@ -2199,7 +2199,7 @@ const COAL_STICK_GEO = new THREE.CylinderGeometry(0.009, 0.01, 0.15, 6)
 const COAL_STICK_MAT = new THREE.MeshToonMaterial({ color: '#2b2b2e' })
 const DIPPER_CUP_GEO = new THREE.CylinderGeometry(0.04, 0.034, 0.05, 12, 1, true)
 const DIPPER_HANDLE_GEO = new THREE.CylinderGeometry(0.006, 0.006, 0.2, 6)
-const DIPPER_MAT = new THREE.MeshToonMaterial({ color: '#c8a273', side: THREE.DoubleSide })
+const DIPPER_MAT = new THREE.MeshToonMaterial({ color: '#c8a273' })
 const DIPPER_WATER_GEO = new THREE.CircleGeometry(0.037, 12)
 const DIPPER_WATER_MAT = new THREE.MeshToonMaterial({ color: '#9ccbe0', transparent: true, opacity: 0.8 })
 /** how often (seconds) the plater goes to stir the miso soup when there's nothing else, and for how long */
