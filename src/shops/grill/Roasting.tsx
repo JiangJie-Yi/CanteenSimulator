@@ -29,6 +29,7 @@ import { sameProps } from '@/scene/sameProps'
 import { StaffFigure, StaffWarm, TRAY_AT } from '@/scene/StaffFigure'
 import { commuteOf, delayOf, paceOf } from '@/game/commute'
 import { COMMUTERS, makeTrip, through, tripStep, type Trip } from './commuteWalk'
+import { fireCall, HOT_AT } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { SHAPE_S, takeRice } from '@/game/rice'
 import { CubbyStock } from './KitchenStores'
@@ -646,8 +647,6 @@ export const PIT_LIFT = 0
 const PIT_PARTS = /^(FirePit|Stone|Robuchi|Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE
-/** the fire run this hot (0..1) for HOT_S seconds: the third cook splashes it down */
-const HOT_AT = 0.9, HOT_S = 6
 /** the square hearth's frame (炉縁, blender/grilledfish.py IRORI_IN + IRORI_W), its outer half-width as drawn: square to the table, along
  * ALONG and LAY; nothing is set down on it or inside it (sized so the table's front row of plates, bowls and the board stand clear of it) */
 const HEARTH_HALF = (0.8 + 0.13) * PIT_SCALE
@@ -4402,34 +4401,36 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     if (!tend && FIRE_TEND.want) FIRE_TEND.want = null
-    // (run too hot for a while (past HOT_AT for HOT_S): a splash of water to calm it, by the third cook only: no one walking, it's left be)
+    // (what to do about the fire: game/fireTend's call; how long it's run too hot, how long since it asked for charcoal)
     const nowS = performance.now() / 1000
     if (fire && fire.current > HOT_AT) { if (hotSince.current === null) hotSince.current = nowS }
     else hotSince.current = null
-    if (tend && !FIRE_TEND.want && hotSince.current !== null && nowS - hotSince.current > HOT_S) {
+    const call = fire ? fireCall({ fire: fire.current, tender: tend, want: FIRE_TEND.want, hotFor: hotSince.current === null ? 0 : nowS - hotSince.current,
+      askedFor: FIRE_TEND.want === 'coal' ? nowS - coalAsked.current : 0 }) : 'none'
+    if (call === 'ask-water') {
       hotSince.current = null
       FIRE_TEND.want = 'water'
       say(L().tooHot)
       return
     }
-    if (fire && fire.current < 0.35) {
+    if (call === 'ask-coal' || call === 'drop-coal') {
       // (a handful out of the crate, as many as the bed takes; paid for only those, and none at all when it's full)
       if (!roomForCoal()) return
       // (no more than the sack has: none left, the chef says so now and then)
       const left = SUPPLIES.coal()
       if (left < 1) { say(L().noCharcoal); return }
-      // (asked a while back and the third cook still off on something long (the rice, the plates) with the fire nearly out: the grill's own cook
-      // drops a handful in himself, as the fire mustn't die)
-      if (tend && FIRE_TEND.want === 'coal' && fire.current < 0.12 && nowS - coalAsked.current > 20) FIRE_TEND.want = null
-      else if (tend && FIRE_TEND.want !== 'coal') coalAsked.current = nowS
-      if (!tend || (FIRE_TEND.want === null && fire.current < 0.12 && nowS - coalAsked.current > 20)) {
+      if (call === 'ask-coal') {
+        // (asked once; the grill gets on with the food while the third cook fetches it)
+        FIRE_TEND.want = 'coal'
+        coalAsked.current = nowS
+      } else {
+        // (no one to send, or the one sent off on something long (the rice, the plates) with the fire nearly out: dropped in at once)
+        if (FIRE_TEND.want === 'coal') FIRE_TEND.want = null
         const placed = dropCoals(undefined, Math.min(left, coalPortion()))
         if (!placed || onAddCharcoal?.(placed) === false) return
         say(L().addCharcoal)
         return
       }
-      // (asked once; the grill gets on with the food while the third cook fetches it)
-      if (!FIRE_TEND.want) FIRE_TEND.want = 'coal'
     }
     const live = pieces.current.filter((p) => present(p) && !p.eaten && p.trash < 0 && !p.carried)
     const stageOfP = (p: Piece) => stageOf(p.progress / roast.times[p.id]).key

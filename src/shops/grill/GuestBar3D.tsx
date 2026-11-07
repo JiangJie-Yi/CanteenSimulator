@@ -2507,7 +2507,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
     | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir'
     t: number; path: THREE.Vector3[]; len: number
-    pos: THREE.Vector3; yaw: number; n: number }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
+    pos: THREE.Vector3; yaw: number; n: number
+    /** what they've gone for for the fire: the charcoal or the water (what's in their hands to the hearth, whatever the grill asks meanwhile) */
+    fire?: 'coal' | 'water' }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   const platerObj = useRef<THREE.Group | null>(null)
   const [platerMoving, setPlaterMoving] = useState(false)
   const platerStack = useRef<THREE.Group>(null)
@@ -3318,7 +3320,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (open && !SHOP.leaving && FIRE_TEND.want) {
             // (the fire's asked for: charcoal from the crate, or water from the bucket on the floor, first of all)
             pl.pos.copy(home())
-            if (FIRE_TEND.want === 'coal') setOff(reachOf(crateAt()), 'toCrate')
+            pl.fire = FIRE_TEND.want
+            if (pl.fire === 'coal') setOff(reachOf(crateAt()), 'toCrate')
             else setOff(reachOf(bucketAt()), 'toBucket')
             away(true)
           } else if (open && !SHOP.leaving && RICE.kama.state === 'done') {
@@ -3358,7 +3361,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       else if (pl.phase === 'takeCoal' && pl.t > 0.6) setOff(hearthSpot(), 'toHearth')
       else if (pl.phase === 'toBucket') walk(() => { pl.phase = 'scoopWater'; faceTo(bucketAt()) })
       else if (pl.phase === 'scoopWater' && pl.t > 0.8) setOff(hearthSpot(), 'toHearth')
-      else if (pl.phase === 'toHearth') walk(() => { pl.phase = FIRE_TEND.want === 'water' ? 'sprinkle' : 'feedCoal'; faceTo(hearthAt()) })
+      else if (pl.phase === 'toHearth') walk(() => { pl.phase = pl.fire === 'water' ? 'sprinkle' : 'feedCoal'; faceTo(hearthAt()) })
       else if ((pl.phase === 'feedCoal' || pl.phase === 'sprinkle') && pl.t > 0.8) {
         // (the sticks in, or the water splashed on: the grill does the rest)
         FIRE_TEND.done = pl.phase === 'feedCoal' ? 'coal' : 'water'
@@ -3505,7 +3508,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (where the hands are, bent forward with them)
         const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE)
           .applyAxisAngle(X_AXIS, o.userData.lean ?? 0).applyAxisAngle(UP_Y, pl.yaw))
-        const coal = (pl.phase === 'takeCoal' && pl.t > 0.3) || (pl.phase === 'toHearth' && FIRE_TEND.want === 'coal') || pl.phase === 'feedCoal'
+        const coal = (pl.phase === 'takeCoal' && pl.t > 0.3) || (pl.phase === 'toHearth' && pl.fire === 'coal') || pl.phase === 'feedCoal'
         pc.visible = coal
         if (coal) {
           o.userData.carry = true
@@ -3515,7 +3518,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           pc.rotation.set(k * 1.2, pl.yaw, 0, 'YXZ')
           pc.scale.setScalar(pl.phase === 'feedCoal' && pl.t > 0.55 ? Math.max(0.01, 1 - (pl.t - 0.55) / 0.25) : 1)
         }
-        const dip = (pl.phase === 'scoopWater' && pl.t > 0.3) || (pl.phase === 'toHearth' && FIRE_TEND.want === 'water') || pl.phase === 'sprinkle' || pl.phase === 'stir'
+        const dip = (pl.phase === 'scoopWater' && pl.t > 0.3) || (pl.phase === 'toHearth' && pl.fire === 'water') || pl.phase === 'sprinkle' || pl.phase === 'stir'
         pd.visible = dip
         if (dip) {
           o.userData.carry = true
