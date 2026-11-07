@@ -1828,7 +1828,10 @@ export default function App() {
    */
   const switchSky = (next: Sky) => {
     const root = document.documentElement
-    if (!('startViewTransition' in document) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // (nor on a Mac: Chrome there draws the page with Skia Graphite, and its GPU process went down mid-transition, the full page with the 3D
+    // view held as pictures twice over: the owner's MacBook logged 'No SurfaceAnimationManager' around each crash)
+    const mac = /Mac/i.test(navigator.platform) || /Macintosh/i.test(navigator.userAgent)
+    if (!('startViewTransition' in document) || mac || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setSky(next)
       return
     }
