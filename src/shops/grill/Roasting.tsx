@@ -1083,7 +1083,12 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     }
     if (stepCommute(o, dt)) SHOP.walking.delete(id)
   })
-  return <group ref={g} name={`crew-${id}`} userData={{ staffId: id }} position={at} rotation-y={yaw} scale={CHEF_SCALE}>{children}</group>
+  // (their place the same Vector3 while it's the same place: a new one each time the grill redraws had React put them back there for a frame,
+  // and anyone walking home as the shop closed jumped back to their place and on again)
+  const atKey = `${at.x},${at.y},${at.z}`
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const place = useMemo(() => at.clone(), [atKey])
+  return <group ref={g} name={`crew-${id}`} userData={{ staffId: id }} position={place} rotation-y={yaw} scale={CHEF_SCALE}>{children}</group>
 }
 function crewPlaces(crew: CrewMember[]) {
   const c0 = GRILL_COUNTERS[0]
