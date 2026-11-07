@@ -105,8 +105,17 @@ export const takeStock = (e: Entry, stock: Stock): Stock | null => {
 /** everything a shop buys in (not its ready-made sets: those are made up from the rest) */
 export const goodsOf = (d: Dish) => [...d.bases.filter((b) => !b.includes), ...d.items]
 
-/** what buying n of every good of a shop costs */
-export const buyAllCost = (d: Dish, n: number) => goodsOf(d).reduce((t, g) => t + costOf(g) * n, 0)
+/** what's bought in packs, not portions: the rice by the 10 kg bag (the owner's: a kitchen buys polished rice by the sack and cooks it, it
+ * doesn't buy onigiri): one bag cooks one pot, ten portions; stock keeps portions, an order is whole bags */
+export const PACK: Record<string, number> = { Onigiri: 10 }
+export const packOf = (id: string) => PACK[id] ?? 1
+/** n portions wanted, as whole packs' worth (none for none) */
+export const inPacks = (id: string, n: number) => n <= 0 ? 0 : Math.ceil(n / packOf(id)) * packOf(id)
+/** what's dry and keeps (the rice): it doesn't go off */
+export const keepsDry = (id: string) => id === 'Onigiri'
+
+/** what buying n of every good of a shop costs (what comes in packs, whole packs) */
+export const buyAllCost = (d: Dish, n: number) => goodsOf(d).reduce((t, g) => t + costOf(g) * inPacks(g.id, n), 0)
 
 /** a stock keeper (倉儲) tops up whatever the menu uses once it's down to this many portions, back up to PAR */
 export const PAR = 10
@@ -131,7 +140,7 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     // (a seasoning, counted in doses, is kept at its own usual stock: ordered once it's down to a third of it)
     const par = isSeasonId(id) ? SEASON_PAR : PAR * q
     if (!g || have > (isSeasonId(id) ? SEASON_PAR / 3 : REORDER_AT * q)) continue
-    const n = par - have
+    const n = inPacks(id, par - have)
     const c = Math.round(costOf(g) * n * off)
     if (cost + c > cash) continue
     buy[id] = n
@@ -165,7 +174,7 @@ export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
   const buy: Stock = {}
   let cost = 0
   for (const g of goodsOf(d)) {
-    const n = par - (stock[g.id] ?? 0)
+    const n = inPacks(g.id, Math.max(par, packOf(g.id)) - (stock[g.id] ?? 0))
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n
@@ -186,7 +195,7 @@ export function averageOrder(d: Dish, stock: Stock) {
   const buy: Stock = {}
   let cost = 0
   for (const g of goods) {
-    const n = avg - (stock[g.id] ?? 0)
+    const n = inPacks(g.id, avg - (stock[g.id] ?? 0))
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n
@@ -197,8 +206,9 @@ export function averageOrder(d: Dish, stock: Stock) {
 /** 各補 n: n more of every good */
 export function eachOrder(d: Dish, n: number) {
   const buy: Stock = {}
-  for (const g of goodsOf(d)) buy[g.id] = n
-  return { buy, cost: buyAllCost(d, n) }
+  let cost = 0
+  for (const g of goodsOf(d)) { buy[g.id] = inPacks(g.id, n); cost += costOf(g) * buy[g.id] }
+  return { buy, cost }
 }
 
 /** what to ask for a dish on the menu: the food's own price plus a little for what goes on it (at the grill: the

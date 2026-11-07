@@ -7,7 +7,7 @@ import { nameIn, tl, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { SEASONINGS, SEASON_COST, type Seasoning } from '@/data/recipes'
 import { STORAGES, stockNameOf, storageName, storageOf, type Storage } from '@/data/storage'
-import { PAR } from '@/game/economy'
+import { PAR, inPacks, keepsDry, packOf } from '@/game/economy'
 import { freshGrade } from '@/game/freshness'
 import { lotGrades, type Lot } from '@/game/lots'
 import { CHARCOAL, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
@@ -206,7 +206,10 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
     const cost = p.unitCost(x.id)
     const have = stock[x.id] ?? 0
     const out = have <= 0
-    const need = Math.max(0, PAR - have)
+    // (what's bought by the pack (the rice: a bag cooks a pot of ten portions) is ordered in whole bags, and doesn't go off)
+    const pack = packOf(x.id)
+    const par = Math.max(PAR, pack)
+    const need = inPacks(x.id, par - have)
     const can = (k: number) => k > 0 && cash >= cost * k
     const buy = (k: number) => (e: { stopPropagation: () => void; preventDefault: () => void }) => { e.stopPropagation(); e.preventDefault(); if (can(k)) p.onBuy(x.id, k) }
     const f = Math.round(p.fresh[x.id] ?? 100)
@@ -220,17 +223,17 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
         onContextMenu={(e) => { e.preventDefault(); if (research) p.onRemove(x.id) }}
         onKeyDown={(e) => { if (research && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); p.onAdd(x.id) } }}>
         <span className="chiller-bin-head">
-          <FoodArt id={x.id} store={storageOf(x.id)} band />
+          <FoodArt id={pack > 1 ? 'RiceBag' : x.id} store={storageOf(x.id)} band />
           <FitLine className="chiller-bin-name">{name}</FitLine>
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>
         {x.en && <span className="chiller-bin-en" lang="en">{stockNameOf(x.id, 'en') ?? x.en}</span>}
-        <span className={`chiller-level${out ? ' is-zero' : have < PAR ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / PAR) * 100)}%` }} /></span>
+        <span className={`chiller-level${out ? ' is-zero' : have < par ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / par) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
-          <b className={out ? 'is-zero' : ''}>{tl(lang, '庫存', '在庫', 'Stock')} <em>{have}</em></b>
-          <small>{tl(lang, '成本', '原価', 'Cost')} <em>{cost}</em></small>
+          <b className={out ? 'is-zero' : ''}>{tl(lang, '庫存', '在庫', 'Stock')} <em>{have}</em>{pack > 1 && tl(lang, '份', '人前', '')}</b>
+          <small title={pack > 1 ? tl(lang, `一袋 ${pack} 份`, `1袋 ${pack}人前`, `${pack} a bag`) : undefined}>{tl(lang, '成本', '原価', 'Cost')} <em>{cost * pack}</em></small>
         </span>
-        {!out && (
+        {!out && !keepsDry(x.id) && (
           <span className={`chiller-fresh is-${grade}`} aria-hidden="true" title={grade === 'spoiled'
             ? tl(lang, `鮮度 ${f}%：已經壞了，不可食用（做出來很難吃，客人吃了容易拉肚子）`, `鮮度 ${f}%：傷んでいて食べられない（まずく、客がお腹を壊しやすい）`, `Freshness ${f}%: spoiled, not fit to eat (it tastes bad, and may well upset a customer's stomach)`)
             : tl(lang, `鮮度 ${f}%：越不新鮮，做出來越不好吃`, `鮮度 ${f}%：鮮度が落ちると味も落ちる`, `Freshness ${f}%: the staler, the less tasty`)}>
@@ -239,12 +242,17 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
             <em>{grade === 'spoiled' ? tl(lang, '不可食用', '食用不可', 'Spoiled') : `${f}%`}</em>
           </span>
         )}
-        {!out && <LotStrip lang={lang} lots={p.lots?.[x.id]} />}
+        {!out && !keepsDry(x.id) && <LotStrip lang={lang} lots={p.lots?.[x.id]} />}
         <span className="chiller-buy">
-          <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={tl(lang, '叫 1 份', '1つ仕入れる', 'Order 1')} onClick={buy(1)}>+1</span>
-          <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 份', '10個仕入れる', 'Order 10')} onClick={buy(10)}>+10</span>
+          {pack > 1 ? <>
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(pack) ? '' : ' is-off'}`} title={tl(lang, `叫 1 袋（${pack} 份）`, `1袋仕入れる（${pack}人前）`, `Order a bag (${pack})`)} onClick={buy(pack)}>{tl(lang, '+1袋', '+1袋', '+1 bag')}</span>
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(2 * pack) ? '' : ' is-off'}`} title={tl(lang, `叫 2 袋（${2 * pack} 份）`, `2袋仕入れる`, `Order 2 bags`)} onClick={buy(2 * pack)}>{tl(lang, '+2袋', '+2袋', '+2')}</span>
+          </> : <>
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={tl(lang, '叫 1 份', '1つ仕入れる', 'Order 1')} onClick={buy(1)}>+1</span>
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 份', '10個仕入れる', 'Order 10')} onClick={buy(10)}>+10</span>
+          </>}
           <span role="button" tabIndex={-1} className={`chiller-btn chiller-fill${can(need) ? '' : ' is-off'}`}
-            title={need ? tl(lang, `補到 ${PAR} 份（${need} 份，NT$${cost * need}）`, `${PAR}まで補充（${need}）`, `Fill up to ${PAR} (${need}, NT$${cost * need})`) : tl(lang, '已經夠了', '十分あります', 'Enough already')}
+            title={need ? tl(lang, `補到 ${par} 份（${need} 份，NT$${cost * need}）`, `${par}まで補充（${need}）`, `Fill up to ${par} (${need}, NT$${cost * need})`) : tl(lang, '已經夠了', '十分あります', 'Enough already')}
             onClick={buy(need)}>{tl(lang, '補', '補', '+')}</span>
         </span>
       </div>

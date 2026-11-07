@@ -28,7 +28,10 @@ feature('成本與定價', () => {
   scenario('全買 n 份的成本隨份數線性增加', ({ given, when, then }) => {
     given('日式烤魚店', (w) => { w.d = DISHES.find((d) => d.id === 'grilledfish')! })
     when('分別全買 1 份和 3 份', (w) => { w.one = buyAllCost(w.d, 1); w.three = buyAllCost(w.d, 3) })
-    then('3 份是 1 份的 3 倍', (w) => { expect(w.three).toBe(w.one * 3) })
+    then('3 份是 1 份的 3 倍（白米整袋買，1 份、3 份都是一袋）', (w) => {
+      const rice = costOf(w.d.items.find((g: { id: string }) => g.id === 'Onigiri')!) * 10
+      expect(w.three - rice).toBe((w.one - rice) * 3)
+    })
   })
 
   scenario('倉儲員越熟練，進貨折扣越高，但最多 5%', ({ when, then }) => {

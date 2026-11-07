@@ -312,6 +312,23 @@ function OtherArt({ id }: { id: string }) {
         <circle cx="64" cy="52" r="6" fill="#d04558" stroke={shade('#d04558', -0.3)} strokeWidth="1" />
         {hi('M50 30 C46 38 42 46 40 54')}
       </g>
+    case 'RiceBag':
+      // (the rice as it's bought: a 10 kg kraft-paper sack of polished rice, its top folded and stitched, the brand in a red frame, a few
+      // grains spilt before it)
+      return <g>
+        <path d="M30 30 C28 52 26 84 30 108 C52 114 76 114 98 108 C102 84 100 52 98 30 Z" fill="#e8cfa0" {...o} />
+        <path d="M80 32 C88 54 90 86 86 110 C92 110 96 109 98 108 C102 84 100 52 98 30 Z" fill="#d2b47e" />
+        <path d="M28 20 H100 L98 32 H30 Z" fill="#d9bc86" {...o} />
+        <path d="M32 26 H96" stroke="#8a6a3a" strokeWidth="1.6" strokeDasharray="3 3" />
+        <rect x="42" y="44" width="44" height="46" rx="3" fill="#fbf6ea" stroke="#c0392b" strokeWidth="2.6" />
+        <rect x="46" y="48" width="36" height="38" rx="2" fill="none" stroke="#c0392b" strokeWidth="1" />
+        <text x="64" y="74" textAnchor="middle" fontSize="22" fontWeight="700" fill="#1e1a16" fontFamily="serif">米</text>
+        <circle cx="64" cy="58" r="3" fill="#c0392b" />
+        {[[40, 112, 20], [52, 116, 70], [80, 115, 140], [92, 112, 30]].map(([x, y, a]) => (
+          <ellipse key={`${x}${y}`} cx={x} cy={y} rx="3.4" ry="1.7" transform={`rotate(${a} ${x} ${y})`} fill="#fffdf6" stroke="#cfc6ad" strokeWidth="0.8" />
+        ))}
+        {hi('M36 40 C34 56 34 74 36 92', 4)}
+      </g>
     case 'ShrimpSkewer':
       // (a prawn grilled on its skewer (the owner's: its curve, its segments, a little charred): curled, its back's shell in banded
       // segments over the curve, deeper at their edges and toasted, its fanned tail, its legs under it, its long feelers)
@@ -474,7 +491,7 @@ function OtherArt({ id }: { id: string }) {
 }
 
 /** the foods there's a picture of (the rest are drawn as a plain round) */
-const OTHER = new Set(['Asparagus', 'BloodCake', 'GrilledCorn', 'GrilledShiitake', 'KingOyster', 'MisoSoup', 'NetMochi', 'Okra', 'Onigiri', 'PorkBelly', 'Potato', 'Sake', 'Sausage', 'Scallop', 'Shishito', 'ShrimpSkewer', 'Squid', 'SweetPotato', 'Yakitori'])
+const OTHER = new Set(['RiceBag', 'Asparagus', 'BloodCake', 'GrilledCorn', 'GrilledShiitake', 'KingOyster', 'MisoSoup', 'NetMochi', 'Okra', 'Onigiri', 'PorkBelly', 'Potato', 'Sake', 'Sausage', 'Scallop', 'Shishito', 'ShrimpSkewer', 'Squid', 'SweetPotato', 'Yakitori'])
 export const hasFoodArt = (id: string) => id in FISH || OTHER.has(id)
 
 /** `band`: drawn across the top of a card (no round tile, the food cropped close to fill the band; the card's band behind it) */

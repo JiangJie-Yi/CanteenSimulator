@@ -24,7 +24,7 @@ export const storageName = (s: (typeof STORAGES)[number], lang: Lang) => (lang =
 /** what a food is called where it's kept, where that's other than the dish (the rice balls are kept as the white rice they're made of, the
  * owner's: grilled with soy sauce) */
 const STOCK_NAMES: Record<string, { zh: string; ja: string; en: string }> = {
-  Onigiri: { zh: '白米（飯糰用）', ja: '白米（おにぎり用）', en: 'Rice (for onigiri)' },
+  Onigiri: { zh: '越光米（袋裝）', ja: 'コシヒカリ（袋）', en: 'Koshihikari rice (bag)' },
 }
 export const stockNameOf = (id: string, lang: Lang): string | null => {
   const n = STOCK_NAMES[id]

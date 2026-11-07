@@ -26,7 +26,7 @@ import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/
 import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, coalCharge, STICKS_PER_PORTION, afterCharcoal, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
-  portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
+  keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
 import { Menu } from '@/ui/Menu'
@@ -1420,7 +1420,7 @@ export default function App() {
   // purchase is a lot of its own at 100, each goes off on its own, what's used comes out of the stalest first. An old save's one mixed
   // freshness becomes a single lot.
   const [lots, setLots] = useState<Record<string, Lot[]>>(() => SAVED?.lots
-    ?? Object.fromEntries(Object.entries(SAVED?.stock ?? {}).filter(([k]) => !isSupply(k)).map(([k, n]) => [k, lotsFrom(n, SAVED?.fresh?.[k] ?? 100)])))
+    ?? Object.fromEntries(Object.entries(SAVED?.stock ?? {}).filter(([k]) => !isSupply(k) && !keepsDry(k)).map(([k, n]) => [k, lotsFrom(n, SAVED?.fresh?.[k] ?? 100)])))
   const stockWas = useRef(stock)
   useEffect(() => {
     stockWas.current = stock
@@ -1429,7 +1429,7 @@ export default function App() {
     setLots((all) => {
       let next: Record<string, Lot[]> | null = null
       for (const k of Object.keys(stock)) {
-        if (isSupply(k) || lotsTotal(all[k]) === (stock[k] ?? 0)) continue
+        if (isSupply(k) || keepsDry(k) || lotsTotal(all[k]) === (stock[k] ?? 0)) continue
         const s = settleLots(all[k], stock[k] ?? 0, getClock().day)
         if (s.used > 0) PANTRY.used[k] = s.fresh
         ;(next ??= { ...all })[k] = s.lots
