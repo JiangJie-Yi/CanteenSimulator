@@ -24,6 +24,8 @@ export type Quality = {
 }
 
 const KEY = 'canteen-quality'
+/** how long a step down after a lost 3D view holds */
+const KEEP_STEP_MS = 3 * 24 * 3600e3
 const ORDER: Tier[] = ['low', 'medium', 'high']
 
 function gpuName(): string {
@@ -59,14 +61,21 @@ function choose(): Tier {
   if (typeof window === 'undefined') return 'high'
   const forced = new URLSearchParams(window.location.search).get('q')
   if (forced === 'low' || forced === 'medium' || forced === 'high') return forced
-  // (a desktop or laptop always gets the best: its full models, sharp shadows and the canvas at full density; only touch devices are judged
-  // and stepped down)
-  if (!window.matchMedia('(hover: none)').matches) return 'high'
-  let tier = detect()
+  // (a desktop or laptop gets the best: its full models, sharp shadows and the canvas at full density; a Mac one level less (the owner's: a
+  // MacBook with 8 GB, its graphics sharing that memory, lost the 3D view with everything at its finest); only touch devices are judged.
+  // Any of them that lost its 3D view is stepped down for next time (it used to be skipped on a desktop: it crashed the same way again))
+  const mac = /Mac/i.test(navigator.platform) || /Macintosh/i.test(navigator.userAgent)
+  const touch = window.matchMedia('(hover: none)').matches
+  let tier: Tier = !touch ? (mac ? 'medium' : 'high') : detect()
   try {
-    // a level that lost its context before is stepped down from
-    const capped = localStorage.getItem(KEY) as Tier | null
-    if (capped && ORDER.indexOf(capped) < ORDER.indexOf(tier)) tier = capped
+    // a level that lost its context before is stepped down from (for three days; the old bare-word record only on a touch device, as it was)
+    const raw = localStorage.getItem(KEY)
+    let capped: Tier | null = null
+    if (raw?.startsWith('{')) {
+      const r = JSON.parse(raw) as { tier: Tier; at: number }
+      if (Date.now() - r.at < KEEP_STEP_MS) capped = r.tier
+    } else if (touch) capped = raw as Tier | null
+    if (capped && ORDER.includes(capped) && ORDER.indexOf(capped) < ORDER.indexOf(tier)) tier = capped
   } catch {
     // storage blocked
   }
@@ -87,7 +96,7 @@ export const QUALITY: Quality = {
 export function stepDown() {
   const i = ORDER.indexOf(QUALITY.tier)
   try {
-    localStorage.setItem(KEY, ORDER[Math.max(0, i - 1)])
+    localStorage.setItem(KEY, JSON.stringify({ tier: ORDER[Math.max(0, i - 1)], at: Date.now() }))
   } catch {
     // storage blocked
   }
