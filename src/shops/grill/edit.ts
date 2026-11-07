@@ -2,6 +2,7 @@
 // offset is kept in the browser. While the shop is open it can't be switched on (and is switched off if the shop opens), since customers and
 // staff are walking about. Here: the state, the key, the panel at the screen's corner, and the list of what can be moved.
 
+import { isMac } from '@/game/navInput'
 import { useSyncExternalStore } from 'react'
 import { clearAllRenderPrefs, clearRenderPref, onRenderPrefs, renderPrefOf, setRenderPref } from './renderPrefs'
 import { RENDER_DEFAULT, type RenderPref } from '@/game/renderPrefs'
@@ -1098,7 +1099,11 @@ function panel() {
     // (the keys, as in Maya, at a glance)
     // (each key and what it does a chip of its own, never broken across a line (the owner's: nothing on two lines); the chips flow on)
     const keys = h('div', 'be-keys')
-    for (const item of T().hotkeys.split(/\n|　|\s{3,}/).map((x) => x.trim()).filter(Boolean)) keys.appendChild(h('span', 'be-key', item))
+    // (on a Mac, Ctrl is ⌘ (the owner's))
+    const mac = isMac(navigator.platform, navigator.userAgent)
+    for (const item of T().hotkeys.split(/\n|　|\s{3,}/).map((x) => x.trim()).filter(Boolean)) {
+      keys.appendChild(h('span', 'be-key', mac ? item.replace(/Ctrl\+Z／Y|Ctrl\+Z \/ Y/, '⌘+Z／⌘+Shift+Z').replace(/Ctrl/g, '⌘') : item))
+    }
     tr.appendChild(keys)
     // Render: how the chosen piece is drawn (its shading, its material, its outline, its shadows), for it alone (a group: each of its members)
     const rs = section(T().render)

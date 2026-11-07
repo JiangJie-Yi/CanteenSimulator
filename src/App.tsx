@@ -1,4 +1,5 @@
 import { setTip } from '@/scene/hoverTip'
+import { wheelIntent } from '@/game/navInput'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -558,6 +559,9 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
   const spotLock = !editing && !lockView && view !== 'free' && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
   const spotRef = useRef(spotLock)
   spotRef.current = spotLock
+  const editRef = useRef(editing)
+  editRef.current = editing
+  const getThree = useThree((s) => s.get)
   const wasLocked = useRef(false)
   // (each view its own lens (the owner's: a cinematographer's choice for each, VIEW_SPOTS' fov), eased to as the camera flies there; through
   // the owner's eyes a wide one; edit mode the usual)
@@ -811,8 +815,21 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
       if (lockRef.current) { lockZoom.current = THREE.MathUtils.clamp(lockZoom.current * Math.exp(e.deltaY * 0.0011), 0.75, 1); return }
       if (spotRef.current) return
       homing.current = false
+      // (developer mode: two fingers on a trackpad slide the view across, a pinch zooms; a mouse's wheel zooms as ever)
+      const how = editRef.current ? wheelIntent(e as WheelEvent & { wheelDeltaY?: number }) : 'zoom'
+      if (how === 'pan') {
+        const d = camera.position.distanceTo(c.target) * 0.0012
+        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+        const upward = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+        const move = right.multiplyScalar(e.deltaX * d).add(upward.multiplyScalar(-e.deltaY * d))
+        camera.position.add(move)
+        c.target.add(move)
+        zoomGoal.current = null
+        c.update()
+        return
+      }
       const now = zoomGoal.current ?? camera.position.distanceTo(c.target)
-      zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * 0.0011), 1.8, 20)
+      zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * (how === 'pinch' ? 0.01 : 0.0011)), 1.8, 20)
     }
     // (held at the grill: a right-button drag turns the view a little round what it looks at; the left button stays for the food)
     let drag: { x: number; y: number } | null = null
@@ -840,26 +857,34 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
     }
   }, [gl, camera])
   const zoomDir = useRef(new THREE.Vector3())
-  // (developer mode navigates as Maya does: Alt with the left button turns the view, with the middle pans, with the right dollies; without Alt
-  // a drag doesn't move the view, so picking and dragging pieces never knocks it about. A frames the whole shop)
+  // (developer mode navigates without a middle button or Alt, for a Mac's trackpad and two-button mouse (the owner's): the left button on
+  // empty space turns the view (on a piece or a handle it's theirs: what's under the pointer is r3f's hovered), Shift with it or the right
+  // button pans, the wheel or a pinch dollies, two fingers on a trackpad pan (onWheel); Maya's Alt ways as before. A frames the whole shop)
   useEffect(() => {
     const c = controls.current
     if (!c) return
     if (!editing) { c.enableRotate = true; c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }; return }
     c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.DOLLY }
     const alt = (e: KeyboardEvent | PointerEvent) => { c.enabled = e.altKey }
-    const down = (e: PointerEvent) => { c.enabled = e.altKey || e.button === 1 }
+    const down = (e: PointerEvent) => {
+      c.mouseButtons.RIGHT = e.altKey ? THREE.MOUSE.DOLLY : THREE.MOUSE.PAN
+      const onSomething = getThree().internal.hovered.size > 0
+      c.enabled = e.altKey || e.button === 1 || e.button === 2 || (e.button === 0 && !onSomething)
+    }
+    const up = () => { c.enabled = false }
     const keyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') c.enabled = false }
     c.enabled = false
     window.addEventListener('keydown', alt)
     window.addEventListener('keyup', keyUp)
     gl.domElement.addEventListener('pointerdown', down, true)
+    window.addEventListener('pointerup', up)
     const all = () => { onView('free') }
     window.addEventListener('edit-frame-all', all)
     return () => {
       window.removeEventListener('keydown', alt)
       window.removeEventListener('keyup', keyUp)
       gl.domElement.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('pointerup', up)
       window.removeEventListener('edit-frame-all', all)
       c.enabled = true
     }
