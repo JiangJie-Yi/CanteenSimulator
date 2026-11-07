@@ -30,10 +30,20 @@ export const CHARCOAL_LOW = 40
 /** the seasonings as goods to be bought in: each dose at what a dab costs */
 export const SEASON_GOODS = SEASONINGS.map((k) => ({ id: seasonId(k), price: 0, cost: SEASON_COST[k] }))
 
+/** nori, by the sheet (the owner's: the rice balls are wrapped in it): one goes round every onigiri made; a new shop has a pack, the stock
+ * keeper keeps it to its usual stock like a seasoning; dry, it doesn't go off */
+export const NORI = 'supply:nori'
+export const NORI_COST = 3
+export const NORI_PAR = 30
+/** what each dish uses beside its own food, a portion each (the onigiri's sheet of nori) */
+export const GARNISH: Record<string, Record<string, number>> = { Onigiri: { [NORI]: 1 } }
+export const GARNISH_GOODS = [{ id: NORI, price: 0, cost: NORI_COST }]
+
 /** what a new shop starts with besides its food */
 export const startingSupplies = (): Stock => ({
   ...Object.fromEntries(SEASONINGS.map((k) => [seasonId(k), SEASON_START])),
   [CHARCOAL]: CHARCOAL_START,
+  [NORI]: NORI_PAR,
   // (spare boxes of tissues for the places' drawers: game/tissues)
   [TISSUE]: TISSUE_START,
   // (and spare rolls of receipt paper for the register's printer: game/receipts)
@@ -66,6 +76,7 @@ export const charcoalOrder = (sacks: number) => ({ sticks: sacks * SACK_STICKS, 
 export function supplyName(id: string, lang: Lang): string | null {
   const k = seasonOf(id)
   if (k) return SEASON_NAME[lang][k]
+  if (id === NORI) return lang === 'ja' ? '焼き海苔' : lang === 'en' ? 'nori' : '海苔'
   if (id === TISSUE) return lang === 'ja' ? 'ティッシュ（箱）' : lang === 'en' ? 'tissues (boxes)' : '衛生紙（盒）'
   if (id === RECEIPT) return lang === 'ja' ? 'レシート用紙（巻）' : lang === 'en' ? 'receipt paper (rolls)' : '發票紙（捲）'
   return id === CHARCOAL ? (lang === 'ja' ? '備長炭' : lang === 'en' ? 'binchotan' : '備長炭') : null

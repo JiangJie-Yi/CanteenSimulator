@@ -47,7 +47,7 @@ const freshDabs = () => ({ salt: 0, soy: 0, milk: 0, peanut: 0, miso: 0, wasabi:
 /** each food's colour raw (it browns from there), for anything without a picture of its own */
 const FOOD_COLOR: [RegExp, string][] = [
   [/Salmon|Nodoguro/, '#f08a5a'], [/Shrimp/, '#f2a0a0'], [/Onigiri|Mochi/, '#f6f0e2'], [/SweetPotato/, '#b0485a'], [/Potato/, '#c8c4bc'],
-  [/Corn/, '#f2d04a'], [/Shiitake|KingOyster/, '#b89a78'], [/Shishito|Okra|Asparagus/, '#6aa04a'], [/Sausage|BloodCake/, '#b8584a'],
+  [/Corn/, '#f2d04a'], [/Shiitake|KingOyster/, '#b89a78'], [/Shishito|Okra|Asparagus|Negi/, '#6aa04a'], [/Onion|Daikon/, '#f1e6c8'], [/Carrot/, '#e8803a'], [/Gobo/, '#8a6a48'], [/Sausage|BloodCake/, '#b8584a'],
   [/Yakitori|PorkBelly|Squid|Scallop/, '#f0d8c0'], [/Fish|Saury|Mackerel|Aji|Iwashi|Shishamo|Hokke|Buri|Gindara/, '#a8b4c0'],
 ]
 const colorOf = (id: string) => FOOD_COLOR.find(([r]) => r.test(id))?.[1] ?? '#d8b890'

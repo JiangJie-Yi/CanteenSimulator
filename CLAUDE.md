@@ -140,6 +140,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 ## 常見改動要碰哪裡
 
+- **根莖蔬菜與大蔥是新的烤物**（店主要的，2026-11-07）：烤洋蔥 `Onion`（玉ねぎ焼き）、烤大蔥 `Negi`（ねぎ焼き）、烤紅蘿蔔 `Carrot`、烤牛蒡 `Gobo`、烤白蘿蔔 `Daikon`（大根ステーキ）（`data/menu.ts`；成本 `COST_SHARE`、調味 `PAIRING`（大蔥配鹽、七味、柚子胡椒，牛蒡與白蘿蔔配醬油、味噌）；洋蔥、紅蘿蔔、牛蒡常溫（主廚去麻袋那裡拿），大蔥、白蘿蔔冷藏；庫存卡片用生的名稱（`storage.ts` 的 `STOCK_NAMES`：洋蔥、日本大蔥…），食物圖在 `ui/FoodArt`）。模型在 `blender/grilledfish.py`：每一塊是 16 段的圓柱（`cut_piece`，切面在貼圖左半、外皮在右半，`veg_picture` 畫，烤痕斜斜橫過）；大蔥、紅蘿蔔、牛蒡穿串站在火爐一圈；**洋蔥圈與白蘿蔔排在烤網上**（火爐一圈已經滿了：一加就跟鰤魚、杏鮑菇撞在一起；它們本來就是放網上烤的；`menu.ts` 的 `net`、`loose`）。**海苔是配料**（`game/supplies.ts` 的 `NORI`、`GARNISH`：每做一個飯糰用一片，套餐裡的也算；沒有海苔就做不出飯糰；新店 30 片、一片 NT$3，倉儲補到 30；乾貨不會壞；庫存常溫頁下面「配料」一張卡片；BDD `stock`、`restock`）。
 - **加一道食材**：在 `data/menu.ts` 的店家 `items` 加一筆；成本比例加在 `game/economy.ts` 的 `COST_SHARE`；燒烤類要在 `game/taste.ts` 的 `PAIRING` 加上調味搭配（調味的最佳時機在 `TIMING`）；有特別菜名的話加在 `data/recipes.ts`（`SPECIAL` / `BREAD`）。燒烤的 3D 模型由 `blender/grilledfish.py` 產生。
 - **調整價格或成本**：`game/economy.ts`（`costOf`、`COST_SHARE`、`CAPITAL`、`SHOP_COST`）和 `data/recipes.ts` 的 `suggestPrice`、`SEASON_COST`。開店後手上是 NT$200,000（店主定的：資本 `CAPITAL` 30 萬 − 開業費用 `SHOP_COST` 10 萬；BDD `pricing`）。
 - **開店門檻和菜單上限**：`data/recipes.ts` 的 `MENU_MIN`、`MENU_MAX`。

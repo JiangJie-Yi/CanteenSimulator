@@ -4,7 +4,7 @@ import { TISSUE, TISSUE_LOW, tissueOrder } from './tissues'
 import { RECEIPT, RECEIPT_LOW, receiptOrder } from './receipts'
 import { DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
-import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
+import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, GARNISH, GARNISH_GOODS, NORI, NORI_PAR, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
 
 export type Stock = Record<string, number>
 
@@ -46,7 +46,7 @@ export const COST_SHARE: Record<string, number> = {
   Buri: 0.5, Gindara: 0.52, Nodoguro: 0.56, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Yakitori: 0.4,
   PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3, GrilledCorn: 0.28, GrilledShiitake: 0.3, Shishito: 0.25,
   KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24,
-  Rice: 0.18, MisoSoup: 0.2, Sake: 0.4,
+  Rice: 0.18, MisoSoup: 0.2, Sake: 0.4, Onion: 0.24, Negi: 0.26, Carrot: 0.24, Gobo: 0.3, Daikon: 0.24,
 }
 
 /** what one of something costs to buy in */
@@ -74,7 +74,11 @@ export const needOf = (e: Entry): Stock => {
   const d = shopOf(e)
   const need: Stock = {}
   for (const p of e.parts) {
-    for (const [k, q] of Object.entries(takesOf(d, p.id))) need[k] = (need[k] ?? 0) + q
+    for (const [k, q] of Object.entries(takesOf(d, p.id))) {
+      need[k] = (need[k] ?? 0) + q
+      // (and what goes with it: a sheet of nori round each onigiri, in a set as on its own)
+      for (const [g, n] of Object.entries(GARNISH[k] ?? {})) need[g] = (need[g] ?? 0) + n * q
+    }
     for (const k of p.dabs ?? []) need[seasonId(k)] = (need[seasonId(k)] ?? 0) + 1
   }
   return need
@@ -112,7 +116,7 @@ export const packOf = (id: string) => PACK[id] ?? 1
 /** n portions wanted, as whole packs' worth (none for none) */
 export const inPacks = (id: string, n: number) => n <= 0 ? 0 : Math.ceil(n / packOf(id)) * packOf(id)
 /** what's dry and keeps (the rice): it doesn't go off */
-export const keepsDry = (id: string) => id === 'Onigiri'
+export const keepsDry = (id: string) => id === 'Onigiri' || id === NORI
 
 /** what buying n of every good of a shop costs (what comes in packs, whole packs) */
 export const buyAllCost = (d: Dish, n: number) => goodsOf(d).reduce((t, g) => t + costOf(g) * inPacks(g.id, n), 0)
@@ -130,7 +134,7 @@ export const supplierDiscount = (skill: number) => Math.max(0, Math.min(0.05, (s
 export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number, skill: number) {
   const per: Stock = {}
   for (const e of menu) for (const [k, q] of Object.entries(needOf(e))) per[k] = Math.max(per[k] ?? 0, q)
-  const goods = new Map([...goodsOf(d), ...SEASON_GOODS].map((g) => [g.id, g]))
+  const goods = new Map([...goodsOf(d), ...SEASON_GOODS, ...GARNISH_GOODS].map((g) => [g.id, g]))
   const off = 1 - supplierDiscount(skill)
   const buy: Stock = {}
   let cost = 0
@@ -138,8 +142,9 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     const g = goods.get(id)
     const have = stock[id] ?? 0
     // (a seasoning, counted in doses, is kept at its own usual stock: ordered once it's down to a third of it)
-    const par = isSeasonId(id) ? SEASON_PAR : PAR * q
-    if (!g || have > (isSeasonId(id) ? SEASON_PAR / 3 : REORDER_AT * q)) continue
+    const kept = isSeasonId(id) ? SEASON_PAR : id === NORI ? NORI_PAR : 0
+    const par = kept || PAR * q
+    if (!g || have > (kept ? kept / 3 : REORDER_AT * q)) continue
     const n = inPacks(id, par - have)
     const c = Math.round(costOf(g) * n * off)
     if (cost + c > cash) continue
@@ -179,8 +184,8 @@ export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
     buy[g.id] = n
     cost += costOf(g) * n
   }
-  for (const g of SEASON_GOODS) {
-    const n = SEASON_PAR - (stock[g.id] ?? 0)
+  for (const g of [...SEASON_GOODS, ...GARNISH_GOODS]) {
+    const n = (g.id === NORI ? NORI_PAR : SEASON_PAR) - (stock[g.id] ?? 0)
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n

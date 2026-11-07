@@ -1,3 +1,4 @@
+import { NORI, NORI_COST, NORI_PAR } from '@/game/supplies'
 import { expect } from 'vitest'
 import { TISSUE, TISSUE_PACK } from '@/game/tissues'
 import { RECEIPT } from '@/game/receipts'
@@ -49,7 +50,9 @@ feature('倉儲自動補貨', () => {
       const rest = goodsOf(grill).filter((g) => g.id !== w.rich)
       for (const g of rest) expect(w.o.buy[g.id]).toBe(PAR)
       for (const g of SEASON_GOODS) expect(w.o.buy[g.id]).toBe(SEASON_PAR)
-      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * PAR, 0) + SEASON_GOODS.reduce((t, g) => t + costOf(g) * SEASON_PAR, 0))
+      // (and the nori, by the sheet, to its own usual stock)
+      expect(w.o.buy[NORI]).toBe(NORI_PAR)
+      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * PAR, 0) + SEASON_GOODS.reduce((t, g) => t + costOf(g) * SEASON_PAR, 0) + NORI_COST * NORI_PAR)
     })
   })
 })

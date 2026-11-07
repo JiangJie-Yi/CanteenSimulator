@@ -24,7 +24,7 @@ import { moodOf } from '@/game/taste'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
-import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
+import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, coalCharge, STICKS_PER_PORTION, afterCharcoal, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
@@ -1756,7 +1756,7 @@ export default function App() {
   }
   /** buy in n of something (paid from the cash in hand) */
   const buyIn = (d: DishInfo, id: string, n: number) => {
-    const it = ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id)
+    const it = ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? GARNISH_GOODS.find((g) => g.id === id)
     const cost = costOf(it ?? { price: 0 }) * n
     if (cost > cash) return
     book('bought', cost)

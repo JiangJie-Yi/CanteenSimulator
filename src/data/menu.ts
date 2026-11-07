@@ -177,6 +177,13 @@ export const DISHES: Dish[] = [
       { id: 'KingOyster', name: '杏鮑菇', ja: 'エリンギ', en: 'King Oyster', price: 60, kcal: 25 },
       { id: 'Asparagus', name: '蘆筍', ja: 'アスパラ', en: 'Asparagus', price: 70, kcal: 20 },
       { id: 'Okra', name: '秋葵', ja: 'オクラ', en: 'Okra', price: 60, kcal: 25 },
+      // (the root vegetables and leeks a robata grills (the owner's): thick rounds of onion, lengths of leek, carrot, burdock root cut on
+      // the slant, a daikon steak)
+      { id: 'Onion', name: '烤洋蔥', ja: '玉ねぎ焼き', en: 'Grilled Onion', price: 60, kcal: 40 },
+      { id: 'Negi', name: '烤大蔥', ja: 'ねぎ焼き', en: 'Grilled Leek', price: 50, kcal: 30 },
+      { id: 'Carrot', name: '烤紅蘿蔔', ja: '人参焼き', en: 'Grilled Carrot', price: 50, kcal: 35 },
+      { id: 'Gobo', name: '烤牛蒡', ja: 'ごぼう焼き', en: 'Grilled Burdock', price: 60, kcal: 50 },
+      { id: 'Daikon', name: '烤白蘿蔔', ja: '大根ステーキ', en: 'Daikon Steak', price: 60, kcal: 30 },
       { id: 'Scallop', name: '干貝串', ja: 'ホタテ串', en: 'Scallop', price: 160, kcal: 90 },
       { id: 'BloodCake', name: '米血', ja: '米血糕', en: 'Rice Blood Cake', price: 50, kcal: 160 },
       // toasted on the grill net, three at a time; more wait their turn
@@ -192,15 +199,18 @@ export const DISHES: Dish[] = [
         Buri: 40, Gindara: 45, Nodoguro: 40, GrilledCorn: 30, GrilledShiitake: 20, Onigiri: 25, ShrimpSkewer: 20,
         Sausage: 25, Potato: 55, SweetPotato: 55,
         Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15,  KingOyster: 20, Asparagus: 15, Okra: 15, Scallop: 20, BloodCake: 20,
+        Onion: 25, Negi: 15, Carrot: 20, Gobo: 20, Daikon: 25,
         NetMochi: 25 },
       names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', Aji: '竹筴魚', Iwashi: '沙丁魚', Shishamo: '柳葉魚',
         Salmon: '鮭魚', Hokke: '花魚', Buri: '鰤魚', Gindara: '銀鱈', Nodoguro: '紅喉', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜',
         Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒',  KingOyster: '杏鮑菇', Asparagus: '蘆筍', Okra: '秋葵', Scallop: '干貝', BloodCake: '米血',
+        Onion: '洋蔥', Negi: '大蔥', Carrot: '紅蘿蔔', Gobo: '牛蒡', Daikon: '白蘿蔔',
         NetMochi: '年糕' },
-      loose: ['Potato', 'SweetPotato', 'NetMochi', 'Onigiri'],
+      loose: ['Potato', 'SweetPotato', 'NetMochi', 'Onigiri', 'Onion', 'Daikon'],
       // toasted on the grill net, which holds three at a time between them (the rest wait their turn)
-      net: ['NetMochi', 'Onigiri'],
+      // (the onion rounds and the daikon steak too: too wide for the ring of skewers, as they're done at a robata anyway)
+      net: ['NetMochi', 'Onigiri', 'Onion', 'Daikon'],
       faceCamera: ['ShrimpSkewer'],
       drinks: ['MisoSoup', 'Sake'],
       // the net's three spots (x, z); the model's mochi sits on the first, its onigiri on the second. In a row across the net as the grill's
@@ -250,7 +260,8 @@ export const DISHES: Dish[] = [
       // the 2nd and 3rd mochi go on the grill net beside the first (blender/grilledfish.py NET_Z)
       // (Roasting moves net items between the net's spots; listing them here keeps Dish from treating them as
       // skewers on the fire ring)
-      slots: { NetMochi: [[0.1, 0.07], [0.06, -0.11]], Onigiri: [[0.06, -0.11], [-0.11, 0.0]],
+      slots: { NetMochi: [[0.1, 0.07], [0.06, -0.11]], Onigiri: [[0.06, -0.11], [-0.11, 0.0]], Onion: [[0.06, -0.11], [-0.11, 0.0]],
+        Daikon: [[0.06, -0.11], [0.1, 0.07]],
         // a second bowl of soup beside the first
         MisoSoup: [[0.0, 1.61]] },
       // potatoes and sweet potatoes sit in the ash at the front: extra ones line up beside the first,

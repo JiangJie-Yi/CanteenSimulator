@@ -6,7 +6,7 @@ import { FoodArt } from '@/ui/FoodArt'
 
 const IDS = ['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Hokke', 'Buri', 'Nodoguro', 'Salmon', 'Gindara', 'ShrimpSkewer',
   'Yakitori', 'PorkBelly', 'BloodCake', 'Squid', 'Scallop', 'Shishito', 'Okra', 'Asparagus', 'KingOyster', 'GrilledShiitake', 'GrilledCorn',
-  'Potato', 'SweetPotato', 'Sausage', 'Onigiri', 'NetMochi', 'MisoSoup', 'Sake']
+  'Potato', 'SweetPotato', 'Sausage', 'Onigiri', 'NetMochi', 'MisoSoup', 'Sake', 'Onion', 'Negi', 'Carrot', 'Gobo', 'Daikon', 'RiceBag']
 // (all in one render, so each picture's gradients and clips get ids of their own)
 const cells = renderToStaticMarkup(<>{IDS.map((id) => <div key={id} className="cell"><FoodArt id={id} store="frozen" band /><div>{id}</div></div>)}</>)
 writeFileSync(process.argv[2] ?? 'foodsheet.html', `<!doctype html><meta charset="utf-8"><title>食材插畫</title>

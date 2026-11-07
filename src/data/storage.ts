@@ -8,7 +8,8 @@ const FROZEN = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shis
   'ShrimpSkewer', 'Squid', 'Scallop'])
 // (and the seasonings that keep dry: salt, the peanut powder, shichimi; the sauces, once opened, go in the fridge)
 // (the rice balls' rice too: white rice keeps at room temperature, in its sacks by the sake (the owner's))
-const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato', 'Onigiri', 'season:salt', 'season:peanut', 'season:shichimi', 'charcoal'])
+// (the onions, carrots and burdock in their sacks and crate on the floor too; the leeks and the daikon chilled)
+const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato', 'Onigiri', 'Onion', 'Carrot', 'Gobo', 'season:salt', 'season:peanut', 'season:shichimi', 'charcoal'])
 
 /** where a food is kept (anything not named frozen or at room temperature is chilled) */
 export const storageOf = (id: string): Storage => (FROZEN.has(id) ? 'frozen' : AMBIENT.has(id) ? 'ambient' : 'chilled')
@@ -25,6 +26,12 @@ export const storageName = (s: (typeof STORAGES)[number], lang: Lang) => (lang =
  * owner's: grilled with soy sauce) */
 const STOCK_NAMES: Record<string, { zh: string; ja: string; en: string }> = {
   Onigiri: { zh: '越光米（袋裝）', ja: 'コシヒカリ（袋）', en: 'Koshihikari rice (bag)' },
+  // (the vegetables as they're kept, raw: the dish is the grilled one)
+  Onion: { zh: '洋蔥', ja: '玉ねぎ', en: 'Onion' },
+  Negi: { zh: '日本大蔥', ja: '長ねぎ', en: 'Negi (Japanese leek)' },
+  Carrot: { zh: '紅蘿蔔', ja: '人参', en: 'Carrot' },
+  Gobo: { zh: '牛蒡', ja: 'ごぼう', en: 'Burdock root' },
+  Daikon: { zh: '白蘿蔔', ja: '大根', en: 'Daikon' },
 }
 export const stockNameOf = (id: string, lang: Lang): string | null => {
   const n = STOCK_NAMES[id]

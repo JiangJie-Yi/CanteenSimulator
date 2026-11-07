@@ -312,6 +312,71 @@ function OtherArt({ id }: { id: string }) {
         <circle cx="64" cy="52" r="6" fill="#d04558" stroke={shade('#d04558', -0.3)} strokeWidth="1" />
         {hi('M50 30 C46 38 42 46 40 54')}
       </g>
+    case 'Onion':
+      // (a yellow onion, its papery skin streaked, the root tuft below; beside it a thick round cut through, its rings)
+      return <g>
+        <path d="M46 26 C44 18 48 12 52 10 C52 16 54 20 56 24 C78 26 92 46 90 70 C88 94 70 108 48 108 C26 108 10 92 12 68 C14 46 26 30 46 26 Z" fill="#d79a4a" {...o} />
+        <path d="M60 30 C78 38 86 54 86 70 C86 90 72 104 52 106 C68 96 76 82 76 66 C76 50 70 38 60 30 Z" fill="#b97a34" />
+        {[[30, 40, 26, 96], [42, 32, 40, 104], [62, 34, 66, 104]].map(([x0, y0, x1, y1]) => <path key={x0} d={`M${x0} ${y0} C${x0 - 6} ${(y0 + y1) / 2} ${x1 - 4} ${y1 - 10} ${x1} ${y1}`} {...line('#9c6428', 1.2)} />)}
+        <path d="M40 108 L36 116 M48 108 L48 118 M56 108 L60 116" {...line('#8a6a48', 1.6)} />
+        <circle cx="94" cy="88" r="26" fill="#f6edd6" {...o} />
+        {[20, 14, 8].map((r) => <circle key={r} cx="94" cy="88" r={r} fill="none" stroke="#dccfa6" strokeWidth="1.6" />)}
+        <circle cx="94" cy="88" r="3" fill="#e6dcbc" />
+        {hi('M24 52 C22 62 22 74 26 84', 4)}
+      </g>
+    case 'Negi':
+      // (a length of Japanese leek: white below, pale through the middle, the green leaves above; cut ends showing their rings)
+      return <g transform="rotate(-35 64 64)">
+        <path d="M54 30 H74 V112 Q64 118 54 112 Z" fill="#f7f6ee" {...o} />
+        <path d="M66 32 H74 V112 Q70 115 66 116 Z" fill="#e3e2d2" />
+        <path d="M54 30 L52 8 Q58 4 62 12 L64 30 Z" fill="#5f9a3a" {...o} />
+        <path d="M64 30 L66 6 Q74 4 76 12 L74 30 Z" fill="#7cb24e" {...o} />
+        <path d="M54 30 H74 V52 Q64 56 54 52 Z" fill="#d8e8a8" {...o} />
+        {[60, 66, 70].map((x) => <path key={x} d={`M${x} 56 V108`} {...line('#dad8c4', 1)} />)}
+        <ellipse cx="64" cy="113" rx="10" ry="3.4" fill="#fdfdf6" stroke={INK} strokeWidth="1.6" />
+        {hi('M58 60 V100', 3)}
+      </g>
+    case 'Carrot':
+      // (a carrot with its leafy top, and thick rounds cut from it, their pale cores)
+      return <g>
+        <path d="M30 34 C42 26 58 30 62 40 L36 112 Q30 116 28 110 Z" fill="#ef8a34" {...o} transform="rotate(-20 46 70)" />
+        <path d="M26 30 C20 18 22 10 30 8 M34 30 C34 16 40 10 46 12 M38 32 C44 22 52 20 56 24" {...line('#5f9a3a', 4.2)} />
+        {[[80, 52, 18], [92, 84, 20], [66, 96, 16]].map(([x, y, r]) => <g key={x}>
+          <ellipse cx={x} cy={y} rx={r} ry={r * 0.9} fill="#f39a45" {...o} />
+          <ellipse cx={x} cy={y} rx={r * 0.5} ry={r * 0.45} fill="#f7b46a" stroke="#d87a2a" strokeWidth="1" />
+        </g>)}
+        {hi('M34 50 C30 62 28 74 28 84', 3)}
+      </g>
+    case 'Gobo':
+      // (burdock root: long, thin, earthy brown, cut on the slant into lengths, their cut faces pale grey-cream)
+      return <g>{skewer}
+        {[[38, 84], [62, 64], [86, 44]].map(([x, y]) => <g key={x} transform={`rotate(-38 ${x} ${y})`}>
+          <rect x={x - 24} y={y - 7} width="48" height="14" rx="5" fill="#8a6a48" {...o} />
+          <path d={`M${x - 20} ${y - 2} H${x + 18} M${x - 16} ${y + 3} H${x + 12}`} {...line('#6e5236', 1)} />
+          <ellipse cx={x + 24} cy={y} rx="4" ry="7" fill="#ece0c6" stroke={INK} strokeWidth="1.6" />
+        </g>)}
+        {hi('M30 78 C40 70 50 64 60 58', 2.6)}
+      </g>
+    case 'Daikon':
+      // (a daikon steak: a thick white round, scored in a crosshatch, browned at the edge, glazed with miso; a sprig of leaf)
+      return <g>
+        <ellipse cx="64" cy="76" rx="44" ry="24" fill="#e8dcc0" {...o} />
+        <ellipse cx="64" cy="66" rx="44" ry="24" fill="#f8f4e8" {...o} />
+        <ellipse cx="64" cy="66" rx="36" ry="18" fill="#e7b75a" opacity="0.75" />
+        {[-20, -8, 4, 16].map((d) => <path key={d} d={`M${48 + d} 52 L${66 + d} 80`} {...line('#c8903a', 1.4)} />)}
+        {[-20, -8, 4, 16].map((d) => <path key={`b${d}`} d={`M${80 + d} 52 L${62 + d} 80`} {...line('#c8903a', 1.4)} />)}
+        <path d="M86 40 C96 30 108 32 112 40 C102 40 96 44 90 48 Z" fill="#6aa04a" {...o} />
+        {hi('M30 60 C34 52 44 46 56 44', 3.4)}
+      </g>
+    case 'Nori':
+      // (a stack of toasted nori sheets, dark green-black with their sheen, one lifted at a corner)
+      return <g>
+        <rect x="22" y="44" width="84" height="62" rx="3" fill="#1f2a22" {...o} transform="rotate(-6 64 75)" />
+        <rect x="26" y="36" width="84" height="62" rx="3" fill="#26362a" {...o} transform="rotate(4 64 67)" />
+        <path d="M30 34 H106 L104 92 Q86 86 70 96 L30 94 Z" fill="#2e4232" {...o} />
+        {[44, 58, 72, 86, 100].map((x) => <path key={x} d={`M${x} 38 L${x - 2} 90`} {...line('#3c5440', 1)} />)}
+        {hi('M36 42 C52 40 70 40 86 42', 3)}
+      </g>
     case 'RiceBag':
       // (the rice as it's bought: a 10 kg kraft-paper sack of polished rice, its top folded and stitched, the brand in a red frame, a few
       // grains spilt before it)
@@ -491,7 +556,7 @@ function OtherArt({ id }: { id: string }) {
 }
 
 /** the foods there's a picture of (the rest are drawn as a plain round) */
-const OTHER = new Set(['RiceBag', 'Asparagus', 'BloodCake', 'GrilledCorn', 'GrilledShiitake', 'KingOyster', 'MisoSoup', 'NetMochi', 'Okra', 'Onigiri', 'PorkBelly', 'Potato', 'Sake', 'Sausage', 'Scallop', 'Shishito', 'ShrimpSkewer', 'Squid', 'SweetPotato', 'Yakitori'])
+const OTHER = new Set(['Nori', 'Onion', 'Negi', 'Carrot', 'Gobo', 'Daikon', 'RiceBag', 'Asparagus', 'BloodCake', 'GrilledCorn', 'GrilledShiitake', 'KingOyster', 'MisoSoup', 'NetMochi', 'Okra', 'Onigiri', 'PorkBelly', 'Potato', 'Sake', 'Sausage', 'Scallop', 'Shishito', 'ShrimpSkewer', 'Squid', 'SweetPotato', 'Yakitori'])
 export const hasFoodArt = (id: string) => id in FISH || OTHER.has(id)
 
 /** `band`: drawn across the top of a card (no round tile, the food cropped close to fill the band; the card's band behind it) */

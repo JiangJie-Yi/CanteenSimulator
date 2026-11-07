@@ -10,7 +10,7 @@ import { STORAGES, stockNameOf, storageName, storageOf, type Storage } from '@/d
 import { PAR, inPacks, keepsDry, packOf } from '@/game/economy'
 import { freshGrade } from '@/game/freshness'
 import { lotGrades, type Lot } from '@/game/lots'
-import { CHARCOAL, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
+import { CHARCOAL, NORI, NORI_COST, NORI_PAR, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
 import { FitLine } from '@/ui/FitLine'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
@@ -258,6 +258,30 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
       </div>
     )
   }
+  /** the nori: by the sheet, one round every onigiri (game/supplies GARNISH), kept to its usual stock */
+  const noriBin = () => {
+    const have = stock[NORI] ?? 0
+    const out = have <= 0
+    const need = Math.max(0, NORI_PAR - have)
+    const can = (n: number) => n > 0 && cash >= NORI_COST * n
+    const buy = (n: number) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (can(n)) p.onBuy(NORI, n) }
+    return (
+      <div key={NORI} className={`chiller-bin season-bin is-still${out ? ' is-out' : ''}`} aria-label={`${supplyName(NORI, lang)}，${tl(lang, '庫存', '在庫', 'Stock')} ${have}`}>
+        <span className="chiller-bin-head"><FoodArt id="Nori" store="ambient" band /><FitLine className="chiller-bin-name">{supplyName(NORI, lang)}</FitLine></span>
+        <span className={`chiller-level${out ? ' is-zero' : have < NORI_PAR / 3 ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / NORI_PAR) * 100)}%` }} /></span>
+        <span className="chiller-bin-info" aria-hidden="true">
+          <b className={out ? 'is-zero' : ''}>{tl(lang, '剩', '残り', 'Left')} <em>{have}</em>{tl(lang, ' 片', '枚', '')}</b>
+          <small>{tl(lang, '每片', '1枚', 'Each')} <em>{NORI_COST}</em></small>
+        </span>
+        <span className="chiller-buy season-buy">
+          <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 片', '10枚仕入れる', 'Order 10')} onClick={buy(10)}>+10</span>
+          <span role="button" tabIndex={-1} className={`chiller-btn chiller-fill${can(need) ? '' : ' is-off'}`}
+            title={need ? tl(lang, `補到 ${NORI_PAR} 片（NT$${NORI_COST * need}）`, `${NORI_PAR}枚まで補充`, `Fill up to ${NORI_PAR} (NT$${NORI_COST * need})`) : tl(lang, '已經夠了', '十分あります', 'Enough already')}
+            onClick={buy(need)}>{tl(lang, '補', '補', '+')}</span>
+        </span>
+      </div>
+    )
+  }
   const seasonBin = (k: Seasoning) => {
     const id = seasonId(k)
     const have = stock[id] ?? 0
@@ -292,6 +316,12 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
           <h3 className="chiller-zone-head"><span>{storageName(st, lang)}</span><i aria-hidden="true">{zone === 'frozen' ? `${FREEZER_TEMP.now < 0 ? '−' : ''}${Math.abs(Math.round(FREEZER_TEMP.now))}℃` : zone === 'chilled' ? '3℃' : st.temp}</i></h3>
           {goods.length > 0 && <div className="chiller-bins">{goods.map(bin)}</div>}
         </section>
+        {zone === 'ambient' && (
+          <section className={`chiller-zone is-${zone} is-seasonings`}>
+            <h3 className="chiller-zone-head"><span>{tl(lang, '配料', '付け合わせ', 'Garnish')}</span><i aria-hidden="true">{tl(lang, '一個飯糰一片', 'おにぎり1個に1枚', 'a sheet an onigiri')}</i></h3>
+            <div className="chiller-bins">{noriBin()}</div>
+          </section>
+        )}
         {seasonings.length > 0 && (
           <section className={`chiller-zone is-${zone} is-seasonings`}>
             <h3 className="chiller-zone-head"><span>{tl(lang, '調味料', '調味料', 'Seasonings')}</span><i aria-hidden="true">{tl(lang, '用一次少一份', '1回で1つ', 'one a dab')}</i></h3>

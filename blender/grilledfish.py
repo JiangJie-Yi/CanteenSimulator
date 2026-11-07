@@ -2306,6 +2306,95 @@ def blood_cake():
 
 
 place(blood_cake(), 224, 0.6, "BloodCake")
+
+
+# ---- the root vegetables and the leek (the owner's: onion, leek, carrot, burdock and daikon on the robata) -------------------------
+# Each cut piece is a short cylinder (16 round, its ends filled in rows when exported, no centre fan), mapped to one picture: the cut face
+# in the left half (from its centre out), the skin in the right half (round it, along it); the grill's bars seared across both.
+def veg_picture(name, face, skin, n=256):
+    """A cut vegetable's picture: `face(r)` the cut face's colour at a distance r (0 centre .. 1 rim), `skin(u, v)` its outside."""
+    uu, vv = grid01(n)
+    left = uu < 0.5
+    fx, fy = (uu / 0.5) * 2 - 1, vv * 2 - 1
+    r = np.clip(np.sqrt(fx ** 2 + fy ** 2), 0, 1)
+    out = np.where(left[..., None], face(r), skin((uu - 0.5) / 0.5, vv))
+    bars = smooth(0.86, 0.95, 0.5 + 0.5 * np.sin((vv * 9 + uu * 1.5) * 2 * np.pi)) * smooth(0.45, 0.75, fbm(n, 6, 6) + 0.25)
+    out = mix(out, (0.2, 0.12, 0.06), bars * 0.7)
+    return image(name, out)
+
+
+def cut_piece(name, mat, r, depth, at, rot, seg=16):
+    """A round piece: its axis along local Z (turned by `rot`), mapped as veg_picture lays out its picture."""
+    bpy.ops.mesh.primitive_cylinder_add(vertices=seg, radius=r, depth=depth, location=at, rotation=rot)
+    o = active()
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    uvl = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        cap = abs(f.normal.z) > 0.7
+        us = [(math.atan2(l.vert.co.y, l.vert.co.x) / (2 * math.pi)) % 1 for l in f.loops]
+        if not cap and max(us) - min(us) > 0.5:
+            us = [x + 1 if x < 0.5 else x for x in us]
+        for l, u_ in zip(f.loops, us):
+            c = l.vert.co
+            l[uvl].uv = ((c.x / r * 0.5 + 0.5) * 0.5, c.y / r * 0.5 + 0.5) if cap else (0.5 + 0.5 * min(u_, 1.0), c.z / depth + 0.5)
+    bm.to_mesh(o.data)
+    bm.free()
+    bevel(o, min(r, depth) * 0.18, 1, angle=False)
+    return finish(o, name, mat)
+
+
+TEX["onion"] = veg_picture("T_Onion",
+    lambda r: mix(mix((0.97, 0.94, 0.84), (0.86, 0.8, 0.62), (0.5 + 0.5 * np.cos(r * np.pi * 14)) ** 6), (0.62, 0.42, 0.2), smooth(0.85, 1.0, r) * 0.6),
+    lambda u, v: mix((0.95, 0.9, 0.76), (0.8, 0.68, 0.44), smooth(0.3, 0.7, fbm(256, 4, 4))))
+TEX["carrot"] = veg_picture("T_Carrot",
+    lambda r: mix(mix((0.98, 0.66, 0.3), (0.93, 0.48, 0.14), smooth(0.35, 0.5, r)), (0.82, 0.38, 0.1), smooth(0.92, 1.0, r)),
+    lambda u, v: mix((0.9, 0.42, 0.12), (0.76, 0.32, 0.08), smooth(0.4, 0.8, vnoise(256, 3, 30))))
+TEX["daikon"] = veg_picture("T_Daikon",
+    # (glazed with miso over the whole face, scored in a crosshatch, browned at the rim)
+    lambda r: mix(mix((0.98, 0.97, 0.92), (0.85, 0.6, 0.25), np.full_like(r, 0.55)), (0.55, 0.32, 0.12), smooth(0.86, 1.0, r) * 0.8),
+    lambda u, v: mix((0.94, 0.92, 0.84), (0.6, 0.38, 0.16), smooth(0.4, 0.75, fbm(256, 5, 5))))
+TEX["negi"] = veg_picture("T_Negi",
+    lambda r: mix((0.94, 0.95, 0.86), (0.82, 0.88, 0.64), (0.5 + 0.5 * np.cos(r * np.pi * 8)) ** 4),
+    lambda u, v: mix(mix((0.96, 0.96, 0.9), (0.78, 0.86, 0.58), smooth(0.6, 1.0, v)), (0.86, 0.86, 0.78), vnoise(256, 60, 2) * 0.3))
+TEX["gobo"] = veg_picture("T_Gobo",
+    lambda r: mix((0.9, 0.86, 0.72), (0.7, 0.6, 0.44), smooth(0.6, 1.0, r)),
+    lambda u, v: mix((0.42, 0.3, 0.18), (0.28, 0.19, 0.11), vnoise(256, 50, 3)))
+M.update({k: pbr(k.capitalize(), tex=TEX[k], rough=0.45, coat=0.2) for k in ("onion", "carrot", "daikon", "negi", "gobo")})
+
+
+def onion_rounds(at):
+    """Two thick rounds of onion, cut across so their rings show, lying on the grill net side by side (too wide for the ring of skewers)."""
+    return [cut_piece("Onion", M["onion"], random.uniform(0.05, 0.055), 0.03, (at[0] + dx, at[1] + dy, NET_Z + 0.019), (0, 0, random.uniform(0, 3)))
+            for dx, dy in ((-0.055, 0.0), (0.055, 0.0))]
+
+
+def negi_lengths():
+    """Four lengths of Japanese leek across the stick (the way they're threaded for negima), each a little tilted."""
+    return [cut_piece("Negi", M["negi"], random.uniform(0.015, 0.018), 0.085, (x, 0, 0), (random.uniform(-0.12, 0.12), random.uniform(-0.1, 0.1), 0), seg=12)
+            for x in (-0.15, -0.05, 0.05, 0.15)]
+
+
+def carrot_rounds():
+    """Four thick rounds of carrot, faces out."""
+    return [cut_piece("Carrot", M["carrot"], random.uniform(0.026, 0.032), 0.028, (x, 0, 0), (math.radians(90), 0, 0), seg=14)
+            for x in (-0.14, -0.047, 0.047, 0.14)]
+
+
+def gobo_sticks():
+    """Three lengths of burdock root across the stick, cut on the slant, earthy brown."""
+    return [cut_piece("Gobo", M["gobo"], 0.012, 0.16, (x, 0, 0), (random.uniform(-0.25, 0.25), 0.35 * (1 if i % 2 else -1), 0), seg=10)
+            for i, x in enumerate((-0.07, 0.0, 0.07))]
+
+
+def daikon_steak(at):
+    """A daikon steak: one thick round, scored and glazed, lying on the grill net."""
+    return [cut_piece("Daikon", M["daikon"], 0.065, 0.038, (at[0], at[1], NET_Z + 0.023), (0, 0, random.uniform(0, 3)), seg=20)]
+
+
+place(negi_lengths(), 300, 0.6, "Negi")
+place(carrot_rounds(), 312, 0.6, "Carrot")
+place(gobo_sticks(), 322, 0.6, "Gobo")
 # ---------------------------------------------------------------------------------------------------------
 
 place(fish(), 95, 0.64, "ExtraFish")
@@ -3322,6 +3411,10 @@ finish(mochi_o, "NetMochi", M["netmochi"])
 oni = join(onigiri(), "Onigiri")
 oni.rotation_euler = (math.radians(90), 0, random.uniform(0, math.pi))
 oni.location = (0.1, -0.07, NET_Z + 0.052)          # (resting on the wires, not sunk through them)
+# (and the onion rounds and the daikon steak, toasted on the net too: the ring of skewers was full; where the model has them is only where
+# they start, the web app moves each between the net's three spots)
+join(onion_rounds((0.0, 0.13)), "Onion")
+join(daikon_steak((-0.14, -0.16)), "Daikon")
 
 mochi_o.shape_key_add(name="Basis")
 puffed = mochi_o.shape_key_add(name="Puffed")
