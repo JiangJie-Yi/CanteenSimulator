@@ -2,6 +2,8 @@
 import './scene/gpuSweep'
 // (and a phone fetches none of the 3D shop: it draws it flat)
 import './scene/flatGate'
+// (the pictures the game paints, kept off the graphics card: they survive its resets)
+import './scene/canvasKeep'
 import './scene/triProfiler'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

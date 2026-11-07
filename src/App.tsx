@@ -83,7 +83,7 @@ import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
-import { noteDrawn } from '@/scene/Later'
+import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
@@ -2605,10 +2605,11 @@ export default function App() {
               window.clearTimeout(lostTimer.current)
               lostTimer.current = window.setTimeout(() => window.location.replace(window.location.pathname + '?v=' + Date.now()), 4000)
             })
+            // (given back: the page brought back all the same, the game going on from where it was (the owner's Mac: carried on, three uploaded
+            // its pictures again from canvases the GPU's reset had emptied, and the floor, the lamps and the window came up black))
             gl.domElement.addEventListener('webglcontextrestored', () => {
               window.clearTimeout(lostTimer.current)
-              try { sessionStorage.removeItem(RESUME_KEY) } catch { /* (nothing kept) */ }
-              setGlLost(false)
+              window.location.replace(window.location.pathname + '?v=' + Date.now())
             })
           }}
           camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
@@ -2618,7 +2619,7 @@ export default function App() {
           <DrawnProbe />
           <Prewarm />
           <FpsMeter />
-          <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
+          {!NO_SCENE && <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
             resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
@@ -2626,7 +2627,7 @@ export default function App() {
             omiki={omikiProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy} speech={speech}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests}
-            phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />
+            phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />}
         </Canvas>}
         </Crash>
       </div>

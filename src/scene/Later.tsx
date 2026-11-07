@@ -7,6 +7,11 @@ import { Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode 
  * lifts is the whole shop, nothing popping in after it (the stools, the fridges, the crates came in seconds after it had gone).
  */
 const DELAY = [0, 600, 1500, 2600]
+/** for finding what brings a machine's GPU down (the owner's Mac): `?stage=N` mounts only the stages up to N (0: none of them), `?scene=0`
+ * none of the shop at all; the loading veil doesn't wait for what's left out */
+const ask = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null
+export const NO_SCENE = ask?.get('scene') === '0'
+const LAST_STAGE = ask?.has('stage') ? Number(ask.get('stage')) : 3
 /** the stages mounted but not yet in (still waiting their turn, or their models still loading), and anything else the veil should wait
  * for (holdVeil: a piece not yet measured and shown) */
 const pending = new Set<symbol>()
@@ -19,7 +24,7 @@ export const laterSeen = () => seen
  * handful. The veil waits for the shop to be drawn as well as loaded (the owner saw it lift on an empty room) */
 let lastDrawn = 0
 export const noteDrawn = (calls: number) => { lastDrawn = calls }
-export const sceneDrawn = () => lastDrawn > 100
+export const sceneDrawn = () => NO_SCENE || lastDrawn > 100
 // (in development, what the veil is waiting for: __veilWait())
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __veilWait?: () => string[] }).__veilWait = () => [...pending].map((s) => s.description ?? '?')
 /** something the loading veil should wait for, till the release it returns is called (or it goes) */
@@ -30,6 +35,9 @@ export function holdVeil(what = 'held') {
 }
 
 export function Later({ stage, children }: { stage: 1 | 2 | 3; children: ReactNode }) {
+  return stage > LAST_STAGE ? null : <LaterStage stage={stage}>{children}</LaterStage>
+}
+function LaterStage({ stage, children }: { stage: 1 | 2 | 3; children: ReactNode }) {
   const [on, setOn] = useState(false)
   const id = useRef(Symbol(`later-${stage}`))
   useLayoutEffect(() => {
