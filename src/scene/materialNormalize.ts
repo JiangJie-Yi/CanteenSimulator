@@ -11,6 +11,7 @@
 // Left alone: shader materials, points, sprites, lines; materials that change their own shader (onBeforeCompile: they're programs of their
 // own anyway, and their code may read the maps; `userData.normalize` lets one in that doesn't mind); and any with `userData.keepProgram`.
 import * as THREE from 'three'
+import { capMaterial } from './textureCap'
 
 const white = (() => {
   const t = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1)
@@ -43,6 +44,8 @@ type Any = THREE.Material & Record<string, any>
 export function normalizeMaterial(mat: THREE.Material) {
   if (done.has(mat)) return
   done.add(mat)
+  // (its pictures within what the machine affords: scene/textureCap)
+  capMaterial(mat)
   const m = mat as Any
   if (!(m.isMeshToonMaterial || m.isMeshStandardMaterial || m.isMeshBasicMaterial)) return
   // (one that changes its own shader is left alone, unless it says its code doesn't mind (`userData.normalize`: the food's charring))
