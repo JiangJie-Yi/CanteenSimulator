@@ -93,7 +93,9 @@ export const KITCHEN_FOLK = new Set<THREE.Object3D>()
  * each other, by the food's key.
  */
 /** how fresh each food in the pantry is just now (0..100, game/freshness), kept by the App, read when a dish is tasted */
-export const PANTRY = { fresh: {} as Record<string, number> }
+export const PANTRY = { fresh: {} as Record<string, number>,
+  /** how fresh the portions last used of each food were (game/lots: the stalest lot first): what a dish made of it tastes of */
+  used: {} as Record<string, number> }
 /** water (and the power heating it) used about the shop since App last metered it (game/utilities' uses: a plate washed, a flush, the
  * washlet, hands washed, the dipper...): App drains it every second into the month's meter */
 export const UTILITY: { uses: Partial<Record<Use, number>> } = { uses: {} }

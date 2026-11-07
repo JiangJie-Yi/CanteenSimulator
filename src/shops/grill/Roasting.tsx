@@ -4661,7 +4661,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         Object.entries(dish.dabs).filter(([k, n]) => n > 0 && k !== 'water').map(([k]) => k).sort().join()
       // (and as fresh as what it was made from: a tired fish tastes of it)
       // (and as they're feeling: a dirty toilet, or one with no paper, sours what they eat after it)
-      const fresh = PANTRY.fresh[dish.id] ?? 100
+      const fresh = PANTRY.used[dish.id] ?? PANTRY.fresh[dish.id] ?? 100
       const taste = Math.max(0, tasteOf(dish) * freshFactor(fresh) - (asOrdered ? 0 : 15) - (WC_GRUMBLE.get(g.id) ?? 0))
       // (made with what wasn't fit to eat: likely as not it upsets their stomach, and they're off to the toilet)
       const sick = Math.random() < sickChance(fresh)

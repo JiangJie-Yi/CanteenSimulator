@@ -1,4 +1,4 @@
-// How fresh what's in the pantry is (0..100): new stock comes in at 100, mixed in with what's already there by how much of each; it goes off
+// How fresh what's in the pantry is (0..100): new stock comes in at 100, a lot of its own (game/lots: never mixed in with what's there); it goes off
 // as time passes, slowly frozen (the colder the freezer's kept, the slower: its lid left up, it warms and the frozen food goes off fast),
 // faster chilled, fastest left out; the staler, the less good it tastes, and below INEDIBLE it isn't fit to eat: it tastes of it, and may
 // well give whoever eats it an upset stomach (the owner's).
@@ -12,10 +12,6 @@ export const INEDIBLE = 30
 /** how much faster frozen food goes off at a freezer's temperature than at -20: half as fast with every 5 degrees colder, twice with every 5
  * warmer (the lid left up, the cavity warms toward the room) */
 export const frozenRate = (temp: number) => Math.pow(2, (temp + 20) / 5)
-
-/** n new portions (at 100) added to `have` portions at `fresh`: the mix */
-export const blendFresh = (have: number, fresh: number, n: number) =>
-  have + n <= 0 ? 100 : (Math.max(0, have) * fresh + n * 100) / (Math.max(0, have) + n)
 
 /** freshness after `mins` game-minutes kept where this food is kept (the frozen in a freezer at `temp`); down to nothing, spoiled */
 export const ageFresh = (id: string, fresh: number, mins: number, temp = -20) => {

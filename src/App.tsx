@@ -92,7 +92,8 @@ import { tl } from '@/data/i18n'
 import { skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
 import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
 import { GameClock } from '@/ui/GameClock'
-import { ageFresh, blendFresh } from '@/game/freshness'
+import { ageFresh } from '@/game/freshness'
+import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, type Lot } from '@/game/lots'
 import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
 
 // distance between dishes on the carousel
@@ -105,6 +106,8 @@ const RESUME_KEY = 'jgs-resume-1'
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
+  /** each food's lots, as bought (game/lots) */
+  lots?: Record<string, Lot[]>
   /** (kept across a lost 3D view only) the menus put out, the game's clock (the day and the time of day), the language, and the people who'd
    * applied for the jobs (made at random each visit: the staff taken on are some of them) */
   menuBy?: Record<string, Entry[]>; clock?: Clock; lang?: Lang; candidates?: typeof CANDIDATES }
@@ -1413,25 +1416,38 @@ export default function App() {
   }, [])
   // ingredients in stock, by portion; nothing until it's bought (but the seasonings and the charcoal: a new shop has some of those, game/supplies)
   const [stock, setStock] = useState<Record<string, number>>(() => ({ ...startingSupplies(), ...SAVED?.stock }))
-  // how fresh each food in stock is (game/freshness): what's bought comes in fresh and mixes with what's there; it goes off as time passes
-  const [fresh, setFresh] = useState<Record<string, number>>(() => SAVED?.fresh ?? {})
+  // each food in stock as the lots it was bought in (game/lots; the owner's: buying fresh stock used to lift the nearly spoiled with it): a
+  // purchase is a lot of its own at 100, each goes off on its own, what's used comes out of the stalest first. An old save's one mixed
+  // freshness becomes a single lot.
+  const [lots, setLots] = useState<Record<string, Lot[]>>(() => SAVED?.lots
+    ?? Object.fromEntries(Object.entries(SAVED?.stock ?? {}).filter(([k]) => !isSupply(k)).map(([k, n]) => [k, lotsFrom(n, SAVED?.fresh?.[k] ?? 100)])))
   const stockWas = useRef(stock)
   useEffect(() => {
-    const was = stockWas.current
     stockWas.current = stock
-    // (what isn't food doesn't go off: the seasonings, the charcoal)
-    const grew = Object.keys(stock).filter((k) => !isSupply(k) && (stock[k] ?? 0) > (was[k] ?? 0))
-    if (grew.length) setFresh((f) => ({ ...f, ...Object.fromEntries(grew.map((k) => [k, blendFresh(was[k] ?? 0, f[k] ?? 100, (stock[k] ?? 0) - (was[k] ?? 0))])) }))
+    // (the stock's count is the truth: more is a new lot, fewer came out of the stalest, and how fresh that was is what the dish is made of;
+    // what isn't food doesn't go off: the seasonings, the charcoal)
+    setLots((all) => {
+      let next: Record<string, Lot[]> | null = null
+      for (const k of Object.keys(stock)) {
+        if (isSupply(k) || lotsTotal(all[k]) === (stock[k] ?? 0)) continue
+        const s = settleLots(all[k], stock[k] ?? 0, getClock().day)
+        if (s.used > 0) PANTRY.used[k] = s.fresh
+        ;(next ??= { ...all })[k] = s.lots
+      }
+      return next ?? all
+    })
   }, [stock])
   useEffect(() => {
     // (every few seconds: a game-minute is a second of play, sped up with the game)
     const t = window.setInterval(() => {
       const mins = 5 * GAME_SPEED.value
       // (the frozen at the freezer's own temperature, as its thermostat's set and as its lid's been left up: game/freshness frozenRate)
-      setFresh((f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, (stockWas.current[k] ?? 0) > 0 ? ageFresh(k, v, mins / 6, FREEZER_TEMP.now) : v])))
+      setLots((all) => Object.fromEntries(Object.entries(all).map(([k, l]) => [k, ageLots(l, (v) => ageFresh(k, v, mins / 6, FREEZER_TEMP.now))])))
     }, 5000)
     return () => window.clearInterval(t)
   }, [])
+  // (what's shown for each food: its stalest lot, the one to use up first)
+  const fresh = useMemo(() => Object.fromEntries(Object.entries(lots).map(([k, l]) => [k, stalest(l)])), [lots])
   PANTRY.fresh = fresh
   // the owner's name ('' while they aren't asked it: they're 老闆); null until they've founded the business, while the
   // welcome is up and the sign is dark
@@ -1444,8 +1460,8 @@ export default function App() {
   // the 開業 button is hovered: a spotlight swings onto the shop
   const [spotOn, setSpotOn] = useState(false)
   // the business is saved as it goes (every few seconds and when the page is left), and picked up next time
-  const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner, opened, fresh })
-  saveRef.current = { ledger, stock, hired, notes, owner, opened, fresh }
+  const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner, opened, fresh, lots })
+  saveRef.current = { ledger, stock, hired, notes, owner, opened, fresh, lots }
   useEffect(() => {
     const write = () => {
       try {
@@ -1902,8 +1918,8 @@ export default function App() {
   }, [talk, lang])
   langRef.current = lang
   // (what's kept if the 3D view is lost: read from here the moment it happens)
-  const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh }))
-  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, menuBy, clock: getClock(), lang, candidates: CANDIDATES })
+  const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh, lots }))
+  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, lots, menuBy, clock: getClock(), lang, candidates: CANDIDATES })
   const lostTimer = useRef(0)
   // (brought back after it was lost: said so, once)
   useEffect(() => {
@@ -2892,7 +2908,7 @@ export default function App() {
       {editOn && !phone && <CharacterViewer lang={lang} />}
       {/* (the stock: everything kept, at any time, from the little fridge top right; researching, its foods are taken out to try from it) */}
       {fridgeOpen && !editOn && !!dish.roast && (
-        <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} cash={cash} focus={stockFocus} meter={meterShown}
+        <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} lots={lots} cash={cash} focus={stockFocus} meter={meterShown}
           unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? { price: 0 })}
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
           onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}

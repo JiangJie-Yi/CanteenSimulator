@@ -6708,6 +6708,15 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .chiller-fresh.is-tired { color: #c0463a; }
 /* (spoiled: not fit to eat, said in words on a dark red) */
 .chiller-fresh.is-spoiled { color: #8e1b12; }
+.chiller-lots { display: flex; align-items: center; gap: 4px; margin: -2px 0 4px; font-size: 9.5px; white-space: nowrap; }
+.chiller-lots-bar { flex: 1; display: flex; height: 3px; border-radius: 2px; overflow: hidden; background: rgb(0 0 0 / 0.1); }
+.chiller-lots-bar i { display: block; height: 100%; }
+.chiller-lots small { display: flex; gap: 3px; }
+.chiller-lots b { font-weight: 700; }
+.chiller-lots .is-fresh { color: #2f9a5c; } .chiller-lots-bar .is-fresh { background: #2f9a5c; }
+.chiller-lots .is-good { color: #c98a1e; } .chiller-lots-bar .is-good { background: #c98a1e; }
+.chiller-lots .is-tired { color: #c0463a; } .chiller-lots-bar .is-tired { background: #c0463a; }
+.chiller-lots .is-spoiled { color: #8e1b12; } .chiller-lots-bar .is-spoiled { background: #8e1b12; }
 .chiller-fresh.is-spoiled em { min-width: 0; padding: 0 4px; border-radius: 3px; background: #8e1b12; color: #fff; font-size: 10px; }
 
 

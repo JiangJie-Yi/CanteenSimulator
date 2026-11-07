@@ -9,6 +9,7 @@ import { SEASONINGS, SEASON_COST, type Seasoning } from '@/data/recipes'
 import { STORAGES, stockNameOf, storageName, storageOf, type Storage } from '@/data/storage'
 import { PAR } from '@/game/economy'
 import { freshGrade } from '@/game/freshness'
+import { lotGrades, type Lot } from '@/game/lots'
 import { CHARCOAL, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
 import { FitLine } from '@/ui/FitLine'
 import { FoodArt } from '@/ui/FoodArt'
@@ -82,6 +83,8 @@ type Props = {
   dish: Dish
   stock: Record<string, number>
   fresh: Record<string, number>
+  /** each food's lots, as bought (game/lots): the card shows how many portions are at each freshness */
+  lots?: Record<string, Lot[]>
   cash: number
   /** what one costs to buy in (a food's portion, a seasoning's dose) */
   unitCost: (id: string) => number
@@ -236,6 +239,7 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
             <em>{grade === 'spoiled' ? tl(lang, '不可食用', '食用不可', 'Spoiled') : `${f}%`}</em>
           </span>
         )}
+        {!out && <LotStrip lang={lang} lots={p.lots?.[x.id]} />}
         <span className="chiller-buy">
           <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={tl(lang, '叫 1 份', '1つ仕入れる', 'Order 1')} onClick={buy(1)}>+1</span>
           <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 份', '10個仕入れる', 'Order 10')} onClick={buy(10)}>+10</span>
@@ -456,5 +460,21 @@ function TissueZone(p: Props) {
         '各席の引き出しに1箱。食べ終わると数枚使う。空だとお客さんの評価が下がる。開店前に空（残り少ない）箱を予備と交換。',
         'A box in each place’s drawer; customers take a few as they finish, and an empty one costs the shop its rating. Before opening, empty (or nearly empty) boxes are swapped from the spares.')}</p>
     </section>
+  )
+}
+
+/** under a card's freshness (the stalest lot's: used first), how its portions stand when they're of more than one grade: a strip in the
+ * grades' colours, as wide as their share, and how many of each (the owner's: 20 at their best, 10 to use up soon) */
+function LotStrip({ lang, lots }: { lang: Lang; lots?: Lot[] }) {
+  const g = lotGrades(lots)
+  const all = g.fresh + g.good + g.tired + g.spoiled
+  if (!all || [g.fresh, g.good, g.tired, g.spoiled].filter((n) => n > 0).length < 2) return null
+  const word = { fresh: tl(lang, '極鮮', '極鮮', 'Prime'), good: tl(lang, '良好', '良好', 'Good'), tired: tl(lang, '即期', '要消費', 'Use soon'), spoiled: tl(lang, '壞了', '傷み', 'Spoiled') }
+  const parts = (['fresh', 'good', 'tired', 'spoiled'] as const).filter((k) => g[k] > 0)
+  return (
+    <span className="chiller-lots" title={parts.map((k) => `${word[k]} ${g[k]}`).join('・')}>
+      <span className="chiller-lots-bar">{parts.map((k) => <i key={k} className={`is-${k}`} style={{ width: `${(g[k] / all) * 100}%` }} />)}</span>
+      <small>{parts.map((k) => <b key={k} className={`is-${k}`}>{g[k]}</b>)}</small>
+    </span>
   )
 }
