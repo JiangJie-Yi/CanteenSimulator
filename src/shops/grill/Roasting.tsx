@@ -1,4 +1,5 @@
 import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { isDummyMap } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
@@ -2712,9 +2713,12 @@ const EYE_LOOKS: Looks = { uChar: { value: 0 }, uSear: { value: 0 }, uSalt: { va
   uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
 
 function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
+  const hasMap = !!mat.map && !isDummyMap(mat.map)
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, looks, bites)
     shader.uniforms.uCharColor = { value: CHAR_COLOR }
+    // (whether it has a picture of its own: the white one scene/materialNormalize gives the rest doesn't count)
+    shader.uniforms.uHasMap = { value: hasMap ? 1 : 0 }
     shader.vertexShader = BITE_VERTEX(shader.vertexShader)
     shader.fragmentShader = BITE_FRAGMENT(shader.fragmentShader
       .replace('#include <common>', /* glsl */ `#include <common>
@@ -2728,6 +2732,7 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
         uniform float uGreen;
         uniform float uRed;
         uniform float uLemon;
+        uniform float uHasMap;
         uniform vec3 uCharColor;
         float charHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float charNoise(vec2 p) {
@@ -2737,30 +2742,22 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
                      mix(charHash(i + vec2(0, 1)), charHash(i + vec2(1, 1)), f.x), f.y);
         }`)
       .replace('#include <map_fragment>', /* glsl */ `#include <map_fragment>
-        #ifdef USE_MAP
-          float charN = charNoise(vMapUv * 9.0) * 0.65 + charNoise(vMapUv * 23.0) * 0.35;
-        #else
-          float charN = 0.5;
-        #endif
+        float charN = uHasMap > 0.5 ? charNoise(vMapUv * 9.0) * 0.65 + charNoise(vMapUv * 23.0) * 0.35 : 0.5;
         // the grill's bars seared across it as it cooks (none on it raw): dark brown, blistered and broken up, deepening as it roasts
-        #ifdef USE_MAP
+        if (uHasMap > 0.5) {
           float searBar = smoothstep(0.84, 0.95, 0.5 + 0.5 * sin((vMapUv.y * 11.0 + vMapUv.x * 1.5) * 6.2831853))
             * smoothstep(0.55, 0.8, charNoise(vMapUv * 8.0) + 0.3);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.12, 0.06), clamp(searBar * 0.75, 0.0, 1.0) * uSear);
-        #endif
+        }
         float charMask = smoothstep(1.0 - uChar * 1.15, 1.0 - uChar * 1.15 + 0.2, charN);
         diffuseColor.rgb = mix(diffuseColor.rgb, uCharColor, charMask);
         // soy brushed on: a dark, rich lacquer over the whole surface
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.3, 0.15) + vec3(0.05, 0.02, 0.0), uSoy * 0.85);
         // miso spread on: a thick golden-brown paste, caught darker where it's bubbled
-        #ifdef USE_MAP
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.42, 0.18) * (0.8 + 0.3 * charNoise(vMapUv * 14.0)), uMiso * 0.8);
-        #else
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.42, 0.18) * 0.95, uMiso * 0.8);
-        #endif
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.42, 0.18) * (uHasMap > 0.5 ? 0.8 + 0.3 * charNoise(vMapUv * 14.0) : 0.95), uMiso * 0.8);
         // lemon squeezed over: a pale, bright sheen
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.08 + vec3(0.05, 0.05, 0.0), uLemon * 0.6);
-        #ifdef USE_MAP
+        if (uHasMap > 0.5) {
           // coarse salt stuck to the surface: scattered white grains, more of them with every pinch
           float saltN = charHash(floor(vMapUv * vec2(150.0, 90.0)));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 1.0, 0.98), step(1.0 - uSalt * 0.3, saltN));
@@ -2777,9 +2774,12 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
           float ribbon = abs(fract(vMapUv.x * (4.0 + 4.0 * step(0.5, uMilk)) + sin(vMapUv.y * 9.0) * 0.25) - 0.5);
           float milk = (1.0 - smoothstep(0.04, 0.08, ribbon)) * step(0.3, charNoise(vMapUv * 5.0 + 3.0));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.99, 0.95, 0.84), milk * min(1.0, uMilk * 2.0));
-        #endif`))
+        }`))
   }
   mat.customProgramCacheKey = () => 'charring'
+  // (scene/materialNormalize gives it the features it lacks in their do-nothing form, a white map among them, so a fish with a picture and
+  // one without share a program: the specks and the seared bars are by uHasMap, not by whether there's a map)
+  mat.userData.normalize = 'charring'
 }
 
 /**

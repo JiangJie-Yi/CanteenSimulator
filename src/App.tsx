@@ -1,4 +1,5 @@
 import { setTip } from '@/scene/hoverTip'
+import { normalizeRenderer } from '@/scene/materialNormalize'
 import { useLowPower } from '@/scene/power'
 import { wheelIntent } from '@/game/navInput'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
@@ -152,6 +153,7 @@ const makeRenderer = ({ canvas }: { canvas: any }) => {
     try {
       const r = new THREE.WebGLRenderer({ canvas, alpha: true, ...t })
       r.toneMapping = THREE.NoToneMapping
+      normalizeRenderer(r)
       return r
     } catch (e) {
       last = e
