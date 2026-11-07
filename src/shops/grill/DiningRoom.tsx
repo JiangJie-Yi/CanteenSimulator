@@ -5548,6 +5548,9 @@ function WillowModel() {
       if (!t) {
         const leaves = src.name === 'WillowLeaves'
         t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, side: leaves ? THREE.DoubleSide : THREE.FrontSide, alphaTest: leaves ? 0.5 : 0 })
+        // (the leaves' picture not made smaller for the distance: its little leaves averaged into the gaps round them came out under the cut-off,
+        // and from the overview the willow stood bare (the owner's view); sharp at every distance instead)
+        if (leaves && src.map) { src.map.minFilter = THREE.LinearFilter; src.map.generateMipmaps = false; src.map.needsUpdate = true }
         made.set(src, t)
       }
       m.material = t
