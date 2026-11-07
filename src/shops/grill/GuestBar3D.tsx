@@ -2194,6 +2194,7 @@ const READY_S = 1.2
 const ON_TABLE = 0.85
 /** the plater's rice bowl (a wooden rice-washing bowl, open), and the rice in it */
 /** the plater's hand props for the fire and the soup: binchotan sticks, a wooden dipper (made once) */
+const X_AXIS = new THREE.Vector3(1, 0, 0)
 const COAL_STICK_GEO = new THREE.CylinderGeometry(0.009, 0.01, 0.15, 6)
 const COAL_STICK_MAT = new THREE.MeshToonMaterial({ color: '#2b2b2e' })
 const DIPPER_CUP_GEO = new THREE.CylinderGeometry(0.04, 0.034, 0.05, 12, 1, true)
@@ -3284,9 +3285,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const c0 = counters[0]
         return c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
       }
-      const crateAt = () => { marks.current.delete('coal-crate'); return inBar('coal-crate', home()) }
-      const bucketAt = () => { marks.current.delete('WaterBucket'); return inBar('WaterBucket', home()) }
-      const soupPot = () => { marks.current.delete('miso-pot'); return inBar('miso-pot', home()) }
+      /** the middle of what's drawn of something (its node's origin is wherever its model put it: the bucket's is the cook table's) */
+      const middleOf = (name: string) => {
+        marks.current.delete(name)
+        const o = markOf(name), f = frame.current
+        if (!o || !f) return home()
+        f.updateWorldMatrix(true, false)
+        return f.worldToLocal(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()))
+      }
+      const crateAt = () => middleOf('coal-crate')
+      const bucketAt = () => middleOf('WaterBucket')
+      const soupPot = () => middleOf('miso-pot')
       const hearthAt = () => { marks.current.delete('FirePit'); return inBar('FirePit', home()) }
       /** beside the chef at the front of the table, by the plating place: leaning in over the hearth's near side from there */
       const hearthSpot = () => skTraySpot()
@@ -3446,6 +3455,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.visible = pl.phase !== 'idle'
         o.position.copy(pl.pos)
         o.rotation.y = pl.yaw
+        // (never the idle fanning of a cook at his place: his hands are full with the work here; bent forward to it: well down to the
+        // bucket on the floor, over the hearth to tip the coals in or splash the water, a little over the crate and the soup)
+        o.userData.fetcher = true
+        o.userData.fanNow = false
+        const bend = (k: number) => Math.sin(Math.PI * Math.min(1, pl.t / k))
+        o.userData.lean = pl.phase === 'scoopWater' ? 0.5 * bend(0.8) : pl.phase === 'feedCoal' || pl.phase === 'sprinkle' ? 0.32 * bend(0.8)
+          : pl.phase === 'takeCoal' ? 0.18 * bend(0.6) : pl.phase === 'stir' ? 0.14 : 0
         // (up on the kitchen's dais)
         // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)
         if (KITCHEN_DROP < 0) {
@@ -3486,7 +3502,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (the charcoal in both hands, crate to hearth, tipped in; the dipper of water, bucket to hearth, splashed; the dipper stirring the soup)
       const pc = platerCoal.current, pd = platerDipper.current
       if (o && pc && pd) {
-        const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
+        // (where the hands are, bent forward with them)
+        const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE)
+          .applyAxisAngle(X_AXIS, o.userData.lean ?? 0).applyAxisAngle(UP_Y, pl.yaw))
         const coal = (pl.phase === 'takeCoal' && pl.t > 0.3) || (pl.phase === 'toHearth' && FIRE_TEND.want === 'coal') || pl.phase === 'feedCoal'
         pc.visible = coal
         if (coal) {
@@ -4050,7 +4068,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       )}
       {given && (
-        <group ref={platerCoal} visible={false}>
+        <group ref={platerCoal} name="plater-coal" visible={false}>
           {/* (a handful of binchotan held across both hands) */}
           {Array.from({ length: 5 }, (_, i) => (
             <mesh key={i} position={[(i - 2) * 0.018, (i % 2) * 0.012, 0]} rotation={[Math.PI / 2, 0, (i - 2) * 0.12]} geometry={COAL_STICK_GEO} material={COAL_STICK_MAT} />
@@ -4058,7 +4076,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       )}
       {given && (
-        <group ref={platerDipper} visible={false}>
+        <group ref={platerDipper} name="plater-dipper" visible={false}>
           {/* (a wooden dipper: its cup out front, its handle back to the hands) */}
           <mesh position={[0, 0, 0.12]} geometry={DIPPER_CUP_GEO} material={DIPPER_MAT} />
           <mesh name="dipper-water" position={[0, 0.022, 0.12]} rotation-x={-Math.PI / 2} geometry={DIPPER_WATER_GEO} material={DIPPER_WATER_MAT} />
