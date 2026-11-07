@@ -31,8 +31,8 @@ export type Worker = {
   intro: string
 }
 
-// The owner is the head chef (大廚) of every shop. Each can take on two more cooks — a second chef (二廚) and a
-// third (三廚) to prep, put on and clear — two people on the floor (外場), one at the till (收銀), and a stock keeper
+// The owner is the head chef (大廚) of every shop, at the fire while it's open. Each can take on two more cooks — a second chef (二廚)
+// fetching each order and skewering it at the board, and a third (三廚) plating, keeping the fire's charcoal and clearing — two people on the floor (外場), one at the till (收銀), and a stock keeper
 // (倉儲) who watches what's running low and orders it in before it runs out.
 const STAFFING = (chef: string, sous: string, chefJa: string, sousJa: string) => [
   { role: 'chef' as Role, max: 1, zh: chef, ja: chefJa },
@@ -42,7 +42,7 @@ const STAFFING = (chef: string, sous: string, chefJa: string, sousJa: string) =>
   { role: 'stock' as Role, max: 1, zh: '倉儲（叫貨・補貨）', ja: '仕入れ' },
 ]
 export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: string }[]> = {
-  grilledfish: STAFFING('二廚（顧爐・烤魚）', '三廚（備料・上火・收拾）', '二番手', '追い回し'),
+  grilledfish: STAFFING('二廚（取料・穿串）', '三廚（擺盤・顧火・收拾）', '二番手', '追い回し'),
 }
 
 // a fair wage for someone this good at this job (NT$/h): from about minimum wage (NT$196) up

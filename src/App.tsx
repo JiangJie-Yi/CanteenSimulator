@@ -79,7 +79,8 @@ import { Welcome } from '@/ui/Welcome'
 import { QUALITY, stepDown, webglReport } from '@/scene/quality'
 import { showsFlat } from '@/game/device'
 import { MOBILE } from '@/scene/flatGate'
-import { PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
+import { platerOf } from '@/game/kitchenCrew'
+import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
@@ -1062,10 +1063,10 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
                 <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
                   servers={dish.roast && ai ? (() => { const hired = crewOf(dish.id).filter((w) => w.role === 'server'); return hired.length ? hired : [HOUSE_SERVER] })() : []}
                   plater={dish.roast && ai ? (() => {
-                    // (who plates at the pass, fetching its plates from the racks, and keeps the fire: the third cook; with none, the owner does
-                    // (the second cook is the one at the grill, fetching and cooking: sent off on these he left it with nobody at it))
-                    const c = crewOf(dish.id), m = c.find((w) => w.role === 'sous')
-                    return m ? { id: m.id, role: m.role as 'chef' | 'sous', look: m.look } : null
+                    // (who plates at the pass, fetching its plates from the racks, and keeps the fire: the third cook; with none, the second (hired,
+                    // or the shop's own), between his rounds of the orders: the owner's at the fire, taking things on and off it)
+                    const m = platerOf(crewOf(dish.id), HOUSE_CHEF)
+                    return { id: m.id, role: m.role as 'chef' | 'sous', look: m.look }
                   })() : null}
                   stocker={dish.roast && ai ? crewOf(dish.id).find((w) => w.role === 'stock') ?? null : null}
                   mark={dish.roast ? '聞野' : '食堂'}

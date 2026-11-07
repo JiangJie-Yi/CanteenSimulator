@@ -11,7 +11,7 @@ import type { Lang } from '@/data/i18n'
 import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
-import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_OUT, type DrinkId } from './bar'
+import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { FigureHit } from '@/scene/FigureHit'
 /** the skin's own colour on a figure (its BossSkin material's) */
@@ -50,8 +50,10 @@ type Phase = { act: 'tongs' | 'walk' | 'fan' | 'run' | 'wave' | 'idle'; len: num
 const ROUND: Phase[] = [
   { act: 'tongs', len: 7 }, { act: 'walk', len: 0 }, { act: 'fan', len: 5 }, { act: 'run', len: 0 }, { act: 'wave', len: 4 }, { act: 'idle', len: 4 },
 ]
-/** and while the shop's open, out of his chef's way: a wave now and then, keeping an eye */
-const ROUND_OPEN: Phase[] = [{ act: 'idle', len: 6 }, { act: 'wave', len: 3 }]
+/** and while the shop's open, the head chef at his fire (his second cook at the board fetching and skewering): turning what's on it with
+ * his tongs, a breath between; what he takes on and off it, and fans, is Roasting's (OWNER_GRILL) */
+// (and a run back to it, after a taste or a drink taken down the aisle: at once past it when he's there)
+const ROUND_OPEN: Phase[] = [{ act: 'tongs', len: 6 }, { act: 'idle', len: 2.5 }, { act: 'run', len: 0 }]
 const WALK_SPEED = 0.9
 /** how near the camera he may come, anywhere in the picture, before he fades (while it's looking past him at something else) */
 const BOSS_CLOSE = 3.4
@@ -263,6 +265,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   /** where his right hand is really drawn, in the hand bone's own frame (worked out once): the bone's origin isn't at the hand (he's one
    * skinned mesh, his parts' vertices hung from their bones some way off), so what he holds hangs from this */
   const palm = useRef<THREE.Vector3 | null>(null)
+  const palmL = useRef<THREE.Vector3 | null>(null)
   const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1, probeX: 0, probeZ: 0, probeEdit: false })
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
@@ -405,13 +408,16 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       BOSS_TASTE.verdict = null
       chewSaid.current = false
     }
-    let act: Phase['act'] | 'taste' | 'drink' = ph.act
+    let act: Phase['act'] | 'taste' | 'drink' | 'hold' = ph.act
     let speed = 0
     // (asked to taste: down his aisle to where it passes nearest the bowl, turned to it, and there he eats it; then back to his round)
     // (or handed a drink: the same, and he drinks it)
     const drinking = !BOSS_TASTE.at && !!BOSS_DRINK.at
     const want = BOSS_TASTE.at ?? BOSS_DRINK.at
     const ask = !edit && want && m.parent ? m.parent.worldToLocal(want.clone()) : null
+    // (at his fire through business: there to take things on and off it (Roasting's, while he's seen to be))
+    const grill = open && !edit && !ask && !OWNER_OUT.on
+    if (grill) OWNER_GRILL.seenAt = performance.now()
     if (ask) {
       // (the nearest he can come to it: on the aisle, by way of the notch's mouth; with no aisle given, along his walk's line, not behind it)
       let goal: [number, number]
@@ -460,6 +466,19 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       // (and when he's done, he runs back to his place and starts his round again from there)
       const runIx = ROUNDS.findIndex((x) => x.act === 'run')
       s.phase = runIx >= 0 ? runIx : 0
+    } else if (grill && OWNER_GRILL.on && m.parent) {
+      // (a piece in his hands, the board to the fire or the fire to the plating place: stood where the carry has him in the notch, turned to
+      // it, leaning in as he reaches and sets it)
+      const at = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.stand))
+      const k = Math.min(1, dt * 12)
+      s.x += (at.x - s.x) * k; s.z += (at.z - s.z) * k
+      const f = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.face))
+      turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt * 10)
+      act = 'hold'
+    } else if (grill && performance.now() < OWNER_GRILL.fanUntil) {
+      // (the coals fanned a moment, half way through something salted)
+      turnTo(s, 0, dt * 5)
+      act = 'fan'
     } else if (act === 'walk' || act === 'run') {
       // (out along the aisle and back home, by way of the notch's mouth)
       const [gx, gz] = act === 'walk' ? to : [0, 0]
@@ -517,7 +536,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // (and Overcooked's squash and stretch, as he starts to say something or his face changes (BOSS_FACE.at))
     const [jw, jh] = jelly((performance.now() - BOSS_FACE.at) / 1000)
     b.scale.set((2 - squash) * jw, squash * jh, (2 - squash) * jw)
-    const lean = moving ? (run ? 0.26 : 0.09) : act === 'fan' ? 0.06 : 0
+    const lean = moving ? (run ? 0.26 : 0.09) : act === 'hold' ? OWNER_GRILL.lean : act === 'fan' ? 0.06 : 0
     b.rotation.x += (lean - b.rotation.x) * Math.min(1, dt * 8)
     b.rotation.z = moving ? Math.sin(step * Math.PI) * (run ? 0.13 : 0.09) : Math.sin(T * 0.7) * 0.025
     // (a little hop of joy as he waves)
@@ -535,6 +554,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       const flip = Math.max(0, Math.sin(s.t * 2.2)) ** 6
       R.set(-0.08, 0.12 + flip * 0.06, 0.3 + flip * 0.04)
       L.set(0.1, 0.1, 0.28)
+    } else if (act === 'hold') {
+      // (both hands out before him: low and forward reaching for it, up at his chest holding it)
+      if (OWNER_GRILL.hold) { R.set(-0.07, 0.16, 0.3); L.set(0.07, 0.16, 0.3) } else { R.set(-0.05, 0.08, 0.34); L.set(0.06, 0.08, 0.3) }
     } else if (act === 'fan') {
       R.set(-0.06, 0.18, 0.3)
       L.set(0.08, 0.06 + Math.sin(T * 1.6) * 0.01, 0.2)
@@ -559,6 +581,14 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     }
     if (parts.handR) parts.handR.position.lerp(R, Math.min(1, dt * 12))
     if (parts.handL) parts.handL.position.lerp(L, Math.min(1, dt * 12))
+    // (where his hands are, for what he carries: between his two palms as they're drawn (the hands' bones aren't on them: drawnCentre))
+    if (grill && parts.handR && parts.handL) {
+      parts.handR.updateWorldMatrix(true, false); parts.handL.updateWorldMatrix(true, false)
+      palm.current ??= drawnCentre(root, parts.handR)
+      palmL.current ??= drawnCentre(root, parts.handL)
+      parts.handR.localToWorld(OWNER_GRILL.hand.copy(palm.current))
+      OWNER_GRILL.hand.add(parts.handL.localToWorld(HAND_AT.copy(palmL.current))).multiplyScalar(0.5)
+    }
     // ---- what's in his hand: the tongs at the fire, the fan down the aisle; held at the right hand, swinging with it
     const hand = REST.R.clone().add(parts.handR?.position ?? new THREE.Vector3())
     // (the drink in his hand, tipped up to his mouth as he drinks)
@@ -615,7 +645,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const talking = !!sayRef.current
     const now = performance.now()
     const gape = talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2
-    let face: CrewFace = act === 'fan' || act === 'tongs' ? 'focused' : act === 'taste' ? (Math.sin((T - BOSS_TASTE.since) * 7) > 0.3 ? 'drink' : 'happy')
+    let face: CrewFace = act === 'fan' || act === 'tongs' || act === 'hold' ? 'focused' : act === 'taste' ? (Math.sin((T - BOSS_TASTE.since) * 7) > 0.3 ? 'drink' : 'happy')
       : act === 'drink' ? ((T - BOSS_DRINK.since) % 1.4 < 1 ? 'drink' : 'talk') : now - RUSH.at < 2500 ? 'panic' : now - BOSS_FX.joyAt < 2000 ? 'proud'
       : act === 'wave' ? 'happy' : 'idle'
     if (BOSS_FACE.face && now < BOSS_FACE.until) face = BOSS_FACE.face

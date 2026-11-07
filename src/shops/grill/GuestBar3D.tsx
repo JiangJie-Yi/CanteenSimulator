@@ -65,7 +65,8 @@ import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
-import { FIRE_TEND, SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { platerFree } from '@/game/kitchenCrew'
+import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -3238,7 +3239,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       return -1
     }
 
-    // the kitchen's plater (the third cook, or the second; with neither, the owner): when the plating place's stack of clean plates runs low, across the
+    // the kitchen's plater (the third cook, or with none the second, between his rounds of the orders; the owner's at the fire): when the plating place's stack of clean plates runs low, across the
     // kitchen to the racks for a few and back with them to the plating place, set down there for plating on, and back to their place
     {
       const pl = platerRun.current
@@ -3315,7 +3316,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (RICE.kama.state === 'done') { const r = scoopIn(RICE.tub); RICE.tub = r.tub; RICE.kama = r.kama }
         if (open && washGoes(SKEWERS.s)) SKEWERS.s = washAll(SKEWERS.s)
       } else if (pl.phase === 'idle') {
-        if (pl.t > 0.5) {
+        // (the second cook, plating with no third cook to: not while he's fetching an order or skewering it at the board)
+        if (pl.t > 0.5 && platerFree(!!plater && FETCHER.id === plater.id, FETCHER.busy)) {
           pl.t = 0
           if (open && !SHOP.leaving && FIRE_TEND.want) {
             // (the fire's asked for: charcoal from the crate, or water from the bucket on the floor, first of all)

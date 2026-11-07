@@ -64,7 +64,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP } from '@/game/shopState'
-import { FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -797,9 +797,9 @@ const COOK_TABLE_PARTS: [number, number, number, number][] = [
   [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_NOTCH.along[1], CUBBY.along[0]],
 ]
 export type CrewMember = { id: string; role: Role; look: Look }
-/** the shop's own head chef, at the grill while the shop's open when no chef's been hired (the kitchen cooks by itself: someone has to
- * fetch each order and bring it to the board) */
-const HOUSE_CHEF: CrewMember = { id: 'house-chef', role: 'chef', look: { female: false, age: 'middle' } }
+/** the shop's own second cook, at the board while the shop's open when none's been hired (the kitchen cooks by itself: someone has to
+ * fetch each order and bring it to the board, the owner at the fire) */
+export const HOUSE_CHEF: CrewMember = { id: 'house-chef', role: 'chef', look: { female: false, age: 'middle' } }
 /**
  * Where each of the staff stands while the shop's open (the owner is the player, so isn't drawn): the second cook at
  * the fire in the bay cut into the cook's table, the third cook and the stock keeper at its right-hand end, facing in
@@ -821,7 +821,7 @@ const floorAt = (v: THREE.Vector3) => (inKitchen(GRILL_COUNTERS, toBar(v)) ? GRI
  */
 function crewWayOut(role: Role, at: THREE.Vector3) {
   const end = (lay: number) => new THREE.Vector3().addScaledVector(ALONG, 2.95).addScaledVector(LAY, lay)
-  const via = role === 'chef' ? [end(2.62), end(-0.8)] : role === 'sous' ? [end(1.3), end(-0.8)]
+  const via = role === 'chef' ? [new THREE.Vector3().addScaledVector(ALONG, at.dot(ALONG)).addScaledVector(LAY, WALK_LAY), end(WALK_LAY), end(-0.8)] : role === 'sous' ? [end(1.3), end(-0.8)]
     : role === 'cashier' ? [new THREE.Vector3().addScaledVector(ALONG, 5.35).addScaledVector(LAY, -0.3)] : []
   return [at.clone(), ...via, ...staffWayOut(GRILL_COUNTERS).map(fromBar)].map((v) => v.setY(floorAt(v)))
 }
@@ -915,28 +915,18 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
   fetcher?: boolean; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const trip = useRef<{ way: THREE.Vector3[]; len: number; gone: number } | null>(null)
-  /** the head chef's round (fetcher): walking to a store or back, taking it out there, preparing it at his place; whether he's away */
+  /** the second cook's round (fetcher): walking to a store or back, taking it out there, preparing and skewering it at the board, his
+   * place; whether he's away (what's on the fire, and off it, is the owner's: Boss.tsx) */
   const walkTrip = (o: THREE.Group, dt: number) => {
     const T = CHEF_TRIP
     T.seenAt = performance.now()
+    FETCHER.id = id
+    FETCHER.busy = T.phase !== 'idle'
     o.userData.fetcher = true
-    // (carrying a piece between the board, the fire and the plating place: stood where the carry has him, turned to it, leaning)
-    const C = CHEF_CARRY
-    o.userData.lean = C.phase === 'idle' ? 0 : C.lean
-    if (C.phase !== 'idle' && (T.phase === 'idle' || T.phase === 'prepping')) {
-      o.position.lerp(C.stand.clone().setY(at.y), Math.min(1, dt * 12))
-      const want = Math.atan2(C.face.x - o.position.x, C.face.z - o.position.z)
-      o.rotation.y += Math.atan2(Math.sin(want - o.rotation.y), Math.cos(want - o.rotation.y)) * Math.min(1, dt * 10)
-      o.userData.carry = C.hold
-      o.userData.prep = false
-      o.userData.fanNow = false
-      o.updateMatrixWorld()
-      T.hand.set(...TRAY_AT).applyMatrix4(o.matrixWorld)
-      return true
-    }
+    o.userData.lean = 0
     o.userData.carry = T.phase === 'toBoard' || (T.phase === 'taking' && T.t > TAKE_S * 0.5)
     o.userData.prep = T.phase === 'prepping'
-    o.userData.fanNow = performance.now() < T.fanUntil
+    o.userData.fanNow = false
     const hand = () => { o.updateMatrixWorld(); T.hand.set(...TRAY_AT).applyMatrix4(o.matrixWorld) }
     if (T.phase === 'toStore' || T.phase === 'toBoard') {
       if (!trip.current) {
@@ -1058,6 +1048,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
           arrived.current = true
         }
       }
+      // (off plating or at the fire's charcoal, with no third cook to: the orders wait in their stores for him, not out onto the board by themselves)
+      if (fetcher && !o.visible) { CHEF_TRIP.seenAt = performance.now(); FETCHER.id = id; FETCHER.busy = CHEF_TRIP.phase !== 'idle' }
       if (fetcher && o.visible && walkTrip(o, Math.min(dt, 0.1))) return
       if (seat && o.parent) {
         if (!mark.current?.parent) mark.current = scene.getObjectByName(seat) ?? null
@@ -1075,7 +1067,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       return
     }
     // (on their way: from where they are, down off a seat onto the floor, finishing up first, then home or upstairs)
-    if (fetcher) { CHEF_TRIP.phase = 'idle'; CHEF_TRIP.keys = []; trip.current = null; o.userData.carry = o.userData.prep = false }
+    if (fetcher) { CHEF_TRIP.phase = 'idle'; CHEF_TRIP.keys = []; trip.current = null; o.userData.carry = o.userData.prep = false; FETCHER.busy = false }
     if (!commute.current || commute.current.dir !== 'out') {
       commute.current = makeTrip(id, 'out', wayOf(o.position.clone().setY(way[0].y), o), delayOf(id, SHOP.day), paceOf(id))
       SHOP.walking.add(id)
@@ -1093,8 +1085,8 @@ function crewPlaces(crew: CrewMember[]) {
   const c0 = GRILL_COUNTERS[0]
   const onFloor = (v: THREE.Vector3) => toGrillScene(v).setY(GRILL_OFFSET.y)
   const spots: Record<Role, { at: THREE.Vector3; yaw: number }[]> = {
-    // (up on the notch's step)
-    chef: [{ at: CHEF_AT.clone().setY(CHEF_AT.y + NOTCH_STEP.h), yaw: CHEF_YAW }],
+    // (at the big chopping board: the fire's the owner's)
+    chef: [{ at: BOARD_COOK_AT, yaw: BOARD_COOK_YAW }],
     sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
     // (the stocker's GuestBar3D's: by the drinks' crates, carrying them to the fridges; drawn here too they stood in the rice tub)
     stock: [],
@@ -1128,11 +1120,14 @@ const AISLE_LAY = 2.62
 const WALK_LAY = AISLE_LAY + 0.38
 const WALK_ALONG: [number, number] = [-1.24, 1.86]
 const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
+/** where the second cook stands while the shop's open (the owner's: the owner, 大廚, at the fire; the second, 二廚, fetching the orders and
+ * skewering them): on the kitchen floor before the big chopping board, left of the notch and of the water bucket on the floor by it, facing
+ * in at the board (measured: the board along -2.33..-0.73, its front at lay 2.15; the bucket from along -1.05; he's 1.17 across with his
+ * arms, which at -1.62 touched it, and the owner's reaching to the board's end)) */
+const BOARD_COOK_AT = new THREE.Vector3().addScaledVector(LAY, 2.55).addScaledVector(ALONG, -1.74).setY(GRILL_OFFSET.y - KITCHEN_DROP)
+const BOARD_COOK_YAW = Math.atan2(-LAY.x, -LAY.z)
 /** the owner, smaller than the cooks (round and short, as Overcooked's), and how far down the cook's aisle his walk goes, in his own frame */
 const BOSS_SCALE = 1.05 * 0.8 * GRILL_SCALE
-/** where he stands while the shop's open: down the aisle from the grill, out of his chef's way (where it was when his place at the fire was
- * further to the left) */
-const BOSS_OPEN_AT = new THREE.Vector3().addScaledVector(LAY, AISLE_LAY).addScaledVector(ALONG, 1.2).setY(CHEF_AT.y)
 /** a step in the Roasting frame, in his own (turned with him, his size) */
 const bossFrame = (v: THREE.Vector3, unit = false): [number, number] => {
   const w = v.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -CHEF_YAW)
@@ -1155,7 +1150,6 @@ const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALO
 const NOTCH_STEP_YAW = Math.atan2(-ALONG.z, ALONG.x)
 const BOSS_AISLE = { ...bossAisle(CHEF_AT),
   step: { to: (NOTCH_STEP_AT.dot(LAY) + NOTCH_STEP.d / 2 - CHEF_AT.dot(LAY)) / BOSS_SCALE, h: NOTCH_STEP.h / BOSS_SCALE } }
-const BOSS_AISLE_OPEN = bossAisle(BOSS_OPEN_AT)
 // (his walk on his round: out of the notch (straight back) and along the aisle)
 const BOSS_WALK = bossFrame(ALONG.clone().multiplyScalar(1.7).addScaledVector(LAY, WALK_LAY - CHEF_AT.dot(LAY)))
 /** a wood texture of blender/woodtex.py's, tiled every `w` x `h` of the table's units */
@@ -2507,12 +2501,12 @@ const NotchStep = memo(function NotchStep() {
   )
 })
 
-/** the owner in his place (at the grill while the shop's shut, along the aisle while it's open): drawn again only when that or the language
- * changes, not with every redraw of the kitchen (he walks, turns and fades by his own frame loop) */
+/** the owner in his place, at the grill (open or shut: open, he's the head chef there, his second cook at the board): drawn again only when
+ * that or the language changes, not with every redraw of the kitchen (he walks, turns and fades by his own frame loop) */
 const BossSpot = memo(function BossSpot({ open, lang }: { open: boolean; lang: Lang }) {
   return (
-    <Movable id="boss" label="老闆"><group position={open ? BOSS_OPEN_AT : CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE}>
-      <Boss to={BOSS_WALK} aisle={open ? BOSS_AISLE_OPEN : BOSS_AISLE} open={open} lang={lang}><BlobShadow r={0.24} /></Boss>
+    <Movable id="boss" label="老闆"><group position={CHEF_AT} rotation-y={CHEF_YAW} scale={BOSS_SCALE}>
+      <Boss to={BOSS_WALK} aisle={BOSS_AISLE} open={open} lang={lang}><BlobShadow r={0.24} /></Boss>
     </group></Movable>
   )
 })
@@ -4363,19 +4357,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const say = chefSay
     // (the head chef's next trip, first come first fetched, while he's at his place: with something on the fire he goes meanwhile)
     const T = CHEF_TRIP
-    // (the chef walking the orders and carrying what's cooked: one thing at a time with his hands; away fetching, or carrying, nothing else
-    // is put on or taken off till he's back (with nobody walking (shut, a phone) pieces go across by themselves, as they did))
+    // (the second cook walking the orders to the board, the owner at the fire carrying them on and off it, each at his own; the owner one
+    // thing at a time in his hands (with nobody walking (shut, a phone) pieces go across by themselves, as they did))
     const chefLive = performance.now() - T.seenAt < 1000
-    // (asked each time: a trip begun just now, or a piece taken up just now, makes him busy for what comes after in the same step)
-    const busy = () => chefLive && (T.phase === 'toStore' || T.phase === 'taking' || T.phase === 'toBoard' || CHEF_CARRY.key !== null)
+    const handLive = performance.now() - OWNER_GRILL.seenAt < 1000
+    // (asked each time: a piece taken up just now makes him busy for what comes after in the same step)
+    const busy = () => handLive && CHEF_CARRY.key !== null
     const carry = (p: Piece, kind: 'toFire' | 'toPlate') => {
       const C = CHEF_CARRY
       C.key = p.key; C.kind = kind; C.phase = 'reach'; C.t = 0
       C.from.copy(p.node.position); C.fromQ.copy(p.node.quaternion)
     }
-    if (T.phase === 'idle' && chefLive && CHEF_CARRY.key === null) {
+    // (not while he's off plating or at the charcoal: the orders wait till he's back at the board)
+    if (T.phase === 'idle' && chefLive && PLATER_OUT.id !== FETCHER.id) {
       const trip = nextTrip(pieces.current.filter((p) => p.fetching && present(p)).map((p) => ({ key: p.key, id: p.id, at: p.stagedAt })))
-      if (trip) { T.store = trip.store; T.keys = trip.keys; T.t = 0; T.phase = 'toStore' }
+      // (busy from now: not sent off for plates in this same frame (GuestBar3D))
+      if (trip) { T.store = trip.store; T.keys = trip.keys; T.t = 0; T.phase = 'toStore'; FETCHER.busy = true }
     }
     // the owner is the head chef and works the grill by hand; a hired chef cooks alongside (takes things off when
     // done, seasons them), the sous chef does the rest (keeps the fire up, puts what's waiting on, clears away)
@@ -4521,7 +4518,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (ready && !busy()) {
       collect(ready)
       // (off the fire in his hands to the plating place, when it's going there and has a place)
-      if (chefLive && ready.collected && ready.via === 'plated' && ready.readyAt !== undefined) carry(ready, 'toPlate')
+      if (handLive && ready.collected && ready.via === 'plated' && ready.readyAt !== undefined) carry(ready, 'toPlate')
       say(L().done(nameOfP(ready)))
       for (const k of planOf(ready)) if (!ready.dabs[k] && bestStage(k) === 'after') dab(ready, k)
       return
@@ -4531,8 +4528,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const toTend = live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 && !p.tended && p.progress / roast.times[p.id] >= TEND_AT)
     if (toTend) {
       toTend.tended = true
-      if (tendOf(planOf(toTend)) === 'fan' && (T.phase === 'idle' || T.phase === 'prepping') && fire && fire.current > 0.02) {
-        T.fanUntil = performance.now() + 2200
+      if (tendOf(planOf(toTend)) === 'fan' && CHEF_CARRY.key === null && fire && fire.current > 0.02) {
+        OWNER_GRILL.fanUntil = performance.now() + 2200
         fanned.current.pending = Math.min(FAN_MAX - fanned.current.extra, fanned.current.pending + FAN_MAX * 0.25)
         fanned.current.last = performance.now()
         say(L().fanned(nameOfP(toTend)))
@@ -4556,7 +4553,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       .sort((a, b) => a.stagedAt - b.stagedAt)[0] : undefined
     if (next && !busy() && putOnFire(next)) {
       // (in his hands from the board to its place in the fire)
-      if (chefLive) carry(next, 'toFire')
+      if (handLive) carry(next, 'toFire')
       say(L().onFire(nameOfP(next)))
     }
   }
@@ -6412,7 +6409,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const C = CHEF_CARRY
       if (tongs.current) tongs.current.visible = false
       const p = C.key ? pieces.current.find((q) => q.key === C.key) : undefined
-      if (C.key && (!p || !present(p) || p.eaten || p.trash >= 0 || performance.now() - CHEF_TRIP.seenAt > 1000)) {
+      if (C.key && (!p || !present(p) || p.eaten || p.trash >= 0 || performance.now() - OWNER_GRILL.seenAt > 1000)) {
         // (gone meanwhile, or nobody to carry it: let go, it goes on by itself)
         C.key = null; C.phase = 'idle'; C.lean = 0; C.hold = false
       } else if (p && C.phase !== 'idle') {
@@ -6432,7 +6429,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           const l = THREE.MathUtils.clamp(v.dot(LAY), home.dot(LAY) - CARRY_STEP, home.dot(LAY))
           return new THREE.Vector3().addScaledVector(ALONG, a).addScaledVector(LAY, l).setY(home.y)
         }
-        const hand = p.node.parent ? p.node.parent.worldToLocal(CHEF_TRIP.hand.clone()) : CHEF_TRIP.hand.clone()
+        const hand = p.node.parent ? p.node.parent.worldToLocal(OWNER_GRILL.hand.clone()) : OWNER_GRILL.hand.clone()
         const k = Math.min(1, C.t / CARRY_S[C.phase]), e = k * k * (3 - 2 * k)
         if (C.phase === 'reach') {
           // (his hands to it where it is: on the board, or standing in the fire)
@@ -6473,7 +6470,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const tg = tongs.current
         if (tg?.parent) {
           const tip = p.node.getWorldPosition(new THREE.Vector3())
-          const from = CHEF_TRIP.hand.clone()
+          const from = OWNER_GRILL.hand.clone()
           const far = tip.distanceTo(from)
           const on = (C.phase === 'reach' || C.phase === 'carry' || C.phase === 'place') && far > ARM_REACH
           tg.visible = on
@@ -6486,6 +6483,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           }
         }
       }
+      // (the owner stands to it at the fire: where, in the world, and how, for Boss.tsx)
+      const fr = tongs.current?.parent
+      OWNER_GRILL.on = C.phase !== 'idle' && !!fr
+      if (fr) { fr.localToWorld(OWNER_GRILL.stand.copy(C.stand)); fr.localToWorld(OWNER_GRILL.face.copy(C.face)) }
+      OWNER_GRILL.lean = C.lean
+      OWNER_GRILL.hold = C.hold
     }
     if (ai && active) {
       aiClock.current += dt
