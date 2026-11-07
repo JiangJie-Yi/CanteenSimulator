@@ -93,6 +93,8 @@ POTATO_SKIN, SWEET_SKIN = potato_skin(512), sweet_potato_skin(512)
 M = {
     "sackP": burlap("ProduceSackPotato"),
     "sackS": burlap("ProduceSackSweet", band="#b8322a"),
+    # (the onions' sack: the same burlap with a green band woven round it)
+    "sackO": burlap("ProduceSackOnion", band="#3f7a3a"),
     "potato": pbr("ProducePotato", (1, 1, 1), tex=image("produce_potato", POTATO_SKIN[0]), nrm=image("produce_potato_n", POTATO_SKIN[1], data=True), rough=0.85),
     "sweet": pbr("ProduceSweetPotato", (1, 1, 1), tex=image("produce_sweet", SWEET_SKIN[0]), nrm=image("produce_sweet_n", SWEET_SKIN[1], data=True), rough=0.55),
     "tie": pbr("ProduceTwine", tuple(lin("#a88a5a")), rough=0.9),
@@ -328,11 +330,101 @@ def tuber(name, x, y, z, size, kind, rot=(0.0, 0.0, 0.0)):
     return o
 
 
+# ---- onions, carrots, burdock (the owner's: the sacks hold potatoes, onions and sweet potatoes; carrots and burdock in a crate beside them)
+def skin_picture(name, base, dark, streaks, lined=0.5, n=256):
+    """a vegetable's skin, u round it and v along it: `base` to `dark` in soft patches, `streaks` fine lines along it"""
+    u, v = grid01(n)
+    col = mix(lin(base), lin(dark), smooth(0.35, 0.75, fbm(n, 4, 6)))
+    lines = smooth(0.85, 1.0, np.abs(np.sin((u * streaks + (fbm(n, 2, 3) - 0.5) * 2.0) * np.pi)))
+    col = mix(col, lin(dark) * 0.75, lines * lined)
+    return image(name, col)
+
+
+M["onion"] = pbr("ProduceOnion", (1, 1, 1), tex=skin_picture("produce_onion", "#e6bc74", "#c08a48", 12, 0.25), rough=0.55)
+M["onion_root"] = pbr("ProduceOnionRoot", tuple(lin("#b89a70")), rough=0.9)
+M["carrot"] = pbr("ProduceCarrot", (1, 1, 1), tex=skin_picture("produce_carrot", "#ec7f2c", "#c55a16", 10), rough=0.6)
+M["carrot_leaf"] = pbr("ProduceCarrotLeaf", tuple(lin("#4f8a34")), rough=0.7)
+M["gobo"] = pbr("ProduceGobo", (1, 1, 1), tex=skin_picture("produce_gobo", "#8a6a48", "#5e4428", 18), rough=0.85)
+M["crate"] = pbr("ProduceCrate", tuple(lin("#b48a58")), rough=0.8)
+
+
+def lathe_veg(name, prof, seg, mat):
+    """a vegetable turned from `prof` [(radius, height)...] bottom to top, `seg` round, its ends closed (filled in rows on export, no fan to a
+    centre point); u round it, v up it"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    rows = [[bm.verts.new((r * math.cos(2 * math.pi * j / seg), r * math.sin(2 * math.pi * j / seg), z)) for j in range(seg)] for r, z in prof]
+    for k in range(len(rows) - 1):
+        for j in range(seg):
+            j2 = (j + 1) % seg
+            f = bm.faces.new((rows[k][j], rows[k][j2], rows[k + 1][j2], rows[k + 1][j]))
+            for l, (uu, vv) in zip(f.loops, ((j, k), (j + 1, k), (j + 1, k + 1), (j, k + 1))):
+                l[uvl].uv = (uu / seg, vv / (len(rows) - 1))
+    bm.faces.new(list(reversed(rows[0])))
+    bm.faces.new(rows[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return mesh_object(name, bm, mat)
+
+
+def onion(name, x, y, z, size, rot=(0.0, 0.0, 0.0)):
+    """a yellow onion: a squat ball drawn up into a pointed neck, a flat root end with a short tuft; `size` its radius; 12 round"""
+    rnd = __import__("random").Random(name)
+    sq = 0.82 + 0.1 * rnd.random()
+    prof = [(0.25, -0.86), (0.62, -0.78), (0.9, -0.5), (1.0, -0.1), (0.94, 0.3), (0.7, 0.62), (0.36, 0.86), (0.12, 1.08), (0.04, 1.3)]
+    o = lathe_veg(name, [(r * size, h * size * sq) for r, h in prof], 12, "onion")
+    o.location = P(x, y, z)
+    o.rotation_euler = rot
+    root = lathe_veg(name + "Root", [(0.22 * size, -0.95 * size * sq), (0.26 * size, -0.86 * size * sq)], 8, "onion_root")
+    root.parent = o
+    return o
+
+
+def carrot(name, x, y, z, length, rot):
+    """a carrot: a long taper from its shoulder to a thin tip, 8 round; three stalks of its leaves cut short above the shoulder"""
+    r = length * 0.12
+    prof = [(0.06 * r, -length * 0.5)] + [(r * (0.25 + 0.75 * t ** 0.7), -length * 0.5 + length * t) for t in (0.2, 0.45, 0.7, 0.9)]
+    prof += [(r * 0.9, length * 0.5), (r * 0.5, length * 0.53)]
+    o = lathe_veg(name, prof, 8, "carrot")
+    o.location = P(x, y, z)
+    o.rotation_euler = rot
+    for k in range(3):
+        a = 2 * math.pi * k / 3
+        bpy.ops.mesh.primitive_cylinder_add(vertices=4, radius=r * 0.12, depth=length * 0.35,
+                                            location=(math.cos(a) * r * 0.25, math.sin(a) * r * 0.25, length * 0.53 + length * 0.16),
+                                            rotation=(math.cos(a) * 0.25, math.sin(a) * 0.25, 0))
+        lf = active()
+        lf.name = f"{name}Leaf{k}"
+        lf.data.materials.append(M["carrot_leaf"])
+        lf.parent = o
+        parts.append(lf)
+    return o
+
+
+def gobo(name, x, y, z, length, rot):
+    """a burdock root: long and thin, a little thicker at its top, 6 round"""
+    r = 0.012
+    o = lathe_veg(name, [(r * 0.35, -length / 2), (r * 0.8, -length / 4), (r, 0.0), (r * 1.1, length / 4), (r * 1.15, length / 2)], 6, "gobo")
+    o.location = P(x, y, z)
+    o.rotation_euler = rot
+    return o
+
+
+def board(name, cx, cy, cz, w, h, d):
+    """one plank of the crate, its middle at (cx, cy, cz) in the game's frame, w along x, h up, d along z"""
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(cx, cy, cz))
+    o = active()
+    o.scale = (w, d, h)
+    o.name = name
+    o.data.materials.append(M["crate"])
+    parts.append(o)
+    return o
+
+
 # ---- the three sacks, standing close together, leaning on each other a little ----
 SACKS = [  # (x, z, height, radius, material, lean, what's in it)
     (-0.38, 0.0, 0.46, 0.17, "sackP", (0.03, 0.0), "potato"),
     (0.0, -0.03, 0.5, 0.18, "sackS", (0.0, 0.01), "sweet"),
-    (0.37, 0.01, 0.42, 0.165, "sackP", (-0.04, 0.0), "potato"),
+    (0.37, 0.01, 0.42, 0.165, "sackO", (-0.04, 0.0), "onion"),
 ]
 for i, (x, z, h, r, mat, lean, kind) in enumerate(SACKS):
     sack(f"ProduceSack{i}", x, z, h, r, mat, lean, front=math.pi / 2 + (i - 1) * 0.35, salt=i)
@@ -347,14 +439,35 @@ for i, (x, z, h, r, mat, lean, kind) in enumerate(SACKS):
                   rot=(k * 0.7, k * 1.3 + a, k * 0.4))
         for k, (dx_, dz_) in enumerate([(-0.035, -0.02), (0.04, -0.015), (0.0, 0.04)]):
             tuber(f"ProducePotatoTop{i}{k}", tx + dx_, h + 0.06, tz + dz_, 0.056, "potato", rot=(k * 1.1, k * 0.7, k * 0.9))
+    elif kind == "onion":
+        for k in range(6):
+            a = 2 * math.pi * k / 6 + i
+            onion(f"ProduceOnion{i}{k}", tx + r * 0.52 * math.cos(a), h + 0.02 + 0.006 * (k % 2), tz + r * 0.52 * math.sin(a), 0.045,
+                  rot=(0.3 * math.cos(a), 0.3 * math.sin(a), k))
+        for k, (dx_, dz_) in enumerate([(-0.03, -0.02), (0.035, 0.0), (0.0, 0.04)]):
+            onion(f"ProduceOnionTop{i}{k}", tx + dx_, h + 0.07, tz + dz_, 0.044, rot=(0.2 * k, -0.15 * k, k))
     else:
         for k, (dx_, dz_, dy, a) in enumerate([(-0.06, -0.05, 0.0, 0.4), (0.07, 0.0, 0.012, -0.6), (-0.02, 0.08, 0.004, 1.2), (0.03, -0.02, 0.05, 0.1),
                                             (-0.07, 0.04, 0.03, 2.0)]):
             tuber(f"ProduceSweet{i}{k}", tx + dx_, h + 0.012 + dy, tz + dz_, 0.05, "sweet", rot=(0.0, 0.15 * k, a))
 # ---- a few rolled out in front ----
 tuber("ProduceLoose0", -0.2, 0.045, 0.27, 0.055, "potato", rot=(0.3, 0.2, 0.9))
-tuber("ProduceLoose1", 0.25, 0.045, 0.3, 0.05, "potato", rot=(1.1, 0.0, 0.2))
-tuber("ProduceLoose2", 0.06, 0.04, 0.33, 0.05, "sweet", rot=(0.0, 0.0, 0.7))
+# (a potato and an onion: the owner's)
+onion("ProduceLooseOnion", 0.25, 0.038, 0.3, 0.044, rot=(1.4, 0.3, 0.6))
+# ---- the crate of carrots and burdock, beside the onions' sack ----
+CX, CW, CD, CH = 0.78, 0.38, 0.26, 0.18
+board("ProduceCrateBottom", CX, 0.012, 0.0, CW, 0.024, CD)
+for sd in (-1, 1):
+    board(f"ProduceCrateSide{sd}", CX + sd * (CW / 2 - 0.01), CH / 2, 0.0, 0.02, CH, CD)
+    for k, yy in enumerate((0.05, 0.13)):
+        board(f"ProduceCrateSlat{sd}{k}", CX, yy, sd * (CD / 2 - 0.01), CW - 0.04, 0.06, 0.016)
+# (the carrots lying across it, front to back, in two layers, their leaves to the back; the burdock leaning in its far end)
+for k in range(7):
+    layer = k // 4
+    carrot(f"ProduceCarrot{k}", CX - 0.14 + (k % 4) * 0.045 + layer * 0.02, 0.13 + layer * 0.035, 0.0, 0.18,
+           rot=(math.pi / 2 + 0.08 * (k % 3 - 1), 0.0, 0.12 * (k % 2) - 0.06))
+for k in range(4):
+    gobo(f"ProduceGobo{k}", CX + 0.09 + 0.012 * k, 0.17, -0.06 + 0.04 * k, 0.36, rot=(0.08 * (k - 1.5), 0.55, 0.0))
 sack_parts = list(parts)
 for lo in LOWS.values():
     bpy.data.objects.remove(lo, do_unlink=True)

@@ -22,7 +22,7 @@ const OPEN = /^(ProduceSack|CharcoalSack)/
  * it as if it were round */
 const BAKED = /^ProduceTuber/
 /** how much brighter each sack's burlap is drawn than it's woven */
-const BURLAP_LIFT: Record<string, number> = { ProduceSackPotato: 1.28, ProduceSackSweet: 1.28, CharcoalSackCloth: 1.18 }
+const BURLAP_LIFT: Record<string, number> = { ProduceSackPotato: 1.28, ProduceSackSweet: 1.28, ProduceSackOnion: 1.28, CharcoalSackCloth: 1.18 }
 /** too small or too fine for an ink line (the skewers, their ties, the labels and the marks on things) */
 const UNINKED = /Skewer|Label|Mark|Spice\d|SpiceCap|FoilRoll|Lemon\d/
 
@@ -89,14 +89,16 @@ export function ProduceSacks() {
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     return r
   }, [gltf])
+  // (the sacks of potatoes, sweet potatoes and onions, and the crate of carrots and burdock beside them: how many of each)
   const says = () => {
-    const p = SUPPLIES.has('Potato'), s = SUPPLIES.has('SweetPotato')
-    return p < 0 ? '點一下看常溫區的庫存' : `馬鈴薯 ${p}・地瓜 ${s}・點一下看常溫區的庫存`
+    const n = (id: string) => SUPPLIES.has(id)
+    return n('Potato') < 0 ? '點一下看常溫區的庫存'
+      : `馬鈴薯 ${n('Potato')}・地瓜 ${n('SweetPotato')}・洋蔥 ${n('Onion')}・紅蘿蔔 ${n('Carrot')}・牛蒡 ${n('Gobo')}｜點一下看常溫區的庫存`
   }
   return (
     // (handlers on a group round it: a primitive's own aren't attached)
-    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('地瓜馬鈴薯', says()).onPointerOver(e) }}
-      onPointerOut={(e) => { if (getEdit().on) return; tipOver('地瓜馬鈴薯', '').onPointerOut(e) }}
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('根莖蔬菜', says()).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver('根莖蔬菜', '').onPointerOut(e) }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack') }}>
       <primitive object={obj} />
     </group>

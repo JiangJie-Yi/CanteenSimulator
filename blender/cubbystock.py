@@ -114,6 +114,11 @@ M = {
     "foam": pbr("StockFoamTray", tuple(lin("#f4f4f2")), rough=0.85),
     "chicken": pbr("StockChicken", tuple(lin("#f0d6c4")), rough=0.6),
     "negi": pbr("StockNegi", tuple(lin("#8ab84a")), rough=0.6),
+    # (the whole leeks and the daikon lying at the front of the left-hand fridge's floor: the owner's)
+    "leekWhite": pbr("StockLeekWhite", tuple(lin("#f1f0e2")), rough=0.5),
+    "leekGreen": pbr("StockLeekGreen", tuple(lin("#5f9a3a")), rough=0.6),
+    "daikon": pbr("StockDaikon", tuple(lin("#f4f1e6")), rough=0.45),
+    "daikonTop": pbr("StockDaikonTop", tuple(lin("#cfe0a0")), rough=0.5),
     "pork": pbr("StockPork", tuple(lin("#e8a0a0")), rough=0.6),
     "fat": pbr("StockPorkFat", tuple(lin("#f6eee4")), rough=0.6),
     "sausage": pbr("StockSausage", tuple(lin("#a8402a")), rough=0.45),
@@ -279,6 +284,21 @@ for k in range(7):
     a = 2 * math.pi * k / 7
     o = blob(f"StockShishito{k}", 0.36 + 0.045 * math.cos(a), 0.055, -0.07 + 0.045 * math.sin(a), 0.035, 0.012, 0.012, "shishito", seg=8, rings=5)
     o.rotation_euler = (0, 0, a)
+# (at the front of its floor, lying along it: three Japanese leeks, white below and green above, tied; and a daikon, its leafy top cut short)
+for k in range(3):
+    o = lathe(f"StockLeek{k}", [(0.006, 0.0), (0.014, 0.004), (0.015, 0.22), (0.013, 0.3), (0.006, 0.31)],
+              lambda b: "leekWhite" if b < 2 else "leekGreen", (0.0, 0.0, 0.0), seg=8)
+    o.location = P(-0.5 + 0.02 * k, 0.016 + 0.024 * (k == 2), -0.035 + 0.03 * (k % 2) - 0.015 * (k == 2))
+    o.rotation_euler = (0, math.pi / 2, 0.04 * (k - 1))
+lathe("StockLeekTie", [(0.033, 0.0), (0.033, 0.014)], lambda b: "twine", (0.0, 0.0, 0.0), seg=8).location = P(-0.4, 0.0, -0.02)
+o = lathe("StockDaikonRoot", [(0.004, 0.0), (0.012, 0.03), (0.03, 0.12), (0.036, 0.24), (0.034, 0.3), (0.016, 0.31)],
+          lambda b: "daikon", (0.0, 0.0, 0.0), seg=12)
+o.location = P(-0.13, 0.036, -0.03)
+o.rotation_euler = (0, math.pi / 2, 0.05)
+o = lathe("StockDaikonTop", [(0.018, 0.0), (0.02, 0.01), (0.012, 0.05), (0.006, 0.055)], lambda b: "daikonTop", (0.0, 0.0, 0.0), seg=8)
+o.location = P(0.18, 0.036, -0.03)
+o.rotation_euler = (0, math.pi / 2, 0.05)
+
 # (on the shelf: trays of skewers ready for the fire, and onigiri on a plate)
 SH = 0.3
 for t, (x0, kind) in enumerate(((-0.52, "negima"), (-0.24, "pork"), (0.04, "sausage"))):

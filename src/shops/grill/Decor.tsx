@@ -837,7 +837,7 @@ function SacksAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)
   // (1.4 times the size they were modelled (the owner's), sized about their foot)
-  return <Movable id="produce" label="地瓜馬鈴薯" baseScale={1.4} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><ProduceSacks /></group></Movable>
+  return <Movable id="produce" label="根莖蔬菜" baseScale={1.4} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><ProduceSacks /></group></Movable>
 }
 /** where the sack of binchotan stands (the owner's: on the floor by the cook table's right-hand end, toward the cook's side, the rice tub
  * beyond it): along and across, in the fire's frame */
