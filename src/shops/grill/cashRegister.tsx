@@ -238,7 +238,7 @@ export function liftOn(root: THREE.Object3D | null, on: boolean) {
 let audio: AudioContext | null = null
 export function beep(kind: 'ok' | 'error') {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const t = audio.currentTime
     const o = audio.createOscillator()
     const g = audio.createGain()
@@ -261,7 +261,7 @@ export function beep(kind: 'ok' | 'error') {
  */
 export function chime() {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const ac = audio
     const t = ac.currentTime
     const sr = ac.sampleRate

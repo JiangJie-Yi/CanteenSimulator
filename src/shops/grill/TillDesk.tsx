@@ -123,7 +123,7 @@ useGLTF.preload(URL)
 let audio: AudioContext | null = null
 function ding() {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const t = audio.currentTime
     const out = audio.createGain()
     out.gain.value = 0.9
@@ -188,7 +188,7 @@ export function TillBellLive({ tip, onRing }: { tip: Record<string, unknown>; on
 /** a drawer's runners: a soft wooden rumble as it's pulled or pushed, and the knock as it comes home (the bar's drawers make it too) */
 export function slide(closing: boolean) {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const t = audio.currentTime
     const len = 0.28
     const buf = audio.createBuffer(1, Math.round(audio.sampleRate * len), audio.sampleRate)

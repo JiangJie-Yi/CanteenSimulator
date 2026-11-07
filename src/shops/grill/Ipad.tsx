@@ -350,7 +350,7 @@ export function IpadModel({ lang = 'zh' }: { lang?: Lang }) {
 let audio: AudioContext | null = null
 function tapSound() {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const t = audio.currentTime
     const n = Math.floor(audio.sampleRate * 0.03)
     const buf = audio.createBuffer(1, n, audio.sampleRate)

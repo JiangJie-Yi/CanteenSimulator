@@ -25,7 +25,7 @@ function ring(at: number, freq: number, gain: number, decay: number) {
 /** pushed through the food: two or three short scrapes, a little crisp at the end */
 export function pierceSound() {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const t = audio.currentTime
     for (let k = 0; k < 3; k++) {
       const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain()
@@ -44,7 +44,7 @@ export function pierceSound() {
 /** laid in the used skewers' tray: a bright clink */
 export function clinkSound() {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     ring(audio.currentTime, 1850 + Math.random() * 300, 0.03, 0.35)
   } catch { /* (no sound to be had) */ }
 }
@@ -52,7 +52,7 @@ export function clinkSound() {
 /** a handful dropped back in the holder: a short rattle of clinks */
 export function rattleSound() {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const t = audio.currentTime
     for (let k = 0; k < 6; k++) ring(t + k * 0.035 + Math.random() * 0.02, 1500 + Math.random() * 900, 0.014, 0.25)
   } catch { /* (no sound to be had) */ }

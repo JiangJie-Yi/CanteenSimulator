@@ -15,7 +15,7 @@ const useOpen = () => useSyncExternalStore((f) => { subs.add(f); return () => { 
 let audio: AudioContext | null = null
 function flip() {
   try {
-    audio ??= new AudioContext()
+    audio ??= new AudioContext({ latencyHint: 'playback' })
     const t = audio.currentTime, sr = audio.sampleRate, len = 0.32
     const b = audio.createBuffer(1, Math.round(sr * len), sr)
     const d = b.getChannelData(0)

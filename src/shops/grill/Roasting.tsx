@@ -154,7 +154,7 @@ function coalClink(strength: number) {
     const now = performance.now()
     if (now - coalLast < 45) return
     coalLast = now
-    coalAudio ??= new AudioContext()
+    coalAudio ??= new AudioContext({ latencyHint: 'playback' })
     const ac = coalAudio
     const t0 = ac.currentTime
     const out = ac.createGain()

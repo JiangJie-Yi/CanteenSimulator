@@ -6,7 +6,7 @@ import { replaces } from '@/scene/hot'
 let ac: AudioContext | null = null
 function ctx() {
   if (ac) return ac.state === 'running' ? ac : null
-  try { ac = new AudioContext() } catch { ac = null }
+  try { ac = new AudioContext({ latencyHint: 'playback' }) } catch { ac = null }
   if (ac?.state === 'suspended') void ac.resume()
   return ac?.state === 'running' ? ac : null
 }

@@ -6,7 +6,7 @@ import { replaces } from '@/scene/hot'
 
 let ac: AudioContext | null = null
 function ctx() {
-  if (!ac) { try { ac = new AudioContext() } catch { ac = null } }
+  if (!ac) { try { ac = new AudioContext({ latencyHint: 'playback' }) } catch { ac = null } }
   // (still waking (the click that opened the panel is what wakes it): what's set going now is heard as soon as it's up)
   if (ac?.state === 'suspended') void ac.resume()
   return ac && ac.state !== 'closed' ? ac : null

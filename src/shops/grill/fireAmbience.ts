@@ -28,7 +28,7 @@ function noiseLoop(a: AudioContext, seconds: number, shape: (i: number, n: numbe
 function start() {
   if (ac) return
   try {
-    ac = new AudioContext()
+    ac = new AudioContext({ latencyHint: 'playback' })
     out = ac.createGain()
     out.gain.value = 0
     out.connect(ac.destination)

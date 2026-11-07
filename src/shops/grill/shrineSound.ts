@@ -3,7 +3,7 @@
 // soft dry brush and a few faint ticks through a hinoki panel's resonances, a knock as they stop or meet).
 
 let audio: AudioContext | null = null
-const ctx = () => (audio ??= new AudioContext())
+const ctx = () => (audio ??= new AudioContext({ latencyHint: 'playback' }))
 
 function noise(a: AudioContext, len: number, shape: (x: number) => number) {
   const b = a.createBuffer(1, Math.round(a.sampleRate * len), a.sampleRate)

@@ -1,4 +1,5 @@
 import { setTip } from '@/scene/hoverTip'
+import { useLowPower } from '@/scene/power'
 import { wheelIntent } from '@/game/navInput'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
@@ -542,6 +543,9 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
 
 /** the view switched to the free one with the camera left where it is (entering edit mode: the owner's), not glided to the free view's own
  * place: set just before the switch, taken by the camera's homing */
+/** the 3D view's resolution, at most (the owner's: a MacBook Air's Retina at 2 ran its GPU's memory out: the floor and the bar went black, then
+ * the GPU process died); never drawn finer than the screen either */
+const DPR_MAX = 1.25
 const HOLD_POSE = { next: false }
 function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
@@ -1921,6 +1925,8 @@ export default function App() {
   const appRef = useRef<HTMLDivElement>(null)
   // (the 3D view's resolution once the frame pacer has stepped it down: the Canvas is given it, or it'd set its own back at every redraw)
   const pacedDpr = usePacedDpr()
+  // (on a laptop's battery (or ?power=low): no more than a pixel per screen pixel (the owner's: unplugged, it froze at 2073x1354))
+  const onBattery = useLowPower()
   const stageRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<Frame>({ cx: 0, cy: 0, w: 0, h: 0 })
   useEffect(() => {
@@ -2576,7 +2582,7 @@ export default function App() {
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
           // (a screen at its plain resolution (devicePixelRatio 1, as most desktops) is drawn a little finer than it shows, then scaled down:
           // with the antialiasing that keeps edges from stepping; the frame pacer drops it to 1 if the frames can't keep up)
-          dpr={pacedDpr ?? (typeof window === 'undefined' ? 1 : Math.min(QUALITY.dpr, Math.max(window.devicePixelRatio || 1, phone ? 1 : 1.5)))}
+          dpr={pacedDpr ?? (typeof window === 'undefined' ? 1 : onBattery ? Math.min(window.devicePixelRatio || 1, 1) : Math.min(QUALITY.dpr, DPR_MAX, window.devicePixelRatio || 1))}
           onPointerMissed={() => window.dispatchEvent(new Event('scene-blank-click'))}
           onCreated={({ gl, camera, scene, get }) => {
             // (in development, the renderer's counts are to hand for checking how heavy a view is; and the canvas's state (its frame
