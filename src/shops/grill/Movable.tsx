@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
 import { holdVeil } from '@/scene/Later'
+import { warmLater } from '@/scene/Prewarm'
 import { beginChange, clickPick, groupFrame, commitOffsets, FIXED_SIZE, getEdit, GIZMO, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
@@ -35,6 +36,8 @@ type Look = 'idle' | 'hover' | 'chosen'
 const lineMat = (color: string, opacity: number, through: boolean) => new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: !through, depthWrite: false, toneMapped: false })
 // (at rest only where it isn't hidden, so the room isn't a tangle of lines; pointed at or chosen, seen through whatever's in front)
 const EDGE: Record<Look, THREE.LineBasicMaterial> = { idle: lineMat('#5fb4ff', 0.4, false), hover: lineMat('#9ad6ff', 0.9, true), chosen: lineMat('#ffb43c', 1, true) }
+// (their program made as the shop loads, not in the frame G is pressed: one box's lines handed to the prewarm)
+warmLater(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.1, 0.1, 0.1)), EDGE.idle))
 
 /** `yaw`: the turn inside it its object axes go by (Movable's inYaw); the box is squared to it, so it sits on the piece as its handles do
  * (the owner's: a turned piece's box stood square to the room, swollen round it) */
