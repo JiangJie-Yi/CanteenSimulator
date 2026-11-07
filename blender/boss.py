@@ -386,7 +386,9 @@ def head_at(a, e, out=0.0):
 
 # (his hair: only what shows under the tenugui, short at the sides and the nape; a light shell, its strands painted)
 HT = 0.012
-ring_ball(radius=R + HT, segs=10, rings=7, location=P(*C))
+# (16 round by 8 as the head is, its points straight out from the head's: its flats never dip in among the head's (they did, the skin
+# poking through it in diamonds))
+ring_ball(radius=R + HT, segs=16, rings=8, location=P(*C))
 hair = active()
 bm = bmesh.new(); bm.from_mesh(hair.data)
 # (cut clean with planes, not face by face, so its edges are smooth lines: off in front of the ears, off under the tenugui's edge, and a
@@ -401,7 +403,7 @@ bm.to_mesh(hair.data); bm.free()
 fin(hair, "BossHair", M["hair"])
 if WEAR in ("band", "bun"):
     # (the crown's hair standing a little fuller than the shell round the sides: its edge just over the brows in front, down to the nape behind)
-    ring_ball(radius=R + HT * 1.3, segs=10, rings=6, location=P(*C))
+    ring_ball(radius=R + HT * 1.3, segs=16, rings=8, location=P(*C))
     top = active()
     bm = bmesh.new(); bm.from_mesh(top.data)
     bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=Vector(P(0, -0.03 if FEMALE else 0.01, 0)),
@@ -512,7 +514,7 @@ for sd in (-1, 1):
 # its two corners sticking out
 BE = math.asin(0.12 / R)
 CAPPED = WEAR in ("boss", "cap")
-ring_ball(radius=R + 0.03, segs=12, rings=8, location=P(*C))
+ring_ball(radius=R + 0.022, segs=16, rings=8, location=P(*C))
 cap = active()
 bm = bmesh.new(); bm.from_mesh(cap.data)
 gone = []
@@ -527,9 +529,10 @@ bmesh.ops.delete(bm, geom=gone, context="FACES")
 # (where on its picture the front of the crown falls, for the fish)
 uvl = bm.loops.layers.uv.active
 front = Vector(P(0, math.sin(0.72), math.cos(0.72)))
-best = min(bm.faces, key=lambda f: (f.calc_center_median().normalized() - front).length)
-u0 = sum(l[uvl].uv.x for l in best.loops) / len(best.loops)
-v0 = sum(l[uvl].uv.y for l in best.loops) / len(best.loops)
+# (the front of the crown by its bearing, straight over the nose (the face's nearest to it sat half a column to one side, the fish with it):
+# ring_ball's u round from Blender's +x, the front a quarter turn back from it)
+u0 = 0.75
+v0 = (0.72 + math.pi / 2) / math.pi
 bm.to_mesh(cap.data); bm.free()
 
 
@@ -650,8 +653,10 @@ _ap = _weave_at(APRON, _aw, _ah, 0.12, 128)
 if CREW not in ("serverF", "stock"):
     bpy.ops.object.text_add(location=(0, 0, 0))
     tx = active()
-    tx.data.body = "聞野"
-    JP = bpy.data.fonts.load("C:/Windows/Fonts/YuGothB.ttc") if os.path.exists("C:/Windows/Fonts/YuGothB.ttc") else None
+    # (日式烤魚 on every apron (the owner's), in a Chinese bold (the Japanese face has no 烤))
+    tx.data.body = "日式烤魚"
+    _fp = next((f for f in ("C:/Windows/Fonts/msjhbd.ttc", "C:/Windows/Fonts/YuGothB.ttc") if os.path.exists(f)), None)
+    JP = bpy.data.fonts.load(_fp) if _fp else None
     if JP:
         tx.data.font = JP
     tx.data.size = 0.075
@@ -891,7 +896,8 @@ _cc = tuple(c for c in M["collar"].diffuse_color[:3])
 _cc = tuple(float(c) ** (1 / 2.2) for c in _cc)
 # (the crossed collar: the dark under-collar at the neck, the right side under, the left over it, as a kappōgi's)
 _body = _band(_body, np.minimum(_seg(_bx, _by_, (-0.08, 0.44 + DY), (0.0, 0.385 + DY)), _seg(_bx, _by_, (0.0, 0.385 + DY), (0.08, 0.44 + DY))), 0.03, PANTS)
-_body = _band(_body, _seg(_bx, _by_, (0.1, 0.43 + DY), (0.0, 0.32 + DY)), 0.05, _cc)
+_over_y = 0.43 + DY - 0.19 * (_bx + 0.1) / 0.24
+_body = _band(_body, np.where(_by_ > _over_y, _seg(_bx, _by_, (0.1, 0.43 + DY), (0.0, 0.32 + DY)), 9.0), 0.05, _cc)
 _body = _band(_body, _seg(_bx, _by_, (-0.1, 0.43 + DY), (0.14, 0.24 + DY)), 0.055, _cc)
 if CREW != "serverF":
     # (the apron's cord round the waist, and its bow at his left side with two short tails)

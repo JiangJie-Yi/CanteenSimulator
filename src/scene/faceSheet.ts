@@ -161,7 +161,12 @@ function solidify(c: HTMLCanvasElement) {
   const g = c.getContext('2d')!
   const img = g.getImageData(0, 0, c.width, c.height)
   const d = img.data
-  for (let i = 3; i < d.length; i += 4) d[i] = d[i] >= 110 ? 255 : 0
+  // (and where nothing's drawn, white under the clear: a material that missed the face's own mode multiplies it by the skin and gets the
+  // skin, never black (a page hot-swapped mid-play showed a black face))
+  for (let i = 3; i < d.length; i += 4) {
+    d[i] = d[i] >= 110 ? 255 : 0
+    if (!d[i]) d[i - 3] = d[i - 2] = d[i - 1] = 255
+  }
   g.putImageData(img, 0, 0)
 }
 
