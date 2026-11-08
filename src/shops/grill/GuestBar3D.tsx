@@ -2609,7 +2609,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const visitorObjs = useRef(new Map<number, THREE.Group>())
   /** those waiting on the genkan's bench for a stool (bar.ts's BENCH): in from the door to their place on it, sat there, and when called (`up`)
    * handed over to the way in to their stool from where they sat (`benchFrom`); given up, out of the door again */
-  type Sitter = { id: number; phase: 'in' | 'sit' | 'out'; t: number; fade: number; fadeT: number; pos: THREE.Vector3; yaw: number; spot: number }
+  type Sitter = { id: number; phase: 'in' | 'sit' | 'out'; t: number; fade: number; fadeT: number; pos: THREE.Vector3; yaw: number; spot: number; handed?: boolean }
   const sitters = useRef(new Map<number, Sitter>())
   const [sitterList, setSitterList] = useState<{ id: number; sat: boolean }[]>([])
   const sitterObjs = useRef(new Map<number, THREE.Group>())
@@ -3809,8 +3809,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (called: up off the bench and on in to their stool from here (setShown's way in starts where they sat))
           BENCH.up.delete(v.id)
           benchFrom.current.set(v.id, v.pos.clone())
-          sitters.current.delete(v.id)
-          benchChanged = true
+          v.handed = true; v.t = 0
+        }
+        // (kept, sat as they were, till the one walking in to the stool is there in their place: let go at once, there was a frame or two of
+        // no one on the bench between)
+        if (v.handed) {
+          if (shownRef.current.some((x) => x.id === v.id) || v.t > 3) { sitters.current.delete(v.id); benchChanged = true }
           continue
         }
         if (BENCH.gone.has(v.id) && v.phase !== 'out') { v.phase = 'out'; v.t = 0; v.fadeT = 0 }
@@ -4517,12 +4521,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           </group>
         </Movable>
       )}
+      {/* (gone from the bench's list, faded out: drawn so until React takes them away, never back at full (it was ?? 1: a blink of them whole in the
+          doorway as they went, the last frame)) */}
       {people && sitterList.map((v) => (
         <group key={`bench${v.id}`} name={`bench-sitter-${v.id}`} ref={(o) => { if (o) sitterObjs.current.set(v.id, o); else sitterObjs.current.delete(v.id) }}>
           <BlobShadow r={0.17 * PEOPLE_SCALE} />
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
-              <FolkFigure id={v.id} eating={false} walking={!v.sat} clock={clock} fade={() => sitters.current.get(v.id)?.fade ?? 1} fit={FOLK_FIT} />
+              <FolkFigure id={v.id} eating={false} walking={!v.sat} clock={clock} fade={() => sitters.current.get(v.id)?.fade ?? 0} fit={FOLK_FIT} />
             </Suspense>
           </group>
         </group>
@@ -4534,9 +4540,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
               <FolkFigure id={v.id} eating={false} walking still={() => visitors.current.get(v.id)?.phase === 'wait'} clock={clock}
-                fade={() => visitors.current.get(v.id)?.fade ?? 1} fit={FOLK_FIT} held={v.has ? <TakeoutBag /> : undefined} />
+                fade={() => visitors.current.get(v.id)?.fade ?? 0} fit={FOLK_FIT} held={v.has ? <TakeoutBag /> : undefined} />
             </Suspense>
-            {v.rider && <RiderGear size={folkSpec(v.id).size} fade={() => visitors.current.get(v.id)?.fade ?? 1} />}
+            {v.rider && <RiderGear size={folkSpec(v.id).size} fade={() => visitors.current.get(v.id)?.fade ?? 0} />}
           </group>
         </group>
       ))}
