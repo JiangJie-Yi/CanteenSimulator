@@ -10,6 +10,10 @@
 //   - Physical: drawn as Standard (clearcoat, sheen, iridescence off: a slight gloss lost on a few pieces)
 // Left alone: shader materials, points, sprites, lines; materials that change their own shader (onBeforeCompile: they're programs of their
 // own anyway, and their code may read the maps; `userData.normalize` lets one in that doesn't mind); and any with `userData.keepProgram`.
+// And one-sided and two-sided fall together (`oneProgramForSides`): which faces are drawn is the GL's cull state, not the program; the
+// two-sided program only turns the normal of a face seen from behind, which is what a back-sided one's own program does to all of its.
+// Two-sided transparent ones are drawn in one pass (three draws, and compiles, the back and the front apart).
+// And a shadow's depth material is given the white map and the tiny alphaTest too (`shadowDepth`).
 import * as THREE from 'three'
 import { capMaterial } from './textureCap'
 
@@ -72,16 +76,60 @@ export function normalizeMaterial(mat: THREE.Material) {
 
 const normalizeAll = (m: THREE.Material | THREE.Material[]) => { if (Array.isArray(m)) m.forEach(normalizeMaterial); else normalizeMaterial(m) }
 
+/**
+ * Whether a material drawn with `side` is drawn with the two-sided program. It's the same picture: the two-sided program turns the normal of a
+ * face the GL sees from behind (gl_FrontFacing false). A front-sided one is drawn with the back faces culled, so every face it draws is seen
+ * from the front (three turns the GL's front face for a mirrored object); a back-sided one is drawn with the front faces culled (not, as three
+ * does, with the GL's front face turned round, which would make its faces seen from the front and leave their normals unturned), so every face
+ * it draws is seen from behind and turned, as its own program would. Built-in materials only: a shader of one's own might read the side its
+ * own way.
+ */
+function oneProgramForSides(m: Any, side: THREE.Side) {
+  if (side === THREE.DoubleSide || m.isShaderMaterial || m.userData?.keepProgram) return false
+  return !!(m.isMeshToonMaterial || m.isMeshStandardMaterial || m.isMeshBasicMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshDepthMaterial || m.isMeshDistanceMaterial)
+}
+
+/**
+ * A shadow's depth material given the white map and the tiny alphaTest too: three draws the shadow of a material without a picture with a
+ * depth material of its own (and one with a picture with a copy of it), each a program; it's handed the source material's map and alphaTest
+ * just before each draw, so it's given the missing ones here every time, after.
+ */
+function shadowDepth(m: Any) {
+  if (!(m.isMeshDepthMaterial || m.isMeshDistanceMaterial) || m.onBeforeCompile !== plainCompile) return
+  if (!m.map) m.map = white
+  if (m.alphaTest === 0) m.alphaTest = 0.002
+}
+
 /** every material the renderer draws or compiles, normalised the first time it's met */
 export function normalizeRenderer(r: THREE.WebGLRenderer) {
   const draw = r.renderBufferDirect.bind(r)
+  // (the material being drawn with the two-sided program, and the side it's really drawn with: the cull state is set from it)
+  let held: Any | null = null
+  let heldSide: THREE.Side = THREE.FrontSide
+  const setMaterial = r.state.setMaterial.bind(r.state)
+  r.state.setMaterial = (material, ...rest) => {
+    // (any other back to culling back faces, after a back-sided one; not a two-sided one: setCullFace turns culling on)
+    if (material !== held) { setMaterial(material, ...rest); if (material.side !== THREE.DoubleSide) r.state.setCullFace(THREE.CullFaceBack); return }
+    // (culled as a front-sided one, the GL's front face as for it; then a back-sided one's front faces culled instead of its back)
+    material.side = THREE.FrontSide
+    setMaterial(material, ...rest)
+    r.state.setCullFace(heldSide === THREE.BackSide ? THREE.CullFaceFront : THREE.CullFaceBack)
+    material.side = THREE.DoubleSide
+  }
   r.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
     normalizeMaterial(material)
-    draw(camera, scene, geometry, material, object, group)
+    shadowDepth(material as Any)
+    const side = material.side
+    const swap = oneProgramForSides(material as Any, side)
+    if (swap) { held = material as Any; heldSide = side; material.side = THREE.DoubleSide }
+    try { draw(camera, scene, geometry, material, object, group) } finally { if (swap) { material.side = side; held = null } }
     // (in development, `__progSeen = new Set()` gathers the programs actually drawn with, to set against all that are held)
     if (import.meta.env.DEV) { const seen = (window as { __progSeen?: Set<number> }).__progSeen; if (seen) { const pr = r.properties.get(material) as { currentProgram?: { id: number } }; if (pr.currentProgram) seen.add(pr.currentProgram.id) } }
   }
-  const visit = (o: THREE.Object3D) => o.traverse((c) => { const m = (c as THREE.Mesh).material; if (m) normalizeAll(m) })
+  // (a transparent two-sided material drawn in one pass, as ShadowPacer has them all now and then: three otherwise draws, and compiles, its
+  // back and its front apart, with a back-sided program of its own besides)
+  const single = (m: THREE.Material) => { if (m.transparent && m.side === THREE.DoubleSide) m.forceSinglePass = true }
+  const visit = (o: THREE.Object3D) => o.traverse((c) => { const m = (c as THREE.Mesh).material; if (m) { normalizeAll(m); ([] as THREE.Material[]).concat(m).forEach(single) } })
   // (and the scene gone through before it's drawn, now and then: the shadows are drawn first, and the depth material three makes for a
   // shadow follows the material's features as they are then: one met first there was made a shadow program of its own, kept for good)
   const render = r.render.bind(r)
@@ -90,8 +138,13 @@ export function normalizeRenderer(r: THREE.WebGLRenderer) {
     if (frame++ % 20 === 0) visit(scene)
     render(scene, camera)
   }
+  // (compiled ahead with the program it'll be drawn with: two-sided, in one pass: a transparent two-sided material is otherwise compiled for
+  // its back and its front apart; compileAsync goes through compile)
   const compile = r.compile.bind(r)
-  r.compile = (o, camera, target) => { visit(o); return compile(o, camera, target) }
-  const compileAsync = r.compileAsync.bind(r)
-  r.compileAsync = (o, camera, target) => { visit(o); return compileAsync(o, camera, target) }
+  r.compile = (o, camera, target) => {
+    visit(o)
+    const was: [Any, THREE.Side, boolean][] = []
+    o.traverse((c) => { for (const m of ([] as Any[]).concat((c as THREE.Mesh).material ?? [])) if (oneProgramForSides(m, m.side)) { was.push([m, m.side, m.forceSinglePass]); m.side = THREE.DoubleSide; m.forceSinglePass = true } })
+    try { return compile(o, camera, target) } finally { for (const [m, side, single] of was) { m.side = side; m.forceSinglePass = single } }
+  }
 }

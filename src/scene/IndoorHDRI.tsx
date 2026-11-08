@@ -51,13 +51,28 @@ export const IndoorHDRI = memo(function IndoorHDRI({ intensity = 0.5, night = fa
   const dayFile = useHdriFile('day'), nightFile = useHdriFile('night')
   const sinks = useMemo(() => ({ day: new THREE.Scene(), night: new THREE.Scene() }), [])
   const scene = useThree((s) => s.scene)
+  const gl = useThree((s) => s.gl)
+  // (each room blurred for reflection here, once, by a generator let go of straight after: handed the room as it is, three blurs it with one
+  // of its own that it keeps for good, and its two shader programs with it)
+  const baked = useMemo(() => new Map<THREE.Texture, { frames: number; tex: THREE.Texture | null }>(), [])
   // (the shop's scene lit by the one for the time of day, once it's there: a photograph is still loading a moment)
   useFrame(() => {
     const from = night ? sinks.night : sinks.day
-    if (from.environment && scene.environment !== from.environment) scene.environment = from.environment
-    if (from.environment && scene.environmentIntensity !== from.environmentIntensity) scene.environmentIntensity = from.environmentIntensity
+    const raw = from.environment
+    if (!raw) return
+    let b = baked.get(raw)
+    if (!b) baked.set(raw, (b = { frames: 0, tex: null }))
+    // (a few frames on: the made-up room is drawn into its cube on its first)
+    if (!b.tex) {
+      if (++b.frames < 3) return
+      const pm = new THREE.PMREMGenerator(gl)
+      b.tex = ((raw as THREE.CubeTexture).isCubeTexture ? pm.fromCubemap(raw as THREE.CubeTexture) : pm.fromEquirectangular(raw)).texture
+      pm.dispose()
+    }
+    if (scene.environment !== b.tex) scene.environment = b.tex
+    if (scene.environmentIntensity !== from.environmentIntensity) scene.environmentIntensity = from.environmentIntensity
   })
-  useEffect(() => () => { scene.environment = null }, [scene])
+  useEffect(() => () => { scene.environment = null; for (const b of baked.values()) b.tex?.dispose(); baked.clear() }, [scene, baked])
   // (a real HDRI photograph, if one's there, lights the glossy things; otherwise the room's own made-up one below)
   const room = (when: 'day' | 'night', file: string | null) => file
     ? <Suspense fallback={null}><Environment key={file} files={file} scene={sinks[when]} environmentIntensity={intensity * REAL_GAIN[when]} background={false} /></Suspense>
