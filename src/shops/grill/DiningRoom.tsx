@@ -363,7 +363,7 @@ const ART = {
     g.fillStyle = '#8a6a44'
     g.beginPath(); g.moveTo(-10, 300); g.quadraticCurveTo(260, 200, 530, 250); g.lineTo(530, 270); g.quadraticCurveTo(260, 222, -10, 322); g.closePath(); g.fill()
     g.strokeStyle = '#3a2814'; g.lineWidth = 3
-    for (let x = 20; x < 512; x += 46) { const y = 300 - (x / 512) * 60 + Math.sin(x / 160) * 0; g.beginPath(); g.moveTo(x, y + 6); g.lineTo(x + 4, 360); g.stroke() }
+    for (let x = 20; x < 512; x += 46) { const y = 300 - (x / 512) * 60; g.beginPath(); g.moveTo(x, y + 6); g.lineTo(x + 4, 360); g.stroke() }
     g.lineWidth = 1.6; g.beginPath(); g.moveTo(-10, 300); g.quadraticCurveTo(260, 200, 530, 250); g.stroke()
     for (const [x, c] of [[150, '#2a3a5a'], [210, '#6a2a1a'], [300, '#2a4a3a'], [340, '#3a3020']] as [number, string][]) {
       const y = 300 - (x / 512) * 60 - 22
