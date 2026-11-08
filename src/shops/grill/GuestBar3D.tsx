@@ -4518,7 +4518,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </Movable>
       )}
       {people && sitterList.map((v) => (
-        <group key={`bench${v.id}`} ref={(o) => { if (o) sitterObjs.current.set(v.id, o); else sitterObjs.current.delete(v.id) }}>
+        <group key={`bench${v.id}`} name={`bench-sitter-${v.id}`} ref={(o) => { if (o) sitterObjs.current.set(v.id, o); else sitterObjs.current.delete(v.id) }}>
           <BlobShadow r={0.17 * PEOPLE_SCALE} />
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
