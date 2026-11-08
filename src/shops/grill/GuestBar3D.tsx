@@ -2884,7 +2884,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (the shop may have given them a stool already: it only does once the last one there has gone)
           const seat = g.seat !== undefined ? g.seat : Array.from({ length: seats.length }, (_, i) => i).find((i) => !taken.has(i))
           // (off the bench (BENCH): their way in starts where they sat, welcomed already)
-          const from = benchFrom.current.get(g.id)
+          // (called this moment, the bench's walk not yet round to it: from where they sit there now)
+          const from = benchFrom.current.get(g.id) ?? (BENCH.up.has(g.id) ? sitters.current.get(g.id)?.pos.clone() : undefined)
           if (from) benchFrom.current.delete(g.id)
           if (seat !== undefined) next = [...next, from ? { id: g.id, seat, phase: 'enter', t: 0, from, welcomed: true } : { id: g.id, seat, phase: 'enter', t: 0 }]
         } else if (s && !seated && s.phase !== 'leave' && !s.leaving && !s.wipeAt) {
