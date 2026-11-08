@@ -35,13 +35,21 @@ const SURFACE = new Set(['MeshToonMaterial', 'MeshStandardMaterial', 'MeshPhysic
 function variantOf(src: THREE.Material, p: RenderPref): THREE.Material {
   const look = p.look ?? 'keep', flat = p.shade === 'flat'
   if (!SURFACE.has(src.type) || (look === 'keep' && !flat)) return src
+  // (a material with its shader changed (the figures' painted faces, the airbrushing, a window cut round) can't be made again another way
+  // without the change; kept as it is but for the flat shading, the change carried over to its copy)
+  const own = src.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile
+  if (own && look !== 'keep') return src
   const key = `${src.uuid}|${look}|${flat}`
   let v = variants.get(key)
   if (!v) {
     const s = src as THREE.MeshStandardMaterial
     const base = { color: s.color?.clone() ?? new THREE.Color('#ffffff'), map: s.map ?? null, transparent: src.transparent, opacity: src.opacity,
       alphaTest: src.alphaTest, side: src.side, vertexColors: src.vertexColors, depthWrite: src.depthWrite }
-    if (look === 'keep') v = src.clone()
+    if (look === 'keep') {
+      v = src.clone()
+      v.onBeforeCompile = src.onBeforeCompile
+      v.customProgramCacheKey = src.customProgramCacheKey
+    }
     else if (look === 'toon') v = new THREE.MeshToonMaterial({ ...base, gradientMap })
     else if (look === 'real') v = new THREE.MeshStandardMaterial({ ...base, roughness: 0.55, metalness: 0, normalMap: s.normalMap ?? null })
     else v = new THREE.MeshBasicMaterial(base)
@@ -82,6 +90,9 @@ function walk(o: THREE.Object3D, id: string | null) {
   // (the editor's own handles and boxes are left be)
   if (o.userData?.editHandle) return
   const own = (o.userData?.editId as string | undefined) ?? id
+  // (never the people: the owner, the staff and the customers are drawn as they're made, whatever they walk past (the owner's face went
+  // black: under a piece set to another look, his face's own shader was dropped, and where nothing's painted on it showed as black))
+  if ((o as THREE.SkinnedMesh).isSkinnedMesh) { apply(o as THREE.Mesh, null); return }
   if ((o as THREE.Mesh).isMesh) apply(o as THREE.Mesh, own ? prefs[own] ?? null : null)
   for (const c of o.children) walk(c, own)
 }
