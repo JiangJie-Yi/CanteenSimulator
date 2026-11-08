@@ -238,9 +238,11 @@ const CONTAINER_TIP = (key: string) => {
   const name = ({ plate: '餐盤', dish: '小碟', basket: '竹籃', box: '調味盒', bin: '水桶', tray: '大砧板', trash: '廚餘桶', rawdish: '生食碟', lantern: '行燈', bowl: '試吃碗' } as Record<string, string>)[kind] ?? '擺設'
   return { title: name, hint: '拖曳移動' }
 }
-/** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates) */
-const BOWL_TOP: [number, number, number] = [1.95, 0, 1.0]
-const BOWL_R = 0.52
+/** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates), and how big: clear of the notch the chef
+ * stands in and inside the table's front edge (the owner's: at 0.52 across from 1.95, 1.0 it ran half into the notch, the chef's belly in it,
+ * and out past the edge); in the room's frame along 1.72, back from the front 0.43, the fire's frame here */
+const BOWL_TOP: [number, number, number] = [1.85, 0, 0.72]
+const BOWL_R = 0.4
 /** something on the table drawn only while `holds` says it holds something (a plate, a side dish: brought from the dish cabinet when it's
  * wanted), looked at every frame, drawn again only when that changes */
 function WhenHeld({ holds, children }: { holds: () => boolean; children: React.ReactNode }) {
