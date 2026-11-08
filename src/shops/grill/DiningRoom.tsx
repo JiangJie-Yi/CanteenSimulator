@@ -4467,51 +4467,95 @@ const FRIDGE_URL = import.meta.env.BASE_URL + 'models/drinkfridge.glb'
 /**
  * The drink fridges' cabinet (blender/drinkfridge.py: made in place of the downloaded one, the owner's: its parts and outlines were some 8,500
  * triangles and nine draws a fridge): a commercial cooler in matte black lacquered metal, a pair of black-framed glass doors with a mullion
- * where they meet and a long silver handle on each, louvres and a little silver maker's plate at its foot; over the doors its light box (銘酒
- * 各種 on the sake's, with two bottles drawn in black; 冷やし ドリンク on the drinks'), a white liner washed with the LEDs' cool white, four
- * wire shelves with a strip of price tags along each one's lip
+ * where they meet and a long silver handle on each, louvres and a little silver maker's plate at its foot; over the doors its light box, an
+ * izakaya's andon (a dark wood frame, a kumiko lattice round warm lit washi: 厳選 銘酒各種 by a sugidama on the sake's, 冷やし 飲み物 by a
+ * maple leaf on the drinks'), a white liner washed with the LEDs' cool white, four wire shelves with a steel strip along each one's lip and a
+ * little black plaque on it naming what the shelf keeps
  */
-const FRIDGE_WORDS: [string, string][] = [['冷やし', 'ドリンク'], ['銘酒', '各種']]
-/** the light box's picture (the owner's: bright clean white lit from behind, a fine matte black frame, black brush lettering and a little red
- * seal; the sake's two bottles in black silhouette before its words). Painted the way up the glTF quad holds it (flipY off: it was upside down) */
+const FRIDGE_WORDS: [string, string][] = [['冷やし', '飲み物'], ['銘酒', '各種']]
+/** the light box's picture, an andon's (the owner's: the white light box looked a convenience store's): a burnt-cedar frame (#2b1810), a fine
+ * kumiko lattice inside it, and warm washi lit from behind (#fff3d1 in the middle to amber #f0d090 at its edges); on the sake's a sugidama hung
+ * by its cord, 厳選 small and 銘酒各種 brushed big; on the drinks' a green maple leaf over a ripple, 冷やし 飲み物; the red seal 聞 in its
+ * corner. Painted the way up the glTF quad holds it (flipY off) */
 const fridgeSignTex = (n: number) => {
   const t = canvasTex(760, 200, (g) => {
-    const bg = g.createRadialGradient(380, 100, 30, 380, 100, 420)
-    bg.addColorStop(0, '#ffffff'); bg.addColorStop(1, '#f1efea')
-    g.fillStyle = bg; g.fillRect(0, 0, 760, 200)
-    // (the diffuser's faint ribs, the tubes behind it)
-    g.fillStyle = 'rgba(200,205,210,0.18)'
-    for (const y of [52, 100, 148]) g.fillRect(0, y - 9, 760, 18)
-    // (a fine matte black frame)
-    g.strokeStyle = '#141416'; g.lineWidth = 10; g.strokeRect(5, 5, 750, 190)
-    g.strokeStyle = 'rgba(20,20,22,0.35)'; g.lineWidth = 1.5; g.strokeRect(16, 16, 728, 168)
-    const [big, small] = FRIDGE_WORDS[n] ?? FRIDGE_WORDS[0]
-    const ink = { fill: '#121012', edge: 'rgba(0,0,0,0)', shadow: 'rgba(0,0,0,0.12)' }
-    if (n === 1) {
-      // (two 一升瓶 in silhouette: a round shoulder, a long neck, a cap; a pale label with a red band on each)
-      for (const [x, h] of [[78, 140], [122, 126]] as const) {
-        const foot = 100 + h / 2, y0 = 100 - h / 2
-        g.fillStyle = '#121012'
-        g.beginPath()
-        g.moveTo(x - 17, foot); g.lineTo(x - 17, y0 + h * 0.42)
-        g.quadraticCurveTo(x - 17, y0 + h * 0.26, x - 6, y0 + h * 0.2)
-        g.lineTo(x - 6, y0 + 8); g.lineTo(x + 6, y0 + 8); g.lineTo(x + 6, y0 + h * 0.2)
-        g.quadraticCurveTo(x + 17, y0 + h * 0.26, x + 17, y0 + h * 0.42)
-        g.lineTo(x + 17, foot); g.closePath(); g.fill()
-        g.fillRect(x - 7.5, y0, 15, 9)
-        g.fillStyle = '#f4f2ec'; g.fillRect(x - 11, y0 + h * 0.5, 22, h * 0.3)
-        g.fillStyle = '#b3241c'; g.fillRect(x - 3, y0 + h * 0.55, 6, h * 0.2)
-      }
-      brushText(g, big, 330, 102, 104, { ...ink, spacing: 6 })
-      brushText(g, small, 545, 106, 92, { ...ink, spacing: 4 })
-    } else {
-      brushText(g, big, 238, 102, 96, { ...ink, spacing: 4 })
-      brushText(g, small, 500, 108, 70, { ...ink, weight: '900', spacing: 2 })
+    const W = 760, H = 200
+    // (the washi, warm in its middle, amber at its edges; its fibres)
+    const bg = g.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, 400)
+    bg.addColorStop(0, '#fff3d1'); bg.addColorStop(0.65, '#f8e2a8'); bg.addColorStop(1, '#f0d090')
+    g.fillStyle = bg; g.fillRect(0, 0, W, H)
+    let seed = 7 + n * 31
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+    g.strokeStyle = 'rgba(190,140,60,0.16)'; g.lineWidth = 1
+    for (let k = 0; k < 140; k++) {
+      const x = rnd() * W, y = rnd() * H, a = rnd() * Math.PI, l = 6 + rnd() * 18
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + 3, y + Math.sin(a) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke()
     }
-    // (the little red seal)
-    g.fillStyle = '#b3241c'; g.fillRect(672, 120, 40, 40)
-    g.strokeStyle = 'rgba(255,240,230,0.7)'; g.lineWidth = 1.5; g.strokeRect(676, 124, 32, 32)
-    g.fillStyle = '#fbe9d6'; g.font = '700 24px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('聞', 692, 141)
+    // (the kumiko: a band of fine dark wood round the washi, upright bars with a rail along its middle, a thin inner frame)
+    const F = 16, K = 14
+    g.fillStyle = '#3a2214'
+    for (let x = F + 4; x < W - F; x += 9) { g.fillRect(x, F, 2, K); g.fillRect(x, H - F - K, 2, K) }
+    for (let y = F + K + 4; y < H - F - K; y += 9) { g.fillRect(F, y, K, 2); g.fillRect(W - F - K, y, K, 2) }
+    g.fillRect(F, F + K / 2 - 1, W - 2 * F, 2); g.fillRect(F, H - F - K / 2 - 1, W - 2 * F, 2)
+    g.fillRect(F + K / 2 - 1, F, 2, H - 2 * F); g.fillRect(W - F - K / 2 - 1, F, 2, H - 2 * F)
+    g.strokeStyle = '#3a2214'; g.lineWidth = 3; g.strokeRect(F + K, F + K, W - 2 * (F + K), H - 2 * (F + K))
+    // (the frame: burnt cedar, a darker grain along it, a fine highlight on its inner lip)
+    g.strokeStyle = '#2b1810'; g.lineWidth = F * 2; g.strokeRect(0, 0, W, H)
+    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1
+    for (let k = 0; k < 6; k++) {
+      const o = 2 + k * 2.4
+      g.beginPath(); g.moveTo(0, o); g.lineTo(W, o + (rnd() - 0.5) * 2); g.stroke()
+      g.beginPath(); g.moveTo(0, H - o); g.lineTo(W, H - o + (rnd() - 0.5) * 2); g.stroke()
+    }
+    g.strokeStyle = 'rgba(160,110,70,0.5)'; g.lineWidth = 1.2; g.strokeRect(F - 0.5, F - 0.5, W - 2 * F + 1, H - 2 * F + 1)
+    const ink = { fill: '#1a1210', edge: 'rgba(0,0,0,0)', shadow: 'rgba(90,50,10,0.18)' }
+    if (n === 1) {
+      // (a sugidama: a ball of cedar sprigs on its cord, its needles drawn in short strokes, darker under; a small wooden tag below)
+      const cx = 118, cy = 100, R = 44
+      g.strokeStyle = '#2b1810'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, F + K); g.lineTo(cx, cy - R + 4); g.stroke()
+      const ball = g.createRadialGradient(cx - 14, cy - 16, 6, cx, cy, R)
+      ball.addColorStop(0, '#5f7c34'); ball.addColorStop(0.7, '#3d5a24'); ball.addColorStop(1, '#263c17')
+      g.fillStyle = ball; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill()
+      for (let k = 0; k < 260; k++) {
+        const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * R, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r
+        const l = 4 + rnd() * 5, b = a + (rnd() - 0.5) * 1.2
+        g.strokeStyle = rnd() < 0.5 ? 'rgba(130,160,70,0.7)' : 'rgba(25,40,15,0.6)'; g.lineWidth = 1.4
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(b) * l, y + Math.sin(b) * l); g.stroke()
+      }
+      g.fillStyle = '#c99a5c'; g.fillRect(cx - 9, cy + R - 2, 18, 22)
+      g.strokeStyle = '#2b1810'; g.lineWidth = 1.5; g.strokeRect(cx - 9, cy + R - 2, 18, 22)
+      // (厳選 small, upright, then 銘酒各種 brushed big)
+      brushText(g, '厳', 212, 80, 40, ink)
+      brushText(g, '選', 212, 126, 40, ink)
+      brushText(g, `${FRIDGE_WORDS[1][0]}${FRIDGE_WORDS[1][1]}`, 452, 104, 88, { ...ink, spacing: 4 })
+    } else {
+      // (a green maple leaf, seven pointed lobes and its veins, over the rings of a ripple)
+      const cx = 118, cy = 90, R = 48
+      g.strokeStyle = 'rgba(70,130,150,0.55)'; g.lineWidth = 2
+      for (const [rx, ry] of [[40, 8], [56, 11], [72, 14]]) { g.beginPath(); g.ellipse(cx, cy + 52, rx, ry, 0, Math.PI * 0.05, Math.PI * 0.95); g.stroke() }
+      const lobes = [-90, -38, 14, 62, -142, -194, -242].map((d) => d * Math.PI / 180), len = [1, 0.92, 0.7, 0.42, 0.92, 0.7, 0.42]
+      const order = [3, 2, 1, 0, 4, 5, 6]
+      const base = R * 0.3
+      g.fillStyle = '#3f8a3a'
+      g.beginPath()
+      order.forEach((k, i) => {
+        const a = lobes[k], r = R * len[k], a0 = a - 0.32, a1 = a + 0.32
+        if (i === 0) g.moveTo(cx + Math.cos(a0) * base, cy + Math.sin(a0) * base)
+        else g.lineTo(cx + Math.cos(a0) * base, cy + Math.sin(a0) * base)
+        g.quadraticCurveTo(cx + Math.cos(a - 0.2) * r * 0.75, cy + Math.sin(a - 0.2) * r * 0.75, cx + Math.cos(a) * r, cy + Math.sin(a) * r)
+        g.quadraticCurveTo(cx + Math.cos(a + 0.2) * r * 0.75, cy + Math.sin(a + 0.2) * r * 0.75, cx + Math.cos(a1) * base, cy + Math.sin(a1) * base)
+      })
+      g.closePath(); g.fill()
+      g.strokeStyle = '#2a5e28'; g.lineWidth = 1.6
+      for (const k of order) { const a = lobes[k]; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * R * len[k] * 0.9, cy + Math.sin(a) * R * len[k] * 0.9); g.stroke() }
+      g.strokeStyle = '#3f6a2a'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.quadraticCurveTo(cx + 4, cy + 24, cx - 6, cy + 36); g.stroke()
+      brushText(g, FRIDGE_WORDS[0][0], 300, 104, 82, { ...ink, spacing: 2 })
+      brushText(g, FRIDGE_WORDS[0][1], 528, 104, 82, { ...ink, spacing: 2 })
+    }
+    // (the red seal)
+    g.fillStyle = '#b3241c'; g.fillRect(668, 122, 40, 40)
+    g.strokeStyle = 'rgba(255,240,230,0.7)'; g.lineWidth = 1.5; g.strokeRect(672, 126, 32, 32)
+    g.fillStyle = '#fbe9d6'; g.font = '700 24px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('聞', 688, 143)
   })
   if (t) t.flipY = false
   if (t) t.anisotropy = 4
@@ -4527,18 +4571,26 @@ const FRIDGE_GLASS_TEX = (() => {
       e.addColorStop(0, 'rgba(150,200,235,0.45)'); e.addColorStop(1, 'rgba(150,200,235,0)')
       return e
     }
-    g.fillStyle = edge(0, 0, 26, 0); g.fillRect(0, 0, 26, 512)
-    g.fillStyle = edge(256, 0, 230, 0); g.fillRect(230, 0, 26, 512)
-    g.fillStyle = edge(0, 0, 0, 22); g.fillRect(0, 0, 256, 22)
-    g.fillStyle = edge(0, 512, 0, 490); g.fillRect(0, 490, 256, 22)
+    // (the glare kept to the pane's upper and middle part, and fainter (the owner's: piled at the foot of the door it read as grey dirt))
     g.save()
+    g.beginPath(); g.rect(0, 0, 256, 370); g.clip()
     g.translate(128, 256); g.rotate(-Math.PI / 4)
-    for (const [x, w, a] of [[-150, 46, 0.5], [-92, 12, 0.62], [40, 70, 0.3], [118, 8, 0.6], [150, 20, 0.34]] as const) {
+    for (const [x, w, a] of [[-150, 46, 0.3], [-92, 12, 0.38], [40, 70, 0.18], [118, 8, 0.36], [150, 20, 0.2]] as const) {
       const st = g.createLinearGradient(x - w / 2, 0, x + w / 2, 0)
       st.addColorStop(0, 'rgba(255,255,255,0)'); st.addColorStop(0.5, `rgba(255,255,255,${a})`); st.addColorStop(1, 'rgba(255,255,255,0)')
       g.fillStyle = st; g.fillRect(x - w / 2, -400, w, 800)
     }
     g.restore()
+    // (faded out toward the clip's edge, not cut off; the pane's own tint put back under)
+    g.save(); g.globalCompositeOperation = 'destination-out'
+    const fade = g.createLinearGradient(0, 250, 0, 370)
+    fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)')
+    g.fillStyle = fade; g.fillRect(0, 250, 256, 262); g.restore()
+    g.fillStyle = 'rgba(214,232,240,0.26)'; g.fillRect(0, 250, 256, 262)
+    g.fillStyle = edge(0, 0, 26, 0); g.fillRect(0, 0, 26, 512)
+    g.fillStyle = edge(256, 0, 230, 0); g.fillRect(230, 0, 26, 512)
+    g.fillStyle = edge(0, 0, 0, 22); g.fillRect(0, 0, 256, 22)
+    g.fillStyle = edge(0, 512, 0, 500); g.fillRect(0, 500, 256, 12)
   })
   if (t) t.flipY = false
   return t
@@ -4564,26 +4616,29 @@ const FRIDGE_LED = (() => {
   if (t) t.flipY = false
   return t
 })()
-/** the price tags along each shelf's lip: a white strip, a little white card with red or blue figures under each place, a thin rule (a quarter
- * of the picture to a shelf, the lowest at the top) */
+/** each shelf's lip (the owner's: no price tags, a convenience store's): brushed steel, and in its middle a small black plaque edged in gold
+ * naming what the shelf keeps (a quarter of the picture to a shelf, the lowest at the top) */
+const SHELF_NAMES = [['冷茶', '炭酸', '牛乳・珈琲', '乳酸菌'], ['純米吟醸', '生ビール', 'ハイボール', '酎ハイ']]
 const fridgeTagTex = (n: number) => {
   const t = canvasTex(1024, 256, (g) => {
-    g.fillStyle = '#f7f8f8'; g.fillRect(0, 0, 1024, 256)
     for (let k = 0; k < 4; k++) {
       const y0 = k * 64
-      g.fillStyle = '#d9dde0'; g.fillRect(0, y0 + 60, 1024, 4)
-      const tags = 6, w = 1024 / tags
-      for (let i = 0; i < tags; i++) {
-        const x = i * w + 14, red = (i + k + n) % 3 !== 0
-        g.fillStyle = '#ffffff'; g.fillRect(x, y0 + 8, w - 28, 46)
-        g.strokeStyle = red ? '#c8261d' : '#1d4f9c'; g.lineWidth = 2; g.strokeRect(x, y0 + 8, w - 28, 46)
-        g.fillStyle = red ? '#c8261d' : '#1d4f9c'; g.fillRect(x, y0 + 8, 12, 46)
-        g.font = '800 30px sans-serif'; g.textAlign = 'right'; g.textBaseline = 'middle'
-        g.fillText(`¥${[150, 180, 200, 250, 300, 380][(i * 7 + k * 3 + n) % 6]}`, x + w - 40, y0 + 32)
-      }
+      const st = g.createLinearGradient(0, y0, 0, y0 + 64)
+      st.addColorStop(0, '#eef0f2'); st.addColorStop(0.45, '#c9cdd2'); st.addColorStop(0.55, '#b9bec4'); st.addColorStop(1, '#9ea4ab')
+      g.fillStyle = st; g.fillRect(0, y0, 1024, 64)
+      g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1
+      for (let y = y0 + 3; y < y0 + 62; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(1024, y + 0.5); g.stroke() }
+      // (the plaque, before the left door (the doors meet in the middle, their handles over it): black lacquer, a gold line round it, the name in gold)
+      const name = SHELF_NAMES[n]?.[k] ?? ''
+      g.font = '700 32px "Noto Serif JP", "Yu Mincho", serif'
+      const w = Math.max(120, g.measureText(name).width + 44), x0 = 256 - w / 2
+      g.fillStyle = '#151210'; g.fillRect(x0, y0 + 9, w, 46)
+      g.strokeStyle = '#c9a24a'; g.lineWidth = 1.5; g.strokeRect(x0 + 4, y0 + 13, w - 8, 38)
+      g.fillStyle = '#e2c06a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, 256, y0 + 33)
     }
   })
   if (t) t.flipY = false
+  if (t) t.anisotropy = 4
   return t
 }
 const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; doors: THREE.Group[] }>()
@@ -4631,9 +4686,10 @@ function useFreezer(n: number) {
       if (!m.isMesh) return
       m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material)
       // (the glass neither casts a shadow nor takes one: swung open, its pane threw a solid one across the floor; nor the wire)
-      const see = (Array.isArray(m.material) ? m.material : [m.material]).some((x) => x.transparent || x.alphaTest > 0)
-      m.castShadow = !see
-      m.receiveShadow = !see
+      // (nor anything inside (the owner's: the shelves', the doors' and the header's shadows fell across the liner's floor in grey slants,
+      // like a broken picture): only the cabinet's outside throws its shadow, on the floor, and nothing of it takes one)
+      m.castShadow = (Array.isArray(m.material) ? m.material : [m.material]).some((x) => x.name === 'FridgeShell')
+      m.receiveShadow = false
     })
     // (an outline round the cabinet and the doors, not the sign, the lit back, the tags, the shelves' wire or the glass)
     inkModel(root, (m) => { const x = m.material as THREE.Material; return x.transparent || x.alphaTest > 0 || x === sign || x === tags || x === FRIDGE_BACK })
@@ -4666,32 +4722,6 @@ function useFreezer(n: number) {
   }, [gltf, n])
 }
 useGLTF.preload(FRIDGE_URL)
-/** what stands on the fridges' tops: a 一升瓶 (turned: a round shoulder, a long neck), a tokkuri (a round body, a narrow neck, a lip) */
-const ISSHO_GEO = new THREE.LatheGeometry([[0.0, 0], [0.046, 0], [0.05, 0.01], [0.05, 0.2], [0.044, 0.24], [0.026, 0.28], [0.02, 0.31], [0.02, 0.37], [0.0, 0.372]].map(([x, y]) => new THREE.Vector2(x, y)), 16)
-const TOKKURI_GEO = new THREE.LatheGeometry([[0.0, 0], [0.03, 0], [0.042, 0.04], [0.04, 0.08], [0.018, 0.12], [0.014, 0.14], [0.02, 0.152], [0.0, 0.152]].map(([x, y]) => new THREE.Vector2(x, y)), 14)
-/** a drinks carton's printed front (kraft board, a green band, the tea's name brushed big, a leaf and its English below) and its taped top */
-const teaCarton = (word: string, en: string, ink: string) => canvasTex(256, 160, (g) => {
-  g.fillStyle = '#c9a26c'; g.fillRect(0, 0, 256, 160)
-  g.strokeStyle = 'rgba(120,85,40,0.18)'; g.lineWidth = 1
-  for (let x = 3; x < 256; x += 6) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 160); g.stroke() }
-  g.fillStyle = ink; g.fillRect(0, 10, 256, 18); g.fillRect(0, 140, 256, 8)
-  g.fillStyle = '#f3efe2'; g.font = '700 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(`${en} · 500ml × 24`, 128, 19)
-  brushText(g, word, 104, 84, 64, { fill: ink, edge: 'rgba(0,0,0,0)', shadow: 'rgba(0,0,0,0.1)', spacing: 2 })
-  // (a tea leaf)
-  g.fillStyle = ink
-  g.beginPath(); g.ellipse(206, 84, 13, 30, 0.5, 0, Math.PI * 2); g.fill()
-  g.strokeStyle = '#c9a26c'; g.lineWidth = 2; g.beginPath(); g.moveTo(194, 108); g.lineTo(218, 60); g.stroke()
-  g.fillStyle = ink; g.font = '700 13px sans-serif'; g.fillText('冷やしてお召し上がりください', 128, 128)
-})
-const CARTON_TEA = teaCarton('緑茶', 'GREEN TEA', '#2f6b34')
-const CARTON_MATCHA = teaCarton('抹茶', 'MATCHA', '#4f7a2a')
-/** a carton's top: kraft board, its flaps' seam down the middle under a strip of clear tape */
-const CARTON_TOP = canvasTex(128, 128, (g) => {
-  g.fillStyle = '#c29a62'; g.fillRect(0, 0, 128, 128)
-  g.fillStyle = 'rgba(80,55,25,0.55)'; g.fillRect(63, 0, 2, 128)
-  g.fillStyle = 'rgba(235,225,190,0.55)'; g.fillRect(48, 0, 32, 128)
-  g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(52, 0, 3, 128)
-})
 /** the soft wash of a cove light: white along the slot, fading to nothing across the wall */
 const COVE_WASH = (() => {
   if (typeof document === 'undefined') return null
@@ -4727,47 +4757,6 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
             <meshBasicMaterial map={COVE_WASH} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.75} side={THREE.DoubleSide} /></mesh>
         </group>
       ))}
-      </StaticBatch>
-      {/* (its top (the owner's: a modern bar's bulb-lit sign stood there, over a flat dead red; the light box over the door is its sign
-          now): the condenser's black louvred grille along the back, a stainless strip along the front edge, and what an izakaya keeps up
-          there: on the sake's, a wooden crate of 一升瓶 (their necks wrapped in washi and tied with a red cord) and a pair of white tokkuri on
-          a tray; on the drinks', beer glasses upturned on a tray and a tokkuri) */}
-      <StaticBatch plain>
-        <group position={[0, H, 0]}>
-          <mesh position={[0, 0.035, -D / 2 + 0.12]}><boxGeometry args={[W * 0.9, 0.07, 0.16]} /><meshToonMaterial color="#1b1c1e" /></mesh>
-          {Array.from({ length: 9 }, (_, k) => (
-            <mesh key={k} position={[0, 0.012 + k * 0.0065, -D / 2 + 0.2005]}><boxGeometry args={[W * 0.86, 0.0025, 0.004]} /><meshToonMaterial color="#4a4d52" /></mesh>
-          ))}
-          <mesh position={[0, 0.006, D / 2 - 0.035]}><boxGeometry args={[W * 0.98, 0.012, 0.03]} /><meshToonMaterial color="#c6c9cd" /></mesh>
-          {n === 1 ? (
-            <>
-              {/* (two dark 一升瓶 standing at its left, their necks wrapped in washi and tied with a red cord (the owner's)) */}
-              {[-0.3, -0.17].map((x, k) => (
-                <group key={x} position={[x, 0.012, 0.04 - k * 0.05]} rotation-y={k * 0.6}>
-                  <mesh geometry={ISSHO_GEO}><meshToonMaterial color={k ? '#2a1a0e' : '#1d2a16'} /></mesh>
-                  <mesh position-y={0.15}><cylinderGeometry args={[0.051, 0.051, 0.09, 16]} /><meshToonMaterial color="#f3ecd8" /></mesh>
-                  <mesh position-y={0.355}><cylinderGeometry args={[0.019, 0.022, 0.05, 12]} /><meshToonMaterial color="#efe6cc" /></mesh>
-                  <mesh position-y={0.338} rotation-x={Math.PI / 2}><torusGeometry args={[0.022, 0.003, 4, 14]} /><meshToonMaterial color="#b3241c" /></mesh>
-                </group>
-              ))}
-              <group position={[0.22, 0.012, 0.06]}>
-                <mesh position-y={0.006}><boxGeometry args={[0.22, 0.012, 0.13]} /><meshToonMaterial color="#2a1a12" /></mesh>
-                {[-0.05, 0.05].map((x) => <mesh key={x} geometry={TOKKURI_GEO} position={[x, 0.012, 0]}><meshToonMaterial color="#f2efe6" /></mesh>)}
-              </group>
-            </>
-          ) : (
-            <>
-              {/* (two cartons of bottled tea stacked, 緑茶 under 抹茶, each its printed front and its taped top (the owner's)) */}
-              {([[0, 0, CARTON_TEA], [0.02, 0.2, CARTON_MATCHA]] as const).map(([dx, y, print], k) => (
-                <group key={k} position={[-0.08 + dx, 0.012 + y, 0.02]} rotation-y={k * 0.08}>
-                  <mesh position-y={0.1}><boxGeometry args={[0.4, 0.2, 0.3]} /><meshToonMaterial color="#c29a62" /></mesh>
-                  <mesh position={[0, 0.1, 0.1505]}><planeGeometry args={[0.4, 0.2]} /><meshToonMaterial map={print} /></mesh>
-                  <mesh position-y={0.2005} rotation-x={-Math.PI / 2}><planeGeometry args={[0.4, 0.3]} /><meshToonMaterial map={CARTON_TOP} /></mesh>
-                </group>
-              ))}
-            </>
-          )}
-        </group>
       </StaticBatch>
     </group>
   )

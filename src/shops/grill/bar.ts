@@ -283,9 +283,12 @@ export function fridgesOf(cs: Counter[]) {
     // (a hand's width apart: their signs on top stand a little wider than the cabinets)
     const z = z0 - n * (FRIDGE.W + 0.08)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
-    return { n, z, at: at(farOf(c) + FRIDGE.D / 2 + 0.01), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE.D + 0.34).add(side), aisle: at(-AISLE) }
+    return { n, z, at: at(farOf(c) + FRIDGE_GAP + FRIDGE.D / 2), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE_GAP + FRIDGE.D + 0.33).add(side), aisle: at(-AISLE) }
   })
 }
+/** how far a fridge's back stands off the wall's face: clear of the rail over the wainscot (DiningRoom's, 4.5 cm proud of the wall; at 1 cm it
+ * ran through the cabinet's back and showed inside, the owner's), and a centimetre more */
+export const FRIDGE_GAP = 0.055
 /** the fridge's size: across, up, deep */
 export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
 /** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
