@@ -85,6 +85,8 @@ import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/R
 import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
+import { DaySummary } from '@/ui/DaySummary'
+import { daySummary, soldBetween, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
 import { Steam } from '@/scene/Steam'
@@ -1294,6 +1296,9 @@ export default function App() {
     if (!ai) return
     SHOP.openedAt = performance.now()
     SHOP.day++
+    // (the day's books as they stand at opening, for its closing sheet; one still up from the last day put away)
+    dayStart.current = { ledger: { ...ledgerNow.current }, seen: new Set(visitsNow.current.map((v) => v.id)), sold: { ...entryCountNow.current }, day: getClock().day }
+    setDaySum(null)
     const day = SHOP.day
     const timers = [window.setTimeout(() => sayStaff.current('owner', OPEN_DORM, day), 1200)]
     talkersOf(commuters().map((w) => w.id), day).forEach((id, k) => {
@@ -1560,6 +1565,13 @@ export default function App() {
   const entriesOf = (id: string) => menuBy[id] ?? []
   // how many of each dish on the menu have been ordered (for the menu board while open)
   const [entryCount, setEntryCount] = useState<Record<string, number>>({})
+  const entryCountNow = useRef(entryCount)
+  entryCountNow.current = entryCount
+  // the day's closing sheet (ui/DaySummary): the books, the customers seen and the orders as they stood at opening; the sheet once shut
+  const dayStart = useRef<{ ledger: typeof ledger; seen: Set<number>; sold: Record<string, number>; day: number } | null>(null)
+  const [daySum, setDaySum] = useState<{ s: DaySum; day: number } | null>(null)
+  const ledgerNow = useRef(ledger)
+  ledgerNow.current = ledger
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
   const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
   /**
@@ -1879,6 +1891,7 @@ export default function App() {
   usePanelSound(showRating)
   usePanelSound(office !== null)
   usePanelSound(fridgeOpen)
+  usePanelSound(daySum !== null)
   usePanelSound(drinksOpen)
   usePanelSound(viewMenu)
   usePanelSound(!menuFolded)
@@ -2360,6 +2373,12 @@ export default function App() {
         setAi(false)
         setClosing(false)
         setLeaving(false)
+        // (the day's closing sheet: the books since opening, the customers who came, what sold)
+        const st = dayStart.current
+        if (st) {
+          dayStart.current = null
+          setDaySum({ s: daySummary(st.ledger, ledgerNow.current, visitsNow.current.filter((v) => !st.seen.has(v.id)), soldBetween(st.sold, entryCountNow.current)), day: st.day })
+        }
       }
     }, 300)
     return () => { window.clearInterval(poll); for (const t of timers) window.clearTimeout(t) }
@@ -3037,6 +3056,8 @@ export default function App() {
         {speed > 1 ? '×2' : '▶▶'}
       </button>
       <Bgm />
+      {daySum && <DaySummary s={daySum.s} day={daySum.day} lang={lang} onClose={() => setDaySum(null)}
+        nameOf={(key) => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === key); return e ? nameIn(lang, e) : key }} />}
       <HoverTip hidden={editOn} />
       <RegisterManual lang={lang} />
       <LoadingScreen scene={!NO_WEBGL && !flatGrill} />
