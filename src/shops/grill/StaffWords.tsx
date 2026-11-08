@@ -7,15 +7,49 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { LATE, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED, type StaffWord } from '@/game/shopState'
 import { SKILLS, TIERS, type SkillId } from '@/data/staff'
-import { SkillIcon, StatusIcon } from '@/ui/GameIcons'
+import { Glyph, SkillIcon, StatusIcon } from '@/ui/GameIcons'
+import { setTip } from '@/scene/hoverTip'
 
 const STYLE = { pointerEvents: 'none' } as const
 const Z = [21, 11]
-/** over the head, in the figure's own frame (the staff and the owner are one model's size) */
-const HEAD = new THREE.Vector3(0, 1.5, 0)
+/** over the head, in the figure's own frame (the staff and the owner are one model's size); a little higher than the badges, which sit
+ * right over the head */
+const HEAD = new THREE.Vector3(0, 1.62, 0)
+/**
+ * drei's Html goes on drawing its page bit whether or not its group's shown: with the one it follows out of sight (off on a round, gone out
+ * of the door), the badge or bubble stayed where it last was (the owner's: a green badge left standing in the aisle). Shown or hidden here,
+ * on the page bit itself
+ */
+const showEl = (el: HTMLElement | null, on: boolean) => { if (el && (el.style.visibility === 'hidden') === on) el.style.visibility = on ? '' : 'hidden' }
 const AT = new THREE.Vector3()
 
+/**
+ * The bubbles kept from lying over one another (the owner's: two heads near together, their words piled up unreadable): a few times a
+ * second, every bubble shown (the customers', the staff's, the owner's) taken from the lowest on the screen up, and one that would overlap
+ * one already placed lifted just clear above it; eased there (the bubble's own transition), back down as the way clears
+ */
+function spreadBubbles() {
+  const placed: { l: number; r: number; t: number; h: number }[] = []
+  const all = [...document.querySelectorAll<HTMLElement>('.g3-bubble')].map((el) => {
+    const r = el.getBoundingClientRect(), dy = +(el.dataset.dy ?? 0)
+    return { el, r, base: r.top + dy, shown: r.width > 0 && el.closest<HTMLElement>('[style*="visibility: hidden"]') === null }
+  }).filter((x) => x.shown).sort((a, b) => b.base - a.base)
+  for (const x of all) {
+    const h = x.r.height
+    let top = x.base
+    for (let guard = 0; guard < 8; guard++) {
+      const hit = placed.find((p) => x.r.left < p.r - 2 && x.r.right > p.l + 2 && top < p.t + p.h + 4 && top + h > p.t - 4)
+      if (!hit) break
+      top = hit.t - h - 4
+    }
+    const dy = Math.min(140, Math.max(0, x.base - top))
+    placed.push({ l: x.r.left, r: x.r.right, t: top, h })
+    if (Math.abs(dy - +(x.el.dataset.dy ?? 0)) > 1) { x.el.dataset.dy = String(dy); x.el.style.translate = dy ? `0 ${-dy}px` : '' }
+  }
+}
+
 export const StaffWords = memo(function StaffWords() {
+  useEffect(() => { const t = window.setInterval(spreadBubbles, 150); return () => window.clearInterval(t) }, [])
   const [words, setWords] = useState<StaffWord[]>([])
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -34,6 +68,7 @@ export const StaffWords = memo(function StaffWords() {
 
 function Word({ word }: { word: StaffWord }) {
   const g = useRef<THREE.Group>(null)
+  const el = useRef<HTMLDivElement>(null)
   const scene = useThree((s) => s.scene)
   const who = useRef<THREE.Object3D | null>(null)
   useFrame(() => {
@@ -50,24 +85,28 @@ function Word({ word }: { word: StaffWord }) {
     }
     const t = who.current
     o.visible = !!t && t.visible
+    showEl(el.current, o.visible)
     if (!t) return
     o.position.copy(o.parent.worldToLocal(t.localToWorld(AT.copy(HEAD))))
   })
   return (
     <group ref={g} visible={false}>
       <Html center zIndexRange={Z} style={STYLE}>
-        <div className="g3-label"><span className="g3-bubble g3-say staff-say"><b className="say-who">{SPEAKERS.get(word.id) ?? ''}</b>{word.text}</span></div>
+        <div className="g3-label" ref={el}><span className="g3-bubble g3-say staff-say"><b className="say-who">{SPEAKERS.get(word.id) ?? ''}</b>{word.text}</span></div>
       </Html>
     </group>
   )
 }
 
-/** beside the head, to one side (the bubble's over it), in the figure's own frame */
-const SIDE = new THREE.Vector3(0.42, 1.3, 0)
+/** right over the head, in its middle (the owner's: beside it, it hung behind the cap), in the figure's own frame; the bubble's over it */
+const SIDE = new THREE.Vector3(0, 1.43, 0)
 const BADGE_Z = [20, 10]
+/** what a badge means, in the shop's paper label (the same as everything else pointed at in the room, the owner's), not the browser's own */
+const tipOn = (title: string, hint: string) => ({ onPointerEnter: () => setTip({ title, hint }), onPointerLeave: () => setTip(null) })
 /** the worn out's debuff, in the page's language */
 const TIRED_SAYS: Record<string, [string, string, string]> = {
-  zh: ['疲', '疲勞', '能力減半・動作變慢'], ja: ['疲', '疲労', '能力半減・動きが遅い'], en: ['Tired', 'Worn out', 'Half as able, half as quick'],
+  zh: ['疲勞中', '疲勞', '能力減半、動作變慢・可安排休息或換班'], ja: ['疲労中', '疲労', '能力半減・動きが遅い・休憩かシフト交代を'],
+  en: ['Tired', 'Worn out', 'Half as able, half as quick; give them a rest or a shift off'],
 }
 type Marks = { tired: boolean; buffs: SkillId[] }
 /** a skill working just now by the time of night (only those that have a time: before midnight, or in the deep night) */
@@ -76,7 +115,7 @@ const marksOf = (id: string): Marks => ({ tired: STAFF_TIRED.has(id), buffs: (ST
 
 /**
  * Beside each of the staff, what's on them (the owner's): worn out (data/staff's isTired: game/shopState's STAFF_TIRED, App keeps it), a
- * little dark-red debuff, ▼ and 疲; a special skill of theirs that's working just now by the time of night (the night owl in the deep
+ * little see-through deep red badge, a bead of sweat and 疲勞中; a special skill of theirs that's working just now by the time of night (the night owl in the deep
  * night, the early bird before midnight), its icon in its quality's colour, ▲. Each says what it means when pointed at; they follow them
  * about, gone as it passes.
  */
@@ -94,6 +133,7 @@ export const TiredBadges = memo(function TiredBadges() {
 
 function TiredBadge({ id, marks }: { id: string; marks: Marks }) {
   const g = useRef<THREE.Group>(null)
+  const el = useRef<HTMLSpanElement>(null)
   const scene = useThree((s) => s.scene)
   const who = useRef<THREE.Object3D | null>(null)
   useFrame(() => {
@@ -109,23 +149,24 @@ function TiredBadge({ id, marks }: { id: string; marks: Marks }) {
     let shown = !!t
     for (let q: THREE.Object3D | null = t; q && shown; q = q.parent) if (!q.visible || (q.userData.fade ?? 1) < 0.5) shown = false
     o.visible = shown
+    showEl(el.current, shown)
     if (!t || !shown) return
     o.position.copy(o.parent.worldToLocal(t.localToWorld(AT.copy(SIDE))))
   })
   const lang = typeof document !== 'undefined' ? document.documentElement.lang : 'zh'
   const tired = () => {
     const [mark, name, says] = TIRED_SAYS[lang] ?? TIRED_SAYS.zh
-    return <span key="tired" className="staff-badge is-tired" title={`${name}：${says}`} aria-label={`${name}：${says}`}><StatusIcon up={false} />{mark}</span>
+    return <span key="tired" className="staff-badge is-tired" aria-label={`${name}：${says}`} {...tipOn(name, says)}><Glyph id="drop" size={12} />{mark}</span>
   }
   const buff = (k: SkillId) => {
     const sk = SKILLS[k], tier = TIERS[sk.tier]
     const [name, says, q] = lang === 'ja' ? [sk.ja, sk.jaSays, tier.ja] : lang === 'en' ? [sk.en, sk.enSays, tier.en] : [sk.zh, sk.zhSays, tier.zh]
-    return <span key={k} className={`staff-badge is-buff is-${sk.tier}`} title={`${q}・${name}：${says}`} aria-label={`${name}：${says}`}><StatusIcon up /><SkillIcon id={k} size={14} /></span>
+    return <span key={k} className={`staff-badge is-buff is-${sk.tier}`} aria-label={`${name}：${says}`} {...tipOn(`${q}・${name}`, says)}><StatusIcon up /><SkillIcon id={k} size={14} /></span>
   }
   return (
     <group ref={g} visible={false}>
       <Html center zIndexRange={BADGE_Z}>
-        <span className="staff-badges">{marks.tired && tired()}{marks.buffs.map(buff)}</span>
+        <span className="staff-badges" ref={el}>{marks.tired && tired()}{marks.buffs.map(buff)}</span>
       </Html>
     </group>
   )

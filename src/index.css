@@ -4065,19 +4065,22 @@ button {
 }
 
 .g3-bubble {
-  /* (every speaker's alike, the owner's: dark smoked glass, white words, rounded, a soft shadow; the speaker's tag over them) */
+  /* (every speaker's alike, the owner's: a see-through warm charcoal glass with a faint lamp-lit edge, white words, the speaker's tag over
+     them; the owner's 2026-11-09: the near-black slabs over every head broke the room) */
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding: 4px 10px 5px;
-  border-radius: 10px;
-  background: rgb(25 25 25 / 0.88);
-  box-shadow: 0 3px 10px rgb(0 0 0 / 0.35);
+  gap: 2px;
+  padding: 6px 12px;
+  border: 1px solid rgb(230 200 160 / 0.2);
+  border-radius: 8px;
+  background: rgb(24 20 18 / 0.78);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   color: #fbf7ef;
-  font: 700 12px/1.3 var(--brush);
+  font: 700 12px/1.4 var(--brush);
+  transition: translate 0.2s ease-out;
   animation: gc-dots 1.4s ease-in-out infinite;
 }
 
@@ -7855,9 +7858,9 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   .day-sum-veil { animation: none; }
 }
 
-/* what's on one of the staff, beside them (StaffWords' TiredBadges; the owner's): worn out, a small dark-red debuff, ▼ and 疲; a special
-   skill working just now by the time of night, ▲ and its icon in its quality's colour (the tiers' colours with the office's .ofc-trait);
-   side by side, bobbing a little; pointed at, they say what they mean (title) */
+/* what's on one of the staff, right over their head (StaffWords' TiredBadges; the owner's): worn out, a see-through deep red with a drawn
+   bead of sweat and 疲勞中; a special skill working just now by the time of night, ▲ and its icon in its quality's colour (the tiers'
+   colours with the office's .ofc-trait); side by side, bobbing a little; pointed at, they say what they mean in the shop's paper label */
 .staff-badges {
   display: inline-flex;
   gap: 3px;
@@ -7866,21 +7869,23 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 7px 2px 5px;
-  border: 1px solid rgb(255 180 170 / 0.5);
+  padding: 2px 8px 2px 6px;
+  border: 1px solid rgb(255 200 190 / 0.35);
   border-radius: 10px;
-  background: linear-gradient(180deg, #a0322a, #6e1b16);
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 0 8px rgb(200 40 30 / 0.45);
-  color: #ffe9e4;
+  background: rgb(180 40 40 / 0.85);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  color: #fff;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
-  cursor: help;
+  cursor: default;
   user-select: none;
   animation: staff-badge-bob 1.8s ease-in-out infinite;
 }
-.staff-badge .game-icon:first-child { color: #ffb4a8; }
+.staff-badge .game-icon:first-child { color: #d6ecff; }
 .staff-badge.is-buff {
   --tier-a: #2f7d3f;
   --tier-b: #1d5129;
