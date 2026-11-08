@@ -4178,8 +4178,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && fridges && stocker && <Stocker counters={counters} fridges={fridges} who={stocker} />}
       {/* (what the staff and the owner say as the day ends and begins, over their heads) */}
       {given && <StaffWords />}
-      {/* (the worn out among the staff: a debuff beside each (the owner's)) */}
-      {given && <TiredBadges />}
+      {/* (the worn out among the staff, while the shop's open: a debuff beside each (the owner's)) */}
+      {given && open && <TiredBadges />}
       {/* (what's just been paid, rising green over the one who paid it, and gone) */}
       {payFloats.map((f) => <PayFloat key={f.key} text={f.text} follow={() => groups.current.get(f.id)} done={() => setPayFloats((all) => all.filter((x) => x.key !== f.key))} />)}
       {ownerServes && (

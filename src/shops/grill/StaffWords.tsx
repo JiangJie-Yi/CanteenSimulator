@@ -96,8 +96,9 @@ function TiredBadge({ id }: { id: string }) {
     }
     const t = who.current
     // (with them: not while they're out of sight (off at the door, or stood in for by the one out on a round))
+    // (nor as they fade out of a doorway going home: it went on hanging there, solid, after they'd gone)
     let shown = !!t
-    for (let q: THREE.Object3D | null = t; q && shown; q = q.parent) if (!q.visible) shown = false
+    for (let q: THREE.Object3D | null = t; q && shown; q = q.parent) if (!q.visible || (q.userData.fade ?? 1) < 0.5) shown = false
     o.visible = shown
     if (!t || !shown) return
     o.position.copy(o.parent.worldToLocal(t.localToWorld(AT.copy(SIDE))))
