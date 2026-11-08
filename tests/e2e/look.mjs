@@ -48,7 +48,7 @@ await page.locator('.nb-views button').nth(0).click()
 const publish = page.locator('.nb-embedded .nb-publish button:not(.nb-off)')
 for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await page.waitForTimeout(50) }
 await page.locator('.office .panel-x').click()
-// (only in the shop's hours, 17:30 to 02:30: the clock moved on to them)
+// (only in the shop's hours, 14:30 to 02:30: the clock moved on to them)
 await toOpeningHours(page)
 await page.locator('.ai-toggle').click()
 // (thirstier and readier for the toilet than usual, so the side trips are walked while we watch)

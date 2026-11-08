@@ -46,7 +46,7 @@ if (process.env.OPEN) {
   const publish = p.locator('.nb-embedded .nb-publish button:not(.nb-off)')
   for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await p.waitForTimeout(50) }
   await p.locator('.office .panel-x').click()
-  // (only in the shop's hours, 17:30 to 02:30: the clock moved on to them)
+  // (only in the shop's hours, 14:30 to 02:30: the clock moved on to them)
   await toOpeningHours(p)
   await p.locator('.ai-toggle').click()
   await p.waitForTimeout(+process.env.OPEN)

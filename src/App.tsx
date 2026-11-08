@@ -2451,7 +2451,7 @@ export default function App() {
       if (up.length) addTalk(d.id, 'chef', CHEF_TALK[lang].menuMade(up.map((m) => m.name), who))
       return
     }
-    // (opened only in the shop's hours (17:30 to 02:30, the owner's): ready before, it waits for them)
+    // (opened only in the shop's hours (14:30 to 02:30, the owner's): ready before, it waits for them)
     if (entriesOf(d.id).length >= (MENU_MIN[d.id] ?? 1) && sellable(d) && inHours(getClock().minute)) {
       setAi(true)
       say(T.autoOpen)
@@ -3022,7 +3022,7 @@ export default function App() {
         // (at the grill the owner is the head chef: with no cooks hired, it's all theirs to do)
         if (!ai && dish.roast && !staffOf(dish.id, 'chef').length && !staffOf(dish.id, 'sous').length) say(UI[lang].ownerCooks)
         if (leaving) return
-        // (only in the shop's hours, 17:30 to 02:30 (the owner's))
+        // (only in the shop's hours, 14:30 to 02:30 (the owner's))
         if (!ai && !inHours(getClock().minute)) { say(tl(lang, `營業時間 ${hoursText()}，還沒到開店的時候`, `営業時間は ${hoursText()}、まだ開けられません`, `Open ${hoursText()}: not yet`)); return }
         if (!ai) setAi(true)
         else if (closing) setClosing(false)

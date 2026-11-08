@@ -57,8 +57,9 @@ export const effective = (w: Worker, fatigue: number) => (w.skill / 100) * (isTi
 /** how fast they get about and get things done, against fresh: half, worn out */
 export const paceOf = (fatigue: number) => (isTired(fatigue) ? 0.5 : 1)
 
-/** fatigue gained per hour open, of the game's clock (the shop's hours (game/hours) are nine of them): the lower the stamina, the faster;
- * one of stamina 40 is worn out some six hours in, one of 80 not by closing */
+/** fatigue gained per hour at work, of the game's clock (from opening till they've gone home: the shop's hours (game/hours) are twelve of
+ * them, and the closing up after; the owner's: as in the real world, all the time they're on the clock): the lower the stamina, the faster;
+ * one of stamina 30 worn out under six hours in, by the end of the shift even one of 90 */
 export const tirePerHour = (w: Worker) => 6 + (100 - w.stamina) * 0.12
-/** fatigue shed per hour with the shop shut: the fifteen hours between closing and opening rest anyone fully */
+/** fatigue shed per hour with the shop shut: the twelve hours between closing and opening rest anyone fully */
 export const restPerHour = 12

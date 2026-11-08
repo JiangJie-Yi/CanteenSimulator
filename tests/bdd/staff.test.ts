@@ -27,8 +27,8 @@ feature('員工與徵人', () => {
     given('體力 90 和體力 30 的兩個人', (w) => { w.a = { stamina: 90 } as Worker; w.b = { stamina: 30 } as Worker })
     when('比較每營業一小時增加的疲勞', (w) => { w.ta = tirePerHour(w.a); w.tb = tirePerHour(w.b) })
     then('體力低的累得比較快', (w) => { expect(w.tb).toBeGreaterThan(w.ta) })
-    and('營業九小時：體力 30 的會累到疲勞，體力 90 的不會', (w) => { expect(9 * w.tb).toBeGreaterThanOrEqual(TIRED_AT); expect(9 * w.ta).toBeLessThan(TIRED_AT) })
-    and('閉店十五小時一定恢復到精神飽滿', () => { expect(15 * restPerHour).toBeGreaterThanOrEqual(100) })
+    and('體力 30 的不到半個班（6 小時）就累了；12 小時的班做完，連體力 90 的也會累', (w) => { expect(6 * w.tb).toBeGreaterThanOrEqual(TIRED_AT); expect(6 * w.ta).toBeLessThan(TIRED_AT); expect(12 * w.ta).toBeGreaterThanOrEqual(TIRED_AT) })
+    and('閉店的 12 小時一定恢復到精神飽滿', () => { expect(12 * restPerHour).toBeGreaterThanOrEqual(100) })
   })
 
   scenario('應徵的人夠多可以挑：每個職位至少是名額的 4 倍，掌爐的師傅（二廚）至少 8 位', ({ given, then, and }) => {
