@@ -5,10 +5,12 @@ plain boxes and planes, about 400 triangles.
 - "FridgeBody": the black cabinet (sides, back, top, plinth with its louvre slats), its white liner inside, the stainless strip under the door,
   the dark gasket round the opening (FridgeShell, FridgeLiner, FridgeLouver, FridgeMetal, FridgeGasket).
 - "FridgeSign": the light box over the door, one quad (its picture, the washi sign, painted by the game: FridgeSign).
-- "FridgeShelves": the four wire shelves, each a quad whose picture is the wire grid (its gaps see-through: FridgeWire) and a white front
-  lip (FridgeLiner).
-- "FridgeDoor": the glass door: its black frame, the pane (FridgeGlass, see-through) and the long silver handle on its right; the game swings
-  it on its left edge.
+- "FridgeShelves": the four wire shelves, each a quad whose picture is the wire grid (its gaps see-through: FridgeWire), a white front
+  lip (FridgeLiner) and on it a strip of price tags (FridgeTag: the shelf's own quarter of the picture, painted by the game).
+- The back of the liner is its own face (FridgeBackLight: the game paints the LED's cool white wash on it, brightest under each shelf).
+- "FridgeDoorL", "FridgeDoorR": the pair of glass doors (the owner's: two black-framed doors a fridge, a black mullion where they meet): each
+  its frame, its pane (FridgeGlass, see-through) and a long silver handle by the middle; the game swings each on its outer edge.
+- The foot: six louvre slats and a small silver maker's plate (FridgeMetal).
 
 The game's frame, in the room's units: y up, the door's face toward +z, the middle of its foot at the origin; as big as bar.ts's FRIDGE
 (0.86 across, 2.17 up, 0.75 deep), the shelves where FRIDGE_UNITS puts the drinks (0.27, 0.72, 1.19, 1.63 up).
@@ -64,6 +66,8 @@ M = {
     "sign": pbr("FridgeSign", (1, 1, 1), rough=0.6),
     "wire": pbr("FridgeWire", (1, 1, 1), tex=image("fridge_wire", wire_rgb, alpha=wires.astype(np.float32)), rough=0.4, blend=False),
     "glass": pbr("FridgeGlass", lin("#cfe2ea"), rough=0.05, blend=True),
+    "backlight": pbr("FridgeBackLight", (1, 1, 1), rough=0.6),
+    "tag": pbr("FridgeTag", (1, 1, 1), rough=0.6),
 }
 parts = []
 
@@ -122,13 +126,14 @@ body = [
     box("floor", x0 + T, x1 - T, PLINTH - 0.02, PLINTH, zb + T, zf - 0.02, "liner"),
     box("strip", x0 + T, x1 - T, PLINTH - 0.025, PLINTH, zf - 0.02, zf, "metal"),
 ]
-# (the louvre: slats across the foot, a little proud of it)
-for k in range(4):
-    y = 0.025 + k * 0.028
-    body.append(box(f"slat{k}", x0 + T + 0.03, x1 - T - 0.03, y, y + 0.01, zf - 0.02, zf - 0.008, "gasket"))
+# (the louvre: six slats across the foot, standing proud of it, and a little silver maker's plate in their middle)
+for k in range(6):
+    y = 0.012 + k * 0.019
+    body.append(box(f"slat{k}", x0 + T + 0.03, x1 - T - 0.03, y, y + 0.009, zf - 0.02, zf - 0.006, "gasket"))
+body.append(box("badge", -0.055, 0.055, 0.056, 0.082, zf - 0.006, zf - 0.002, "metal"))
 # (the liner: the back and sides inside, white; the ceiling under the header)
 ix0, ix1, iz0, iz1 = x0 + T, x1 - T, zb + T, zf - 0.06
-body.append(quad("liner-back", [(ix0, open_y0, iz0 + 0.001), (ix1, open_y0, iz0 + 0.001), (ix1, open_y1, iz0 + 0.001), (ix0, open_y1, iz0 + 0.001)], "liner"))
+body.append(quad("liner-back", [(ix0, open_y0, iz0 + 0.001), (ix1, open_y0, iz0 + 0.001), (ix1, open_y1, iz0 + 0.001), (ix0, open_y1, iz0 + 0.001)], "backlight"))
 body.append(quad("liner-l", [(ix0 + 0.001, open_y0, iz1), (ix0 + 0.001, open_y0, iz0), (ix0 + 0.001, open_y1, iz0), (ix0 + 0.001, open_y1, iz1)], "liner"))
 body.append(quad("liner-r", [(ix1 - 0.001, open_y0, iz0), (ix1 - 0.001, open_y0, iz1), (ix1 - 0.001, open_y1, iz1), (ix1 - 0.001, open_y1, iz0)], "liner"))
 body.append(quad("liner-top", [(ix0, open_y1 - 0.001, iz1), (ix1, open_y1 - 0.001, iz1), (ix1, open_y1 - 0.001, iz0), (ix0, open_y1 - 0.001, iz0)], "liner"))
@@ -149,31 +154,39 @@ for k, y in enumerate(SHELVES):
     sy = y - 0.004
     shelves.append(quad(f"shelf{k}", [(ix0 + 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy, iz0 + 0.02), (ix0 + 0.01, sy, iz0 + 0.02)], "wire"))
     shelves.append(box(f"lip{k}", ix0 + 0.01, ix1 - 0.01, sy - 0.025, sy + 0.012, iz1 - 0.022, iz1 - 0.01, "liner"))
+    # (the price tags along the lip's face, 1.5 mm proud of it: this shelf's quarter of the picture)
+    v0, v1 = 1 - (k + 1) / len(SHELVES), 1 - k / len(SHELVES)
+    shelves.append(quad(f"tags{k}", [(ix0 + 0.012, sy - 0.023, iz1 - 0.0085), (ix1 - 0.012, sy - 0.023, iz1 - 0.0085), (ix1 - 0.012, sy + 0.01, iz1 - 0.0085),
+                                     (ix0 + 0.012, sy + 0.01, iz1 - 0.0085)], "tag", uv=((0, v0), (1, v0), (1, v1), (0, v1))))
 fridge_shelves = join(shelves, "FridgeShelves")
 
-# ---- the door: its frame, the pane, the handle on its right
+# ---- the doors: a pair, each its frame, its pane, its handle by the middle (where the two frames meet, a black mullion)
 dz0, dz1 = zf - 0.005, zf + 0.025
 fx0, fx1, fy0, fy1 = x0 + 0.008, x1 - 0.008, open_y0 - 0.01, open_y1 + 0.006
-fw = 0.045
-door = [
-    box("dframe-t", fx0, fx1, fy1 - fw, fy1, dz0, dz1, "shell"),
-    box("dframe-b", fx0, fx1, fy0, fy0 + fw * 1.4, dz0, dz1, "shell"),
-    box("dframe-l", fx0, fx0 + fw, fy0, fy1, dz0, dz1, "shell"),
-    box("dframe-r", fx1 - fw, fx1, fy0, fy1, dz0, dz1, "shell"),
-    quad("pane", [(fx0 + fw, fy0 + fw * 1.4, (dz0 + dz1) / 2), (fx1 - fw, fy0 + fw * 1.4, (dz0 + dz1) / 2),
-                  (fx1 - fw, fy1 - fw, (dz0 + dz1) / 2), (fx0 + fw, fy1 - fw, (dz0 + dz1) / 2)], "glass"),
-    # (the long handle: a bar on two posts, out from the frame on its right)
-    box("handle", fx1 - fw * 0.7, fx1 - fw * 0.3, 0.75, 1.55, dz1 + 0.03, dz1 + 0.048, "metal"),
-    box("post-t", fx1 - fw * 0.65, fx1 - fw * 0.35, 1.5, 1.53, dz1, dz1 + 0.032, "metal"),
-    box("post-b", fx1 - fw * 0.65, fx1 - fw * 0.35, 0.77, 0.8, dz1, dz1 + 0.032, "metal"),
-]
-fridge_door = join(door, "FridgeDoor")
+fw = 0.04
+doors = []
+for side, (ax, bx) in (("L", (fx0, -0.002)), ("R", (0.002, fx1))):
+    inner = bx if side == "L" else ax
+    # (the handle on the inner stile's face: a bar on two posts; the stile by the middle a little wider, the mullion)
+    hx0, hx1 = (inner - fw * 0.75, inner - fw * 0.35) if side == "L" else (inner + fw * 0.35, inner + fw * 0.75)
+    parts_ = [
+        box(f"dframe-t{side}", ax, bx, fy1 - fw, fy1, dz0, dz1, "shell"),
+        box(f"dframe-b{side}", ax, bx, fy0, fy0 + fw * 1.4, dz0, dz1, "shell"),
+        box(f"dframe-l{side}", ax, ax + fw, fy0, fy1, dz0, dz1, "shell"),
+        box(f"dframe-r{side}", bx - fw, bx, fy0, fy1, dz0, dz1, "shell"),
+        quad(f"pane{side}", [(ax + fw, fy0 + fw * 1.4, (dz0 + dz1) / 2), (bx - fw, fy0 + fw * 1.4, (dz0 + dz1) / 2),
+                             (bx - fw, fy1 - fw, (dz0 + dz1) / 2), (ax + fw, fy1 - fw, (dz0 + dz1) / 2)], "glass"),
+        box(f"handle{side}", hx0, hx1, 0.75, 1.55, dz1 + 0.03, dz1 + 0.046, "metal"),
+        box(f"post-t{side}", hx0 + 0.003, hx1 - 0.003, 1.5, 1.53, dz1, dz1 + 0.031, "metal"),
+        box(f"post-b{side}", hx0 + 0.003, hx1 - 0.003, 0.77, 0.8, dz1, dz1 + 0.031, "metal"),
+    ]
+    doors.append(join(parts_, f"FridgeDoor{side}"))
 
 root = bpy.data.objects.new("DrinkFridge", None)
 bpy.context.collection.objects.link(root)
-for o in (fridge_body, sign, fridge_shelves, fridge_door):
+for o in (fridge_body, sign, fridge_shelves, *doors):
     o.parent = root
-print("FRIDGE_TRIS", sum(len(p.vertices) - 2 for o in (fridge_body, sign, fridge_shelves, fridge_door) for p in o.data.polygons))
+print("FRIDGE_TRIS", sum(len(p.vertices) - 2 for o in (fridge_body, sign, fridge_shelves, *doors) for p in o.data.polygons))
 if PREVIEW:
     target = P(0, 1.1, 0)
     cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))

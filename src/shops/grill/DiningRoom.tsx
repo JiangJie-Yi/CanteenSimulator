@@ -4420,46 +4420,138 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
 const FRIDGE_URL = import.meta.env.BASE_URL + 'models/drinkfridge.glb'
 /**
  * The drink fridges' cabinet (blender/drinkfridge.py: made in place of the downloaded one, the owner's: its parts and outlines were some 8,500
- * triangles and nine draws a fridge): a commercial one-door cooler, black, its light box over the door the washi sign (冷やし・ドリンク on
- * the drinks', 銘酒・厳選地酒 on the sake's, lit warm), a white liner, four wire shelves, a glass door on a long silver handle
+ * triangles and nine draws a fridge): a commercial cooler in matte black lacquered metal, a pair of black-framed glass doors with a mullion
+ * where they meet and a long silver handle on each, louvres and a little silver maker's plate at its foot; over the doors its light box (銘酒
+ * 各種 on the sake's, with two bottles drawn in black; 冷やし ドリンク on the drinks'), a white liner washed with the LEDs' cool white, four
+ * wire shelves with a strip of price tags along each one's lip
  */
-const FRIDGE_WORDS: [string, string][] = [['冷やし', 'ドリンク'], ['銘酒', '厳選地酒']]
-function fridgeSignCanvas(n: number) {
-  const c = document.createElement('canvas')
-  c.width = 640; c.height = 200
-  const g = c.getContext('2d')!
-  // (washi: warm cream, fibres and a soft cloudiness, brighter in its middle as if lit from behind)
-  const bg = g.createRadialGradient(320, 100, 20, 320, 100, 360)
-  bg.addColorStop(0, '#fff6dc'); bg.addColorStop(1, '#ecd8a8')
-  g.fillStyle = bg; g.fillRect(0, 0, 640, 200)
-  let seed = 7 + n
-  const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646 }
-  g.strokeStyle = 'rgba(170,130,70,0.18)'; g.lineWidth = 1
-  for (let k = 0; k < 160; k++) { const x = rnd() * 640, y = rnd() * 200, a = rnd() * Math.PI; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 18, y + Math.sin(a) * 18); g.stroke() }
-  // (thin bamboo ribs behind the paper)
-  g.fillStyle = 'rgba(120,85,40,0.16)'
-  for (let x = 107; x < 640; x += 107) g.fillRect(x - 2, 0, 4, 200)
-  // (its dark walnut edge)
-  g.strokeStyle = '#2e1d12'; g.lineWidth = 16; g.strokeRect(8, 8, 624, 184)
-  g.strokeStyle = 'rgba(214,170,90,0.6)'; g.lineWidth = 2; g.strokeRect(20, 20, 600, 160)
-  const [big, small] = FRIDGE_WORDS[n] ?? FRIDGE_WORDS[0]
-  brushText(g, big, 210, 104, 86, { fill: '#1a120c', edge: 'rgba(0,0,0,0)', shadow: 'rgba(80,40,10,0.25)', spacing: 4 })
-  brushText(g, small, 448, 108, 54, { fill: '#2a1a10', edge: 'rgba(0,0,0,0)', shadow: 'rgba(80,40,10,0.2)', spacing: 2 })
-  // (a little red seal)
-  g.fillStyle = '#b3241c'; g.fillRect(566, 128, 34, 34)
-  g.fillStyle = '#fbe9d6'; g.font = '700 22px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('聞', 583, 146)
-  return c
+const FRIDGE_WORDS: [string, string][] = [['冷やし', 'ドリンク'], ['銘酒', '各種']]
+/** the light box's picture (the owner's: bright clean white lit from behind, a fine matte black frame, black brush lettering and a little red
+ * seal; the sake's two bottles in black silhouette before its words). Painted the way up the glTF quad holds it (flipY off: it was upside down) */
+const fridgeSignTex = (n: number) => {
+  const t = canvasTex(760, 200, (g) => {
+    const bg = g.createRadialGradient(380, 100, 30, 380, 100, 420)
+    bg.addColorStop(0, '#ffffff'); bg.addColorStop(1, '#f1efea')
+    g.fillStyle = bg; g.fillRect(0, 0, 760, 200)
+    // (the diffuser's faint ribs, the tubes behind it)
+    g.fillStyle = 'rgba(200,205,210,0.18)'
+    for (const y of [52, 100, 148]) g.fillRect(0, y - 9, 760, 18)
+    // (a fine matte black frame)
+    g.strokeStyle = '#141416'; g.lineWidth = 10; g.strokeRect(5, 5, 750, 190)
+    g.strokeStyle = 'rgba(20,20,22,0.35)'; g.lineWidth = 1.5; g.strokeRect(16, 16, 728, 168)
+    const [big, small] = FRIDGE_WORDS[n] ?? FRIDGE_WORDS[0]
+    const ink = { fill: '#121012', edge: 'rgba(0,0,0,0)', shadow: 'rgba(0,0,0,0.12)' }
+    if (n === 1) {
+      // (two 一升瓶 in silhouette: a round shoulder, a long neck, a cap; a pale label with a red band on each)
+      for (const [x, h] of [[78, 140], [122, 126]] as const) {
+        const foot = 100 + h / 2, y0 = 100 - h / 2
+        g.fillStyle = '#121012'
+        g.beginPath()
+        g.moveTo(x - 17, foot); g.lineTo(x - 17, y0 + h * 0.42)
+        g.quadraticCurveTo(x - 17, y0 + h * 0.26, x - 6, y0 + h * 0.2)
+        g.lineTo(x - 6, y0 + 8); g.lineTo(x + 6, y0 + 8); g.lineTo(x + 6, y0 + h * 0.2)
+        g.quadraticCurveTo(x + 17, y0 + h * 0.26, x + 17, y0 + h * 0.42)
+        g.lineTo(x + 17, foot); g.closePath(); g.fill()
+        g.fillRect(x - 7.5, y0, 15, 9)
+        g.fillStyle = '#f4f2ec'; g.fillRect(x - 11, y0 + h * 0.5, 22, h * 0.3)
+        g.fillStyle = '#b3241c'; g.fillRect(x - 3, y0 + h * 0.55, 6, h * 0.2)
+      }
+      brushText(g, big, 330, 102, 104, { ...ink, spacing: 6 })
+      brushText(g, small, 545, 106, 92, { ...ink, spacing: 4 })
+    } else {
+      brushText(g, big, 238, 102, 96, { ...ink, spacing: 4 })
+      brushText(g, small, 500, 108, 70, { ...ink, weight: '900', spacing: 2 })
+    }
+    // (the little red seal)
+    g.fillStyle = '#b3241c'; g.fillRect(672, 120, 40, 40)
+    g.strokeStyle = 'rgba(255,240,230,0.7)'; g.lineWidth = 1.5; g.strokeRect(676, 124, 32, 32)
+    g.fillStyle = '#fbe9d6'; g.font = '700 24px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('聞', 692, 141)
+  })
+  if (t) t.flipY = false
+  if (t) t.anisotropy = 4
+  return t
 }
-const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; door: THREE.Group }>()
-/** the wire shelves' and the glass's materials, and the sign's, made once (the sign's for each fridge) */
-const FRIDGE_GLASS = new THREE.MeshToonMaterial({ color: '#cfe4ec', transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
-const fridgeSign = (n: number) => {
-  const t = new THREE.CanvasTexture(fridgeSignCanvas(n))
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 4
-  // (lit from inside: as bright by night as by day)
-  return new THREE.MeshBasicMaterial({ map: t, toneMapped: false })
+/** the glass: a cool clear tint, two broad and a few thin white glare streaks at 45°, its edges a faint cold blue (the alpha the glass's own) */
+const FRIDGE_GLASS_TEX = (() => {
+  const t = canvasTex(256, 512, (g) => {
+    g.clearRect(0, 0, 256, 512)
+    g.fillStyle = 'rgba(214,232,240,0.26)'; g.fillRect(0, 0, 256, 512)
+    const edge = (x0: number, y0: number, x1: number, y1: number) => {
+      const e = g.createLinearGradient(x0, y0, x1, y1)
+      e.addColorStop(0, 'rgba(150,200,235,0.45)'); e.addColorStop(1, 'rgba(150,200,235,0)')
+      return e
+    }
+    g.fillStyle = edge(0, 0, 26, 0); g.fillRect(0, 0, 26, 512)
+    g.fillStyle = edge(256, 0, 230, 0); g.fillRect(230, 0, 26, 512)
+    g.fillStyle = edge(0, 0, 0, 22); g.fillRect(0, 0, 256, 22)
+    g.fillStyle = edge(0, 512, 0, 490); g.fillRect(0, 490, 256, 22)
+    g.save()
+    g.translate(128, 256); g.rotate(-Math.PI / 4)
+    for (const [x, w, a] of [[-150, 46, 0.5], [-92, 12, 0.62], [40, 70, 0.3], [118, 8, 0.6], [150, 20, 0.34]] as const) {
+      const st = g.createLinearGradient(x - w / 2, 0, x + w / 2, 0)
+      st.addColorStop(0, 'rgba(255,255,255,0)'); st.addColorStop(0.5, `rgba(255,255,255,${a})`); st.addColorStop(1, 'rgba(255,255,255,0)')
+      g.fillStyle = st; g.fillRect(x - w / 2, -400, w, 800)
+    }
+    g.restore()
+  })
+  if (t) t.flipY = false
+  return t
+})()
+/** the liner's back, washed by the LED strips: cool white, brightest just under the ceiling and under each shelf, softer below each (the
+ * shelves, up from the liner's foot over its height: blender/drinkfridge.py's SHELVES, PLINTH, HEAD) */
+const FRIDGE_LED = (() => {
+  const t = canvasTex(64, 512, (g) => {
+    g.fillStyle = '#d6e2ea'; g.fillRect(0, 0, 64, 512)
+    const top = 2.17 - 0.27, foot = 0.14
+    const rowOf = (y: number) => ((top - y) / (top - foot)) * 512
+    for (const y of [top, 0.27, 0.72, 1.19, 1.63]) {
+      const r = rowOf(y)
+      const w = g.createLinearGradient(0, r, 0, r + 150)
+      w.addColorStop(0, 'rgba(250,253,255,1)'); w.addColorStop(0.25, 'rgba(232,244,252,0.85)'); w.addColorStop(1, 'rgba(232,244,252,0)')
+      g.fillStyle = w; g.fillRect(0, r, 64, 150)
+    }
+    // (its sides a touch darker: the light's from the middle)
+    const sd = g.createLinearGradient(0, 0, 64, 0)
+    sd.addColorStop(0, 'rgba(120,140,155,0.25)'); sd.addColorStop(0.2, 'rgba(120,140,155,0)'); sd.addColorStop(0.8, 'rgba(120,140,155,0)'); sd.addColorStop(1, 'rgba(120,140,155,0.25)')
+    g.fillStyle = sd; g.fillRect(0, 0, 64, 512)
+  })
+  if (t) t.flipY = false
+  return t
+})()
+/** the price tags along each shelf's lip: a white strip, a little white card with red or blue figures under each place, a thin rule (a quarter
+ * of the picture to a shelf, the lowest at the top) */
+const fridgeTagTex = (n: number) => {
+  const t = canvasTex(1024, 256, (g) => {
+    g.fillStyle = '#f7f8f8'; g.fillRect(0, 0, 1024, 256)
+    for (let k = 0; k < 4; k++) {
+      const y0 = k * 64
+      g.fillStyle = '#d9dde0'; g.fillRect(0, y0 + 60, 1024, 4)
+      const tags = 6, w = 1024 / tags
+      for (let i = 0; i < tags; i++) {
+        const x = i * w + 14, red = (i + k + n) % 3 !== 0
+        g.fillStyle = '#ffffff'; g.fillRect(x, y0 + 8, w - 28, 46)
+        g.strokeStyle = red ? '#c8261d' : '#1d4f9c'; g.lineWidth = 2; g.strokeRect(x, y0 + 8, w - 28, 46)
+        g.fillStyle = red ? '#c8261d' : '#1d4f9c'; g.fillRect(x, y0 + 8, 12, 46)
+        g.font = '800 30px sans-serif'; g.textAlign = 'right'; g.textBaseline = 'middle'
+        g.fillText(`¥${[150, 180, 200, 250, 300, 380][(i * 7 + k * 3 + n) % 6]}`, x + w - 40, y0 + 32)
+      }
+    }
+  })
+  if (t) t.flipY = false
+  return t
 }
+const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; doors: THREE.Group[] }>()
+/** the glass (cool, clear, its glare streaks; the studio's room in it), made once */
+const FRIDGE_GLASS = new THREE.MeshStandardMaterial({ color: '#ffffff', map: FRIDGE_GLASS_TEX, transparent: true, roughness: 0.05, metalness: 0.1,
+  side: THREE.DoubleSide, depthWrite: false })
+/** the cabinet and the doors' frames: deep matte black lacquered metal; the handles, the strip and the plate: bright silver (the studio's
+ * room in both: metal shows as metal by what it reflects) */
+const FRIDGE_SHELL = new THREE.MeshStandardMaterial({ color: '#181a1d', roughness: 0.35, metalness: 0.6 })
+const FRIDGE_METAL = new THREE.MeshStandardMaterial({ color: '#d8dee9', roughness: 0.2, metalness: 0.85 })
+reflectStudio(FRIDGE_GLASS, FRIDGE_SHELL, FRIDGE_METAL)
+/** lit from inside: as bright by night as by day */
+const fridgeSign = (n: number) => new THREE.MeshBasicMaterial({ map: fridgeSignTex(n), toneMapped: false })
+const FRIDGE_BACK = new THREE.MeshBasicMaterial({ map: FRIDGE_LED })
 function useFreezer(n: number) {
   const gltf = useGLTF(FRIDGE_URL) as unknown as { scene: THREE.Group }
   return useMemo(() => {
@@ -4468,6 +4560,7 @@ function useFreezer(n: number) {
     const root = (gltf.scene.getObjectByName('DrinkFridge') ?? gltf.scene).clone(true)
     root.position.set(0, 0, 0)
     const sign = fridgeSign(n)
+    const tags = new THREE.MeshBasicMaterial({ map: fridgeTagTex(n) })
     const mats = new Map<THREE.Material, THREE.Material>()
     const conv = (m: THREE.Material) => {
       let t = mats.get(m)
@@ -4475,10 +4568,14 @@ function useFreezer(n: number) {
         const src = m as THREE.MeshStandardMaterial
         if (src.name === 'FridgeSign') t = sign
         else if (src.name === 'FridgeGlass') t = FRIDGE_GLASS
+        else if (src.name === 'FridgeShell') t = FRIDGE_SHELL
+        else if (src.name === 'FridgeMetal') t = FRIDGE_METAL
+        else if (src.name === 'FridgeBackLight') t = FRIDGE_BACK
+        else if (src.name === 'FridgeTag') t = tags
         // (the wire grid: its gaps cut away)
         else if (src.name === 'FridgeWire') t = new THREE.MeshToonMaterial({ color: '#eceeee', map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })
         else t = new THREE.MeshToonMaterial({ color: src.color.clone() })
-        t.name = src.name
+        if (!t.name) t.name = src.name
         mats.set(m, t)
       }
       return t
@@ -4492,45 +4589,63 @@ function useFreezer(n: number) {
       m.castShadow = !see
       m.receiveShadow = !see
     })
-    // (an outline round the cabinet and the door, not the sign, the shelves' wire or the glass)
-    inkModel(root, (m) => { const x = m.material as THREE.Material; return x.transparent || x.alphaTest > 0 || x === sign })
+    // (an outline round the cabinet and the doors, not the sign, the lit back, the tags, the shelves' wire or the glass)
+    inkModel(root, (m) => { const x = m.material as THREE.Material; return x.transparent || x.alphaTest > 0 || x === sign || x === tags || x === FRIDGE_BACK })
     root.updateMatrixWorld(true)
-    const door = root.getObjectByName('FridgeDoor')
     const body = new THREE.Group()
-    const pivot = new THREE.Group()
     body.add(root)
-    if (door) {
-      // (the door swings on its left edge: a pivot there, the door moved onto it without moving)
-      const box = new THREE.Box3().setFromObject(door)
-      pivot.position.set(box.min.x, 0, box.max.z)
-      body.updateMatrixWorld(true)
-      pivot.updateMatrixWorld(true)
-      pivot.attach(door)
+    body.updateMatrixWorld(true)
+    // (each door swings on its outer edge: a pivot there, the door moved onto it without moving)
+    const doors: THREE.Group[] = []
+    for (const side of ['L', 'R'] as const) {
+      const door = root.getObjectByName(`FridgeDoor${side}`)
+      const pivot = new THREE.Group()
+      if (door) {
+        const box = new THREE.Box3().setFromObject(door)
+        pivot.position.set(side === 'L' ? box.min.x : box.max.x, 0, box.max.z)
+        pivot.updateMatrixWorld(true)
+        pivot.attach(door)
+      }
+      doors.push(pivot)
     }
-    // (the cabinet never moves and the door swings as one: each folded together by material)
+    // (the cabinet never moves and each door swings as one: each folded together by material)
     plainColours(root)
     mergeByMaterial(root)
-    mergeByMaterial(pivot)
+    for (const d of doors) mergeByMaterial(d)
     const doorRoot = new THREE.Group()
-    doorRoot.add(pivot)
-    const out = { body, doorRoot, door: pivot }
+    for (const d of doors) doorRoot.add(d)
+    const out = { body, doorRoot, doors }
     freezers.set(n, out)
     return out
   }, [gltf, n])
 }
 useGLTF.preload(FRIDGE_URL)
-/** what stands on the fridges' tops: a 一升瓶 (turned: a round shoulder, a long neck), a tokkuri (a round body, a narrow neck, a lip), a beer
- * glass upturned (open at its foot), and the crate's burnt-in stamp */
+/** what stands on the fridges' tops: a 一升瓶 (turned: a round shoulder, a long neck), a tokkuri (a round body, a narrow neck, a lip) */
 const ISSHO_GEO = new THREE.LatheGeometry([[0.0, 0], [0.046, 0], [0.05, 0.01], [0.05, 0.2], [0.044, 0.24], [0.026, 0.28], [0.02, 0.31], [0.02, 0.37], [0.0, 0.372]].map(([x, y]) => new THREE.Vector2(x, y)), 16)
 const TOKKURI_GEO = new THREE.LatheGeometry([[0.0, 0], [0.03, 0], [0.042, 0.04], [0.04, 0.08], [0.018, 0.12], [0.014, 0.14], [0.02, 0.152], [0.0, 0.152]].map(([x, y]) => new THREE.Vector2(x, y)), 14)
-const MUG_GEO = new THREE.CylinderGeometry(0.028, 0.032, 0.11, 14, 1, true).translate(0, 0.055, 0)
-const CRATE_STAMP = canvasTex(256, 96, (g) => {
-  g.fillStyle = '#c49a64'; g.fillRect(0, 0, 256, 96)
-  g.strokeStyle = 'rgba(120,80,40,0.25)'; g.lineWidth = 1
-  for (let y = 4; y < 96; y += 7) { g.beginPath(); g.moveTo(0, y + Math.sin(y) * 2); g.lineTo(256, y + Math.cos(y) * 2); g.stroke() }
-  g.strokeStyle = '#3a2412'; g.lineWidth = 3; g.strokeRect(70, 14, 116, 68)
-  brushText(g, '聞野酒造', 128, 50, 30, { fill: '#3a2412', edge: 'rgba(0,0,0,0)', shadow: 'rgba(0,0,0,0)', spacing: 1 })
-}, true)
+/** a drinks carton's printed front (kraft board, a green band, the tea's name brushed big, a leaf and its English below) and its taped top */
+const teaCarton = (word: string, en: string, ink: string) => canvasTex(256, 160, (g) => {
+  g.fillStyle = '#c9a26c'; g.fillRect(0, 0, 256, 160)
+  g.strokeStyle = 'rgba(120,85,40,0.18)'; g.lineWidth = 1
+  for (let x = 3; x < 256; x += 6) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 160); g.stroke() }
+  g.fillStyle = ink; g.fillRect(0, 10, 256, 18); g.fillRect(0, 140, 256, 8)
+  g.fillStyle = '#f3efe2'; g.font = '700 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(`${en} · 500ml × 24`, 128, 19)
+  brushText(g, word, 104, 84, 64, { fill: ink, edge: 'rgba(0,0,0,0)', shadow: 'rgba(0,0,0,0.1)', spacing: 2 })
+  // (a tea leaf)
+  g.fillStyle = ink
+  g.beginPath(); g.ellipse(206, 84, 13, 30, 0.5, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = '#c9a26c'; g.lineWidth = 2; g.beginPath(); g.moveTo(194, 108); g.lineTo(218, 60); g.stroke()
+  g.fillStyle = ink; g.font = '700 13px sans-serif'; g.fillText('冷やしてお召し上がりください', 128, 128)
+})
+const CARTON_TEA = teaCarton('緑茶', 'GREEN TEA', '#2f6b34')
+const CARTON_MATCHA = teaCarton('抹茶', 'MATCHA', '#4f7a2a')
+/** a carton's top: kraft board, its flaps' seam down the middle under a strip of clear tape */
+const CARTON_TOP = canvasTex(128, 128, (g) => {
+  g.fillStyle = '#c29a62'; g.fillRect(0, 0, 128, 128)
+  g.fillStyle = 'rgba(80,55,25,0.55)'; g.fillRect(63, 0, 2, 128)
+  g.fillStyle = 'rgba(235,225,190,0.55)'; g.fillRect(48, 0, 32, 128)
+  g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(52, 0, 3, 128)
+})
 /** the soft wash of a cove light: white along the slot, fading to nothing across the wall */
 const COVE_WASH = (() => {
   if (typeof document === 'undefined') return null
@@ -4580,20 +4695,15 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
           <mesh position={[0, 0.006, D / 2 - 0.035]}><boxGeometry args={[W * 0.98, 0.012, 0.03]} /><meshToonMaterial color="#c6c9cd" /></mesh>
           {n === 1 ? (
             <>
-              <group position={[-0.16, 0.012, 0.02]}>
-                {/* (the crate: four boards and a floor, its maker's name burnt into its front) */}
-                <mesh position={[0, 0.005, 0]}><boxGeometry args={[0.36, 0.01, 0.13]} /><meshToonMaterial color="#b98c58" /></mesh>
-                {[-1, 1].map((sd) => <mesh key={`f${sd}`} position={[0, 0.07, sd * 0.06]}><boxGeometry args={[0.36, 0.14, 0.012]} /><meshToonMaterial color="#c49a64" map={sd > 0 ? CRATE_STAMP : undefined} /></mesh>)}
-                {[-1, 1].map((sd) => <mesh key={`e${sd}`} position={[sd * 0.174, 0.07, 0]}><boxGeometry args={[0.012, 0.14, 0.11]} /><meshToonMaterial color="#a77b48" /></mesh>)}
-                {[-0.11, 0, 0.11].map((x, k) => (
-                  <group key={x} position={[x, 0.01, 0]}>
-                    <mesh geometry={ISSHO_GEO}><meshToonMaterial color={k === 1 ? '#3e5a2a' : '#5a3418'} /></mesh>
-                    <mesh position-y={0.17}><cylinderGeometry args={[0.048, 0.048, 0.1, 16]} /><meshToonMaterial color="#f3ecd8" /></mesh>
-                    <mesh position-y={0.355}><cylinderGeometry args={[0.019, 0.022, 0.05, 12]} /><meshToonMaterial color="#efe6cc" /></mesh>
-                    <mesh position-y={0.338} rotation-x={Math.PI / 2}><torusGeometry args={[0.022, 0.003, 4, 14]} /><meshToonMaterial color="#b3241c" /></mesh>
-                  </group>
-                ))}
-              </group>
+              {/* (two dark 一升瓶 standing at its left, their necks wrapped in washi and tied with a red cord (the owner's)) */}
+              {[-0.3, -0.17].map((x, k) => (
+                <group key={x} position={[x, 0.012, 0.04 - k * 0.05]} rotation-y={k * 0.6}>
+                  <mesh geometry={ISSHO_GEO}><meshToonMaterial color={k ? '#2a1a0e' : '#1d2a16'} /></mesh>
+                  <mesh position-y={0.15}><cylinderGeometry args={[0.051, 0.051, 0.09, 16]} /><meshToonMaterial color="#f3ecd8" /></mesh>
+                  <mesh position-y={0.355}><cylinderGeometry args={[0.019, 0.022, 0.05, 12]} /><meshToonMaterial color="#efe6cc" /></mesh>
+                  <mesh position-y={0.338} rotation-x={Math.PI / 2}><torusGeometry args={[0.022, 0.003, 4, 14]} /><meshToonMaterial color="#b3241c" /></mesh>
+                </group>
+              ))}
               <group position={[0.22, 0.012, 0.06]}>
                 <mesh position-y={0.006}><boxGeometry args={[0.22, 0.012, 0.13]} /><meshToonMaterial color="#2a1a12" /></mesh>
                 {[-0.05, 0.05].map((x) => <mesh key={x} geometry={TOKKURI_GEO} position={[x, 0.012, 0]}><meshToonMaterial color="#f2efe6" /></mesh>)}
@@ -4601,16 +4711,14 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
             </>
           ) : (
             <>
-              <group position={[-0.14, 0.012, 0.04]}>
-                <mesh position-y={0.006}><boxGeometry args={[0.3, 0.012, 0.2]} /><meshToonMaterial color="#2a1a12" /></mesh>
-                {[-0.09, 0, 0.09].flatMap((x) => [-0.05, 0.05].map((z) => (
-                  <group key={`${x}${z}`} position={[x, 0.012, z]}>
-                    <mesh geometry={MUG_GEO}><meshBasicMaterial color="#d8eef4" transparent opacity={0.35} depthWrite={false} side={THREE.DoubleSide} /></mesh>
-                    <mesh position-y={0.112}><cylinderGeometry args={[0.031, 0.031, 0.006, 14]} /><meshToonMaterial color="#e6eef0" /></mesh>
-                  </group>
-                )))}
-              </group>
-              <mesh geometry={TOKKURI_GEO} position={[0.22, 0.012, 0.06]}><meshToonMaterial color="#f2efe6" /></mesh>
+              {/* (two cartons of bottled tea stacked, 緑茶 under 抹茶, each its printed front and its taped top (the owner's)) */}
+              {([[0, 0, CARTON_TEA], [0.02, 0.2, CARTON_MATCHA]] as const).map(([dx, y, print], k) => (
+                <group key={k} position={[-0.08 + dx, 0.012 + y, 0.02]} rotation-y={k * 0.08}>
+                  <mesh position-y={0.1}><boxGeometry args={[0.4, 0.2, 0.3]} /><meshToonMaterial color="#c29a62" /></mesh>
+                  <mesh position={[0, 0.1, 0.1505]}><planeGeometry args={[0.4, 0.2]} /><meshToonMaterial map={print} /></mesh>
+                  <mesh position-y={0.2005} rotation-x={-Math.PI / 2}><planeGeometry args={[0.4, 0.3]} /><meshToonMaterial map={CARTON_TOP} /></mesh>
+                </group>
+              ))}
             </>
           )}
         </group>
@@ -4627,7 +4735,8 @@ export const FridgeDoor = memo(FridgeDoorImpl)
 const FRIDGE_DOOR_AT = new THREE.Vector3()
 function FridgeDoorImpl({ n = 0 }: { n?: number }) {
   const { W, D } = FRIDGE
-  const { door, doorRoot } = useFreezer(n)
+  const { doors, doorRoot } = useFreezer(n)
+  const door = doors[0]
   const open = useRef(0)
   const mist = useRef(0)
   // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
@@ -4641,7 +4750,9 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
     else if (!want && heard.current && open.current < 0.04) { heard.current = 0; coolerDoorSound(false, near()) }
     open.current += Math.sign(want - open.current) * Math.min(Math.abs(want - open.current), Math.min(dt, 0.1) * 2.2)
     const e = open.current * open.current * (3 - 2 * open.current)
-    door.rotation.y = -e * (Math.PI / 2)
+    // (the pair swing out from the middle: the left on its left edge, the right on its right)
+    doors[0].rotation.y = -e * (Math.PI / 2)
+    doors[1].rotation.y = e * (Math.PI / 2)
     mist.current = e
   })
   return (
@@ -5022,15 +5133,15 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
     <group scale={DRINK_SCALE[id]}>
       <group rotation-y={-Math.PI / 2}>
         {kind === 'can' && id !== 'cola' && id !== 'greenTea' ? <>
-          <mesh geometry={labelGeo(LITE_GEO.canLabel, id)} position-y={0.045} material={LABEL_LIT} />
-          <mesh geometry={tinted(LITE_GEO.canTop, '#c4c8cc')} position-y={0.089} material={PARTS} />
+          <mesh geometry={shadedLabel(LITE_GEO.canLabel, id)} position-y={0.045} material={SHELF_LABEL} />
+          <mesh geometry={shaded(LITE_GEO.canTop, '#c4c8cc')} position-y={0.089} material={SHELF_PARTS} />
         </> : kind === 'small' ? <>
-          <mesh geometry={labelGeo(BOTTLE_GEO.small, id)} position-y={0.036} material={LABEL_LIT} />
-          <mesh geometry={tinted(BOTTLE_GEO.smallTop, d.cap)} position-y={0.074} material={PARTS} />
+          <mesh geometry={shadedLabel(BOTTLE_GEO.small, id)} position-y={0.036} material={SHELF_LABEL} />
+          <mesh geometry={shaded(BOTTLE_GEO.smallTop, d.cap)} position-y={0.074} material={SHELF_PARTS} />
         </> : shaped && <>
-          <mesh geometry={tinted(LITE_GEO[shaped].body, body)} material={PARTS} />
-          <mesh geometry={labelGeo(LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={LABEL_LIT} />
-          <mesh geometry={tinted(LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={PARTS} />
+          <mesh geometry={shaded(LITE_GEO[shaped].body, body)} material={SHELF_PARTS} />
+          <mesh geometry={shadedLabel(LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
+          <mesh geometry={shaded(LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
         </>}
       </group>
     </group>
@@ -5469,6 +5580,46 @@ const FILL = glowByVertex(new THREE.MeshPhysicalMaterial({ color: '#ffffff', ver
   emissive: '#ffffff', emissiveIntensity: 0.12 }), 'bottle-fill')
 /** the caps, foils, collars and rims: their colours in their vertices */
 const PARTS = new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true })
+/**
+ * The shelf's bottles and cans (DrinkBottleLite), glossy (the owner's: they were flat and dead): their colours in their vertices shaded round
+ * them as a turned bottle under a strip light is, so eight sides read as thirty-two: dark at the edges, a white gleam on the left (the tube's
+ * reflection), the colour full in the middle, a second softer gleam on the right; the studio's room in them. Their labels the same way.
+ */
+const SHELF_PARTS = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.22, metalness: 0.25 })
+const SHELF_LABEL = LABEL_LIT.clone()
+SHELF_LABEL.vertexColors = true
+reflectStudio(SHELF_PARTS, SHELF_LABEL)
+/** how a point round a bottle is lit, by which way it faces (in the bottle's own frame, its front (to the door) +x, the viewer's left +z):
+ * [how much of its colour, how much white gleam] */
+function roundLight(x: number, z: number): [number, number] {
+  const r = Math.hypot(x, z)
+  if (r < 1e-5) return [1, 0]
+  const nx = x / r, nz = z / r
+  const front = Math.max(0, nx)
+  const key = Math.max(0, nx * 0.45 + nz * 0.89), fill = Math.max(0, nx * 0.6 - nz * 0.8)
+  return [0.5 + 0.5 * front, Math.pow(key, 10) * 0.85 + Math.pow(fill, 12) * 0.3]
+}
+const SHADED = new Map<string, THREE.BufferGeometry>()
+/** a geometry's colour, shaded round it (roundLight) */
+function shaded(g: THREE.BufferGeometry, hex: string) {
+  const key = `${g.uuid}|${hex}`
+  let out = SHADED.get(key)
+  if (!out) {
+    out = g.clone()
+    const c = new THREE.Color(hex), pos = out.attributes.position, a = new Float32Array(pos.count * 3)
+    for (let i = 0; i < pos.count; i++) {
+      const [k, w] = roundLight(pos.getX(i), pos.getZ(i))
+      a[i * 3] = Math.min(1, c.r * k + w); a[i * 3 + 1] = Math.min(1, c.g * k + w); a[i * 3 + 2] = Math.min(1, c.b * k + w)
+    }
+    out.setAttribute('color', new THREE.BufferAttribute(a, 3))
+    SHADED.set(key, out)
+  }
+  return out
+}
+/** a label's band shaded round it the same way (white shaded: it multiplies the label's picture; the gleam lifts it a little) */
+function shadedLabel(g: THREE.BufferGeometry, id: DrinkId) {
+  return shaded(labelGeo(g, id), '#ffffff')
+}
 /** the ramune's marble: clear glass catching the light */
 const MARBLE = new THREE.MeshPhysicalMaterial({ color: '#e8f6fa', roughness: 0.02, clearcoat: 1, transparent: true, opacity: 0.55, specularIntensity: 1 })
 /** dew on a cold bottle: little beads of water scattered over it, a few running down (a picture of them, laid over the glass) */
