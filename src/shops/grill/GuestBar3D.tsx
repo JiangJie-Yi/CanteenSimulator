@@ -2056,6 +2056,8 @@ function Counter({ length }: { length: number }) {
 }
 
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
+  /** done eating, a tissue to their mouth a moment before they get up (the owner's): since when */
+  wipeAt?: number
   /** their shoes in a cubby of the cupboard; welcomed in */
   shoesIn?: boolean; welcomed?: boolean
   /** (leaving) how long they've stood in the queue for the till; what's been said on the way out (getting up, paying, thanks) */
@@ -2217,6 +2219,8 @@ type PlateRun = { key: number; seat: number; guest: number; phase: 'ready' | 'se
   to?: THREE.Vector3
   /** (on the plating place) its slot there */
   slot?: number
+  /** (done with) the crumpled tissue they wiped their mouth with, beside it, from its middle: cleared with it (the owner's) */
+  tissue?: [number, number, number]
   /** (done with) the sticks left on it, of what was eaten off it: into the bin by the sink with them */
   sticks?: number
   /** (done with) the whole fish eaten off it, their bones left on it; and the customer's emptied glass beside it, cleared with it */
@@ -2312,6 +2316,21 @@ const GLASS_GEO = new THREE.CylinderGeometry(0.03, 0.025, 0.1, 14, 1, true)
 const GLASS_FOOT = new THREE.CylinderGeometry(0.0255, 0.0255, 0.006, 14)
 /** where it rides once the plate's up on the tray: on the plate, at its middle */
 const GLASS_ON: [number, number, number] = [0.02, 0, 0.02]
+/** a used tissue crumpled into a ball (a lumpy little ball, its points pushed in and out); on the plate once it's taken up with it */
+const CRUMPLE_GEO = (() => {
+  const g = new THREE.IcosahedronGeometry(0.018, 1)
+  const p = g.attributes.position as THREE.BufferAttribute
+  for (let i = 0; i < p.count; i++) {
+    const k = 0.72 + 0.5 * Math.abs((Math.sin(i * 12.9898 + p.getX(i) * 311) * 43758.5453) % 1)
+    p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.8, p.getZ(i) * k)
+  }
+  g.computeVertexNormals()
+  return g
+})()
+const CRUMPLE_MAT = new THREE.MeshToonMaterial({ color: '#f7f5ef' })
+const TISSUE_ON: [number, number, number] = [-0.035, 0.006, 0.025]
+/** how long a customer wipes their mouth with a tissue before getting up */
+const WIPE_MOUTH_MS = 900
 // (a done-with plate's bones and glass, and the plater's rice bowl, first shown mid-shift: their shaders made with the rest at load (scene/Prewarm))
 {
   const g = new THREE.Group()
@@ -2324,9 +2343,11 @@ const GLASS_ON: [number, number, number] = [0.02, 0, 0.02]
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and the sticks left on it, of what was eaten off it,
  * thrown away with it at the sink (the owner's)); drawn again only when it gets dirty */
 const Plate = memo(PlateImpl)
-function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass }: { dirty?: boolean; design?: number; sticks?: number; bones?: number
+function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass, tissue }: { dirty?: boolean; design?: number; sticks?: number; bones?: number
   /** the emptied glass, where it stands from the plate's middle (on the bar where it was drunk, or on the plate being cleared) */
-  glass?: readonly [number, number, number] }) {
+  glass?: readonly [number, number, number]
+  /** the crumpled tissue left by it, from its middle (on the bar, or on the plate being cleared) */
+  tissue?: readonly [number, number, number] }) {
   return (
     <group>
       <mesh geometry={PLATE_GEO} castShadow receiveShadow>
@@ -2352,6 +2373,8 @@ function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass }: 
               <mesh geometry={HEAD_GEO}><meshToonMaterial color="#8a5a30" /></mesh>
             </group>
           ))}
+          {/* (the tissue they wiped their mouth with, crumpled up) */}
+          {tissue && <mesh name="plate-tissue" geometry={CRUMPLE_GEO} position={[tissue[0], tissue[1] + 0.016, tissue[2]]} material={CRUMPLE_MAT} />}
           {/* (their glass, drunk up) */}
           {glass && (
             <group name="plate-glass" position={[glass[0], glass[1] + 0.05, glass[2]]}>
@@ -2740,6 +2763,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const t = takeSheets(tissuesAt(at), sheetsFor(guest))
       setTissues(at, t.box)
       if (t.short) { gripe(guest, 'tissue'); onSay?.('guest', LINES[lang].noTissue(guest), guest) }
+      // (one of them crumpled up and left by their plate, on its right (the owner's), for the server who clears it)
+      if (r && tissuesAt(at) < BOX_SHEETS && !t.short) {
+        const st = seats[r.seat], c = counters[st.counter]
+        r.tissue = st.mid.clone().addScaledVector(c.along, -0.13).addScaledVector(c.lay, -0.06).setY(top).sub(plateAt(r.seat)).toArray() as [number, number, number]
+      }
     }
   }
   /** a plate done with: left at the seat for a server to clear (the owner's: nobody's plates fly), or, with none, away to the sink by itself */
@@ -2841,9 +2869,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (the shop may have given them a stool already: it only does once the last one there has gone)
           const seat = g.seat !== undefined ? g.seat : Array.from({ length: seats.length }, (_, i) => i).find((i) => !taken.has(i))
           if (seat !== undefined) next = [...next, { id: g.id, seat, phase: 'enter', t: 0 }]
-        } else if (s && !seated && s.phase !== 'leave' && !s.leaving) {
-          // (away at the toilet: they go once they're back at their stool)
-          next = next.map((x) => (x.id === g.id ? (x.phase.startsWith('wc') ? { ...x, leaving: true } : { ...x, phase: 'leave', t: 0 }) : x))
+        } else if (s && !seated && s.phase !== 'leave' && !s.leaving && !s.wipeAt) {
+          // (away at the toilet: they go once they're back at their stool; done and satisfied, a tissue to the mouth first, then up (the
+          // frame's 'sit'); gone off in a huff, straight up)
+          next = next.map((x) => (x.id === g.id ? (x.phase.startsWith('wc') ? { ...x, leaving: true }
+            : x.phase === 'sit' && g.state === 'done' ? { ...x, wipeAt: performance.now() } : { ...x, phase: 'leave', t: 0 }) : x))
         }
       }
       return next
@@ -2972,6 +3002,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       } else if (s.phase === 'sit') {
         g?.position.copy(st.stool)
         if (g) g.rotation.y = st.yaw
+        if (s.wipeAt && performance.now() - s.wipeAt > WIPE_MOUTH_MS) { s.phase = 'leave'; s.t = 0; redraw() }
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
         if (guest) s.items = guest.items
@@ -4347,7 +4378,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.position.copy(r.from)
           }
         }}>
-          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} />
+          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)}
+            tissue={r.tissue && (r.phase === 'taken' ? TISSUE_ON : r.tissue)} />
         </group>
       ))}
       <Later stage={3}>
@@ -4546,7 +4578,7 @@ function PersonClockImpl({ s, eating, clock, talk, mood }: { s: Shown; phase: st
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them)
   return <Suspense fallback={null}><FolkFigure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
-    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : undefined} fit={FOLK_FIT}
+    fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : s.phase === 'sit' && s.wipeAt ? 'Wipe' : undefined} fit={FOLK_FIT}
     held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></Suspense>
 }
 
