@@ -4219,6 +4219,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * everyone's hands (not `taken` already for this order) */
   const recyclable = (id: string, taken: Set<Piece>) => pieces.current.find((q) => q.id === id && menuIds.has(q.id) && present(q) && q.eaten &&
     q.trash < 0 && !q.carried && !q.via && !taken.has(q) && !SERVICE.waiting.has(q.key) && !SERVICE.carried.has(q.key) && !SERVICE.claimed.has(q.key))
+  /** one kept warm in the bowl, cooked for someone who'd gone and nobody's yet (not `taken` already for this order): a new order of it has
+   * that one, not one more cooked (the owner's: the bowl never emptied, every order cooking one more for it) */
+  const warmFor = (id: string, taken: Set<Piece>) => pieces.current.find((q) => q.id === id && q.keepWarm && q.container?.startsWith('bowl') &&
+    q.guest < 0 && present(q) && !q.eaten && q.trash < 0 && !taken.has(q) && !SERVICE.claimed.has(q.key) && !SERVICE.carried.has(q.key))
   /** made again: back as it was before it was ever cooked, to be brought out raw on the tray as the order's (next frame: present, not yet seen) */
   const revive = (p: Piece) => {
     fresh(p)
@@ -4314,6 +4318,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }, [ai])
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __roastGuests: guests })
   // (a customer dragged to another stool (GuestBar3D asks): only while they're waiting with nothing cooked tied to their stool yet, and
   // the stool's nobody's)
   useFrame(() => {
@@ -4484,6 +4489,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           say(L().orphanAway)
           return
         }
+        // (already in the bowl, held for someone who went before it reached them: nobody's again, kept warm, not picked up over and over)
+        stray.guest = -1
+        stray.keepWarm = true
       }
     }
     // the chef cooks to the notes when they choose to (a better hand follows them more often), else by eye
@@ -4527,8 +4535,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (ready && !busy()) {
       collect(ready)
-      // (off the fire in his hands to the plating place, when it's going there and has a place)
-      if (handLive && ready.collected && ready.via === 'plated' && ready.readyAt !== undefined) carry(ready, 'toPlate')
+      // (off the fire in his hands to the plating place, or kept warm in the bowl; one waiting by the fire for a place there is taken over when one's free (above))
+      if (handLive && ready.collected && !inBasket(ready) && (ready.via === 'plated' ? ready.readyAt !== undefined : !!ready.container)) carry(ready, 'toPlate')
       say(L().done(nameOfP(ready)))
       for (const k of planOf(ready)) if (!ready.dabs[k] && bestStage(k) === 'after') dab(ready, k)
       return
@@ -4631,18 +4639,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             const e = entries[Math.floor(Math.random() * entries.length)]
             if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
             wants.current.push(...e.parts)
-            // (its parts made from portions already used and cleared, where there are any)
-            const again: Piece[] = []
+            // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
+            const again: Piece[] = [], warm: Piece[] = []
             for (const pt of e.parts) {
+              const w = warmFor(pt.id, new Set(warm))
+              if (w) { warm.push(w); continue }
               const q = recyclable(pt.id, new Set(again))
               if (q) again.push(q)
             }
             const reuse: Record<string, number> = {}
-            for (const q of again) reuse[q.id] = (reuse[q.id] ?? 0) + 1
+            for (const q of [...again, ...warm]) reuse[q.id] = (reuse[q.id] ?? 0) + 1
             if (onOrderEntry?.(e.key, id, reuse)) {
               // (its prep: rice washed and cooked, the soup, what's rinsed)
               meterWater('cooking', e.parts.length)
               for (const q of again) revive(q)
+              // (the bowl's held for them: carried over to them from there (the stray's way, next))
+              for (const q of warm) { q.guest = id; q.keepWarm = false }
               orders.push(...e.parts.map((pt) => pt.id))
               said.push(e.name)
             } else {
@@ -4651,9 +4663,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             continue
           }
           const pick = itemIds.filter((x) => x in roast.times)[Math.floor(Math.random() * itemIds.filter((x) => x in roast.times).length)]
-          const again = pick ? recyclable(pick, new Set()) : undefined
-          if (pick && onOrder(pick, id, !!again)) {
+          const warm = pick ? warmFor(pick, new Set()) : undefined
+          const again = pick && !warm ? recyclable(pick, new Set()) : undefined
+          if (pick && onOrder(pick, id, !!(again || warm))) {
             if (again) revive(again)
+            if (warm) { warm.guest = id; warm.keepWarm = false }
             orders.push(pick)
             said.push(nameOf(pick))
           }
@@ -4722,7 +4736,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const owed = [...g.orders]
       for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
       const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
-        p.trash < 0 && owed.includes(p.id) && (p.guest === g.id || p.guest < 0) && stageOf(p.progress / roast.times[p.id]).key === 'done')
+        // (with the shop open only their own, and only once it's set before them (via 'plated': still on the plating place, the server not
+        // there yet): one nobody's in the kitchen's bowl, or their own on the plating place, was eaten where it lay, from the bar, and what was
+        // cooked after came off the fire for nobody, into the bowl: the bowl filled with twenty and more an hour in; the bowl's go to the next
+        // owed one through serveTo, carried)
+        p.trash < 0 && owed.includes(p.id) && (space === 'open' ? p.guest === g.id && p.container === 'bar' && p.via !== 'plated' : p.guest === g.id || p.guest < 0) && stageOf(p.progress / roast.times[p.id]).key === 'done')
       if (!dish) continue
       if (inBasket(dish) && !dish.unwrapped) {
         dish.unwrapped = true
@@ -6242,8 +6260,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             p.local.copy(p.toP).sub(containerAt('bar'))
             p.flight = 1
           } else if (p.readyAt === undefined) {
-            // (held by the fire: a slot on the plating place, and a plate in it, asked for again)
-            plateReady(p)
+            // (held by the fire: a slot on the plating place, and a plate in it, asked for again; with the owner at the grill, only once his
+            // hands are free, and then he takes it there (it flew over by itself, the owner saw: the head chef takes everything off the fire))
+            const owner = performance.now() - OWNER_GRILL.seenAt < 1000
+            if (!owner || CHEF_CARRY.key === null) {
+              if (plateReady(p) && owner) {
+                const C = CHEF_CARRY
+                C.key = p.key; C.kind = 'toPlate'; C.phase = 'reach'; C.t = 0
+                C.from.copy(p.node.position); C.fromQ.copy(p.node.quaternion)
+              }
+            }
           } else if (!SERVICE.claimed.has(p.key) && PLATING.slots[p.readyAt]?.seat !== p.seat) {
             // (its slot taken up, or freed, without it: it goes to a slot of its own again, from where it is)
             p.readyAt = undefined
