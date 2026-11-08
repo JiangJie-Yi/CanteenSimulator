@@ -1906,7 +1906,7 @@ export default function App() {
   // (each speaker's tag over their bubbles: the role and the name, in the game's language; the till's whoever's at it, the owner if nobody)
   {
     const crew = staffOf(DISHES[active].id)
-    const roleName: Record<Role, [string, string, string]> = { chef: ['主廚', '板長', 'Chef'], sous: ['二廚', '二番手', 'Cook'], server: ['外場', 'ホール', 'Server'],
+    const roleName: Record<Role, [string, string, string]> = { chef: ['二廚', '二番手', 'Second cook'], sous: ['三廚', '追い回し', 'Third cook'], server: ['外場', 'ホール', 'Server'],
       cashier: ['收銀', 'レジ', 'Cashier'], stock: ['倉儲', '仕入れ', 'Stock'] }
     const tag = (r: Role, name: string) => `${roleName[r]?.[lang === 'ja' ? 1 : lang === 'en' ? 2 : 0] ?? ''} ${name}`.trim()
     SPEAKERS.clear()

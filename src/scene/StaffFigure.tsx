@@ -36,7 +36,7 @@ const variantOf = (role: Role, female: boolean): Variant =>
 /** the head and what's on it, which take no shadow (as the customers' don't): the face's and the glasses' patches are see-through
  * rectangles off the face, and the shadow pass (no alphaTest: they're hashed) cast them whole, black blocks over the eyes (the owner saw) */
 const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
-const ROLE_TAG: Record<Role, string> = { chef: '主廚', sous: '二廚', server: '外場', cashier: '收銀', stock: '倉儲' }
+const ROLE_TAG: Record<Role, string> = { chef: '二廚', sous: '三廚', server: '外場', cashier: '收銀', stock: '倉儲' }
 const UNINKED = /(Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
