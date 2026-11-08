@@ -9,6 +9,7 @@
 //   npm run dev          (in another terminal)
 //   node tests/e2e/paths.mjs [url]        (WATCH=<ms> how long to watch, default 120000; SHOT=<dir> pictures of each clash)
 import { chromium } from 'playwright-core'
+import { toOpeningHours } from './hours.mjs'
 
 const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
 const WATCH = Number(process.env.WATCH ?? 120000)
@@ -47,6 +48,8 @@ await page.locator('.nb-views button').nth(0).click()
 const publish = page.locator('.nb-embedded .nb-publish button:not(.nb-off)')
 for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await page.waitForTimeout(50) }
 await page.locator('.office .panel-x').click()
+// (only in the shop's hours, 17:30 to 02:30: the clock moved on to them)
+await toOpeningHours(page)
 await page.locator('.ai-toggle').click()
 // (thirstier and readier for the toilet than usual, so the side trips are walked while we watch)
 await page.evaluate(() => { window.__drinkRate = 0.08 })

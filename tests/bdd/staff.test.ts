@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { ROLES, effective, fair, restPerMin, tirePerMin, type Worker } from '@/data/staff'
+import { ROLES, TIRED_AT, effective, fair, paceOf, restPerHour, tirePerHour, type Worker } from '@/data/staff'
 import { canDismiss, canHire, makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
@@ -15,16 +15,20 @@ feature('員工與徵人', () => {
     then('開店或閉店都能雇人', () => { expect(canHire(true)).toBe(true); expect(canHire(false)).toBe(true) })
   })
 
-  scenario('越累的人做事越差，最多掉到 55%', ({ given, when, then }) => {
+  scenario('疲勞值到了，能力就減半', ({ given, when, then, and }) => {
     given('一位技能 80 的員工', (w) => { w.w = { skill: 80 } as Worker })
-    when('看他精神飽滿和累到 100 的表現', (w) => { w.fresh = effective(w.w, 0); w.tired = effective(w.w, 100) })
-    then('累的人只剩 55% 的功力', (w) => { expect(w.tired).toBeCloseTo(w.fresh * 0.55, 6); expect(w.tired).toBeLessThan(w.fresh) })
+    when(`看他精神飽滿、快累了（${TIRED_AT - 1}）與疲勞（${TIRED_AT}）的表現`, (w) => { w.fresh = effective(w.w, 0); w.almost = effective(w.w, TIRED_AT - 1); w.tired = effective(w.w, TIRED_AT) })
+    then('還沒到疲勞照常', (w) => { expect(w.almost).toBe(w.fresh) })
+    and('疲勞了只剩一半', (w) => { expect(w.tired).toBeCloseTo(w.fresh / 2, 6) })
+    and('走路、做事的速度也是一半', () => { expect(paceOf(TIRED_AT - 1)).toBe(1); expect(paceOf(TIRED_AT)).toBe(0.5) })
   })
 
-  scenario('體力低的人累得比較快', ({ given, when, then }) => {
+  scenario('體力低的人累得比較快', ({ given, when, then, and }) => {
     given('體力 90 和體力 30 的兩個人', (w) => { w.a = { stamina: 90 } as Worker; w.b = { stamina: 30 } as Worker })
-    when('比較每分鐘增加的疲勞', (w) => { w.ta = tirePerMin(w.a); w.tb = tirePerMin(w.b) })
-    then('體力低的累得比較快，而休息一分鐘恢復的比任何人累積的都多', (w) => { expect(w.tb).toBeGreaterThan(w.ta); expect(restPerMin).toBeGreaterThan(w.tb) })
+    when('比較每營業一小時增加的疲勞', (w) => { w.ta = tirePerHour(w.a); w.tb = tirePerHour(w.b) })
+    then('體力低的累得比較快', (w) => { expect(w.tb).toBeGreaterThan(w.ta) })
+    and('營業九小時：體力 30 的會累到疲勞，體力 90 的不會', (w) => { expect(9 * w.tb).toBeGreaterThanOrEqual(TIRED_AT); expect(9 * w.ta).toBeLessThan(TIRED_AT) })
+    and('閉店十五小時一定恢復到精神飽滿', () => { expect(15 * restPerHour).toBeGreaterThanOrEqual(100) })
   })
 
   scenario('應徵的人夠多可以挑：每個職位至少是名額的 4 倍，掌爐的師傅（二廚）至少 8 位', ({ given, then, and }) => {

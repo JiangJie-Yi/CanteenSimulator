@@ -9,6 +9,10 @@
  * only once it's 0 (the owner's: they used to vanish all at once as it did, the ones paying and walking out with them) */
 export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, walking: new Set<string>(), inRoom: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shop?: typeof SHOP }).__shop = SHOP
+/** the staff worn out just now (data/staff's isTired, App keeps it): at half pace in the 3D, a badge beside them */
+export const STAFF_TIRED = new Set<string>()
+/** how fast this one of the staff gets about and gets things done: half, worn out (data/staff's paceOf) */
+export const paceOfStaff = (id: string | null | undefined) => (id && STAFF_TIRED.has(id) ? 0.5 : 1)
 
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }

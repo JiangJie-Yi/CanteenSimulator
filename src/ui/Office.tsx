@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useDrag } from './useDrag'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
-import { ROLES, type Worker } from '@/data/staff'
+import { isTired, ROLES, type Worker } from '@/data/staff'
 import { CANDIDATES, pickHires } from '@/game/hiring'
 import { Avatar } from './Avatar'
 
@@ -124,7 +124,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                       <span className="ofc-energy" title={t('精神', '元気')}>
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
-                      <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}・{money(w.wage)}/h</small>
+                      <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}{isTired(hired[w.id].fatigue) && <em className="ofc-tired" title={t('能力減半・動作變慢', '能力半減・動きが遅い')}>{t('疲勞', '疲労')}</em>}・{money(w.wage)}/h</small>
                     </div>
                     <button type="button" className="ofc-fire" disabled={!canDismiss(shopOpen)} onClick={() => { if (canDismiss(shopOpen)) onFire(w) }}
                       title={canDismiss(shopOpen) ? undefined : t('營業中不能解雇，請先閉店', '営業中は解雇できません。先に閉店してください')}>{t('解雇', '解雇')}</button>

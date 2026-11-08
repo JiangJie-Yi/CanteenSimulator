@@ -5,7 +5,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { SPEAKERS, STAFF_TALK, type StaffWord } from '@/game/shopState'
+import { SPEAKERS, STAFF_TALK, STAFF_TIRED, type StaffWord } from '@/game/shopState'
 
 const STYLE = { pointerEvents: 'none' } as const
 const Z = [21, 11]
@@ -55,6 +55,61 @@ function Word({ word }: { word: StaffWord }) {
     <group ref={g} visible={false}>
       <Html center zIndexRange={Z} style={STYLE}>
         <div className="g3-label"><span className="g3-bubble g3-say staff-say"><b className="say-who">{SPEAKERS.get(word.id) ?? ''}</b>{word.text}</span></div>
+      </Html>
+    </group>
+  )
+}
+
+/** beside the head, to one side (the bubble's over it), in the figure's own frame */
+const SIDE = new THREE.Vector3(0.42, 1.3, 0)
+const BADGE_Z = [20, 10]
+/** what it says, in the page's language */
+const TIRED_SAYS: Record<string, [string, string]> = {
+  zh: ['疲勞', '能力減半・動作變慢'], ja: ['疲労', '能力半減・動きが遅い'], en: ['Worn out', 'Half as able, half as quick'],
+}
+
+/**
+ * The staff worn out (data/staff's isTired: game/shopState's STAFF_TIRED, App keeps it; the owner's): a debuff beside each one, a little
+ * dark-red badge with a downward arrow and 疲, that says what it means when pointed at; it follows them about, gone as they've rested.
+ */
+export const TiredBadges = memo(function TiredBadges() {
+  const [ids, setIds] = useState<string[]>([])
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setIds((was) => (was.length === STAFF_TIRED.size && was.every((id) => STAFF_TIRED.has(id)) ? was : [...STAFF_TIRED]))
+    }, 500)
+    return () => window.clearInterval(t)
+  }, [])
+  return <>{ids.map((id) => <TiredBadge key={id} id={id} />)}</>
+})
+
+function TiredBadge({ id }: { id: string }) {
+  const g = useRef<THREE.Group>(null)
+  const scene = useThree((s) => s.scene)
+  const who = useRef<THREE.Object3D | null>(null)
+  useFrame(() => {
+    const o = g.current
+    if (!o || !o.parent) return
+    if (!who.current?.parent) {
+      who.current = null
+      scene.traverse((q) => { if (!who.current && q.userData.staffId === id) who.current = q })
+    }
+    const t = who.current
+    // (with them: not while they're out of sight (off at the door, or stood in for by the one out on a round))
+    let shown = !!t
+    for (let q: THREE.Object3D | null = t; q && shown; q = q.parent) if (!q.visible) shown = false
+    o.visible = shown
+    if (!t || !shown) return
+    o.position.copy(o.parent.worldToLocal(t.localToWorld(AT.copy(SIDE))))
+  })
+  const lang = typeof document !== 'undefined' ? document.documentElement.lang : 'zh'
+  const [name, says] = TIRED_SAYS[lang] ?? TIRED_SAYS.zh
+  return (
+    <group ref={g} visible={false}>
+      <Html center zIndexRange={BADGE_Z}>
+        <span className="tired-badge" title={`${name}：${says}`} aria-label={`${name}：${says}`}>
+          <b aria-hidden="true">▼</b>{lang === 'en' ? 'Tired' : '疲'}
+        </span>
       </Html>
     </group>
   )

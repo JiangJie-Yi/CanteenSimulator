@@ -11,6 +11,7 @@
 //     DSF=<n>     the screen's pixel ratio (default 1); Q=<tier> a quality tier
 // The page is opened with ?pace=0, so the frame pacer doesn't step the drawing down while it's measured.
 import { chromium } from 'playwright-core'
+import { toOpeningHours } from './hours.mjs'
 const URL = 'http://localhost:5173/JapaneseGrillSimulator/?pace=0' + (process.env.Q ? `&q=${process.env.Q}` : '')
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] })
 const ctx0 = await b.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: +(process.env.DSF ?? 1) })
@@ -45,6 +46,8 @@ if (process.env.OPEN) {
   const publish = p.locator('.nb-embedded .nb-publish button:not(.nb-off)')
   for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await p.waitForTimeout(50) }
   await p.locator('.office .panel-x').click()
+  // (only in the shop's hours, 17:30 to 02:30: the clock moved on to them)
+  await toOpeningHours(p)
   await p.locator('.ai-toggle').click()
   await p.waitForTimeout(+process.env.OPEN)
   // (SHOTS=<prefix>: views 3 and 4 (the till and the doorway) and the overview shot while open, to see the customers' things)

@@ -49,10 +49,16 @@ export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: st
 export const fair = (role: Role, skill: number) =>
   Math.round((role === 'chef' ? 200 + skill * 4.2 : role === 'sous' ? 196 + skill * 2.4 : role === 'server' ? 196 + skill * 1.4 : role === 'stock' ? 196 + skill * 1.2 : 196 + skill * 1.1) / 5) * 5
 
-/** how well they work right now: tired people work worse (at 100 fatigue, down to 55%) */
-export const effective = (w: Worker, fatigue: number) => (w.skill * (1 - fatigue * 0.0045)) / 100
+/** fatigue (0..100) from which they're worn out (the owner's: then they work at half, and it shows beside them) */
+export const TIRED_AT = 80
+export const isTired = (fatigue: number) => fatigue >= TIRED_AT
+/** how well they work right now: at their skill, halved once they're worn out */
+export const effective = (w: Worker, fatigue: number) => (w.skill / 100) * (isTired(fatigue) ? 0.5 : 1)
+/** how fast they get about and get things done, against fresh: half, worn out */
+export const paceOf = (fatigue: number) => (isTired(fatigue) ? 0.5 : 1)
 
-/** fatigue gained per minute open (0..100): the lower the stamina, the faster */
-export const tirePerMin = (w: Worker) => 1.2 + (100 - w.stamina) * 0.05
-/** fatigue shed per minute with the shop closed */
-export const restPerMin = 6
+/** fatigue gained per hour open, of the game's clock (the shop's hours (game/hours) are nine of them): the lower the stamina, the faster;
+ * one of stamina 40 is worn out some six hours in, one of 80 not by closing */
+export const tirePerHour = (w: Worker) => 6 + (100 - w.stamina) * 0.12
+/** fatigue shed per hour with the shop shut: the fifteen hours between closing and opening rest anyone fully */
+export const restPerHour = 12

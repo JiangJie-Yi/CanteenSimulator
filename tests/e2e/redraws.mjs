@@ -4,6 +4,7 @@
 // would spare it) or one of its own state hooks (named by the line that declares it, read from the module as the dev server serves it).
 //   node tests/e2e/redraws.mjs     (WARM=<ms> default 45000, SPAN=<ms> default 30000, TOP=<n> default 30; needs the dev server, for names)
 import { chromium } from 'playwright-core'
+import { toOpeningHours } from './hours.mjs'
 
 const WARM = +(process.env.WARM ?? 45000), SPAN = +(process.env.SPAN ?? 30000)
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] })
@@ -118,6 +119,8 @@ await p.locator('.nb-views button').nth(0).click()
 const publish = p.locator('.nb-embedded .nb-publish button:not(.nb-off)')
 for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await p.waitForTimeout(50) }
 await p.locator('.office .panel-x').click()
+// (only in the shop's hours, 17:30 to 02:30: the clock moved on to them)
+await toOpeningHours(p)
 await p.locator('.ai-toggle').click()
 await p.locator('.speed-toggle').click()
 await p.locator('.view-reset').click()

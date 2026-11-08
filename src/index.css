@@ -7776,3 +7776,46 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .day-sum-veil { animation: none; }
 }
+
+/* a debuff beside one of the staff worn out (StaffWords' TiredBadges; the owner's): a small dark-red pill, a downward arrow and 疲, pulsing
+   a little; pointed at, it says what it means (title) */
+.tired-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px 2px 5px;
+  border: 1px solid rgb(255 180 170 / 0.5);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #a0322a, #6e1b16);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 0 8px rgb(200 40 30 / 0.45);
+  color: #ffe9e4;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: help;
+  user-select: none;
+  animation: tired-pulse 1.8s ease-in-out infinite;
+}
+.tired-badge b {
+  font-size: 9px;
+  color: #ffb4a8;
+}
+@keyframes tired-pulse {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(2px); opacity: 0.85; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tired-badge { animation: none; }
+}
+/* (the office's staff list: one worn out marked so, as the badge beside them in the shop) */
+.ofc-tired {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #8e2620;
+  color: #ffe9e4;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}

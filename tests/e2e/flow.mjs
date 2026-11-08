@@ -8,6 +8,7 @@
 //
 // Uses the installed Chrome (playwright-core), headless, with software WebGL.
 import { chromium } from 'playwright-core'
+import { toOpeningHours } from './hours.mjs'
 
 const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
 // (only the grill is open in this build; a new game starts in it, already set up)
@@ -90,6 +91,8 @@ for (const [i, shop] of SHOPS.entries()) {
     }
     await page.locator('.office .panel-x').click()
     // open for business
+    // (only in the shop's hours, 17:30 to 02:30: the clock moved on to them)
+    await toOpeningHours(page)
     await page.locator('.ai-toggle').click()
     await page.waitForTimeout(500)
     check(shop, 'opens for business (enough dishes on the menu)', (await page.locator('.ai-toggle.is-on').count()) === 1)

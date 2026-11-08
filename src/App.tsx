@@ -44,7 +44,7 @@ import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { SHOP, SPEAKERS, STAFF_TALK } from '@/game/shopState'
+import { SHOP, SPEAKERS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -72,7 +72,8 @@ import { LINES } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
-import { effective, restPerMin, ROLES, tirePerMin, type Role } from '@/data/staff'
+import { effective, isTired, restPerHour, ROLES, tirePerHour, type Role } from '@/data/staff'
+import { hoursEnd, hoursText, inHours } from '@/game/hours'
 import { CANDIDATES, pickHires } from '@/game/hiring'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
@@ -1274,6 +1275,13 @@ export default function App() {
   const [closing, setClosing] = useState(false)
   const [leaving, setLeaving] = useState(false)
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
+  /** the hours over: shut up as by hand (the button's way: no auto-run reopening it till they come round again) */
+  const hoursOver = useRef<() => void>(() => {})
+  hoursOver.current = () => {
+    if (closing || leaving) return
+    say(tl(lang, `${hoursText().split('–')[1]} 打烊時間到了`, `${hoursText().split('–')[1]}、閉店の時間です`, `${hoursText().split('–')[1]}: closing time`))
+    setClosing(true)
+  }
   /** who goes home through the front door at the day's end and comes in by it in the morning (game/commute): the hired staff but the
    * cooks who live upstairs, and the shop's own server when none's hired */
   const commuters = () => {
@@ -1335,6 +1343,8 @@ export default function App() {
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
   // the staff hired at each shop (by worker id) and how tired each is
   const [hired, setHired] = useState<Record<string, Record<string, { fatigue: number }>>>(() => SAVED?.hired ?? {})
+  // (in development, `__fatigue(80)`: every one hired that worn, to see them worn out without a night's work)
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __fatigue: (v: number) => setHired((h) => Object.fromEntries(Object.entries(h).map(([k, ws]) => [k, Object.fromEntries(Object.keys(ws).map((id) => [id, { fatigue: v }]))]))) })
   const staffOf = (dishId: string, role?: Role) =>
     (CANDIDATES[dishId] ?? []).filter((w) => hired[dishId]?.[w.id] && (!role || w.role === role))
   /** the kitchen's cooking as the simulation needs it: the owner is the head chef; a hired chef (or, failing that,
@@ -2203,16 +2213,23 @@ export default function App() {
           for (const [wid, st] of Object.entries(ws)) {
             const w = CANDIDATES[shop].find((x) => x.id === wid)!
             const working = aiRef.current.ai && aiRef.current.shop === shop
-            const fatigue = Math.max(0, Math.min(100, st.fatigue + (working ? tirePerMin(w) : -restPerMin) / 60 * GAME_SPEED.value))
+            // (by the game's clock: a minute of it a second, sped up with the game)
+            const fatigue = Math.max(0, Math.min(100, st.fatigue + (working ? tirePerHour(w) : -restPerHour) / 60 * GAME_SPEED.value))
             if (fatigue !== st.fatigue) changed = true
             next[shop][wid] = { fatigue }
+            // (worn out: at half, and it shows beside them (StaffWords' TiredBadges, the 3D's own paces))
+            if (isTired(fatigue)) STAFF_TIRED.add(wid)
+            else STAFF_TIRED.delete(wid)
           }
         }
         return changed ? next : h
       })
       // (the game's clock: a minute of the game's for each second (the owner's), sped up with the game; only its face redraws, and the page
       // at dusk, at dawn and at midnight)
+      const was = getClock().minute
       advanceClock(GAME_SPEED.value)
+      // (the hours over (02:30, the owner's): shut up as by hand, last orders and all)
+      if (aiRef.current.ai && hoursEnd(was, getClock().minute)) hoursOver.current()
       // (and the chef's wage, by the second while the shop's open: in the same tick, so the two are one redraw of the page, not two)
       if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600 * GAME_SPEED.value)
       // (and the water and power (the owner's: what keeping it going costs), metered by the second against the month)
@@ -2327,7 +2344,6 @@ export default function App() {
   // opening, ordering more as it sells, and shutting for a rest when the staff are worn out — one step every few
   // seconds (each step acts on the state as it is then, so it does one thing at a time)
   const [auto, setAuto] = useState(false)
-  const resting = useRef(false)
   // (shut up for the day: the owner calls last orders; nobody more comes in (Roasting), those here eat, pay and walk out of the door)
   useEffect(() => {
     if (!closing || !ai) return
@@ -2391,17 +2407,7 @@ export default function App() {
     const d = DISHES[active]
     const T = UI[lang]
     const mine = hired[d.id] ?? {}
-    const tired = Math.max(0, ...Object.values(mine).map((w) => w.fatigue))
-    const seated = (guestsBy[d.id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')
     if (ai) {
-      // worn out: no more customers in; shut once the last has eaten
-      // (shut up as by hand: last orders, those here finish and walk out)
-      if (tired > 85 && !seated) {
-        resting.current = true
-        setClosing(true)
-        say(T.autoRest)
-        return
-      }
       // no stock keeper: order in what the menu's running low on, as one would
       const keeper = (CANDIDATES[d.id] ?? []).some((w) => w.role === 'stock' && mine[w.id])
       if (!keeper) {
@@ -2418,8 +2424,6 @@ export default function App() {
       }
       return
     }
-    if (resting.current && tired > 25) return
-    resting.current = false
     const hires = pickHires(CANDIDATES[d.id] ?? [], ROLES[d.id] ?? [], mine)
     if (hires.length) {
       setHired((h) => ({ ...h, [d.id]: { ...(h[d.id] ?? {}), ...Object.fromEntries(hires.map((w) => [w.id, { fatigue: 0 }])) } }))
@@ -2436,7 +2440,8 @@ export default function App() {
       if (up.length) addTalk(d.id, 'chef', CHEF_TALK[lang].menuMade(up.map((m) => m.name), who))
       return
     }
-    if (entriesOf(d.id).length >= (MENU_MIN[d.id] ?? 1) && sellable(d)) {
+    // (opened only in the shop's hours (17:30 to 02:30, the owner's): ready before, it waits for them)
+    if (entriesOf(d.id).length >= (MENU_MIN[d.id] ?? 1) && sellable(d) && inHours(getClock().minute)) {
       setAi(true)
       say(T.autoOpen)
     }
@@ -2985,6 +2990,8 @@ export default function App() {
         // (at the grill the owner is the head chef: with no cooks hired, it's all theirs to do)
         if (!ai && dish.roast && !staffOf(dish.id, 'chef').length && !staffOf(dish.id, 'sous').length) say(UI[lang].ownerCooks)
         if (leaving) return
+        // (only in the shop's hours, 17:30 to 02:30 (the owner's))
+        if (!ai && !inHours(getClock().minute)) { say(tl(lang, `營業時間 ${hoursText()}，還沒到開店的時候`, `営業時間は ${hoursText()}、まだ開けられません`, `Open ${hoursText()}: not yet`)); return }
         if (!ai) setAi(true)
         else if (closing) setClosing(false)
         else {

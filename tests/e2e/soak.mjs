@@ -4,6 +4,7 @@
 //   node tests/e2e/soak.mjs        (MINUTES=<n> default 20, SAMPLE=<ms> default 60000, BASE=<origin> default the dev server)
 //   BASE=http://localhost:4173 node tests/e2e/soak.mjs    (the production build, `npm run build && npx vite preview`, as players get it)
 import { chromium } from 'playwright-core'
+import { toOpeningHours } from './hours.mjs'
 
 const MINUTES = +(process.env.MINUTES ?? 20), SAMPLE = +(process.env.SAMPLE ?? 60000)
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] })
@@ -37,6 +38,8 @@ await p.locator('.nb-views button').nth(0).click()
 const publish = p.locator('.nb-embedded .nb-publish button:not(.nb-off)')
 for (let guard = 0; guard < 60 && (await publish.count()); guard++) { await publish.first().click(); await p.waitForTimeout(50) }
 await p.locator('.office .panel-x').click()
+// (only in the shop's hours, 17:30 to 02:30: the clock moved on to them)
+await toOpeningHours(p)
 await p.locator('.ai-toggle').click()
 await p.locator('.speed-toggle').click()
 await p.locator('.view-reset').click()

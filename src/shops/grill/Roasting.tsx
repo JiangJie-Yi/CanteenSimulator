@@ -65,7 +65,7 @@ import { ColdMist } from '@/scene/ColdMist'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
-import { SHOP } from '@/game/shopState'
+import { SHOP, paceOfStaff } from '@/game/shopState'
 import { FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
@@ -945,7 +945,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
         trip.current = { way: w, len: pathLength(w), gone: 0 }
       }
       const w = trip.current
-      w.gone = Math.min(w.len, w.gone + dt * CHEF_PACE)
+      // (worn out, at half pace (the owner's): walking, reaching in, preparing)
+      w.gone = Math.min(w.len, w.gone + dt * CHEF_PACE * paceOfStaff(id))
       const { p, dir } = alongPath(w.way, w.gone)
       o.position.copy(p)
       if (dir.x || dir.z) o.rotation.y = Math.atan2(dir.x, dir.z)
@@ -965,7 +966,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     if (T.phase === 'taking') {
       o.position.copy(T.spot)
       o.rotation.y = Math.atan2(T.face.x - T.spot.x, T.face.z - T.spot.z)
-      T.t += dt
+      T.t += dt * paceOfStaff(id)
       if (T.t >= TAKE_S) {
         // (a rice ball's rice out of the tub, for each one he's bringing (game/rice))
         if (T.store === 'ricetub') for (let i = 0; i < T.keys.length; i++) RICE.tub = takeRice(RICE.tub)
@@ -975,7 +976,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       return true
     }
     if (T.phase === 'prepping') {
-      T.t += dt
+      T.t += dt * paceOfStaff(id)
       if (T.t >= prepOf(T.store)) { T.phase = afterPhase(T.phase); T.t = 0 }
     }
     return false

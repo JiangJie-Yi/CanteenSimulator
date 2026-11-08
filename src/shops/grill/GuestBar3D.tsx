@@ -20,8 +20,8 @@ import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, type Trip } from './commuteWalk'
-import { StaffWords } from './StaffWords'
-import { STAFF_TALK } from '@/game/shopState'
+import { StaffWords, TiredBadges } from './StaffWords'
+import { STAFF_TALK, paceOfStaff } from '@/game/shopState'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
@@ -247,7 +247,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   const cm = useRef<{ trip: Trip | null; arrived: boolean }>({ trip: null, arrived: false })
   useEffect(() => () => { SHOP.walking.delete(who.id) }, [who.id])
   useFrame((_, dt0) => {
-    const dt = Math.min(dt0, 0.1)
+    // (worn out, at half pace (the owner's))
+    const dt = Math.min(dt0, 0.1) * paceOfStaff(who.id)
     const s = st.current
     const o = g.current
     if (o) {
@@ -3275,7 +3276,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (d >= pl.len) { pl.t = 0; then() }
       }
       const away = (on: boolean) => { if (plater) PLATER_OUT.id = on ? plater.id : null; else OWNER_OUT.on = on }
-      pl.t += step
+      // (worn out, at half pace (the owner's))
+      pl.t += step * paceOfStaff(plater?.id)
       // (the rice pot cooking on its stove, by the game's clock; cooked, said in the kitchen's log (the owner's))
       {
         const r = kamaTick(RICE.kama, step)
@@ -3643,7 +3645,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (d >= w.len) { w.t = 0; setMove(false); then() }
       }
       const face = (at: THREE.Vector3) => { w.yaw = Math.atan2(at.x - w.pos.x, at.z - w.pos.z) }
-      w.t += step
+      w.t += step * paceOfStaff(servers[wi]?.id)
       // (the customer gone meanwhile: what was being carried to them put down, and the server goes back)
       if ((w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
         for (const k of w.keys) {
@@ -4176,6 +4178,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && fridges && stocker && <Stocker counters={counters} fridges={fridges} who={stocker} />}
       {/* (what the staff and the owner say as the day ends and begins, over their heads) */}
       {given && <StaffWords />}
+      {/* (the worn out among the staff: a debuff beside each (the owner's)) */}
+      {given && <TiredBadges />}
       {/* (what's just been paid, rising green over the one who paid it, and gone) */}
       {payFloats.map((f) => <PayFloat key={f.key} text={f.text} follow={() => groups.current.get(f.id)} done={() => setPayFloats((all) => all.filter((x) => x.key !== f.key))} />)}
       {ownerServes && (
