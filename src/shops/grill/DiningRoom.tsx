@@ -4618,6 +4618,14 @@ const FRIDGE_LED = (() => {
       w.addColorStop(0, 'rgba(250,253,255,1)'); w.addColorStop(0.25, 'rgba(232,244,252,0.85)'); w.addColorStop(1, 'rgba(232,244,252,0)')
       g.fillStyle = w; g.fillRect(0, r, 64, 150)
     }
+    // (the back panel of a commercial cooler (the owner's: its inside finer): rows of small air holes in the band under each shelf, where the
+    // cold comes out, and a fine seam down its middle)
+    g.fillStyle = 'rgba(70,90,105,0.32)'
+    for (const y of [0.27, 0.72, 1.19, 1.63]) {
+      const r = rowOf(y) - 16
+      for (let row = 0; row < 3; row++) for (let x = 5 + (row % 2) * 3; x < 64; x += 6) { g.beginPath(); g.arc(x, r + row * 5, 1.1, 0, Math.PI * 2); g.fill() }
+    }
+    g.fillStyle = 'rgba(90,110,125,0.25)'; g.fillRect(31.5, 0, 1, 512)
     // (its sides a touch darker: the light's from the middle)
     const sd = g.createLinearGradient(0, 0, 64, 0)
     sd.addColorStop(0, 'rgba(120,140,155,0.25)'); sd.addColorStop(0.2, 'rgba(120,140,155,0)'); sd.addColorStop(0.8, 'rgba(120,140,155,0)'); sd.addColorStop(1, 'rgba(120,140,155,0.25)')
