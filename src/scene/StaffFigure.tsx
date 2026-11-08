@@ -256,7 +256,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
-    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number } | undefined
+    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -336,6 +336,13 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
         // (working at the board: both hands down in front, the knife hand cutting, the other holding it)
         hand.position.set(sd * 0.12, 0.3 + (sd > 0 ? Math.abs(Math.sin(t * 11)) * 0.05 : 0), 0.3)
         hand.rotation.x = -0.6
+        // (a skewer pushed through what's on the board (Roasting's CHEF_TRIP.pierceAt): the left hand holding it down, the right pushing the
+        // rod in from the side, in two shoves)
+        if (job.pierce !== undefined) {
+          const k = job.pierce, shove = Math.min(1, k * 2) * 0.5 + Math.max(0, Math.min(1, k * 2 - 1)) * 0.5
+          if (sd < 0) hand.position.set(-0.06, 0.28, 0.32)
+          else hand.position.set(0.3 - 0.2 * shove, 0.3, 0.3)
+        }
       }
       if (job?.wipe !== undefined && sd > 0) {
         // (wiping the bar down: the hand out in front on the cloth on the bar's top (0.79: the bar at a server's height), along and back twice)

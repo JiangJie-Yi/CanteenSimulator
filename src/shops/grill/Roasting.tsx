@@ -856,6 +856,8 @@ function crewWayOut(role: Role, at: THREE.Vector3) {
  * onto the board. `seenAt`: when a chef last walked it (with nobody drawn to, orders come out onto the board as they used to).
  */
 export const CHEF_TRIP = {
+  /** when he last pushed a skewer through what's on the board (his hand drawn pushing it in, for the 0.6 s the rod takes to go in) */
+  pierceAt: -1e9,
   phase: 'idle' as ChefPhase, store: 'freezer' as Store, keys: [] as string[], t: 0, seenAt: -1e9, fanUntil: 0,
   /** where he stands to take it out, and what he faces there (Roasting's frame) */
   spot: new THREE.Vector3(), face: new THREE.Vector3(),
@@ -947,6 +949,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     o.userData.lean = 0
     o.userData.carry = T.phase === 'toBoard' || (T.phase === 'taking' && T.t > TAKE_S * 0.5)
     o.userData.prep = T.phase === 'prepping'
+    const pierced = performance.now() - T.pierceAt
+    o.userData.pierce = T.phase === 'prepping' && pierced < 600 ? pierced / 600 : undefined
     o.userData.fanNow = false
     const hand = () => { o.updateMatrixWorld(); T.hand.set(...TRAY_AT).applyMatrix4(o.matrixWorld) }
     if (T.phase === 'toStore' || T.phase === 'toBoard') {
@@ -6221,7 +6225,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             let t = takeSkewer(SKEWERS.s)
             // (the shop shut, the owner on his own: he washes the used ones himself when the holder's empty)
             if (!t && space !== 'open' && SKEWERS.s.dirty + SKEWERS.s.carrying > 0) { SKEWERS.s = washAll(SKEWERS.s); t = takeSkewer(SKEWERS.s) }
-            if (t) { SKEWERS.s = t; p.skewerAt = now; pierceSound() }
+            if (t) { SKEWERS.s = t; p.skewerAt = now; pierceSound(); CHEF_TRIP.pierceAt = now }
             else {
               p.prepUntil = Math.max(p.prepUntil ?? 0, now + 800)
               if (now - noSkewerSaid.current > 15000) { noSkewerSaid.current = now; chefSay(L().noSkewer) }
