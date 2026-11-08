@@ -2333,6 +2333,8 @@ const CRUMPLE_GEO = (() => {
 const CRUMPLE_MAT = new THREE.MeshToonMaterial({ color: '#f7f5ef' })
 const TISSUE_ON: [number, number, number] = [-0.035, 0.006, 0.025]
 /** how long a customer wipes their mouth with a tissue before getting up */
+/** how much of their way into a toilet's stall they fade out over (and fade in at the washstand coming out) */
+const WC_FADE_LEN = 0.45
 const WIPE_MOUTH_MS = 900
 // (a done-with plate's bones and glass, and the plater's rice bowl, first shown mid-shift: their shaders made with the rest at load (scene/Prewarm))
 {
@@ -3061,6 +3063,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const { p, dir } = alongPath(w.path, s.phase === 'wcGo' ? d : w.len - d)
         g?.position.copy(p)
         if (g) g.rotation.y = s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
+        // (into the stall round the corner, faded out over the last step: put out of sight there at once, they went in a blink, seen from above
+        // through the slats of its ceiling)
+        if (s.phase === 'wcGo' && w.who !== 'drink') s.fade = Math.max(0, Math.min(1, (w.len - d) / WC_FADE_LEN))
         if (d >= w.len) {
           if (s.phase === 'wcGo') SICK.delete(s.id)
           s.phase = s.phase === 'wcGo' ? 'wcIn' : s.leaving ? 'leave' : 'sit'
@@ -3111,6 +3116,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(w.basin)
         if (g) g.rotation.y = w.basinYaw
         s.still = true
+        // (and out of it at the washstand, faded in)
+        s.fade = Math.min(1, s.t / 0.4)
         if (s.t > HAND_S) {
           // (then a step to the hand dryer on the wall beside, turned to it, hands under it while it blows)
           const who = s.wc!.who as 'm' | 'f'
@@ -3121,7 +3128,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           g?.position.lerpVectors(w.basin, to, k * k * (3 - 2 * k))
           if (g) g.rotation.y = w.basinYaw + Math.atan2(Math.sin(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw), Math.cos(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw)) * k
         }
-        if (s.t > HAND_S + HAND_DRY_S) { s.phase = 'wcBack'; s.t = 0; s.still = false }
+        if (s.t > HAND_S + HAND_DRY_S) { s.phase = 'wcBack'; s.t = 0; s.still = false; s.fade = undefined }
       } else {
         // a moment to get up, then off the way they came, by the till: they stop there to pay, and again at the genkan's step
         const lp = leavePaths[s.seat]
