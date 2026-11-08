@@ -91,7 +91,7 @@ for (const [i, shop] of SHOPS.entries()) {
     }
     await page.locator('.office .panel-x').click()
     // open for business
-    // (only in the shop's hours, 14:30 to 02:30: the clock moved on to them)
+    // (only in the shop's hours, 16:30 to 04:30: the clock moved on to them)
     await toOpeningHours(page)
     await page.locator('.ai-toggle').click()
     await page.waitForTimeout(500)

@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { ROLES, TIRED_AT, effective, fair, paceOf, restPerHour, tirePerHour, type Worker } from '@/data/staff'
-import { canDismiss, canHire, makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
+import { LATE_TIRE, ROLES, SKILLS, TIER_ODDS, TIRED_AT, effective, fair, paceBoost, paceOf, restPerHour, tireNow, tirePerHour, type SkillId, type Worker } from '@/data/staff'
+import { canDismiss, canHire, makeCandidates, pickHires, seeded, skillDraw, valueOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
   scenario('營業中不能解雇員工，閉店後才可以', ({ given, when, then, and }) => {
@@ -29,6 +29,43 @@ feature('員工與徵人', () => {
     then('體力低的累得比較快', (w) => { expect(w.tb).toBeGreaterThan(w.ta) })
     and('體力 30 的不到半個班（6 小時）就累了；12 小時的班做完，連體力 90 的也會累', (w) => { expect(6 * w.tb).toBeGreaterThanOrEqual(TIRED_AT); expect(6 * w.ta).toBeLessThan(TIRED_AT); expect(12 * w.ta).toBeGreaterThanOrEqual(TIRED_AT) })
     and('閉店的 12 小時一定恢復到精神飽滿', () => { expect(12 * restPerHour).toBeGreaterThanOrEqual(100) })
+  })
+
+  scenario('過了午夜進入深夜模式，疲勞加劇', ({ given, then, but }) => {
+    given('一位體力 80 的一般員工', (w) => { w.w = { stamina: 80 } as Worker })
+    then(`深夜每小時累積的是平常的 ${LATE_TIRE} 倍`, (w) => { expect(tireNow(w.w, true)).toBeCloseTo(tirePerHour(w.w) * LATE_TIRE, 6) })
+    but('午夜前照常', (w) => { expect(tireNow(w.w, false)).toBe(tirePerHour(w.w)) })
+  })
+
+  scenario('夜貓子（菁英）在深夜發動特殊效果', ({ given, then, and, but }) => {
+    given('一位技能 80、體力 80 的夜貓子', (w) => { w.w = { skill: 80, stamina: 80, skills: ['nightOwl'] } as Worker })
+    then('深夜工作效率與速度 ×1.25', (w) => { expect(effective(w.w, 0, true)).toBeCloseTo(effective(w.w, 0, false) * 1.25, 6); expect(paceOf(0, paceBoost(w.w, true))).toBe(1.25) })
+    and('疲勞不受深夜加劇', (w) => { expect(tireNow(w.w, true)).toBe(tirePerHour(w.w)) })
+    and('品質是菁英', () => { expect(SKILLS.nightOwl.tier).toBe('elite') })
+    but('累了一樣減半（再乘夜貓子的加成）', (w) => { expect(effective(w.w, TIRED_AT, true)).toBeCloseTo(0.8 * 0.5 * 1.25, 6) })
+  })
+
+  scenario('特殊技能分四種品質，各自的效果', ({ given, then, and }) => {
+    given('同樣技能 80、體力 80 的四個人', (w) => { const one = (k: SkillId) => ({ skill: 80, stamina: 80, skills: [k] }) as Worker; w.plain = { skill: 80, stamina: 80 } as Worker; w.craft = one('craftsman'); w.iron = one('ironMan'); w.king = one('prodigy') })
+    then('職人魂（菁英）工作能力 ×1.15', (w) => { expect(effective(w.craft, 0)).toBeCloseTo(effective(w.plain, 0) * 1.15, 6) })
+    and('鐵人（稀有）疲勞只累積 0.6', (w) => { expect(tireNow(w.iron, false)).toBeCloseTo(tirePerHour(w.iron) * 0.6, 6) })
+    and('天才（極品）能力 ×1.3、速度 ×1.15、疲勞 ×0.8', (w) => {
+      expect(effective(w.king, 0)).toBeCloseTo(effective(w.plain, 0) * 1.3, 6)
+      expect(paceBoost(w.king, false)).toBeCloseTo(1.15, 6)
+      expect(tireNow(w.king, false)).toBeCloseTo(tirePerHour(w.king) * 0.8, 6)
+    })
+    and('每一種品質至少有一個技能', () => { for (const t of ['special', 'elite', 'rare', 'legend']) expect(Object.values(SKILLS).some((k) => k.tier === t)).toBe(true) })
+  })
+
+  scenario('特殊技能隨機賦予，越好的越少見', ({ when, then, and }) => {
+    when('抽兩萬位應徵者', (w) => {
+      const r = seeded(7), n: Record<string, number> = { none: 0, special: 0, elite: 0, rare: 0, legend: 0 }
+      for (let i = 0; i < 20000; i++) { const k = skillDraw(r)[0]; n[k ? SKILLS[k].tier : 'none']++ }
+      w.n = n
+    })
+    then('大多數人沒有技能', (w) => { expect(w.n.none / 20000).toBeGreaterThan(0.6) })
+    and('特殊 > 菁英 > 稀有 > 極品', (w) => { expect(w.n.special).toBeGreaterThan(w.n.elite); expect(w.n.elite).toBeGreaterThan(w.n.rare); expect(w.n.rare).toBeGreaterThan(w.n.legend); expect(w.n.legend).toBeGreaterThan(0) })
+    and('跟設定的機率差不多', (w) => { for (const t of ['special', 'elite', 'rare', 'legend'] as const) expect(Math.abs(w.n[t] / 20000 - TIER_ODDS[t])).toBeLessThan(0.01) })
   })
 
   scenario('應徵的人夠多可以挑：每個職位至少是名額的 4 倍，掌爐的師傅（二廚）至少 8 位', ({ given, then, and }) => {

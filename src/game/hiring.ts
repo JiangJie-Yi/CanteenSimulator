@@ -4,7 +4,7 @@
 // then one asks too much.
 import { BACKGROUNDS, INTRO, JP_GIVEN, JP_SURNAMES, PAY, TO_JA, TRAITS, TW_GIVEN, TW_SURNAMES } from '@/data/people'
 import { DISHES } from '@/data/menu'
-import { fair, type Look, type Role, type Worker } from '@/data/staff'
+import { fair, SKILLS, TIER_ODDS, type Look, type Role, type SkillId, type Tier, type Worker } from '@/data/staff'
 
 export type Rand = () => number
 
@@ -14,6 +14,18 @@ export const APPLICANTS: Record<Role, number> = { chef: 8, sous: 6, cashier: 5, 
 /** how likely each job's applicants are women */
 const WOMEN: Record<Role, number> = { chef: 0.3, sous: 0.4, cashier: 0.7, server: 0.55, stock: 0.35 }
 const AGES: Look['age'][] = ['young', 'middle', 'old']
+/** a special skill now and then (data/staff's SKILLS, the owner's): its quality drawn by TIER_ODDS (most have none), then one of that quality */
+export function skillDraw(rand: Rand): SkillId[] {
+  let r = rand()
+  for (const tier of ['legend', 'rare', 'elite', 'special'] as Tier[]) {
+    if (r < TIER_ODDS[tier]) {
+      const of = (Object.keys(SKILLS) as SkillId[]).filter((k) => SKILLS[k].tier === tier)
+      return [of[Math.floor(rand() * of.length) % of.length]]
+    }
+    r -= TIER_ODDS[tier]
+  }
+  return []
+}
 /** skill, speed and stamina ranges by age */
 const STATS: Record<Look['age'], { skill: [number, number]; speed: [number, number]; stamina: [number, number] }> = {
   young: { skill: [45, 76], speed: [74, 96], stamina: [80, 96] },
@@ -91,6 +103,8 @@ export function makeCandidates(shop: string, rand: Rand = Math.random, taken = n
         wage: Math.round((fair(role, stats.skill) * adj) / 5) * 5, note: noteOf(rand, shop, role, age, stats, adj),
         years: between(rand, YEARS[age]),
         intro: `${pick(rand, INTRO.why[age])}，${pick(rand, INTRO.likes)}，${pick(rand, INTRO.when)}。`,
+        // (now and then a special skill (the owner's), of a quality: drawn last, after all else, so the rest of each is as it was)
+        skills: skillDraw(rand),
       })
     }
   }

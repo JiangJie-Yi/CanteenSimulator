@@ -1,3 +1,5 @@
+import { paceBoost, paceOf, TIRED_AT, type SkillId } from '@/data/staff'
+
 /**
  * Where the shop is in closing (App writes it, the scenes read it): `closing` once the owner has shut up for the day, so no
  * new customer comes in while those still here finish; `leaving` once the last has gone, the staff walking out (home by the front door,
@@ -11,8 +13,13 @@ export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, wa
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shop?: typeof SHOP }).__shop = SHOP
 /** the staff worn out just now (data/staff's isTired, App keeps it): at half pace in the 3D, a badge beside them */
 export const STAFF_TIRED = new Set<string>()
-/** how fast this one of the staff gets about and gets things done: half, worn out (data/staff's paceOf) */
-export const paceOfStaff = (id: string | null | undefined) => (id && STAFF_TIRED.has(id) ? 0.5 : 1)
+/** each of the staff's special skills (data/staff's SKILLS), and whether it's the deep night (game/hours' isLate): App keeps both */
+export const STAFF_SKILLS = new Map<string, SkillId[]>()
+export const LATE = { on: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffState: { STAFF_SKILLS, STAFF_TIRED, LATE } })
+/** how fast this one of the staff gets about and gets things done: half, worn out, and as their skills make it now (data/staff's paceOf) */
+export const paceOfStaff = (id: string | null | undefined) =>
+  !id ? 1 : paceOf(STAFF_TIRED.has(id) ? TIRED_AT : 0, paceBoost({ skills: STAFF_SKILLS.get(id) }, LATE.on))
 
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }

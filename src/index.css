@@ -696,6 +696,19 @@ button {
 .game-clock-sky:active { transform: scale(0.9); transition-duration: 0s; }
 .game-clock-sky:focus-visible { outline: 2px solid var(--sky-ink); outline-offset: 1px; }
 /* (the sound effects on or off: a little speaker at its end, its waves while they sound, struck through and dimmed while muted) */
+/* (past midnight: the deep night's mark, a little indigo seal) */
+.game-clock-late {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #3b3f8f;
+  box-shadow: 0 0 8px rgb(110 120 255 / 0.55);
+  color: #eef0ff;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: help;
+}
 .game-clock-sfx {
   display: grid;
   place-items: center;
@@ -7796,9 +7809,14 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   .day-sum-veil { animation: none; }
 }
 
-/* a debuff beside one of the staff worn out (StaffWords' TiredBadges; the owner's): a small dark-red pill, a downward arrow and 疲, pulsing
-   a little; pointed at, it says what it means (title) */
-.tired-badge {
+/* what's on one of the staff, beside them (StaffWords' TiredBadges; the owner's): worn out, a small dark-red debuff, ▼ and 疲; a special
+   skill working just now by the time of night, ▲ and its icon in its quality's colour (the tiers' colours with the office's .ofc-trait);
+   side by side, bobbing a little; pointed at, they say what they mean (title) */
+.staff-badges {
+  display: inline-flex;
+  gap: 3px;
+}
+.staff-badge {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -7814,18 +7832,30 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   white-space: nowrap;
   cursor: help;
   user-select: none;
-  animation: tired-pulse 1.8s ease-in-out infinite;
+  animation: staff-badge-bob 1.8s ease-in-out infinite;
 }
-.tired-badge b {
+.staff-badge b {
   font-size: 9px;
   color: #ffb4a8;
 }
-@keyframes tired-pulse {
+.staff-badge.is-buff {
+  --tier-a: #2f7d3f;
+  --tier-b: #1d5129;
+  --tier-ink: #e6ffe9;
+  --tier-glow: rgb(80 200 110 / 0.45);
+  border-color: rgb(255 255 255 / 0.3);
+  background: linear-gradient(180deg, var(--tier-a), var(--tier-b));
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 0 8px var(--tier-glow);
+  color: var(--tier-ink);
+  animation-direction: reverse;
+}
+.staff-badge.is-buff b { color: #b6ffc8; }
+@keyframes staff-badge-bob {
   0%, 100% { transform: translateY(0); opacity: 1; }
   50% { transform: translateY(2px); opacity: 0.85; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tired-badge { animation: none; }
+  .staff-badge { animation: none; }
 }
 /* (the office's staff list: one worn out marked so, as the badge beside them in the shop) */
 .ofc-tired {
@@ -7881,3 +7911,30 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .ledger-days td.is-loss { color: #c0392b; font-weight: 700; }
 :root[data-theme='dark'] .ledger-days th { background: rgb(40 30 22 / 0.95); color: #c9b597; }
 :root[data-theme='dark'] .ledger-days td.is-gain { color: #4fff85; }
+/* (someone's special skill, after their name in the office: its icon and name, in its quality's colour (the owner's): 特殊 green, 菁英
+   blue, 稀有 purple, 極品 a dark gold with a glint) */
+.ofc-trait {
+  --tier-a: #2f7d3f;
+  --tier-b: #1d5129;
+  --tier-ink: #e6ffe9;
+  --tier-glow: rgb(80 200 110 / 0.45);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px 1px 5px;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--tier-a), var(--tier-b));
+  box-shadow: 0 0 6px var(--tier-glow);
+  color: var(--tier-ink);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+.ofc-trait i { font-style: normal; }
+:is(.ofc-trait, .staff-badge).is-elite { --tier-a: #2f62b8; --tier-b: #1b3c7e; --tier-ink: #e6efff; --tier-glow: rgb(90 140 255 / 0.5); }
+:is(.ofc-trait, .staff-badge).is-rare { --tier-a: #7e3fb8; --tier-b: #4f2280; --tier-ink: #f3e6ff; --tier-glow: rgb(170 100 255 / 0.5); }
+:is(.ofc-trait, .staff-badge).is-legend { --tier-a: #8f6d22; --tier-b: #574013; --tier-ink: #ffe9a8; --tier-glow: rgb(230 180 60 / 0.6); }

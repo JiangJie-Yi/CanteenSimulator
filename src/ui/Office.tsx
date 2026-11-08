@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useDrag } from './useDrag'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
-import { isTired, ROLES, type Worker } from '@/data/staff'
+import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
 import { CANDIDATES, pickHires } from '@/game/hiring'
 import { Avatar } from './Avatar'
 
@@ -120,7 +120,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                   <div key={w.id} id={`ofc-${w.id}`} className="ofc-person is-hired">
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
-                      <b>{ja ? w.ja : w.zh}</b>
+                      <b>{ja ? w.ja : w.zh}<Traits w={w} ja={ja} /></b>
                       <span className="ofc-energy" title={t('精神', '元気')}>
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
@@ -135,7 +135,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
                       <b>{ja ? w.ja : w.zh}<span className={`ofc-tag-who${w.look.female ? ' is-f' : ''}`}>
-                        {w.look.female ? t('女', '女性') : t('男', '男性')}・{w.years}{t('歲', '歳')}</span></b>
+                        {w.look.female ? t('女', '女性') : t('男', '男性')}・{w.years}{t('歲', '歳')}</span><Traits w={w} ja={ja} /></b>
                       <span className="ofc-stars">
                         <Stat label={t('手藝', '腕')} v={w.skill} />
                         <Stat label={t('速度', '速さ')} v={w.speed} />
@@ -161,4 +161,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
     </>,
     document.body,
   )
+}
+
+/** someone's special skills (data/staff's SKILLS; the owner's), a chip after their name: its icon and name, in its quality's colour (特殊
+ * green, 菁英 blue, 稀有 purple, 極品 dark gold); pointed at, the quality and what it does */
+function Traits({ w, ja }: { w: Worker; ja: boolean }) {
+  if (!w.skills?.length) return null
+  return <>{w.skills.map((k) => {
+    const sk = SKILLS[k], tier = TIERS[sk.tier]
+    return <em key={k} className={`ofc-trait is-${sk.tier}`} title={`${ja ? tier.ja : tier.zh}・${ja ? sk.ja : sk.zh}：${ja ? sk.jaSays : sk.zhSays}`}><i aria-hidden="true">{sk.icon}</i>{ja ? sk.ja : sk.zh}</em>
+  })}</>
 }

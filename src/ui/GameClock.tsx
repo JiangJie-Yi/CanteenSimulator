@@ -4,6 +4,7 @@
 // waiting): it moves the clock on to where the next part starts, and the room dissolves into that light.
 import { memo, useEffect, useRef } from 'react'
 import { hhmm, nextSky, skyAt, type Sky } from '@/game/clock'
+import { isLate } from '@/game/hours'
 import { tl, type Lang } from '@/data/i18n'
 import { setTip } from '@/scene/hoverTip'
 import { setSfxMuted, useSfxMuted } from '@/scene/sfx'
@@ -54,6 +55,8 @@ function GameClockImpl({ lang }: { lang: Lang }) {
       </button>
       <span className="game-clock-day">{tl(lang, `第 ${day} 天`, `${day} 日目`, `Day ${day}`)}</span>
       <span className="game-clock-time">{hhmm(minute)}</span>
+      {/* (past midnight: the deep night (game/hours' isLate; the owner's), the staff tiring faster, the night's crowd in) */}
+      {isLate(minute) && <span className="game-clock-late" title={tl(lang, '深夜模式：員工疲勞加劇、客人換成夜間的客群', '深夜：疲れが早く、夜の客層に', 'Late night: staff tire faster, the night crowd comes in')}>{tl(lang, '深夜', '深夜', 'Late')}</span>}
       <SfxToggle lang={lang} />
     </div>
   )

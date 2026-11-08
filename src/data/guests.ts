@@ -49,3 +49,24 @@ export const kindOf = (id: number) => {
 }
 /** what the staff call this customer */
 export const guestLabel = (id: number, lang: Lang) => kindOf(id)[lang]
+
+/**
+ * The deep night's crowd (深夜, the owner's: game/hours' isLate): no children, no schoolkids and no old folk after midnight; the night's
+ * regulars and the rough lot, the gyaru, the office workers off a late shift and the old regulars more often. A weight against each kind's
+ * own (0: not at all); a guest the shop's next number would make is let in by it (comesLate), else the number after is tried.
+ */
+export const LATE_WEIGHT: Partial<Record<GuestKind, number>> = {
+  kid: 0, schoolboy: 0, schoolgirl: 0, grandpa: 0, grandma: 0,
+  delinquent: 3, bosozoku: 3, gyaru: 2, salaryman: 1.5, uncle: 1.5, officeLady: 1.2, collegeStudent: 1.2,
+}
+const LATE_MAX = Math.max(1, ...Object.values(LATE_WEIGHT).map((v) => v ?? 1))
+/** whether this guest (by their number) comes in in the deep night: by their kind's weight then, fixed for each number */
+export const comesLate = (id: number) => {
+  const w = LATE_WEIGHT[kindOf(id).kind] ?? 1
+  if (w <= 0) return false
+  let h = Math.imul(id ^ 0x5bd1e995, 0x27d4eb2d)
+  h = Math.imul(h ^ (h >>> 15), 0x165667b1)
+  return (((h ^ (h >>> 13)) >>> 0) % 1000) / 1000 < w / LATE_MAX
+}
+/** the deep night's customers order more: one more dish, about half of them */
+export const LATE_MORE = 0.5

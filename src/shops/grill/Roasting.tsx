@@ -40,7 +40,7 @@ import { seasonSound, sprinkleTick } from './seasonSound'
 import { biteSound, chewSound } from './chewSound'
 import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
 import { getLights } from '@/scene/lightsStore'
-import { kindOf, type GuestKind } from '@/data/guests'
+import { comesLate, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
@@ -65,7 +65,7 @@ import { ColdMist } from '@/scene/ColdMist'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
-import { SHOP, paceOfStaff } from '@/game/shopState'
+import { SHOP, paceOfStaff, LATE } from '@/game/shopState'
 import { FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
@@ -4620,10 +4620,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const pairAt = Math.random() < Math.min(0.9, fl.pairs * flowerBuffs(SHRINE_FLOWERS).pairs)
         ? Array.from({ length: BAR_SEATS - 1 }, (_, n) => n).find((n) => free(n) && free(n + 1) && GRILL_SEATS[n].counter === GRILL_SEATS[n + 1].counter)
         : undefined
-      let ids = [guestSeq.current + 1]
+      // (in the deep night, a different crowd: the next number that would come in then (data/guests' comesLate))
+      const lateOk = (i: number) => !LATE.on || comesLate(i)
+      let first = guestSeq.current + 1
+      while (!lateOk(first) && first < guestSeq.current + 400) first++
+      let ids = [first]
       if (pairAt !== undefined) {
         let i = guestSeq.current + 1
-        while (!(COUPLE_HIM.has(kindOf(i).kind) && COUPLE_HER.has(kindOf(i + 1).kind)) && i < guestSeq.current + 400) i++
+        while (!(COUPLE_HIM.has(kindOf(i).kind) && COUPLE_HER.has(kindOf(i + 1).kind) && lateOk(i) && lateOk(i + 1)) && i < guestSeq.current + 400) i++
         if (i < guestSeq.current + 400) ids = [i, i + 1]
       }
       const couple = ids.length === 2
@@ -4631,7 +4635,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (a stool for them, before they order: with every one taken, or someone still at it, they don't come in)
         const seatFor = couple ? pairAt! + k : Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n))
         if (seatFor === undefined || used.has(seatFor)) continue
-        const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0)
+        // (the deep night's crowd orders more (the owner's: a different class of customer then))
+        const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0) + (LATE.on && Math.random() < LATE_MORE ? 1 : 0)
         const orders: string[] = []
         const said: string[] = []
         for (let j = 0; j < (entries ? Math.min(want, blessed ? 3 : 2) : want); j++) {
