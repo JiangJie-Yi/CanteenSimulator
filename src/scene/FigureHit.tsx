@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { whoOver } from './hoverTip'
+import { glowOff, glowOn } from './hoverGlow'
 
 const BOX = new THREE.BoxGeometry(1, 1, 1)
 const INV = new THREE.Matrix4()
@@ -15,11 +16,34 @@ const ALL = new THREE.Box3()
  * (every vertex through its bones: dear); its tag their name in the speakers' yellow. `onPointerDown`: what grabbing them does (customers
  * only: the owner and the staff can't be dragged, they keep to their work).
  */
-export function FigureHit({ title, hint, onPointerDown }: { title: () => string; hint?: () => string
-  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void }) {
+/** someone being carried just now (GuestBar3D's drag): their glow and the closed hand kept on while the pointer slips off them */
+export const GRABBING = { on: false }
+export function FigureHit({ title, hint, onPointerDown, grabbable }: { title: () => string; hint?: () => string
+  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
+  /** whether they can be picked up just now: the open hand over them, and they glow (the owner's), as the things in the room that can */
+  grabbable?: () => boolean }) {
   const box = useRef<THREE.Mesh>(null)
   const fits = useRef(0)
-  const over = useMemo(() => whoOver(title, hint), [title, hint])
+  const over = useMemo(() => {
+    const w = whoOver(title, hint)
+    if (!grabbable) return w
+    return {
+      onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+        w.onPointerOver(e)
+        if (!grabbable()) return
+        const el = e.nativeEvent?.target as HTMLElement | null
+        if (el?.style) el.style.cursor = 'grab'
+        glowOn(e.eventObject.parent)
+      },
+      onPointerOut: (e: ThreeEvent<PointerEvent>) => {
+        w.onPointerOut(e)
+        if (GRABBING.on) return
+        const el = e.nativeEvent?.target as HTMLElement | null
+        if (el?.style && el.style.cursor === 'grab') el.style.cursor = ''
+        glowOff(e.eventObject.parent)
+      },
+    }
+  }, [title, hint, grabbable])
   useFrame(() => {
     const me = box.current, p = me?.parent
     if (!me || !p || fits.current > 3) return

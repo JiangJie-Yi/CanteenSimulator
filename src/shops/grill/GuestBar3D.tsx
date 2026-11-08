@@ -2,7 +2,8 @@ import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes } from '@/game/skewers'
 import { rattleSound } from './skewerSound'
 import { getClock } from '@/ui/clockStore'
-import { FigureHit } from '@/scene/FigureHit'
+import { FigureHit, GRABBING } from '@/scene/FigureHit'
+import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, stockerChore, type StockChore } from '@/game/stocker'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
@@ -2838,7 +2839,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     drag.current = { id: s.id, at: grp.position.clone(), asked: 0 }
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3()
     const el = st.gl.domElement
+    // (held: the closed hand, and they go on glowing till they're let go)
     el.style.cursor = 'grabbing'
+    GRABBING.on = true
     const move = (ev: PointerEvent) => {
       const r = el.getBoundingClientRect()
       ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1)
@@ -2851,6 +2854,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       window.removeEventListener('pointerup', up)
       if (ctl) ctl.enabled = true
       el.style.cursor = ''
+      GRABBING.on = false
+      glowOff(grp)
       const d = drag.current
       if (!d) return
       // (the nearest stool to where they're let go, if it's close; free of anyone, their plate, their bones)
@@ -4353,7 +4358,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                 clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} />
               {/* (named as the pointer's over them; picked up and carried to another stool while they wait) */}
               <FigureHit title={() => guestLabel(s.id, lang)} hint={() => (canMove(s) ? (lang === 'ja' ? 'ドラッグして空席へ' : lang === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : '')}
-                onPointerDown={grab(s)} />
+                onPointerDown={grab(s)} grabbable={() => !getEdit().on && canMove(s)} />
             </group>
             {/* (their label just over their head, sat up on the seat or standing) */}
             <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15}
