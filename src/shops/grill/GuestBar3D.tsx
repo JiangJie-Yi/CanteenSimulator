@@ -415,8 +415,12 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     if (g.current) {
       g.current.position.copy(s.pos)
       g.current.rotation.y = s.yaw
-      // (unseen while he's in the toilet, the door shut)
-      g.current.visible = !(c?.kind === 'roll' && s.phase === 'work')
+      // (unseen while he's in the toilet's stall changing the roll: faded out as he goes in and in again as he comes out, as the customers
+      // are (put out of sight at once, seen from above through the slats, he went in a blink))
+      const inStall = c?.kind === 'roll' && s.phase === 'work'
+      const fade = inStall ? (s.t < 0.35 ? 1 - s.t / 0.35 : s.t > 2.45 ? Math.min(1, (s.t - 2.45) / 0.35) : 0) : 1
+      g.current.userData.fade = fade
+      g.current.visible = fade > 0.01
     }
     // (in his arms: a case of drinks carried out; a new roll; a new box of tissues; back empty-handed)
     const out = s.phase === 'go' || s.phase === 'work'
