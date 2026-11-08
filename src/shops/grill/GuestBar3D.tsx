@@ -3009,6 +3009,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const { p, dir } = alongPath(path, d)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < len
         s.lastD = d
+        // (in through the door faded in, as the takeaways are (they were there at once, whole, in the doorway); one off the bench is in already)
+        if (!s.from) s.fade = d >= 0.6 && s.t >= FADE_S ? undefined : Math.min(1, d / 0.6 + s.t / FADE_S)
         g?.position.copy(p)
         if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
         // (welcomed in as they come through the noren: the servers and the owner)
@@ -3189,7 +3191,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // (the name tag goes with the body: gone a little before they are, so none is left hanging in the doorway)
       const tag = labels.current.get(s.id)
-      if (tag) tag.style.opacity = s.phase === 'leave' ? String(Math.max(0, Math.min(1, (s.fade ?? 1) * 1.6 - 0.5))) : ''
+      if (tag) tag.style.opacity = s.fade !== undefined ? String(Math.max(0, Math.min(1, s.fade * 1.6 - 0.5))) : ''
       if (g) g.visible = !(s.phase === 'wcIn' && s.wc?.who !== 'drink')
       // (down a step, standing in the genkan)
       if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
