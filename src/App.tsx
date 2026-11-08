@@ -44,7 +44,7 @@ import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { dutyDay, LATE, SHOP, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { dutyDay, LAST_CALL, LATE, SHOP, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -73,7 +73,7 @@ import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
 import { effective, isTired, restPerHour, ROLES, tireNow, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
-import { hoursEnd, hoursText, inHours, isLate } from '@/game/hours'
+import { hoursEnd, hoursText, inHours, isLate, lastCall } from '@/game/hours'
 import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
 import { keptForResume, resumeFrom } from '@/game/resume'
@@ -1287,6 +1287,9 @@ export default function App() {
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
   // (shut: the day's counted done, the next shift's on duty from now (game/shifts' dutyDay))
   useEffect(() => { if (!ai) SHOP.counted = false }, [ai])
+  /** the last half hour begun: said in the kitchen's log (the current language and shop: the clock's timer is made once) */
+  const lastCallSay = useRef(() => {})
+  lastCallSay.current = () => addTalk(DISHES[active].id, 'chef', LINES[lang].lastCall)
   /** a new day by the game's clock: the applicants' new lot, the dice back */
   const newDay = useRef<(day: number) => void>(() => {})
   /** the hours over: shut up as by hand (the button's way: no auto-run reopening it till they come round again) */
@@ -2293,6 +2296,10 @@ export default function App() {
       // (the deep night, past midnight till the sky lightens (game/hours): the staff tire faster, a different crowd comes in, the night
       // owls at their best)
       LATE.on = isLate(getClock().minute)
+      // (the last half hour: takeaways only (game/hours' lastCall); said once as it starts)
+      const lastNow = lastCall(getClock().minute)
+      if (lastNow && !LAST_CALL.on && aiRef.current.ai) lastCallSay.current()
+      LAST_CALL.on = lastNow
       // (the hours over (04:30, the owner's): shut up as by hand, last orders and all)
       if (aiRef.current.ai && hoursEnd(was, getClock().minute)) hoursOver.current()
       // (and the chef's wage, by the second while the shop's open: in the same tick, so the two are one redraw of the page, not two)

@@ -21,6 +21,8 @@ export const STAFF_TIRED = new Set<string>()
 /** each of the staff's special skills (data/staff's SKILLS), and whether it's the deep night (game/hours' isLate): App keeps both */
 export const STAFF_SKILLS = new Map<string, SkillId[]>()
 export const LATE = { on: false }
+/** the last half hour before closing (game/hours' lastCall): no one more sat down, takeaways only (App keeps it) */
+export const LAST_CALL = { on: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffState: { STAFF_SKILLS, STAFF_TIRED, LATE } })
 /** how fast this one of the staff gets about and gets things done: half, worn out, and as their skills make it now (data/staff's paceOf) */
 export const paceOfStaff = (id: string | null | undefined) =>

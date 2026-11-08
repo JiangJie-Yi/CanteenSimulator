@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
 import { TUB_FULL, emptyKama, type Kama } from '@/game/rice'
@@ -651,6 +652,20 @@ export type ReadyPlate = { seat: number; plate: boolean; flying: number; landed:
  * seat's food on it; GuestBar3D draws the plate and has a server come for it, the slot freed as it's taken up)
  */
 export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_SLOTS }, () => null as ReadyPlate | null) }
+/**
+ * The takeaways and deliveries waiting (game/takeout, the owner's): Roasting takes the order, packs its food into the box at the plating place
+ * (TAKEOUT_SPOT: the plating place's second slot, toward the chef, free) and marks it ready; GuestBar3D walks the one waiting to the till, has
+ * a server carry the box out to them (`taken`, `handed`) and walks them out (`gone`, then Roasting lets it go)
+ */
+export const TAKEOUT = { orders: [] as TakeoutOrder[] }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __takeout: TAKEOUT })
+/** the takeaway box's place on the table, in the scene's frame (ALONG, LAY) */
+export const TAKEOUT_SPOT = { along: PLATING_SPOT.along + readyAlong(1), lay: PLATING_SPOT.lay }
+/** the same, in the bar's frame (for the server who comes for it): where it stands and where they stand to take it */
+export const takeoutOf = () => {
+  const top = sceneToBar(0, 0, 0).y
+  return { at: sceneToBar(TAKEOUT_SPOT.along, TAKEOUT_SPOT.lay).setY(top), out: sceneToBar(TAKEOUT_SPOT.along, PLATING_SPOT.serverLay).setY(0) }
+}
 /** the seats whose plate is out (set down at them, or on its way there): their later food is set out at the plating place loose, for adding to it */
 export const PLATES_OUT = new Set<number>()
 /** the kitchen's plater (the third cook, or the second) off their place, fetching plates for the plating place: GuestBar3D walks a figure of them,

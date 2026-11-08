@@ -41,13 +41,14 @@ import { biteSound, chewSound } from './chewSound'
 import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
 import { getLights } from '@/scene/lightsStore'
 import { comesLate, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
+import { RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -65,7 +66,7 @@ import { ColdMist } from '@/scene/ColdMist'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
-import { SHOP, paceOfStaff, LATE } from '@/game/shopState'
+import { SHOP, paceOfStaff, LATE, LAST_CALL } from '@/game/shopState'
 import { FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
@@ -107,7 +108,9 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
   leftAt?: number; cleared?: boolean
   /** (shop clock) when they ate their first piece: how long they waited for it */
-  firstAte?: number }
+  firstAte?: number
+  /** a takeaway or a delivery (game/takeout): not sat anywhere, their food packed at the plating place, carried out to them at the till */
+  takeout?: boolean }
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = GRILL_SEATS.length
 /** who can come in as a couple: him, and her */
@@ -2662,6 +2665,34 @@ function SideDishImpl({ position, container }: { position: [number, number, numb
 }
 
 /** The tasting bowl (試食碗): a deep round bowl of the same plum-blossom ware, where whatever's cooked by hand to try is put. */
+/**
+ * The takeaway box (game/takeout; the owner's): at the plating place's second slot while an order's being packed, open, a kraft card tray its
+ * food is laid in; all of it in, its lid on and a red seal across it; gone as a server takes it out to the till. One draw for each part.
+ */
+const BOX_W = 0.34, BOX_D = 0.2, BOX_H = 0.07
+const KRAFT = new THREE.MeshToonMaterial({ color: '#b8875a' })
+const KRAFT_IN = new THREE.MeshToonMaterial({ color: '#9c6f45' })
+const SEAL = new THREE.MeshToonMaterial({ color: '#b3241c' })
+const TakeoutBox = memo(function TakeoutBox({ position }: { position: [number, number, number] }) {
+  const g = useRef<THREE.Group>(null)
+  const lid = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const o = TAKEOUT.orders.find((x) => !x.taken && x.packed > 0)
+    if (g.current) g.current.visible = !!o
+    if (lid.current) lid.current.visible = !!o?.ready
+  })
+  return (
+    <group ref={g} position={position} rotation-y={Math.atan2(ALONG.x, ALONG.z)} visible={false}>
+      <mesh position-y={0.004} material={KRAFT_IN}><boxGeometry args={[BOX_W, 0.008, BOX_D]} /></mesh>
+      {[-1, 1].map((sd) => <mesh key={`l${sd}`} position={[0, BOX_H / 2, sd * BOX_D / 2]} material={KRAFT}><boxGeometry args={[BOX_W, BOX_H, 0.008]} /></mesh>)}
+      {[-1, 1].map((sd) => <mesh key={`e${sd}`} position={[sd * BOX_W / 2, BOX_H / 2, 0]} material={KRAFT}><boxGeometry args={[0.008, BOX_H, BOX_D]} /></mesh>)}
+      <group ref={lid} visible={false}>
+        <mesh position-y={BOX_H + 0.006} material={KRAFT}><boxGeometry args={[BOX_W + 0.012, 0.012, BOX_D + 0.012]} /></mesh>
+        <mesh position-y={BOX_H + 0.013} material={SEAL}><boxGeometry args={[0.05, 0.003, BOX_D + 0.016]} /></mesh>
+      </group>
+    </group>
+  )
+})
 const TasteBowl = memo(TasteBowlImpl, sameProps)
 function TasteBowlImpl({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = wareOnce('bowl', () => {
@@ -3704,6 +3735,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
     if (kind === 'rawdish') return atHome('rawdish', new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])))
     if (kind === 'bowl') return bowlAt()
+    if (kind === 'takeout') return new THREE.Vector3().addScaledVector(ALONG, TAKEOUT_SPOT.along).addScaledVector(LAY, TAKEOUT_SPOT.lay)
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   /** where the fan hangs: from its peg past the ledge's left end, its paper's middle below it (Decor turns it to face the cook) */
@@ -3915,6 +3947,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    */
   const serveTo = (p: Piece, owner: Guest) => {
     p.keepWarm = false
+    // (a takeaway's: packed into the box at the plating place, side by side, the owner's hands taking it there)
+    if (owner.takeout) {
+      p.guest = owner.id
+      p.seat = -1
+      const row = pieces.current.filter((q) => q !== p && q.guest === owner.id && q.container === 'takeout' && !q.eaten).length
+      p.container = 'takeout'
+      p.body = null
+      p.toP.copy(containerAt('takeout')).addScaledVector(LAY_DIR, (row % 3 - 1) * 0.05).add(new THREE.Vector3(0, 0.06 + Math.floor(row / 3) * 0.04, 0))
+      flatQ(p, p.toQ, STACK_DIR)
+      p.local.copy(p.toP).sub(containerAt('takeout'))
+      return
+    }
     const seat = owner.seat
     p.guest = owner.id
     p.seat = seat
@@ -4319,6 +4363,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }, [ai])
   const chefClock = useRef(0)
   const guests = useRef<Guest[]>([])
+  /** the shop's seconds since the last takeaway order (game/takeout) */
+  const takeoutClock = useRef(0)
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __roastGuests: guests })
   // (a customer dragged to another stool (GuestBar3D asks): only while they're waiting with nothing cooked tied to their stool yet, and
   // the stool's nobody's)
@@ -4339,7 +4385,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const wants = useRef<{ id: string; dabs: string[]; name: string }[]>([])
   const nameOfP = (p: Piece) => p.want?.name ?? nameOf(p.id)
   const guestSeq = useRef(0)
-  const report = () => onGuests?.(guests.current.map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
+  const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner })))
   const chefSaid = useRef(0)
   /** when the chef last said there's no clean skewer */
@@ -4458,7 +4504,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (space === 'open') {
       const here = (id: number) => guests.current.some((g) => g.id === id && (g.state === 'waiting' || g.state === 'eating'))
       const stray = live.find((p) => p.collected && (p.flight >= 1 || (p.via === 'plated' && p.readyAt === undefined)) && !p.stickOnly &&
-        !SERVICE.claimed.has(p.key) && !SERVICE.carried.has(p.key) && (p.container !== 'bar' || (p.via === 'plated' && !here(p.guest))) &&
+        !SERVICE.claimed.has(p.key) && !SERVICE.carried.has(p.key) && p.container !== 'takeout' && (p.container !== 'bar' || (p.via === 'plated' && !here(p.guest))) &&
         // (one kept warm in the bowl waits there till someone orders it: it's not to be picked up again and again ahead of the rest)
         !(p.keepWarm && p.container?.startsWith('bowl') && !ownerOf(p)))
       if (stray) {
@@ -4588,7 +4634,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     guestTime.current += 0.8
     const now = guestTime.current
     guestClock.current += 0.8
-    const seated = guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating')
+    const seated = guests.current.filter((g) => !g.takeout && (g.state === 'waiting' || g.state === 'eating'))
     // (no room drawn, on a phone: nobody walks to the fridge, but they still help themselves to a drink, once each)
     if (!bar && onDrink) for (const g of seated) {
       if (g.state !== 'waiting' || drank.current.has(g.id) || Math.random() > 0.8 / 70) continue
@@ -4608,7 +4654,54 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         break
       }
     }
-    if (onOrder && !SHOP.closing && comesIn(mood) && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
+    /** what someone (number `id`) orders, `want` dishes at most: off the menu as listed (each charged and its stock taken), a portion kept
+     * warm in the bowl or one cleared away made again where there is (the dine-in's and the takeaway's alike) */
+    const placeOrders = (id: number, want: number) => {
+      const orders: string[] = []
+      const said: string[] = []
+      for (let j = 0; j < (entries ? Math.min(want, blessed ? 3 : 2) : want); j++) {
+        if (entries) {
+          // a dish (or a set) off the menu, made the way it's listed
+          const e = entries[Math.floor(Math.random() * entries.length)]
+          if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
+          wants.current.push(...e.parts)
+          // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
+          const again: Piece[] = [], warm: Piece[] = []
+          for (const pt of e.parts) {
+            const w = warmFor(pt.id, new Set(warm))
+            if (w) { warm.push(w); continue }
+            const q = recyclable(pt.id, new Set(again))
+            if (q) again.push(q)
+          }
+          const reuse: Record<string, number> = {}
+          for (const q of [...again, ...warm]) reuse[q.id] = (reuse[q.id] ?? 0) + 1
+          if (onOrderEntry?.(e.key, id, reuse)) {
+            // (its prep: rice washed and cooked, the soup, what's rinsed)
+            meterWater('cooking', e.parts.length)
+            for (const q of again) revive(q)
+            // (the bowl's held for them: carried over to them from there (the stray's way, next))
+            for (const q of warm) { q.guest = id; q.keepWarm = false }
+            orders.push(...e.parts.map((pt) => pt.id))
+            said.push(e.name)
+          } else {
+            wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
+          }
+          continue
+        }
+        const pick = itemIds.filter((x) => x in roast.times)[Math.floor(Math.random() * itemIds.filter((x) => x in roast.times).length)]
+        const warm = pick ? warmFor(pick, new Set()) : undefined
+        const again = pick && !warm ? recyclable(pick, new Set()) : undefined
+        if (pick && onOrder?.(pick, id, !!(again || warm))) {
+          if (again) revive(again)
+          if (warm) { warm.guest = id; warm.keepWarm = false }
+          orders.push(pick)
+          said.push(nameOf(pick))
+        }
+      }
+      return { orders, said }
+    }
+    // (no one more sat down in the last half hour before closing (game/hours' lastCall): takeaways only then, below)
+    if (onOrder && !SHOP.closing && !LAST_CALL.on && comesIn(mood) && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
@@ -4637,47 +4730,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (seatFor === undefined || used.has(seatFor)) continue
         // (the deep night's crowd orders more (the owner's: a different class of customer then))
         const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0) + (LATE.on && Math.random() < LATE_MORE ? 1 : 0)
-        const orders: string[] = []
-        const said: string[] = []
-        for (let j = 0; j < (entries ? Math.min(want, blessed ? 3 : 2) : want); j++) {
-          if (entries) {
-            // a dish (or a set) off the menu, made the way it's listed
-            const e = entries[Math.floor(Math.random() * entries.length)]
-            if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
-            wants.current.push(...e.parts)
-            // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
-            const again: Piece[] = [], warm: Piece[] = []
-            for (const pt of e.parts) {
-              const w = warmFor(pt.id, new Set(warm))
-              if (w) { warm.push(w); continue }
-              const q = recyclable(pt.id, new Set(again))
-              if (q) again.push(q)
-            }
-            const reuse: Record<string, number> = {}
-            for (const q of [...again, ...warm]) reuse[q.id] = (reuse[q.id] ?? 0) + 1
-            if (onOrderEntry?.(e.key, id, reuse)) {
-              // (its prep: rice washed and cooked, the soup, what's rinsed)
-              meterWater('cooking', e.parts.length)
-              for (const q of again) revive(q)
-              // (the bowl's held for them: carried over to them from there (the stray's way, next))
-              for (const q of warm) { q.guest = id; q.keepWarm = false }
-              orders.push(...e.parts.map((pt) => pt.id))
-              said.push(e.name)
-            } else {
-              wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
-            }
-            continue
-          }
-          const pick = itemIds.filter((x) => x in roast.times)[Math.floor(Math.random() * itemIds.filter((x) => x in roast.times).length)]
-          const warm = pick ? warmFor(pick, new Set()) : undefined
-          const again = pick && !warm ? recyclable(pick, new Set()) : undefined
-          if (pick && onOrder(pick, id, !!(again || warm))) {
-            if (again) revive(again)
-            if (warm) { warm.guest = id; warm.keepWarm = false }
-            orders.push(pick)
-            said.push(nameOf(pick))
-          }
-        }
+        const { orders, said } = placeOrders(id, want)
         guestSeq.current = Math.max(guestSeq.current, id)
         if (orders.length) {
           const seat = seatFor
@@ -4700,6 +4753,37 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         i >= all.length - 12)
       report()
     }
+    // takeaways and deliveries (game/takeout, the owner's): now and then one at the till, more often in the last half hour; not on a phone (no
+    // room to walk them in), nor while closing up
+    takeoutClock.current += 0.8
+    if (onOrder && bar && !SHOP.closing && comesIn(mood) && TAKEOUT.orders.filter((o) => !o.gone).length < TAKEOUT_MAX &&
+      takeoutClock.current > takeoutGap(LAST_CALL.on, crowd) * (0.6 + Math.random() * 0.8)) {
+      takeoutClock.current = 0
+      const id = guestSeq.current + 1
+      guestSeq.current = id
+      const rider = Math.random() < RIDER_SHARE
+      const { orders, said } = placeOrders(id, takeoutSize(rider, Math.random()))
+      if (orders.length) {
+        guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat: -1, takeout: true })
+        TAKEOUT.orders.push({ id, rider, items: orders.length, packed: 0, ready: false, taken: false, handed: false, gone: false })
+        onSay?.('chef', L().takeoutOrder(said, rider))
+      }
+    }
+    // (each one's food packed as it's done (its pieces in the box: Roasting's collect, serveTo); taken out by a server, those pieces done
+    // with; gone out of the door, the order let go)
+    for (const o of TAKEOUT.orders) {
+      const g = guests.current.find((x) => x.id === o.id)
+      if (!g) { o.gone = true; continue }
+      const mine = pieces.current.filter((p) => p.guest === o.id && p.container === 'takeout' && !p.eaten)
+      o.packed = mine.filter((p) => p.flight >= 1 && !p.carried).length
+      o.ready = o.packed >= o.items
+      if (o.taken && g.state === 'waiting') {
+        for (const p of mine) { p.eaten = true; p.slot = null }
+        g.state = 'done'
+        g.cleared = true
+      }
+    }
+    TAKEOUT.orders = TAKEOUT.orders.filter((o) => !o.gone)
     // someone kept waiting too long goes
     for (const g of seated) {
       if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood)) {
@@ -4739,6 +4823,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // a guest eats a piece of what they ordered, if it's ready
     for (const g of guests.current) {
       if (g.state !== 'waiting' && g.state !== 'eating') continue
+      // (a takeaway's eaten at home)
+      if (g.takeout) continue
       const owed = [...g.orders]
       for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
       const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
@@ -6629,6 +6715,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <WhenHeld key={n} holds={() => holds(`dish-${n}`)}><SideDish container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} /></WhenHeld>
       ))}
       <TasteBowl container="bowl-0" position={bowlAt().toArray() as [number, number, number]} />
+      {/* the takeaway box, while one's being packed (game/takeout) */}
+      {space === 'open' && <TakeoutBox position={containerAt('takeout').toArray() as [number, number, number]} />}
       <EmberBed fuel={fuel} />
       {/* (the sticks on the fire, their ink, and the crumbs they break into: a few instanced meshes, written each frame) */}
       <primitive object={coalDraw.group} />

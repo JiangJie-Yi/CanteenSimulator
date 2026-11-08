@@ -67,7 +67,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -2472,6 +2472,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   }
   /** from a server's place (inside their gate) across the kitchen to the chef, for a plate he's set out ready: round what stands on its floor */
   const fetchPath = (wi: number) => kitchenRoute(homeOf(wi).at, pickupSpot)
+  /** a takeaway's way (the owner's: the customer, or the rider, waits in the genkan in their shoes, by the till): in from the front door to just
+   * short of the step up into the room (`wait`); where the server stands on the step to give them their box (`hand`); and the server's way from
+   * their place out through their gate, along the aisle by the till to the step (the way customers walk out to pay, backwards) */
+  const takeoutWay = useMemo(() => {
+    if (!given || !seats.length) return null
+    const door = pathTo(counters, seats[0])[0], { spot, lane, aisle } = payOf(counters)
+    const line = [door, spot], len = pathLength(line)
+    let edge = 0
+    for (let d = 0; d < len; d += 0.02) if (!inGenkan(counters, alongPath(line, d).p)) { edge = d; break }
+    const wait = alongPath(line, Math.max(0.3, edge - 0.32)).p.setY(0), hand = alongPath(line, Math.min(len, edge + 0.3)).p.setY(0)
+    // (across the line in, for a second one waiting beside the first)
+    const side = new THREE.Vector3(-(spot.z - door.z), 0, spot.x - door.x).normalize()
+    return { door: door.clone(), wait, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()] }
+  }, [counters, seats, given])
+  /** from a server's place out to the step where the takeaway's handed over (walked backwards, the way back) */
+  const tillPath = (wi: number) => {
+    const h = homeOf(wi), way = takeoutWay!
+    return [...h.way.map((v) => v.clone()), ...(h.counter ? [aisleCorner(counters[h.counter])] : []), ...way.out.map((v) => v.clone())]
+  }
   /** beside a customer, where a server stands to set their plate down */
   const besideSeat = (n: number) => {
     const st = seats[n]
@@ -2496,16 +2515,33 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * them; at the sink washing them into the dryer; taking the dried ones out of it back to the racks */
   type WaiterPhase = 'idle' | 'fetch' | 'pickup' | 'go' | 'set' | 'back' | 'clearGo' | 'clearTake' | 'clearBack' | 'drop'
     | 'washGo' | 'wash' | 'unloadGo' | 'unloadTake' | 'unloadCarry' | 'unloadPut'
+    | 'toBox' | 'boxTake' | 'toTill' | 'hand'
   const waiters = useRef<{ phase: WaiterPhase
     t: number; seat: number; keys: string[]; run: number | null
     /** (serving) the plating place's slot they've come for */
     slot?: number
     /** (clearing) the dirty plates they've come for, on their tray once taken; (from the dryer) how many dried plates are on their tray */
     carry?: number[]; stack?: number
+    /** (a takeaway) the order whose box they've gone for, and carry out to its customer waiting in the genkan */
+    box?: number
     path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number
     /** their walk home once the shop's shut, and in as it opens (commuteWalk); whether they're in yet */
     out?: Trip; in?: Trip; arrived?: boolean }[]>([])
   const waiterObjs = useRef<(THREE.Group | null)[]>([])
+  /** the takeaway boxes in servers' hands, one for each server */
+  const waiterBoxes = useRef<(THREE.Group | null)[]>([])
+  /**
+   * takeaway customers and delivery riders (game/takeout, the owner's): in at the front door to the edge of the genkan, by the till, where
+   * they wait in their shoes (no seat, no shoes off) for a server to bring their box out to them; and out again with it, fading through the door
+   */
+  type Visitor = { id: number; rider: boolean; order: (typeof TAKEOUT.orders)[number]; phase: 'in' | 'wait' | 'out'; t: number; fade: number; fadeT: number; pos: THREE.Vector3; yaw: number
+    /** where they wait: two side by side in the genkan, not in one another */
+    wait: THREE.Vector3 }
+  const visitors = useRef(new Map<number, Visitor>())
+  const [visitorList, setVisitorList] = useState<{ id: number; rider: boolean; has: boolean }[]>([])
+  const visitorObjs = useRef(new Map<number, THREE.Group>())
+  /** the orders whose boxes a server's on the way with */
+  const boxClaimed = useRef(new Set<number>())
   /** the kitchen's plater on their way to the racks for plates, and back with them to the plating place ('idle': at their place in the kitchen,
    * drawn there by Roasting) */
   // (and the kitchen's rice (game/rice): to the open sack of rice to scoop a pot's worth ('toSack', 'scoopRaw'), to the sink to wash it, to the
@@ -2698,11 +2734,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v) })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v) })
 
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
-  useEffect(() => { SHOP.inRoom = shown.length; return () => { SHOP.inRoom = 0 } }, [shown])
+  useEffect(() => { SHOP.inRoom = shown.length + visitorList.length; return () => { SHOP.inRoom = 0 } }, [shown, visitorList])
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __shown: shownRef })
   // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
   // (and looked at as the shop opens: measured while it was shut, the room may still have been coming in (the miso pot by the rice tub wasn't
@@ -3609,6 +3645,68 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]) o.position.y += -KITCHEN_DROP / scale
       }
     }
+    // takeaways (game/takeout): each order's customer in at the door to the genkan's edge, waiting there, and once their box is in their
+    // hands out again; the box in a server's hands as they carry it out
+    {
+      const way = takeoutWay
+      let changed = false
+      for (const o of TAKEOUT.orders) {
+        if (visitors.current.has(o.id) || o.handed) continue
+        if (!way || !open) { if (o.ready) { o.taken = true; o.handed = true; o.gone = true } continue }
+        const taken = new Set([...visitors.current.values()].filter((v) => v.phase !== 'out').map((v) => v.wait.distanceTo(way.wait) > 0.1 ? 1 : 0))
+        const wait = way.wait.clone().addScaledVector(way.side, taken.has(0) ? 0.42 : 0)
+        visitors.current.set(o.id, { id: o.id, rider: o.rider, order: o, phase: 'in', t: 0, fade: 0, fadeT: 0, pos: way.door.clone(), yaw: 0, wait })
+        changed = true
+      }
+      for (const v of visitors.current.values()) {
+        v.t += step
+        const sp = SPEED * walkSpeedOf(kindOf(v.id).kind)
+        if (!way || !open) { v.order.gone = true; visitors.current.delete(v.id); changed = true; continue }
+        if (v.phase === 'in') {
+          const len = way.door.distanceTo(v.wait), d = Math.min(len, v.t * sp)
+          v.pos.lerpVectors(way.door, v.wait, len ? d / len : 1)
+          v.yaw = Math.atan2(v.wait.x - way.door.x, v.wait.z - way.door.z)
+          v.fade = Math.min(1, d / 0.6 + v.t / FADE_S)
+          if (d >= len) { v.phase = 'wait'; v.t = 0 }
+        } else if (v.phase === 'wait') {
+          v.fade = 1
+          // (turned to the step, where the box comes from)
+          const yaw = Math.atan2(way.hand.x - v.pos.x, way.hand.z - v.pos.z)
+          v.yaw += Math.atan2(Math.sin(yaw - v.yaw), Math.cos(yaw - v.yaw)) * Math.min(1, step * 6)
+          // (no one to bring it (no server, the owner busy with nothing to walk), the box is at the till for them a moment after it's packed)
+          if (!waiters.current.length && v.order.ready && v.t > 1.5) { v.order.taken = true; v.order.handed = true }
+          if (v.order.handed) {
+            v.phase = 'out'; v.t = 0; changed = true
+            onSay?.('guest', LINES[lang].payThanks(v.id, v.id + 1), v.id)
+          }
+        } else {
+          // (back out of the door with it, fading on the last stretch, and no quicker than FADE_S)
+          const len = v.wait.distanceTo(way.door), d = Math.min(len, v.t * sp)
+          v.pos.lerpVectors(v.wait, way.door, len ? d / len : 1)
+          v.yaw = Math.atan2(way.door.x - v.wait.x, way.door.z - v.wait.z)
+          if (len - d < 0.9) v.fadeT += step
+          v.fade = Math.max(0, Math.min(1, Math.max((len - d) / 0.9, 1 - v.fadeT / FADE_S)))
+          if (d >= len && v.fade <= 0) { v.order.gone = true; visitors.current.delete(v.id); changed = true }
+        }
+        const g = visitorObjs.current.get(v.id)
+        if (g) {
+          g.position.copy(v.pos)
+          g.position.y = inGenkan(counters, v.pos) ? -GENKAN.depth : 0
+          g.rotation.y = v.yaw
+        }
+      }
+      if (changed) setVisitorList([...visitors.current.values()].map((v) => ({ id: v.id, rider: v.rider, has: v.phase === 'out' })))
+      waiters.current.forEach((w, wi) => {
+        const b = waiterBoxes.current[wi]
+        if (!b) return
+        b.visible = w.phase === 'toTill' || w.phase === 'hand'
+        if (b.visible) {
+          b.position.copy(w.pos).add(new THREE.Vector3(...HELD_AT).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, w.yaw))
+          if (inGenkan(counters, w.pos)) b.position.y -= GENKAN.depth
+          b.rotation.y = w.yaw
+        }
+      })
+    }
     waiters.current.forEach((w, wi) => {
       const home = homeOf(wi)
       // (coming in as the shop opens: in at the front door, along the aisle and through their gate to their place, each at their own
@@ -3681,6 +3779,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           w.t = 0
           // (not at their place: the day's first moment, stood where it was before the kitchen's floor was looked at (in the miso pot): over to it)
           if (open && !SHOP.leaving && Math.hypot(w.pos.x - home.at.x, w.pos.z - home.at.z) > 0.05) { go([home.at.clone(), w.pos.clone()], 'back'); return }
+          // (a takeaway's box packed and its customer waiting for it in the genkan: out to them with it before anything else, no one
+          // else's on the way with it)
+          const box = takeoutWay && !SHOP.leaving ? TAKEOUT.orders.find((o) => o.ready && !o.taken && !boxClaimed.current.has(o.id) &&
+            visitors.current.get(o.id)?.phase === 'wait') : undefined
+          if (box && (duty !== 'dish' || nServers < 2)) {
+            boxClaimed.current.add(box.id)
+            w.box = box.id
+            go(fetchPath(wi), 'toBox')
+            return
+          }
           const slot = readySlot()
           const spoken = new Set(waiters.current.flatMap((x) => x.carry ?? []))
           const dirtyNow = runs.current.filter((r) => r.phase === 'dirty' && !spoken.has(r.key))
@@ -3708,6 +3816,29 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
         }
       } else if (w.phase === 'fetch') walk(() => { w.phase = 'pickup'; face(plating.at) })
+      else if (w.phase === 'toBox') walk(() => { w.phase = 'boxTake'; face(takeoutOf().at) })
+      else if (w.phase === 'boxTake' && w.t > 0.45) {
+        // (the box up off the cook table (Roasting lets its food go with it), back across the kitchen, out through their gate to the step)
+        const o = TAKEOUT.orders.find((x) => x.id === w.box)
+        if (o) o.taken = true
+        const path = [...kitchenRoute(pickupSpot, home.at), ...tillPath(wi).slice(1)]
+        path[0] = w.pos.clone()
+        go(path, 'toTill')
+      } else if (w.phase === 'toTill') walk(() => {
+        w.phase = 'hand'
+        const v = visitors.current.get(w.box ?? -1)
+        if (v) face(v.pos)
+        const id = ownerServes ? 'owner' : servers[wi]?.id
+        if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].takeoutHand(!!v?.rider), until: performance.now() + 3000 })
+      })
+      else if (w.phase === 'hand' && w.t > 0.6) {
+        // (into their hands; back the way they came, in through their gate)
+        const v = visitors.current.get(w.box ?? -1)
+        if (v) v.order.handed = true
+        boxClaimed.current.delete(w.box ?? -1)
+        w.box = undefined
+        go(tillPath(wi).slice(0, -1).concat(w.pos.clone()), 'back')
+      }
       else if (w.phase === 'pickup' && w.t > 0.4 && !(PLATING.slots[w.slot ?? -1]?.flying)) {
         // (what's set out for the seat taken up off the plating place, once nothing more's flying to it: its plate, if one's laid there, onto the tray,
         // and the food with it; the slot free)
@@ -4225,7 +4356,66 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           </group>
         )
       })}
+      {/* takeaway customers and riders waiting in the genkan, and the boxes the servers carry out to them */}
+      {people && visitorList.map((v) => (
+        <group key={`takeout${v.id}`} ref={(o) => { if (o) visitorObjs.current.set(v.id, o); else visitorObjs.current.delete(v.id) }}>
+          <BlobShadow r={0.17 * PEOPLE_SCALE} />
+          <group scale={PEOPLE_SCALE}>
+            <Suspense fallback={null}>
+              <FolkFigure id={v.id} eating={false} walking still={() => visitors.current.get(v.id)?.phase === 'wait'} clock={clock}
+                fade={() => visitors.current.get(v.id)?.fade ?? 1} fit={FOLK_FIT} held={v.has ? <TakeoutBag /> : undefined} />
+            </Suspense>
+            {v.rider && <RiderGear size={folkSpec(v.id).size} />}
+          </group>
+        </group>
+      ))}
+      {people && homes.map((_, i) => (
+        <group key={`box${i}`} ref={(o) => { waiterBoxes.current[i] = o }} visible={false}><TakeoutBox /></group>
+      ))}
       </Later>
+    </group>
+  )
+}
+
+/**
+ * A takeaway: the kraft box of grilled food, lidded and sealed with a red band (as Roasting packs it on the cook table), on a server's tray;
+ * and the same in a kraft paper bag with a handle, in the customer's hand going out. A rider wears a helmet and carries the insulated box of
+ * a delivery on their back. Shared shapes and materials, made once.
+ */
+const TO_KRAFT = new THREE.MeshToonMaterial({ color: '#b8875a' })
+const TO_SEAL = new THREE.MeshToonMaterial({ color: '#b3241c' })
+const TO_BAG = new THREE.MeshToonMaterial({ color: '#c9a274' })
+const HELMET = new THREE.MeshToonMaterial({ color: '#2a2d33' })
+const DELIVERY = new THREE.MeshToonMaterial({ color: '#e0a21c' })
+const DELIVERY_DARK = new THREE.MeshToonMaterial({ color: '#3a3a3e' })
+const TakeoutBox = memo(function TakeoutBox() {
+  return (
+    <group position-y={0.02}>
+      <mesh position-y={0.022} material={TO_KRAFT}><boxGeometry args={[0.17, 0.044, 0.1]} /></mesh>
+      <mesh position-y={0.046} material={TO_SEAL}><boxGeometry args={[0.026, 0.004, 0.104]} /></mesh>
+    </group>
+  )
+})
+const TakeoutBag = memo(function TakeoutBag() {
+  return (
+    <group position-y={-0.1}>
+      <mesh position-y={-0.02} material={TO_BAG}><boxGeometry args={[0.13, 0.12, 0.07]} /></mesh>
+      <mesh position-y={0.045} rotation-x={Math.PI / 2} material={TO_BAG}><torusGeometry args={[0.03, 0.006, 4, 10, Math.PI]} /></mesh>
+      <mesh position={[0, -0.02, 0.036]} material={TO_SEAL}><boxGeometry args={[0.02, 0.12, 0.002]} /></mesh>
+    </group>
+  )
+})
+function RiderGear({ size }: { size: number }) {
+  // (blender/folk.py's measure: the head a ball of 0.27 about 0.8 up, the body 0.26 round at its widest; all as the figure's scaled)
+  const k = FOLK_FIT * size
+  return (
+    <group scale={k}>
+      {/* (the helmet over the crown of the head, clear of the hair, down to the brow; a band round its rim) */}
+      <mesh position-y={0.8} material={HELMET}><sphereGeometry args={[0.34, 16, 6, 0, Math.PI * 2, 0, Math.PI * 0.4]} /></mesh>
+      <mesh position-y={0.8 + 0.34 * Math.cos(Math.PI * 0.4) - 0.01} material={DELIVERY}><cylinderGeometry args={[0.326, 0.328, 0.035, 16, 1, true]} /></mesh>
+      {/* (the insulated box of a delivery on their back) */}
+      <mesh position={[0, 0.36, -0.42]} material={DELIVERY}><boxGeometry args={[0.46, 0.44, 0.3]} /></mesh>
+      <mesh position={[0, 0.36, -0.572]} material={DELIVERY_DARK}><boxGeometry args={[0.28, 0.1, 0.004]} /></mesh>
     </group>
   )
 }

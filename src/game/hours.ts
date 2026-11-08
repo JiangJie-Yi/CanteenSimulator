@@ -24,6 +24,14 @@ export const isLate = (minute: number) => {
   const m = ((Math.floor(minute) % 1440) + 1440) % 1440
   return m >= LATE_FROM && m < LATE_TO
 }
+/** the last half hour before closing (the owner's): no one more sat down to eat in, only takeaways and deliveries */
+export const LAST_CALL_MIN = 30
+export const lastCall = (minute: number) => {
+  const m = ((Math.floor(minute) % 1440) + 1440) % 1440
+  return inHours(m) && ((CLOSE_AT - m + 1440) % 1440) <= LAST_CALL_MIN
+}
+/** whether a customer's let in to sit down and eat at this minute: in the hours, before the last half hour */
+export const seatsOpen = (minute: number) => inHours(minute) && !lastCall(minute)
 /** the hours as they read: 16:30–04:30 */
 export const hoursText = () => `${hm(OPEN_AT)}–${hm(CLOSE_AT)}`
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
