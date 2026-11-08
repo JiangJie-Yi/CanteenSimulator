@@ -321,6 +321,13 @@ export const DRINKS = [
   // a sports drink in its plastic bottle, the glass milk bottle with its paper cap, a chuhai in a can
   { id: 'sports', zh: '運動飲料', ja: 'スポーツドリンク', en: 'Sports drink', price: 50, color: '#a8d8ee', cap: '#1f6fb8', glass: true, shape: 'bottle', label: ['#f4f9fc', '#1f6fb8', 'スポーツ'] },
   { id: 'milk', zh: '牛奶', ja: '牛乳', en: 'Milk', price: 45, color: '#f6f2e6', cap: '#f4efe2', glass: true, shape: 'bottle', label: ['#f4f0e4', '#3a6ab0', '牛乳'] },
+  // (more to choose from (the owner's, 2026-11-09): canned coffee black and with milk, a yuzu soda; a dark beer, shochu and umeshu in bottles)
+  { id: 'blackCoffee', zh: '無糖黑咖啡', ja: 'ブラック缶コーヒー', en: 'Black coffee', price: 45, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#141414', '#f2f2f2', 'ブラック'] },
+  { id: 'cafeAuLait', zh: '拿鐵咖啡', ja: 'カフェオレ', en: 'Café au lait', price: 45, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#e8d2b0', '#5a3418', 'カフェオレ'] },
+  { id: 'yuzuSoda', zh: '柚子蘇打', ja: 'ゆずソーダ', en: 'Yuzu soda', price: 60, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#e8e070', '#2a5a2a', 'ゆず'] },
+  { id: 'darkBeer', zh: '黑啤酒', ja: '黒ビール', en: 'Dark beer', price: 130, color: '#2a1408', cap: '#c4a040', glass: false, shape: 'bottle', label: ['#1a120c', '#e8c27a', '黒ビール'] },
+  { id: 'shochu', zh: '燒酎', ja: '焼酎', en: 'Shochu', price: 140, color: '#eef2f2', cap: '#2a4a7a', glass: true, shape: 'bottle', label: ['#f4f2ec', '#1a1a1a', '焼酎'] },
+  { id: 'umeshu', zh: '梅酒', ja: '梅酒', en: 'Umeshu', price: 130, color: '#c88a3a', cap: '#7a1a1a', glass: true, shape: 'bottle', label: ['#f2e6c8', '#7a1a2a', '梅酒'] },
   { id: 'chuhai', zh: '檸檬沙瓦', ja: 'チューハイ', en: 'Chu-hi', price: 90, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#f6b8c4', '#ffffff', 'チューハイ'] },
 ] as const
 export type DrinkId = (typeof DRINKS)[number]['id']
@@ -332,12 +339,12 @@ export type DrinkId = (typeof DRINKS)[number]['id']
 export const FRIDGE_UNITS: { sign: [string, string]; shelves: { y: number; pitch: number; ids: DrinkId[] }[] }[] = [
   { sign: ['飲料', 'ドリンク'], shelves: [
     { y: 0.27, pitch: 0.082, ids: ['oolong', 'oolong', 'oolong', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
-    { y: 0.72, pitch: 0.08, ids: ['cola', 'cola', 'cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'ramune'] },
-    { y: 1.19, pitch: 0.07, ids: ['milk', 'milk', 'milk', 'milk', 'milk', 'coffee', 'coffee', 'coffee', 'coffee', 'coffee'] },
+    { y: 0.72, pitch: 0.08, ids: ['cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'yuzuSoda', 'yuzuSoda', 'yuzuSoda'] },
+    { y: 1.19, pitch: 0.07, ids: ['milk', 'milk', 'milk', 'coffee', 'coffee', 'coffee', 'blackCoffee', 'blackCoffee', 'cafeAuLait', 'cafeAuLait'] },
     { y: 1.63, pitch: 0.06, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult', 'yakult'] },
   ] },
   { sign: ['酒類', 'お酒'], shelves: [
-    { y: 0.27, pitch: 0.082, ids: ['sake', 'sake', 'sake', 'sake', 'beer', 'beer', 'beer', 'beer', 'beer'] },
+    { y: 0.27, pitch: 0.082, ids: ['sake', 'sake', 'shochu', 'shochu', 'umeshu', 'umeshu', 'beer', 'beer', 'darkBeer'] },
     { y: 0.72, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'beerCan', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
     { y: 1.19, pitch: 0.07, ids: ['highball', 'highball', 'highball', 'highball', 'highball', 'chuhai', 'chuhai', 'chuhai', 'chuhai', 'chuhai'] },
     { y: 1.63, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'highball'] },
@@ -499,12 +506,12 @@ export function putBack(index: number, unit: number, to: [number, number]) {
 /** what each kind of customer takes from the fridge: the children a ramune, the old folk tea, the rest any */
 export const drinkFor = (kind: string, id: number): DrinkId => {
   const of = (l: DrinkId[]) => l[id % l.length]
-  if (kind === 'kid') return of(['ramune', 'yakult', 'cola'])
-  if (kind === 'grandma' || kind === 'grandpa') return of(['oolong', 'greenTea', 'yakult', 'sake'])
-  if (kind === 'schoolgirl' || kind === 'schoolboy') return of(['cola', 'ramune', 'greenTea', 'coffee', 'yakult'])
-  if (kind === 'salaryman' || kind === 'civilServant') return of(['beerCan', 'coffee', 'highball', 'beer'])
-  if (kind === 'uncle') return of(['beer', 'sake', 'highball', 'beerCan'])
-  return of(['beer', 'highball', 'sake', 'beerCan', 'oolong', 'coffee', 'cola'])
+  if (kind === 'kid') return of(['ramune', 'yakult', 'cola', 'yuzuSoda'])
+  if (kind === 'grandma' || kind === 'grandpa') return of(['oolong', 'greenTea', 'yakult', 'sake', 'shochu', 'umeshu'])
+  if (kind === 'schoolgirl' || kind === 'schoolboy') return of(['cola', 'ramune', 'greenTea', 'coffee', 'yakult', 'cafeAuLait', 'yuzuSoda'])
+  if (kind === 'salaryman' || kind === 'civilServant') return of(['beerCan', 'coffee', 'highball', 'beer', 'blackCoffee', 'darkBeer'])
+  if (kind === 'uncle') return of(['beer', 'sake', 'highball', 'beerCan', 'shochu', 'darkBeer'])
+  return of(['beer', 'highball', 'sake', 'beerCan', 'oolong', 'coffee', 'cola', 'umeshu', 'yuzuSoda', 'cafeAuLait'])
 }
 
 /** each toilet: how many are going through its door just now and whether someone's inside, locked (GuestBar3D); whether the player's

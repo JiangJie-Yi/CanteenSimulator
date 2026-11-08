@@ -4628,7 +4628,8 @@ const FRIDGE_LED = (() => {
 })()
 /** each shelf's lip (the owner's: no price tags, a convenience store's): brushed steel, and in its middle a small black plaque edged in gold
  * naming what the shelf keeps (a quarter of the picture to a shelf, the lowest at the top) */
-const SHELF_NAMES = [['冷茶', '炭酸', '牛乳・珈琲', '乳酸菌'], ['純米吟醸', '生ビール', 'ハイボール', '酎ハイ']]
+// (as bar.ts's FRIDGE_UNITS fills each shelf, the lowest first)
+const SHELF_NAMES = [['冷茶', '炭酸・ゆず', '牛乳・珈琲', '乳酸菌'], ['日本酒・焼酎・梅酒', '缶ビール・酎ハイ', 'ハイボール・酎ハイ', '缶ビール・ハイボール']]
 const fridgeTagTex = (n: number) => {
   const t = canvasTex(1024, 256, (g) => {
     for (let k = 0; k < 4; k++) {
@@ -5161,7 +5162,11 @@ const drinkName = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? '飲料
 // (as sold: a 500 ml beer bottle 25 cm, a 300 ml sake 23 cm, a 2 l tea bottle 31 cm, ramune 18 cm, 350 ml cans 12.2 cm, 500 ml PET 20.5 cm,
 // the 65 ml cultured milk 9 cm, a 200 ml milk bottle 13 cm)
 const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.26, ramune: 1.06, beerCan: 1.36, highball: 1.36, coffee: 1.2, greenTea: 1.3,
-  cola: 1.3, yakult: 1.12, sports: 1.3, milk: 1.1, chuhai: 1.36 }
+  cola: 1.3, yakult: 1.12, sports: 1.3, milk: 1.1, chuhai: 1.36, blackCoffee: 1.2, cafeAuLait: 1.2, yuzuSoda: 1.36, darkBeer: 1.2, shochu: 1.12, umeshu: 1.06 }
+/** what each drink's shaped as (its bottle or can): the newer ones as one of the first (a dark beer the beer's bottle, shochu and umeshu the
+ * sake's) */
+const FORM: Partial<Record<DrinkId, DrinkId>> = { darkBeer: 'beer', shochu: 'sake', umeshu: 'sake', blackCoffee: 'coffee', cafeAuLait: 'coffee', yuzuSoda: 'chuhai' }
+const formOf = (id: DrinkId): DrinkId => FORM[id] ?? id
 /** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */
 /** (`wet`: out of the fridge, misted over with beads of condensation, a few run down) */
 export const DrinkBottle = memo(DrinkBottleImpl)
@@ -5173,10 +5178,11 @@ export const DrinkBottle = memo(DrinkBottleImpl)
 const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
   const d = DRINKS.find((x) => x.id === id)!
   const kind = KIND_OF[id]
-  const shaped = id === 'beer' ? 'beer' : id === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'cola' || id === 'greenTea' || id === 'sports' ? 'pet500'
+  const f = formOf(id)
+  const shaped = f === 'beer' ? 'beer' : f === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'cola' || id === 'greenTea' || id === 'sports' ? 'pet500'
     : id === 'milk' ? 'milk' : id === 'ramune' ? 'ramune' : null
   // (its body's colour: the beer's brown glass, the ramune's aqua, the milk white; a clear bottle the colour of what's in it, paled by the glass)
-  const body = id === 'beer' ? '#4a2a10' : id === 'ramune' ? '#bfe6f0' : id === 'milk' ? '#f4f2ea' : id === 'sake' ? '#e4ece6'
+  const body = id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#bfe6f0' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : f === 'sake' ? '#e4ece6'
     : `#${new THREE.Color(d.color).lerp(new THREE.Color('#ffffff'), 0.25).getHexString()}`
   return (
     <group scale={DRINK_SCALE[id]}>
@@ -5206,10 +5212,10 @@ function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: b
   const glassMat = kind === 'can' ? (lit ? CAN_LIT : CAN) : (lit ? GLASS_LIT : GLASS)
   // (the glass itself: the beer's brown, the ramune's pale aqua, the rest clear; the PET clear and thinner; its tint and clearness in its vertices)
   const glass = (g: THREE.BufferGeometry) => kind === 'can' ? g
-    : tinted(g, id === 'beer' ? '#5a3010' : id === 'ramune' ? '#a8dcea' : kind === 'pet' ? '#f2f6f8' : '#eef4f2', id === 'beer' ? 0.88 : kind === 'pet' ? 0.22 : 0.28)
+    : tinted(g, formOf(id) === 'beer' ? (id === 'darkBeer' ? '#2a1808' : '#5a3010') : id === 'ramune' ? '#a8dcea' : kind === 'pet' ? '#f2f6f8' : '#eef4f2', formOf(id) === 'beer' ? 0.88 : kind === 'pet' ? 0.22 : 0.28)
   // (the drink in it: its own colour, a little see-through (the milk not at all))
-  const fill = (g: THREE.BufferGeometry) => tinted(g, id === 'ramune' ? '#dff4fa' : id === 'sake' ? '#f6f2de' : d.color,
-    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || id === 'sports' ? 0.45 : 0.85)
+  const fill = (g: THREE.BufferGeometry) => tinted(g, id === 'ramune' ? '#dff4fa' : id === 'sake' || id === 'shochu' ? '#f6f2de' : d.color,
+    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || id === 'shochu' || id === 'sports' ? 0.45 : 0.85)
   // (turned so its label's name faces +z)
   if (d.shape === 'can' && id !== 'cola' && id !== 'greenTea') return (
     // a can: printed all over, its silver top and rim
@@ -5231,9 +5237,10 @@ function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: b
     </group>
   )
   // the bottles proper, each shaped as it is in a shop: the beer's long neck, the sake's slim shoulder, the big tea bottle
-  const shaped = id === 'beer' ? BOTTLE_SHAPE.beer : id === 'sake' ? BOTTLE_SHAPE.sake : id === 'oolong' ? BOTTLE_SHAPE.pet
+  const f = formOf(id)
+  const shaped = f === 'beer' ? BOTTLE_SHAPE.beer : f === 'sake' ? BOTTLE_SHAPE.sake : id === 'oolong' ? BOTTLE_SHAPE.pet
     : id === 'cola' || id === 'greenTea' || id === 'sports' ? BOTTLE_SHAPE.pet500 : id === 'milk' ? BOTTLE_SHAPE.milk : null
-  const drinkKey = id === 'beer' ? 'beer' : id === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'milk' ? 'milk' : 'pet500'
+  const drinkKey = f === 'beer' ? 'beer' : f === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'milk' ? 'milk' : 'pet500'
   if (shaped) return (
     <group rotation-y={-Math.PI / 2}>
       {/* (the drink inside, seen through the glass or plastic: made before the bottle, so at the same depth it is drawn first and the bottle over it) */}
@@ -5243,7 +5250,7 @@ function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: b
       <mesh geometry={labelGeo(shaped.label, id)} position-y={shaped.labelY} material={label} />
       <mesh geometry={tinted(shaped.cap, d.cap)} position-y={shaped.capY} material={PARTS} />
       {/* (the foil round the beer's neck, the sake's paper collar) */}
-      {shaped.foil && <mesh geometry={tinted(shaped.foil, id === 'beer' ? '#d4b04a' : '#f4efe2')} position-y={shaped.foilY} material={PARTS} />}
+      {shaped.foil && <mesh geometry={tinted(shaped.foil, f === 'beer' ? '#d4b04a' : id === 'umeshu' ? '#b8261c' : '#f4efe2')} position-y={shaped.foilY} material={PARTS} />}
     </group>
   )
   // the ramune: its pale aqua glass, the fizzy drink in it, the glass marble held up in the neck's pinch, the blue plastic cap, a paper band
@@ -5372,7 +5379,7 @@ const LABEL_W = 512, LABEL_H = 256
 function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly string[]) {
   const W = LABEL_W, H = LABEL_H
   // (a glass bottle's label printed once, on its front: its back shows through the glass, and twice it would read through itself)
-  const once = id === 'sake' || id === 'ramune' || id === 'milk' || id === 'beer'
+  const once = formOf(id) === 'sake' || id === 'ramune' || id === 'milk' || formOf(id) === 'beer'
   const face = (draw: (cx: number) => void) => { for (const cx of once ? [W * 0.25] : [W * 0.25, W * 0.75]) { g.save(); draw(cx); g.restore() } }
   const vtext = (text: string, cx: number, cy: number, size: number, fill: string) => {
     const chars = [...text]
@@ -5520,6 +5527,71 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
       })
       break
     }
+    case 'blackCoffee': {
+      g.fillStyle = grad([[0, '#2a2a2a'], [1, '#0a0a0a']]); g.fillRect(0, 0, W, H)
+      g.fillStyle = '#c8a24a'; g.fillRect(0, H * 0.12, W, 3); g.fillRect(0, H * 0.86, W, 3)
+      face((cx) => {
+        htext('BLACK', cx, H * 0.42, 54, '#f2f2f2')
+        htext('COFFEE', cx, H * 0.62, 22, '#c8a24a')
+        g.fillStyle = '#b8201c'; g.beginPath(); g.arc(cx + 72, H * 0.24, 20, 0, Math.PI * 2); g.fill()
+        htext('無糖', cx + 72, H * 0.24, 15, '#fff', JP)
+      })
+      break
+    }
+    case 'cafeAuLait': {
+      g.fillStyle = grad([[0, '#f2e2c4'], [1, '#c89a64']]); g.fillRect(0, 0, W, H)
+      g.fillStyle = '#6a3c1c'; g.fillRect(0, H * 0.8, W, H * 0.2)
+      face((cx) => {
+        g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(cx + 40, H * 0.46, 30, 22, 0, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#a06a3a'; g.beginPath(); g.ellipse(cx + 40, H * 0.44, 22, 12, 0, 0, Math.PI * 2); g.fill()
+        vtext('カフェオレ', cx - 34, H * 0.44, 28, '#5a3418')
+        htext('CAFE AU LAIT', cx, H * 0.9, 18, '#f2e2c4')
+      })
+      break
+    }
+    case 'yuzuSoda': {
+      g.fillStyle = grad([[0, '#f4f2a0'], [1, '#b8d050']]); g.fillRect(0, 0, W, H)
+      g.fillStyle = 'rgba(255,255,255,0.7)'
+      for (let k = 0; k < 14; k++) { g.beginPath(); g.arc((k * 71) % W, H * 0.15 + (k * 43) % (H * 0.7), 3 + (k % 3), 0, Math.PI * 2); g.fill() }
+      face((cx) => {
+        g.fillStyle = '#f2c41c'; g.beginPath(); g.arc(cx + 34, H * 0.44, 34, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#3a7a2a'; g.beginPath(); g.ellipse(cx + 44, H * 0.26, 14, 7, -0.5, 0, Math.PI * 2); g.fill()
+        vtext('ゆず', cx - 34, H * 0.44, 40, '#2a5a2a')
+        htext('SODA', cx, H * 0.84, 26, '#2a5a2a')
+      })
+      break
+    }
+    case 'darkBeer': {
+      g.fillStyle = '#1a120c'; g.fillRect(0, 0, W, H)
+      face((cx) => {
+        g.strokeStyle = '#e8c27a'; g.lineWidth = 4; g.beginPath(); g.ellipse(cx, H / 2, 96, 84, 0, 0, Math.PI * 2); g.stroke()
+        htext('黒', cx, H * 0.44, 78, '#e8c27a', JP)
+        htext('STOUT', cx, H * 0.78, 20, '#e8c27a')
+      })
+      break
+    }
+    case 'shochu': {
+      g.fillStyle = '#f4f2ec'; g.fillRect(0, 0, W, H)
+      g.fillStyle = 'rgba(120,120,120,0.12)'
+      for (let k = 0; k < 90; k++) g.fillRect((k * 83) % W, (k * 47) % H, 12, 1)
+      face((cx) => {
+        vtext('焼酎', cx, H * 0.46, 70, '#1a1a1a')
+        g.fillStyle = '#2a4a7a'; g.fillRect(cx + 44, H * 0.12, 26, 40)
+        vtext('本格', cx + 57, H * 0.12 + 20, 15, '#f2f2f2')
+      })
+      break
+    }
+    case 'umeshu': {
+      g.fillStyle = '#f2e6c8'; g.fillRect(0, 0, W, H)
+      face((cx) => {
+        // (a plum blossom: five round petals in deep red)
+        g.fillStyle = '#b8263a'
+        for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k * 2 * Math.PI) / 5; g.beginPath(); g.arc(cx + 40 + Math.cos(a) * 14, H * 0.3 + Math.sin(a) * 14, 10, 0, Math.PI * 2); g.fill() }
+        g.fillStyle = '#f2d27a'; g.beginPath(); g.arc(cx + 40, H * 0.3, 5, 0, Math.PI * 2); g.fill()
+        vtext('梅酒', cx - 20, H * 0.5, 62, '#7a1a2a')
+      })
+      break
+    }
     case 'yakult': {
       g.fillStyle = '#f8f2e4'; g.fillRect(0, 0, W, H)
       g.fillStyle = '#d42a24'; g.fillRect(0, H * 0.3, W, H * 0.4)
@@ -5534,7 +5606,8 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
 }
 /** what each drink's made of: aluminium cans, glass bottles, PET bottles, the little cultured milk bottle */
 const KIND_OF: Record<DrinkId, 'can' | 'glass' | 'pet' | 'small'> = { beer: 'glass', sake: 'glass', oolong: 'pet', ramune: 'glass', beerCan: 'can', highball: 'can',
-  coffee: 'can', greenTea: 'pet', cola: 'pet', yakult: 'small', sports: 'pet', milk: 'glass', chuhai: 'can' }
+  coffee: 'can', greenTea: 'pet', cola: 'pet', yakult: 'small', sports: 'pet', milk: 'glass', chuhai: 'can', blackCoffee: 'can', cafeAuLait: 'can', yuzuSoda: 'can',
+  darkBeer: 'glass', shochu: 'glass', umeshu: 'glass' }
 /**
  * The drinks' looks, shared by them all, so a fridge's eighty bottles are a handful of draws (each drink's own glass, label, drink and cap
  * had been a material each: some fifty draws for the two fridges). Every label in one picture (LABEL_ATLAS, a cell each, a margin of itself
@@ -5570,7 +5643,7 @@ const LABEL_FINISH = (() => {
   for (const d of DRINKS) {
     const { c, r } = cellOf(d.id), kind = KIND_OF[d.id]
     // (red: its clear coat; green: how rough; blue: how metallic, as three's maps read them)
-    const [coat, rough, metal] = kind === 'can' ? [0, 0.28, 0.55] : d.id === 'sake' ? [0, 0.8, 0] : [0.6, 0.3, 0]
+    const [coat, rough, metal] = kind === 'can' ? [0, 0.28, 0.55] : formOf(d.id) === 'sake' ? [0, 0.8, 0] : [0.6, 0.3, 0]
     data.set([coat * 255, rough * 255, metal * 255, 255], ((ATLAS_ROWS - 1 - r) * ATLAS_COLS + c) * 4)
   }
   const t = new THREE.DataTexture(data, ATLAS_COLS, ATLAS_ROWS)

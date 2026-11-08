@@ -8,11 +8,12 @@ export type Back = Record<string, number>
 /** how many come in a case (bottles in a crate, cans in a carton) */
 export const CASE_SIZE: Record<string, number> = {
   beer: 20, sake: 12, oolong: 12, ramune: 30, beerCan: 24, highball: 24, coffee: 30, greenTea: 24, cola: 24,
-  yakult: 50, sports: 24, milk: 20, chuhai: 24,
+  yakult: 50, sports: 24, milk: 20, chuhai: 24, blackCoffee: 30, cafeAuLait: 30, yuzuSoda: 24, darkBeer: 20, shochu: 6, umeshu: 6,
 }
 /** what a case costs the shop (NT$), about four tenths of what it sells for */
 const UNIT_COST: Record<string, number> = {
   beer: 48, sake: 60, oolong: 20, ramune: 24, beerCan: 40, highball: 44, coffee: 18, greenTea: 16, cola: 16, yakult: 8, sports: 20, milk: 18, chuhai: 36,
+  blackCoffee: 18, cafeAuLait: 18, yuzuSoda: 24, darkBeer: 52, shochu: 56, umeshu: 52,
 }
 export const caseCost = (id: string) => (CASE_SIZE[id] ?? 24) * (UNIT_COST[id] ?? 20)
 /** what the back starts with: two cases of each */
