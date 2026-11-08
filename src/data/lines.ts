@@ -98,6 +98,9 @@ const ZH = {
   angry: (_id: number) => `等得我都快餓暈了！到底還要多久？不吃了，退單！`,
   dark: (_id: number) => `怎麼瞬間眼前一片黑？！跳電還是打烊啦？`,
   darkGone: (_id: number) => `伸手不見五指黑漆漆的，連魚刺都看不見怎麼吃？走人了！`,
+  // (every stool taken: sat on the bench in the genkan to wait a turn; waited too long there, off)
+  benchWait: (_id: number) => `客滿了啊⋯⋯那我在這邊坐著等一下。`,
+  benchGone: (_id: number) => `等不到位子，下次再來吧。`,
   verdict: (_id: number, n: string, stars: number) => {
     const comments = [
       '火候好像沒控制好…有點失望。',
@@ -204,6 +207,8 @@ const JA: typeof ZH = {
   angry: (_id) => `待たせすぎだ！腹ペコで倒れちまうよ！もう帰る、キャンセルだ！`,
   dark: (_id) => `うわっ、急に真っ暗？！停電か？それとも閉店かい？`,
   darkGone: (_id) => `一寸先も闇じゃ魚の骨も見えやしない！お暇させてもらうよ！`,
+  benchWait: (_id) => `満席かぁ⋯⋯じゃあここで座って待つよ。`,
+  benchGone: (_id) => `席が空かないな、また今度にするよ。`,
   verdict: (_id, n, stars) => {
     const comments = [
       'ちょっと焼き加減が微妙だったかな…',
@@ -310,6 +315,8 @@ const EN: typeof ZH = {
   angry: (_id) => `This is ridiculous, I’m starving here! Cancel my order, I’m out!`,
   dark: (_id) => `Whoa, lights out?! Did a breaker flip or are we closing?!`,
   darkGone: (_id) => `Pitch black in here—can’t even see the fish bones! I’m out!`,
+  benchWait: (_id) => `Full up, huh… I’ll sit here and wait my turn.`,
+  benchGone: (_id) => `No seat coming free. Another time, then.`,
   verdict: (_id, n, stars) => {
     const comments = [
       'Heat control was a bit off... disappointing.',

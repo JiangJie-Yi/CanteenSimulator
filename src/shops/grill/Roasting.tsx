@@ -48,7 +48,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, BENCH, BENCH_SEATS, BENCH_WAIT } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -4721,8 +4721,41 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       return { orders, said }
     }
+    // the bench in the genkan (bar.ts's BENCH, the owner's): the first sat waiting called to a stool that's come free (ordering then, as anyone
+    // coming in does); one who's waited too long there, or with the shop closing or past its last call, off out of the door again
+    if (BENCH.ids.length) {
+      const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
+      for (const n of SEATS_TAKEN) used.add(n)
+      const seat = Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n))
+      for (const id of [...BENCH.ids]) {
+        if (SHOP.closing || LAST_CALL.on || !onOrder || now - (BENCH.since.get(id) ?? now) > BENCH_WAIT) {
+          BENCH.ids = BENCH.ids.filter((x) => x !== id)
+          BENCH.since.delete(id)
+          BENCH.gone.add(id)
+          onSay?.('guest', L().benchGone(id), id)
+          onVisit?.({ id, taste: null, waited: BENCH_WAIT, walkedOut: true, gripes: ['wait'] })
+        }
+      }
+      if (seat !== undefined && BENCH.ids.length && onOrder && !SHOP.closing && !LAST_CALL.on) {
+        const id = BENCH.ids.shift()!
+        BENCH.since.delete(id)
+        const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0) + (LATE.on && Math.random() < LATE_MORE ? 1 : 0)
+        const { orders, said } = placeOrders(id, want)
+        if (orders.length) {
+          BENCH.up.add(id)
+          guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
+          onSay?.('guest', L().order(id, said), id)
+        } else {
+          BENCH.gone.add(id)
+          onSay?.('guest', L().nothing(id), id)
+          onVisit?.({ id, taste: null, waited: 0, walkedOut: true, gripes: ['nothing'] })
+        }
+        report()
+      }
+    }
     // (no one more sat down in the last half hour before closing (game/hours' lastCall): takeaways only then, below)
-    if (onOrder && !SHOP.closing && !LAST_CALL.on && comesIn(mood) && seated.length < MAX_SEATED && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
+    // (every stool taken, still one comes in if there's room on the bench to wait)
+    if (onOrder && !SHOP.closing && !LAST_CALL.on && comesIn(mood) && (seated.length < MAX_SEATED || (bar && BENCH.ids.length < BENCH_SEATS)) && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
@@ -4746,8 +4779,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       const couple = ids.length === 2
       for (const [k, id] of ids.entries()) {
-        // (a stool for them, before they order: with every one taken, or someone still at it, they don't come in)
-        const seatFor = couple ? pairAt! + k : Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n))
+        // (a stool for them, before they order: with every one taken, or someone still at it, or others already waiting on the bench, one on
+        // their own sits down on the bench to wait their turn if there's room on it (a couple doesn't); else they don't come in)
+        const seatFor = couple ? pairAt! + k : BENCH.ids.length ? undefined : Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n))
+        if (!couple && seatFor === undefined && bar && BENCH.ids.length < BENCH_SEATS) {
+          guestSeq.current = Math.max(guestSeq.current, id)
+          BENCH.ids.push(id)
+          BENCH.since.set(id, now)
+          onSay?.('guest', L().benchWait(id), id)
+          continue
+        }
         if (seatFor === undefined || used.has(seatFor)) continue
         // (the deep night's crowd orders more (the owner's: a different class of customer then))
         const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0) + (LATE.on && Math.random() < LATE_MORE ? 1 : 0)

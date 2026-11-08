@@ -665,6 +665,15 @@ export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_
  * a server carry the box out to them (`taken`, `handed`) and walks them out (`gone`, then Roasting lets it go)
  */
 export const TAKEOUT = { orders: [] as TakeoutOrder[] }
+/**
+ * The waiting bench in the genkan (the owner's, 2026-11-09): with every stool taken, up to BENCH_SEATS come in and sit there in their shoes to
+ * wait their turn (Roasting puts them on it, `ids` in the order they came, `since` when), are called to the first stool to come free (`up`:
+ * GuestBar3D walks them from the bench to it) and give up after BENCH_WAIT (`gone`: out of the door again)
+ */
+export const BENCH_SEATS = 2
+export const BENCH_WAIT = 90
+export const BENCH = { ids: [] as number[], since: new Map<number, number>(), up: new Set<number>(), gone: new Set<number>() }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bench: BENCH })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __takeout: TAKEOUT })
 /** the takeaway box's place on the table, in the scene's frame (ALONG, LAY) */
 // (beside the ready plate along the table, toward the fire, clear of it: a plate's half-width and the box's, and a little between)
