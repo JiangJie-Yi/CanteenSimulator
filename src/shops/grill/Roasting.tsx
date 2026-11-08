@@ -918,12 +918,39 @@ function storeSpot(store: Store, scene: THREE.Object3D, frame: THREE.Object3D, h
   const inv = frame.matrixWorld.clone().invert(), lb = new THREE.Box3()
   for (let i = 0; i < 8; i++) lb.expandByPoint(new THREE.Vector3(i & 1 ? wb.max.x : wb.min.x, i & 2 ? wb.max.y : wb.min.y, i & 4 ? wb.max.z : wb.min.z).applyMatrix4(inv))
   const face = lb.getCenter(new THREE.Vector3()), half = lb.getSize(new THREE.Vector3()).multiplyScalar(0.5)
+  // (up on the warming counter (Decor's Warmer: the rice tub): before the counter's front, the kitchen's side, across from it; off its own
+  // side, toward his place, he stood in the counter)
+  const counter = store === 'ricetub' ? warmerFront(scene, piece, frame) : null
+  if (counter) return { spot: counter.setY(floorAt(counter)), face }
   const d = home.clone().sub(face).setY(0)
   if (d.lengthSq() < 1e-6) d.set(1, 0, 0)
   d.normalize()
   const out = Math.min(Math.abs(d.x) > 1e-4 ? half.x / Math.abs(d.x) : 1e9, Math.abs(d.z) > 1e-4 ? half.z / Math.abs(d.z) : 1e9)
   const spot = face.clone().addScaledVector(d, out + 0.45)
   return { spot: spot.setY(floorAt(spot)), face }
+}
+/** the warming counter's front (Decor's Warmer: its own +z the kitchen's side) across from a piece on it, a step out (the chef's frame); null
+ * if it's not on it */
+function warmerFront(scene: THREE.Object3D, piece: THREE.Object3D, frame: THREE.Object3D) {
+  let w: THREE.Object3D | undefined
+  scene.traverse((o) => { if (!w && o.userData.editId === 'warmer') w = o })
+  // (the counter's own frame: the turned group in it)
+  let f: THREE.Object3D | undefined
+  w?.traverse((o) => { if (!f && o !== w && Math.abs(o.rotation.y) > 1e-3) f = o })
+  if (!w || !f) return null
+  f.updateWorldMatrix(true, true)
+  const inv = f.matrixWorld.clone().invert(), b = new THREE.Box3(), v = new THREE.Vector3()
+  w.traverse((m) => {
+    const mesh = m as THREE.Mesh
+    if (!mesh.isMesh || !mesh.geometry?.attributes.position) return
+    const pos = mesh.geometry.attributes.position, m4 = inv.clone().multiply(mesh.matrixWorld)
+    for (let i = 0; i < pos.count; i += 4) b.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(m4))
+  })
+  if (b.isEmpty()) return null
+  const at = f.worldToLocal(new THREE.Box3().setFromObject(piece).getCenter(new THREE.Vector3()))
+  if (at.x < b.min.x || at.x > b.max.x || at.z < b.min.z || at.z > b.max.z) return null
+  const spot = f.localToWorld(new THREE.Vector3(at.x, 0, b.max.z + 0.4))
+  return frame.worldToLocal(spot)
 }
 /** the chef's way from his place to a spot (Roasting's frame): straight back out of the notch onto the aisle, then round all that stands on
  * the kitchen floor (GuestBar3D's route) */
@@ -938,6 +965,18 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
   fetcher?: boolean; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const trip = useRef<{ way: THREE.Vector3[]; len: number; gone: number } | null>(null)
+  /** where the third cook stands, clear of all on the kitchen's floor (GuestBar3D's KITCHEN_ROUTE.clear), found again each day as what
+   * stands there's measured anew (the warming counter was put where he stood: he stood in it) */
+  const clearAt = useRef<{ day: number; at: THREE.Vector3; from: THREE.Vector3 } | null>(null)
+  const placeOf = () => {
+    if (role !== 'sous' || !KITCHEN_ROUTE.clear) return at
+    const c = clearAt.current
+    if (c && c.day === SHOP.day && c.from.equals(at)) return c.at
+    const to = fromBar(KITCHEN_ROUTE.clear(toBar(at)))
+    to.y = at.y
+    clearAt.current = { day: SHOP.day, at: to, from: at.clone() }
+    return to
+  }
   /** the second cook's round (fetcher): walking to a store or back, taking it out there, preparing and skewering it at the board, his
    * place; whether he's away (what's on the fire, and off it, is the owner's: Boss.tsx) */
   const walkTrip = (o: THREE.Group, dt: number) => {
@@ -1064,7 +1103,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       // before it)
       if (!arrived.current) {
         if (!commute.current || commute.current.dir !== 'in') {
-          const w = performance.now() - SHOP.openedAt < 4000 ? wayOf(at.clone(), o) : null
+          const w = performance.now() - SHOP.openedAt < 4000 ? wayOf(placeOf().clone(), o) : null
           if (w && w.length > 2) commute.current = makeTrip(id, 'in', w.reverse(), delayOf(id, SHOP.day + 0.5) * 0.8, paceOf(id))
           else arrived.current = true
         }
@@ -1088,7 +1127,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
           return
         }
       }
-      o.position.copy(at)
+      o.position.copy(placeOf())
       o.rotation.y = yaw
       return
     }

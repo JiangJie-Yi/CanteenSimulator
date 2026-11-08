@@ -2746,7 +2746,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // (the crew's way home goes round the same things: Roasting asks for it as they leave)
   useEffect(() => {
     KITCHEN_ROUTE.route = (from, to) => kitchenRoute(from, to)
-    return () => { KITCHEN_ROUTE.route = null }
+    // (and where to stand clear of it all: the third cook's place was under the warming counter put where he stood)
+    KITCHEN_ROUTE.clear = (at) => {
+      const blocks = kitchenBlocks()
+      if (!blocks.length) return at.clone()
+      const [a, l] = standClear(flat(at), blocks), c0 = counters[0]
+      return c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(at.y)
+    }
+    return () => { KITCHEN_ROUTE.route = null; KITCHEN_ROUTE.clear = null }
   })
 
   // the plates: those out at the seats (or on their way), and the two stacks
