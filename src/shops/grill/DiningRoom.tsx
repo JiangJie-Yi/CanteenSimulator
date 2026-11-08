@@ -24,6 +24,7 @@ import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
+import { useSfxMuted } from '@/scene/sfx'
 import { drawGlyph } from '@/ui/glyphs'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
 import { lampGlow, lightOn, type Circuit } from '@/game/roomLights'
@@ -6060,7 +6061,9 @@ const SPEAKER_ARM = 0.38 - 0.19
 
 function WallSpeaker() {
   const [lit, setLit] = useState(false)
-  const off = useBgmOff()
+  // (silent too while the sound's muted at the clock (the owner's): no thump, no notes, its lamp red)
+  const bgmOff = useBgmOff(), muted = useSfxMuted()
+  const off = bgmOff || muted
   const tag = () => setTip({ title: '音箱', hint: getBgmOff() ? '點一下開啟音樂' : '點一下關閉音樂' })
   const press = (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setBgmOff(!getBgmOff()); tag() }
   const gltf = useGLTF(SPEAKER_URL) as unknown as { scene: THREE.Group }

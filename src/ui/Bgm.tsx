@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { getBgmOff, useBgmOff } from './bgmStore'
+import { sfxMuted, useSfxMuted } from '@/scene/sfx'
 
 /**
  * The shop's background music, looped quietly, from public/music/ (LateNightTavern.mp3, the owner's; it was IzakayaNight.mp3; failing that,
@@ -12,7 +13,9 @@ const SRCS = NAMES.map((n) => import.meta.env.BASE_URL + 'music/' + encodeURICom
 
 export function Bgm() {
   const audio = useRef<HTMLAudioElement | null>(null)
-  const off = useBgmOff()
+  // (the clock's mute silences the music too (the owner's): the speaker's own switch left as it was, it plays again unmuted)
+  const bgmOff = useBgmOff(), muted = useSfxMuted()
+  const off = bgmOff || muted
   useEffect(() => {
     const a = new Audio()
     a.loop = true
@@ -23,7 +26,7 @@ export function Bgm() {
       if (i >= SRCS.length) return
       a.src = SRCS[i++]
       a.load()
-      if (!getBgmOff()) a.play().catch(() => {})
+      if (!getBgmOff() && !sfxMuted()) a.play().catch(() => {})
     }
     a.addEventListener('error', next)
     next()
