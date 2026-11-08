@@ -59,6 +59,7 @@ import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore,
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { SCOOP_S, WASH_S, kamaTick, riceGoes, scoopIn, setOn } from '@/game/rice'
+import { bottleClink, plateClink, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
@@ -66,10 +67,12 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
+/** where a sound's heard from, worked out in place */
+const SOUND_AT = new THREE.Vector3()
 
 /*
  * The customers, in 3D, at the bar behind the cooking (only while the shop is open). A long counter of pale hinoki
@@ -349,6 +352,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           DRINK_BACK.back = run.back
           DRINK_BACK.ver++
           FRIDGE_STOCK.ver++
+          bottleClink(false, FRIDGE_AT[c.unit])
           FRIDGE_STATE[c.unit].passing = Math.max(0, FRIDGE_STATE[c.unit].passing - 1)
           s.phase = 'back'
         }
@@ -2951,7 +2955,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
           if (s.wc?.who === 'drink' && !s.drink) {
             s.drink = s.wc.pick ?? drinkFor(kindOf(s.id).kind, s.id)
-            takeDrink(s.drink)
+            // (taken from among the others on its shelf: its clink, glass or a can, heard at the fridge)
+            const u = takeDrink(s.drink)
+            if (u >= 0) bottleClink(isCan(s.drink), FRIDGE_AT[u])
             onDrink?.(s.id, s.drink)
             redraw()
           }
@@ -3778,6 +3784,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           dirty.current = r.dirty
           DRYER.n = r.dryer.n
           meterWater('dish')
+          // (heard: the splash and scrub in the soapy water, the plate stood in the dryer with a clink)
+          const o = waiterObjs.current[wi]
+          if (o) { washSplash(o.getWorldPosition(SOUND_AT)); window.setTimeout(() => plateClink(SOUND_AT), 330) }
           redraw()
         }
         // (done: the sink washed empty or the dryer full; or nothing more could be washed)
@@ -3795,6 +3804,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         redraw()
       } else if (w.phase === 'unloadCarry') walk(() => { face(rackTop(rackNow(PLATE_RACK.n + 1))); w.phase = 'unloadPut' })
       else if (w.phase === 'unloadPut' && w.t > 0.5) {
+        // (set down on the rack's stack: a clink or two)
+        const o = waiterObjs.current[wi]
+        if (o && w.stack) { plateClink(o.getWorldPosition(SOUND_AT)); window.setTimeout(() => plateClink(SOUND_AT), 120) }
         PLATE_RACK.n = putBack(PLATE_RACK.n, w.stack ?? 0)
         w.stack = 0
         go(kitchenRoute(home.at, w.pos), 'back')

@@ -22,11 +22,25 @@ function ring(at: number, freq: number, gain: number, decay: number) {
   }
 }
 
-/** pushed through the food: two or three short scrapes, a little crisp at the end */
+/** drawn from the holder, a bright metal shing (the steel sliding out past the others, a high ring), then pushed through the food: two or
+ * three short firm scrapes, a little crisp at the end */
 export function pierceSound() {
   try {
     audio ??= new AudioContext({ latencyHint: 'playback' })
-    const t = audio.currentTime
+    const t0 = audio.currentTime
+    {
+      const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain()
+      s.buffer = noise(0.13, (x) => Math.sin(Math.PI * x) ** 0.6)
+      f.type = 'bandpass'
+      f.frequency.setValueAtTime(4800, t0)
+      f.frequency.linearRampToValueAtTime(7200, t0 + 0.13)
+      f.Q.value = 3
+      g.gain.value = 0.045
+      s.connect(f).connect(g).connect(audio.destination)
+      s.start(t0)
+      ring(t0 + 0.12, 3600, 0.01, 0.25)
+    }
+    const t = t0 + 0.16
     for (let k = 0; k < 3; k++) {
       const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain()
       s.buffer = noise(0.07, (x) => Math.sin(Math.PI * x))

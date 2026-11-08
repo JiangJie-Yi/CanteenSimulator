@@ -5,6 +5,7 @@ import { wheelIntent } from '@/game/navInput'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { setEar } from '@/scene/sfx'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
 import { Html, OrbitControls, useGLTF } from '@react-three/drei'
@@ -248,6 +249,12 @@ function usePrefersReducedMotion() {
 /** tells the loading veil how many draws each frame took (scene/Later's noteDrawn): it waits for the shop to be drawn, not only loaded */
 function DrawnProbe() {
   useFrame(({ gl }) => noteDrawn(gl.info.render.calls))
+  return null
+}
+/** the camera the sound effects are heard from (scene/sfx: how near each is, and which side) */
+function SfxEar() {
+  const camera = useThree((s) => s.camera)
+  useEffect(() => { setEar(camera) }, [camera])
   return null
 }
 /** whether the phone's flat grill (Grill2D) is open: not yet (the owner's); at a phone's size a card says so instead (PhoneClosed) */
@@ -2653,6 +2660,7 @@ export default function App() {
         >
           <FramePacer />
           <DrawnProbe />
+          <SfxEar />
           <Prewarm />
           <FpsMeter />
           {!NO_SCENE && <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}

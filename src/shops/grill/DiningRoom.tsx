@@ -2,7 +2,7 @@ import { blessingChime, pourSake, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
-import { coolerDoorSound, lightSwitchSound, slideDoorSound } from './restroomSound'
+import { bottleClink, coolerDoorSound, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -12,12 +12,13 @@ import { plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/s
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
+import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
-import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, type Counter, type DrinkId } from './bar'
+import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -2538,8 +2539,10 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
   }, [door, who, paper])
   const k = useRef(0)
   const was = useRef(0)
+  // (latched behind someone once it's shut: its little brass bolt heard)
+  const latched = useRef(false)
   const spill = useRef<THREE.MeshBasicMaterial>(null)
-  useFrame(({ camera }, dt) => {
+  useFrame((_, dt) => {
     const d = TOILETS[who]
     // (how dark it is outside, and whether this toilet's light is on: the paper's glow and the faint warm spill on the floor before it)
     const sky = skyNow(), dark = sky === 'night' ? 1 : sky === 'dusk' ? 0.6 : sky === 'dawn' ? 0.5 : 0.3
@@ -2555,9 +2558,11 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     // (heard as it starts to move, opening or shutting, as loud as it's near (the owner's))
     if (want !== was.current) {
       was.current = want
-      if (g.current) slideDoorSound(want === 1, Math.max(0, 1 - camera.position.distanceTo(g.current.getWorldPosition(doorAt)) / 12))
+      if (g.current) slideDoorSound(want === 1, heard(g.current.getWorldPosition(doorAt)).near)
     }
     k.current += Math.sign(want - k.current) * Math.min(Math.abs(want - k.current), Math.min(dt, 0.1) * 1.8)
+    if (k.current > 0.1) latched.current = false
+    else if (k.current === 0 && d.inside > 0 && !latched.current && g.current) { latched.current = true; latchSound(g.current.getWorldPosition(doorAt)) }
     // (first out of the doorway onto its track in front of the wall, clear of the frame's posts and the plaster, then along it, open (seen
     // open: run into the wall it was gone, and the owner wanted it there); shutting, the other way about)
     const ss = (a: number, b: number) => { const t = Math.min(1, Math.max(0, (k.current - a) / (b - a))); return t * t * (3 - 2 * t) }
@@ -4742,12 +4747,13 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
   // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
   useEffect(() => () => { FRIDGE_STATE[n].open = false; FRIDGE_STATE[n].passing = 0 }, [n])
   // (heard: its seal let go as it starts to swing open, a muffled knock as it swings shut (the owner's), as loud as it's near)
-  const heard = useRef(0)
-  useFrame(({ camera }, dt) => {
+  const sounded = useRef(0)
+  useFrame((_, dt) => {
     const want = FRIDGE_STATE[n].passing > 0 || FRIDGE_STATE[n].open ? 1 : 0
-    const near = () => Math.max(0, 1 - door.getWorldPosition(FRIDGE_DOOR_AT).distanceTo(camera.position) / 12)
-    if (want && !heard.current) { heard.current = 1; coolerDoorSound(true, near()) }
-    else if (!want && heard.current && open.current < 0.04) { heard.current = 0; coolerDoorSound(false, near()) }
+    door.getWorldPosition(FRIDGE_AT[n])
+    const near = () => heard(door.getWorldPosition(FRIDGE_DOOR_AT)).near
+    if (want && !sounded.current) { sounded.current = 1; coolerDoorSound(true, near()) }
+    else if (!want && sounded.current && open.current < 0.04) { sounded.current = 0; coolerDoorSound(false, near()) }
     open.current += Math.sign(want - open.current) * Math.min(Math.abs(want - open.current), Math.min(dt, 0.1) * 2.2)
     const e = open.current * open.current * (3 - 2 * open.current)
     // (the pair swing out from the middle: the left on its left edge, the right on its right)
@@ -4910,6 +4916,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     if (from.kind === 'slot' && !doorOpen()) return
     ev.stopPropagation()
     if (from.kind === 'out') { const o = FRIDGE_STOCK.out[from.i]; if (o) { o.tipped = false; o.tip = 0; o.roll = 0 } }
+    // (lifted from its place among the others: its clink against them)
+    const lifting = from.kind === 'slot' ? FRIDGE_STOCK.units[n][from.r]?.[from.k] : null
+    if (lifting) bottleClink(isCan(lifting), FRIDGE_AT[n])
     const key = from.kind === 'slot' ? `${from.r}-${from.k}` : `o${from.i}`
     const grp = objs.current.get(key)
     const host = root.current

@@ -289,6 +289,10 @@ export function fridgesOf(cs: Counter[]) {
 export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
 /** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
 export const FRIDGE_STATE = [{ passing: 0, open: false }, { passing: 0, open: false }]
+/** where each fridge's doors are in the world (DiningRoom keeps it): its sounds heard from there */
+export const FRIDGE_AT = [new THREE.Vector3(), new THREE.Vector3()]
+/** whether a drink's a can (its clink a can's) */
+export const isCan = (id: DrinkId) => DRINKS.find((d) => d.id === id)?.shape === 'can'
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridgeDoors?: unknown }).__fridgeDoors = FRIDGE_STATE
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fridge?: typeof FRIDGE_STATE }).__fridge = FRIDGE_STATE
 /** what's in it, and what each costs (NT$) */
@@ -384,8 +388,8 @@ export const onPantryAsk = (f: PantryAsk) => { pantryAsks.add(f); return () => {
 const pantryShuts = new Set<() => void>()
 export function shutPantry() { pantryShuts.forEach((f) => f()) }
 export const onPantryShut = (f: () => void) => { pantryShuts.add(f); return () => { pantryShuts.delete(f) } }
-/** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out) */
-export function takeDrink(id: DrinkId) {
+/** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out); the fridge it was in, or -1 */
+export function takeDrink(id: DrinkId): number {
   const home = fridgeUnitOf(id)
   for (const u of [home, ...FRIDGE_STOCK.units.map((_, i) => i).filter((i) => i !== home)]) {
     const rows = FRIDGE_STOCK.units[u]
@@ -395,13 +399,14 @@ export function takeDrink(id: DrinkId) {
           if (want ? rows[r][k] === want : rows[r][k]) {
             rows[r][k] = null
             FRIDGE_STOCK.ver++
-            return
+            return u
           }
         }
       }
     }
     if (u === home) break
   }
+  return -1
 }
 /** the shop puts back one drink in a fridge where one's been taken (the first empty place, its own kind) */
 export function restockDrink(unit: number) {

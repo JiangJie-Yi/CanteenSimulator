@@ -3,7 +3,9 @@
 // the brush scrubbing, a knock at a locked door, the paper holder's new roll, the Otohime (音姫): a babbling stream with birdsong, played for
 // a while to cover what's done; a tap's handle turned, the light switch's tick, the cold cabinets' doors.
 
+import * as THREE from 'three'
 import { replaces } from '@/scene/hot'
+import { gate, heard } from '@/scene/sfx'
 
 let ac: AudioContext | null = null
 function ctx() {
@@ -29,11 +31,19 @@ function noise(a: AudioContext, seconds: number, shape: (t: number) => number, s
   s.buffer = b
   return s
 }
-function out(a: AudioContext, gain: number) {
+function out(a: AudioContext, gain: number, pan = 0) {
   const g = a.createGain()
   g.gain.value = gain
-  g.connect(a.destination)
+  if (pan) { const p = a.createStereoPanner(); p.pan.value = pan; g.connect(p).connect(a.destination) } else g.connect(a.destination)
   return g
+}
+/** a short ring at a pitch, dying away (glass, a can, a plate, a latch) */
+function ping(a: AudioContext, t: number, freq: number, gain: number, decay: number, to: AudioNode, type: OscillatorType = 'sine') {
+  const o = a.createOscillator(), g = a.createGain()
+  o.type = type; o.frequency.value = freq
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + decay)
+  o.connect(g).connect(to)
+  o.start(t); o.stop(t + decay + 0.02)
 }
 
 /** the flush: a rush that swells and drains, its pitch falling as the bowl empties, a gurgle at the end, the tank refilling after */
@@ -129,7 +139,8 @@ export function knockSound(near: number) {
  */
 export function slideDoorSound(opening: boolean, near = 1, seconds = 0.55) {
   const a = ctx()
-  if (!a || near < 0.02) return
+  // (not twice within 0.3 s for one door: one caught on a walker going to and fro clattered)
+  if (!a || near < 0.02 || !gate(`slide${opening}${near.toFixed(2)}`)) return
   const t = a.currentTime
   // (the runners: low noise through a low band, swelling and fading with the door's pace)
   const run = noise(a, seconds, (x) => Math.sin(Math.PI * Math.min(1, x * 1.15)) ** 0.8, 0.86)
@@ -276,7 +287,7 @@ export function lightSwitchSound(on: boolean) {
  * let go, a short soft breath of air; shut, it meets the cabinet, a muffled knock with the seal's little tick on it */
 export function coolerDoorSound(opening: boolean, near = 1, chest = false) {
   const a = ctx()
-  if (!a || near < 0.02) return
+  if (!a || near < 0.02 || !gate(`cooler${opening}${chest}${near.toFixed(1)}`)) return
   const t = a.currentTime
   if (opening) {
     const s = noise(a, 0.09, (x) => Math.min(1, x * 8) * (1 - x) ** 2, 0.3)
@@ -338,4 +349,83 @@ export function otohimeNear(near: number) {
   if (!ac || !oto) return
   oto.gain.gain.setTargetAtTime(0.5 * near, ac.currentTime, 0.2)
   if (oto.until < ac.currentTime) oto = null
+}
+
+/**
+ * A drink taken out of (or put back in) a fridge, heard at `at` (world): a glass bottle's bright clink against its neighbour (two quick high
+ * pings and a tick), a can's hollow aluminium tonk (two lower knocks, a little out of tune with each other)
+ */
+export function bottleClink(can: boolean, at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('clink', 120)) return
+  const t = a.currentTime, o = out(a, 0.22 * near, pan)
+  if (can) {
+    ping(a, t, 880 + Math.random() * 60, 0.5, 0.09, o, 'triangle')
+    ping(a, t + 0.004, 1330 + Math.random() * 80, 0.3, 0.06, o, 'triangle')
+    ping(a, t + 0.09, 960, 0.22, 0.06, o, 'triangle')
+  } else {
+    ping(a, t, 2650 + Math.random() * 200, 0.5, 0.16, o)
+    ping(a, t + 0.002, 3420 + Math.random() * 200, 0.3, 0.1, o)
+    ping(a, t + 0.075, 2900, 0.25, 0.12, o)
+  }
+  const k = noise(a, 0.006, (x) => 1 - x, 0)
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 4000
+  k.connect(hp).connect(o); k.start(t)
+}
+
+/** a toilet's door latched behind someone, heard at `at`: a little brass bolt slid home, a click and its small ring, a softer click after */
+export function latchSound(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate(`latch${at.x.toFixed(1)}`)) return
+  const t = a.currentTime, o = out(a, 0.2 * near, pan)
+  for (const [dt, g] of [[0, 1], [0.045, 0.5]] as const) {
+    const k = noise(a, 0.007, (x) => 1 - x, 0.1)
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 2
+    const kg = a.createGain(); kg.gain.value = g
+    k.connect(bp).connect(kg).connect(o); k.start(t + dt)
+  }
+  ping(a, t, 1900, 0.18, 0.07, o)
+}
+
+/** a glaze brushed or salt thrown on what's over the coals: a burst of sizzle (white noise, high, crackling), swelling and dying away */
+export function sizzleBurst(at: THREE.Vector3, level = 1) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('sizzle', 250)) return
+  const t = a.currentTime, o = out(a, 0.16 * near * level, pan)
+  const s = noise(a, 0.7, (x) => Math.min(1, x * 12) * (1 - x) ** 1.6 * (0.55 + 0.45 * Math.random() ** 6), 0.05)
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600
+  s.connect(hp).connect(o); s.start(t)
+}
+
+/** a plate scrubbed in the sink: a splash and a scrub of the brush in soapy water, a bubble or two */
+export function washSplash(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('wash', 280)) return
+  const t = a.currentTime, o = out(a, 0.17 * near, pan)
+  const s = noise(a, 0.38, (x) => Math.min(1, x * 6) * (1 - x) * (0.6 + 0.4 * Math.sin(x * 60)), 0.5)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.7
+  s.connect(bp).connect(o); s.start(t)
+  for (let k = 0; k < 2; k++) {
+    const b = a.createOscillator(), g = a.createGain(), at0 = t + 0.08 + k * 0.11 + Math.random() * 0.05
+    b.frequency.setValueAtTime(520 + Math.random() * 200, at0); b.frequency.exponentialRampToValueAtTime(1300, at0 + 0.05)
+    g.gain.setValueAtTime(0.0001, at0); g.gain.exponentialRampToValueAtTime(0.12, at0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, at0 + 0.06)
+    b.connect(g).connect(o); b.start(at0); b.stop(at0 + 0.08)
+  }
+}
+
+/** a plate set down on another: a short ceramic clink */
+export function plateClink(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('plate', 90)) return
+  const t = a.currentTime, o = out(a, 0.16 * near, pan)
+  ping(a, t, 2080 + Math.random() * 120, 0.45, 0.09, o)
+  ping(a, t + 0.002, 3350 + Math.random() * 160, 0.25, 0.06, o)
+  const k = noise(a, 0.01, (x) => 1 - x, 0.2)
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500
+  k.connect(hp).connect(o); k.start(t)
 }

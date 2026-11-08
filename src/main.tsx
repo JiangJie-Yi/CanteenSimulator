@@ -5,6 +5,8 @@ import './scene/flatGate'
 // (the pictures the game paints, kept off the graphics card: they survive its resets)
 import './scene/canvasKeep'
 import './scene/triProfiler'
+// (every sound effect through one switch: muted together from the clock, top right)
+import './scene/sfx'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

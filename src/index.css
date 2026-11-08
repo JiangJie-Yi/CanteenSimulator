@@ -695,6 +695,36 @@ button {
 .game-clock-sky:hover svg { filter: drop-shadow(0 0 3px var(--sky-ink)); }
 .game-clock-sky:active { transform: scale(0.9); transition-duration: 0s; }
 .game-clock-sky:focus-visible { outline: 2px solid var(--sky-ink); outline-offset: 1px; }
+/* (the sound effects on or off: a little speaker at its end, its waves while they sound, struck through and dimmed while muted) */
+.game-clock-sfx {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0 -6px 0 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #f6ecda;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 120ms ease, transform 120ms ease, opacity 120ms ease;
+}
+.game-clock-sfx svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.game-clock-sfx .game-clock-sfx-box { fill: currentColor; }
+.game-clock-sfx.is-off { opacity: 0.55; }
+.game-clock-sfx:hover { background-color: rgb(255 255 255 / 0.16); opacity: 1; }
+.game-clock-sfx:active { transform: scale(0.9); transition-duration: 0s; }
+.game-clock-sfx:focus-visible { outline: 2px solid #f6ecda; outline-offset: 1px; }
 .game-clock-time {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;

@@ -6,6 +6,7 @@ import { memo, useEffect, useRef } from 'react'
 import { hhmm, nextSky, skyAt, type Sky } from '@/game/clock'
 import { tl, type Lang } from '@/data/i18n'
 import { setTip } from '@/scene/hoverTip'
+import { setSfxMuted, useSfxMuted } from '@/scene/sfx'
 import { getClock, setClock, useClock } from './clockStore'
 
 const NAMES: Record<Sky, [string, string, string]> = {
@@ -53,7 +54,28 @@ function GameClockImpl({ lang }: { lang: Lang }) {
       </button>
       <span className="game-clock-day">{tl(lang, `第 ${day} 天`, `${day} 日目`, `Day ${day}`)}</span>
       <span className="game-clock-time">{hhmm(minute)}</span>
+      <SfxToggle lang={lang} />
     </div>
   )
 }
 export const GameClock = memo(GameClockImpl)
+
+/** the sound effects on or off (the owner's: muted on their own, top right; the music has the speaker on the wall): a little speaker at the
+ * clock's end, its waves while they sound, struck through while they're muted */
+function SfxToggle({ lang }: { lang: Lang }) {
+  const muted = useSfxMuted()
+  const hovered = useRef(false)
+  const tip = (m: boolean) => setTip({ title: tl(lang, '音效', '効果音', 'Sound effects'),
+    hint: m ? tl(lang, '點一下開啟音效', 'クリックでオン', 'Click to turn on') : tl(lang, '點一下關閉音效', 'クリックでオフ', 'Click to turn off') })
+  return (
+    <button type="button" className={`game-clock-sfx${muted ? ' is-off' : ''}`} aria-pressed={!muted}
+      aria-label={tl(lang, muted ? '開啟音效' : '關閉音效', muted ? '効果音をオン' : '効果音をオフ', muted ? 'Turn sound effects on' : 'Turn sound effects off')}
+      onClick={() => { setSfxMuted(!muted); if (hovered.current) tip(!muted) }}
+      onPointerEnter={() => { hovered.current = true; tip(muted) }} onPointerLeave={() => { hovered.current = false; setTip(null) }}>
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path className="game-clock-sfx-box" d="M2.5 6h2.6L8.6 3v10L5.1 10H2.5Z" />
+        {muted ? <path d="M10.6 6 14 9.8M14 6l-3.4 3.8" /> : <path d="M10.6 5.6a3.4 3.4 0 0 1 0 4.8M12.4 3.9a5.8 5.8 0 0 1 0 8.2" />}
+      </svg>
+    </button>
+  )
+}

@@ -3,6 +3,8 @@ import { isDummyMap } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
+import { coolerDoorSound, sizzleBurst } from './restroomSound'
+import { heard } from '@/scene/sfx'
 import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
@@ -255,6 +257,8 @@ const EAT_SECONDS = 3
 const BITES_PER_PIECE = 4
 const UP = new THREE.Vector3(0, 1, 0)
 const ZERO = new THREE.Vector3()
+/** where a sound's heard from (a seasoned piece's sizzle, a cupboard's doors), worked out in place */
+const SIZZLE_AT = new THREE.Vector3()
 /** the pinching hand is drawn a little above the pinch of salt it holds */
 const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
 /** the water bucket, drawn this much bigger than modelled (its water is for damping the fire down, not for the food: the owner's); and its
@@ -1441,7 +1445,10 @@ function CubbyDoors({ along: [a0, a1], hinge, front = COOK_TABLE.lay[1] - 0.11, 
     // (the chef reaching in: part way open a moment, whoever's before them (he is))
     const want = performance.now() - CUBBY_KICK[side] < 1500 ? 0.6 : !s.blocked && s.kept ? 1 : 0
     s.k += (want - s.k) * Math.min(1, Math.min(dt, 0.1) * (s.blocked ? 16 : 5))
-    CUBBY_OPEN[side] = s.k > 0.05
+    // (heard as its doors come open and as they meet again: a fridge's seal, quieter than the drinks fridges' (under the table, smaller doors))
+    const opened = s.k > 0.05
+    if (opened !== CUBBY_OPEN[side] && frame.current) coolerDoorSound(opened, heard(frame.current.getWorldPosition(SIZZLE_AT)).near * 0.55)
+    CUBBY_OPEN[side] = opened
     // (each door about its hinge at its outer edge, its free edge swinging out toward the cook, a little past square)
     const e = s.k * s.k * (3 - 2 * s.k)
     doors.current.forEach((d, i) => { if (d) d.rotation.y = leaves[i] * e * LEAF_SWING })
@@ -4513,6 +4520,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (none left in stock: it goes without, and the cook says so)
       if (!season(p, k)) { say(L().outOf(k)); return }
       emit(k, p.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
+      // (heard as by hand: its own sound, and over the coals the fire's sizzle (it was silent, the owner's))
+      seasonSound(k)
+      if (!p.collected && !p.staged) sizzleBurst(p.node.getWorldPosition(SIZZLE_AT), k === 'salt' ? 0.7 : 1)
       say(L().seasoned(nameOfP(p), k))
     }
     if (ready && !busy()) {
@@ -4884,6 +4894,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       ringLife.current[k] = RING_LIFE
     }
     seasonSound(kind)
+    // (on what's over the coals, the fire answers: a burst of sizzle (salt a lighter one))
+    if (!p.collected && !p.staged && p.homeFlight >= 1) sizzleBurst(p.node.getWorldPosition(SIZZLE_AT), kind === 'salt' ? 0.7 : 1)
   }
   /** the dipper pouring out what it scooped, where it was let go: how long it has left (s) */
   const pouring = useRef<{ tool: Tool; left: number; at: THREE.Vector3 } | null>(null)
