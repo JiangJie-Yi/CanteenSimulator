@@ -36,6 +36,10 @@ export const KINDS: { kind: GuestKind; zh: string; ja: string; en: string; weigh
 ]
 
 const TOTAL = KINDS.reduce((n, k) => n + k.weight, 0)
+/** who comes in as a delivery rider (the owner's riders, helmet and box: the sort who'd take the work, never a yukata lady or a child) */
+export const RIDER_KINDS: ReadonlySet<GuestKind> = new Set(['collegeStudent', 'uncle', 'delinquent', 'bosozoku'])
+/** whether customer number `id` could come in as a rider */
+export const canRide = (id: number) => RIDER_KINDS.has(kindOf(id).kind)
 /** each guest's kind, fixed by their id: drawn by weight, the ids scattered so neighbours seldom match */
 export const kindOf = (id: number) => {
   let h = Math.imul(id ^ (id >>> 16) ^ 0x2c1b3c6d, 0x45d9f3b)

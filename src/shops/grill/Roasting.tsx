@@ -40,7 +40,7 @@ import { seasonSound, sprinkleTick } from './seasonSound'
 import { biteSound, chewSound } from './chewSound'
 import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
 import { getLights } from '@/scene/lightsStore'
-import { comesLate, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
+import { canRide, comesLate, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
 import { RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
@@ -4759,9 +4759,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (onOrder && bar && !SHOP.closing && comesIn(mood) && TAKEOUT.orders.filter((o) => !o.gone).length < TAKEOUT_MAX &&
       takeoutClock.current > takeoutGap(LAST_CALL.on, crowd) * (0.6 + Math.random() * 0.8)) {
       takeoutClock.current = 0
-      const id = guestSeq.current + 1
-      guestSeq.current = id
       const rider = Math.random() < RIDER_SHARE
+      // (a rider the next number that'd take the work (data/guests' canRide): a yukata lady came for a delivery, helmet and box on her back)
+      let id = guestSeq.current + 1
+      while (rider && !canRide(id) && id < guestSeq.current + 400) id++
+      guestSeq.current = id
       const { orders, said } = placeOrders(id, takeoutSize(rider, Math.random()))
       if (orders.length) {
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat: -1, takeout: true })
