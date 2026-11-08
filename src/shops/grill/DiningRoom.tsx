@@ -1758,58 +1758,62 @@ function fitText(g: CanvasRenderingContext2D, text: string, x: number, y: number
   g.restore()
 }
 /**
- * The plaque over each toilet's door (the owner's: some design to it, and its words in the language on screen): a board of pale keyaki, its
- * grain running along it, a dark rim and a fine gold line inside that; a round badge in the room's colour (indigo the men's, vermilion the
- * women's) with a white figure in it; the big character brushed in that colour (男, 女; in English MEN, WOMEN); and a band along its foot
- * in the colour with what it is in white (男廁 · MEN, 男性 · お手洗い, RESTROOM). Made once for each room and language.
+ * The plaque over each toilet's door (the owner's: a carved wooden board, as at an old inn or izakaya, not printed plastic; 2026-11-09): a
+ * thick board of dark walnut, its grain along it, a bevelled edge catching the light, a brass nail at each end; carved into it (sunk, the
+ * hollow's upper edge in shadow, its lower one catching the light) the room's crest on the left (梅鉢 the men's, 桜 the women's, as on their
+ * noren) and the big character brushed (男, 女; in English MEN, WOMEN), the hollows filled with deep indigo or cinnabar. Made once for each
+ * room and language.
  */
 const WC_SIGN_MADE = new Map<string, THREE.Texture | null>()
 function wcSign(who: 'm' | 'f', lang: string) {
   const key = `${who}|${lang}`
   if (!WC_SIGN_MADE.has(key)) WC_SIGN_MADE.set(key, canvasTex(320, 192, (g) => {
-    const ink = who === 'm' ? '#24407a' : '#b8262a'
-    const ja = lang.startsWith('ja'), en = lang.startsWith('en')
+    const ink = who === 'm' ? '#1a283e' : '#8c2626'
+    const en = lang.startsWith('en')
     g.save()
-    const rim = new Path2D(); rim.roundRect(4, 4, 312, 184, 22)
-    g.fillStyle = '#4a2c18'; g.fill(rim)
-    const face = new Path2D(); face.roundRect(11, 11, 298, 170, 16)
-    const wood = g.createLinearGradient(0, 11, 0, 181)
-    wood.addColorStop(0, '#d9ad74'); wood.addColorStop(0.5, '#e8c590'); wood.addColorStop(1, '#cc9c62')
+    // (the board: its edge darker, bevelled, the face inside it)
+    const rim = new Path2D(); rim.roundRect(2, 2, 316, 188, 10)
+    g.fillStyle = '#24150c'; g.fill(rim)
+    const face = new Path2D(); face.roundRect(10, 10, 300, 172, 6)
+    const wood = g.createLinearGradient(0, 10, 0, 182)
+    wood.addColorStop(0, '#5e3c24'); wood.addColorStop(0.5, '#6e4a2e'); wood.addColorStop(1, '#53331e')
     g.fillStyle = wood; g.fill(face)
     g.save(); g.clip(face)
-    g.strokeStyle = 'rgba(120,72,30,0.22)'; g.lineWidth = 1.2
-    for (let k = 0; k < 17; k++) {
-      const y0 = 12 + k * 10.5
+    // (the grain: long flowing lines along it, deeper and paler, a knot's swirl)
+    let seed = who === 'm' ? 3 : 11
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+    for (let k = 0; k < 26; k++) {
+      const y0 = 8 + k * 7 + rnd() * 3
+      g.strokeStyle = rnd() < 0.5 ? 'rgba(30,16,6,0.32)' : 'rgba(150,104,64,0.22)'; g.lineWidth = 0.8 + rnd() * 1.4
       g.beginPath()
-      for (let x = 0; x <= 320; x += 8) { const y = y0 + Math.sin(x / 55 + k * 0.9) * 4 + Math.sin(x / 17 + k) * 1.2; if (x === 0) g.moveTo(x, y); else g.lineTo(x, y) }
+      for (let x = 0; x <= 320; x += 6) { const y = y0 + Math.sin(x / (40 + k * 3) + k) * 3 + Math.sin(x / 13 + k * 2) * 0.8; if (x === 0) g.moveTo(x, y); else g.lineTo(x, y) }
       g.stroke()
     }
-    const vg = g.createRadialGradient(160, 96, 60, 160, 96, 190)
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(70,36,10,0.3)')
-    g.fillStyle = vg; g.fillRect(0, 0, 320, 192)
+    g.strokeStyle = 'rgba(30,16,6,0.3)'; g.lineWidth = 1
+    for (let r = 4; r < 22; r += 4) { g.beginPath(); g.ellipse(250, 160, r * 1.8, r * 0.6, 0.05, 0, Math.PI * 2); g.stroke() }
     g.restore()
-    g.strokeStyle = '#c9a24e'; g.lineWidth = 2
-    g.beginPath(); g.roundRect(19, 19, 282, 154, 11); g.stroke()
-    // (the band along its foot)
-    g.fillStyle = ink; g.beginPath(); g.roundRect(28, 136, 264, 28, 6); g.fill()
-    const band = en ? 'RESTROOM' : ja ? (who === 'm' ? '男性 · お手洗い' : '女性 · お手洗い') : (who === 'm' ? '男廁 · MEN' : '女廁 · WOMEN')
-    fitText(g, band, 160, 151, 244, 18, '#fbf4e6', 'sans-serif', 'bold', en ? 4 : 2)
-    // (the badge and its figure)
-    const cx = 80, cy = 76, R = 44
-    g.fillStyle = ink; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill()
-    g.strokeStyle = '#f6ecd6'; g.lineWidth = 2.5; g.beginPath(); g.arc(cx, cy, R - 6, 0, Math.PI * 2); g.stroke()
-    g.fillStyle = '#fbf4e6'
-    g.beginPath(); g.arc(cx, cy - 21, 7.5, 0, Math.PI * 2); g.fill()
-    if (who === 'm') {
-      g.beginPath(); g.roundRect(cx - 12, cy - 10, 24, 25, 5); g.fill()
-      g.fillRect(cx - 10, cy + 12, 8, 20); g.fillRect(cx + 2, cy + 12, 8, 20)
-    } else {
-      g.beginPath(); g.moveTo(cx, cy - 11); g.lineTo(cx + 18, cy + 17); g.lineTo(cx - 18, cy + 17); g.closePath(); g.fill()
-      g.fillRect(cx - 9, cy + 15, 6, 17); g.fillRect(cx + 3, cy + 15, 6, 17)
+    // (the bevel: a fine pale line along its top and left, dark along its foot and right)
+    g.strokeStyle = 'rgba(214,170,120,0.55)'; g.lineWidth = 2
+    g.beginPath(); g.moveTo(12, 178); g.lineTo(12, 12); g.lineTo(308, 12); g.stroke()
+    g.strokeStyle = 'rgba(10,5,2,0.6)'
+    g.beginPath(); g.moveTo(308, 12); g.lineTo(308, 180); g.lineTo(12, 180); g.stroke()
+    // (a brass nail at either end)
+    for (const x of [26, 294]) {
+      const n = g.createRadialGradient(x - 2, 94, 1, x, 96, 7)
+      n.addColorStop(0, '#f6dc94'); n.addColorStop(0.6, '#b98a2e'); n.addColorStop(1, '#5a3a10')
+      g.fillStyle = n; g.beginPath(); g.arc(x, 96, 6, 0, Math.PI * 2); g.fill()
     }
-    // (the big character, or the word)
-    if (en) fitText(g, who === 'm' ? 'MEN' : 'WOMEN', 208, 78, 150, 60, ink, SIGN_FONT, 'bold', 2)
-    else brushText(g, who === 'm' ? '男' : '女', 206, 76, 100, { fill: ink, edge: '#f6ecd6', shadow: 'rgba(60,30,10,0.35)', shine: '#ffffff' })
+    // (carved: the hollow's lit lower edge, its shadowed upper one, then the colour filling it)
+    const carve = (draw: (fill: string) => void) => {
+      g.save(); g.translate(1.5, 2); draw('rgba(232,190,140,0.45)'); g.restore()
+      g.save(); g.translate(-1.5, -2); draw('rgba(8,4,2,0.8)'); g.restore()
+      draw(ink)
+    }
+    carve((fill) => crest(g, who === 'm' ? 'ume' : 'sakura', 92, 96, 46, fill, fill))
+    carve((fill) => {
+      if (en) fitText(g, who === 'm' ? 'MEN' : 'WOMEN', 214, 98, 150, 64, fill, SIGN_FONT, 'bold', 2)
+      else brushText(g, who === 'm' ? '男' : '女', 214, 96, 118, { fill })
+    })
     g.restore()
   }))
   return WC_SIGN_MADE.get(key) ?? null
