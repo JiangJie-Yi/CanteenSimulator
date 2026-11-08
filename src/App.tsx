@@ -44,7 +44,7 @@ import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { LATE, SHOP, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { dutyDay, LATE, SHOP, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -72,9 +72,10 @@ import { LINES } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
-import { effective, isTired, restPerHour, ROLES, tireNow, type Role, type SkillId } from '@/data/staff'
+import { effective, isTired, restPerHour, ROLES, tireNow, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
 import { hoursEnd, hoursText, inHours, isLate } from '@/game/hours'
-import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY } from '@/game/hiring'
+import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
+import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
 import { Welcome } from '@/ui/Welcome'
@@ -109,7 +110,7 @@ const SAVE_KEY = 'canteen-save'
 /** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
 const RESUME_KEY = 'jgs-resume-1'
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number }
-  stock: Record<string, number>; hired: Record<string, Record<string, { fatigue: number }>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
+  stock: Record<string, number>; hired: Record<string, Record<string, Rota>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
   /** each food's lots, as bought (game/lots) */
   lots?: Record<string, Lot[]>
@@ -1283,6 +1284,8 @@ export default function App() {
   const [closing, setClosing] = useState(false)
   const [leaving, setLeaving] = useState(false)
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
+  // (shut: the day's counted done, the next shift's on duty from now (game/shifts' dutyDay))
+  useEffect(() => { if (!ai) SHOP.counted = false }, [ai])
   /** a new day by the game's clock: the applicants' new lot, the dice back */
   const newDay = useRef<(day: number) => void>(() => {})
   /** the hours over: shut up as by hand (the button's way: no auto-run reopening it till they come round again) */
@@ -1314,6 +1317,12 @@ export default function App() {
     if (!ai) return
     SHOP.openedAt = performance.now()
     SHOP.day++
+    SHOP.counted = true
+    // (the day's shift on (game/shifts): each one's run of days counted, those off resting it all)
+    {
+      const today = SHOP.day
+      setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, r]) => [id, openDay(r, today)]))])))
+    }
     // (the day's books as they stand at opening, for its closing sheet; one still up from the last day put away)
     dayStart.current = { ledger: { ...ledgerNow.current }, seen: new Set(visitsNow.current.map((v) => v.id)), sold: { ...entryCountNow.current }, day: getClock().day }
     setDaySum(null)
@@ -1352,9 +1361,11 @@ export default function App() {
   const setOrders = (fn: (all: Record<string, Record<string, number>>) => Record<string, Record<string, number>>) =>
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
   // the staff hired at each shop (by worker id) and how tired each is
-  const [hired, setHired] = useState<Record<string, Record<string, { fatigue: number }>>>(() => SAVED?.hired ?? {})
+  const [hired, setHired] = useState<Record<string, Record<string, Rota>>>(() => SAVED?.hired ?? {})
   const hiredNow = useRef(hired)
   hiredNow.current = hired
+  // (in development, `__rota()`: each one hired's fatigue, shift, run of days and the floor a night's rest won't go below)
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __rota: () => hiredNow.current })
   // the applicants: a new lot each day (the game's clock turning a day: game/hiring's refreshApplicants, those taken on staying), and the
   // dice: ROLLS_PER_DAY draws again by hand a day (the owner's); `ver` redraws the office's list as it changes
   const [rolls, setRolls] = useState(() => SAVED?.rolls ?? { day: getClock().day, left: ROLLS_PER_DAY })
@@ -1375,9 +1386,21 @@ export default function App() {
   // (in development, `__giveSkill('grilledfish-3', 'nightOwl')`: someone given a skill, to see what it does without waiting for luck)
   if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __giveSkill: (id: string, k: SkillId) => { for (const ws of Object.values(CANDIDATES)) for (const w of ws) if (w.id === id) w.skills = [k] } })
   // (in development, `__fatigue(80)`: every one hired that worn, to see them worn out without a night's work)
-  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __fatigue: (v: number) => setHired((h) => Object.fromEntries(Object.entries(h).map(([k, ws]) => [k, Object.fromEntries(Object.keys(ws).map((id) => [id, { fatigue: v }]))]))) })
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __fatigue: (v: number) => setHired((h) => Object.fromEntries(Object.entries(h).map(([k, ws]) => [k, Object.fromEntries(Object.entries(ws).map(([id, r]) => [id, { ...r, fatigue: v }]))]))) })
+  // (only the shift on duty (game/shifts, the owner's): the business day open, or the one coming while it's shut)
   const staffOf = (dishId: string, role?: Role) =>
-    (CANDIDATES[dishId] ?? []).filter((w) => hired[dishId]?.[w.id] && (!role || w.role === role))
+    (CANDIDATES[dishId] ?? []).filter((w) => hired[dishId]?.[w.id] && onShift(hired[dishId][w.id].shift, dutyDay(ai)) && (!role || w.role === role))
+  /** a new hand's shift: the one of the two short of this job (A first) */
+  const shiftFor = (dishId: string, role: Role, h: typeof hired): Shift => {
+    const of = (CANDIDATES[dishId] ?? []).filter((x) => x.role === role && h[dishId]?.[x.id])
+    const on = (k: 'A' | 'B') => of.filter((x) => { const s = h[dishId][x.id].shift ?? 'A'; return s === k || s === 'both' }).length
+    return on('B') < on('A') ? 'B' : 'A'
+  }
+  const hire = (dishId: string, ws: Hand[]) => setHired((h) => {
+    const next = { ...h, [dishId]: { ...(h[dishId] ?? {}) } }
+    for (const w of ws) next[dishId][w.id] = { fatigue: 0, shift: shiftFor(dishId, w.role, next) }
+    return next
+  })
   /** the kitchen's cooking as the simulation needs it: the owner is the head chef; a hired chef (or, failing that,
    * the sous chef) is the hand that works alongside, and every cook in the kitchen speeds things up */
   const chefOf = (dishId: string): Chef => {
@@ -2242,14 +2265,16 @@ export default function App() {
           next[shop] = {}
           for (const [wid, st] of Object.entries(ws)) {
             const w = CANDIDATES[shop].find((x) => x.id === wid)!
-            const working = aiRef.current.ai && aiRef.current.shop === shop
+            // (at work: the shop open and their shift on (game/shifts))
+            const working = aiRef.current.ai && aiRef.current.shop === shop && onShift(st.shift, dutyDay(true))
             // (by the game's clock: a minute of it a second, sped up with the game)
-            // (faster in the deep night, and as their special skills make it (the owner's))
-            const fatigue = Math.max(0, Math.min(100, st.fatigue + (working ? tireNow(w, LATE.on) : -restPerHour) / 60 * GAME_SPEED.value))
+            // (faster in the deep night, and as their special skills make it (the owner's); resting, not below what a run of days leaves)
+            const fatigue = working ? Math.min(100, st.fatigue + tireNow(w, LATE.on) / 60 * GAME_SPEED.value)
+              : Math.max(Math.min(st.fatigue, st.floor ?? 0), st.fatigue - restPerHour / 60 * GAME_SPEED.value)
             if (w.skills?.length) STAFF_SKILLS.set(wid, w.skills)
             else STAFF_SKILLS.delete(wid)
             if (fatigue !== st.fatigue) changed = true
-            next[shop][wid] = { fatigue }
+            next[shop][wid] = fatigue === st.fatigue ? st : { ...st, fatigue }
             // (worn out: at half, and it shows beside them (StaffWords' TiredBadges, the 3D's own paces))
             if (isTired(fatigue)) STAFF_TIRED.add(wid)
             else STAFF_TIRED.delete(wid)
@@ -2428,6 +2453,8 @@ export default function App() {
         setAi(false)
         setClosing(false)
         setLeaving(false)
+        // (the night's rest won't take all of a run of days' tiredness away (game/shifts))
+        setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, r]) => [id, shutDay(r, SHOP.day)]))])))
         // (the day's closing sheet: the books since opening, the customers who came, what sold)
         const st = dayStart.current
         if (st) {
@@ -2469,11 +2496,21 @@ export default function App() {
       }
       return
     }
-    const hires = pickHires(CANDIDATES[d.id] ?? [], ROLES[d.id] ?? [], mine)
+    // (two shifts' worth taken on (the owner's: two lots, turn about))
+    const hires = pickHires(CANDIDATES[d.id] ?? [], (ROLES[d.id] ?? []).map((r) => ({ ...r, max: r.max * 2 })), mine)
     if (hires.length) {
-      setHired((h) => ({ ...h, [d.id]: { ...(h[d.id] ?? {}), ...Object.fromEntries(hires.map((w) => [w.id, { fatigue: 0 }])) } }))
+      hire(d.id, hires)
       say(T.autoHired(hires.length))
       return
+    }
+    // (and the rota made out by itself (game/shifts' arrange): A, then B, the best on both where a shift's short of hands)
+    {
+      const want: Record<string, Shift> = {}
+      for (const r of ROLES[d.id] ?? []) Object.assign(want, arrange((CANDIDATES[d.id] ?? []).filter((w) => w.role === r.role && mine[w.id]).sort((a, b) => valueOf(b) - valueOf(a)), r.max))
+      if (Object.entries(want).some(([id, k]) => (mine[id]?.shift ?? 'A') !== k)) {
+        setHired((h) => ({ ...h, [d.id]: Object.fromEntries(Object.entries(h[d.id] ?? {}).map(([id, r]) => [id, want[id] ? { ...r, shift: want[id] } : r])) }))
+        return
+      }
     }
     const order = topUpOrder(d, stock)
     if (order.cost && order.cost <= cash) {
@@ -2875,7 +2912,9 @@ export default function App() {
             }}
             hired={hired[dish.id] ?? {}}
             rollsLeft={rolls.left} onRoll={rollApplicants}
-            onHire={(w) => setHired((h) => ({ ...h, [dish.id]: { ...(h[dish.id] ?? {}), [w.id]: { fatigue: 0 } } }))}
+            onHire={(w) => hire(dish.id, [w])}
+            today={dutyDay(ai)}
+            onShift={(w, k) => setHired((h) => ({ ...h, [dish.id]: { ...(h[dish.id] ?? {}), [w.id]: { ...h[dish.id][w.id], shift: k } } }))}
             shopOpen={ai}
             onFire={(w) => setHired((h) => {
               const mine = { ...(h[dish.id] ?? {}) }

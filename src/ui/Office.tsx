@@ -6,6 +6,7 @@ import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
 import { CANDIDATES, pickHires, ROLLS_PER_DAY } from '@/game/hiring'
+import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts'
 import { Avatar } from './Avatar'
 
 /** the office's tabs: the kitchen's notebook, the staff, the books */
@@ -15,7 +16,10 @@ type Props = {
   dish: Dish
   lang: Lang
   cash: number
-  hired: Record<string, { fatigue: number }>
+  hired: Record<string, Rota>
+  /** the business day whose shift is on (game/shifts' dutyDay), and putting someone on a shift (the owner's: A, B or both) */
+  today: number
+  onShift: (w: Worker, k: Shift) => void
   onHire: (w: Worker) => void
   /** the dice: how many draws of the applicants again by hand are left today, and drawing one (the owner's) */
   rollsLeft: number
@@ -49,7 +53,7 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * two cooks, someone on the floor and at the till — each filled with a face, or open, with the people who could
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
-export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll }: Props) {
+export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll, today, onShift }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -60,7 +64,11 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
     關閉: 'Close' }
   const t = (zh: string, jp: string) => (ja ? jp : lang === 'en' ? EN[zh] ?? zh : zh)
   const drag = useDrag('office')
-  const wages = people.filter((w) => hired[w.id]).reduce((s, w) => s + w.wage, 0)
+  // (two shifts' worth of every job (game/shifts, the owner's); the wages are the shift on duty's)
+  const shiftRoles = roles.map((r) => ({ ...r, max: r.max * 2 }))
+  const onToday = (w: Worker) => !!hired[w.id] && worksOn(hired[w.id].shift, today)
+  const wages = people.filter(onToday).reduce((s, w) => s + w.wage, 0)
+  const shiftLabel = (k: Shift) => (k === 'both' ? t('全勤', '通し') : t(`${k} 班`, `${k} 番`))
   // (put on the page itself, over the menu and everything else)
   return createPortal(
     <>
@@ -87,7 +95,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
               const mine = people.filter((x) => x.role === r.role && hired[x.id])
               // one place for each person the job takes (two on the floor); an open one is filled with a click, by the
               // applicant who's the best value for their pay; a filled one shows that person below
-              return Array.from({ length: r.max }, (_, i) => {
+              return Array.from({ length: r.max * 2 }, (_, i) => {
                 const w = mine[i]
                 const best = w ? null : pickHires(people.filter((x) => x.role === r.role && !hired[x.id]), [{ role: r.role, max: 1 }], {})[0]
                 return (
@@ -100,17 +108,19 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                       }}>
                       {w ? <Avatar id={w.id} look={w.look} role={w.role} size={48} /> : <span className="ofc-slot-empty">＋</span>}
                     </button>
+                    {w && <span className={`ofc-shift-tag is-${hired[w.id].shift ?? 'A'}${onToday(w) ? ' is-on' : ''}`}>{(hired[w.id].shift ?? 'A') === 'both' ? t('全', '通') : hired[w.id].shift ?? 'A'}</span>}
                     <figcaption><b>{w ? (ja ? w.ja : w.zh) : t('點我徵人', '募集中')}</b><small>{ja ? r.ja : r.zh.split('（')[0]}</small></figcaption>
                   </figure>
                 )
               })
             })}
           </div>
+          <p className="ofc-today">{t(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`)}</p>
           <div className="ofc-wages">
-            <span>{t(`人事成本 ${money(wages)}/小時（營業時才計薪）`, `人件費 ${money(wages)}/時（営業中のみ）`)}</span>
+            <span>{t(`今天這班的人事成本 ${money(wages)}/小時（營業時才計薪）`, `本日の班の人件費 ${money(wages)}/時（営業中のみ）`)}</span>
             {/* every open job filled at once, by who's the best value for their pay */}
-            <button type="button" className="ofc-hireall" disabled={!pickHires(people, roles, hired).length}
-              onClick={() => { for (const w of pickHires(people, roles, hired)) onHire(w) }}
+            <button type="button" className="ofc-hireall" disabled={!pickHires(people, shiftRoles, hired).length}
+              onClick={() => { for (const w of pickHires(people, shiftRoles, hired)) onHire(w) }}
               title={t('每個空缺各雇一位最划算的人', '空いている枠に一番お得な人を雇う')}>{t('一鍵徵人', 'おまかせ採用')}</button>
             {/* (the dice: the applicants drawn again, twice a day; a new lot comes each day by itself as well) */}
             <button type="button" className="ofc-roll" disabled={rollsLeft <= 0} onClick={onRoll}
@@ -122,7 +132,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
             const open = people.filter((w) => w.role === r.role && !hired[w.id])
             return (
               <div key={r.role} className={`ofc-role is-${r.role}`}>
-                <h4>{ja ? r.ja : r.zh} <small>{mine.length}/{r.max}</small></h4>
+                <h4>{ja ? r.ja : r.zh} <small>{mine.length}/{r.max * 2}</small></h4>
                 {mine.map((w) => (
                   <div key={w.id} id={`ofc-${w.id}`} className="ofc-person is-hired">
                     <Avatar id={w.id} look={w.look} role={w.role} />
@@ -133,11 +143,18 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                       </span>
                       <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}{isTired(hired[w.id].fatigue) && <em className="ofc-tired" title={t('能力減半・動作變慢', '能力半減・動きが遅い')}>{t('疲勞', '疲労')}</em>}・{money(w.wage)}/h</small>
                     </div>
+                    {/* (their shift: A, B, or both (the owner's); not while the shop's open: they'd vanish from their place) */}
+                    <span className="ofc-shift" role="group" aria-label={t('班別', '班')}>
+                      {(['A', 'B', 'both'] as Shift[]).map((k) => (
+                        <button key={k} type="button" aria-pressed={(hired[w.id].shift ?? 'A') === k} disabled={shopOpen} onClick={() => onShift(w, k)}
+                          title={shopOpen ? t('營業中不能換班', '営業中は変更できません') : k === 'both' ? t('兩班都上（連續上班，休息恢復會打折）', '両方出勤（連勤は回復が減る）') : undefined}>{shiftLabel(k)}</button>
+                      ))}
+                    </span>
                     <button type="button" className="ofc-fire" disabled={!canDismiss(shopOpen)} onClick={() => { if (canDismiss(shopOpen)) onFire(w) }}
                       title={canDismiss(shopOpen) ? undefined : t('營業中不能解雇，請先閉店', '営業中は解雇できません。先に閉店してください')}>{t('解雇', '解雇')}</button>
                   </div>
                 ))}
-                {mine.length < r.max && open.map((w) => (
+                {mine.length < r.max * 2 && open.map((w) => (
                   <div key={w.id} className="ofc-person">
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">

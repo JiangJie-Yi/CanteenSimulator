@@ -4367,6 +4367,7 @@ button {
 }
 
 .ofc-slot {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -7967,3 +7968,52 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 :is(.ofc-trait, .staff-badge).is-elite { --tier-a: #2f62b8; --tier-b: #1b3c7e; --tier-ink: #e6efff; --tier-glow: rgb(90 140 255 / 0.5); }
 :is(.ofc-trait, .staff-badge).is-rare { --tier-a: #7e3fb8; --tier-b: #4f2280; --tier-ink: #f3e6ff; --tier-glow: rgb(170 100 255 / 0.5); }
 :is(.ofc-trait, .staff-badge).is-legend { --tier-a: #8f6d22; --tier-b: #574013; --tier-ink: #ffe9a8; --tier-glow: rgb(230 180 60 / 0.6); }
+
+/* the rota in the office (game/shifts; the owner's): the shift on duty today; on each place, its person's shift (A teal, B amber, both
+   purple; dimmed with their face for one off today); in each one's row, A / B / both to pick */
+.ofc-today {
+  margin: 6px 0 0;
+  color: #7a6450;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ofc-shift-tag {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #2f8a86;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
+}
+.ofc-shift-tag.is-B { background: #c98a1e; }
+.ofc-shift-tag.is-both { background: #7e3fb8; }
+.ofc-slot:has(.ofc-shift-tag:not(.is-on)) .ofc-slot-btn { filter: grayscale(0.8); opacity: 0.55; }
+.ofc-shift {
+  display: inline-flex;
+  flex: none;
+  margin-right: 6px;
+  border: 1px solid #b9a58a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ofc-shift button {
+  padding: 3px 8px;
+  border: 0;
+  background: transparent;
+  color: #7a6450;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ofc-shift button + button { border-left: 1px solid #b9a58a; }
+.ofc-shift button[aria-pressed='true'] { background: #5a3d28; color: #fff; }
+.ofc-shift button:disabled { cursor: default; opacity: 0.6; }

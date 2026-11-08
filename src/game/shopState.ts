@@ -9,7 +9,12 @@ import { paceBoost, paceOf, TIRED_AT, type SkillId } from '@/data/staff'
  */
 /** `inRoom`: the customers still in the room (at their stools, paying, at the toilet, walking out: GuestBar3D counts them): the shop shuts
  * only once it's 0 (the owner's: they used to vanish all at once as it did, the ones paying and walking out with them) */
-export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, walking: new Set<string>(), inRoom: 0 }
+/** `counted`: today's opening counted in `day` (between its opening and shutting): the shift on duty is `day`'s then, else the next one's
+ * (dutyDay) */
+export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, walking: new Set<string>(), inRoom: 0, counted: false }
+/** the business day whose shift is on (game/shifts): the one open (once counted), or the one coming; the same number either side of the
+ * opening, so nobody's swapped for a frame as the shop opens */
+export const dutyDay = (open: boolean) => (open && SHOP.counted ? SHOP.day : SHOP.day + 1)
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shop?: typeof SHOP }).__shop = SHOP
 /** the staff worn out just now (data/staff's isTired, App keeps it): at half pace in the 3D, a badge beside them */
 export const STAFF_TIRED = new Set<string>()
