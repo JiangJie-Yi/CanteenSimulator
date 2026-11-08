@@ -14,6 +14,7 @@ import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { FigureHit } from '@/scene/FigureHit'
+import { Glyph } from '@/ui/GameIcons'
 /** the skin's own colour on a figure (its BossSkin material's) */
 const skinOf = (r: THREE.Object3D) => {
   let c: THREE.Color | null = null
@@ -678,13 +679,13 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       )}
       {gulu > 0 && !getEdit().on && (
         <Html position={[0.18, 1.2, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
-          <span key={gulu} className="boss-float boss-gulu">{lang === 'ja' ? 'ゴクゴク〜♪' : lang === 'en' ? 'Glug glug~ ♪' : '咕嚕咕嚕～♪'}</span>
+          <span key={gulu} className="boss-float boss-gulu">{lang === 'ja' ? 'ゴクゴク〜' : lang === 'en' ? 'Glug glug~' : '咕嚕咕嚕～'}<Glyph id="note" size="0.95em" /></span>
         </Html>
       )}
       {joy > 0 && !getEdit().on && (
         <Html position={[0, 1.3, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
           <span key={joy} className="boss-joy" aria-hidden="true">
-            {['🪙', '❤️', '🪙', '💖', '🪙', '❤️'].map((c, i) => <i key={i} style={{ '--i': i } as React.CSSProperties}>{c}</i>)}
+            {(['coin', 'heart', 'coin', 'heart', 'coin', 'heart'] as const).map((c, i) => <i key={i} className={`is-${c}`} style={{ '--i': i } as React.CSSProperties}><Glyph id={c} size={18} /></i>)}
           </span>
         </Html>
       )}

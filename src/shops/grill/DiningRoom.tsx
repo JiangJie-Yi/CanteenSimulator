@@ -24,6 +24,7 @@ import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
+import { drawGlyph } from '@/ui/glyphs'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
 import { lampGlow, lightOn, type Circuit } from '@/game/roomLights'
 import type { Sky } from '@/game/clock'
@@ -3143,7 +3144,7 @@ function StaffDoor() {
         <planeGeometry args={[STAFF_W * 2.4, WC_H * 1.4]} />
       </mesh>
       <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS}
-        onPointerOver={(ev) => { ev.stopPropagation(); if (getEdit().on) return; stairsHot.current = true; document.body.style.cursor = 'not-allowed'; setTip({ title: '2F 員工休息室／倉庫', hint: '🚫 閒人勿進・禁止進入', warn: true }) }}
+        onPointerOver={(ev) => { ev.stopPropagation(); if (getEdit().on) return; stairsHot.current = true; document.body.style.cursor = 'not-allowed'; setTip({ title: '2F 員工休息室／倉庫', hint: '閒人勿進・禁止進入', warn: true }) }}
         onPointerOut={() => { stairsHot.current = false; document.body.style.cursor = ''; setTip(null) }} onClick={(ev) => ev.stopPropagation()}>
         <planeGeometry args={[STAFF_W + 0.06, WC_H + 0.03]} />
       </mesh>
@@ -5802,7 +5803,8 @@ const cartonPrint = (id: DrinkId) => canvasTex(512, 256, (g) => {
   g.font = '700 26px "Arial Black", sans-serif'
   g.fillText(`350ml × ${CASE_SIZE[id] ?? 24}`, 256, 220)
   g.font = '700 18px sans-serif'; g.textAlign = 'left'
-  g.fillText('↑ 天地無用', 18, 24)
+  drawGlyph(g, 'arrowU', 16, 15, 18, '#3b2a20')
+  g.fillText('天地無用', 38, 24)
 })
 /** the cartons of canned drinks stacked by the crates (blender/drinkcartons.py), each printed for its drink, in the room's toon light */
 function DrinkCartons() {
@@ -5945,26 +5947,24 @@ function BottleCrates() {
  * kitchen's end — all of it on the floor out of everyone's way, and facing the room.
  */
 
-/** the glyphs of the notes that float out of the speaker, drawn once */
+/** the notes that float out of the speaker, drawn once */
 const NOTE_TEX = (() => {
   if (typeof document === 'undefined') return []
-  return ['♪', '♫', '♩', '♬'].map((ch, i) => {
+  return (['note', 'notes', 'note', 'notes'] as const).map((ch, i) => {
     const c = document.createElement('canvas')
     c.width = c.height = 64
     const g = c.getContext('2d')!
-    g.font = '700 52px sans-serif'
-    g.textAlign = 'center'; g.textBaseline = 'middle'
-    g.lineWidth = 6; g.strokeStyle = 'rgba(40,20,8,0.85)'
-    g.strokeText(ch, 32, 34)
-    g.fillStyle = ['#ffd98a', '#9fe3ae', '#ffb0a0', '#a8d0ff'][i]
-    g.fillText(ch, 32, 34)
+    // (the game's own drawn notes (ui/glyphs), never a font's: a dark edge all round, then the colour; the second pair turned the other way)
+    if (i > 1) { g.translate(64, 0); g.scale(-1, 1) }
+    for (let a = 0; a < 8; a++) drawGlyph(g, ch, 7 + Math.cos(a * Math.PI / 4) * 3, 7 + Math.sin(a * Math.PI / 4) * 3, 50, 'rgba(40,20,8,0.85)')
+    drawGlyph(g, ch, 7, 7, 50, ['#ffd98a', '#9fe3ae', '#ffb0a0', '#a8d0ff'][i])
     const t = new THREE.CanvasTexture(c)
     t.colorSpace = THREE.SRGBColorSpace
     return t
   })
 })()
 /**
- * Notes coming out of the speaker's cones while music plays: ♪ ♫ ♩ ♬ sprites, big ones from the woofer and small ones from the tweeter, each
+ * Notes coming out of the speaker's cones while music plays: sprites of the game's own drawn notes, single and beamed, big ones from the woofer and small ones from the tweeter, each
  * rising and swaying on its own beat, growing as it goes and fading out; with the music off no more set out, and those up finish their flight.
  */
 function MusicNotes({ playing }: { playing: boolean }) {

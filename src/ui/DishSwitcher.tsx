@@ -1,5 +1,6 @@
 import { nameIn, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
+import { Glyph } from './GameIcons'
 
 type DishSwitcherProps = {
   dishes: Dish[]
@@ -21,7 +22,7 @@ export function DishSwitcher({ dishes, index, onChange, lang }: DishSwitcherProp
     <nav className="switcher" aria-label="切換料理">
       <button type="button" className="switcher-arrow" onClick={() => onChange(prev)}
         aria-label={`上一道：${nameIn(lang, dishes[prev])}`}>
-        ‹
+        <Glyph id="chevL" size="1em" />
       </button>
       <div className="switcher-center">
         <h2 className="dish-name" aria-live="polite">{nameIn(lang, dishes[index])}</h2>
@@ -34,7 +35,7 @@ export function DishSwitcher({ dishes, index, onChange, lang }: DishSwitcherProp
       </div>
       <button type="button" className="switcher-arrow" onClick={() => onChange(next)}
         aria-label={`下一道：${nameIn(lang, dishes[next])}`}>
-        ›
+        <Glyph id="chevR" size="1em" />
       </button>
     </nav>
   )

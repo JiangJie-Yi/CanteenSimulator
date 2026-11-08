@@ -3,6 +3,7 @@ import type { Lang } from '@/data/i18n'
 import { REGISTER_MANUAL } from '@/data/registerManual'
 import { tl } from '@/data/i18n'
 import { usePanelSound } from './uiSound'
+import { Glyph } from './GameIcons'
 
 /** whether the register's manual is open (opened by clicking the booklet under the till) */
 let open = false
@@ -78,17 +79,23 @@ export function RegisterManual({ lang }: { lang: Lang }) {
         <dl>
           {p.steps.map((s, i) => (
             <div key={i}>
-              <dt><kbd>{s.keys}</kbd></dt>
-              <dd>{s.text[lang] ?? s.text.zh}</dd>
+              <dt><kbd>{withArrows(s.keys)}</kbd></dt>
+              <dd>{withArrows(s.text[lang] ?? s.text.zh)}</dd>
             </div>
           ))}
         </dl>
         <footer>
-          <button type="button" disabled={page === 0} onClick={() => turn(setPage, -1)}>‹</button>
+          <button type="button" disabled={page === 0} onClick={() => turn(setPage, -1)} aria-label={tl(lang, '上一頁', '前へ', 'Previous')}><Glyph id="chevL" size={18} /></button>
           <span>{page + 1} / {last + 1}</span>
-          <button type="button" disabled={page === last} onClick={() => turn(setPage, 1)}>›</button>
+          <button type="button" disabled={page === last} onClick={() => turn(setPage, 1)} aria-label={tl(lang, '下一頁', '次へ', 'Next')}><Glyph id="chevR" size={18} /></button>
         </footer>
       </div>
     </div>
   )
+}
+
+/** a step's keys or words with each " → " (one key, then the next) drawn as the game's own arrow, not a character */
+function withArrows(text: string) {
+  const parts = text.split(/\s*→\s*/)
+  return parts.flatMap((p, i) => (i ? [<Glyph key={i} id="arrowR" size="0.9em" className="manual-arrow" />, p] : [p]))
 }

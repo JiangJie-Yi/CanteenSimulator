@@ -71,7 +71,6 @@ export const bestStage = (k: string): Stage => TIMING[k as keyof typeof TIMING]?
 
 /** 1-5 stars for a taste (0-100) */
 export const starsOf = (taste: number) => Math.max(1, Math.min(5, Math.round(taste / 20)))
-export const starText = (taste: number) => '★'.repeat(starsOf(taste)) + '☆'.repeat(5 - starsOf(taste))
 
 /** which face a rating gets (the number itself isn't shown) */
 export const moodOf = (r: number | null) => r === null ? 'wait' : r >= 80 ? 'love' : r >= 65 ? 'happy' : r >= 45 ? 'ok' : r >= 25 ? 'meh' : 'sad'

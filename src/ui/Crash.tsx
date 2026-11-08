@@ -14,7 +14,7 @@ export class Crash extends Component<{ children: ReactNode; inline?: boolean }, 
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    this.setState({ where: (info.componentStack ?? '').split('\n').filter(Boolean).slice(0, 4).join(' ← ') })
+    this.setState({ where: (info.componentStack ?? '').split('\n').filter(Boolean).slice(0, 4).join(' < ') })
     console.error(error)
   }
 

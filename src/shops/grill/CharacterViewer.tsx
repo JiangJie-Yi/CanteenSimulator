@@ -18,6 +18,7 @@ import { WireView } from './Movable'
 import { isInk } from '@/scene/inkHull'
 import type { CrewFace } from '@/scene/faceSheet'
 import { usePanelSound } from '@/ui/uiSound'
+import { Glyph } from '@/ui/GameIcons'
 import { getCharHidden, onCharHidden, setCharHidden, toggleEdit } from './edit'
 
 type Entry = { key: string; zh: string; ja: string; en: string; group: 'boss' | 'staff' | 'guest'; role?: Role; female?: boolean; kind?: GuestKind }
@@ -306,9 +307,9 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
       <header className="char-view-head">
         <b>{tl(lang, '角色模型', 'キャラクター', 'Characters')}</b>
         <span>{name}{e.kind ? ` #${gid}` : ''}</span>
-        <button type="button" className="char-view-fold" onClick={() => setCharHidden(true)} title={minLabel} aria-label={minLabel}>−</button>
+        <button type="button" className="char-view-fold" onClick={() => setCharHidden(true)} title={minLabel} aria-label={minLabel}><Glyph id="minus" /></button>
         {/* (× leaves developer mode, as the dev panel's does (the owner's): both panels, the handles and the boxes gone) */}
-        <button type="button" className="char-view-fold char-view-x" onClick={() => toggleEdit()} title={closeLabel} aria-label={closeLabel}>×</button>
+        <button type="button" className="char-view-fold char-view-x" onClick={() => toggleEdit()} title={closeLabel} aria-label={closeLabel}><Glyph id="close" /></button>
       </header>
       {open && (<>
         <div className="char-view-stage">

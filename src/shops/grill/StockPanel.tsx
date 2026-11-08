@@ -12,6 +12,7 @@ import { freshGrade } from '@/game/freshness'
 import { lotGrades, type Lot } from '@/game/lots'
 import { CHARCOAL, NORI, NORI_COST, NORI_PAR, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
 import { FitLine } from '@/ui/FitLine'
+import { Glyph } from '@/ui/GameIcons'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
@@ -401,7 +402,7 @@ function ReceiptZone(p: Props) {
       <h3 className="chiller-zone-head"><span>{tl(lang, '收銀', 'レジ', 'Till')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
       <div className="chiller-bins">
         <div className={`chiller-bin season-bin supply-bin is-still${out ? ' is-out' : ''}`}>
-          <span className="chiller-bin-head"><span className="tissue-icon" aria-hidden="true">🧾</span><FitLine className="chiller-bin-name">{supplyName(RECEIPT, lang)}</FitLine></span>
+          <span className="chiller-bin-head"><Glyph id="receipt" size={18} className="tissue-icon" /><FitLine className="chiller-bin-name">{supplyName(RECEIPT, lang)}</FitLine></span>
           <FitLine className="drink-bin-sub" min={9}>{tl(lang, `57mm 感熱紙 × ${RECEIPT_PACK.rolls}捲・NT$${RECEIPT_PACK.cost}`, `57mm 感熱紙 × ${RECEIPT_PACK.rolls}巻・NT$${RECEIPT_PACK.cost}`, `57 mm thermal × ${RECEIPT_PACK.rolls}, NT$${RECEIPT_PACK.cost}`)}</FitLine>
           <span className={`chiller-level${slips <= 0 ? ' is-zero' : slips < ROLL_SLIPS / 5 ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (slips / ROLL_SLIPS) * 100)}%` }} /></span>
           <span className="chiller-bin-info" aria-hidden="true">
@@ -442,8 +443,8 @@ function MeterChip({ lang, meter: m }: { lang: Lang; meter: Meter }) {
       <button type="button" className={`stock-meter${open ? ' is-open' : ''}`} onClick={() => setOpen((v) => !v)} aria-expanded={open}
         title={tl(lang, '水電（這個月）', '水道光熱費（今月）', 'Water and power (this month)')}>
         <i>{tl(lang, `第 ${Math.max(1, m.day)} 營業日`, `${Math.max(1, m.day)} 営業日目`, `Opening day ${Math.max(1, m.day)}`)}</i>
-        <span>⚡{m.kwh.toFixed(1)}</span>
-        <span>💧{(m.m3 * 1000).toFixed(0)}L</span>
+        <span><Glyph id="bolt" size="1em" className="meter-bolt" />{m.kwh.toFixed(1)}</span>
+        <span><Glyph id="drop" size="1em" className="meter-drop" />{(m.m3 * 1000).toFixed(0)}L</span>
         <b>NT${m.cost.toFixed(0)}</b>
       </button>
       {open && (
@@ -479,7 +480,7 @@ function TissueZone(p: Props) {
       <h3 className="chiller-zone-head"><span>{tl(lang, '民生', '日用品', 'Household')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
       <div className="chiller-bins">
         <div className={`chiller-bin season-bin supply-bin is-still${empty ? ' is-out' : ''}`}>
-          <span className="chiller-bin-head"><span className="tissue-icon" aria-hidden="true">🧻</span><FitLine className="chiller-bin-name">{supplyName(TISSUE, lang)}</FitLine></span>
+          <span className="chiller-bin-head"><Glyph id="tissue" size={18} className="tissue-icon" /><FitLine className="chiller-bin-name">{supplyName(TISSUE, lang)}</FitLine></span>
           <FitLine className="drink-bin-sub" min={9}>{tl(lang, `${BOX_SHEETS}抽 × ${TISSUE_PACK.boxes}盒・NT$${TISSUE_PACK.cost}`, `${BOX_SHEETS}枚 × ${TISSUE_PACK.boxes}箱・NT$${TISSUE_PACK.cost}`, `${BOX_SHEETS} × ${TISSUE_PACK.boxes} boxes, NT$${TISSUE_PACK.cost}`)}</FitLine>
           <span className={`chiller-level${empty ? ' is-zero' : low ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (sheets / (boxes.length * BOX_SHEETS || 1)) * 100)}%` }} /></span>
           <span className="chiller-bin-info" aria-hidden="true">

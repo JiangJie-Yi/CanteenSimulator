@@ -7,6 +7,7 @@ import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { TILL_STATE, tipOver } from './bar'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
+import { drawGlyph } from '@/ui/glyphs'
 
 /**
  * The till's order tablet on its stand, from blender/ipad.py, in the frame the till had it (the stand's middle at the origin, the screen
@@ -120,7 +121,8 @@ function drawPos(g: CanvasRenderingContext2D) {
   g.font = `700 34px ${SANS}`
   g.fillText('お会計', 24, 64)
   rr(g, 170, 48, 300, 34, 10); g.fillStyle = '#e3e3e8'; g.fill()
-  g.fillStyle = '#8e8e93'; g.font = `400 16px ${SANS}`; g.fillText('🔍  メニューを検索', 184, 66)
+  g.fillStyle = '#8e8e93'; g.font = `400 16px ${SANS}`; g.fillText('メニューを検索', 206, 66)
+  drawGlyph(g, 'search', 183, 58, 16, '#8e8e93')
   g.fillStyle = BLUE; g.font = `500 17px ${SANS}`; g.textAlign = 'right'; g.fillText('履歴', 668, 65); g.textAlign = 'left'
   // the category tabs, a segmented control
   rr(g, TAB.x, TAB.y, TAB.w, TAB.h, 9); g.fillStyle = '#e3e3e8'; g.fill()

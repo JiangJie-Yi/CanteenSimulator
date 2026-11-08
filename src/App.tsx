@@ -88,7 +88,7 @@ import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
-import { StarIcon, StatusIcon } from '@/ui/GameIcons'
+import { Glyph, StarIcon, StatusIcon } from '@/ui/GameIcons'
 import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
@@ -3022,7 +3022,7 @@ export default function App() {
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
         {pull > 0 && (
           <div className={`pull-refresh${pull >= 1 ? ' is-ready' : ''}`} style={{ '--pull': pull } as React.CSSProperties}>
-            <span>↻</span>{pull >= 1 ? UI[lang].pullGo : UI[lang].pullMore}
+            <Glyph id="refresh" size="1em" />{pull >= 1 ? UI[lang].pullGo : UI[lang].pullMore}
           </div>
         )}
       </div>
@@ -3085,11 +3085,11 @@ export default function App() {
       {ai && (
         <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
           aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
-          <span>{menuFolded ? '‹' : '›'}</span>
+          <span aria-hidden="true" />
         </button>
       )}
       <button type="button" className="tools-toggle" onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
-        aria-label={UI[lang].tools}>{toolsOpen ? '×' : '☰'}</button>
+        aria-label={UI[lang].tools}><Glyph id={toolsOpen ? 'close' : 'menu'} size="1.1em" /></button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {
         // (opening with nothing a customer could order would only shut again at once: say what's missing instead)
         if (!ai && entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1)) {
@@ -3174,7 +3174,7 @@ export default function App() {
       )}
       <button type="button" className={`speed-toggle${speed > 1 ? ' is-on' : ''}`} onClick={() => setSpeed((v) => (v > 1 ? 1 : 2))}
         aria-pressed={speed > 1} title={tl(lang, '快速 ×2', '早送り ×2', 'Fast ×2')}>
-        {speed > 1 ? '×2' : '▶▶'}
+        {speed > 1 ? '×2' : <Glyph id="fast" size="1.15em" />}
       </button>
       <Bgm />
       {daySum && <DaySummary s={daySum.s} day={daySum.day} lang={lang} onClose={() => setDaySum(null)}

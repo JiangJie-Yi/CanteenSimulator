@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { bestStage, moodOf, stageOf, starsOf, starText, timingLoss } from '@/game/taste'
+import { bestStage, moodOf, stageOf, starsOf, timingLoss } from '@/game/taste'
 
 feature('調味與口味評分', () => {
   scenario('烤的進度決定現在是哪個階段', ({ given, when, then }) => {
@@ -29,7 +29,6 @@ feature('調味與口味評分', () => {
       expect(Math.max(...s)).toBe(5)
       expect([...s].sort((a, b) => a - b)).toEqual(s)
     })
-    then('星星文字永遠是五個字', () => { for (const t of [0, 33, 77, 100]) expect([...starText(t)]).toHaveLength(5) })
   })
 
   scenario('客人的表情依評分而變', ({ when, then }) => {

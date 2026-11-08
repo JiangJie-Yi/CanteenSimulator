@@ -121,6 +121,6 @@ export function webglReport() {
   const w2 = probe('webgl2')
   const w2low = probe('webgl2', { powerPreference: 'low-power', failIfMajorPerformanceCaveat: false })
   const w1 = probe('webgl')
-  return `WebGL2: ${w2.ok ? 'OK' : '✗'} · WebGL2 省電: ${w2low.ok ? 'OK' : '✗'} · WebGL1: ${w1.ok ? 'OK' : '✗'}` +
+  return `WebGL2: ${w2.ok ? 'OK' : 'NG'} · WebGL2 省電: ${w2low.ok ? 'OK' : 'NG'} · WebGL1: ${w1.ok ? 'OK' : 'NG'}` +
     ` · GPU: ${w2.gpu || w2low.gpu || w1.gpu || '—'} · 等級: ${QUALITY.tier}`
 }

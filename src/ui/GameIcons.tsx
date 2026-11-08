@@ -3,6 +3,7 @@
 // down for a debuff), the dice that draws the applicants again, and the stars of a rating (whole, half, empty).
 import type { ReactElement } from 'react'
 import type { SkillId } from '@/data/staff'
+import { GLYPHS, type GlyphId } from './glyphs'
 
 const box = { viewBox: '0 0 16 16', 'aria-hidden': true } as const
 const line = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
@@ -60,4 +61,17 @@ export function StarIcon({ fill = 1, size = 14 }: { fill?: 0 | 0.5 | 1; size?: n
 export function Stars({ value, size = 14 }: { value: number; size?: number | string }) {
   const v = Math.round(value * 2) / 2
   return <span className="game-stars">{[0, 1, 2, 3, 4].map((i) => <StarIcon key={i} size={size} fill={v >= i + 1 ? 1 : v >= i + 0.5 ? 0.5 : 0} />)}</span>
+}
+
+/** one of the small drawn icons of ./glyphs (the speed button's wedges, a fold's caret, the bolt and drop of the meter, a heart...) */
+export function Glyph({ id, size = 12, className = '' }: { id: GlyphId; size?: number | string; className?: string }) {
+  return (
+    <svg {...box} width={size} height={size} className={`game-icon${className ? ` ${className}` : ''}`}>
+      {GLYPHS[id].map((p, i) => {
+        const col = p.cut ? 'var(--icon-cut, #fff)' : 'currentColor'
+        return p.stroke ? <path key={i} d={p.d} fill="none" stroke={col} strokeWidth={p.stroke} strokeLinecap="round" strokeLinejoin="round" />
+          : <path key={i} d={p.d} fill={col} />
+      })}
+    </svg>
+  )
 }

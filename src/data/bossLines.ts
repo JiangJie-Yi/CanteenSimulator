@@ -17,7 +17,7 @@ export const BOSS_LINES: Record<BossSituation, Line[]> = {
     { zh: '嗯～先試烤一串看看。', ja: 'よし、試しに一本焼いてみるか。', en: "Right, let's grill one to try." },
     { zh: '開店前地板要拖乾淨。', ja: '開ける前に床を拭いとかんと。', en: 'Floor needs mopping before we open.' },
     { zh: '天氣這麼好，客人應該會多。', ja: 'いい天気だ、客も来るだろう。', en: "Fine day. They'll come." },
-    { zh: '哼～哼哼～♪', ja: 'ふんふ～ん♪', en: 'Hmm-hm-hmm~♪' },
+    { zh: '哼～哼哼～', ja: 'ふんふ～ん', en: 'Hmm-hm-hmm~' },
   ],
   nightClosed: [
     { zh: '呼……今天也辛苦了。', ja: 'ふう……今日もお疲れさん。', en: 'Phew… another day done.' },
@@ -136,8 +136,8 @@ export const drinkLineText = (r: number, lang: Lang) => {
 }
 /** what the owner says, delighted, as the money's taken out of the till's drawer (the owner's) */
 export const CASH_LINES: Line[] = [
-  { zh: '喔喔！今天收成真好！💸', ja: 'おおっ！今日は大漁だ！💸', en: 'Ooh! A good haul today! 💸' },
-  { zh: '太棒了！有錢賺囉！❤️', ja: 'やった！儲かったぞ！❤️', en: "Brilliant! We're making money! ❤️" },
+  { zh: '喔喔！今天收成真好！', ja: 'おおっ！今日は大漁だ！', en: 'Ooh! A good haul today!' },
+  { zh: '太棒了！有錢賺囉！', ja: 'やった！儲かったぞ！', en: "Brilliant! We're making money!" },
   { zh: '嘿嘿，今天也是大豐收～', ja: 'へへっ、今日も大漁だね〜', en: 'Heh heh, another bumper day~' },
 ]
 export const cashLineText = (r: number, lang: Lang) => {

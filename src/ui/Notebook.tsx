@@ -260,7 +260,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                   </div>
                 </>
               ) : (
-                <p className="notebook-empty">{t(lang, '還沒有二廚。到「經營 › 人事」雇用廚師後，就能問他做菜的意見。',
+                <p className="notebook-empty">{t(lang, '還沒有二廚。到「經營／人事」雇用廚師後，就能問他做菜的意見。',
                   'まだ二番手がいません。人事で料理人を雇うと相談できます。')}</p>
               )}
             </div>

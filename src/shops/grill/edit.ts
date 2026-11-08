@@ -14,6 +14,9 @@ import { glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { GRILL_SEATS } from './bar'
 import { replaces } from '@/scene/hot'
+import { glyphSvg, type GlyphId } from '@/ui/glyphs'
+/** a drawn icon (ui/glyphs) put in front of a button's or label's words, never an emoji or a symbol (the owner's) */
+const withGlyph = (el: HTMLElement, id: GlyphId, text = '', size = 12) => { el.innerHTML = glyphSvg(id, size); if (text) el.append(' ' + text) }
 
 export type V3 = [number, number, number]
 /** the panel's language (the game's: App sets it) */
@@ -681,8 +684,10 @@ function showDock() {
       dock!.appendChild(b)
       return b
     }
-    devPill = pill('🛠️ ' + T().devPill, () => setTucked(false))
-    charPill = pill('👤 ' + T().charPill, () => setCharHidden(false))
+    devPill = pill(T().devPill, () => setTucked(false))
+    charPill = pill(T().charPill, () => setCharHidden(false))
+    withGlyph(devPill, 'tools', T().devPill, 13)
+    withGlyph(charPill, 'person', T().charPill, 13)
     document.body.appendChild(dock)
   }
   const on = state.on
@@ -754,7 +759,7 @@ const PANEL_CSS = `
 .be-tab:hover { color:#d6d6d6; background:#2c2c2c }
 .be-tab.on { background:#e0a040; border-color:#e0a040; color:#1d1d1d }
 .be-tabs + .be-list { border-top-left-radius:0; border-top-right-radius:0 }
-.be-win { width:22px; height:22px; padding:0; border:0; border-radius:4px; background:#3a3a3a; color:#ddd; font:600 14px/22px sans-serif; cursor:pointer; flex:none }
+.be-win { display:inline-grid; place-items:center; width:22px; height:22px; padding:0; border:0; border-radius:4px; background:#3a3a3a; color:#ddd; font:600 14px/22px sans-serif; cursor:pointer; flex:none }
 .be-win:hover { background:#4a4a4a } .be-close:hover { background:#b8433a; color:#fff }
 .be { transform-origin:0 100%; transition:transform .28s cubic-bezier(.4,0,.2,1), opacity .22s ease }
 .be.be-tucked { pointer-events:none; opacity:0; transform:translate(140px, 92px) scale(.15) }
@@ -769,8 +774,9 @@ const PANEL_CSS = `
 .be-grip:hover::after { background:#e08a2c }
 .be-sec { border-top:1px solid #1d1d1d }
 .be-sec > .be-st { display:flex; align-items:center; gap:5px; padding:4px 8px; background:#3d3d3d; color:#e0e0e0; font-weight:600; cursor:pointer }
-.be-sec > .be-st::before { content:'▾'; color:#9a9a9a; font-size:10px }
-.be-sec.shut > .be-st::before { content:'▸' }
+.be-sec > .be-st::before { content:''; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #9a9a9a }
+.be-sec.shut > .be-st::before { border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:5px solid #9a9a9a; border-right:0 }
+.be-pill .game-icon, .be-space .game-icon { vertical-align:-0.15em } .be-fold .game-icon { display:block; margin:0 auto }
 .be-sec.shut > .be-sc { display:none }
 .be-sc { padding:6px 8px 8px; background:#2b2b2b }
 .be-sum { color:#9ab0c8; font-size:11px; margin-bottom:5px }
@@ -797,7 +803,7 @@ const PANEL_CSS = `
 .be-name em { font-style:normal; font-weight:400; color:#8a8a8a }
 .be-grp { margin-bottom:7px }
 .be-gl { display:flex; align-items:center; color:#a8a8a8; margin-bottom:2px }
-.be-gl button { margin-left:auto; background:#3c3c3c; color:#cfcfcf; border:0; border-radius:3px; width:22px; height:17px; cursor:pointer; padding:0; font:12px sans-serif; line-height:1 }
+.be-gl button { display:inline-grid; place-items:center; margin-left:auto; background:#3c3c3c; color:#cfcfcf; border:0; border-radius:3px; width:22px; height:17px; cursor:pointer; padding:0; font:12px sans-serif; line-height:1 }
 .be-gl button:hover { background:#4d4d4d }
 .be-f { display:flex; align-items:stretch; margin-bottom:1px; border-radius:4px; overflow:hidden; background:#545454 }
 .be-f:hover { background:#626262 }
@@ -886,10 +892,12 @@ function panel() {
     const head = h('div', 'be-head', T().title)
     head.appendChild(h('small', '', T().keys))
     // (the panel folded down to its title bar, and shut (leaving the mode, as G or Esc))
-    const minB = h('button', 'be-win', '−') as HTMLButtonElement
+    const minB = h('button', 'be-win') as HTMLButtonElement
+    withGlyph(minB, 'minus', '', 12)
     minB.title = T().minimize
     minB.onclick = (e) => { e.stopPropagation(); setTucked(true) }
-    const closeB = h('button', 'be-win be-close', '×') as HTMLButtonElement
+    const closeB = h('button', 'be-win be-close') as HTMLButtonElement
+    withGlyph(closeB, 'close', '', 12)
     closeB.title = T().close
     closeB.onclick = (e) => { e.stopPropagation(); toggleEdit() }
     head.append(minB, closeB)
@@ -954,12 +962,13 @@ function panel() {
       const row = h('div', `be-row${group ? ' be-grow' : ''}${kind === 'area' ? ' be-area' : ''}`)
       if (group) {
         // (its arrow folds what's in it away, or opens it)
-        const fold = h('span', 'be-fold', open.has(id) ? '▾' : '▸')
+        const fold = h('span', 'be-fold')
+        withGlyph(fold, open.has(id) ? 'caretD' : 'caretR', '', 10)
         fold.title = T().fold
         fold.onclick = (e) => {
           e.stopPropagation()
           if (open.has(id)) open.delete(id); else open.add(id)
-          fold.textContent = open.has(id) ? '▾' : '▸'
+          withGlyph(fold, open.has(id) ? 'caretD' : 'caretR', '', 10)
           keepOpen(); showRows?.()
         }
         row.appendChild(fold)
@@ -1021,8 +1030,8 @@ function panel() {
       for (const [id, row] of rows) {
         const shown = q ? (row.textContent ?? id).toLowerCase().includes(q) : (rowUnder.get(id) ?? []).every((g) => open.has(g))
         row.style.display = rowTab.get(id) === listTab && shown ? '' : 'none'
-        const fold = row.querySelector('.be-fold')
-        if (fold) fold.textContent = open.has(id) ? '▾' : '▸'
+        const fold = row.querySelector<HTMLElement>('.be-fold')
+        if (fold) withGlyph(fold, open.has(id) ? 'caretD' : 'caretR', '', 10)
       }
       for (const [t, b] of tabButtons) b.classList.toggle('on', t === listTab)
     }
@@ -1056,7 +1065,8 @@ function panel() {
     fields = []
     const group = (label: string, step: string, get: (id: string) => V3, set: (id: string, v: V3) => void, rest: V3, stepper = false) => {
       const g = h('div', 'be-grp'), gl = h('div', 'be-gl', label)
-      const back = h('button', '', '↺') as HTMLButtonElement
+      const back = h('button') as HTMLButtonElement
+      withGlyph(back, 'undo', '', 11)
       back.title = T().resetRow(label)
       back.onclick = () => { const id = state.selected; if (id) { beginChange(); set(id, [...rest] as V3); save() } }
       gl.appendChild(back)
@@ -1168,7 +1178,7 @@ function panel() {
   }
   ;(['select', 'move', 'rotate', 'scale'] as Tool[]).forEach((t, k) => toolButtons[k]?.classList.toggle('on', state.tool === t))
   if (spaceBadge) {
-    spaceBadge.textContent = state.space === 'world' ? T().spaceBadgeWorld : T().spaceBadgeLocal
+    withGlyph(spaceBadge, state.space === 'world' ? 'globe' : 'box', state.space === 'world' ? T().spaceBadgeWorld : T().spaceBadgeLocal, 12)
     spaceBadge.title = T().spaceBadgeTip
     spaceBadge.classList.toggle('local', state.space === 'local')
   }
@@ -1199,7 +1209,7 @@ function panel() {
   if (info) {
     const id = state.selected
     const r = id ? registry.get(id) : null
-    info.innerHTML = id ? `${state.groups[id] ? '▣ ' + pieceName(state.groups[id].name, lang) + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
+    info.innerHTML = id ? `${state.groups[id] ? glyphSvg('group', 11) + ' ' + pieceName(state.groups[id].name, lang) + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
     const st = id ? statsOf(id) : null
     if (st) info.innerHTML += `<div class="be-stats">${T().stats(st.tris, st.verts, st.meshes)}</div>`
     const values = id ? [...readLoc(id), ...readRot(id), ...readScale(id)] : []

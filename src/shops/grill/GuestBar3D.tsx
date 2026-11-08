@@ -16,6 +16,7 @@ import { QUALITY } from '@/scene/quality'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
+import { Glyph } from '@/ui/GameIcons'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
@@ -4450,7 +4451,7 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
 
 /** the whole line at once (the owner's: said a piece at a time, each piece ended in …, and looked cut short), wrapping inside the bubble */
 function Say({ text, who, heart }: { text: string; who: string; heart?: boolean }) {
-  return <span className="g3-bubble g3-say"><b className="say-who">{heart && <i className="say-heart">♥</i>}{who}</b>{text}</span>
+  return <span className="g3-bubble g3-say"><b className="say-who">{heart && <i className="say-heart"><Glyph id="heart" size="0.9em" /></i>}{who}</b>{text}</span>
 }
 
 const LABEL_STYLE = { pointerEvents: 'none' } as const
@@ -4468,7 +4469,7 @@ const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, p
         {/* (a bubble only while there's something to say (the owner's): a line, or the dots of waiting to order; their kind over it in
             yellow, no number; nothing at all over someone just sitting there, not even their name) */}
         {say ? <Say key={say.key} text={say.text} who={name} heart={partner} />
-          : dots && <span className="g3-bubble"><b className="say-who">{partner && <i className="say-heart">♥</i>}{name}</b>…</span>}
+          : dots && <span className="g3-bubble"><b className="say-who">{partner && <i className="say-heart"><Glyph id="heart" size="0.9em" /></i>}{name}</b>…</span>}
         {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
       </div>
     </Html>

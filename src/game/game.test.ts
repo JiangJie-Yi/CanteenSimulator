@@ -13,7 +13,7 @@ import { SEASON_GOODS, SEASON_PAR } from './supplies'
 import { trialIdeas } from '@/game/research'
 import { APPLICANTS, makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
 import { bestDabs, expectedTaste, understand } from '@/game/chefChat'
-import { moodOf, PAIRING, PAIRING_DEFAULT, starText } from '@/game/taste'
+import { moodOf, PAIRING, PAIRING_DEFAULT, starsOf } from '@/game/taste'
 
 const shop = (id: string) => DISHES.find((d) => d.id === id)!
 const entry = (shopId: string, ids: string[], dabs: Entry['parts'][number]['dabs'] = []): Entry =>
@@ -125,8 +125,8 @@ describe('research: what the second chef can try', () => {
 
 describe('taste', () => {
   it('turns a rating into stars and a face', () => {
-    expect(starText(100)).toBe('★★★★★')
-    expect(starText(0)).toBe('★☆☆☆☆')
+    expect(starsOf(100)).toBe(5)
+    expect(starsOf(0)).toBe(1)
     expect(moodOf(null)).toBe('wait')
     expect(moodOf(90)).toBe('love')
     expect(moodOf(10)).toBe('sad')
