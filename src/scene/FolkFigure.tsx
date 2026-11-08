@@ -3,6 +3,7 @@ import { guestFaceStrip, type FaceKind } from './faceSheet'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { footDust, newSteps } from './DustPuffs'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
 import { airbrush, gradientMap, hash, lookOf } from './Person3D'
@@ -422,6 +423,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const faded = useRef(1)
   const look = useRef({ yaw: 0, pitch: 0 })
   const pace = useRef(0)
+  // (their footfalls' puffs of dust (scene/DustPuffs), and how tall they stand in the world, measured once)
+  const steps = useRef(newSteps())
+  const tall = useRef(0)
   const lastPos = useRef<THREE.Vector3 | null>(null)
   const outer = useRef<THREE.Group>(null)
   const exprNow = useRef<Expr | null>('neutral')
@@ -467,6 +471,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const going = walking && !still?.()
     pace.current += ((going ? Math.min(1, Math.max(0.6, moved / 0.5)) : 0) - pace.current) * Math.min(1, dt * 8)
     const walk = pace.current
+    if (!tall.current) { const bx = new THREE.Box3().setFromObject(fig.root); if (!bx.isEmpty()) tall.current = bx.max.y - bx.min.y }
+    // (not on the character viewer's turntable (`ground`): its own little canvas, the puffs are the room's)
+    if (tall.current && going && !ground) footDust(steps.current, v3, walk, tall.current, dt)
     // (the food's come: a crouch, a hop up stretched tall and down again squashed, half a second; their eyes shut happy a moment)
     if (eating !== served.current.was) { served.current.was = eating; if (eating && !walking) { served.current.at = t; fig.root.userData.served = (fig.root.userData.served ?? 0) + 1 } }
     const since = t - served.current.at

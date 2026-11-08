@@ -56,6 +56,7 @@ import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
 import { HoverTip } from '@/ui/HoverTip'
+import { DustPuffs } from '@/scene/DustPuffs'
 import { RegisterManual } from '@/ui/RegisterManual'
 import type { Restock } from '@/ui/Menu'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
@@ -2776,6 +2777,7 @@ export default function App() {
           <DrawnProbe />
           <SfxEar />
           <Prewarm />
+          <DustPuffs />
           <FpsMeter />
           {!NO_SCENE && <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}

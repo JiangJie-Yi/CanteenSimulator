@@ -12,6 +12,8 @@ import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
 import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
+import { footDust, newSteps } from '@/scene/DustPuffs'
+const FEET = new THREE.Vector3()
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { FigureHit } from '@/scene/FigureHit'
 import { Glyph } from '@/ui/GameIcons'
@@ -386,6 +388,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       }
     }
   })
+  // (his footfalls' puffs of dust, and how tall he stands in the world, measured once)
+  const steps = useRef(newSteps())
+  const tall = useRef(0)
   useFrame(({ clock }) => {
     const s = st.current
     const T = clock.elapsedTime
@@ -471,8 +476,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       // (a piece in his hands, the board to the fire or the fire to the plating place: stood where the carry has him in the notch, turned to
       // it, leaning in as he reaches and sets it)
       const at = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.stand))
-      const k = Math.min(1, dt * 12)
-      s.x += (at.x - s.x) * k; s.z += (at.z - s.z) * k
+      // (eased over, at a step's pace at most (the owner's: at x2 he shot across the notch in two or three frames, a jitter), never past it)
+      const dx = at.x - s.x, dz = at.z - s.z, d = Math.hypot(dx, dz)
+      if (d > 1e-4) { const go = Math.min(d, d * Math.min(1, dt * 8), dt * 1.4); s.x += (dx / d) * go; s.z += (dz / d) * go }
       const f = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.face))
       turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt * 10)
       act = 'hold'
@@ -530,6 +536,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // ---- the body: a waddle (up at each step, rocking, leaning in) when moving, breathing when not
     const step = s.stride * (speed > 1 ? 2.6 : 3.4)
     const moving = speed > 0
+    // (his footfalls' puffs of dust (scene/DustPuffs); not the viewer's copy of him)
+    if (!tall.current) { const bx = new THREE.Box3().setFromObject(m); if (!bx.isEmpty()) tall.current = bx.max.y - bx.min.y }
+    if (tall.current && m.visible) footDust(steps.current, m.getWorldPosition(FEET), moving ? Math.min(1, 0.6 + speed * 0.4) : 0, tall.current, dt)
     const run = speed > 1
     const bob = moving ? Math.abs(Math.sin(step * Math.PI)) * (run ? 0.055 : 0.035) : 0
     const squash = moving ? 1 - Math.abs(Math.cos(step * Math.PI)) * 0.04 : 1 + Math.sin(T * 1.6) * 0.012

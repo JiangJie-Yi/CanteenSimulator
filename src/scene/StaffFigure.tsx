@@ -2,6 +2,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { footDust, newSteps } from './DustPuffs'
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { atlasModel } from './atlasMerge'
 import { airbrush, gradientMap } from './Person3D'
@@ -231,6 +232,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   const outer = useRef<THREE.Group>(null)
   const last = useRef<THREE.Vector3 | null>(null)
   const pace = useRef(0)
+  // (their footfalls' puffs of dust (scene/DustPuffs), and how tall they stand in the world, measured once)
+  const steps = useRef(newSteps())
+  const tall = useRef(0)
   const faded = useRef<{ was: Map<THREE.Mesh, THREE.Material | THREE.Material[]>; mats: THREE.Material[] } | null>(null)
   const inks = useRef<THREE.Mesh[]>([])
   useEffect(() => () => { if (faded.current) { for (const [m, mat] of faded.current.was) m.material = mat; for (const c of faded.current.mats) c.dispose(); faded.current = null } }, [fig])
@@ -246,6 +250,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     last.current = at
     pace.current += (Math.min(1, step / 0.6) - pace.current) * Math.min(1, dt * 8)
     const walk = pace.current
+    if (!tall.current) { const b = new THREE.Box3().setFromObject(fig.root); if (!b.isEmpty()) tall.current = b.max.y - b.min.y }
+    // (not on the character viewer's turntable: its own little canvas, the puffs are the room's)
+    if (tall.current && o.visible && !id.startsWith('viewer-')) footDust(steps.current, at, walk, tall.current, dt)
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
