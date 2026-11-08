@@ -3795,7 +3795,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const dirtyNow = runs.current.filter((r) => r.phase === 'dirty' && !spoken.has(r.key))
           // (the sink and the dryer one server's at a time)
           const atSink = waiters.current.some((x) => x !== w && (x.phase === 'washGo' || x.phase === 'wash' || x.phase === 'unloadGo' || x.phase === 'unloadTake'))
-          const chore = nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : dirty.current, rack: PLATE_RACK.n,
+          // (the shop shut and going home: nothing new taken on; what's left is put away overnight with the closing)
+          const chore = SHOP.leaving ? null : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : dirty.current, rack: PLATE_RACK.n,
             dryer: atSink ? { n: 0, left: null } : DRYER })
           if (chore === 'serve') {
             // (across the kitchen to the chef for it)
@@ -4033,7 +4034,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           rag.rotation.y = yaw + Math.PI / 2 + Math.sin(p * Math.PI * 4) * 0.25
         }
       }
-      if (o && SHOP.leaving && !ownerServes) {
+      // (going home only once what's in hand is put down: a plate carried to the sink, a stack to the racks; the owner saw the plates of a
+      // server who'd set off for the door float on without them along the way they'd have walked, in mid-air)
+      if (o && SHOP.leaving && !ownerServes && (w.out || w.phase === 'idle')) {
         // (the shop's shut and empty: finishing up a moment where they are, then out through their gate, along the aisle (round the corner
         // from the side counter's) to the front door, a nod back in, and through it fading, as the customers go (commuteWalk))
         const id = servers[wi]?.id ?? `server${wi}`
@@ -4048,6 +4051,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (w.out.done) SHOP.walking.delete(id)
       } else if (o) {
         w.out = undefined
+        // (still finishing as the others go: the shop waits for them too)
+        if (SHOP.leaving && !ownerServes) SHOP.walking.add(servers[wi]?.id ?? `server${wi}`)
         // (the owner's figure here only while he's out: at his place, Roasting draws him)
         o.visible = !ownerServes || OWNER_OUT.on
         o.position.copy(w.pos)

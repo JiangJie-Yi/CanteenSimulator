@@ -2336,6 +2336,11 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <WcMass x={[WC_IN, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E + WC_T)]} />
       <WcMass x={[X0, D]} y={[h, top]} z={[s * w / 2, s * (w / 2 + WC_T)]} />
       <WcMass x={[X0, D]} y={[0, top]} z={[s * (w / 2 + E + 0.002), s * (w / 2 + E + WC_T)]} />
+      {/* (the doorway's jambs lined inside in dark cedar, a board each side a hand deep into the room up to the lintel: the wall beside the
+          post began bare, its plaster seen nearly edge on as a pale sliver and its wainscot as a dark slot down past the noren (the owner's)) */}
+      {[-1, 1].map((k) => (
+        <mesh key={k} position={[0.045, h / 2, k * (w / 2 - 0.006)]}><boxGeometry args={[0.09, h, 0.012]} /><meshToonMaterial color="#3d2414" /></mesh>
+      ))}
       {/* (the back wall's top capped too, along the washroom and the toilet's room) */}
       <mesh position={[D + 0.012, top + WC_CAP / 2, s * (E + WC_T) / 2]}><boxGeometry args={[0.05, WC_CAP, w + E + 2 * WC_T + 0.024]} /><meshToonMaterial color="#2e1c10" /></mesh>
       {/* (the slatted ceilings, over the washroom and the toilet's room, on the caps) */}
@@ -3248,7 +3253,7 @@ function ToiletHit({ who }: { who: 'm' | 'f' }) {
 }
 /** the door noren's place: its cloth's plane (in front of the panel slid out onto its track, its face at -0.109), its top (up over the
  * head, WC_H to WC_H + 0.07), its rod's height (in front of the head's middle) and the slit between its panels */
-const NOREN_X = -0.118, NOREN_TOP = WC_H + 0.08, NOREN_SLIT = 0.008
+const NOREN_X = -0.138, NOREN_TOP = WC_H + 0.08, NOREN_SLIT = 0.008
 function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
   const door = useWcDoor()

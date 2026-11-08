@@ -1074,6 +1074,9 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       o.rotation.y = yaw
       return
     }
+    // (still out with plates, the coal or the rice (GuestBar3D walks them): home first, what's in hand put down, and only then out; set off
+    // from their place meanwhile, what they carried floated on alone along their way (the owner's ghost plates))
+    if (PLATER_OUT.id === id && !commute.current) { o.visible = false; SHOP.walking.add(id); return }
     // (on their way: from where they are, down off a seat onto the floor, finishing up first, then home or upstairs)
     if (fetcher) { CHEF_TRIP.phase = 'idle'; CHEF_TRIP.keys = []; trip.current = null; o.userData.carry = o.userData.prep = false; FETCHER.busy = false }
     if (!commute.current || commute.current.dir !== 'out') {
