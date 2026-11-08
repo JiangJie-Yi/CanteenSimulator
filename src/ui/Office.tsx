@@ -6,6 +6,7 @@ import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
 import { CANDIDATES, pickHires, ROLLS_PER_DAY } from '@/game/hiring'
+import { DiceIcon, SkillIcon } from './GameIcons'
 import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts'
 import { Avatar } from './Avatar'
 
@@ -125,7 +126,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
             {/* (the dice: the applicants drawn again, twice a day; a new lot comes each day by itself as well) */}
             <button type="button" className="ofc-roll" disabled={rollsLeft <= 0} onClick={onRoll}
               title={t(`重新刷新應徵名單（每天 ${ROLLS_PER_DAY} 次，隔天重置；每天也會自動換一批）`, `応募者を引き直す（1 日 ${ROLLS_PER_DAY} 回、翌日リセット。毎日自動でも入れ替わる）`)}>
-              <span aria-hidden="true">🎲</span>{t('刷新', '引き直し')} {rollsLeft}/{ROLLS_PER_DAY}</button>
+              <DiceIcon />{t('刷新', '引き直し')} {rollsLeft}/{ROLLS_PER_DAY}</button>
           </div>
           {roles.map((r) => {
             const mine = people.filter((w) => w.role === r.role && hired[w.id])
@@ -193,6 +194,6 @@ function Traits({ w, ja }: { w: Worker; ja: boolean }) {
   if (!w.skills?.length) return null
   return <>{w.skills.map((k) => {
     const sk = SKILLS[k], tier = TIERS[sk.tier]
-    return <em key={k} className={`ofc-trait is-${sk.tier}`} title={`${ja ? tier.ja : tier.zh}・${ja ? sk.ja : sk.zh}：${ja ? sk.jaSays : sk.zhSays}`}><i aria-hidden="true">{sk.icon}</i>{ja ? sk.ja : sk.zh}</em>
+    return <em key={k} className={`ofc-trait is-${sk.tier}`} title={`${ja ? tier.ja : tier.zh}・${ja ? sk.ja : sk.zh}：${ja ? sk.jaSays : sk.zhSays}`}><SkillIcon id={k} />{ja ? sk.ja : sk.zh}</em>
   })}</>
 }

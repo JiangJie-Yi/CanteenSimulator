@@ -4,7 +4,8 @@ import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice,
   type Entry, type Part } from '@/data/recipes'
-import { starText } from '@/game/taste'
+import { starsOf } from '@/game/taste'
+import { Stars } from './GameIcons'
 import { idealSteps, recipeSteps, timingTips } from '@/game/research'
 import { menuPrice } from '@/game/economy'
 import type { Notes, Talk, Try } from '@/game/types'
@@ -143,7 +144,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                   <li key={r.key}>
                     <div className="nb-head">
                       <b>{nameOf(r.part)}</b>
-                      <span className="nb-stars">{starText(r.best.taste)}</span>
+                      <span className="nb-stars"><Stars value={starsOf(r.best.taste)} size="1em" /></span>
                       <small>{t(lang, '美味', '美味')} {Math.round(r.best.taste)}</small>
                     </div>
                     <p>{t(lang, '最好：', 'ベスト：')}{describe(r)}・{t(lang, `試了 ${r.tries} 次`, `${r.tries}回`)}・{t(lang, '成本', '原価')} NT${r.cost}</p>

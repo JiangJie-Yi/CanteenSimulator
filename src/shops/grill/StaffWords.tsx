@@ -7,6 +7,7 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { LATE, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED, type StaffWord } from '@/game/shopState'
 import { SKILLS, TIERS, type SkillId } from '@/data/staff'
+import { SkillIcon, StatusIcon } from '@/ui/GameIcons'
 
 const STYLE = { pointerEvents: 'none' } as const
 const Z = [21, 11]
@@ -114,12 +115,12 @@ function TiredBadge({ id, marks }: { id: string; marks: Marks }) {
   const lang = typeof document !== 'undefined' ? document.documentElement.lang : 'zh'
   const tired = () => {
     const [mark, name, says] = TIRED_SAYS[lang] ?? TIRED_SAYS.zh
-    return <span key="tired" className="staff-badge is-tired" title={`${name}：${says}`} aria-label={`${name}：${says}`}><b aria-hidden="true">▼</b>{mark}</span>
+    return <span key="tired" className="staff-badge is-tired" title={`${name}：${says}`} aria-label={`${name}：${says}`}><StatusIcon up={false} />{mark}</span>
   }
   const buff = (k: SkillId) => {
     const sk = SKILLS[k], tier = TIERS[sk.tier]
     const [name, says, q] = lang === 'ja' ? [sk.ja, sk.jaSays, tier.ja] : lang === 'en' ? [sk.en, sk.enSays, tier.en] : [sk.zh, sk.zhSays, tier.zh]
-    return <span key={k} className={`staff-badge is-buff is-${sk.tier}`} title={`${q}・${name}：${says}`} aria-label={`${name}：${says}`}><b aria-hidden="true">▲</b>{sk.icon}</span>
+    return <span key={k} className={`staff-badge is-buff is-${sk.tier}`} title={`${q}・${name}：${says}`} aria-label={`${name}：${says}`}><StatusIcon up /><SkillIcon id={k} size={14} /></span>
   }
   return (
     <group ref={g} visible={false}>

@@ -57,10 +57,11 @@ export const fair = (role: Role, skill: number) =>
  * deep night `late`), how fast they get about (`pace`, and `latePace` in the deep night), how fast they tire (`tire`), and whether the deep
  * night wears them faster (`lateTire` false: not).
  */
+// (each one's picture is ui/GameIcons' SkillIcon: drawn, not a character)
 export type Tier = 'special' | 'elite' | 'rare' | 'legend'
 export type SkillId = 'quick' | 'earlyBird' | 'sturdy' | 'nightOwl' | 'craftsman' | 'ironMan' | 'whirlwind' | 'prodigy'
 export type Skill = {
-  tier: Tier; icon: string; zh: string; ja: string; en: string; zhSays: string; jaSays: string; enSays: string
+  tier: Tier; zh: string; ja: string; en: string; zhSays: string; jaSays: string; enSays: string
   skill?: number; early?: number; late?: number; pace?: number; latePace?: number; tire?: number; lateTire?: boolean
 }
 export const TIERS: Record<Tier, { zh: string; ja: string; en: string }> = {
@@ -68,21 +69,21 @@ export const TIERS: Record<Tier, { zh: string; ja: string; en: string }> = {
   rare: { zh: '稀有', ja: 'レア', en: 'Rare' }, legend: { zh: '極品', ja: '極上', en: 'Legendary' },
 }
 export const SKILLS: Record<SkillId, Skill> = {
-  quick: { tier: 'special', icon: '⚡', zh: '手腳俐落', ja: '手際よし', en: 'Nimble', pace: 1.1,
+  quick: { tier: 'special', zh: '手腳俐落', ja: '手際よし', en: 'Nimble', pace: 1.1,
     zhSays: '動作速度 ×1.1', jaSays: '動きの速さ ×1.1', enSays: 'Moves ×1.1 as fast' },
-  earlyBird: { tier: 'special', icon: '🌅', zh: '早鳥', ja: '朝型', en: 'Early bird', early: 1.1,
+  earlyBird: { tier: 'special', zh: '早鳥', ja: '朝型', en: 'Early bird', early: 1.1,
     zhSays: '午夜前工作效率 ×1.1', jaSays: '深夜前は効率 ×1.1', enSays: 'Before midnight: works ×1.1' },
-  sturdy: { tier: 'special', icon: '💪', zh: '好體力', ja: 'タフ', en: 'Sturdy', tire: 0.85,
+  sturdy: { tier: 'special', zh: '好體力', ja: 'タフ', en: 'Sturdy', tire: 0.85,
     zhSays: '疲勞累積 ×0.85', jaSays: '疲れのたまり方 ×0.85', enSays: 'Tires ×0.85 as fast' },
-  nightOwl: { tier: 'elite', icon: '🦉', zh: '夜貓子', ja: '夜型', en: 'Night owl', late: 1.25, latePace: 1.25, lateTire: false,
+  nightOwl: { tier: 'elite', zh: '夜貓子', ja: '夜型', en: 'Night owl', late: 1.25, latePace: 1.25, lateTire: false,
     zhSays: '深夜工作效率與速度 ×1.25，疲勞不受深夜加劇', jaSays: '深夜は効率・速さ ×1.25、深夜の疲れが増えない', enSays: 'Deep night: works and moves ×1.25, not tired faster by it' },
-  craftsman: { tier: 'elite', icon: '🔪', zh: '職人魂', ja: '職人気質', en: 'Craftsman', skill: 1.15,
+  craftsman: { tier: 'elite', zh: '職人魂', ja: '職人気質', en: 'Craftsman', skill: 1.15,
     zhSays: '工作能力 ×1.15', jaSays: '腕前 ×1.15', enSays: 'Works ×1.15 as well' },
-  ironMan: { tier: 'rare', icon: '🛡', zh: '鐵人', ja: '鉄人', en: 'Iron man', tire: 0.6,
+  ironMan: { tier: 'rare', zh: '鐵人', ja: '鉄人', en: 'Iron man', tire: 0.6,
     zhSays: '疲勞累積 ×0.6', jaSays: '疲れのたまり方 ×0.6', enSays: 'Tires ×0.6 as fast' },
-  whirlwind: { tier: 'rare', icon: '🌪', zh: '疾風', ja: '疾風', en: 'Whirlwind', pace: 1.25,
+  whirlwind: { tier: 'rare', zh: '疾風', ja: '疾風', en: 'Whirlwind', pace: 1.25,
     zhSays: '動作速度 ×1.25', jaSays: '動きの速さ ×1.25', enSays: 'Moves ×1.25 as fast' },
-  prodigy: { tier: 'legend', icon: '👑', zh: '天才', ja: '天才', en: 'Prodigy', skill: 1.3, pace: 1.15, tire: 0.8,
+  prodigy: { tier: 'legend', zh: '天才', ja: '天才', en: 'Prodigy', skill: 1.3, pace: 1.15, tire: 0.8,
     zhSays: '工作能力 ×1.3、動作速度 ×1.15、疲勞累積 ×0.8', jaSays: '腕前 ×1.3・速さ ×1.15・疲れ ×0.8', enSays: 'Works ×1.3, moves ×1.15, tires ×0.8' },
 }
 /** how likely an applicant has a skill of each quality (the rest, about seven in ten, none) */

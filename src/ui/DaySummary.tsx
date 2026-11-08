@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { tl, type Lang } from '@/data/i18n'
 import type { DaySummary as Summary } from '@/game/daySummary'
+import { Stars } from './GameIcons'
 
 /** how long (s, of real time: the game's clock stands still meanwhile) it stays up by itself */
 export const AUTO_S = 10
@@ -56,7 +57,7 @@ export function DaySummary({ s, day, lang, nameOf, onClose }: { s: Summary; day:
           </dl>
           <dl className="day-sum-guests">
             <div><dt>{t('來客', '来客', 'Customers')}</dt><dd>{t(`${s.guests} 位`, `${s.guests} 名`, `${s.guests}`)}{s.walkedOut > 0 && <small>{t(`（${s.walkedOut} 位沒吃就走）`, `（${s.walkedOut} 名が食べずに帰った）`, ` (${s.walkedOut} left without eating)`)}</small>}</dd></div>
-            <div><dt>{t('平均評價', '平均評価', 'Rating')}</dt><dd>{stars === null ? '—' : <><span className="day-sum-stars" aria-hidden="true">{'★'.repeat(Math.round(stars))}{'☆'.repeat(5 - Math.round(stars))}</span> {stars.toFixed(1)}</>}</dd></div>
+            <div><dt>{t('平均評價', '平均評価', 'Rating')}</dt><dd>{stars === null ? '—' : <><span className="day-sum-stars"><Stars value={stars} /></span> {stars.toFixed(1)}</>}</dd></div>
             <div><dt>{t('最暢銷', '一番人気', 'Best seller')}</dt><dd>{s.best ? `${nameOf(s.best.key)} ×${s.best.n}` : '—'}</dd></div>
           </dl>
           <button type="button" className="day-sum-ok" onClick={onClose}>{t('收工', 'お疲れさま', 'Done for the day')}</button>

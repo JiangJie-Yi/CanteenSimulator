@@ -1,5 +1,6 @@
 import { UI, type Lang } from '@/data/i18n'
-import { starText } from '@/game/taste'
+import { starsOf } from '@/game/taste'
+import { Stars } from './GameIcons'
 import { tl } from '@/data/i18n'
 
 type FullnessProps = {
@@ -66,12 +67,12 @@ export function Fullness({ kcal, full, lang, rating, lastTry }: FullnessProps) {
         <span className="heat-word">{fullWord(pct, lang)}</span> {Math.round(kcal)} kcal
         {lastTry ? (
           <span key={lastTry.key} className="fullness-rating fullness-try" title={`美味 ${Math.round(lastTry.taste)}`}>
-            {tl(lang, '試吃', '試食', 'Tasting')} {lastTry.name} {starText(lastTry.taste)}
+            {tl(lang, '試吃', '試食', 'Tasting')} {lastTry.name} <Stars value={starsOf(lastTry.taste)} size="1em" />
             <small> 美味 {Math.round(lastTry.taste)}</small>
           </span>
         ) : rating !== null && (
           <span className="fullness-rating" title={`${UI[lang].rating} ${Math.round(rating)}`}>
-            {UI[lang].rating} {'★'.repeat(stars)}{'☆'.repeat(5 - stars)}
+            {UI[lang].rating} <Stars value={stars} size="1em" />
           </span>
         )}
       </span>

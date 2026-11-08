@@ -13,6 +13,7 @@ import { CAPITAL, SHOP_COST } from '@/game/economy'
 import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
 import { FitLine } from './FitLine'
 import { ReviewerAvatar } from './ReviewerAvatar'
+import { StarIcon } from './GameIcons'
 
 /** what a customer says as they go, a few ways each (the owner's: every one said the same line), picked by who they were and how it went */
 const REMARK: Record<Remark, [string, string, string][]> = {
@@ -88,8 +89,9 @@ const remarkLine = (v: Visit) => {
 function Stars({ v, big = false }: { v: number; big?: boolean }) {
   return (
     <span className={`rep-stars${big ? ' is-big' : ''}`} aria-hidden="true">
-      <span className="rep-stars-base">★★★★★</span>
-      <span className="rep-stars-fill" style={{ width: `${Math.max(0, Math.min(1, v / 5)) * 100}%` }}>★★★★★</span>
+      {/* (drawn stars, ui/GameIcons: no characters (the owner's)) */}
+      <span className="rep-stars-base">{[0, 1, 2, 3, 4].map((i) => <StarIcon key={i} size="1em" />)}</span>
+      <span className="rep-stars-fill" style={{ width: `${Math.max(0, Math.min(1, v / 5)) * 100}%` }}>{[0, 1, 2, 3, 4].map((i) => <StarIcon key={i} size="1em" />)}</span>
     </span>
   )
 }

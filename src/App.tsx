@@ -88,6 +88,7 @@ import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
+import { StarIcon, StatusIcon } from '@/ui/GameIcons'
 import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
@@ -2860,7 +2861,7 @@ export default function App() {
                         <section className="ledger-days">
                           <h4>{tl(lang, '每日結算', '日ごとの締め', 'Day by day')}</h4>
                           <div className="ledger-days-scroll"><table>
-                            <thead><tr><th>{tl(lang, '天', '日', 'Day')}</th><th>{tl(lang, '營業額', '売上', 'Takings')}</th><th>{UI[lang].profit}</th><th>{tl(lang, '來客', '来客', 'Guests')}</th><th>★</th></tr></thead>
+                            <thead><tr><th>{tl(lang, '天', '日', 'Day')}</th><th>{tl(lang, '營業額', '売上', 'Takings')}</th><th>{UI[lang].profit}</th><th>{tl(lang, '來客', '来客', 'Guests')}</th><th aria-label={tl(lang, '星數', '星', 'Stars')}><StarIcon size={12} /></th></tr></thead>
                             <tbody>
                               {[...dayLog].reverse().map((d) => (
                                 <tr key={d.day} title={d.best ? `${tl(lang, '最暢銷', '一番人気', 'Best seller')}：${(() => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === d.best!.key); return e ? nameIn(lang, e) : d.best.key })()} ×${d.best.n}` : undefined}>
@@ -2937,7 +2938,7 @@ export default function App() {
                   </span>
                 )
               })()}
-              <span className="chip-caret">{boardsOpen ? '▲' : '▼'}</span>
+              <span className="chip-caret"><StatusIcon up={boardsOpen} size="0.8em" /></span>
             </button>
           )}
           {/* (the customers' board only on a phone, where the bar is the 2D one; on a computer they're seen at the bar itself) */}

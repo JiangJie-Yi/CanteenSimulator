@@ -7144,7 +7144,7 @@ html[lang='en'] .menu-title-en { display: none; }
   cursor: pointer;
 }
 .ofc-roll:hover:not(:disabled) { background: #5a3d28; }
-.ofc-roll:hover:not(:disabled) span { display: inline-block; animation: ofc-roll-shake 0.4s ease-in-out; }
+.ofc-roll:hover:not(:disabled) .game-icon { animation: ofc-roll-shake 0.4s ease-in-out; }
 .ofc-roll:disabled { opacity: 0.4; cursor: default; }
 @keyframes ofc-roll-shake {
   0%, 100% { transform: rotate(0); }
@@ -7152,7 +7152,7 @@ html[lang='en'] .menu-title-en { display: none; }
   75% { transform: rotate(18deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ofc-roll:hover:not(:disabled) span { animation: none; }
+  .ofc-roll:hover:not(:disabled) .game-icon { animation: none; }
 }
 /* the pantry's header: its name and its ×, as the drinks' stock has them */
 .chiller-head {
@@ -7864,10 +7864,7 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   user-select: none;
   animation: staff-badge-bob 1.8s ease-in-out infinite;
 }
-.staff-badge b {
-  font-size: 9px;
-  color: #ffb4a8;
-}
+.staff-badge .game-icon:first-child { color: #ffb4a8; }
 .staff-badge.is-buff {
   --tier-a: #2f7d3f;
   --tier-b: #1d5129;
@@ -7879,7 +7876,8 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   color: var(--tier-ink);
   animation-direction: reverse;
 }
-.staff-badge.is-buff b { color: #b6ffc8; }
+.staff-badge.is-buff { --icon-cut: var(--tier-b); }
+.staff-badge.is-buff .game-icon:first-child { color: #b6ffc8; }
 @keyframes staff-badge-bob {
   0%, 100% { transform: translateY(0); opacity: 1; }
   50% { transform: translateY(2px); opacity: 0.85; }
@@ -7964,7 +7962,7 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   white-space: nowrap;
   cursor: help;
 }
-.ofc-trait i { font-style: normal; }
+.ofc-trait { --icon-cut: var(--tier-b); }
 :is(.ofc-trait, .staff-badge).is-elite { --tier-a: #2f62b8; --tier-b: #1b3c7e; --tier-ink: #e6efff; --tier-glow: rgb(90 140 255 / 0.5); }
 :is(.ofc-trait, .staff-badge).is-rare { --tier-a: #7e3fb8; --tier-b: #4f2280; --tier-ink: #f3e6ff; --tier-glow: rgb(170 100 255 / 0.5); }
 :is(.ofc-trait, .staff-badge).is-legend { --tier-a: #8f6d22; --tier-b: #574013; --tier-ink: #ffe9a8; --tier-glow: rgb(230 180 60 / 0.6); }
@@ -8017,3 +8015,16 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .ofc-shift button + button { border-left: 1px solid #b9a58a; }
 .ofc-shift button[aria-pressed='true'] { background: #5a3d28; color: #fff; }
 .ofc-shift button:disabled { cursor: default; opacity: 0.6; }
+
+/* the game's own drawn icons (ui/GameIcons; the owner's: no emoji, no special characters): sat on the text's line; a rating's stars in gold */
+.game-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: -0.12em;
+}
+.game-stars {
+  display: inline-flex;
+  gap: 1px;
+  color: #e0a72e;
+  vertical-align: -0.1em;
+}
