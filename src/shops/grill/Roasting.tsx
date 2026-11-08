@@ -126,8 +126,9 @@ const BAR_SEATS = GRILL_SEATS.length
  * set at a customer's place lay 0.65 along the counter from their plate, and that carried on a server's tray beside the tray) */
 const BAR_AT_SCENE = toGrillScene(BAR_AT).sub(FIRE_SHIFT)
 const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
-/** how big food is on the bar, next to the fire's: a skewer about as long as a customer's plate is wide */
-const BAR_FOOD_SCALE = 0.5 * GRILL_SCALE
+/** how big food is on a plate, next to the fire's: a whole fish no longer than the plate is wide (the owner's: at the fire's size, laid
+ * across the plating place, a fish's tail hung off the table's edge, three mushrooms ran off the plate onto the wood) */
+const BAR_FOOD_SCALE = 0.3 * GRILL_SCALE
 /** the chef's plating place (bar.ts's platingOf), on the cook table right beside him: what's grilled is plated there, ready (ORDER_READY), and
  * a server comes into the kitchen to him for it (the owner's: no pass on the bar between them any more); the table's top in the scene, and
  * the way across the table */
@@ -144,11 +145,11 @@ const skewerTrayYaw = Math.atan2(-ALONG.z, ALONG.x)
 const skewerHolderAt = () => new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[1] + CUBBY.along[0]) / 2 - FIRE_SHIFT.dot(ALONG))
   .addScaledVector(LAY, COOK_NOTCH.lay[1] + 0.06 * SKEWER_SCALE).setY(-0.22 * SKEWER_SCALE)
 const PLATING_TOP = PLATING_FRAME.top * GRILL_SCALE + GRILL_OFFSET.y
-const PLATING_ACROSS = PLATING_FRAME.across.clone()
+const PLATING_ALONG = PLATING_FRAME.dir.clone()
 /** where a piece goes at the plating place: side by side in its slot (on the plate laid there, or loose on the table, for a plate already out),
  * three to a row, a full row with another on top; in this one's frame, the fire FIRE_SHIFT along from the bar's (fromBar, below) */
 const readyFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, readyAlong(slot))).sub(FIRE_SHIFT)
-  .addScaledVector(PLATING_FRAME.across, ((row % 3) - 1) * 0.06 * GRILL_SCALE)
+  .addScaledVector(PLATING_FRAME.across, ((row % 3) - 1) * 0.035 * GRILL_SCALE)
   .setY(PLATING_TOP + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + Math.floor(row / 3) * 0.06)
 const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).sub(FIRE_SHIFT).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
@@ -3969,9 +3970,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
     p.container = 'bar'
     p.body = null
-    if (p.loose) flatQ(p, p.toQ, LAY_DIR)
-    // (across the plating place, side by side; on a customer's plate along it)
-    else flatQ(p, p.toQ, SERVICE.servers && bar ? PLATING_ACROSS : STACK_DIR)
+    // (on the plate at the plating place lying along the table, side by side across the plate, in its middle: never across the table's edge;
+    // on a customer's plate along it)
+    if (SERVICE.servers && bar) flatQ(p, p.toQ, PLATING_ALONG)
+    else if (p.loose) flatQ(p, p.toQ, LAY_DIR)
+    else flatQ(p, p.toQ, STACK_DIR)
     p.local.copy(p.toP).sub(containerAt('bar'))
     if (SERVICE.servers && bar) {
       p.via = 'plated'
