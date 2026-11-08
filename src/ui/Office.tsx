@@ -1,12 +1,13 @@
 import { canDismiss } from '@/game/hiring'
 import { createPortal } from 'react-dom'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { useDrag } from './useDrag'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
 import { CANDIDATES, pickHires, ROLLS_PER_DAY } from '@/game/hiring'
-import { DiceIcon, SkillIcon } from './GameIcons'
+import { DiceIcon, Glyph, SkillIcon } from './GameIcons'
+import { setTip } from '@/scene/hoverTip'
 import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts'
 import { Avatar } from './Avatar'
 
@@ -65,6 +66,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
     關閉: 'Close' }
   const t = (zh: string, jp: string) => (ja ? jp : lang === 'en' ? EN[zh] ?? zh : zh)
   const drag = useDrag('office')
+  // (a skill's label taken away with the office, if it was up when it shut)
+  useEffect(() => () => setTip(null), [])
   // (two shifts' worth of every job (game/shifts, the owner's); the wages are the shift on duty's)
   const shiftRoles = roles.map((r) => ({ ...r, max: r.max * 2 }))
   const onToday = (w: Worker) => !!hired[w.id] && worksOn(hired[w.id].shift, today)
@@ -86,34 +89,48 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
       </header>
       {tab === 'book' ? book : tab === 'ledger' ? <div className="ofc-ledger ledger">{ledger}</div> : (
         <div className="ofc-staff">
-          {/* the team as it stands: the owner, then each place to fill */}
-          <div className="ofc-team">
-            <figure className="ofc-slot is-owner">
-              <Avatar id="owner" look={{ female: false, age: 'middle' }} role="owner" size={48} />
-              <figcaption><b>{owner || t('老闆', '店主')}</b><small>{t('大廚（你）', '大将（あなた）')}</small></figcaption>
-            </figure>
-            {roles.flatMap((r) => {
+          {/* the team as it stands, a strip of seats by job (the owner's: the big cards took over half the panel): the owner, then each job's
+              places, a small round face with its shift on it, or a dashed ring where one's open; a face takes you down to that person's card,
+              an open ring hires the best value for the job */}
+          <div className="ofc-roster">
+            <div className="ofc-roster-group">
+              <span className="ofc-roster-role">{t('大廚', '大将')}</span>
+              <span className="ofc-roster-seats">
+                <span className="ofc-seat is-owner" title={`${owner || t('老闆', '店主')}・${t('大廚（你）', '大将（あなた）')}`}>
+                  <Avatar id="owner" look={{ female: false, age: 'middle' }} role="owner" size={38} />
+                </span>
+              </span>
+            </div>
+            {roles.map((r) => {
               const mine = people.filter((x) => x.role === r.role && hired[x.id])
-              // one place for each person the job takes (two on the floor); an open one is filled with a click, by the
-              // applicant who's the best value for their pay; a filled one shows that person below
-              return Array.from({ length: r.max * 2 }, (_, i) => {
-                const w = mine[i]
-                const best = w ? null : pickHires(people.filter((x) => x.role === r.role && !hired[x.id]), [{ role: r.role, max: 1 }], {})[0]
-                return (
-                  <figure key={`${r.role}-${i}`} className={`ofc-slot${w ? '' : ' is-open'}`}>
-                    <button type="button" className="ofc-slot-btn" disabled={!w && !best}
-                      title={w ? (ja ? w.ja : w.zh) : best ? t(`點一下雇用 ${best.zh}（最划算）`, `クリックで${best.ja}を採用`) : ''}
-                      onClick={() => {
-                        if (w) document.getElementById(`ofc-${w.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                        else if (best) onHire(best)
-                      }}>
-                      {w ? <Avatar id={w.id} look={w.look} role={w.role} size={48} /> : <span className="ofc-slot-empty">＋</span>}
-                    </button>
-                    {w && <span className={`ofc-shift-tag is-${hired[w.id].shift ?? 'A'}${onToday(w) ? ' is-on' : ''}`}>{(hired[w.id].shift ?? 'A') === 'both' ? t('全', '通') : hired[w.id].shift ?? 'A'}</span>}
-                    <figcaption><b>{w ? (ja ? w.ja : w.zh) : t('點我徵人', '募集中')}</b><small>{ja ? r.ja : r.zh.split('（')[0]}</small></figcaption>
-                  </figure>
-                )
-              })
+              const best = pickHires(people.filter((x) => x.role === r.role && !hired[x.id]), [{ role: r.role, max: 1 }], {})[0]
+              return (
+                <div key={r.role} className={`ofc-roster-group is-${r.role}`}>
+                  <span className="ofc-roster-role">{ja ? r.ja : r.zh.split('（')[0]}</span>
+                  <span className="ofc-roster-seats">
+                    {Array.from({ length: r.max * 2 }, (_, i) => {
+                      const w = mine[i]
+                      if (w) {
+                        const k = hired[w.id].shift ?? 'A'
+                        return (
+                          <button key={i} type="button" className={`ofc-seat${onToday(w) ? '' : ' is-off'}`} title={ja ? w.ja : w.zh}
+                            onClick={() => document.getElementById(`ofc-${w.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+                            <Avatar id={w.id} look={w.look} role={w.role} size={38} />
+                            <span className={`ofc-shift-tag is-${k}`}>{k === 'both' ? t('全', '通') : k}</span>
+                          </button>
+                        )
+                      }
+                      return (
+                        <button key={i} type="button" className="ofc-seat is-open" disabled={!best} onClick={() => { if (best) onHire(best) }}
+                          title={best ? t(`點一下雇用 ${best.zh}（最划算）`, `クリックで${best.ja}を採用`) : ''}>
+                          <span className="ofc-seat-ring"><Glyph id="plus" size={14} /></span>
+                          <small>{t('空缺', '空き')}</small>
+                        </button>
+                      )
+                    })}
+                  </span>
+                </div>
+              )
             })}
           </div>
           <p className="ofc-today">{t(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`)}</p>
@@ -155,7 +172,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                       title={canDismiss(shopOpen) ? undefined : t('營業中不能解雇，請先閉店', '営業中は解雇できません。先に閉店してください')}>{t('解雇', '解雇')}</button>
                   </div>
                 ))}
-                {mine.length < r.max * 2 && open.map((w) => (
+                {/* (who could fill it, shown when the job's full too (the owner's: they went missing): only not hireable till a place opens) */}
+                {open.map((w) => (
                   <div key={w.id} className="ofc-person">
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
@@ -171,7 +189,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                     </div>
                     <div className="ofc-hire">
                       <b className="money">{money(w.wage)}<small>/h</small></b>
-                      <button type="button" onClick={() => onHire(w)}>{t('雇用', '雇う')}</button>
+                      <button type="button" disabled={mine.length >= r.max * 2} onClick={() => onHire(w)}
+                        title={mine.length >= r.max * 2 ? t('這個職位已經滿了，先解雇一位才能雇用', '枠がいっぱいです') : undefined}>{mine.length >= r.max * 2 ? t('滿員', '満員') : t('雇用', '雇う')}</button>
                     </div>
                   </div>
                 ))}
@@ -189,11 +208,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
 }
 
 /** someone's special skills (data/staff's SKILLS; the owner's), a chip after their name: its icon and name, in its quality's colour (特殊
- * green, 菁英 blue, 稀有 purple, 極品 dark gold); pointed at, the quality and what it does */
+ * green, 菁英 blue, 稀有 purple, 極品 dark gold); pointed at, the quality and what it does, in the shop's paper label */
 function Traits({ w, ja }: { w: Worker; ja: boolean }) {
   if (!w.skills?.length) return null
   return <>{w.skills.map((k) => {
     const sk = SKILLS[k], tier = TIERS[sk.tier]
-    return <em key={k} className={`ofc-trait is-${sk.tier}`} title={`${ja ? tier.ja : tier.zh}・${ja ? sk.ja : sk.zh}：${ja ? sk.jaSays : sk.zhSays}`}><SkillIcon id={k} />{ja ? sk.ja : sk.zh}</em>
+    // (pointed at: the quality and what it does in the shop's own paper label, as everything pointed at in the room says itself (the owner's))
+    const title = `${ja ? tier.ja : tier.zh}・${ja ? sk.ja : sk.zh}`, hint = ja ? sk.jaSays : sk.zhSays
+    return <em key={k} className={`ofc-trait is-${sk.tier}`} aria-label={`${title}：${hint}`}
+      onPointerEnter={() => setTip({ title, hint })} onPointerLeave={() => setTip(null)}><SkillIcon id={k} />{ja ? sk.ja : sk.zh}</em>
   })}</>
 }

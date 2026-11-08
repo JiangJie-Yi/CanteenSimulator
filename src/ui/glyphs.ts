@@ -8,7 +8,7 @@ export type GlyphPart = { d: string; stroke?: number; cut?: boolean; o?: number 
 export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
-  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban'
+  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -18,6 +18,7 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
   menu: [{ d: 'M2.5 4.2h11M2.5 8h11M2.5 11.8h11', stroke: S }],
   close: [{ d: 'M4 4l8 8M12 4l-8 8', stroke: S }],
   minus: [{ d: 'M3.5 8h9', stroke: S }],
+  plus: [{ d: 'M8 3.5v9M3.5 8h9', stroke: S }],
   chevL: [{ d: 'M10 3.2 5.2 8 10 12.8', stroke: S }],
   chevR: [{ d: 'M6 3.2 10.8 8 6 12.8', stroke: S }],
   // (a group shut or open in a list: a small filled wedge)

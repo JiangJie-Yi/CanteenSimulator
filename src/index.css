@@ -4364,50 +4364,75 @@ button {
   color: #c4442f;
 }
 
-/* 人事: the team as places to fill, then who could fill each */
-.ofc-team {
+/* 人事: the team as it stands, a strip of seats by job (the owner's, 2026-11-09: the big cards took over half the panel), then who could fill
+   each; a seat a small round face with its shift on its shoulder (A green, B amber, both gold), a dashed ring where one's open */
+.ofc-roster {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 4px 0 8px;
+  gap: 6px 14px;
+  margin: 10px 14px 4px;
+  padding: 8px 10px;
+  border: 1px solid rgb(59 42 32 / 0.12);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.45);
 }
-
-.ofc-slot {
-  position: relative;
+.ofc-roster-group {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  width: 76px;
-  margin: 0;
-  text-align: center;
+  gap: 3px;
 }
-
-.ofc-slot figcaption b {
-  display: block;
-  font-size: 12px;
-}
-
-.ofc-slot figcaption small {
-  display: block;
-  color: #7a6656;
-  font-size: 10px;
+.ofc-roster-role {
+  padding-left: 6px;
+  border-left: 3px solid var(--role, #a08a5c);
+  color: #6b5442;
+  font-size: 11px;
+  font-weight: 700;
   line-height: 1.2;
+  white-space: nowrap;
 }
-
-.ofc-slot-empty {
+.ofc-roster-group.is-chef { --role: #e8b04a; }
+.ofc-roster-group.is-sous { --role: #d9c27a; }
+.ofc-roster-group.is-server { --role: #5a7a9a; }
+.ofc-roster-group.is-cashier { --role: #7aa070; }
+.ofc-roster-group.is-stock { --role: #a08a5c; }
+.ofc-roster-seats {
+  display: flex;
+  gap: 4px;
+}
+.ofc-seat {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.ofc-seat:not(:disabled):hover { transform: translateY(-1px) scale(1.06); }
+.ofc-seat .avatar { border-radius: 50%; box-shadow: 0 1px 4px rgb(59 42 32 / 0.25); }
+.ofc-seat.is-owner { cursor: default; }
+.ofc-seat.is-owner:hover { transform: none; }
+/* (not on today's shift: the face greyed) */
+.ofc-seat.is-off .avatar { filter: grayscale(0.8); opacity: 0.55; }
+.ofc-seat.is-open { display: flex; flex-direction: column; gap: 1px; width: 40px; height: auto; }
+.ofc-seat-ring {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
   border: 1.5px dashed rgb(59 42 32 / 0.4);
   border-radius: 50%;
-  color: rgb(59 42 32 / 0.45);
-  font-size: 20px;
+  color: rgb(59 42 32 / 0.5);
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
-
-.ofc-slot.is-open figcaption b {
-  color: #c4442f;
-}
+.ofc-seat.is-open small { color: #c4442f; font-size: 10px; line-height: 1.1; white-space: nowrap; }
+.ofc-seat.is-open:not(:disabled):hover .ofc-seat-ring { border-color: #c4442f; color: #c4442f; background: rgb(196 68 47 / 0.08); }
+.ofc-seat:disabled { cursor: default; opacity: 0.5; }
 
 .ofc-wages {
   margin: 0 0 6px;
@@ -4415,10 +4440,17 @@ button {
   font-size: 12px;
 }
 
-.ofc-person,
-.ofc-person.is-hired {
+.ofc-person {
   display: grid;
   grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+/* (one of the staff: in one row, the face and who they are, then their shift, then letting them go at the right end (the owner's: it fell
+   to a line of its own at the left)) */
+.ofc-person.is-hired {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
 }
@@ -4469,7 +4501,7 @@ button {
   font-size: 10px;
 }
 
-.ofc-person .ofc-hire button {
+.ofc-person .ofc-hire button:not(:disabled) {
   background: #c4442f !important;
   color: #fff !important;
 }
@@ -4497,9 +4529,6 @@ button {
     grid-row: 1 / span 2;
   }
 
-  .ofc-slot {
-    width: 62px;
-  }
 }
 
 /* 試做 board: each tag shows what it costs and what's in, and buys ten more */
@@ -4776,22 +4805,6 @@ button {
   color: #f2cf7a;
   font-variant-numeric: tabular-nums;
 }
-.ofc-team {
-  gap: 10px;
-  padding: 12px 14px 4px;
-}
-.ofc-slot {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(59, 42, 32, 0.15);
-  border-radius: 12px;
-  padding: 8px 6px 6px;
-  box-shadow: 0 2px 6px rgba(59, 42, 32, 0.08);
-}
-.ofc-slot.is-open {
-  background: transparent;
-  border-style: dashed;
-  box-shadow: none;
-}
 .ofc-wages {
   margin: 6px 14px 4px;
   padding: 6px 10px;
@@ -4892,19 +4905,34 @@ button {
   color: #fff;
   border-radius: 8px;
 }
-.ofc-person .ofc-hire button:hover {
+.ofc-person .ofc-hire button:not(:disabled):hover {
   background: #a8352a;
 }
-.ofc-fire {
-  border-radius: 8px;
+/* (the job full: who could fill it still shown, their button a quiet 滿員) */
+.ofc-person .ofc-hire button:disabled {
+  border-color: rgb(59 42 32 / 0.2);
+  background: rgb(59 42 32 / 0.08);
+  color: #8a7462;
+  cursor: default;
 }
+.ofc-person .ofc-fire {
+  padding: 4px 10px;
+  border: 1px solid rgb(224 82 82 / 0.4);
+  border-radius: 6px;
+  background: rgb(224 82 82 / 0.08);
+  color: #e05252;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+.ofc-person .ofc-fire:not(:disabled):hover { background: rgb(224 82 82 / 0.16); border-color: rgb(224 82 82 / 0.7); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .office {
     background: linear-gradient(#2b2520, #231d18);
     border-color: rgba(246, 236, 216, 0.15);
   }
   :root:not([data-theme='light']) .ofc-person,
-  :root:not([data-theme='light']) .ofc-slot { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
+  :root:not([data-theme='light']) .ofc-roster { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
   :root:not([data-theme='light']) .ofc-person.is-hired { background: rgba(232, 176, 74, 0.1); }
   :root:not([data-theme='light']) .ofc-stat,
   :root:not([data-theme='light']) .ofc-note { color: #c8b8a4; }
@@ -4916,28 +4944,12 @@ button {
   border-color: rgba(246, 236, 216, 0.15);
 }
 :root[data-theme='dark'] .ofc-person,
-:root[data-theme='dark'] .ofc-slot { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
+:root[data-theme='dark'] .ofc-roster { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
 :root[data-theme='dark'] .ofc-person.is-hired { background: rgba(232, 176, 74, 0.1); }
 :root[data-theme='dark'] .ofc-stat,
 :root[data-theme='dark'] .ofc-note { color: #c8b8a4; }
 :root[data-theme='dark'] .ofc-stat em,
 :root[data-theme='dark'] .ofc-hire b { color: #f6ecd8; }
-/* (the team in one row: the owner and the five jobs) */
-.office .ofc-team {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
-  gap: 6px;
-}
-.office .ofc-slot {
-  width: auto;
-  min-width: 0;
-}
-.office .ofc-slot figcaption small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
 
 /* night: the boards and the office go dark, and everything written on them light */
 @media (prefers-color-scheme: dark) {
@@ -4969,9 +4981,6 @@ button {
   :root:not([data-theme='light']) .office .notebook-empty,
   :root:not([data-theme='light']) .office .ofc-wages {
     color: #c9bfae;
-  }
-  :root:not([data-theme='light']) .office .ofc-slot.is-open figcaption b {
-    color: #ff8f78;
   }
   :root:not([data-theme='light']) .office .nb-sec,
   :root:not([data-theme='light']) .office h4 {
@@ -5037,9 +5046,6 @@ button {
 :root[data-theme='dark'] .office .notebook-empty,
 :root[data-theme='dark'] .office .ofc-wages {
   color: #c9bfae;
-}
-:root[data-theme='dark'] .office .ofc-slot.is-open figcaption b {
-  color: #ff8f78;
 }
 :root[data-theme='dark'] .office .nb-sec,
 :root[data-theme='dark'] .office h4 {
@@ -5235,19 +5241,21 @@ button {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .office .ofc-fire, :root:not([data-theme='light']) .guest-board button:not(.is-on) { color: #3b2a20; }
+  :root:not([data-theme='light']) .guest-board button:not(.is-on) { color: #3b2a20; }
 }
-:root[data-theme='dark'] .office .ofc-fire, :root[data-theme='dark'] .guest-board button:not(.is-on) { color: #3b2a20; }
+:root[data-theme='dark'] .guest-board button:not(.is-on) { color: #3b2a20; }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .office .nb-chat .from-chef b { color: #ff9a80 !important; }
   :root:not([data-theme='light']) .office .nb-chat .from-me { background: #c4442f; color: #fff !important; border: 0; }
-  :root:not([data-theme='light']) .office .ofc-slot.is-open figcaption b { color: #ff8f78 !important; }
+  :root:not([data-theme='light']) .office .ofc-seat.is-open small { color: #ff8f78; }
+  :root:not([data-theme='light']) .office .ofc-roster-role { color: #d8c8b2; }
   :root:not([data-theme='light']) .office .nb-stars { color: #f2b84b !important; }
 }
 :root[data-theme='dark'] .office .nb-chat .from-chef b { color: #ff9a80 !important; }
 :root[data-theme='dark'] .office .nb-chat .from-me { background: #c4442f; color: #fff !important; border: 0; }
-:root[data-theme='dark'] .office .ofc-slot.is-open figcaption b { color: #ff8f78 !important; }
+:root[data-theme='dark'] .office .ofc-seat.is-open small { color: #ff8f78; }
+:root[data-theme='dark'] .office .ofc-roster-role { color: #d8c8b2; }
 :root[data-theme='dark'] .office .nb-stars { color: #f2b84b !important; }
 /* nothing on a tag runs past its edges: the cost and stock as label-over-number, the 缺 tab inside the corner */
 .menu .strip-stock {
@@ -5353,8 +5361,7 @@ button {
   background: linear-gradient(rgb(74 52 38 / 0.82), rgb(54 37 26 / 0.82));
 }
 .ofc-person,
-.ofc-person.is-hired,
-.ofc-slot {
+.ofc-person.is-hired {
   background: rgb(255 255 255 / 0.55);
 }
 @media (prefers-color-scheme: dark) {
@@ -5387,39 +5394,7 @@ button {
   :root:not([data-theme='light']) .office-toggle { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
 }
 :root[data-theme='dark'] .office-toggle { background: rgb(30 36 50 / 0.55); border-color: rgb(246 236 216 / 0.3); }
-.ofc-slot-btn {
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-.ofc-slot.is-open .ofc-slot-btn:hover .ofc-slot-empty {
-  border-color: #c4442f;
-  color: #c4442f;
-  background: rgb(196 68 47 / 0.08);
-}
-.ofc-slot-btn:disabled {
-  cursor: default;
-}
 
-.ofc-slot-btn {
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-.ofc-slot.is-open .ofc-slot-btn:hover .ofc-slot-empty {
-  border-color: #c4442f;
-  color: #c4442f;
-  background: rgb(196 68 47 / 0.08);
-}
-.ofc-slot-btn:disabled {
-  cursor: default;
-}
 .nb-embedded .nb-recipe li {
   margin: 0;
   padding: 0;
@@ -6386,15 +6361,15 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
 }
 
 .ofc-person,
-.ofc-person.is-hired,
-.ofc-slot {
+.ofc-person.is-hired {
   background: rgb(255 255 255 / 0.3);
 }
 
 /* the tag that follows the pointer over a usable thing in the room */
 .hover-tip {
   position: fixed;
-  z-index: 40;
+  /* (over the docked panels too: a skill's chip in the office says itself in it) */
+  z-index: 60;
   left: 0;
   top: 0;
   pointer-events: none;
@@ -7998,33 +7973,35 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 }
 .ofc-shift-tag {
   position: absolute;
-  top: 2px;
-  right: 4px;
-  min-width: 18px;
-  padding: 0 4px;
+  top: -3px;
+  right: -4px;
+  min-width: 16px;
+  padding: 0 3px;
+  border: 1.5px solid #fffaf0;
   border-radius: 9px;
-  background: #2f8a86;
+  background: #3f9a4f;
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
-  line-height: 18px;
+  line-height: 14px;
   text-align: center;
   white-space: nowrap;
 }
-.ofc-shift-tag.is-B { background: #c98a1e; }
-.ofc-shift-tag.is-both { background: #7e3fb8; }
-.ofc-slot:has(.ofc-shift-tag:not(.is-on)) .ofc-slot-btn { filter: grayscale(0.8); opacity: 0.55; }
+.ofc-shift-tag.is-B { background: #e08a2a; }
+.ofc-shift-tag.is-both { background: #c9a227; color: #3b2a10; }
 .ofc-shift {
   display: inline-flex;
   flex: none;
-  margin-right: 6px;
-  border: 1px solid #b9a58a;
-  border-radius: 8px;
-  overflow: hidden;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgb(59 42 32 / 0.18);
+  border-radius: 9px;
+  background: rgb(59 42 32 / 0.07);
 }
 .ofc-shift button {
-  padding: 3px 8px;
+  padding: 3px 9px;
   border: 0;
+  border-radius: 7px;
   background: transparent;
   color: #7a6450;
   font: inherit;
@@ -8033,8 +8010,8 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   white-space: nowrap;
   cursor: pointer;
 }
-.ofc-shift button + button { border-left: 1px solid #b9a58a; }
-.ofc-shift button[aria-pressed='true'] { background: #5a3d28; color: #fff; }
+.ofc-shift button:not(:disabled):not([aria-pressed='true']):hover { background: rgb(255 255 255 / 0.6); }
+.ofc-shift button[aria-pressed='true'] { background: linear-gradient(#b0702e, #7a4a1f); color: #fff6e2; box-shadow: 0 1px 3px rgb(59 42 32 / 0.35); }
 .ofc-shift button:disabled { cursor: default; opacity: 0.6; }
 
 /* the game's own drawn icons (ui/GameIcons; the owner's: no emoji, no special characters): sat on the text's line; a rating's stars in gold */
