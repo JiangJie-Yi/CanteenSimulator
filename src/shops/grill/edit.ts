@@ -121,8 +121,14 @@ const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.05
 /** offsets made defaults by how far they went, whichever way the panel's axes ran when they were set (the way-in switches moved 0.54 along
  * their wall by the owner, then made so) */
 const SETTLED_BY: Record<string, number> = { 'lightswitch-room': 0.54, 'lightswitch-door': 0.54 }
+/** pieces laid out afresh since a browser may have moved them by hand (the rice tub, the miso pot, the rice pot and the cooker put up on the
+ * warming counter, 2026-11-09): what it held for them was from where they stood before, so it's dropped, once (RELAID_KEY marks it done) */
+const RELAID = ['ricetub', 'misopot', 'hagama', 'denkinabe']
+const RELAID_KEY = 'jgs-edit-relaid-1'
+const relaid = (() => { try { return !!localStorage.getItem(RELAID_KEY) } catch { return true } })()
+const dropRelaid = (o: Record<string, V3>) => { if (!relaid) for (const id of RELAID) delete o[id]; return o }
 const loadOffsets = () => {
-  const o = load(KEY)
+  const o = dropRelaid(load(KEY))
   for (const [id, v] of Object.entries(SETTLED)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.002)) delete o[id]
   for (const [id, d] of Object.entries(SETTLED_BY)) if (o[id] && Math.abs(Math.hypot(...o[id]) - d) < 0.01 && Math.abs(o[id][1]) < 0.002) delete o[id]
   return o
@@ -132,15 +138,22 @@ const SETTLED_R: Record<string, V3> = { fishlantern: [0, -90, 0] }
 /** and sizes made defaults (a Movable's baseScale) since they were set by hand: the fish lantern 1.3 times as big (the owner's) */
 const SETTLED_S: Record<string, V3> = { fishlantern: [1.3, 1.3, 1.3] }
 const loadScales = () => {
-  const o = load(KEY_S)
+  const o = dropRelaid(load(KEY_S))
   for (const [id, v] of Object.entries(SETTLED_S)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.01)) delete o[id]
   return o
 }
 const loadRotations = () => {
-  const o = load(KEY_R)
+  const o = dropRelaid(load(KEY_R))
   for (const [id, v] of Object.entries(SETTLED_R)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.5)) delete o[id]
   return o
 }
+// (written back at once, so the next load doesn't find them again)
+if (!relaid) try {
+  localStorage.setItem(KEY, JSON.stringify(dropRelaid(load(KEY))))
+  localStorage.setItem(KEY_R, JSON.stringify(dropRelaid(load(KEY_R))))
+  localStorage.setItem(KEY_S, JSON.stringify(dropRelaid(load(KEY_S))))
+  localStorage.setItem(RELAID_KEY, '1')
+} catch { /* private window */ }
 let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
   pivots: load(KEY_P), pivotMode: false, space: 'local', wire: false }
 const subs = new Set<() => void>()
