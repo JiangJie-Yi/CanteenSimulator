@@ -667,7 +667,8 @@ export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_
 export const TAKEOUT = { orders: [] as TakeoutOrder[] }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __takeout: TAKEOUT })
 /** the takeaway box's place on the table, in the scene's frame (ALONG, LAY) */
-export const TAKEOUT_SPOT = { along: PLATING_SPOT.along + readyAlong(1), lay: PLATING_SPOT.lay }
+// (beside the ready plate along the table, toward the fire, clear of it: a plate's half-width and the box's, and a little between)
+export const TAKEOUT_SPOT = { along: PLATING_SPOT.along - 0.46, lay: PLATING_SPOT.lay }
 /** the same, in the bar's frame (for the server who comes for it): where it stands and where they stand to take it */
 export const takeoutOf = () => {
   const top = sceneToBar(0, 0, 0).y

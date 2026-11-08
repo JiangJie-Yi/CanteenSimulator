@@ -147,7 +147,9 @@ const skewerTrayYaw = Math.atan2(-ALONG.z, ALONG.x)
 const skewerHolderAt = () => new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[1] + CUBBY.along[0]) / 2 - FIRE_SHIFT.dot(ALONG))
   .addScaledVector(LAY, COOK_NOTCH.lay[1] + 0.06 * SKEWER_SCALE).setY(-0.22 * SKEWER_SCALE)
 const PLATING_TOP = PLATING_FRAME.top * GRILL_SCALE + GRILL_OFFSET.y
-const PLATING_ALONG = PLATING_FRAME.dir.clone()
+/** the way back across the table at the plating place (bar.ts's platingOf `dir`): a plated piece lies so, its length toward the table's back
+ * (the plating place is near the table's end: lying along the table, a fish ran off it) */
+const PLATING_DIR = PLATING_FRAME.dir.clone()
 /** where a piece goes at the plating place: side by side in its slot (on the plate laid there, or loose on the table, for a plate already out),
  * three to a row, a full row with another on top; in this one's frame, the fire FIRE_SHIFT along from the bar's (fromBar, below) */
 const readyFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, readyAlong(slot))).sub(FIRE_SHIFT)
@@ -2679,7 +2681,8 @@ function SideDishImpl({ position, container }: { position: [number, number, numb
  * The takeaway box (game/takeout; the owner's): at the plating place's second slot while an order's being packed, open, a kraft card tray its
  * food is laid in; all of it in, its lid on and a red seal across it; gone as a server takes it out to the till. One draw for each part.
  */
-const BOX_W = 0.34, BOX_D = 0.2, BOX_H = 0.07
+// (a bento's size: a fish at the plate's size lies in it, its length across the table, three side by side along it)
+const BOX_W = 0.4, BOX_D = 0.26, BOX_H = 0.07
 const KRAFT = new THREE.MeshToonMaterial({ color: '#b8875a' })
 const KRAFT_IN = new THREE.MeshToonMaterial({ color: '#9c6f45' })
 const SEAL = new THREE.MeshToonMaterial({ color: '#b3241c' })
@@ -3745,7 +3748,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'trash') return new THREE.Vector3(...(roast.trash ?? [0, 0, 0])).add(nudge('trash'))
     if (kind === 'rawdish') return atHome('rawdish', new THREE.Vector3(...(roast.rawDish?.at ?? [0, 0, 0])))
     if (kind === 'bowl') return bowlAt()
-    if (kind === 'takeout') return new THREE.Vector3().addScaledVector(ALONG, TAKEOUT_SPOT.along).addScaledVector(LAY, TAKEOUT_SPOT.lay)
+    // (the plating place's frame is the room's: in the fire's own, FIRE_SHIFT back, as the plates there are (readyFoodAt); without it the box
+    // stood off the table's corner, half over the floor, what was packed into it hanging out over the bin (the owner's "brown block"))
+    if (kind === 'takeout') return new THREE.Vector3().addScaledVector(ALONG, TAKEOUT_SPOT.along).addScaledVector(LAY, TAKEOUT_SPOT.lay).sub(FIRE_SHIFT)
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   /** where the fan hangs: from its peg past the ledge's left end, its paper's middle below it (Decor turns it to face the cook) */
@@ -3964,8 +3969,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const row = pieces.current.filter((q) => q !== p && q.guest === owner.id && q.container === 'takeout' && !q.eaten).length
       p.container = 'takeout'
       p.body = null
-      p.toP.copy(containerAt('takeout')).addScaledVector(LAY_DIR, (row % 3 - 1) * 0.05).add(new THREE.Vector3(0, 0.06 + Math.floor(row / 3) * 0.04, 0))
-      flatQ(p, p.toQ, STACK_DIR)
+      // (lying the box's long way, across the table, side by side along it; at the plate's size (BAR_FOOD_SCALE): at the fire's, a fish
+      // lay out over the box's sides and the tasting bowl beside it)
+      p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, (row % 3 - 1) * 0.075).add(new THREE.Vector3(0, 0.05 + Math.floor(row / 3) * 0.035, 0))
+      flatQ(p, p.toQ, LAY)
       p.local.copy(p.toP).sub(containerAt('takeout'))
       return
     }
@@ -3976,9 +3983,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
     p.container = 'bar'
     p.body = null
-    // (on the plate at the plating place lying along the table, side by side across the plate, in its middle: never across the table's edge;
-    // on a customer's plate along it)
-    if (SERVICE.servers && bar) flatQ(p, p.toQ, PLATING_ALONG)
+    // (on the plate at the plating place lying back across the table, side by side, in its middle: never over the table's end; on a
+    // customer's plate along it)
+    if (SERVICE.servers && bar) flatQ(p, p.toQ, PLATING_DIR)
     else if (p.loose) flatQ(p, p.toQ, LAY_DIR)
     else flatQ(p, p.toQ, STACK_DIR)
     p.local.copy(p.toP).sub(containerAt('bar'))
@@ -6527,7 +6534,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       // served at the bar it comes down to the size of the customers and their plates (the fire is drawn big, to
       // cook on; the bar is in the people's own scale), shrinking as it's carried over
-      if (p.container === 'bar' && p.collected) shrink *= p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1))
+      if ((p.container === 'bar' || p.container === 'takeout') && p.collected) shrink *= p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1))
       if (p.eaten || waiting(p) || inFridge.has(p)) shrink = 0.0001
       const bounce = bounces.current.get(p)
       if (bounce !== undefined) shrink *= 1 + BOUNCE * Math.sin(Math.PI * bounce)
