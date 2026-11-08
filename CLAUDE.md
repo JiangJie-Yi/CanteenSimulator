@@ -148,6 +148,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 - **加一道食材**：在 `data/menu.ts` 的店家 `items` 加一筆；成本比例加在 `game/economy.ts` 的 `COST_SHARE`；燒烤類要在 `game/taste.ts` 的 `PAIRING` 加上調味搭配（調味的最佳時機在 `TIMING`）；有特別菜名的話加在 `data/recipes.ts`（`SPECIAL` / `BREAD`）。燒烤的 3D 模型由 `blender/grilledfish.py` 產生。
 - **調整價格或成本**：`game/economy.ts`（`costOf`、`COST_SHARE`、`CAPITAL`、`SHOP_COST`）和 `data/recipes.ts` 的 `suggestPrice`、`SEASON_COST`。開店後手上是 NT$200,000（店主定的：資本 `CAPITAL` 30 萬 − 開業費用 `SHOP_COST` 10 萬；BDD `pricing`）。
 - **開店門檻和菜單上限**：`data/recipes.ts` 的 `MENU_MIN`、`MENU_MAX`。
+- **應徵者**（店主要的，2026-11-08）：名字、數值、技能都隨機；**價碼照數值走**（`game/hiring.ts` 的 `wageOf`：手藝 0.6、速度 0.2、體力 0.2 的分數照各職位的行情 `fair`，上下 3%；以前有一成五的人便宜三成、一成貴三到四成，跟能力無關），**技能純憑運氣、不影響價碼**；**名單每天更新**（遊戲時鐘換日時 `refreshApplicants`：雇用的人留下、其他人換一批新的，編號不重複，App 的 `newDay`）；**每天 2 次骰子**（`ROLLS_PER_DAY`；經營頁人事成本那一列「一鍵徵人」旁的「🎲 刷新 2/2」，用完變灰，隔天回到 2/2；`rolls` 跟著 3D 中斷的接回存）；BDD `staff`；檢查 `tests/e2e/_dice.mjs`（在 git 外）。重新整理開新局時清掉上一局的每日結算（`jgs-days-1`）。
 - **員工編制**：`data/staff.ts` 的 `ROLES`（二廚、三廚、外場 ×2、收銀、倉儲）。倉儲自動補貨的規則在 `game/economy.ts` 的 `restockOrder`。應徵者每局隨機產生（`game/hiring.ts`），每個職位的人數是 `APPLICANTS`（店主說師傅與員工太少：以前二廚 4 位、其他各 3 位；現在二廚（掌爐的師傅）8、三廚 6、外場 8、收銀 5、倉儲 5，每個職位至少是名額的 4 倍，BDD `staff`），姓名、背景、個性的詞庫在 `data/people.ts`（一起加了烤魚店各職位的經歷、日文名字、自我介紹，人多了也不太重複）。
 - **加一間店**：`data/menu.ts` 加一個 Dish，`src/shops/<新店>/` 放它的 3D，`App.tsx` 的 Scene 掛上去，`data/staff.ts`、`data/recipes.ts` 補上它的資料，並在 `tests/architecture.test.ts` 的 `ALLOWED` 加上新資料夾。
 

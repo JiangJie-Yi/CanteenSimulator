@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { LATE_TIRE, ROLES, SKILLS, TIER_ODDS, TIRED_AT, effective, fair, paceBoost, paceOf, restPerHour, tireNow, tirePerHour, type SkillId, type Worker } from '@/data/staff'
-import { canDismiss, canHire, makeCandidates, pickHires, seeded, skillDraw, valueOf } from '@/game/hiring'
+import { CANDIDATES, ROLLS_PER_DAY, canDismiss, canHire, makeCandidates, pickHires, refreshApplicants, seeded, skillDraw, valueOf, wageOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
   scenario('營業中不能解雇員工，閉店後才可以', ({ given, when, then, and }) => {
@@ -66,6 +66,35 @@ feature('員工與徵人', () => {
     then('大多數人沒有技能', (w) => { expect(w.n.none / 20000).toBeGreaterThan(0.6) })
     and('特殊 > 菁英 > 稀有 > 極品', (w) => { expect(w.n.special).toBeGreaterThan(w.n.elite); expect(w.n.elite).toBeGreaterThan(w.n.rare); expect(w.n.rare).toBeGreaterThan(w.n.legend); expect(w.n.legend).toBeGreaterThan(0) })
     and('跟設定的機率差不多', (w) => { for (const t of ['special', 'elite', 'rare', 'legend'] as const) expect(Math.abs(w.n[t] / 20000 - TIER_ODDS[t])).toBeLessThan(0.01) })
+  })
+
+  scenario('價碼照數值走：數值越高越貴，技能純憑運氣不影響價碼', ({ then, and }) => {
+    then('同一個職位，手藝、速度、體力越高，價碼越高', () => {
+      expect(wageOf('chef', { skill: 85, speed: 70, stamina: 70 })).toBeGreaterThan(wageOf('chef', { skill: 60, speed: 70, stamina: 70 }))
+      expect(wageOf('server', { skill: 70, speed: 90, stamina: 90 })).toBeGreaterThan(wageOf('server', { skill: 70, speed: 60, stamina: 60 }))
+    })
+    and('一整批應徵者：數值分數高的那一半，平均價碼比低的那一半貴', () => {
+      const ws = makeCandidates('grilledfish', seeded(11)).filter((w) => w.role === 'server').sort((a, b) => (a.skill + a.speed + a.stamina) - (b.skill + b.speed + b.stamina))
+      const avg = (xs: Worker[]) => xs.reduce((n, w) => n + w.wage, 0) / xs.length
+      expect(avg(ws.slice(ws.length / 2))).toBeGreaterThan(avg(ws.slice(0, ws.length / 2)))
+    })
+    and('價碼只看數值，有沒有技能都一樣', () => {
+      const r = seeded(3), ws = makeCandidates('grilledfish', r)
+      for (const w of ws) expect(Math.abs(w.wage - wageOf(w.role, w))).toBeLessThanOrEqual(wageOf(w.role, w) * 0.03 + 5)
+    })
+  })
+
+  scenario(`應徵名單每天更新，另外每天有 ${ROLLS_PER_DAY} 次骰子可以重新刷新`, ({ given, when, then, and }) => {
+    given('一份應徵名單，雇了其中一位', (w) => { w.before = [...CANDIDATES.grilledfish]; w.kept = w.before[0].id })
+    when('換一批', (w) => { refreshApplicants('grilledfish', (id) => id === w.kept, 'd2', seeded(5)); w.after = CANDIDATES.grilledfish })
+    then('雇用的人還在', (w) => { expect(w.after.some((x: Worker) => x.id === w.kept)).toBe(true) })
+    and('其他人都換成新的，編號不重複', (w) => {
+      const old = new Set(w.before.map((x: Worker) => x.id))
+      const fresh = w.after.filter((x: Worker) => x.id !== w.kept)
+      expect(fresh.every((x: Worker) => !old.has(x.id))).toBe(true)
+      expect(new Set(w.after.map((x: Worker) => x.id)).size).toBe(w.after.length)
+    })
+    and('每天兩次骰子', () => { expect(ROLLS_PER_DAY).toBe(2) })
   })
 
   scenario('應徵的人夠多可以挑：每個職位至少是名額的 4 倍，掌爐的師傅（二廚）至少 8 位', ({ given, then, and }) => {

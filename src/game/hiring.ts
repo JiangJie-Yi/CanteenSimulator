@@ -83,7 +83,18 @@ function noteOf(rand: Rand, shop: string, role: Role, age: Look['age'], w: { ski
 }
 
 /** everyone who comes to be hired at a shop */
-export function makeCandidates(shop: string, rand: Rand = Math.random, taken = new Set<string>()): Worker[] {
+/**
+ * What someone asks an hour (the owner's: the better they are, the dearer): from their skill most, their speed and their stamina, each
+ * job's going rate (data/staff's fair) for that, within a few per cent either way (`jitter`). Their special skills don't come into it: those
+ * are luck.
+ */
+export const statScore = (w: { skill: number; speed: number; stamina: number }) => 0.6 * w.skill + 0.2 * w.speed + 0.2 * w.stamina
+export const wageOf = (role: Role, w: { skill: number; speed: number; stamina: number }, jitter = 1) =>
+  Math.round((fair(role, statScore(w)) * jitter) / 5) * 5
+/** how many times a day the applicants can be drawn again by hand (the dice, the owner's), on top of the new lot each day brings */
+export const ROLLS_PER_DAY = 2
+
+export function makeCandidates(shop: string, rand: Rand = Math.random, taken = new Set<string>(), prefix = `${shop}-`): Worker[] {
   const out: Worker[] = []
   for (const role of Object.keys(APPLICANTS) as Role[]) {
     const off = Math.floor(rand() * 3)
@@ -96,11 +107,11 @@ export function makeCandidates(shop: string, rand: Rand = Math.random, taken = n
       taken.add(name.zh)
       const s = STATS[age]
       const stats = { skill: between(rand, s.skill), speed: between(rand, s.speed), stamina: between(rand, s.stamina) }
-      const r = rand()
-      const adj = r < 0.15 ? 0.7 + rand() * 0.1 : r < 0.25 ? 1.25 + rand() * 0.15 : 0.92 + rand() * 0.16
+      // (their pay by what they're worth, give or take three per cent: no more bargains and no more chancers (the owner's))
+      const adj = 0.97 + rand() * 0.06
       out.push({
-        id: `${shop}-${out.length}`, look: { female, age }, ...name, role, ...stats,
-        wage: Math.round((fair(role, stats.skill) * adj) / 5) * 5, note: noteOf(rand, shop, role, age, stats, adj),
+        id: `${prefix}${out.length}`, look: { female, age }, ...name, role, ...stats,
+        wage: wageOf(role, stats, adj), note: noteOf(rand, shop, role, age, stats, adj),
         years: between(rand, YEARS[age]),
         intro: `${pick(rand, INTRO.why[age])}，${pick(rand, INTRO.likes)}，${pick(rand, INTRO.when)}。`,
         // (now and then a special skill (the owner's), of a quality: drawn last, after all else, so the rest of each is as it was)
@@ -111,7 +122,17 @@ export function makeCandidates(shop: string, rand: Rand = Math.random, taken = n
   return out
 }
 
-/** this game's applicants at every shop (made once, when the page loads: a new game, a new lot) */
+/**
+ * A new lot of applicants at a shop (each day's, and the dice's): those taken on (`keep`) stay, everyone else goes and as many new come in,
+ * named apart from those kept; `tag` marks the lot (their ids are its own, never one of before)
+ */
+export function refreshApplicants(shop: string, keep: (id: string) => boolean, tag: string, rand: Rand = Math.random) {
+  const kept = (CANDIDATES[shop] ?? []).filter((w) => keep(w.id))
+  const taken = new Set(kept.map((w) => w.zh))
+  CANDIDATES[shop] = [...kept, ...makeCandidates(shop, rand, taken, `${shop}-${tag}-`)]
+}
+
+/** this game's applicants at every shop (made once, when the page loads: a new game, a new lot; a new lot each day after, refreshApplicants) */
 export const CANDIDATES: Record<string, Worker[]> = (() => {
   const taken = new Set<string>()
   return Object.fromEntries(DISHES.map((d) => d.id).map((shop) => [shop, makeCandidates(shop, Math.random, taken)]))

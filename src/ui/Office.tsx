@@ -5,7 +5,7 @@ import { useDrag } from './useDrag'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
-import { CANDIDATES, pickHires } from '@/game/hiring'
+import { CANDIDATES, pickHires, ROLLS_PER_DAY } from '@/game/hiring'
 import { Avatar } from './Avatar'
 
 /** the office's tabs: the kitchen's notebook, the staff, the books */
@@ -17,6 +17,9 @@ type Props = {
   cash: number
   hired: Record<string, { fatigue: number }>
   onHire: (w: Worker) => void
+  /** the dice: how many draws of the applicants again by hand are left today, and drawing one (the owner's) */
+  rollsLeft: number
+  onRoll: () => void
   onFire: (w: Worker) => void
   /** the shop's open: no one can be let go until it's shut */
   shopOpen?: boolean
@@ -46,7 +49,7 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * two cooks, someone on the floor and at the till — each filled with a face, or open, with the people who could
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
-export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false }: Props) {
+export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -109,6 +112,10 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
             <button type="button" className="ofc-hireall" disabled={!pickHires(people, roles, hired).length}
               onClick={() => { for (const w of pickHires(people, roles, hired)) onHire(w) }}
               title={t('每個空缺各雇一位最划算的人', '空いている枠に一番お得な人を雇う')}>{t('一鍵徵人', 'おまかせ採用')}</button>
+            {/* (the dice: the applicants drawn again, twice a day; a new lot comes each day by itself as well) */}
+            <button type="button" className="ofc-roll" disabled={rollsLeft <= 0} onClick={onRoll}
+              title={t(`重新刷新應徵名單（每天 ${ROLLS_PER_DAY} 次，隔天重置；每天也會自動換一批）`, `応募者を引き直す（1 日 ${ROLLS_PER_DAY} 回、翌日リセット。毎日自動でも入れ替わる）`)}>
+              <span aria-hidden="true">🎲</span>{t('刷新', '引き直し')} {rollsLeft}/{ROLLS_PER_DAY}</button>
           </div>
           {roles.map((r) => {
             const mine = people.filter((w) => w.role === r.role && hired[w.id])

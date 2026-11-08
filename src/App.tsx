@@ -74,7 +74,7 @@ import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
 import { effective, isTired, restPerHour, ROLES, tireNow, type Role, type SkillId } from '@/data/staff'
 import { hoursEnd, hoursText, inHours, isLate } from '@/game/hours'
-import { CANDIDATES, pickHires } from '@/game/hiring'
+import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY } from '@/game/hiring'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
 import { Welcome } from '@/ui/Welcome'
@@ -115,7 +115,7 @@ type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number;
   lots?: Record<string, Lot[]>
   /** (kept across a lost 3D view only) the menus put out, the game's clock (the day and the time of day), the language, and the people who'd
    * applied for the jobs (made at random each visit: the staff taken on are some of them) */
-  menuBy?: Record<string, Entry[]>; clock?: Clock; lang?: Lang; candidates?: typeof CANDIDATES }
+  menuBy?: Record<string, Entry[]>; clock?: Clock; lang?: Lang; candidates?: typeof CANDIDATES; rolls?: { day: number; left: number } }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff). The one exception is a page
 // brought back because its 3D view was lost (game/resume): it goes on from where it was, once.
 // (Any save left by an older version is cleared.)
@@ -135,6 +135,8 @@ const SAVED: Saved | null = (() => {
   } catch {
     // storage blocked
   }
+  // (a fresh game (not one brought back): the last game's days gone from the books)
+  if (!back) try { localStorage.removeItem('jgs-days-1') } catch { /* (storage blocked) */ }
   // (the same applicants as before, so the staff taken on are still among them)
   if (back?.candidates) for (const [shop, ws] of Object.entries(back.candidates)) CANDIDATES[shop] = ws
   // (and the clock as it was: the same day, the same time of day)
@@ -1281,6 +1283,8 @@ export default function App() {
   const [closing, setClosing] = useState(false)
   const [leaving, setLeaving] = useState(false)
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
+  /** a new day by the game's clock: the applicants' new lot, the dice back */
+  const newDay = useRef<(day: number) => void>(() => {})
   /** the hours over: shut up as by hand (the button's way: no auto-run reopening it till they come round again) */
   const hoursOver = useRef<() => void>(() => {})
   hoursOver.current = () => {
@@ -1349,6 +1353,25 @@ export default function App() {
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
   // the staff hired at each shop (by worker id) and how tired each is
   const [hired, setHired] = useState<Record<string, Record<string, { fatigue: number }>>>(() => SAVED?.hired ?? {})
+  const hiredNow = useRef(hired)
+  hiredNow.current = hired
+  // the applicants: a new lot each day (the game's clock turning a day: game/hiring's refreshApplicants, those taken on staying), and the
+  // dice: ROLLS_PER_DAY draws again by hand a day (the owner's); `ver` redraws the office's list as it changes
+  const [rolls, setRolls] = useState(() => SAVED?.rolls ?? { day: getClock().day, left: ROLLS_PER_DAY })
+  const [, setApplicantsVer] = useState(0)
+  const newApplicants = (tag: string) => {
+    for (const shop of Object.keys(CANDIDATES)) refreshApplicants(shop, (id) => !!hiredNow.current[shop]?.[id], tag)
+    setApplicantsVer((v) => v + 1)
+  }
+  const rollApplicants = () => {
+    if (rolls.left <= 0) return
+    newApplicants(`d${rolls.day}r${ROLLS_PER_DAY - rolls.left + 1}`)
+    setRolls((r) => ({ ...r, left: r.left - 1 }))
+  }
+  newDay.current = (day) => {
+    newApplicants(`d${day}`)
+    setRolls({ day, left: ROLLS_PER_DAY })
+  }
   // (in development, `__giveSkill('grilledfish-3', 'nightOwl')`: someone given a skill, to see what it does without waiting for luck)
   if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __giveSkill: (id: string, k: SkillId) => { for (const ws of Object.values(CANDIDATES)) for (const w of ws) if (w.id === id) w.skills = [k] } })
   // (in development, `__fatigue(80)`: every one hired that worn, to see them worn out without a night's work)
@@ -1958,7 +1981,7 @@ export default function App() {
   langRef.current = lang
   // (what's kept if the 3D view is lost: read from here the moment it happens)
   const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh, lots }))
-  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, lots, menuBy, clock: getClock(), lang, candidates: CANDIDATES })
+  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, lots, menuBy, clock: getClock(), lang, candidates: CANDIDATES, rolls })
   const lostTimer = useRef(0)
   // (brought back after it was lost: said so, once)
   useEffect(() => {
@@ -2237,7 +2260,10 @@ export default function App() {
       // (the game's clock: a minute of the game's for each second (the owner's), sped up with the game; only its face redraws, and the page
       // at dusk, at dawn and at midnight)
       const was = getClock().minute
+      const dayWas = getClock().day
       advanceClock(GAME_SPEED.value)
+      // (a new day: a new lot of applicants, and the dice back to two (the owner's))
+      if (getClock().day !== dayWas) newDay.current(getClock().day)
       // (the deep night, past midnight till the sky lightens (game/hours): the staff tire faster, a different crowd comes in, the night
       // owls at their best)
       LATE.on = isLate(getClock().minute)
@@ -2848,6 +2874,7 @@ export default function App() {
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}
+            rollsLeft={rolls.left} onRoll={rollApplicants}
             onHire={(w) => setHired((h) => ({ ...h, [dish.id]: { ...(h[dish.id] ?? {}), [w.id]: { fatigue: 0 } } }))}
             shopOpen={ai}
             onFire={(w) => setHired((h) => {

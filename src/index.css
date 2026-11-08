@@ -7124,6 +7124,35 @@ html[lang='en'] .menu-title-en { display: none; }
 }
 .ofc-hireall:hover:not(:disabled) { background: #a8352a; }
 .ofc-hireall:disabled { opacity: 0.4; cursor: default; }
+/* (the dice: the applicants drawn again, two a day (the owner's); dark wood, the count left after it) */
+.ofc-roll {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1.5px solid #5a3d28;
+  border-radius: 8px;
+  background: #6b4a30;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ofc-roll:hover:not(:disabled) { background: #5a3d28; }
+.ofc-roll:hover:not(:disabled) span { display: inline-block; animation: ofc-roll-shake 0.4s ease-in-out; }
+.ofc-roll:disabled { opacity: 0.4; cursor: default; }
+@keyframes ofc-roll-shake {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-18deg); }
+  75% { transform: rotate(18deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ofc-roll:hover:not(:disabled) span { animation: none; }
+}
 /* the pantry's header: its name and its ×, as the drinks' stock has them */
 .chiller-head {
   display: flex;
