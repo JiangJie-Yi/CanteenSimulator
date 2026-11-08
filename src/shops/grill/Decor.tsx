@@ -40,7 +40,8 @@ export const DECOR = {
   // (the cooked rice the rice balls are made from: a shop's big tub, on a side table of its own just past the cook's
   // table's right-hand end, by the other cooks)
   // (moved up toward the back and in toward the table, by its back corner, as the owner drew: the miso soup's pot where it stood)
-  rice: { at: [2.167, -2.607], r: 1.1 },
+  // (on the warming counter now, its first well (WARMER, below): along 3.12, back 1.2 toward the bar)
+  rice: { at: [1.819, -2.813], r: 1.1 },
 } satisfies Record<string, Spot>
 
 /** what's being carried from here: a stick of charcoal or the fan, where it is (Roasting sets it), and how far the
@@ -486,12 +487,13 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
  * steaming white rice, the wooden paddle (しゃもじ) stood in it, its lid leant against its side.
  */
 /** the tub as drawn below, made this much bigger (a shop's おひつ, wider than two plates, and deep) */
-const RICE_SCALE = 2.0
+// (0.8 of the 2.0 it was on its own stand: in a row on the warming counter with the rest)
+const RICE_SCALE = 1.6
 /** the side table it stands on: its top's height (the cook's table's top is the scene's y = 0), and its size */
 const SIDE_TOP = -0.3
 /**
  * The rice the rice balls are shaped from (おひつ): a big round tub of pale sawara bound with copper hoops, heaped with
- * steaming white rice, the wooden paddle (しゃもじ) stood in it, on a stand of its own (飯台, blender/ricestand.py), and its lid (the rice
+ * steaming white rice, the wooden paddle (しゃもじ) stood in it, on the warming counter (Warmer: it stood on a stand of its own), and its lid (the rice
  * bowls are kept in the dish cabinet with the rest).
  */
 /** the rice tub's model (blender/ricetub.py) cut into its body, its lid (lifted off) and the rice with its paddle (shown with the lid off),
@@ -529,33 +531,8 @@ function useRiceTub() {
 }
 useGLTF.preload(RICETUB_URL)
 
-const RICESTAND_URL = import.meta.env.BASE_URL + 'models/ricestand.glb'
-useGLTF.preload(RICESTAND_URL)
-/** a stand of the rice tub's (blender/ricestand.py), in the room's toon light, inked and drawn a few parts at a time */
-function useStand() {
-  const standGltf = useGLTF(RICESTAND_URL) as unknown as { scene: THREE.Group }
-  return useMemo(() => {
-    const r = standGltf.scene.clone(true)
-    const made = new Map<THREE.Material, THREE.Material>()
-    r.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      let t = made.get(src)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); made.set(src, t) }
-      m.material = t
-      m.castShadow = true
-      m.receiveShadow = true
-    })
-    inkModel(r, () => false, { width: 0.0016, weld: true })
-    plainColours(r)
-    mergeByMaterial(r)
-    return r
-  }, [standGltf])
-}
 function RiceTub() {
   const tub = useRiceTub()
-  const stand = useStand()
   const [x, z] = DECOR.rice.at
   // (the lid: on the tub, or lifted off and leant against its side; click the tub to lift it or put it back. Open, the rice shows,
   // steaming, with its paddle in it)
@@ -569,12 +546,9 @@ function RiceTub() {
     lid.current.position.set(-0.32 * k, 0.42 - 0.1585 * k + Math.sin(k * Math.PI) * 0.22, 0)
     lid.current.rotation.z = k * 1.36
   })
-  const floor = GRILL_OFFSET.y - KITCHEN_DROP
   return (
     <group position={[x, 0, z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
-      {/* the stand (blender/ricestand.py): a hinoki top in a raised walnut border, tapered legs splayed a little, walnut aprons with a
-          cloud-shaped arch cut from them, a shelf of bamboo slats low down; drawn its own height from the floor up to the top */}
-      <primitive object={stand} position-y={floor} scale={[1, (SIDE_TOP - floor) / 1.08, 1]} />
+      {/* (on the warming counter's first well (Warmer): its top is the stand's was, SIDE_TOP) */}
       {/* (the tub's middle at its rim: the cooked rice goes in here) */}
       <group name="ricetub-mid" position-y={SIDE_TOP + 0.5} />
       <group position-y={SIDE_TOP} scale={RICE_SCALE}
@@ -900,13 +874,13 @@ useGLTF.preload(KNIVES_URL)
 const MISOPOT_URL = import.meta.env.BASE_URL + 'models/misopot.glb'
 useGLTF.preload(MISOPOT_URL)
 // (beside the rice tub, on its far side from the cook table, in a row with it (the owner's: it stood behind the tub, where the crew stand))
-const MISO_AT = { along: 4.49, lay: -0.83 }
-const MISO_SCALE = 1.3
-const MISO_TOP = -0.45
+// (on the warming counter's second well (WARMER): it stood on a little stand of its own)
+const MISO_AT = { along: 4.07, lay: -1.2 }
+const MISO_SCALE = 1.05
+const MISO_TOP = -0.3
 function MisoPot() {
   useStudio()
   const gltf = useGLTF(MISOPOT_URL) as unknown as { scene: THREE.Group }
-  const stand = useStand()
   const pot = useMemo(() => {
     const r = gltf.scene.getObjectByName('MisoPot')!.clone(true)
     r.position.set(0, 0, 0)
@@ -934,12 +908,9 @@ function MisoPot() {
     plainColours(r)
     return mergeByMaterial(r)
   }, [gltf])
-  const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, MISO_AT.along).addScaledVector(LAY, MISO_AT.lay)
-  const s = stand.clone()
   return (
     <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} name="miso-pot">
-      <primitive object={s} position-y={floor} scale={[0.6, (MISO_TOP - floor) / 1.08, 0.6]} />
       {/* (nothing to do with it: named when pointed at, no glow, no pointing hand (bar.ts's nameOver)) */}
       <group position-y={MISO_TOP} scale={MISO_SCALE} {...nameOver('味噌湯鍋', '一直保溫著的味噌湯（豆腐、海帶芽、蔥）')}>
         <primitive object={pot} />
@@ -956,8 +927,9 @@ function MisoPot() {
  */
 const HAGAMA_URL = import.meta.env.BASE_URL + 'models/hagama.glb'
 useGLTF.preload(HAGAMA_URL)
-const HAGAMA_AT = { along: 4.3, lay: 0.35 }
-const HAGAMA_SCALE = 1.3
+// (on the warming counter's third well (WARMER), smaller: it stood on the floor, in the middle of the kitchen's way)
+const HAGAMA_AT = { along: 4.745, lay: -1.2 }
+const HAGAMA_SCALE = 0.6
 const GLOW_OFF = new THREE.Color('#2a1a12')
 function Hagama() {
   const gltf = useGLTF(HAGAMA_URL) as unknown as { scene: THREE.Group }
@@ -981,10 +953,9 @@ function Hagama() {
     mergeByMaterial(r)
     return { root: r }
   }, [gltf])
-  const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, HAGAMA_AT.along).addScaledVector(LAY, HAGAMA_AT.lay)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={HAGAMA_SCALE} {...nameOver('羽釜與爐灶', '老式的炊飯爐灶（現在用電鍋煮飯）')}>
+    <group position={[p.x, SIDE_TOP, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={HAGAMA_SCALE} {...nameOver('羽釜與爐灶', '老式的炊飯爐灶（現在用電鍋煮飯）')}>
       <primitive object={model.root} />
     </group>
   )
@@ -998,13 +969,13 @@ function Hagama() {
  */
 const DENKI_URL = import.meta.env.BASE_URL + 'models/denkinabe.glb'
 useGLTF.preload(DENKI_URL)
-const DENKI_AT = { along: 5.05, lay: 0.3 }
-const DENKI_SCALE = 1.3
-const DENKI_TOP = -0.45
+// (on the warming counter's last well (WARMER): it stood on a little stand of its own)
+const DENKI_AT = { along: 5.3, lay: -1.2 }
+const DENKI_SCALE = 1.1
+const DENKI_TOP = -0.3
 const LAMP_OFF = new THREE.Color('#3a1a14'), LAMP_COOK = new THREE.Color('#ff3a20'), LAMP_WARM = new THREE.Color('#ffb030')
 function DenkiNabe() {
   const gltf = useGLTF(DENKI_URL) as unknown as { scene: THREE.Group }
-  const stand = useStand()
   const model = useMemo(() => {
     const r = gltf.scene.getObjectByName('DenkiNabe')!.clone(true)
     r.position.set(0, 0, 0)
@@ -1049,11 +1020,9 @@ function DenkiNabe() {
   })
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, DENKI_AT.along).addScaledVector(LAY, DENKI_AT.lay)
-  const s = stand.clone()
   const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? '飯煮好了（保溫中），等著盛進飯桶' : `空著（飯桶裡還有 ${RICE.tub} 份飯）`)
   return (
     <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)}>
-      <primitive object={s} position-y={floor} scale={[0.55, (DENKI_TOP - floor) / 1.08, 0.55]} />
       <group position-y={DENKI_TOP} scale={DENKI_SCALE}
         onPointerOver={(e) => { e.stopPropagation(); setTip({ title: '電鍋', hint: say() }) }}
         onPointerOut={() => setTip(null)}>
@@ -1064,8 +1033,62 @@ function DenkiNabe() {
         {/* (where the rice goes in and comes out) */}
         <group name="cooker-top" position={[0, 0.3, 0]} />
       </group>
-      {/* (where whoever's cooking it stands, before it) */}
-      <group name="cooker-front" position={[0, floor, 0.62]} />
+      {/* (where whoever's cooking it stands, before it: a step out from the counter's front (the owner's: 0.35 from its edge)) */}
+      <group name="cooker-front" position={[0, floor, WARMER_D / 2 + 0.35]} />
+    </group>
+  )
+}
+/**
+ * The warming counter (blender/warmer.py; the owner's, 2026-11-09): the rice tub, the miso soup, the old rice pot on its stove and the
+ * electric cooker in a row on one counter along the bar's side of the kitchen, each over a warming well, where they'd each stood on a stand of
+ * their own about the middle of the floor; the floor between is the crew's way. A burnt-cedar body with stainless sliding doors, a brushed
+ * stainless top, along its front a knob, a thermometer and a pilot lamp for each well. Never moves: drawn by material, a few draws.
+ */
+const WARMER_URL = import.meta.env.BASE_URL + 'models/warmer.glb'
+useGLTF.preload(WARMER_URL)
+/** its middle (along, back from the table's line) and its depth, as blender/warmer.py has it (its length 3.0, its wells at -0.98, -0.03,
+ * 0.645, 1.2 along it: the tub, the soup, the rice pot, the cooker, above) */
+const WARMER_AT = { along: 4.1, lay: -1.2 }
+const WARMER_D = 1.0
+function Warmer() {
+  useStudio()
+  const gltf = useGLTF(WARMER_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('Warmer') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        // (the stainless real metal, the studio in it; the wells' warm glow and the pilot lamps lit; the rest in the room's toon light)
+        if (src.name === 'WarmerSteel' || src.name === 'WarmerWell' || src.name === 'WarmerBrass') {
+          const g = new THREE.MeshStandardMaterial({ color: src.name === 'WarmerSteel' ? '#ffffff' : src.color.clone(), map: src.map ?? null,
+            metalness: 0.7, roughness: src.name === 'WarmerSteel' ? 0.25 : 0.35, envMapIntensity: 0.9 })
+          reflectStudio(g)
+          t = g
+        } else if (src.name === 'WarmerGlow') t = new THREE.MeshBasicMaterial({ color: '#8a3418' })
+        else if (src.name === 'WarmerLamp') t = new THREE.MeshBasicMaterial({ color: '#ff7a3a', toneMapped: false })
+        else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        t.name = src.name
+        made.set(src, t)
+      }
+      m.material = t
+      m.castShadow = src.name === 'WarmerWood' || src.name === 'WarmerSteel' || src.name === 'WarmerDark'
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => m.name !== 'WarmerBody', { width: 0.0016, weld: true })
+    plainColours(r)
+    mergeByMaterial(r)
+    return r
+  }, [gltf])
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, WARMER_AT.along).addScaledVector(LAY, WARMER_AT.lay)
+  return (
+    <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} {...nameOver('保溫餐檯', '飯桶、味噌湯、羽釜與電鍋都放在加熱座上保溫')}>
+      <primitive object={model} />
     </group>
   )
 }
@@ -1076,6 +1099,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="fan" label="團扇"><Fan held={held} at={fanAt} /></Movable>
       <HeldStick held={held} />
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
+      <Movable id="warmer" label="保溫餐檯"><Warmer /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="hagama" label="羽釜與爐灶"><Hagama /></Movable>
