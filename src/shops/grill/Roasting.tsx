@@ -153,8 +153,11 @@ const PLATING_DIR = PLATING_FRAME.dir.clone()
 /** where a piece goes at the plating place: side by side in its slot (on the plate laid there, or loose on the table, for a plate already out),
  * three to a row, a full row with another on top; in this one's frame, the fire FIRE_SHIFT along from the bar's (fromBar, below) */
 const readyFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, readyAlong(slot))).sub(FIRE_SHIFT)
-  .addScaledVector(PLATING_FRAME.across, ((row % 3) - 1) * 0.035 * GRILL_SCALE)
+  .addScaledVector(PLATING_FRAME.across, sideOf(row) * 0.035 * GRILL_SCALE)
   .setY(PLATING_TOP + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + Math.floor(row / 3) * 0.06)
+/** where the n-th piece put on a plate lies across it: the first in the middle, the next to one side of it, the third to the other (the owner
+ * saw a dish alone on its plate lying by the rim: they were laid left, middle, right) */
+const sideOf = (row: number) => [0, -1, 1][row % 3]
 const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).sub(FIRE_SHIFT).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 /**
@@ -3008,6 +3011,8 @@ type Piece = {
    * the one and after the other (the raw food from the fridge has none: the owner's) */
   skewerAt?: number
   pullAt?: number
+  /** (on a plate) where it was last sat down on its face (its container and place there): measured again only when it's moved */
+  sitAt?: string
   id: string
   copy: number
   loose: boolean
@@ -3973,7 +3978,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.body = null
       // (lying the box's long way, across the table, side by side along it; at the plate's size (BAR_FOOD_SCALE): at the fire's, a fish
       // lay out over the box's sides and the tasting bowl beside it)
-      p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, (row % 3 - 1) * 0.075).add(new THREE.Vector3(0, 0.05 + Math.floor(row / 3) * 0.035, 0))
+      p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, sideOf(row) * 0.075).add(new THREE.Vector3(0, 0.05 + Math.floor(row / 3) * 0.035, 0))
       flatQ(p, p.toQ, LAY)
       p.local.copy(p.toP).sub(containerAt('takeout'))
       return
@@ -3982,7 +3987,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.guest = owner.id
     p.seat = seat
     const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === seat && present(q) && !q.eaten).length
-    p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
+    p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, sideOf(row) * 0.05 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
     p.container = 'bar'
     p.body = null
     // (on the plate at the plating place lying back across the table, side by side, in its middle: never over the table's end; on a
@@ -6417,7 +6422,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === p.seat && !q.via && present(q) && !q.eaten).length
             p.fromP.copy(p.node.position)
             p.fromQ.copy(p.node.quaternion)
-            p.toP.copy(barSeat(p.seat)).addScaledVector(GRILL_SEATS[p.seat].along, ((row % 3) - 1) * 0.07 * GRILL_SCALE)
+            p.toP.copy(barSeat(p.seat)).addScaledVector(GRILL_SEATS[p.seat].along, sideOf(row) * 0.05 * GRILL_SCALE)
               .add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
             // (its spot is kept as where it is from the bar (the frame below puts it there each frame): moved to the plate, or it went back to
             // the plating place every frame, and lay there, on the plating place, while its customer's plate went out empty (the owner saw two skewers
@@ -6464,6 +6469,20 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.position.lerpVectors(p.fromP, p.toP, e)
           p.node.position.y += Math.sin(p.flight * Math.PI) * 0.45   // a little arc through the air
           p.node.quaternion.slerpQuaternions(p.fromQ, p.toQ, e)
+          // (landed on a plate (or in a takeaway's box): its own underside put on the plate's face, measured once there, so a thick fish
+          // doesn't sink through it and a thin slice doesn't hover over it (they were all set at one height: the owner saw both))
+          if (p.flight >= 1 && (p.container === 'bar' || p.container === 'takeout') && p.node.parent) {
+            const at = `${p.container}|${p.local.x.toFixed(3)}|${p.local.z.toFixed(3)}`
+            if (p.sitAt !== at) {
+              p.node.updateWorldMatrix(true, true)
+              const low = p.node.parent.worldToLocal(new THREE.Box3().setFromObject(p.node).min).y
+              const face = p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
+              p.local.y += face + 0.003 - low
+              p.toP.copy(containerAt(p.container)).add(p.local)
+              p.node.position.copy(p.toP)
+              p.sitAt = `${p.container}|${p.local.x.toFixed(3)}|${p.local.z.toFixed(3)}`
+            }
+          }
           if (p.flight >= 1 && inBasket(p)) {
             // let go above the basket: size the ball from the potato's two shorter axes
             const s = [p.node.scale.x, p.node.scale.y, p.node.scale.z].sort((x, y) => x - y)
