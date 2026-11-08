@@ -56,19 +56,24 @@ export const IndoorHDRI = memo(function IndoorHDRI({ intensity = 0.5, night = fa
   // of its own that it keeps for good, and its two shader programs with it)
   const baked = useMemo(() => new Map<THREE.Texture, { frames: number; tex: THREE.Texture | null }>(), [])
   // (the shop's scene lit by the one for the time of day, once it's there: a photograph is still loading a moment)
+  // (both blurred as soon as they're there, the night's too while it's still day, by the one generator: made at the first nightfall, its two
+  // shader programs were built then, and the game stopped a moment as night came on)
   useFrame(() => {
-    const from = night ? sinks.night : sinks.day
-    const raw = from.environment
-    if (!raw) return
-    let b = baked.get(raw)
-    if (!b) baked.set(raw, (b = { frames: 0, tex: null }))
-    // (a few frames on: the made-up room is drawn into its cube on its first)
-    if (!b.tex) {
-      if (++b.frames < 3) return
-      const pm = new THREE.PMREMGenerator(gl)
+    let pm: THREE.PMREMGenerator | null = null
+    for (const s of [sinks.day, sinks.night]) {
+      const raw = s.environment
+      if (!raw) continue
+      let b = baked.get(raw)
+      if (!b) baked.set(raw, (b = { frames: 0, tex: null }))
+      // (a few frames on: the made-up room is drawn into its cube on its first)
+      if (b.tex || ++b.frames < 3) continue
+      pm ??= new THREE.PMREMGenerator(gl)
       b.tex = ((raw as THREE.CubeTexture).isCubeTexture ? pm.fromCubemap(raw as THREE.CubeTexture) : pm.fromEquirectangular(raw)).texture
-      pm.dispose()
     }
+    pm?.dispose()
+    const from = night ? sinks.night : sinks.day
+    const b = from.environment ? baked.get(from.environment) : undefined
+    if (!b?.tex) return
     if (scene.environment !== b.tex) scene.environment = b.tex
     if (scene.environmentIntensity !== from.environmentIntensity) scene.environmentIntensity = from.environmentIntensity
   })

@@ -4366,7 +4366,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               <FolkFigure id={v.id} eating={false} walking still={() => visitors.current.get(v.id)?.phase === 'wait'} clock={clock}
                 fade={() => visitors.current.get(v.id)?.fade ?? 1} fit={FOLK_FIT} held={v.has ? <TakeoutBag /> : undefined} />
             </Suspense>
-            {v.rider && <RiderGear size={folkSpec(v.id).size} />}
+            {v.rider && <RiderGear size={folkSpec(v.id).size} fade={() => visitors.current.get(v.id)?.fade ?? 1} />}
           </group>
         </group>
       ))}
@@ -4385,10 +4385,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
  */
 const TO_KRAFT = new THREE.MeshToonMaterial({ color: '#b8875a' })
 const TO_SEAL = new THREE.MeshToonMaterial({ color: '#b3241c' })
-const TO_BAG = new THREE.MeshToonMaterial({ color: '#c9a274' })
-const HELMET = new THREE.MeshToonMaterial({ color: '#2a2d33' })
-const DELIVERY = new THREE.MeshToonMaterial({ color: '#e0a21c' })
-const DELIVERY_DARK = new THREE.MeshToonMaterial({ color: '#3a3a3e' })
+/** what goes out of the door with a customer, fading with them: hashed from the start (as the figures' own materials, so a fade only moves
+ * its opacity, no program made then: the bag in a hand was switched to hashed by the figure's fade as they went, a 100 ms hitch the first
+ * time), its own copy for each customer (the fade sets the opacity: shared, one fading out faded every other bag), the hashed program made at
+ * loading (warmLater) */
+const fading = (color: string) => { const m = new THREE.MeshToonMaterial({ color, alphaHash: true }); m.userData.hashed = true; return m }
+const TO_LOOKS = { bag: '#c9a274', seal: '#b3241c', helmet: '#2a2d33', band: '#e0a21c', dark: '#3a3a3e' }
+const ownLooks = () => Object.fromEntries(Object.entries(TO_LOOKS).map(([k, c]) => [k, fading(c)])) as Record<keyof typeof TO_LOOKS, THREE.MeshToonMaterial>
+if (typeof document !== 'undefined') {
+  const warm = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), fading('#ffffff'))
+  warmLater(warm)
+}
+function useOwnLooks() {
+  const mats = useMemo(ownLooks, [])
+  useEffect(() => () => { for (const m of Object.values(mats)) m.dispose() }, [mats])
+  return mats
+}
 const TakeoutBox = memo(function TakeoutBox() {
   return (
     <group position-y={0.02}>
@@ -4397,26 +4409,31 @@ const TakeoutBox = memo(function TakeoutBox() {
     </group>
   )
 })
-const TakeoutBag = memo(function TakeoutBag() {
+/** (in the figure's hand: its fade reaches these, as it does everything it holds) */
+function TakeoutBag() {
+  const m = useOwnLooks()
   return (
     <group position-y={-0.1}>
-      <mesh position-y={-0.02} material={TO_BAG}><boxGeometry args={[0.13, 0.12, 0.07]} /></mesh>
-      <mesh position-y={0.045} rotation-x={Math.PI / 2} material={TO_BAG}><torusGeometry args={[0.03, 0.006, 4, 10, Math.PI]} /></mesh>
-      <mesh position={[0, -0.02, 0.036]} material={TO_SEAL}><boxGeometry args={[0.02, 0.12, 0.002]} /></mesh>
+      <mesh position-y={-0.02} material={m.bag}><boxGeometry args={[0.13, 0.12, 0.07]} /></mesh>
+      <mesh position-y={0.045} rotation-x={Math.PI / 2} material={m.bag}><torusGeometry args={[0.03, 0.006, 4, 10, Math.PI]} /></mesh>
+      <mesh position={[0, -0.02, 0.036]} material={m.seal}><boxGeometry args={[0.02, 0.12, 0.002]} /></mesh>
     </group>
   )
-})
-function RiderGear({ size }: { size: number }) {
+}
+/** (beside the figure, not in it: faded here with them) */
+function RiderGear({ size, fade }: { size: number; fade: () => number }) {
   // (blender/folk.py's measure: the head a ball of 0.27 about 0.8 up, the body 0.26 round at its widest; all as the figure's scaled)
   const k = FOLK_FIT * size
+  const m = useOwnLooks()
+  useFrame(() => { const f = fade(); for (const x of Object.values(m)) x.opacity = f })
   return (
     <group scale={k}>
       {/* (the helmet over the crown of the head, clear of the hair, down to the brow; a band round its rim) */}
-      <mesh position-y={0.8} material={HELMET}><sphereGeometry args={[0.34, 16, 6, 0, Math.PI * 2, 0, Math.PI * 0.4]} /></mesh>
-      <mesh position-y={0.8 + 0.34 * Math.cos(Math.PI * 0.4) - 0.01} material={DELIVERY}><cylinderGeometry args={[0.326, 0.328, 0.035, 16, 1, true]} /></mesh>
+      <mesh position-y={0.8} material={m.helmet}><sphereGeometry args={[0.34, 16, 6, 0, Math.PI * 2, 0, Math.PI * 0.4]} /></mesh>
+      <mesh position-y={0.8 + 0.34 * Math.cos(Math.PI * 0.4) - 0.01} material={m.band}><cylinderGeometry args={[0.326, 0.328, 0.035, 16, 1, true]} /></mesh>
       {/* (the insulated box of a delivery on their back) */}
-      <mesh position={[0, 0.36, -0.42]} material={DELIVERY}><boxGeometry args={[0.46, 0.44, 0.3]} /></mesh>
-      <mesh position={[0, 0.36, -0.572]} material={DELIVERY_DARK}><boxGeometry args={[0.28, 0.1, 0.004]} /></mesh>
+      <mesh position={[0, 0.36, -0.42]} material={m.band}><boxGeometry args={[0.46, 0.44, 0.3]} /></mesh>
+      <mesh position={[0, 0.36, -0.572]} material={m.dark}><boxGeometry args={[0.28, 0.1, 0.004]} /></mesh>
     </group>
   )
 }

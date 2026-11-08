@@ -763,6 +763,36 @@ function drawRoundPaper(g: CanvasRenderingContext2D, sky: Sky) {
  * three greens; `night`: moonlit silhouettes, a cool light down one edge), so each culm, branch and leaf outside is where its shadow falls
  * (the owner's: the view open matching the shadows shut)
  */
+/**
+ * A layer to draw something blurred on sharp, laid on the picture after with one blur (the owner's freeze at every turn of the day: a canvas
+ * filter set before many fills blurs each fill on its own, and these canvases are drawn on the CPU (scene/canvasKeep): the round window's
+ * leaves, culms, far windows and clouds, a thousand blurs, took the page 4 to 5 s at each change of sky, the whole game stopped). A layer for
+ * each size of canvas, cleared and given the picture's transform as it's taken.
+ */
+const BLUR_LAYERS = new Map<string, CanvasRenderingContext2D>()
+function blurLayer(g: CanvasRenderingContext2D) {
+  const { width: w, height: h } = g.canvas
+  let l = BLUR_LAYERS.get(`${w}x${h}`)
+  if (!l) {
+    const c = document.createElement('canvas')
+    c.width = w; c.height = h
+    l = c.getContext('2d')!
+    BLUR_LAYERS.set(`${w}x${h}`, l)
+  }
+  l.setTransform(1, 0, 0, 1, 0, 0)
+  l.globalAlpha = 1; l.filter = 'none'; l.globalCompositeOperation = 'source-over'
+  l.clearRect(0, 0, w, h)
+  l.setTransform(g.getTransform())
+  return l
+}
+/** the layer laid on the picture, blurred `px` (in the picture's own pixels, as the filters were), in whatever clip the picture has */
+function layBlurred(g: CanvasRenderingContext2D, l: CanvasRenderingContext2D, px: number) {
+  g.save()
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.filter = px > 0 ? `blur(${px}px)` : 'none'
+  g.drawImage(l.canvas, 0, 0)
+  g.restore()
+}
 /** `part`: only the two further culms ('back'), only the two near ones and the sprays ('front'), or all of it; drawn the same whichever */
 function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'night', shade = '6,10,24', part: 'all' | 'back' | 'front' = 'all') {
   const rnd = seeded(5)
@@ -788,11 +818,14 @@ function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'nigh
     }
   }
   const culm = (x: number, w: number, lean: number, blur: number, alpha: number, far: boolean) => {
+    // (the shadows soft as the moon throws them; the bamboo itself crisp, the two further off a touch out of focus: drawn sharp on a layer,
+    // blurred once as it's laid on)
+    const soft = shadow ? blur : far ? 0.8 : 0
+    const pic = g, unseen = (far && part === 'front') || (!far && part === 'back')
+    if (soft) g = blurLayer(pic)
     g.save()
     // (the part not drawn still drawn, unseen: the same random runs through, so each part is as it is in the whole)
-    if ((far && part === 'front') || (!far && part === 'back')) g.globalAlpha = 0
-    // (the shadows soft as the moon throws them; the bamboo itself crisp, the two further off a touch out of focus)
-    g.filter = shadow ? `blur(${blur}px)` : far ? 'blur(0.8px)' : 'none'
+    if (unseen) g.globalAlpha = 0
     const ink = shadow ? `rgba(${shade},${alpha})` : look === 'day' ? '#4a5e22' : '#141e18'
     g.fillStyle = ink
     g.strokeStyle = ink
@@ -832,21 +865,23 @@ function bambooGrove(g: CanvasRenderingContext2D, look: 'shadow' | 'day' | 'nigh
       }
     }
     g.restore()
+    if (soft) { const l = g; g = pic; if (!unseen) layBlurred(g, l, soft) }
   }
   culm(146, 11, 0.05, 2.4, 0.26, true)
   culm(214, 8, -0.035, 2.6, 0.22, true)
   culm(366, 17, 0.03, 0.9, 0.46, false)
   culm(434, 12, -0.06, 1.1, 0.4, false)
   // (sprays hanging in from above, out of the frame)
+  const pic = g
+  if (shadow) g = blurLayer(pic)
   g.save()
-  g.filter = shadow ? 'blur(1.4px)' : 'none'
   if (part === 'back') g.globalAlpha = 0
   g.fillStyle = `rgba(${shade},0.34)`
   for (const [x, y, side] of [[290, -8, 1], [120, 4, -1], [470, 20, -1]] as [number, number, number][]) {
     g.save(); g.translate(x, y); g.rotate(Math.PI * 0.08 * side); spray(5, side, 46); g.restore()
   }
   g.restore()
-  g.filter = 'none'
+  if (shadow) { const l = g; g = pic; if (part !== 'back') layBlurred(g, l, 1.4) }
 }
 const ROUND_PAPER = (() => {
   if (typeof document === 'undefined') return null
@@ -958,7 +993,9 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
       }
     }
     // (long thin clouds lit from below: gold and rose at dusk, pink at dawn)
-    g.filter = 'blur(5px)'
+    // (drawn sharp on a layer, blurred once as it's laid on: blurLayer)
+    const pic = g
+    g = blurLayer(pic)
     for (const [cx, cy, w] of [[-3.5, 3.0, 3.2], [2.8, 4.4, 3.6], [0.2, 2.4, 2.2], [5.2, 2.9, 2.6], [-6, 4.8, 3.0]]) {
       g.fillStyle = sky === 'dusk' ? 'rgba(255,200,145,0.7)' : 'rgba(255,212,222,0.75)'
       for (let k = 0; k < 6; k++) {
@@ -968,7 +1005,7 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
       g.fillStyle = sky === 'dusk' ? 'rgba(138,104,122,0.42)' : 'rgba(190,170,210,0.4)'
       g.fillRect(X(cx - w * 0.5), Y(cy + 0.02), S(w), S(0.1))
     }
-    g.filter = 'none'
+    { const l = g; g = pic; layBlurred(g, l, 5) }
     return
   }
   if (night) { grd.addColorStop(0, '#070d22'); grd.addColorStop(0.42, '#14214a'); grd.addColorStop(0.5, '#3a3550'); grd.addColorStop(0.53, '#6a4a48'); grd.addColorStop(1, '#1a1a26') }
@@ -994,7 +1031,8 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
     for (const [dx, dy, r] of [[-0.25, -0.1, 0.22], [0.2, 0.25, 0.15], [0.05, -0.35, 0.12]]) { g.beginPath(); g.arc(mx + dx * mr, my + dy * mr, r * mr, 0, Math.PI * 2); g.fill() }
   } else {
     // (a few clouds: soft heaps of white, flat below, drifting high)
-    g.filter = 'blur(6px)'
+    const pic = g
+    g = blurLayer(pic)
     for (const [cx, cy, w] of [[-3.5, 3.2, 2.4], [2.6, 4.6, 3.0], [0.4, 2.2, 1.6], [5.5, 2.6, 2.0], [-6, 5.2, 2.6]]) {
       g.fillStyle = 'rgba(255,255,255,0.85)'
       for (let k = 0; k < 7; k++) {
@@ -1004,7 +1042,7 @@ function drawViewSky(g: CanvasRenderingContext2D, size: number, sky: Sky) {
       g.fillStyle = 'rgba(205,220,240,0.6)'
       g.fillRect(X(cx - w * 0.55), Y(cy - 0.05), S(w * 1.1), S(0.18))
     }
-    g.filter = 'none'
+    { const l = g; g = pic; layBlurred(g, l, 6) }
   }
 }
 function drawViewFar(g: CanvasRenderingContext2D, size: number, sky: Sky) {
@@ -1014,7 +1052,9 @@ function drawViewFar(g: CanvasRenderingContext2D, size: number, sky: Sky) {
   const rnd = seeded(37)
   // (far off, the haze of the distance: their colour gone toward the sky's)
   const body = night ? '#121a30' : '#8aa3c2', edge = night ? '#0c1222' : '#7d97b8'
-  g.filter = 'blur(0.8px)'
+  // (a touch out of focus: drawn sharp on a layer, blurred once as it's laid on (blurLayer))
+  const pic = g
+  g = blurLayer(pic)
   // (the radio tower: a lattice tapering up, two decks, its top a mast; red and white by day, lit warm by night)
   const tx = -0.9
   const tower = (x: number, y: number) => [X(tx + x), Y(y)] as const
@@ -1058,7 +1098,7 @@ function drawViewFar(g: CanvasRenderingContext2D, size: number, sky: Sky) {
     if (night && h > 0.9) { g.fillStyle = '#ff3a2a'; g.beginPath(); g.arc(X(x + w / 2), Y(y0 + h + 0.02), Math.max(1.5, S(0.016)), 0, Math.PI * 2); g.fill() }
     x += w + (rnd() < 0.25 ? 0.05 + rnd() * 0.15 : 0)
   }
-  g.filter = 'none'
+  { const l = g; g = pic; layBlurred(g, l, 0.8) }
   // (the haze at their feet, the street's lights by night)
   const haze = g.createLinearGradient(0, Y(-0.2), 0, Y(-0.8))
   haze.addColorStop(0, night ? 'rgba(90,60,70,0)' : 'rgba(210,225,240,0)')
