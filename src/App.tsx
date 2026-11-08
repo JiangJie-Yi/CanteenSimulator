@@ -45,7 +45,7 @@ import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
 import { SHOP, SPEAKERS, STAFF_TALK } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
-import { CLOSE_DORM, CLOSE_HOME, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
+import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
 import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
@@ -2295,20 +2295,27 @@ export default function App() {
       setAi(false)
       return
     }
-    if (sellable(d)) return
-    const seated = (guestsBy[d.id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')
-    if (seated) return
-    setAi(false)
+    if (sellable(d) || closing) return
+    // (sold out: shut up as by hand, those here finishing and walking out first)
+    setAuto(false)
+    setClosing(true)
     say(UI[lang].soldOut)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ai, stock, guestsBy, active, opened])
+  }, [ai, stock, guestsBy, active, opened, closing])
 
   // 自動營運: the whole shop runs itself — hiring whoever's missing, buying in, having the kitchen work out a menu,
   // opening, ordering more as it sells, and shutting for a rest when the staff are worn out — one step every few
   // seconds (each step acts on the state as it is then, so it does one thing at a time)
   const [auto, setAuto] = useState(false)
   const resting = useRef(false)
-  // (the last customer's gone: the staff walk out, and then the shop is shut)
+  // (shut up for the day: the owner calls last orders; nobody more comes in (Roasting), those here eat, pay and walk out of the door)
+  useEffect(() => {
+    if (!closing || !ai) return
+    sayStaff.current('owner', LAST_ORDER, SHOP.day)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closing])
+  // (the last customer out of the door (not just done eating: those paying, at the toilet, walking out are still in the room, and stopping
+  // the business took them all away at once): the staff walk out, and then the shop is shut)
   useEffect(() => {
     if (!closing || leaving) return
     if (!ai) {
@@ -2316,18 +2323,27 @@ export default function App() {
       return
     }
     if ((guestsBy[DISHES[active].id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')) return
-    setLeaving(true)
+    const t0 = performance.now()
+    const wait = window.setInterval(() => {
+      if (SHOP.inRoom > 0 && performance.now() - t0 < 90000) return
+      window.clearInterval(wait)
+      setLeaving(true)
+    }, 300)
+    return () => window.clearInterval(wait)
+  }, [closing, leaving, ai, guestsBy, active])
+  useEffect(() => {
+    if (!leaving) return
     // (one or two of those going home say goodbye on their way to the door, the owner answering (game/commute))
     const day = SHOP.day, goers = commuters()
     let first = Infinity
+    const timers: number[] = []
     talkersOf(goers.map((w) => w.id), day).forEach((id, k) => {
       const at = (delayOf(id, day) + 0.6 + k * 1.8) * 1000
       first = Math.min(first, at)
-      window.setTimeout(() => sayStaff.current(id, CLOSE_HOME, day, k), at)
+      timers.push(window.setTimeout(() => sayStaff.current(id, CLOSE_HOME, day, k), at))
     })
-    window.setTimeout(() => sayStaff.current('owner', CLOSE_DORM, day), (Number.isFinite(first) ? first : 600) + 1800)
-    // (shut once everyone's out of the door or up the stair (each walks off at their own moment: game/commute), at the latest after 40 s;
-    // a timer of its own, not the effect's: the effect runs again the moment `leaving` changes)
+    timers.push(window.setTimeout(() => sayStaff.current('owner', CLOSE_DORM, day), (Number.isFinite(first) ? first : 600) + 1800))
+    // (shut once everyone's out of the door or up the stair (each walks off at their own moment: game/commute), at the latest after 40 s)
     const t0 = performance.now()
     const poll = window.setInterval(() => {
       const gone = performance.now() - t0
@@ -2339,8 +2355,9 @@ export default function App() {
         setLeaving(false)
       }
     }, 300)
+    return () => { window.clearInterval(poll); for (const t of timers) window.clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closing, leaving, ai, guestsBy, active])
+  }, [leaving])
   const autoStep = useRef<() => void>(() => {})
   autoStep.current = () => {
     // (shut for the day by hand: it stays shut)
@@ -2352,9 +2369,10 @@ export default function App() {
     const seated = (guestsBy[d.id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')
     if (ai) {
       // worn out: no more customers in; shut once the last has eaten
+      // (shut up as by hand: last orders, those here finish and walk out)
       if (tired > 85 && !seated) {
         resting.current = true
-        setAi(false)
+        setClosing(true)
         say(T.autoRest)
         return
       }

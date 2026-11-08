@@ -2694,6 +2694,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v) })
 
   shownRef.current = shown
+  // (how many are still in the room: the shop shuts only once they're all out of the door)
+  useEffect(() => { SHOP.inRoom = shown.length; return () => { SHOP.inRoom = 0 } }, [shown])
   // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
   // (and looked at as the shop opens: measured while it was shut, the room may still have been coming in (the miso pot by the rice tub wasn't
   // there yet, and the whole day the servers' places and ways went through it))

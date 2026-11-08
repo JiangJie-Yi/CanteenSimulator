@@ -15,6 +15,12 @@ export const CLOSE_DORM: Lines = {
   ja: ['お疲れさん！帰り道気をつけて、早く休めよ。', 'ありがとな。明日の仕入れは確認しとくから、俺も上で寝るわ。', '炉の火を落としたら上がろう。今日はみんなよくやった！'],
   en: ['Good work! Mind how you go, and get some rest.', "Thanks. I'll check tomorrow's stock, then I'm off upstairs to bed.", "Bank the fire and we'll head up. Great work today, everyone!"],
 }
+/** the owner as the shop's shut for the day: no one more comes in, those here finish */
+export const LAST_ORDER: Lines = {
+  zh: ['差不多到最後點餐時間囉～', '各位，最後點餐時間到囉，慢慢吃不用急！', '今天的最後點餐囉～門口的燈籠要收了。'],
+  ja: ['そろそろラストオーダーの時間です～', 'ラストオーダーになります、ごゆっくりどうぞ！', '本日のラストオーダーです～提灯もそろそろ下ろします。'],
+  en: ["It's nearly last orders~", "Last orders, everyone! No rush, take your time.", "Last orders for today~ the lanterns are coming in soon."],
+}
 /** the owner, or one coming down the stair, in the morning */
 export const OPEN_DORM: Lines = {
   zh: ['早安！先把炭火升起來，準備迎接今天的客人吧。', '昨晚睡得真好，今天也要大幹一場！'],
