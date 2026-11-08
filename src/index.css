@@ -7768,6 +7768,25 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   white-space: nowrap;
 }
 .day-sum-ok:hover { background: #9e1f17; }
+.day-sum-auto {
+  justify-self: center;
+  margin-top: -6px;
+  color: var(--ds-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+/* (the time it stays up, running down along its foot) */
+.day-sum-timer {
+  display: block;
+  height: 3px;
+  background: #b8261c;
+  transform-origin: left;
+  animation: day-sum-timer linear forwards;
+}
+@keyframes day-sum-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
 .day-sum-ok:focus-visible { outline: 3px solid var(--moss); outline-offset: 3px; }
 @keyframes day-sum-in {
   from { opacity: 0; }
@@ -7819,3 +7838,46 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* the books' day by day (each day's closing sheet, App's dayLog; the owner's): a small table under the ledger, the latest first, the
+   profit green or red, scrolling past a fortnight; every cell on one line */
+.ledger-days {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(90 61 40 / 0.2);
+}
+.ledger-days h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.ledger-days-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.ledger-days table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.ledger-days th,
+.ledger-days td {
+  padding: 3px 8px;
+  white-space: nowrap;
+  text-align: right;
+}
+.ledger-days th:first-child,
+.ledger-days td:first-child { text-align: left; }
+.ledger-days th {
+  position: sticky;
+  top: 0;
+  background: rgb(251 246 234 / 0.95);
+  color: #7a6450;
+  font-weight: 600;
+}
+.ledger-days tbody tr:nth-child(odd) { background: rgb(90 61 40 / 0.05); }
+.ledger-days td.is-gain { color: #2f8a4c; font-weight: 700; }
+.ledger-days td.is-loss { color: #c0392b; font-weight: 700; }
+:root[data-theme='dark'] .ledger-days th { background: rgb(40 30 22 / 0.95); color: #c9b597; }
+:root[data-theme='dark'] .ledger-days td.is-gain { color: #4fff85; }

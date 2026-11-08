@@ -1,20 +1,33 @@
 // The day's closing sheet (the owner's: once the last customer's out of the door and the staff have gone home, the day's takings): the day,
 // the profit large (green, or red at a loss), what came in and what went out, who came and how pleased they were, the dish that sold best.
-// In the middle of the page over the shut shop; × , the button below, Esc or a click outside put it away.
-import { useEffect } from 'react'
+// In the middle of the page over the shut shop; × , the button below, Esc or a click outside put it away, and it goes by itself after
+// AUTO_S seconds (the owner's: the game stands still while it's up, App's GAME_SPEED; it goes on after); a bar along its foot runs down.
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { tl, type Lang } from '@/data/i18n'
 import type { DaySummary as Summary } from '@/game/daySummary'
 
+/** how long (s, of real time: the game's clock stands still meanwhile) it stays up by itself */
+export const AUTO_S = 10
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString('en-US')}`
 
 export function DaySummary({ s, day, lang, nameOf, onClose }: { s: Summary; day: number; lang: Lang; nameOf: (key: string) => string; onClose: () => void }) {
   const t = (zh: string, ja: string, en: string) => tl(lang, zh, ja, en)
+  const [left, setLeft] = useState(AUTO_S)
+  // (counted from when it came up, once: the page above redraws every second or so (the staff resting), each time with a new onClose)
+  const close = useRef(onClose)
+  close.current = onClose
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+    const t0 = performance.now()
+    const tick = window.setInterval(() => {
+      const l = Math.max(0, Math.ceil(AUTO_S - (performance.now() - t0) / 1000))
+      setLeft(l)
+      if (l <= 0) { window.clearInterval(tick); close.current() }
+    }, 250)
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close.current() } }
     window.addEventListener('keydown', key, true)
-    return () => window.removeEventListener('keydown', key, true)
-  }, [onClose])
+    return () => { window.clearInterval(tick); window.removeEventListener('keydown', key, true) }
+  }, [])
   const rows: [string, number, boolean][] = [
     [t('營業額', '売上', 'Takings'), s.revenue, true],
     [t('食材', '食材', 'Food'), -s.food, false],
@@ -47,7 +60,9 @@ export function DaySummary({ s, day, lang, nameOf, onClose }: { s: Summary; day:
             <div><dt>{t('最暢銷', '一番人気', 'Best seller')}</dt><dd>{s.best ? `${nameOf(s.best.key)} ×${s.best.n}` : '—'}</dd></div>
           </dl>
           <button type="button" className="day-sum-ok" onClick={onClose}>{t('收工', 'お疲れさま', 'Done for the day')}</button>
+          <small className="day-sum-auto">{t(`${left} 秒後自動關閉`, `${left} 秒後に閉じます`, `Closing in ${left}s`)}</small>
         </div>
+        <i className="day-sum-timer" style={{ animationDuration: `${AUTO_S}s` }} aria-hidden="true" />
       </section>
     </div>,
     document.body,

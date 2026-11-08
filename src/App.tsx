@@ -87,7 +87,7 @@ import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
-import { daySummary, soldBetween, type DaySummary as DaySum } from '@/game/daySummary'
+import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
 import { Steam } from '@/scene/Steam'
@@ -319,6 +319,8 @@ function ShadowPacer() {
 const METER_KEY = 'jgs-utilities-1'
 /** the customers' visits (game/reputation), kept in the browser; cleared with a fresh start */
 const VISITS_KEY = 'jgs-reputation-1'
+/** each day's closing sheet in the books (ui/DaySummary, game/daySummary's DayRecord) */
+const DAYS_KEY = 'jgs-days-1'
 function useSky(): [Sky, (s: Sky) => void] {
   // (the part of the day on the game's clock (the owner's: day and night come round with the time, dawn and dusk between them): a new game's
   // ten in the morning, a page brought back after its 3D view was lost the time it was); on the page as its look (data-theme: dark by night
@@ -1262,7 +1264,11 @@ export default function App() {
   }, [editOn])
   // (the game stands still while developer mode's on during business (the owner's): the customers, the clock, the wages, the fire, the
   // cooks; on again, at its speed, as the mode ends)
-  useEffect(() => { GAME_SPEED.value = editOn && ai ? 0 : speed }, [speed, editOn, ai])
+  // the day's closing sheet (ui/DaySummary), up once the shop's shut: the game stands still while it's up (the owner's), going on as it goes
+  const [daySum, setDaySum] = useState<{ s: DaySum; day: number } | null>(null)
+  // (and each day's sheet kept in the books (the owner's), shown under the ledger: kept in the browser, cleared with a fresh start)
+  const [dayLog, setDayLog] = useState<DayRecord[]>(() => { try { return JSON.parse(localStorage.getItem(DAYS_KEY) ?? '[]') as DayRecord[] } catch { return [] } })
+  useEffect(() => { GAME_SPEED.value = (editOn && ai) || daySum ? 0 : speed }, [speed, editOn, ai, daySum])
   // (and the frame pacer doesn't judge for a while after any of these, or the view flown elsewhere: a moment of slow frames, figures built
   // and shaders compiled, no measure of the machine; it took the shop opening for a slow machine and drew the rest of the session coarse)
   useEffect(() => { holdPacer() }, [speed, editOn, ai, view])
@@ -1579,7 +1585,6 @@ export default function App() {
   entryCountNow.current = entryCount
   // the day's closing sheet (ui/DaySummary): the books, the customers seen and the orders as they stood at opening; the sheet once shut
   const dayStart = useRef<{ ledger: typeof ledger; seen: Set<number>; sold: Record<string, number>; day: number } | null>(null)
-  const [daySum, setDaySum] = useState<{ s: DaySum; day: number } | null>(null)
   const ledgerNow = useRef(ledger)
   ledgerNow.current = ledger
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
@@ -2393,7 +2398,13 @@ export default function App() {
         const st = dayStart.current
         if (st) {
           dayStart.current = null
-          setDaySum({ s: daySummary(st.ledger, ledgerNow.current, visitsNow.current.filter((v) => !st.seen.has(v.id)), soldBetween(st.sold, entryCountNow.current)), day: st.day })
+          const sum = daySummary(st.ledger, ledgerNow.current, visitsNow.current.filter((v) => !st.seen.has(v.id)), soldBetween(st.sold, entryCountNow.current))
+          setDaySum({ s: sum, day: st.day })
+          setDayLog((log) => {
+            const next = addDay(log, st.day, sum)
+            try { localStorage.setItem(DAYS_KEY, JSON.stringify(next)) } catch { /* (not kept) */ }
+            return next
+          })
         }
       }
     }, 300)
@@ -2773,6 +2784,26 @@ export default function App() {
                         <b className={profit < 0 ? '' : 'money'}>{profit < 0 ? '−' : ''}NT${Math.abs(profit).toFixed(0)}</b></p>
                       <p className="ledger-margin"><span>{UI[lang].margin}</span>
                         <b>{ledger.revenue > 0 ? `${((profit / ledger.revenue) * 100).toFixed(1)}%` : '—'}</b></p>
+                      {/* each day's closing sheet, gathered into the books (the owner's), the latest first */}
+                      {dayLog.length > 0 && (
+                        <section className="ledger-days">
+                          <h4>{tl(lang, '每日結算', '日ごとの締め', 'Day by day')}</h4>
+                          <div className="ledger-days-scroll"><table>
+                            <thead><tr><th>{tl(lang, '天', '日', 'Day')}</th><th>{tl(lang, '營業額', '売上', 'Takings')}</th><th>{UI[lang].profit}</th><th>{tl(lang, '來客', '来客', 'Guests')}</th><th>★</th></tr></thead>
+                            <tbody>
+                              {[...dayLog].reverse().map((d) => (
+                                <tr key={d.day} title={d.best ? `${tl(lang, '最暢銷', '一番人気', 'Best seller')}：${(() => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === d.best!.key); return e ? nameIn(lang, e) : d.best.key })()} ×${d.best.n}` : undefined}>
+                                  <td>{tl(lang, `第 ${d.day} 天`, `${d.day} 日目`, `${d.day}`)}</td>
+                                  <td>{Math.round(d.revenue).toLocaleString('en-US')}</td>
+                                  <td className={d.profit < 0 ? 'is-loss' : 'is-gain'}>{d.profit < 0 ? '−' : ''}{Math.abs(Math.round(d.profit)).toLocaleString('en-US')}</td>
+                                  <td>{d.guests}</td>
+                                  <td>{d.stars === null ? '—' : d.stars.toFixed(1)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table></div>
+                        </section>
+                      )}
                     </>
                   )
                 })()}
@@ -2798,6 +2829,7 @@ export default function App() {
                 localStorage.removeItem(DRINKS_KEY)
                 localStorage.removeItem(METER_KEY)
                 localStorage.removeItem(VISITS_KEY)
+                localStorage.removeItem(DAYS_KEY)
                 localStorage.removeItem(TISSUES_KEY)
                 // (and this tab's kept progress, from a lost 3D view: never brought back over the fresh start)
                 sessionStorage.removeItem(RESUME_KEY)
