@@ -245,12 +245,16 @@ button {
   pointer-events: none;
 }
 
+/* (the owner's: a see-through smoked glass, the shop behind it showing, warm white words) */
 .ai-line {
   padding: 6px 12px;
-  border-radius: 12px 12px 12px 3px;
-  background: rgb(251 243 228 / 0.92);
-  box-shadow: 0 4px 12px -6px rgb(59 42 32 / 0.5);
-  color: var(--ink);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 10px;
+  background: rgb(20 18 16 / 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+  color: #f3f0e6;
   font: 14px/1.35 var(--brush);
   animation: stamp 260ms ease-out;
 }
