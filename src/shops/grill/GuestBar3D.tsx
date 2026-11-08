@@ -2549,8 +2549,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (the waiting bench (BENCH): along the way in, a little in from the door, against the genkan's wall on the side away from the shoe
     // cupboard (that side's the cupboard's, and a second takeaway waits there); its two places along it, those sat there facing the way in)
     const u = wait.clone().sub(door).setY(0).normalize()
-    const bench = door.clone().addScaledVector(u, 0.25).addScaledVector(side, -BENCH_OFF).setY(0)
-    const benchSpots = [-1, 1].map((k) => bench.clone().addScaledVector(u, k * 0.16))
+    const bench = door.clone().addScaledVector(u, 0.32).addScaledVector(side, -BENCH_OFF).setY(0)
+    const benchSpots = [-1, 1].map((k) => bench.clone().addScaledVector(u, k * 0.17))
     return { door: door.clone(), wait, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()], bench, benchYaw: Math.atan2(u.x, u.z), benchSpots }
   }, [counters, seats, given])
   /** from a server's place out to the step where the takeaway's handed over (walked backwards, the way back) */
@@ -4511,7 +4511,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && takeoutWay && (
         <Movable id="bench" label="候位長凳">
           <group position={[takeoutWay.bench.x, -GENKAN.depth, takeoutWay.bench.z]} rotation-y={takeoutWay.benchYaw - Math.PI / 2}>
-            <group scale={[0.74, 1, 1]}><WaitingBench /></group>
+            {/* (drawn at the customers' size, as the stools are: its seat a stool's height under them) */}
+            <group scale={[0.48 * PEOPLE_SCALE, PEOPLE_SCALE, 0.8 * PEOPLE_SCALE]}><WaitingBench /></group>
           </group>
         </Movable>
       )}
@@ -4572,7 +4573,7 @@ function useOwnLooks() {
 /** the waiting bench (blender/bench.py): two cedar planks on splayed dark legs, its seat a stool's height; how far off the way in it stands */
 const BENCH_URL = import.meta.env.BASE_URL + 'models/bench.glb'
 useGLTF.preload(BENCH_URL)
-const BENCH_OFF = 0.36
+const BENCH_OFF = 0.3
 const WaitingBench = memo(function WaitingBench() {
   const gltf = useGLTF(BENCH_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
