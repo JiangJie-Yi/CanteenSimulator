@@ -7833,6 +7833,19 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   .day-sum-veil { animation: none; }
 }
 
+/* what the stock keeper's at, over his head (GuestBar3D's Stocker; the owner's: stood by the cartons he looked idle): a small warm charcoal
+   chip, as the speech bubbles are */
+.staff-status {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid rgb(230 200 160 / 0.25);
+  border-radius: 8px;
+  background: rgb(24 20 18 / 0.72);
+  color: #f3e6cf;
+  font: 600 11px/1.5 var(--brush);
+  white-space: nowrap;
+  user-select: none;
+}
 /* what's on one of the staff, right over their head (StaffWords' TiredBadges; the owner's): worn out, a see-through deep red with a drawn
    bead of sweat and 疲勞中; a special skill working just now by the time of night, ▲ and its icon in its quality's colour (the tiers'
    colours with the office's .ofc-trait); side by side, bobbing a little; pointed at, they say what they mean in the shop's paper label */

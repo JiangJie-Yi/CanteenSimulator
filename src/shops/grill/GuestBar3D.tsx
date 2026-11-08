@@ -232,16 +232,18 @@ const Stocker = memo(StockerImpl, (a, b) => a.counters === b.counters && a.fridg
 function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>>; who: { id: string; look: StaffLook } }) {
   const g = useRef<THREE.Group>(null)
   const held = useRef<{ crate: THREE.Object3D | null; roll: THREE.Object3D | null; box: THREE.Object3D | null }>({ crate: null, roll: null, box: null })
+  const statusEl = useRef<HTMLSpanElement>(null)
   const c1 = counters[1]
   const home = useMemo(() => {
     const last = fridges[fridges.length - 1]
-    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.55)
+    // (a step out from the cartons into the aisle (the owner's: stood against them, he read as staring at the wall))
+    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.55 - 0.15)
   }, [c1, fridges])
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => toiletsOf(counters), [counters])
   /** his way out into the side counter's aisle, across from his place */
   const homeAisle = useMemo(() => c1.at.clone().addScaledVector(c1.along, home.clone().sub(c1.at).dot(c1.along) / c1.along.lengthSq()).addScaledVector(c1.lay, -AISLE), [home, c1])
-  const st = useRef({ phase: 'idle' as 'idle' | 'go' | 'work' | 'back', t: 0, chore: null as StockChore, path: [] as THREE.Vector3[], len: 0, d: 0,
+  const st = useRef({ phase: 'idle' as 'idle' | 'take' | 'go' | 'work' | 'back', t: 0, chore: null as StockChore, path: [] as THREE.Vector3[], len: 0, d: 0,
     pos: home.clone(), yaw: 0, check: 0, done: false })
   const [moving, setMoving] = useState(false)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stocker?: typeof st }).__stocker = st
@@ -255,6 +257,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     const o = g.current
     if (o) {
       const c = cm.current
+      // (his status put away while he walks in or home: shown again below once he's at work)
+      if ((!c.arrived || SHOP.leaving) && statusEl.current) statusEl.current.style.visibility = 'hidden'
       const wayFrom = (from: THREE.Vector3) => {
         const w = [from.clone(), homeAisle.clone(), aisleCornerOf(counters, c1), doorOf(counters)]
         return [...w, through(w[w.length - 2], w[w.length - 1], 0.5)]
@@ -306,7 +310,12 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     const c = s.chore
     if (s.phase === 'idle') {
       s.check += dt
-      s.yaw += (Math.atan2(-c1.lay.x, -c1.lay.z) - s.yaw) * Math.min(1, dt * 4)
+      s.t += dt
+      // (standing by: facing the room most of the while, now and then turned to the stock behind him, bent over his clipboard counting it)
+      const counting = s.t % 14 > 9
+      const face = counting ? Math.atan2(c1.lay.x, c1.lay.z) : Math.atan2(-c1.lay.x, -c1.lay.z)
+      s.yaw += Math.atan2(Math.sin(face - s.yaw), Math.cos(face - s.yaw)) * Math.min(1, dt * 4)
+      if (g.current) { g.current.userData.lean = counting ? 0.18 : 0; g.current.userData.prep = undefined }
       if (s.check > 1) {
         s.check = 0
         // (a case ordered in of whatever the back's running out of, one a look)
@@ -337,10 +346,16 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
             const beside = seat.aisle.clone().lerp(seat.stool, 0.55).addScaledVector(seat.along, 0.3)
             set([home.clone(), homeAisle.clone(), ...(seat.counter === 1 ? [] : [aisleCornerOf(counters, c1)]), seat.aisle.clone(), beside])
           }
-          s.phase = 'go'
-          setMoving(true)
+          // (the drinks: first bent to the cartons for a case, then off with it)
+          if (next.kind === 'drinks') { s.phase = 'take'; s.t = 0 } else { s.phase = 'go'; setMoving(true) }
         }
       }
+    } else if (s.phase === 'take') {
+      s.t += dt
+      const face = Math.atan2(c1.lay.x, c1.lay.z)
+      s.yaw += Math.atan2(Math.sin(face - s.yaw), Math.cos(face - s.yaw)) * Math.min(1, dt * 6)
+      if (g.current) g.current.userData.lean = 0.4 * Math.sin(Math.min(1, s.t / 0.9) * Math.PI)
+      if (s.t > 0.9) { if (g.current) g.current.userData.lean = 0; s.phase = 'go'; s.t = 0; setMoving(true) }
     } else if (s.phase === 'go') {
       if (walk()) { s.phase = 'work'; s.t = 0; setMoving(false) }
     } else if (s.phase === 'work' && c) {
@@ -384,6 +399,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     } else if (s.phase === 'back') {
       if (walk()) {
         s.phase = 'idle'
+        s.t = 0
         s.pos.copy(home)
         if (c?.kind === 'roll') STOCKER_WC.who = null
         s.chore = null
@@ -405,7 +421,22 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     // (in his arms: a case of drinks carried out; a new roll; a new box of tissues; back empty-handed)
     const out = s.phase === 'go' || s.phase === 'work'
     const h = held.current
-    if (h.crate) h.crate.visible = out && c?.kind === 'drinks'
+    if (h.crate) h.crate.visible = (out || (s.phase === 'take' && s.t > 0.45)) && c?.kind === 'drinks'
+    // (what he's at, over his head (the owner's: standing about, nobody could tell): as words, the run's share done while it's under way)
+    const el = statusEl.current
+    if (el) {
+      const zh = document.documentElement.lang !== 'ja' && document.documentElement.lang !== 'en', ja = document.documentElement.lang === 'ja'
+      const tl3 = (a: string, b: string, e: string) => (ja ? b : zh ? a : e)
+      const pct = (k: number) => ` ${Math.round(Math.min(1, k) * 100)}%`
+      const text = s.phase === 'idle' ? (s.t % 14 > 9 ? tl3('庫存清點中', '在庫チェック中', 'Counting stock') : tl3('待命', '待機中', 'Standing by'))
+        : s.phase === 'take' ? tl3('取貨中', '荷出し中', 'Picking up a case')
+        : s.phase === 'back' ? tl3('返回待命', '戻り中', 'Heading back')
+        : c?.kind === 'drinks' ? (s.phase === 'work' ? tl3('補貨中', '補充中', 'Restocking') + pct(s.t / 1.6) : tl3('搬運飲料中', '飲み物運搬中', 'Carrying drinks'))
+        : c?.kind === 'roll' ? tl3('更換衛生紙', 'トイレ紙交換', 'Changing the toilet roll') + (s.phase === 'work' ? pct(s.t / 2.8) : '')
+        : tl3('補充面紙', 'ティッシュ補充', 'Refilling tissues') + (s.phase === 'work' ? pct(s.t / 2.0) : '')
+      if (el.textContent !== text) el.textContent = text
+      el.style.visibility = g.current?.visible === false ? 'hidden' : ''
+    }
     if (h.roll) h.roll.visible = out && c?.kind === 'roll' && !s.done
     if (h.box) h.box.visible = out && c?.kind === 'tissue' && !s.done
   })
@@ -415,6 +446,9 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     <group ref={g} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id }}>
       <BlobShadow r={0.17} />
       <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
+      <Html position={[0, 1.95, 0]} center zIndexRange={[19, 9]} style={{ pointerEvents: 'none' }}>
+        <span ref={statusEl} className="staff-status" />
+      </Html>
       <mesh ref={(o) => { held.current.crate = o }} position={[0, HELD_AT[1] + 0.06, HELD_AT[2]]} visible={false}>
         <boxGeometry args={[0.22, 0.13, 0.16]} />
         <meshToonMaterial color="#b98a52" />
