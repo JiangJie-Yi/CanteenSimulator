@@ -67,7 +67,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, paceOfStaff, LATE, LAST_CALL } from '@/game/shopState'
-import { FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -109,6 +109,8 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
   leftAt?: number; cleared?: boolean
   /** (shop clock) when they ate their first piece: how long they waited for it */
   firstAte?: number
+  /** when they last began a piece: waiting on the rest of their order from then */
+  lastAte?: number
   /** a takeaway or a delivery (game/takeout): not sat anywhere, their food packed at the plating place, carried out to them at the till */
   takeout?: boolean }
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
@@ -256,8 +258,12 @@ const EDIT_PIECES: Record<string, string> = { tray: 'cutboard', box: 'seasoning'
 const DRAG_PIECES = false
 /** where the plates past the first start on the table's top, round the fire (the first is in the cubby under it) */
 const PLATE_TOP: [number, number, number] = [1.45, 0.02, -1.24]
-/** seconds to eat one piece: a few bites, each taking a chunk out and chewed before the next */
+/** seconds to eat one piece: a few bites, each taking a chunk out and chewed before the next (the owner's tasting) */
 const EAT_SECONDS = 3
+/** a customer's piece takes longer, the food on the plate going bite by bite (the owner's: 8 to 14 seconds a dish; game time, so faster at
+ * x2); and how long one who's eaten waits for the rest of what they ordered before getting up to pay for what they've had */
+const GUEST_EAT_SECONDS = 8
+const NEXT_DISH_WAIT = 25
 const BITES_PER_PIECE = 4
 const UP = new THREE.Vector3(0, 1, 0)
 const ZERO = new THREE.Vector3()
@@ -4827,12 +4833,27 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.slot = null
       }
     }
-    if (pieces.current.some((p) => p.eat > 0 && !p.eaten && !p.stickOnly)) return
-    // a guest eats a piece of what they ordered, if it's ready
+    // (who has food before them: drawn eating only then (bar.ts's FED))
+    FED.clear()
+    for (const p of pieces.current) if (p.container === 'bar' && p.guest >= 0 && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly && p.via !== 'plated' && present(p)) FED.add(p.guest)
+    // a guest eats a piece of what they ordered, if it's ready (each one piece at a time: the whole shop waited on one mouthful at a time
+    // before, and with the room full everyone sat on and on)
     for (const g of guests.current) {
       if (g.state !== 'waiting' && g.state !== 'eating') continue
       // (a takeaway's eaten at home)
       if (g.takeout) continue
+      if (pieces.current.some((p) => p.guest === g.id && p.eat > 0 && !p.eaten && !p.stickOnly)) continue
+      // (eaten some, and the rest long in coming (lost, or the kitchen swamped): up to pay for what they've had, the rest let go, not sat
+      // at an empty plate for ever)
+      if (g.state === 'eating' && !FED.has(g.id) && now - (g.lastAte ?? now) > NEXT_DISH_WAIT + GUEST_EAT_SECONDS) {
+        const owed = [...g.orders]
+        for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
+        g.state = 'done'
+        gripe(g.id, 'wait')
+        onWalkOut?.(owed, g.id)
+        report()
+        continue
+      }
       const owed = [...g.orders]
       for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
       const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
@@ -4858,6 +4879,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       dish.node.userData.byGuest = true
       eat(dish)
       g.firstAte ??= now
+      g.lastAte = now
       g.eaten.push(taste)
       g.ate.push(dish.id)
       g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
@@ -6461,7 +6483,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.eat = 0.0001
       }
       if (p.eat > 0 && !p.eaten && !p.stickOnly) {
-        p.eat = Math.min(1, p.eat + dt / EAT_SECONDS)
+        p.eat = Math.min(1, p.eat + dt / (p.container === 'bar' && !p.byBoss ? GUEST_EAT_SECONDS : EAT_SECONDS))
         const phase = p.eat * BITES_PER_PIECE
         const wanted = Math.min(BITES_PER_PIECE, Math.floor(phase + 0.35))
         while (p.bites.uBiteCount.value < wanted) {

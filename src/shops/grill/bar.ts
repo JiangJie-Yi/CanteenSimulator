@@ -79,6 +79,10 @@ export const SEATS_TAKEN = new Set<number>()
 /** the places whose chopsticks are up: their customer's eating (GuestBar3D fills it each frame; Roasting's BarChopsticks takes those pairs
  * off their rests, FolkFigure has them in the hand) */
 export const CHOPS_UP = new Set<number>()
+/** the customers with food before them just now, on their own plate at the bar (Roasting keeps it): only they're drawn eating, chopsticks in
+ * hand (the owner's: waiting for the next dish, they went on picking at an empty plate) */
+export const FED = new Set<number>()
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __fed: FED })
 /** the customers whose stomachs something spoiled has upset (game/freshness sickChance): off to the toilet as soon as they can be */
 export const SICK = new Set<number>()
 /**
