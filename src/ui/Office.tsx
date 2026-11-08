@@ -63,7 +63,11 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   const EN: Record<string, string> = { 一鍵徵人: 'Hire all', 人事: 'Staff', '大廚（你）': 'Head chef (you)', 女: 'F', 廚房: 'Kitchen', 手藝: 'Skill', 歲: 'yrs',
     每個空缺各雇一位最划算的人: 'Fill every opening with the best-value hire', '營業中不能解雇，請先閉店': 'Can’t dismiss while open: close first', 現金: 'Cash',
     男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 體力: 'Stamina', 點我徵人: 'Hiring',
-    關閉: 'Close' }
+    關閉: 'Close', 大廚: 'Head chef' }
+  // (each job's name in English: the roster's, the cards' headings)
+  const ROLE_EN: Record<string, string> = { chef: 'Sous chef', sous: 'Prep cook', server: 'Floor', cashier: 'Cashier', stock: 'Stockroom' }
+  const roleOf = (r: { role: string; zh: string; ja: string }, short = false) =>
+    ja ? r.ja : lang === 'en' ? ROLE_EN[r.role] ?? r.zh : short ? r.zh.split('（')[0] : r.zh
   const t = (zh: string, jp: string) => (ja ? jp : lang === 'en' ? EN[zh] ?? zh : zh)
   const drag = useDrag('office')
   // (a skill's label taken away with the office, if it was up when it shut)
@@ -106,7 +110,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
               const best = pickHires(people.filter((x) => x.role === r.role && !hired[x.id]), [{ role: r.role, max: 1 }], {})[0]
               return (
                 <div key={r.role} className={`ofc-roster-group is-${r.role}`}>
-                  <span className="ofc-roster-role">{ja ? r.ja : r.zh.split('（')[0]}</span>
+                  <span className="ofc-roster-role">{roleOf(r, true)}</span>
                   <span className="ofc-roster-seats">
                     {Array.from({ length: r.max * 2 }, (_, i) => {
                       const w = mine[i]
@@ -150,12 +154,12 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
             const open = people.filter((w) => w.role === r.role && !hired[w.id])
             return (
               <div key={r.role} className={`ofc-role is-${r.role}`}>
-                <h4>{ja ? r.ja : r.zh} <small>{mine.length}/{r.max * 2}</small></h4>
+                <h4>{roleOf(r)} <small>{mine.length}/{r.max * 2}</small></h4>
                 {mine.map((w) => (
                   <div key={w.id} id={`ofc-${w.id}`} className="ofc-person is-hired">
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
-                      <b>{ja ? w.ja : w.zh}<Traits w={w} ja={ja} /></b>
+                      <b>{ja ? w.ja : w.zh}<Traits w={w} lang={lang} /></b>
                       <span className="ofc-energy" title={t('精神', '元気')}>
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
@@ -178,7 +182,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
                       <b>{ja ? w.ja : w.zh}<span className={`ofc-tag-who${w.look.female ? ' is-f' : ''}`}>
-                        {w.look.female ? t('女', '女性') : t('男', '男性')}・{w.years}{t('歲', '歳')}</span><Traits w={w} ja={ja} /></b>
+                        {w.look.female ? t('女', '女性') : t('男', '男性')}・{w.years}{t('歲', '歳')}</span><Traits w={w} lang={lang} /></b>
                       <span className="ofc-stars">
                         <Stat label={t('手藝', '腕')} v={w.skill} />
                         <Stat label={t('速度', '速さ')} v={w.speed} />
@@ -209,13 +213,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
 
 /** someone's special skills (data/staff's SKILLS; the owner's), a chip after their name: its icon and name, in its quality's colour (特殊
  * green, 菁英 blue, 稀有 purple, 極品 dark gold); pointed at, the quality and what it does, in the shop's paper label */
-function Traits({ w, ja }: { w: Worker; ja: boolean }) {
+function Traits({ w, lang }: { w: Worker; lang: Lang }) {
   if (!w.skills?.length) return null
+  const ja = lang === 'ja'
   return <>{w.skills.map((k) => {
     const sk = SKILLS[k], tier = TIERS[sk.tier]
     // (pointed at: the quality and what it does in the shop's own paper label, as everything pointed at in the room says itself (the owner's))
-    const title = `${ja ? tier.ja : tier.zh}・${ja ? sk.ja : sk.zh}`, hint = ja ? sk.jaSays : sk.zhSays
+    const title = `${ja ? tier.ja : lang === 'en' ? tier.en : tier.zh}・${ja ? sk.ja : lang === 'en' ? sk.en : sk.zh}`, hint = ja ? sk.jaSays : lang === 'en' ? sk.enSays : sk.zhSays
     return <em key={k} className={`ofc-trait is-${sk.tier}`} aria-label={`${title}：${hint}`}
-      onPointerEnter={() => setTip({ title, hint })} onPointerLeave={() => setTip(null)}><SkillIcon id={k} />{ja ? sk.ja : sk.zh}</em>
+      onPointerEnter={() => setTip({ title, hint })} onPointerLeave={() => setTip(null)}><SkillIcon id={k} />{ja ? sk.ja : lang === 'en' ? sk.en : sk.zh}</em>
   })}</>
 }
