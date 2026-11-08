@@ -18,7 +18,7 @@ import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
-import { delayOf, paceOf } from '@/game/commute'
+import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, type Trip } from './commuteWalk'
 import { StaffWords } from './StaffWords'
 import { STAFF_TALK } from '@/game/shopState'
@@ -2035,6 +2035,8 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   items?: number
   /** how much of them shows (fading out as they go out of the door) */
   fade?: number
+  /** going out of the door: how long (s) they've been fading */
+  fadeT?: number
   /** in the house's slippers (inside, past the genkan's step), or their own shoes */
   slippers?: boolean }
 /** how long they stand at the genkan's step changing their shoes */
@@ -2508,7 +2510,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // (and the kitchen's rice (game/rice): to the open sack of rice to scoop a pot's worth ('toSack', 'scoopRaw'), to the sink to wash it, to the
   // electric cooker to set it on ('toSink', 'wash', 'toKama', 'load'); cooked,
   // to the stove to scoop it out and to the tub with it ('toCooked', 'scoop', 'toTub', 'fill'))
-  const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'toSack' | 'scoopRaw' | 'toSink' | 'wash' | 'toKama' | 'load' | 'toCooked' | 'scoop' | 'toTub' | 'fill'
+  const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'settle' | 'toSack' | 'scoopRaw' | 'toSink' | 'wash' | 'toKama' | 'load' | 'toCooked' | 'scoop' | 'toTub' | 'fill'
     | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
     | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir'
     t: number; path: THREE.Vector3[]; len: number
@@ -2700,6 +2702,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
   useEffect(() => { SHOP.inRoom = shown.length; return () => { SHOP.inRoom = 0 } }, [shown])
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __shown: shownRef })
   // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
   // (and looked at as the shop opens: measured while it was shut, the room may still have been coming in (the miso pot by the rice tub wasn't
   // there yet, and the whole day the servers' places and ways went through it))
@@ -3037,10 +3040,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             onSay?.('guest', LINES[lang].payThanks(s.id, s.id + 1), s.id)
           }
         }
+        // (out of the door they fade away, the last stretch, and no quicker than FADE_S: through it, they stand on there till they're gone
+        // (let go at its end, a long stride at ×2 left them a third seen, a blink out of sight))
+        if (lp.len - d < 0.9) s.fadeT = (s.fadeT ?? 0) + dt
+        s.fade = Math.max(0, Math.min(1, Math.max((lp.len - d) / 0.9, 1 - (s.fadeT ?? 0) / FADE_S)))
         // (and if they've somehow not got out in all the time it can take, they're gone all the same)
-        if (d >= lp.len || raw > lp.len + (PAY_S + SHOES_S + 8) * v) done.push(s.id)
-        // (out of the door they fade away, the last stretch)
-        s.fade = Math.min(1, (lp.len - d) / 0.9)
+        if ((d >= lp.len && s.fade <= 0) || raw > lp.len + (PAY_S + SHOES_S + 8) * v) done.push(s.id)
       }
       // (the name tag goes with the body: gone a little before they are, so none is left hanging in the doorway)
       const tag = labels.current.get(s.id)
@@ -3254,6 +3259,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (someone to keep the fire: the grill asks them rather than dropping the coals in itself)
       FIRE_TEND.tender = !!given && !ownerServes && open
       const home = () => (plater ? inBar(`crew-${plater.id}`, ownerAt()) : ownerAt()).setY(0)
+      /** which way the one at their place faces, in the bar's frame (null: no one there to match) */
+      const yawOfCrew = () => {
+        const o = plater ? markOf(`crew-${plater.id}`) : null, f = frame.current
+        if (!o || !f) return null
+        const q = f.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(o.getWorldQuaternion(new THREE.Quaternion()))
+        const z = new THREE.Vector3(0, 0, 1).applyQuaternion(q)
+        return Math.atan2(z.x, z.z)
+      }
       const walk = (then: () => void) => {
         const d = Math.min(pl.len, pl.t * SERVER_SPEED)
         const { p, dir } = alongPath(pl.path, d)
@@ -3312,6 +3325,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const hearthSpot = () => skTraySpot()
       const setOff = (to: THREE.Vector3, phase: typeof pl.phase) => {
         pl.path = kitchenRoute(pl.pos, to)
+        // (home: the last step onto just where they stand at their place (the route stops at the nearest clear floor, as much as 0.7 off:
+        // the one at their place shown again there, they jumped))
+        if (phase === 'home' && pl.path.length && pl.path[pl.path.length - 1].distanceTo(to) > 0.02) pl.path.push(to.clone())
         pl.len = pathLength(pl.path)
         pl.phase = phase
         pl.t = 0
@@ -3405,10 +3421,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.len = pathLength(pl.path)
         pl.phase = 'home'
         pl.t = 0
-      } else if (pl.phase === 'home') walk(() => {
-        pl.phase = 'idle'
-        away(false)
-      })
+      } else if (pl.phase === 'home') walk(() => { pl.phase = 'settle' })
+      else if (pl.phase === 'settle') {
+        // (turned to face as they do at their place, then they're themselves again there: turned at once, they snapped round)
+        const want = yawOfCrew()
+        const turn = want === null ? 0 : Math.atan2(Math.sin(want - pl.yaw), Math.cos(want - pl.yaw))
+        if (want !== null) pl.yaw += turn * Math.min(1, step * 10)
+        if (Math.abs(turn) < 0.03 || pl.t > 0.5) {
+          if (want !== null) pl.yaw = want
+          pl.phase = 'idle'
+          away(false)
+        }
+      }
       else if (pl.phase === 'toSack') walk(() => { pl.phase = 'scoopRaw'; faceTo(sackSpots().at) })
       // ---- the iron skewers (game/skewers): the used tray's all picked up, washed at the sink, put back in the holder by the board
       else if (pl.phase === 'toSkTray') walk(() => { pl.phase = 'takeSk'; faceTo(inBar('skewer-tray', pl.pos)) })

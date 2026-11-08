@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { atlasModel } from './atlasMerge'
 import { airbrush, gradientMap } from './Person3D'
-import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from './rigidSkin'
+import { cloneFigure, paintable, releaseFigure, rigidFigure, thinWithFade, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
@@ -250,15 +250,15 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
     const job = o.parent?.userData as { carry?: boolean; prep?: boolean; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number } | undefined
-    // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line, a
-    // solid colour, put away meanwhile (as the customers' is))
+    // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
+    // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
     if (fade < 0.999 && !faded.current) {
       const was = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>(), mats: THREE.Material[] = []
       fig.root.traverse((q) => {
         const m = q as THREE.Mesh
         if (!m.isMesh) return
-        if ((m.material as THREE.Material).type === 'ShaderMaterial') { m.visible = false; inks.current.push(m); return }
+        if ((m.material as THREE.Material).type === 'ShaderMaterial') { thinWithFade(m); inks.current.push(m); return }
         was.set(m, m.material)
         const one = (x: THREE.Material) => { const c = fadeOf(x); mats.push(c); return c }
         m.material = Array.isArray(m.material) ? m.material.map(one) : one(m.material)
@@ -268,11 +268,14 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     if (faded.current) {
       if (fade >= 0.999) {
         for (const [m, mat] of faded.current.was) m.material = mat
-        for (const m of inks.current) m.visible = true
+        for (const m of inks.current) { m.userData.fade = 1; m.visible = true }
         inks.current = []
         for (const c of faded.current.mats) c.dispose()
         faded.current = null
-      } else for (const c of faded.current.mats) c.opacity = fade
+      } else {
+        for (const c of faded.current.mats) c.opacity = fade
+        for (const m of inks.current) { m.userData.fade = fade; m.visible = fade > 0.04 }
+      }
     }
     if (cook) {
       const f = job?.fetcher ? !!job.fanNow : (t + seed * 3.7) % 17 < 6 && !moving

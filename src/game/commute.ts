@@ -19,7 +19,8 @@ export const delayOf = (id: string, day = 0) => 0.5 + 3.5 * unit(id, `delay${day
 export const paceOf = (id: string) => 0.9 + 0.2 * unit(id, 'pace')
 /** the pause at the door, turned back to the room with a nod; then out of it, fading */
 export const NOD_S = 0.6
-export const FADE_S = 0.5
+/** (no quicker than this, however short the doorway: at 0.5 s, at ×2, they were gone in a quarter of a second) */
+export const FADE_S = 1.1
 
 /**
  * How fast to go for someone ahead on the way: `gap` how far they are, `ahead` how much they're in front (the cosine between the way

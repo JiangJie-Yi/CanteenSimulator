@@ -181,3 +181,25 @@ export function releaseFigure(root: THREE.Object3D) {
     m.skeleton.dispose()
   })
 }
+
+/** an outline (a skinned hull of the shared ink, `uWidth`) drawn as wide as its figure is faded in (`userData.fade`): set for its own draw,
+ * put back after, so the others drawn with the same material keep theirs */
+export function thinWithFade(m: THREE.Mesh) {
+  if (m.userData.thins) return
+  m.userData.thins = true
+  m.onBeforeRender = (_r, _s, _c, _g, material) => {
+    const f = (m.userData.fade as number | undefined) ?? 1
+    const u = (material as THREE.ShaderMaterial).uniforms?.uWidth
+    if (!u || f >= 1) return
+    m.userData.width = u.value
+    u.value *= f
+    ;(material as THREE.ShaderMaterial).uniformsNeedUpdate = true
+  }
+  m.onAfterRender = (_r, _s, _c, _g, material) => {
+    const u = (material as THREE.ShaderMaterial).uniforms?.uWidth
+    if (!u || m.userData.width === undefined) return
+    u.value = m.userData.width
+    m.userData.width = undefined
+    ;(material as THREE.ShaderMaterial).uniformsNeedUpdate = true
+  }
+}

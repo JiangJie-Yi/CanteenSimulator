@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
 import { airbrush, gradientMap, hash, lookOf } from './Person3D'
-import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from './rigidSkin'
+import { cloneFigure, paintable, releaseFigure, rigidFigure, thinWithFade, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
 import { cloth } from './patterns'
 import type { Mood } from './people'
@@ -437,7 +437,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const mat = m.material as THREE.Material
-      if ((mat as THREE.MeshBasicMaterial).side === THREE.BackSide && mat.type !== 'MeshToonMaterial') { m.visible = f >= 1; return }
+      // (their outline: thinned with them as they fade, to nothing (hidden at once as a fade began, it was gone in a blink before the rest of
+      // them, the owner saw them vanish); its material's shared, so its width is set just for their draw and put back after)
+      if ((mat as THREE.MeshBasicMaterial).side === THREE.BackSide && mat.type !== 'MeshToonMaterial') { m.visible = f > 0.04; m.userData.fade = f; thinWithFade(m); return }
       if (mat.userData.base === undefined) mat.userData.base = { opacity: mat.opacity, transparent: mat.transparent }
       const base = mat.userData.base as { opacity: number; transparent: boolean }
       if (was !== f < 1 && !base.transparent && !mat.userData.hashed) { mat.alphaHash = f < 1; mat.needsUpdate = true }

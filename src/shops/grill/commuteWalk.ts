@@ -22,6 +22,8 @@ export type Trip = {
   pace: number
   /** seconds into the nod at the door */
   nod: number
+  /** going out: how long (s) they've been in the doorway, fading */
+  door?: number
   done: boolean
   /** where they were in the world last step (which way they're going, for giving way) */
   last: THREE.Vector3 | null
@@ -97,10 +99,14 @@ export function tripStep(tr: Trip, dt: number, speed: number, world: (v: THREE.V
   tr.d = Math.min(tr.len, tr.d + dt * speed * tr.pace * slow * (inDoor ? 0.7 : 1))
   const { p, dir } = along(tr.way, tr.d)
   let vis = 1
-  if (tr.dir === 'out' && atDoor) vis = Math.max(0, 1 - (tr.d - (tr.len - doorLen)) / Math.max(1e-4, doorLen))
+  if (tr.dir === 'out' && atDoor) {
+    // (a fade no quicker than FADE_S, however short the doorway or quick the game: through it, they stand on there till they're gone (they
+    // were let go at the doorway's far end half seen, a blink out of sight, the owner saw them vanish))
+    tr.door = (tr.door ?? 0) + dt
+    vis = Math.max(0, 1 - (tr.d - (tr.len - doorLen)) / Math.max(1e-4, doorLen), 1 - tr.door / FADE_S)
+  }
   if (tr.dir === 'in' && tr.d < inLen) vis = Math.min(1, tr.d / Math.max(1e-4, inLen))
-  // (a fade no quicker than FADE_S, however short the doorway)
-  if (tr.d >= tr.len) {
+  if (tr.d >= tr.len && (tr.dir !== 'out' || vis <= 0)) {
     tr.done = true
     COMMUTERS.delete(tr.id)
   }
