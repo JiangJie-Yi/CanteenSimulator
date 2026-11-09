@@ -2688,7 +2688,9 @@ export default function App() {
     setEntryCount((c) => ({ ...c, [e.key]: (c[e.key] ?? 0) + 1 }))
     const key = ++feedSeq.current
     setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
-    talk('order', `${tl(lang, '點了', 'から', ' ordered ')} ${nameIn(lang, e)}`, guest)
+    // (in English, its name made the menu's way, from its parts: the entry carries only the Chinese and the Japanese)
+    const en = e.parts.map((pt) => partEn(findItem(d, pt.id)?.en, pt.dabs, d.roast ? 'grill' : 'plain') ?? pt.name).join(' & ')
+    talk('order', `${tl(lang, '點了', 'から', ' ordered ')} ${nameIn(lang, { ...e, en })}`, guest)
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }

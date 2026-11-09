@@ -44,6 +44,7 @@ import { canRide, comesLate, kindOf, LATE_MORE, type GuestKind } from '@/data/gu
 import { RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
+import { partName, type Seasoning as Dab } from '@/data/recipes'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
@@ -3163,7 +3164,7 @@ type Piece = {
   guest: number
   seat: number
   /** (shop open) the dish on the menu it was ordered as: what goes on it, and its name */
-  want: { dabs: string[]; name: string } | null
+  want: { dabs: string[]; name: string; ja?: string } | null
 }
 
 type TagState = { stage: (typeof ROAST_STAGES)[number]['key']; label: string; pct: number }
@@ -3261,7 +3262,7 @@ type RoastingProps = {
   /** a customer's visit, scored as they go (game/reputation): App keeps them for the shop's rating */
   onVisit?: (v: Visit) => void
   /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
-  entries?: { key: string; name: string; parts: { id: string; dabs: string[]; name: string }[] }[]
+  entries?: { key: string; name: string; ja?: string; parts: { id: string; dabs: string[]; name: string; ja?: string }[] }[]
   /** a customer orders this dish off the menu: false if it can't be had (out of stock, the fire's full) */
   onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>) => boolean
   /** how slowly customers come in (no cashier: fewer) */
@@ -4467,7 +4468,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const darkSaid = useRef(new Set<number>())
   /** what's been ordered off the menu and not yet brought out: each food, as which dish */
   const wants = useRef<{ id: string; dabs: string[]; name: string }[]>([])
-  const nameOfP = (p: Piece) => p.want?.name ?? nameOf(p.id)
+  // (said in the page's language: the menu's own Japanese name for it, its English made the menu's way; the bare food's name in it otherwise
+  // (the kitchen's log in Japanese named the dishes in Chinese))
+  const nameOfP = (p: Piece) => {
+    const w = p.want
+    if (!w) return nameOf(p.id)
+    if (lang === 'ja') return w.ja ?? w.name
+    if (lang === 'en') return partName({ name: w.name, en: nameOf(p.id) }, nameOf(p.id), p.id, w.dabs as Dab[], 'en')
+    return w.name
+  }
   const guestSeq = useRef(0)
   const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner })))
@@ -4772,7 +4781,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             // (the bowl's held for them: carried over to them from there (the stray's way, next))
             for (const q of warm) { q.guest = id; q.keepWarm = false }
             orders.push(...e.parts.map((pt) => pt.id))
-            said.push(e.name)
+            said.push(lang === 'ja' ? e.ja ?? e.name : lang === 'en' ? e.parts.map((pt) => partName({ name: pt.name, en: nameOf(pt.id) }, nameOf(pt.id), pt.id, pt.dabs as Dab[], 'en')).join(' & ') : e.name)
           } else {
             wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
           }

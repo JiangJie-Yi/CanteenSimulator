@@ -105,7 +105,7 @@ export const UI = {
     autoOpen: 'AI：献立も在庫も揃いました、開店！',
     autoRest: 'AI：スタッフが疲れたので、ひと休み',
     pullMore: '引っ張って更新',
-    lockedHint: '営業中：注文はお客さんが',
+    lockedHint: '営業中：お客さんが注文、見るだけ',
     outOfStock: (n: string) => `「${n}」は在庫切れ。事務所で仕入れを`,
     needChef: '料理人がいません。人事で雇ってから開店を',
     soldOut: '売り切れのため、閉店しました',

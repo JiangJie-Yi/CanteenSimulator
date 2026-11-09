@@ -54,6 +54,9 @@ const SPECIAL: Record<string, Partial<Record<string, string>>> = {
   Potato: { milk: '奶油馬鈴薯', salt: '鹽烤馬鈴薯' },
 }
 
+/** a food's English name without a "Grilled" of its own (Grilled Mochi, Grilled Corn): the dish's name puts one in, and it said it twice */
+const bareEn = (en: string) => en.replace(/^grilled\s+/i, '')
+
 /**
  * The name of a food cooked this way: 鹽烤 / 醬烤 before it (salt, soy), and 佐花生粉 / 淋煉乳 after it for what's
  * put on to finish, unless the dish has a name of its own; with nothing on it, 烤 and the food. Elsewhere than the
@@ -67,7 +70,7 @@ export function partName(item: { name: string; ja?: string; en?: string }, short
   // (in English: what went on it, then grilled, then the food: "Salt & soy grilled saury", "Grilled corn")
   if (lang === 'en') {
     const how = dabs.map((k) => SEASON_NAME.en[k]).join(' & ')
-    return how ? `${how[0].toUpperCase()}${how.slice(1)} grilled ${en.toLowerCase()}` : `Grilled ${en.toLowerCase()}`
+    return how ? `${how[0].toUpperCase()}${how.slice(1)} grilled ${bareEn(en).toLowerCase()}` : `Grilled ${bareEn(en).toLowerCase()}`
   }
   if (lang === 'ja') return (dabs.length ? dabs.map((k) => SEASON_NAME.ja[k]).join('・') : '') + '焼き' + ja
   const sig = dabs.join('+')
@@ -92,6 +95,7 @@ export function partName(item: { name: string; ja?: string; en?: string }, short
 export function partEn(en: string | undefined, dabs: Seasoning[], kind: 'grill' | 'plain' = 'grill') {
   if (!en) return undefined
   if (kind === 'plain') return en
+  en = bareEn(en)
   const W: Record<string, string> = { salt: 'Salt', soy: 'Soy', miso: 'Miso', milk: 'Condensed Milk', peanut: 'Peanut',
     wasabi: 'Wasabi', shichimi: 'Shichimi', yuzu: 'Yuzu Kosho', lemon: 'Lemon' }
   const head = (['salt', 'soy', 'miso'] as const).filter((k) => dabs.includes(k)).map((k) => W[k])
