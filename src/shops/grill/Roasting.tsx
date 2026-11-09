@@ -5233,7 +5233,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const pop = (at: THREE.Vector3, delta: number) => {
     if (!delta) return
     const id = ++popId.current
-    const text = delta > 0 ? `美味 +${delta}` : `美味 ${delta}`
+    const word = lang === 'en' ? 'Taste' : '美味'
+    const text = delta > 0 ? `${word} +${delta}` : `${word} ${delta}`
     setPops((all) => {
       // (the first free place, or the oldest's)
       let k = all.findIndex((x) => !x)

@@ -1315,7 +1315,7 @@ export default function App() {
     STAFF_TALK.push({ key: ++chatId.current, id, text, until: performance.now() + 4800 })
     const w = id === 'owner' ? null : staffOf(DISHES[active].id).find((x) => x.id === id)
     const name = w ? personName(w, lang) : ''
-    talk(id === 'owner' ? 'owner' : 'staff', name ? `${name}${lang === 'ja' ? '「' : '：'}${text}${lang === 'ja' ? '」' : ''}` : text)
+    talk(id === 'owner' ? 'owner' : 'staff', name ? `${name}${lang === 'ja' ? '「' : lang === 'en' ? ': ' : '：'}${text}${lang === 'ja' ? '」' : ''}` : text)
   }
   // (opened: the staff walk in from now, each at their own moment (Roasting, GuestBar3D); the owner says good morning, then one or two of
   // those coming in at the door as they reach their places)
@@ -1920,7 +1920,7 @@ export default function App() {
     }
     // customers are named by how they look (上班族, 老奶奶…), not by number: their name before their words in the log
     const lg = langRef.current
-    const text = guest !== undefined ? `${guestLabel(guest, lg)}${lg === 'ja' ? '「' : '：'}${raw}${lg === 'ja' ? '」' : ''}` : raw
+    const text = guest !== undefined ? `${guestLabel(guest, lg)}${lg === 'ja' ? '「' : lg === 'en' ? ': ' : '：'}${raw}${lg === 'ja' ? '」' : ''}` : raw
     const id = ++chatId.current
     setChat((all) => [...all.slice(-4), { id, who, text }])
     window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
@@ -2701,7 +2701,7 @@ export default function App() {
     if (!d) return
     book('revenue', d.price)
     book('food', Math.round(d.price * 0.35))
-    talk('order', `${tl(lang, '從冰箱拿了', 'が冷蔵庫から', ' took from the fridge ')} ${lang === 'ja' ? d.ja : lang === 'en' ? (d as { en?: string }).en ?? d.zh : d.zh}`, guest)
+    talk('order', lang === 'en' ? `took a ${((d as { en?: string }).en ?? d.zh).toLowerCase()} from the fridge` : `${tl(lang, '從冰箱拿了', 'が冷蔵庫から', '')} ${lang === 'ja' ? d.ja : d.zh}`, guest)
   }
   const sellDrinkRef = useRef(sellDrink)
   sellDrinkRef.current = sellDrink
@@ -2876,7 +2876,7 @@ export default function App() {
                             <thead><tr><th>{tl(lang, '天', '日', 'Day')}</th><th>{tl(lang, '營業額', '売上', 'Takings')}</th><th>{UI[lang].profit}</th><th>{tl(lang, '來客', '来客', 'Guests')}</th><th aria-label={tl(lang, '星數', '星', 'Stars')}><StarIcon size={12} /></th></tr></thead>
                             <tbody>
                               {[...dayLog].reverse().map((d) => (
-                                <tr key={d.day} title={d.best ? `${tl(lang, '最暢銷', '一番人気', 'Best seller')}：${(() => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === d.best!.key); return e ? nameIn(lang, e) : d.best.key })()} ×${d.best.n}` : undefined}>
+                                <tr key={d.day} title={d.best ? `${tl(lang, '最暢銷', '一番人気', 'Best seller')}${lang === 'en' ? ': ' : '：'}${(() => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === d.best!.key); return e ? nameIn(lang, e) : d.best.key })()} ×${d.best.n}` : undefined}>
                                   <td>{tl(lang, `第 ${d.day} 天`, `${d.day} 日目`, `${d.day}`)}</td>
                                   <td>{Math.round(d.revenue).toLocaleString('en-US')}</td>
                                   <td className={d.profit < 0 ? 'is-loss' : 'is-gain'}>{d.profit < 0 ? '−' : ''}{Math.abs(Math.round(d.profit)).toLocaleString('en-US')}</td>

@@ -180,8 +180,9 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
   }
 
   // every tag on the board is lettered the same size: the size the longest one needs (with room for its stamp)
-  const priceText = (x: { price: number }) => (research ? '' : toChineseNumber(x.price))
-  const boardFit = Math.min(1, ...all.map((x) => tagFit(nameIn(lang, x), x.en, priceText(x), true, research && !!onBuy, !!layoutLike)))
+  // (the price in kanji numerals, the board's way; in English in figures, which an English reader can read)
+  const priceText = (x: { price: number }) => (research ? '' : lang === 'en' ? String(x.price) : toChineseNumber(x.price))
+  const boardFit = Math.min(1, ...all.map((x) => tagFit(nameIn(lang, x), lang === 'en' ? undefined : x.en, priceText(x), true, research && !!onBuy, !!layoutLike)))
   const fitStyle = { '--fit': boardFit.toFixed(3) } as CSSProperties
 
   const baseName = ordered.length ? ordered.map((b) => nameIn(lang, b)).join('、') : null
@@ -194,7 +195,7 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
     const name = nameIn(lang, x)
     // (the test kitchen's board shows what it costs)
     const cost = research && unitCost ? unitCost(x.id) : 0
-    const price = research ? `${cost}` : toChineseNumber(x.price)
+    const price = research ? `${cost}` : priceText(x)
     const hasSet = base && !!(x as { includes?: object }).includes
     const filling = feed.filter((f) => f.id === x.id)
     const parts = (x as { includes?: Record<string, number> }).includes ?? { [x.id]: 1 }
@@ -226,7 +227,8 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
         onBlur={hasSet ? () => setPeek(null) : undefined}>
         <StripArt id={x.id} icon={icon} />
         <span className="strip-name">{name}</span>
-        {x.en && <span className="strip-en" lang="en">{x.en}</span>}
+        {/* (the English under the name: not in English, where the name already is) */}
+        {x.en && lang !== 'en' && <span className="strip-en" lang="en">{x.en}</span>}
         {!research && <span className="strip-price">{price}</span>}
         {research && onBuy && (
           // (stocked right here: it isn't the tag itself, which takes one to try)

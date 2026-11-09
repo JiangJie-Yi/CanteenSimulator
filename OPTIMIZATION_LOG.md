@@ -61,3 +61,8 @@
 - 工具：`tests/e2e/_cjk.mjs`（在 git 外：英文介面打開每個面板與頁籤，列出畫面上還有中日文字的元素）
 - 找到並修好：開發者模式的十三件擺設沒有英文名（兩扇閘門、刀具組、逃生出口燈、收銀凳……：`editText.ts` 的 `PIECES_EN`）；左下 Dock 的「開發工具」「角色預覽」只在第一次建立時寫字，之後換語言不變（`edit.ts` 的 `dockLang`）；換語言時老闆頭上那句舊語言的話留著（`Boss.tsx` 換語言時收掉）；經營頁的「M・40yrs」用日文中點，英文改成「M, 40 yrs」、天賦標籤「Elite: …」。
 - 驗證：`_cjk.mjs` 只剩語言鈕上的「中」（刻意的：按下去換到中文）；`_wraps.mjs` 英文 0 處斷行；`npm test` 415 過。
+
+## 16:20 — 英文營業中的掃描
+- 工具：`tests/e2e/_cjkopen.mjs`（在 git 外：英文介面自動營運開店，每 3 秒收集畫面上帶中日文字的元素，`SHOT=` 截圖）
+- 找到並修好：試做時飄出的「美味 +n」（英文 Taste +n，`Roasting.tsx` 的 `pop`）；菜單直條的價格是漢數字（英文用阿拉伯數字，原本就有的英文規則讓它橫寫）；英文菜單卡名字下面又重複一行同樣的英文小字（英文不畫，`tagFit` 也不算它）；日誌與說話者後面用全形冒號「：」（英文用 ": "）；「took from the fridge Bottled beer」改成「took a bottled beer from the fridge」。
+- 驗證：`_cjkopen.mjs` 開店 2.5 分鐘 0 處；截圖看過菜單與日誌；`npm test` 415 過。
