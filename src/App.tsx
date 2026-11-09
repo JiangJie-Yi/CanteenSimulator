@@ -100,6 +100,8 @@ import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 import { ViewToast } from '@/ui/ViewToast'
 
 /** closing up, by the game's minutes past closing time: those still in hurried out (half an hour), the shop shut whoever's left (an hour) */
+/** the most lines the log keeps (a day's worth, the oldest written over past it) */
+const LOG_MAX = 300
 const CLOSE_HURRY = 30
 const CLOSE_HARD = 60
 /** where the clock's put when the day's sheet is put away: the next day's getting ready, half an hour before opening (16:30) */
@@ -1339,6 +1341,9 @@ export default function App() {
     if (!ai) return
     SHOP.openedAt = performance.now()
     SHOP.day++
+    // (the day's log begun afresh (the owner's: a day's worth of it))
+    setChat([])
+    chatPinned.current = true
     // (the shop's name, as it stands this morning, bringing them in, or keeping them away (game/reputation's flowOf; the owner's))
     Object.assign(RATING_FLOW, flowOf(shopRatingRef.current.stars))
     SHOP.counted = true
@@ -1925,6 +1930,10 @@ export default function App() {
     shiftStock({ [CHARCOAL]: o.sticks })
   }
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner'; text: string }[]>([])
+  // (the log's list, and whether it's at its newest (not scrolled up to read back): kept at the foot as lines come in while it is)
+  const chatEl = useRef<HTMLUListElement>(null)
+  const chatPinned = useRef(true)
+  useLayoutEffect(() => { const el = chatEl.current; if (el && chatPinned.current) el.scrollTop = el.scrollHeight }, [chat])
   /** what each customer's saying just now (over their head) */
   const [speech, setSpeech] = useState<Record<number, { key: number; text: string; ms: number }>>({})
   const chatId = useRef(0)
@@ -1945,9 +1954,10 @@ export default function App() {
     // customers are named by how they look (上班族, 老奶奶…), not by number: their name before their words in the log
     const lg = langRef.current
     const text = guest !== undefined ? `${guestLabel(guest, lg)}${lg === 'ja' ? '「' : lg === 'en' ? ': ' : '：'}${raw}${lg === 'ja' ? '」' : ''}` : raw
+    // (kept the day's business long (the owner's, as an online game's chat: a day's worth, the oldest written over past LOG_MAX), not gone
+    // after six seconds)
     const id = ++chatId.current
-    setChat((all) => [...all.slice(-4), { id, who, text }])
-    window.setTimeout(() => setChat((all) => all.filter((m) => m.id !== id)), 6000)
+    setChat((all) => [...all.slice(-(LOG_MAX - 1)), { id, who, text }])
   }, [])
   const [sky, setSky] = useSky()
   const theme = themeOf(sky)
@@ -3018,8 +3028,11 @@ export default function App() {
             </section>
           )}
         </div>
-        {ai && chat.length > 0 && (
-          <ul className="ai-chat is-draggable" aria-live="polite" style={{ ...dragChat.style, pointerEvents: 'auto' }}
+        {chat.length > 0 && (
+          // (the day's log, as an online game's chat window (the owner's): the newest at the foot, older ones up it fading, the wheel to read
+          // back; held at the newest unless it's been scrolled up to read)
+          <ul ref={chatEl} className="ai-chat is-draggable" aria-live="polite" style={{ ...dragChat.style, pointerEvents: 'auto' }}
+            onScroll={(e) => { const el = e.currentTarget; chatPinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24 }}
             onPointerDown={dragChat.onPointerDown} onDoubleClick={dragChat.onDoubleClick}>
             {chat.map((m) => (
               <li key={m.id} className={`ai-line ai-${m.who}`}>

@@ -236,14 +236,28 @@ button {
   position: absolute;
   left: 22px;
   bottom: 84px;
-  display: grid;
+  /* (a column from the foot up: the first line takes the room over it while there's room, and past it the list scrolls; aligned to its end
+     instead, what overflowed went off its top, out of the scroll's reach) */
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   max-width: min(360px, 80%);
+  /* (the day's log (the owner's: an online game's chat window): some six lines high, scrolled with the wheel, the older lines up it fading out
+     toward its top; no bar showing) */
+  max-height: 270px;
   margin: 0;
-  padding: 0;
+  padding: 26px 0 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   list-style: none;
   pointer-events: none;
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 55%, rgb(0 0 0 / 0.45) 80%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0, #000 55%, rgb(0 0 0 / 0.45) 80%, transparent 100%);
 }
+.ai-chat::-webkit-scrollbar { display: none; }
+.ai-chat > :first-child { margin-top: auto; }
+.ai-chat > li { flex: none; }
 
 /* (the owner's: a see-through smoked glass, the shop behind it showing, warm white words) */
 .ai-line {
