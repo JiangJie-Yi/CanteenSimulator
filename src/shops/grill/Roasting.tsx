@@ -2001,80 +2001,6 @@ const COVE_GLOW = (() => {
   g.fillRect(0, 0, 8, 64)
   return new THREE.CanvasTexture(c)
 })()
-/** the foot rail along a counter's base (the counter's frame: height, how far out toward the customers, its radius) */
-const FOOT_RAIL = { y: 0.186, z: -0.3, r: 0.034 }
-/** the foot rail's log, a unit long: a round of timber a little uneven, its trunk a touch fatter at one end, the surface
- * roughened (the same every time) */
-const LOG_GEO = (() => {
-  const g = new THREE.CylinderGeometry(FOOT_RAIL.r, FOOT_RAIL.r * 1.07, 1, 9, 14, false)
-  const p = g.attributes.position
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i)
-    const a = Math.atan2(z, x)
-    const bump = 1 + 0.07 * Math.sin(a * 3 + y * 9) + 0.05 * Math.sin(a * 5 - y * 23 + 1.3) + 0.03 * Math.sin(y * 41 + a)
-    p.setXYZ(i, x * bump, y, z * bump)
-  }
-  g.computeVertexNormals()
-  return g
-})()
-/** the log's bark (its fissures running down its length, v along it) and its cut end (the growth rings, the heartwood darker, a crack or two) */
-const LOG_BARK = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 256; c.height = 512
-  const g = c.getContext('2d')!
-  g.fillStyle = '#6e4a2c'; g.fillRect(0, 0, 256, 512)
-  let seed = 7
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  // (plates of bark between long fissures, each plate its own shade, worn paler where feet rest)
-  for (let k = 0; k < 26; k++) {
-    const x = rnd() * 256, w = 6 + rnd() * 16
-    g.fillStyle = `hsl(${24 + rnd() * 8}, ${30 + rnd() * 15}%, ${22 + rnd() * 14}%)`
-    g.fillRect(x, 0, w, 512)
-  }
-  g.strokeStyle = 'rgba(25,14,6,0.8)'
-  for (let k = 0; k < 40; k++) {
-    let x = rnd() * 256, y = rnd() * 512
-    g.lineWidth = 0.8 + rnd() * 2
-    g.beginPath(); g.moveTo(x, y)
-    const len = 60 + rnd() * 200
-    for (let t = 0; t < len; t += 8) { x += (rnd() - 0.5) * 3; y += 8; g.lineTo(x, y) }
-    g.stroke()
-  }
-  // (cross checks between the fissures)
-  g.strokeStyle = 'rgba(30,18,8,0.5)'; g.lineWidth = 1
-  for (let k = 0; k < 60; k++) { const x = rnd() * 256, y = rnd() * 512; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 4 + rnd() * 8, y + (rnd() - 0.5) * 3); g.stroke() }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  return t
-})()
-const LOG_END_TEX = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = c.height = 128
-  const g = c.getContext('2d')!
-  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64)
-  gr.addColorStop(0, '#b07a48'); gr.addColorStop(0.45, '#d8b07a'); gr.addColorStop(0.9, '#e2bf8a'); gr.addColorStop(1, '#5a3a20')
-  g.fillStyle = gr; g.fillRect(0, 0, 128, 128)
-  g.strokeStyle = 'rgba(120,80,40,0.45)'
-  for (let r = 4; r < 60; r += 3 + (r % 5)) { g.lineWidth = 0.8; g.beginPath(); g.ellipse(64 + Math.sin(r) * 1.5, 64, r, r * 0.97, 0, 0, Math.PI * 2); g.stroke() }
-  g.strokeStyle = 'rgba(60,35,15,0.7)'; g.lineWidth = 1.2
-  g.beginPath(); g.moveTo(64, 64); g.lineTo(100, 40); g.stroke()
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
-const LOG_RING = new THREE.CylinderGeometry(FOOT_RAIL.r * 1.1, FOOT_RAIL.r * 1.1, 0.026, 9)
-const LOG_END = new THREE.CircleGeometry(FOOT_RAIL.r * 1.03, 9)
-/** the bark tiled along a log of this length, so its fissures keep their size whatever the length */
-const BARK_BY_LEN = new Map<number, THREE.Texture>()
-function logBarkFor(len: number) {
-  const k = Math.round(len * 10) / 10
-  let t = BARK_BY_LEN.get(k)
-  if (!t && LOG_BARK) { t = LOG_BARK.clone(); t.repeat.set(1, Math.max(1, k * 2.2)); t.needsUpdate = true; BARK_BY_LEN.set(k, t) }
-  return t ?? null
-}
 /** how high the raised lip along the bar's cook's side stands over its top */
 /** how far the first counter's lip runs on towards the side counter's, so the two meet at the corner with no gap (the bar's own sizes) */
 const LIP_JOIN = 0.29
@@ -2216,40 +2142,6 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
         {/* (laid on as light, added to the boards under it, not painted over them: their grain shows through the glow) */}
         <meshBasicMaterial map={COVE_GLOW} transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
       </mesh>
-      {/* the foot rail: a log of raw timber along the base's front at the height of a sitting customer's soles, held out from
-          the base on wooden brackets, so their feet rest on something */}
-      {(() => {
-        const x0 = -(L + 0.3) / 2 + (trim ? 0.34 : 0.1) + (gate && end < 0 ? G : 0)
-        const x1 = (L + 0.3) / 2 - (butt ? 0.32 : 0.1) - (gate && end > 0 ? G : 0)
-        const len = x1 - x0
-        const n = Math.max(2, Math.round(len / 0.9) + 1)
-        return (
-          <group position-x={(x0 + x1) / 2}>
-            <mesh geometry={LOG_GEO} position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2} scale={[1, len, 1]}>
-              <meshToonMaterial color="#ffffff" map={logBarkFor(len)} />
-            </mesh>
-            <mesh geometry={LOG_GEO} position={[0, FOOT_RAIL.y, FOOT_RAIL.z]} rotation-z={Math.PI / 2} scale={[1.16, len + 0.012, 1.16]}>
-              <meshBasicMaterial color="#2a1a10" side={THREE.BackSide} />
-            </mesh>
-            {/* (the bark's rings along it, and the cut ends showing the pale wood; its knots taken off: the owner saw odd little dots under the legs) */}
-            {Array.from({ length: Math.max(1, Math.round(len / 0.55)) }, (_, k) => (
-              <mesh key={`r${k}`} geometry={LOG_RING} position={[-len / 2 + (len * (k + 0.5)) / Math.max(1, Math.round(len / 0.55)), FOOT_RAIL.y, FOOT_RAIL.z]}
-                rotation-z={Math.PI / 2} rotation-y={k}><meshToonMaterial color="#4a3220" /></mesh>
-            ))}
-            {[-1, 1].map((sd) => (
-              <mesh key={`e${sd}`} geometry={LOG_END} position={[sd * (len / 2 + 0.002), FOOT_RAIL.y, FOOT_RAIL.z]} rotation-y={sd * Math.PI / 2}>
-                <meshToonMaterial color="#ffffff" map={LOG_END_TEX} />
-              </mesh>
-            ))}
-            {Array.from({ length: n }, (_, k) => (
-              <mesh key={k} position={[-len / 2 + (len * k) / (n - 1), FOOT_RAIL.y, (FOOT_RAIL.z - 0.12) / 2]}>
-                <boxGeometry args={[0.035, 0.035, Math.abs(FOOT_RAIL.z + 0.12)]} />
-                <meshToonMaterial color="#4a3220" />
-              </mesh>
-            ))}
-          </group>
-        )
-      })()}
       {/* the base stands back on the cook's side, so the customers' knees go under the top: dark cedar boards standing in a frame, their
           grain at one scale along it (the table's own panelling, darker), the cove light washing down them */}
       {/* (it stands in the top's shadow, lit by nothing but the cove light: its boards glow a little with it, grain and all, or they'd be black) */}
