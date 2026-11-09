@@ -10,7 +10,7 @@ import { reviewerNames } from '@/data/reviewers'
 import { tl, type Lang } from '@/data/i18n'
 import { STORY } from '@/data/story'
 import { CAPITAL, SHOP_COST } from '@/game/economy'
-import { remarkOf, satisfaction, starsOf, type Rating, type Remark, type Visit } from '@/game/reputation'
+import { remarkOf, visitStars, type Rating, type Remark, type Visit } from '@/game/reputation'
 import { FitLine } from './FitLine'
 import { ReviewerAvatar } from './ReviewerAvatar'
 import { StarIcon } from './GameIcons'
@@ -24,6 +24,8 @@ const REMARK: Record<Remark, [string, string, string][]> = {
     ['吃得好滿足，下次帶朋友來', '大満足、今度は友達を連れてくる', 'So satisfying. Bringing friends next time'],
     ['鹹淡剛好，配酒一流', '塩加減が絶妙で酒がすすむ', 'Seasoned just right, perfect with a drink'],
     ['這才是真正的炭烤', 'これぞ本物の炭火焼', 'Now that’s real charcoal grilling'],
+    ['烤魚皮脆多汁！出餐俐落', '焼き魚は皮パリでジューシー！出てくるのも早い', 'Crisp skin, juicy fish! Out quick, too'],
+    ['氣氛超棒，大廚手藝一流！', '雰囲気最高、大将の腕も一流！', 'Lovely atmosphere, and the chef’s first rate!'],
   ],
   good: [
     ['好吃，會再來', 'おいしかった、また来たい', 'Good. I’ll be back'],
@@ -46,6 +48,8 @@ const REMARK: Record<Remark, [string, string, string][]> = {
   walkedOut: [
     ['等不到餐點，走了', '料理が来なくて帰った', 'Gave up waiting and left'],
     ['等太久了，下次再說', '待ちきれない、また今度', 'Took too long. Another time'],
+    ['等了半小時連杯水都沒上，絕不再來', '30分待って水一杯も出ない、二度と来ない', 'Half an hour and not even a glass of water. Never again'],
+    ['出餐太慢，餓到胃痛先走了', '出てくるのが遅すぎて、空腹で胃が痛くて帰った', 'So slow I left with my stomach aching'],
   ],
   wait: [
     ['等太久了', '待たされた', 'Waited too long'],
@@ -58,6 +62,7 @@ const REMARK: Record<Remark, [string, string, string][]> = {
     ['付了錢，連張發票都沒有', '払ったのにレシートもない', 'Paid, and not even a receipt'],
   ],
   tissue: [
+    ['桌上衛生紙盒空了沒人補', '席のティッシュが空なのに誰も補充しない', 'The tissue box was empty and nobody refilled it'],
     ['抽屜裡沒有衛生紙', 'ティッシュがなかった', 'No tissues at my place'],
     ['想擦嘴卻沒有衛生紙', '口を拭くティッシュがない', 'Nothing to wipe my mouth with'],
   ],
@@ -66,6 +71,7 @@ const REMARK: Record<Remark, [string, string, string][]> = {
     ['廁所該打掃了', 'トイレの掃除をしてほしい', 'The toilet needs a clean'],
   ],
   dark: [
+    ['店裡暗得像鬧鬼，差點找不到位子', 'お化け屋敷みたいに暗くて、席も見つからなかった', 'Dark as a haunted house, could barely find a seat'],
     ['店裡太暗了', '店が暗すぎた', 'It was too dark to eat'],
     ['暗到看不清楚菜', '暗くて料理が見えない', 'Too dark to see the food'],
   ],
@@ -201,22 +207,21 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
             <h4>{tl(lang, '最近的客人說', '最近のお客さんの声', 'What the latest said')}<small>{latest.length}</small></h4>
             <ul className="rep-recent">
               {(() => { const names = reviewerNames(latest.map((v) => v.id), lang); return latest.map((v, i) => {
-                const sat = satisfaction(v)
                 const [zh, ja, en] = remarkLine(v)
                 return (
                   <li key={visitKey(v)}>
                     {/* (their profile picture, as a map app's reviews have them (the owner's: not an emoji): game/avatars) */}
                     {/* (the name they review under, as on a map app (data/reviewers); what kind of customer they were a small tag beside it) */}
                     <ReviewerAvatar id={v.id} name={names[i]} />
-                    <span className="rep-who">{names[i]}<small className="rep-kind">{guestLabel(v.id, lang)}</small><Stars v={starsOf(sat)} /></span>
+                    <span className="rep-who">{names[i]}<small className="rep-kind">{guestLabel(v.id, lang)}</small><Stars v={visitStars(v)} /></span>
                     <span className="rep-said">「{tl(lang, zh, ja, en)}」</span>
                   </li>
                 )
               }) })()}
             </ul>
-            <p className="rep-note">{tl(lang, '最近 60 位客人的滿意度（越近的越重）：美味、等候時間、衛生紙、廁所、燈光、身體狀況都算。',
-              '最近 60 人の満足度（新しいほど重い）：味・待ち時間・ティッシュ・トイレ・照明・体調。',
-              'The latest 60 customers’ satisfaction, newer counting more: the food, the wait, the tissues, the toilet, the light, how they felt after.')}</p>
+            <p className="rep-note">{tl(lang, '最近 60 位客人（越近的越重）：料理 45%、服務 35%、環境 20%。沒吃就走的給 1 星。評價會影響來客：4.6 以上客人多五成，2.5 以下只剩三成。',
+              '最近 60 人（新しいほど重い）：料理 45%・サービス 35%・雰囲気 20%。食べずに帰った客は星 1。評価は客足に響く：4.6 以上で 5 割増、2.5 未満で 3 割に。',
+              'The latest 60 customers, newer counting more: food 45%, service 35%, the place 20%. Walked out without eating: one star. The rating brings them in: 4.6 and up, half as many again; under 2.5, a third.')}</p>
           </>
         )}
       </div>

@@ -69,7 +69,7 @@ import { ColdMist } from '@/scene/ColdMist'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
-import { SHOP, paceOfStaff, LATE, LAST_CALL } from '@/game/shopState'
+import { SHOP, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
 import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
@@ -4983,7 +4983,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // (no one more sat down in the last half hour before closing (game/hours' lastCall): takeaways only then, below)
     // (every stool taken, still one comes in if there's room on the bench to wait)
-    if (onOrder && !SHOP.closing && !LAST_CALL.on && comesIn(mood) && (seated.length < MAX_SEATED || (bar && BENCH.ids.length < BENCH_SEATS)) && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK)) {
+    if (onOrder && !SHOP.closing && !LAST_CALL.on && comesIn(mood) && (seated.length < MAX_SEATED || (bar && BENCH.ids.length < BENCH_SEATS)) && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK) / RATING_FLOW.more) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
@@ -5078,7 +5078,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     TAKEOUT.orders = TAKEOUT.orders.filter((o) => !o.gone)
     // someone kept waiting too long goes
     for (const g of seated) {
-      if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood)) {
+      if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience) {
         g.state = 'angry'
         if (mood === 'dark') gripe(g.id, 'dark')
         const owed = [...g.orders]

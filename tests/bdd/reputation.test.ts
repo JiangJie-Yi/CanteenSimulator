@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import { rateShop, remarkOf, satisfaction, starsOf, type Visit } from '@/game/reputation'
+import { flowOf, rateShop, remarkOf, satisfaction, starsOf, visitStars, WEIGHTS, type Visit } from '@/game/reputation'
 import { BOX_LOW, BOX_SHEETS, refillBoxes, sheetsFor, takeSheets, tissueOrder, TISSUE_PACK } from '@/game/tissues'
 import { feature, scenario } from './bdd'
 
@@ -28,6 +28,32 @@ feature('店家評價：綜合每位客人的滿意度（點招牌看）', () =>
     })
     when('算店家評價', (w) => { w.r = rateShop(w.vs as Visit[]) })
     then('比兩者的平均（3.4 星）高', (w) => { expect((w.r as ReturnType<typeof rateShop>).stars!).toBeGreaterThan(3.4) })
+  })
+  scenario('總分就是三項照權重算出來的（料理 45%、服務 35%、環境 20%）', ({ given, when, then }) => {
+    given('各種客人：好吃的、等很久的、沒衛生紙的、沒吃就走的', (w) => {
+      w.vs = [visit({ id: 1, taste: 90 }), visit({ id: 2, taste: 70, waited: 300 }), visit({ id: 3, taste: 60, gripes: ['tissue'] }), visit({ id: 4, taste: null, walkedOut: true, waited: 500 })]
+    })
+    when('算店家評價', (w) => { w.r = rateShop(w.vs as Visit[]) })
+    then('總分等於三項的加權平均（差不到 0.01）', (w) => {
+      const r = w.r as ReturnType<typeof rateShop>
+      expect(r.stars!).toBeCloseTo(r.food! * WEIGHTS.food + r.service! * WEIGHTS.service + r.place! * WEIGHTS.place, 1)
+      const lo = Math.min(r.food!, r.service!, r.place!), hi = Math.max(r.food!, r.service!, r.place!)
+      expect(r.stars!).toBeGreaterThanOrEqual(lo - 0.01)
+      expect(r.stars!).toBeLessThanOrEqual(hi + 0.01)
+    })
+  })
+  scenario('沒吃就生氣走掉的客人給 1 星，服務分跟著掉', ({ when, then, and }) => {
+    when('一位沒吃就走、一位很滿意', (w) => { w.r = rateShop([visit({ id: 1, taste: 90 }), visit({ id: 2, taste: null, walkedOut: true })]) })
+    then('走掉的那位自己是 1 星', () => { expect(visitStars(visit({ taste: null, walkedOut: true }))).toBe(1) })
+    and('服務分低於 3.1（一位 5 星、一位 1 星）', (w) => { expect((w.r as ReturnType<typeof rateShop>).service!).toBeLessThan(3.1) })
+  })
+  scenario('評價影響來客：名店客人多五成、口碑崩盤只剩三成', ({ then, and }) => {
+    then('4.7 星：來客 1.5 倍、耐心多一成', () => { expect(flowOf(4.7)).toEqual({ more: 1.5, patience: 1.1 }) })
+    and('4.2 星：1.2 倍', () => { expect(flowOf(4.2).more).toBe(1.2) })
+    and('3.7 星：照常', () => { expect(flowOf(3.7)).toEqual({ more: 1, patience: 1 }) })
+    and('3.0 星：少了近四成、耐心少 15%', () => { expect(flowOf(3.0)).toEqual({ more: 0.62, patience: 0.85 }) })
+    and('2.0 星：只剩三成', () => { expect(flowOf(2.0).more).toBe(0.32) })
+    and('還沒有評價：照常', () => { expect(flowOf(null)).toEqual({ more: 1, patience: 1 }) })
   })
   scenario('沒有客人時沒有評價', ({ then }) => {
     then('星數是空的', () => { expect(rateShop([]).stars).toBeNull() })

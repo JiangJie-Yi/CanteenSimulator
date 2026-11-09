@@ -45,7 +45,7 @@ import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { dutyDay, LAST_CALL, LATE, SHOP, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { dutyDay, LAST_CALL, LATE, RATING_FLOW, SHOP, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -67,7 +67,7 @@ import { SAY_EACH, sayChunks } from '@/game/say'
 import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
 import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
-import { keepVisits, rateShop, type Visit } from '@/game/reputation'
+import { flowOf, keepVisits, rateShop, type Visit } from '@/game/reputation'
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
 import { RECEIPT, receiptOrder } from '@/game/receipts'
 import { LINES } from '@/data/lines'
@@ -1350,6 +1350,8 @@ export default function App() {
     if (!ai) return
     SHOP.openedAt = performance.now()
     SHOP.day++
+    // (the shop's name, as it stands this morning, bringing them in, or keeping them away (game/reputation's flowOf; the owner's))
+    Object.assign(RATING_FLOW, flowOf(shopRatingRef.current.stars))
     SHOP.counted = true
     // (the day's shift on (game/shifts): each one's run of days counted, those off resting it all)
     {
@@ -1498,6 +1500,8 @@ export default function App() {
     return next
   }), [])
   const shopRating = useMemo(() => rateShop(shopVisits), [shopVisits])
+  const shopRatingRef = useRef(shopRating)
+  shopRatingRef.current = shopRating
   // (a gripe after the visit's been scored: no receipt as they paid, the printer out of paper and no spare roll (game/receipts); added to their
   // visit, or kept for it if it isn't scored yet)
   const visitsNow = useRef(shopVisits)

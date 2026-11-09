@@ -43,3 +43,6 @@ export const SPEAKERS = new Map<string, string>()
 /** when a customer last complained of the wait (performance.now(), shops/grill/bar's gripe): the owner and the staff look alarmed a moment
  * (the owner's: Overcooked's panic as the orders pile up) */
 export const RUSH = { at: -1e9 }
+/** what the shop's name brings in today (game/reputation's flowOf, taken as the day's business opens: App): how many more customers come
+ * (the gap between them divided by it), how patient they are */
+export const RATING_FLOW = { more: 1, patience: 1 }

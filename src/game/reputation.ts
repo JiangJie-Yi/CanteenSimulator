@@ -44,14 +44,44 @@ export function rateShop(visits: Visit[]): Rating {
     })
     return wt ? Math.round((sum / wt) * 100) / 100 : null
   }
-  const has = (v: Visit, g: Gripe) => v.gripes.includes(g)
-  return {
-    stars: avg(satisfaction),
-    n: visits.length,
-    food: avg((v) => v.taste),
-    service: avg((v) => clamp(100 - Math.min(60, Math.max(0, v.waited - 60) / 2) - (v.walkedOut ? 50 : 0) - (has(v, 'nothing') ? 30 : 0) - (has(v, 'receipt') ? 20 : 0), 0, 100)),
-    place: avg((v) => clamp(100 - (has(v, 'tissue') ? 25 : 0) - (has(v, 'toilet') ? 30 : 0) - (has(v, 'dark') ? 35 : 0) - (has(v, 'sick') ? 40 : 0), 0, 100)),
-  }
+  const food = avg(foodScore), service = avg(serviceScore), place = avg(placeScore)
+  return { stars: weighed(food, service, place), n: visits.length, food, service, place }
+}
+/** the three sides weighed into the whole (the owner's: the food most, then the service, then the place), so the stars are what the three
+ * shown beside them make (they were the visits' own satisfaction, not the sides': 3.57 beside 4.07, 4.52 and 4.81); with no food eaten by
+ * anyone, the other two */
+export const WEIGHTS = { food: 0.45, service: 0.35, place: 0.2 }
+function weighed(food: number | null, service: number | null, place: number | null) {
+  const parts = [[food, WEIGHTS.food], [service, WEIGHTS.service], [place, WEIGHTS.place]].filter(([v]) => v !== null) as [number, number][]
+  if (!parts.length) return null
+  const w = parts.reduce((a, [, k]) => a + k, 0)
+  return Math.round((parts.reduce((a, [v, k]) => a + v * k, 0) / w) * 100) / 100
+}
+const has = (v: Visit, g: Gripe) => v.gripes.includes(g)
+/** a visit's three sides (0..100): the food (what was eaten; none, nothing), the service (the wait, walking out (nothing at all), nothing to
+ * be had, no receipt), the place (tissues, the toilet, the light, stomachs) */
+const foodScore = (v: Visit) => v.taste
+const serviceScore = (v: Visit) => (v.walkedOut ? 0 : clamp(100 - Math.min(60, Math.max(0, v.waited - 60) / 2) - (has(v, 'nothing') ? 30 : 0) - (has(v, 'receipt') ? 20 : 0), 0, 100))
+const placeScore = (v: Visit) => clamp(100 - (has(v, 'tissue') ? 25 : 0) - (has(v, 'toilet') ? 30 : 0) - (has(v, 'dark') ? 35 : 0) - (has(v, 'sick') ? 40 : 0), 0, 100)
+/** one visit's own stars, by the same weighing as the shop's; walked out without eating, one */
+export function visitStars(v: Visit) {
+  if (v.walkedOut) return 1
+  const f = foodScore(v)
+  return weighed(f === null ? null : starsOf(f), starsOf(serviceScore(v)), starsOf(placeScore(v)))!
+}
+
+/**
+ * What the shop's name brings in (the owner's): how many more (or fewer) customers come, and how patient they are, by its stars, taken as
+ * the day's business opens. A famous shop has them queueing (half as many again, a tenth more patient); a poor name thins them out and has
+ * them doubting (fewer, less patient); a ruined one, a few passing drinkers. No rating yet: as it is.
+ */
+export function flowOf(stars: number | null): { more: number; patience: number } {
+  if (stars === null) return { more: 1, patience: 1 }
+  if (stars >= 4.6) return { more: 1.5, patience: 1.1 }
+  if (stars >= 4.0) return { more: 1.2, patience: 1 }
+  if (stars >= 3.5) return { more: 1, patience: 1 }
+  if (stars >= 2.5) return { more: 0.62, patience: 0.85 }
+  return { more: 0.32, patience: 0.85 }
 }
 /** what a customer says of their visit: walking out, the worst thing that put them out, or what they thought of the food */
 export type Remark = 'walkedOut' | Gripe | 'great' | 'good' | 'fine' | 'poor'
