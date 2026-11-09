@@ -18,8 +18,11 @@ export const DEVELOPER = 'JiangJie-Yi'
 export const DEVELOPER_URL = 'https://github.com/JiangJie-Yi'
 export const REPO_URL = 'https://github.com/JiangJie-Yi/CanteenSimulator'
 export const SITE_URL = 'https://jiangjie-yi.github.io/CanteenSimulator/'
-/** the game's version (the owner's: 0.01 for now), and the AI model it's developed with (in Claude Code) */
+/** the game's version (the owner's: up 0.01 with every push), and the AI model it's developed with */
 /** the game's version: <gameVersion's whole part>.<commit count> (<short hash>), worked out by vite.config.ts as it builds or serves */
 declare const __GAME_VERSION__: string | undefined
 export const VERSION: string = typeof __GAME_VERSION__ === 'string' ? __GAME_VERSION__ : '0.01'
+/** the version as shown: the site's v and its number; a build on the developer's own machine ('dev', or 'dev (commit)': vite.config's
+ * gameVersion) as `dev` says it (開發版) and its commit, no v before it (it read vdev) */
+export const versionText = (v: string, dev: string) => (v.startsWith('dev') ? v.replace(/^dev/, dev) : `v${v}`)
 export const DEV_MODEL = 'Claude Opus 5.5'

@@ -4,7 +4,7 @@
 // nothing in the room or at Esc (the owner's), in the office's finish: its wood title bar, its glass, a section under a rule, a card each.
 // Its second tab, 關於 (the owner's): the game, who makes it, its source on GitHub, and the work used in it under licence with its authors.
 import { memo, useEffect, useState } from 'react'
-import { CC_BY_URL, CREDITS, DEV_MODEL, DEVELOPER, DEVELOPER_URL, REPO_URL, VERSION } from '@/data/credits'
+import { CC_BY_URL, CREDITS, DEV_MODEL, DEVELOPER, DEVELOPER_URL, REPO_URL, VERSION, versionText } from '@/data/credits'
 import { guestLabel } from '@/data/guests'
 import { reviewerNames } from '@/data/reviewers'
 import { tl, type Lang } from '@/data/i18n'
@@ -163,12 +163,13 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
               <dl>
                 <dt>{pick('開發者', '開発', 'Developer')}</dt><dd><a href={DEVELOPER_URL} target="_blank" rel="noopener noreferrer">{DEVELOPER}</a></dd>
                 {/* (each on one line, set smaller if it must be (the owner's: nothing on two lines): the addresses without their https://
-                    and the end slash, the model and the tool each a line of its own) */}
+                    and the end slash, the model and the tools each a line of its own) */}
                 <dt>GitHub</dt><dd><FitLine><a href={REPO_URL} target="_blank" rel="noopener noreferrer">{REPO_URL.replace(/^https:\/\/|\/$/g, '')}</a></FitLine></dd>
-                <dt>{pick('版本', 'バージョン', 'Version')}</dt><dd>v{VERSION}</dd>
+                {/* (the site's: v and its number; run here, on the developer's own machine, not a version at all: the build and its commit) */}
+                <dt>{pick('版本', 'バージョン', 'Version')}</dt><dd>{versionText(VERSION, pick('開發版', '開発版', 'Dev build'))}</dd>
                 <dt>{pick('開發模型', '開発モデル', 'Model')}</dt><dd><FitLine>{DEV_MODEL}（Anthropic）</FitLine></dd>
-                <dt>{pick('開發工具', '開発ツール', 'Tool')}</dt><dd>Claude Code</dd>
-                <dt>{pick('製作', '制作', 'Made with')}</dt><dd><FitLine>React・three.js・Vite・Blender</FitLine></dd>
+                {/* (what it's made with, as its development tools (the owner's: one line, where 製作 was; Claude Code's line taken off)) */}
+                <dt>{pick('開發工具', '開発ツール', 'Tools')}</dt><dd><FitLine>React・three.js・Vite・Blender</FitLine></dd>
               </dl>
             </div>
             {/* (the work used under a licence that asks for its author to be named: each its own card, what was changed in it said) */}
