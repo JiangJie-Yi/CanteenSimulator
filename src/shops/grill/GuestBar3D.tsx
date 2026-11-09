@@ -2342,9 +2342,11 @@ const CRUMPLE_GEO = (() => {
 })()
 const CRUMPLE_MAT = new THREE.MeshToonMaterial({ color: '#f7f5ef' })
 const TISSUE_ON: [number, number, number] = [-0.035, 0.006, 0.025]
-/** how long a customer wipes their mouth with a tissue before getting up */
 /** how much of their way into a toilet's stall they fade out over (and fade in at the washstand coming out) */
 const WC_FADE_LEN = 0.45
+/** how faded they are at the stall's door, and how long the rest takes once they're in (seconds) */
+const WC_FADE_IN = 0.35, WC_FADE_LAST = 0.35
+/** how long a customer wipes their mouth with a tissue before getting up */
 const WIPE_MOUTH_MS = 900
 // (a done-with plate's bones and glass, and the plater's rice bowl, first shown mid-shift: their shaders made with the rest at load (scene/Prewarm))
 {
@@ -3084,13 +3086,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) g.rotation.y = s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
         // (into the stall round the corner, faded out over the last step: put out of sight there at once, they went in a blink, seen from above
         // through the slats of its ceiling)
-        if (s.phase === 'wcGo' && w.who !== 'drink') s.fade = Math.max(0, Math.min(1, (w.len - d) / WC_FADE_LEN))
+        // (to a third of themselves at the stall's door, the rest just inside it (below): at x2 the last step was two or three frames, and
+        // they still went in a blink)
+        if (s.phase === 'wcGo' && w.who !== 'drink') s.fade = WC_FADE_IN + (1 - WC_FADE_IN) * Math.max(0, Math.min(1, (w.len - d) / WC_FADE_LEN))
         if (d >= w.len) {
           if (s.phase === 'wcGo') SICK.delete(s.id)
           s.phase = s.phase === 'wcGo' ? 'wcIn' : s.leaving ? 'leave' : 'sit'
           s.t = 0
         }
       } else if (s.phase === 'wcIn') {
+        // (in the stall: the last of them faded out, then out of sight)
+        if (s.wc?.who !== 'drink' && (s.fade ?? 0) > 0) s.fade = Math.max(0, (s.fade ?? 0) - Math.min(dt, 0.1) * WC_FADE_IN / WC_FADE_LAST)
         // (at the fridge: facing it, choosing; then their drink in hand, back to their stool)
         if (s.wc?.who === 'drink' && g && fridges) g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
         if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : wcStayOf(s.id))) {
@@ -3204,7 +3210,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // (the name tag goes with the body: gone a little before they are, so none is left hanging in the doorway)
       const tag = labels.current.get(s.id)
-      const hidden = s.phase === 'wcIn' && s.wc?.who !== 'drink'
+      const hidden = s.phase === 'wcIn' && s.wc?.who !== 'drink' && (s.fade ?? 0) <= 0
       if (g) g.visible = !hidden
       // (drei's Html draws its page bit whether its group's shown or not: inside the stall, their words hung on the toilet's wall with no
       // one under them, the owner's ghost bubble; hidden here with the body)
