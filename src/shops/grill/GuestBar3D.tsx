@@ -4013,7 +4013,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) {
           g.position.copy(v.pos)
           g.position.y = inGenkan(counters, v.pos) ? -GENKAN.depth : 0
-          g.rotation.y = v.yaw
+          // (turned to the way they face a moment at a time: set at once, they spun round as they took their bag and went)
+          g.rotation.y = turnToward(g.rotation.y, v.yaw, step * 1.5)
         }
       }
       if (changed) setVisitorList([...visitors.current.values()].map((v) => ({ id: v.id, rider: v.rider, has: v.phase === 'out' })))
@@ -4070,7 +4071,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) {
           g.position.copy(v.pos)
           g.position.y = inGenkan(counters, v.pos) ? -GENKAN.depth : 0
-          g.rotation.y = v.yaw
+          // (and those on the bench as they sit down, get up and go)
+          g.rotation.y = turnToward(g.rotation.y, v.yaw, step * 1.5)
         }
       }
       if (benchChanged) setSitterList([...sitters.current.values()].map((v) => ({ id: v.id, sat: v.phase === 'sit' })))
