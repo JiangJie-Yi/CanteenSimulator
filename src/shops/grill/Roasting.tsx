@@ -5193,11 +5193,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (pieces.current.some((p) => p.guest === g.id && p.eat > 0 && !p.eaten && !p.stickOnly)) continue
       // (eaten some, and the rest long in coming (lost, or the kitchen swamped): up to pay for what they've had, the rest let go, not sat
       // at an empty plate for ever)
-      if (g.state === 'eating' && !FED.has(g.id) && now - (g.lastAte ?? now) > NEXT_DISH_WAIT + GUEST_EAT_SECONDS) {
+      // (or hurried out half an hour past closing (SHOP.hurry), nothing before them: up to pay for what they've had, the rest refunded)
+      if ((g.state === 'eating' && !FED.has(g.id) && now - (g.lastAte ?? now) > NEXT_DISH_WAIT + GUEST_EAT_SECONDS) || (SHOP.hurry && !FED.has(g.id))) {
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
         g.state = 'done'
-        gripe(g.id, 'wait')
+        if (!SHOP.hurry || g.ate.length === 0) gripe(g.id, 'wait')
         onWalkOut?.(owed, g.id)
         report()
         continue
@@ -6869,7 +6870,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.eat = 0.0001
       }
       if (p.eat > 0 && !p.eaten && !p.stickOnly) {
-        p.eat = Math.min(1, p.eat + dt / (p.container === 'bar' && !p.byBoss ? GUEST_EAT_SECONDS : EAT_SECONDS))
+        p.eat = Math.min(1, p.eat + dt / (p.container === 'bar' && !p.byBoss ? GUEST_EAT_SECONDS / (SHOP.hurry ? 4 : 1) : EAT_SECONDS))
         const phase = p.eat * BITES_PER_PIECE
         const wanted = Math.min(BITES_PER_PIECE, Math.floor(phase + 0.35))
         while (p.bites.uBiteCount.value < wanted) {

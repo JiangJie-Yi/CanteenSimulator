@@ -98,6 +98,11 @@ import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
 import { ViewToast } from '@/ui/ViewToast'
+
+/** closing up, by the game's minutes past closing time: those still in hurried out (half an hour), the shop shut whoever's left (an hour) */
+const CLOSE_HURRY = 30
+const CLOSE_HARD = 60
+const gameMinutes = () => getClock().day * 1440 + getClock().minute
 import { tl } from '@/data/i18n'
 import { skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
 import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
@@ -1286,6 +1291,9 @@ export default function App() {
   const [blessed, setBlessed] = useState(false)
   // closing: shut by the owner, the last customers finishing; leaving: they've gone and the staff are walking out
   const [closing, setClosing] = useState(false)
+  /** when closing up began (the game's minutes from day 0: gameMinutes) */
+  const closingAt = useRef(0)
+  useEffect(() => { if (closing) closingAt.current = gameMinutes(); else SHOP.hurry = false }, [closing])
   const [leaving, setLeaving] = useState(false)
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
   // (shut: the day's counted done, the next shift's on duty from now (game/shifts' dutyDay))
@@ -1422,6 +1430,8 @@ export default function App() {
   }
   const chef = chefOf(DISHES[active].id)
   const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
+  const guestsRef = useRef(guestsBy)
+  guestsRef.current = guestsBy
   const guests = guestsBy[DISHES[active].id] ?? []
   // how many have come in all (customers are numbered as they come; the list itself only keeps the latest)
   const visits = guests.reduce((n, g) => Math.max(n, g.id), 0)
@@ -2435,15 +2445,19 @@ export default function App() {
       setClosing(false)
       return
     }
-    if ((guestsBy[DISHES[active].id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating')) return
-    const t0 = performance.now()
+    // (by the game's clock, not the wall's: at ×2 a wait of seconds was twice the hours, and one customer left waiting or eating for ever
+    // kept the shop open till morning (the owner saw the day's sheet at 08:08): half an hour past closing time those left are hurried out
+    // (SHOP.hurry: Roasting), an hour past it the shop's shut whoever's still in (CLOSE_HARD))
     const wait = window.setInterval(() => {
-      if (SHOP.inRoom > 0 && performance.now() - t0 < 90000) return
+      const late = gameMinutes() - closingAt.current
+      SHOP.hurry = late >= CLOSE_HURRY
+      const still = (guestsRef.current[DISHES[active].id] ?? []).some((g) => g.state === 'waiting' || g.state === 'eating') || SHOP.inRoom > 0
+      if (still && late < CLOSE_HARD) return
       window.clearInterval(wait)
       setLeaving(true)
     }, 300)
     return () => window.clearInterval(wait)
-  }, [closing, leaving, ai, guestsBy, active])
+  }, [closing, leaving, ai, active])
   useEffect(() => {
     if (!leaving) return
     // (one or two of those going home say goodbye on their way to the door, the owner answering (game/commute))
@@ -2460,9 +2474,10 @@ export default function App() {
     const t0 = performance.now()
     const poll = window.setInterval(() => {
       const gone = performance.now() - t0
-      if ((gone > 1500 && SHOP.walking.size === 0) || gone > 40000) {
+      if ((gone > 1500 && SHOP.walking.size === 0) || gameMinutes() - closingAt.current >= CLOSE_HARD) {
         window.clearInterval(poll)
         SHOP.walking.clear()
+        SHOP.hurry = false
         setAi(false)
         setClosing(false)
         setLeaving(false)

@@ -11,7 +11,9 @@ import { paceBoost, paceOf, TIRED_AT, type SkillId } from '@/data/staff'
  * only once it's 0 (the owner's: they used to vanish all at once as it did, the ones paying and walking out with them) */
 /** `counted`: today's opening counted in `day` (between its opening and shutting): the shift on duty is `day`'s then, else the next one's
  * (dutyDay) */
-export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, walking: new Set<string>(), inRoom: 0, counted: false }
+/** (`hurry`: half an hour past closing time and customers still in (App's closing deadlines): those with nothing before them pay for what
+ * they've had and go, those eating eat up quickly) */
+export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, walking: new Set<string>(), inRoom: 0, counted: false, hurry: false }
 /** the business day whose shift is on (game/shifts): the one open (once counted), or the one coming; the same number either side of the
  * opening, so nobody's swapped for a frame as the shop opens */
 export const dutyDay = (open: boolean) => (open && SHOP.counted ? SHOP.day : SHOP.day + 1)
