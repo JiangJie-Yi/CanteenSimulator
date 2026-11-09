@@ -164,8 +164,11 @@ const BASKET_WEAVE = canvas(256, 128, (g) => {
 
 /** the crate's sticks: how many are in it (36 packed; each one dragged to the fire is one fewer; the last gone, it's filled again from the
  * sack of binchotan on the floor by the table, as much as the sack has: with none left in the sack, it stays empty till some's bought) */
-const CRATE_FULL = 36
-export const CRATE = { left: CRATE_FULL }
+export const CRATE_FULL = 36
+/** `tended`: the third cook keeps it filled while the shop's open (he carries an armful from the sack on the floor when it runs low:
+ * GuestBar3D), so it isn't topped up of itself then */
+export const CRATE = { left: CRATE_FULL, tended: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __crate: CRATE })
 /** a stick taken out of the crate (onto the fire) */
 export function takeFromCrate() {
   CRATE.left -= 1
@@ -217,7 +220,7 @@ function Crate() {
   const lastLook = useRef(0)
   useFrame((st) => {
     // (empty, it's filled again as soon as there's charcoal in the sack: looked at now and then)
-    if (CRATE.left <= 0 && st.clock.elapsedTime - lastLook.current > 1) {
+    if (CRATE.left <= 0 && !CRATE.tended && st.clock.elapsedTime - lastLook.current > 1) {
       lastLook.current = st.clock.elapsedTime
       if (SUPPLIES.coal() > 0) CRATE.left = SUPPLIES.refillCrate(CRATE_FULL)
     }
@@ -848,7 +851,7 @@ const COAL_SACK_AT = { along: 2.72, lay: 1.7 }
 function CharcoalSackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, COAL_SACK_AT.along).addScaledVector(LAY, COAL_SACK_AT.lay)
-  return <Movable id="coalsack" label="備長炭麻袋" baseScale={1.25} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)}><CharcoalSack /></group></Movable>
+  return <Movable id="coalsack" label="備長炭麻袋" baseScale={1.25} ground={floor}><group name="coal-sack" position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)}><CharcoalSack /></group></Movable>
 }
 const KNIVES_URL = import.meta.env.BASE_URL + 'models/knives.glb'
 /** the cook's knives on their folded cloth (blender/knives.py), laid along the table behind the hearth */

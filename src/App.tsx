@@ -408,7 +408,7 @@ type SceneProps = {
   /** the shop's shut and being worked by hand (研製料理) */
   research: boolean
   onOrder: (id: string, guest?: number, reuse?: boolean) => boolean
-  onAddCharcoal: (sticks?: number, byHand?: boolean) => boolean
+  onAddCharcoal: (sticks?: number, byHand?: boolean, fromCrate?: boolean) => boolean
   onSay: (who: 'chef' | 'guest', text: string, guest?: number) => void
   /** bumped by the 視角 button: glide back to the home view */
   resetView: number
@@ -2129,11 +2129,11 @@ export default function App() {
   /** a load of charcoal on the fire (the button, the chef), or `one` stick dragged on by hand */
   // (`sticks`: how many went on the bed (the 3D grill places them first; none when it's full, and then nothing is paid); left out (the 2D
   // grill, which has no bed), a portion)
-  const addCharcoal = (sticks?: number, byHand = false) => {
+  const addCharcoal = (sticks?: number, byHand = false, fromCrate = false) => {
     if (!canAddCharcoal(fire.current) || sticks === 0) { say(UI[lang].charcoalFull); return false }
     // (a stick by hand comes out of the crate on the table, already taken from the sack when the crate was filled; a handful comes out of the
-    // sack: none left there, none goes on. It was paid for as fuel when it was bought)
-    if (!byHand) {
+    // sack: none left there, none goes on. It was paid for as fuel when it was bought. The third cook's handful's out of the crate too)
+    if (!byHand && !fromCrate) {
       const n = Math.ceil(sticks ?? STICKS_PER_PORTION)
       if ((stockRef.current[CHARCOAL] ?? 0) < n) { say(tl(lang, '木炭用完了，到庫存的耗材訂木炭', '炭が切れた。在庫の消耗品から注文を', 'Out of charcoal: order some from the stock’s supplies')); return false }
       shiftStock({ [CHARCOAL]: -n })

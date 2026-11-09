@@ -932,6 +932,13 @@ export const CUBBY2 = { along: [-1.5, -0.35], lay: [0.95, 2.1] }
 export const CUBBY = { along: [1.605, 2.755], lay: [0.95, 2.1], plinth: 0.1, shelfThick: 0.04 }
 /** the notch cut into the cook's table's front under the hearth (along from–to, lay from–to): somewhere to stand right up at the fire */
 export const COOK_NOTCH = { along: [-0.04, 1.26], lay: [1.26, 2.1] }
+/**
+ * The third cook's bay (the owner's, 2026-11-10: the table's far end was all top there, and he stood out past it, the charcoal out of his
+ * reach): cut into the cook table's far end (along from–to, lay from–to, the table's frame as COOK_NOTCH's), between the hearth's frame
+ * and the table's edge, a narrow ledge of top left before the frame. He stands in it facing the fire, the charcoal crate on the top at his
+ * right hand, the plating place at his left; as wide as the owner's notch (he's a metre across), deep enough for him to stand in it
+ */
+export const SOUS_NOTCH = { along: [2.33, 3.1], lay: [-0.98, 0.32] }
 /** the cubby's floor and shelf surfaces, in the scene: the table's top is y = 0 */
 export const CUBBY_FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP + CUBBY.plinth
 export const CUBBY_SHELF_Y = CUBBY_FLOOR_Y + 0.3

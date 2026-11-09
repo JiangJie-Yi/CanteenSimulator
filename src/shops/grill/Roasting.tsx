@@ -52,7 +52,7 @@ import { tipIn } from '@/data/tipText'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
-import { DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
+import { CRATE, DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
 import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, BENCH, BENCH_SEATS, BENCH_WAIT } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
@@ -72,7 +72,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
-import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
+import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -672,8 +672,13 @@ function clearOfHearth(at: THREE.Vector3, r: number, w = 0, d = 0) {
     const a = at.dot(ALONG) + FIRE_SHIFT.dot(ALONG), l = at.dot(LAY) + FIRE_SHIFT.dot(LAY)
     const [n0, n1] = COOK_NOTCH.along, ha = r + w / 2
     if (l + r + d / 2 > COOK_NOTCH.lay[0] && a + ha > n0 && a - ha < n1) at.addScaledVector(ALONG, a - n0 < n1 - a ? n0 - ha - a : n1 + ha - a)
+    // (nor over the third cook's bay at its far end: moved across to its nearer side)
+    const [m0, m1] = SOUS_NOTCH.lay, hl = r + d / 2
+    if (a + ha > SOUS_NOTCH.along[0] && l + hl > m0 && l - hl < m1) at.addScaledVector(LAY, l - m0 < m1 - l ? m0 - hl - l : m1 + hl - l)
   }
 }
+/** whether a round thing at (a, l) (the table's frame) of reach r is over the third cook's bay, where there's no top */
+const overSousBay = (a: number, l: number, r: number) => a + r > SOUS_NOTCH.along[0] && l + r > SOUS_NOTCH.lay[0] && l - r < SOUS_NOTCH.lay[1]
 
 /**
  * The tray's planed cedar: three boards with the grain running along them, drawn as wavering growth lines that
@@ -793,15 +798,23 @@ function BarImpl() {
 const COOK_TABLE = { lay: [-2.1, 2.1], along: [-2.4 + 2 * SIDE_PULL, 3.1] }
 /** the cooks the boss's height (BOSS_SCALE, his figure 0.95 tall; theirs 0.97) */
 const CHEF_SCALE = 1.05 * 0.8 * GRILL_SCALE * 0.98
-/** the table as boxes (lay from–to, along from–to): all of it behind the cubby, and the front either side of it */
+/** the table as boxes (lay from–to, along from–to, and how far each face is set back under the top: lay's low and high ends, along's low and
+ * high; less than 0 where it runs into the next box): all of it behind the cubby, and the front either side of it */
 /** (and the notch's: its back wall, and the wall between it and the cubby) */
-const COOK_TABLE_PARTS: [number, number, number, number][] = [
-  [COOK_TABLE.lay[0], CUBBY.lay[0], COOK_TABLE.along[0], COOK_TABLE.along[1]],
-  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_TABLE.along[0], CUBBY2.along[0]],
-  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY2.along[1], COOK_NOTCH.along[0]],
-  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY.along[1], COOK_TABLE.along[1]],
-  [CUBBY.lay[0], COOK_NOTCH.lay[0], COOK_NOTCH.along[0], COOK_NOTCH.along[1]],
-  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_NOTCH.along[1], CUBBY.along[0]],
+// (the back's split round the third cook's bay at the far end (SOUS_NOTCH): before it, across its back wall, and either side of it, each face
+// on the bay set back under the top as the table's outer faces are)
+const [SN0, SN1] = SOUS_NOTCH.lay, SNA = SOUS_NOTCH.along[0]
+const COOK_TABLE_PARTS: [number, number, number, number, [number, number, number, number]][] = [
+  [COOK_TABLE.lay[0], SN0, COOK_TABLE.along[0], SNA, [0.06, -0.01, 0.06, -0.01]],
+  [SN0, SN1, COOK_TABLE.along[0], SNA, [-0.01, -0.01, 0.06, 0.06]],
+  [SN1, CUBBY.lay[0], COOK_TABLE.along[0], SNA, [-0.01, -0.01, 0.06, -0.01]],
+  [COOK_TABLE.lay[0], SN0, SNA, COOK_TABLE.along[1], [0.06, 0.06, -0.01, 0.06]],
+  [SN1, CUBBY.lay[0], SNA, COOK_TABLE.along[1], [0.06, -0.01, -0.01, 0.06]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_TABLE.along[0], CUBBY2.along[0], [-0.01, 0.06, 0.06, -0.01]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY2.along[1], COOK_NOTCH.along[0], [-0.01, 0.06, -0.01, 0.06]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], CUBBY.along[1], COOK_TABLE.along[1], [-0.01, 0.06, -0.01, 0.06]],
+  [CUBBY.lay[0], COOK_NOTCH.lay[0], COOK_NOTCH.along[0], COOK_NOTCH.along[1], [-0.01, 0.06, -0.01, -0.01]],
+  [CUBBY.lay[0], COOK_TABLE.lay[1], COOK_NOTCH.along[1], CUBBY.along[0], [-0.01, 0.06, 0.06, -0.01]],
 ]
 export type CrewMember = { id: string; role: Role; look: Look }
 /** the shop's own second cook, at the board while the shop's open when none's been hired (the kitchen cooks by itself: someone has to
@@ -809,13 +822,11 @@ export type CrewMember = { id: string; role: Role; look: Look }
 export const HOUSE_CHEF: CrewMember = { id: 'house-chef', role: 'chef', look: { female: false, age: 'middle' } }
 /**
  * Where each of the staff stands while the shop's open (the owner is the player, so isn't drawn): the second cook at
- * the fire in the bay cut into the cook's table, the third cook and the stock keeper at its right-hand end, facing in
- * along it; the cashier behind the till by the door; one server at
+ * the board, the third cook in his bay at the cook's table's far end (SOUS_AT), facing in at the fire; the cashier behind the till by the door; one server at
  * the near end of the bar by the till, the other at the dead end of the side counter's aisle (both out of the way the
  * customers walk). The first two of each job are shown.
  */
 const KITCHEN_YAW = Math.atan2(-ALONG.x, -ALONG.z)
-const kitchenAt = (lay: number) => new THREE.Vector3().addScaledVector(LAY, lay).addScaledVector(ALONG, 3.55).setY(GRILL_OFFSET.y - KITCHEN_DROP)
 /** a place in the bar's plan (the first counter's frame) as the crew stand (Roasting's frame: the fire FIRE_SHIFT along from the bar's), and back */
 const fromBar = (v: THREE.Vector3) => toGrillScene(v).sub(FIRE_SHIFT)
 const toBar = (v: THREE.Vector3) => v.clone().add(FIRE_SHIFT).sub(GRILL_OFFSET).divideScalar(GRILL_SCALE)
@@ -828,7 +839,8 @@ const floorAt = (v: THREE.Vector3) => (inKitchen(GRILL_COUNTERS, toBar(v)) ? GRI
  */
 function crewWayOut(role: Role, at: THREE.Vector3) {
   const end = (lay: number) => new THREE.Vector3().addScaledVector(ALONG, 2.95).addScaledVector(LAY, lay)
-  const via = role === 'chef' ? [new THREE.Vector3().addScaledVector(ALONG, at.dot(ALONG)).addScaledVector(LAY, WALK_LAY), end(WALK_LAY), end(-0.8)] : role === 'sous' ? [end(1.3), end(-0.8)]
+  // (the third cook straight out of his bay first, then round)
+  const via = role === 'chef' ? [new THREE.Vector3().addScaledVector(ALONG, at.dot(ALONG)).addScaledVector(LAY, WALK_LAY), end(WALK_LAY), end(-0.8)] : role === 'sous' ? [end(at.dot(LAY)), end(-0.8)]
     : role === 'cashier' ? [new THREE.Vector3().addScaledVector(ALONG, 5.35).addScaledVector(LAY, -0.3)] : []
   return [at.clone(), ...via, ...staffWayOut(GRILL_COUNTERS).map(fromBar)].map((v) => v.setY(floorAt(v)))
 }
@@ -951,18 +963,10 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
   fetcher?: boolean; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const trip = useRef<{ way: THREE.Vector3[]; len: number; gone: number } | null>(null)
-  /** where the third cook stands, clear of all on the kitchen's floor (GuestBar3D's KITCHEN_ROUTE.clear), found again each day as what
-   * stands there's measured anew (the warming counter was put where he stood: he stood in it) */
-  const clearAt = useRef<{ day: number; at: THREE.Vector3; from: THREE.Vector3 } | null>(null)
-  const placeOf = () => {
-    if (role !== 'sous' || !KITCHEN_ROUTE.clear) return at
-    const c = clearAt.current
-    if (c && c.day === SHOP.day && c.from.equals(at)) return c.at
-    const to = fromBar(KITCHEN_ROUTE.clear(toBar(at)))
-    to.y = at.y
-    clearAt.current = { day: SHOP.day, at: to, from: at.clone() }
-    return to
-  }
+  /** where they stand: their place (the third cook's is his own bay in the cook table now (SOUS_AT): it was out on the kitchen's floor and
+   * moved off anything stood there each day (KITCHEN_ROUTE.clear: the warming counter was put where he stood); that moved him out of
+   * his bay, it being the table's) */
+  const placeOf = () => at
   /** the second cook's round (fetcher): walking to a store or back, taking it out there, preparing and skewering it at the board, his
    * place; whether he's away (what's on the fire, and off it, is the owner's: Boss.tsx) */
   const walkTrip = (o: THREE.Group, dt: number) => {
@@ -1148,7 +1152,7 @@ function crewPlaces(crew: CrewMember[]) {
   const spots: Record<Role, { at: THREE.Vector3; yaw: number }[]> = {
     // (at the big chopping board: the fire's the owner's)
     chef: [{ at: BOARD_COOK_AT, yaw: BOARD_COOK_YAW }],
-    sous: [{ at: kitchenAt(1.3), yaw: KITCHEN_YAW }],
+    sous: [{ at: SOUS_AT, yaw: KITCHEN_YAW }],
     // (the stocker's GuestBar3D's: by the drinks' crates, carrying them to the fridges; drawn here too they stood in the rice tub)
     stock: [],
     // (stood back far enough that the register's drawer, run all the way out, stops short of them)
@@ -1173,6 +1177,10 @@ function crewPlaces(crew: CrewMember[]) {
 // (and 2.2 out, not 2.0: up on the notch's step his chest and sleeves were level with the seasonings' ledge, its pots in them (clips.mjs
 // found it; at 2.12 his sleeves still brushed the peanut bowl and the miso))
 const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+/** where the third cook stands: in his bay at the table's far end (SOUS_NOTCH), a little out from its back wall (his front's some 0.3 ahead
+ * of his feet), in the middle of it across, facing in at the fire (KITCHEN_YAW); he stood out past the table's end, the crate out of reach */
+const SOUS_AT = new THREE.Vector3().addScaledVector(ALONG, (SOUS_NOTCH.along[0] + SOUS_NOTCH.along[1]) / 2 + 0.03 - FIRE_SHIFT.dot(ALONG))
+  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(GRILL_OFFSET.y - KITCHEN_DROP)
   .setY(GRILL_OFFSET.y - KITCHEN_DROP)
 /** the aisle in front of the cook table, where he stands while the shop's open */
 const AISLE_LAY = 2.62
@@ -1267,9 +1275,10 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
   return (
     <>
       {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
-      {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]}
-        inset={[[0.06, -0.01, 0.06, 0.06], [-0.01, 0.06, 0.06, -0.01], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, 0.06], [-0.01, 0.06, -0.01, -0.01], [-0.01, 0.06, 0.06, -0.01]][i] as [number, number, number, number]} />)}
+      {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]} inset={p[4]} />)}
       <CubbyFrame />
+      {/* (the third cook's fire irons, leant by his bay at its right-hand side, against the crate) */}
+      <SousIrons />
       {/* (its far corners, marked for the servers' way round it to the dish racks: GuestBar3D) */}
       <group name="cook-table-c0" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[0]).addScaledVector(LAY, COOK_TABLE.lay[0])} />
       <group name="cook-table-c1" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[1]).addScaledVector(LAY, COOK_TABLE.lay[1])} />
@@ -1294,6 +1303,48 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
   )
 }
 /**
+ * The third cook's fire irons (the owner's, 2026-11-10): a pair of long iron hibashi joined at the top by a ring, and a little ash shovel,
+ * stood on the top at his bay's right-hand side and leant back against the charcoal crate, there to his hand. Iron, one draw (their parts'
+ * colours on their points), no shadow (thin things).
+ */
+const IRONS_GEO = (() => {
+  const parts: THREE.BufferGeometry[] = []
+  const tint = (g: THREE.BufferGeometry, hex: string) => {
+    const c = new THREE.Color(hex), n = g.attributes.position.count, col = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3)
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+    g.deleteAttribute('uv')
+    return g
+  }
+  // (the hibashi: two square iron rods 0.55 long, a hair apart, meeting at a brass-dark ring at the top)
+  for (const sd of [-1, 1]) parts.push(tint(new THREE.BoxGeometry(0.012, 0.55, 0.012).translate(sd * 0.012, 0.275, 0), '#3a3a3e'))
+  parts.push(tint(new THREE.TorusGeometry(0.022, 0.005, 4, 10).translate(0, 0.565, 0), '#6b5a3a'))
+  // (the shovel: a flat blade with its sides turned up, on a rod with a wooden grip)
+  const shovel = [
+    tint(new THREE.BoxGeometry(0.1, 0.006, 0.09), '#4a4a50'),
+    tint(new THREE.BoxGeometry(0.006, 0.022, 0.09).translate(-0.05, 0.011, 0), '#4a4a50'),
+    tint(new THREE.BoxGeometry(0.006, 0.022, 0.09).translate(0.05, 0.011, 0), '#4a4a50'),
+    tint(new THREE.CylinderGeometry(0.006, 0.006, 0.36, 6).translate(0, 0.18, -0.045), '#3a3a3e'),
+    tint(new THREE.CylinderGeometry(0.011, 0.011, 0.11, 8).translate(0, 0.33, -0.045), '#6b4a2a'),
+  ]
+  // (the blade stood on its tip, the rod up: tilted back as it leans)
+  const sh = mergeGeometries(shovel)!.rotateX(-Math.PI / 2 + 0.25).translate(0.07, 0.045, 0)
+  parts.push(sh)
+  return mergeGeometries(parts)!
+})()
+const IRONS_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
+function SousIronsImpl() {
+  // (on the top at the bay's right-hand side, by its mouth, leant back toward the crate (lay-) a little past upright)
+  const at = new THREE.Vector3().addScaledVector(ALONG, SOUS_NOTCH.along[1] - 0.26).addScaledVector(LAY, SOUS_NOTCH.lay[0] - 0.07)
+  return (
+    <group position={at} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      {/* (leant over toward the crate: about the table's along, its x here; lay is its -z) */}
+      <mesh geometry={IRONS_GEO} material={IRONS_MAT} rotation-x={0.28} rotation-z={0.05} {...nameOver('火鋏與灰鏟', '三廚添炭、整理炭火用的鐵火鋏與小灰鏟')} />
+    </group>
+  )
+}
+const SousIrons = memo(SousIronsImpl)
+/**
  * The cook's table's top, in one piece round its bay: a thick plank top with its edges rounded over (面取り), the
  * grain running on unbroken, its ink outline round the whole shape (no seams where the parts under it meet).
  */
@@ -1317,10 +1368,12 @@ function tableTopGeometry(grow: number, thick: number) {
   const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
   const i = 0.025 - grow
   const { along: [n0, n1], lay: [nl] } = COOK_NOTCH
-  // (the notch under the hearth cut in from its front: the outline runs in round it)
-  const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, l1 - i], [n1 + i, l1 - i], [n1 + i, nl + i], [n0 - i, nl + i], [n0 - i, l1 - i], [a0 + i, l1 - i]]
+  const { along: [s0], lay: [m0, m1] } = SOUS_NOTCH
+  // (the notch under the hearth cut in from its front: the outline runs in round it; and round the third cook's bay at its far end)
+  const pts: [number, number][] = [[a0 + i, l0 + i], [a1 - i, l0 + i], [a1 - i, m0 - i], [s0 - i, m0 - i], [s0 - i, m1 + i], [a1 - i, m1 + i],
+    [a1 - i, l1 - i], [n1 + i, l1 - i], [n1 + i, nl + i], [n0 - i, nl + i], [n0 - i, l1 - i], [a0 + i, l1 - i]]
   // (its corners rounded off, as a planed top would be; the outline, grown out, keeps to the same curves)
-  const sh = roundedShape(pts, [0.16, 0.16, 0.16, 0.04, 0.1, 0.1, 0.04, 0.16].map((r) => r + grow))
+  const sh = roundedShape(pts, [0.16, 0.16, 0.04, 0.1, 0.1, 0.04, 0.16, 0.04, 0.1, 0.1, 0.04, 0.16].map((r) => r + grow))
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.08 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
     bevelSegments: 3, curveSegments: 6 })
   g.rotateX(Math.PI / 2)
@@ -3376,7 +3429,7 @@ type RoastingProps = {
   /** order something; false if it couldn't be (the fire or the basket is full) */
   /** `reuse`: made from a portion already put out and eaten (Roasting's revived it): paid for, but no new portion put out */
   onOrder?: (id: string, guest?: number, reuse?: boolean) => boolean
-  onAddCharcoal?: (sticks?: number, byHand?: boolean) => boolean
+  onAddCharcoal?: (sticks?: number, byHand?: boolean, fromCrate?: boolean) => boolean
   /** something the chef or a customer says */
   onSay?: (who: 'chef' | 'guest', text: string, guest?: number) => void
   /** which table is out: the player's tasting (closed) or the shop's (open); each keeps its own food */
@@ -3758,6 +3811,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const c = spot(m)
       const a = c.dot(ALONG), l = c.dot(LAY)
       if (a < a0 || a > a1 || l < l0 || l > l1) continue
+      if (overSousBay(a + FIRE_SHIFT.dot(ALONG), l + FIRE_SHIFT.dot(LAY), r)) continue
       if (things.some((t) => Math.hypot(t.p.x - c.x, t.p.z - c.z) < t.r + r * 0.85)) continue
       if (++free === n) { v = c; break }
     }
@@ -3933,7 +3987,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const outsideTable = (at: THREE.Vector3, r: number) => {
     const a = at.dot(ALONG) + FIRE_SHIFT.dot(ALONG), l = at.dot(LAY) + FIRE_SHIFT.dot(LAY)
     // (and over the notch cut into its front: nothing to stand on there)
-    const inNotch = a > COOK_NOTCH.along[0] + 0.05 && a < COOK_NOTCH.along[1] - 0.05 && l > COOK_NOTCH.lay[0] + 0.05
+    const inNotch = (a > COOK_NOTCH.along[0] + 0.05 && a < COOK_NOTCH.along[1] - 0.05 && l > COOK_NOTCH.lay[0] + 0.05)
+      || (a > SOUS_NOTCH.along[0] + 0.05 && l > SOUS_NOTCH.lay[0] + 0.05 && l < SOUS_NOTCH.lay[1] - 0.05)
     return inNotch || a < COOK_TABLE.along[0] - 0.05 || a > COOK_TABLE.along[1] + 0.05 || l < COOK_TABLE.lay[0] - 0.05 || l > COOK_TABLE.lay[1] + 0.05 - 0 * r
   }
   /** a container at home, moved by its nudge (no spare plates or dishes stacked on the table any more: they're all in the dish cabinet, but
@@ -4691,11 +4746,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // the hearth do the sticks go in or the water on; with no one, it's done at once, as it always was)
     const tend = space === 'open' && FIRE_TEND.tender
     if (FIRE_TEND.done === 'coal') {
+      // (his handful out of the crate at his right hand: paid for as it was filled from the sack, not again now)
       FIRE_TEND.done = null; FIRE_TEND.want = null
-      const left = SUPPLIES.coal()
+      const left = CRATE.left
       if (fire && left >= 1 && roomForCoal()) {
-        const placed = dropCoals(undefined, Math.min(left, coalPortion()))
-        if (placed && onAddCharcoal?.(placed) !== false) say(L().addCharcoal)
+        // (tipped in from his hands, over the hearth's near side in front of his bay)
+        const tip = SOUS_AT.clone().addScaledVector(ALONG, -0.55)
+        const placed = dropCoals({ x: tip.x, y: 0.45, z: tip.z }, Math.min(left, coalPortion()))
+        if (placed) { CRATE.left = Math.max(0, CRATE.left - placed); if (onAddCharcoal?.(placed, false, true) !== false) say(L().addCharcoal) }
       }
       return
     }
@@ -4722,8 +4780,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (call === 'ask-coal' || call === 'drop-coal') {
       // (a handful out of the crate, as many as the bed takes; paid for only those, and none at all when it's full)
       if (!roomForCoal()) return
-      // (no more than the sack has: none left, the chef says so now and then)
-      const left = SUPPLIES.coal()
+      // (no more than the sack has (and what's in the crate, for the third cook: he takes from it): none left, the chef says so now and then)
+      const left = SUPPLIES.coal() + (tend ? CRATE.left : 0)
       if (left < 1) { say(L().noCharcoal); return }
       if (call === 'ask-coal') {
         // (asked once; the grill gets on with the food while the third cook fetches it)
