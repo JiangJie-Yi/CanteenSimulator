@@ -224,6 +224,9 @@ const FLIGHT_SECONDS = 0.7
 // LAY_DIR points at the camera and STACK_DIR runs across the screen, so the row reads left to right
 const LAY_DIR = new THREE.Vector3(0.59, 0, 0.81).normalize()
 const STACK_DIR = new THREE.Vector3(0.81, 0, -0.59).normalize()
+/** skewers on the board: the other way along it from STACK_DIR, the point away from the cook and the foot to his hand */
+const ON_BOARD = STACK_DIR.clone().negate()
+const ONE = new THREE.Vector3(1, 1, 1)
 const PLATE_R = 0.5
 const SLOT_GAP = 0.2       // wider than the broadest piece (a fish lying flat)
 const PER_LAYER = 5
@@ -3153,6 +3156,94 @@ function inkOneLine(p: Piece) {
   }
 }
 
+/**
+ * Every skewer the same iron rod (the owner's: the model's came each its own length and thickness, made at random, so on the board one was half
+ * again as long as the next): its foot where the model's was, straight up its line, STICK_LEN long and STICK_R round, a short point at the top.
+ * One rod per model rod, shared by every copy; also where the rod's middle is (its own frame), for laying it centred on the board.
+ */
+const STICK_LEN = 1.474
+const STICK_R = 0.0075
+const STICK_POINT = 0.06
+/** the size of piece the rod is STICK_LEN long in (its world length the same in every one) */
+const STICK_BASE = 0.95
+const RODS = new WeakMap<THREE.BufferGeometry, Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3 }>>()
+/** `scale`: its piece's own (each piece is authored at its own size in the dish's model, some not even alike every way: the rod drawn that
+ * much the other way, so it doesn't grow and shrink with the food) */
+function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: THREE.Quaternion) {
+  const key = [...scale.toArray(), ...turn.toArray()].map((x) => x.toFixed(3)).join()
+  const mine = RODS.get(src) ?? new Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3 }>()
+  RODS.set(src, mine)
+  const had = mine.get(key)
+  if (had) return had
+  const P = src.attributes.position as THREE.BufferAttribute
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i < P.count; i++) pts.push(new THREE.Vector3().fromBufferAttribute(P, i))
+  // (its two ends: the farthest two points; the point is the end whose last few millimetres all close in on one spot, the foot a ring)
+  let a = pts[0], b = pts[0], far = -1
+  for (const p of pts) for (const q of pts) { const d = p.distanceToSquared(q); if (d > far) { far = d; a = p; b = q } }
+  const axis = b.clone().sub(a).normalize()
+  const end = (e: THREE.Vector3, sign: number) => {
+    const near = pts.filter((p) => sign * p.clone().sub(e).dot(axis) > -0.01)
+    const c = near.reduce((m, p) => m.add(p), new THREE.Vector3()).multiplyScalar(1 / near.length)
+    return { c, spread: Math.max(...near.map((p) => p.distanceTo(c))) }
+  }
+  const ea = end(a, -1), eb = end(b, 1)
+  const foot = ea.spread > eb.spread ? ea.c : eb.c
+  const tip = ea.spread > eb.spread ? b : a
+  const up = tip.clone().sub(foot).normalize()
+  const u = new THREE.Vector3().crossVectors(up, Math.abs(up.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize()
+  const v = new THREE.Vector3().crossVectors(up, u)
+  // (how long a unit of each of these is in the world, the piece's scale taken off)
+  // (`turn`: the rod's own frame in its piece's, where the scale is)
+  const along = (d: THREE.Vector3) => STICK_BASE / Math.max(0.05, d.clone().applyQuaternion(turn).multiply(scale).length())
+  const LEN = STICK_LEN * along(up), POINT = STICK_POINT * along(up)
+  const Ru = STICK_R * along(u), Rv = STICK_R * along(v)
+  // (eight round: the foot, where the point starts, half way down the point; then the point itself)
+  const SEG = 8
+  const rings = [[0, 1], [LEN - POINT, 1], [LEN - POINT * 0.4, 0.45]] as const
+  const pos: number[] = [], uv: number[] = [], idx: number[] = []
+  rings.forEach(([h, w], r) => {
+    for (let j = 0; j < SEG; j++) {
+      const t = (j / SEG) * Math.PI * 2
+      const at = foot.clone().addScaledVector(up, h).addScaledVector(u, Math.cos(t) * Ru * w).addScaledVector(v, Math.sin(t) * Rv * w)
+      pos.push(at.x, at.y, at.z)
+      uv.push(j / SEG, h / LEN)
+    }
+    if (r) for (let j = 0; j < SEG; j++) {
+      const j2 = (j + 1) % SEG, o = (r - 1) * SEG, n = r * SEG
+      idx.push(o + j, o + j2, n + j2, o + j, n + j2, n + j)
+    }
+  })
+  const top = foot.clone().addScaledVector(up, LEN)
+  const tipI = pos.length / 3
+  pos.push(top.x, top.y, top.z)
+  uv.push(0.5, 1)
+  for (let j = 0; j < SEG; j++) idx.push(2 * SEG + j, 2 * SEG + ((j + 1) % SEG), tipI)
+  // (the foot closed across in a ladder, no fan to a middle)
+  const L = [[0, 1, 7], [1, 6, 7], [1, 2, 6], [2, 5, 6], [2, 3, 5], [3, 4, 5]]
+  for (const [x, y, z] of L) idx.push(x, z, y)
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  geo.setIndex(idx)
+  // (which way round the triangles go, checked: they face out from the rod)
+  geo.computeVertexNormals()
+  const n0 = new THREE.Vector3().fromBufferAttribute(geo.attributes.normal as THREE.BufferAttribute, 0)
+  if (n0.dot(u) < 0) {
+    const ix = geo.index!.array as Uint16Array | Uint32Array
+    for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t }
+    geo.computeVertexNormals()
+  }
+  for (const name of Object.keys(src.attributes)) {
+    if (geo.attributes[name]) continue
+    const s0 = src.attributes[name] as THREE.BufferAttribute
+    geo.setAttribute(name, new THREE.Float32BufferAttribute(new Array((pos.length / 3) * s0.itemSize).fill(1), s0.itemSize))
+  }
+  const out = { geo, mid: foot.clone().addScaledVector(up, LEN / 2) }
+  mine.set(key, out)
+  return out
+}
+
 /** A small repeatable random generator, so a piece always gets the same crumple. */
 function seeded(key: string) {
   let h = 2166136261
@@ -3190,6 +3281,8 @@ type Piece = {
    * the one and after the other (the raw food from the fridge has none: the owner's) */
   skewerAt?: number
   pullAt?: number
+  /** where its rod's middle is (its own frame): laid on the board centred on it */
+  stickMid?: THREE.Vector3
   /** (on a plate) where it was last sat down on its face (its container and place there): measured again only when it's moved */
   sitAt?: string
   id: string
@@ -3597,7 +3690,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!BASE_MATERIAL.has(m)) BASE_MATERIAL.set(m, m.material)
       m.material = mat
       p.mats.push({ mat, mesh: m, base: mat.color.clone(), emissive: mat.emissive.clone(), foil, show, eye })
-      if (mat.name.startsWith('BambooSkewer')) p.sticks.push(m)
+      if (mat.name.startsWith('BambooSkewer')) {
+        // (every rod the one iron skewer, whatever the model made it)
+        const rod = standardStick(m.geometry, (p.node.userData.home?.s as THREE.Vector3 | undefined) ?? ONE, m.quaternion)
+        m.geometry = rod.geo
+        for (const c of m.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) c.geometry = rod.geo
+        p.stickMid = rod.mid.clone().applyQuaternion(m.quaternion).add(m.position)
+        p.sticks.push(m)
+      }
       else p.food.push(m)
       if (m.morphTargetInfluences?.length) p.puffs.push(m)
     }
@@ -6574,7 +6674,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           if (p.node.userData.shrink !== undefined) p.node.position.copy(at)
           else p.node.position.lerp(at, Math.min(1, dt * 14))
           p.node.userData.shrink = undefined
-          flatQ(p, p.node.quaternion, STACK_DIR)
+          flatQ(p, p.node.quaternion, ON_BOARD)
         } else p.node.userData.shrink = 0.0001
       } else if (p.staged && roast.rawDish?.items.includes(p.id)) {
         // rice balls wait raw on their own little dish, sitting the way they'll go on the net
@@ -6591,9 +6691,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       } else if (p.staged) {
         // waiting raw on the tray, laid flat in its spot
         const at = p.loose ? trayLooseSpot(Math.max(0, boardLoose.indexOf(p))) : traySpot(Math.max(0, boardSticks.indexOf(p)))
+        // (lying along the tray's long side, which runs across the front, its point away from the cook; the rod's middle on its spot)
+        flatQ(p, p.node.quaternion, p.loose ? STACK_DIR : ON_BOARD)
+        if (!p.loose && p.stickMid) {
+          const off = p.stickMid.clone().multiply(p.node.scale.x > 0.01 ? p.node.scale : ONE).applyQuaternion(p.node.quaternion)
+          at.x -= off.x
+          at.z -= off.z
+        }
         if (p.fresh) { p.node.position.copy(at); p.fresh = false } else p.node.position.lerp(at, Math.min(1, dt * 10))
-        // (lying along the tray's long side, which runs across the front)
-        flatQ(p, p.node.quaternion, STACK_DIR)
       } else if (!p.collected) {
         if (active && !waiting(p) && !p.carried && p.homeFlight >= 1) p.progress += dt * roastRate(fire?.current ?? 0.55)
         p.node.quaternion.copy(p.homeQ)
