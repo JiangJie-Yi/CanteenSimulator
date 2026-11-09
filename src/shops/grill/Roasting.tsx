@@ -12,7 +12,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
-import { colourVertices, StaticBatch } from '@/scene/StaticBatch'
+import { colourVertices, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
 import { FLOWS, flowOf, wantOf, type FlowKind } from '@/game/flow'
@@ -2263,17 +2263,27 @@ const DRAWER = { x: 0.17, z: -0.296, out: 0.15, tissue: [0, -0.105, 0.122] as [n
  * case is the counter's own (batched with it); the drawer moves, so it isn't, and the tissues in it are drawn only while it's out. Nothing
  * works in edit mode.
  */
+// (all shut, the drawers are drawn as one batch, a few draws for the lot, not four apiece (body, brass pull and the ink of each): one
+// pulled out is put away from the batch and drawn on its own while it's out, as the till's keys are)
 const BarDrawers = memo(function BarDrawers({ c, first }: { c: Counter; first: number }) {
+  const parts = useRef<BatchParts | null>(null)
   return (
     <group position={c.at} rotation-y={Math.atan2(-c.along.z, c.along.x)}>
-      {Array.from({ length: c.seats }, (_, n) => <BarDrawer key={n} x={seatAlong(c, n) + DRAWER.x} seat={first + n} grain={n} />)}
+      <StaticBatch parts={parts}>
+        {Array.from({ length: c.seats }, (_, n) => (
+          <group key={n} position={[seatAlong(c, n) + DRAWER.x, BAR_TOP - 0.06, DRAWER.z]} userData={{ batchPart: `d${n}` }}><BarPiece name="BarDrawer" grain={n} /></group>
+        ))}
+      </StaticBatch>
+      {Array.from({ length: c.seats }, (_, n) => <BarDrawer key={n} x={seatAlong(c, n) + DRAWER.x} seat={first + n} grain={n} batch={parts} part={`d${n}`} />)}
     </group>
   )
 })
 /** a place's drawer (its seat's number among all the bars': while someone sits there it's pushed home and stays shut, or it'd go into them; and
  * which of the walnut's boards it's made of) */
-function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number }) {
+function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; grain: number; batch: RefObject<BatchParts | null>; part: string }) {
   const slider = useRef<THREE.Group>(null)
+  /** the drawer as drawn on its own (hidden while it's shut and the batch has it; still pointed at: the pointer's rays don't mind) */
+  const own = useRef<THREE.Group>(null)
   const inside = useRef<THREE.Group>(null)
   const sheet = useRef<THREE.Group>(null)
   const box = useRef<THREE.Group>(null)
@@ -2321,6 +2331,9 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
     // (out while the stock keeper changes its box of tissues, too)
     const want = s.open || DRAWER_HELD.has(seat) ? 1 : 0
     if (inside.current && want) inside.current.visible = true
+    // (drawn on its own while it's anything but home and shut, the batch's copy of it put away meanwhile; the batch not made yet, on its own)
+    const alone = want > 0 || s.at > 0 || !batch.current
+    if (own.current && own.current.visible !== alone) { own.current.visible = alone; batch.current?.show(part, !alone) }
     if (Math.abs(want - s.at) < 1e-4) return
     s.at = Math.abs(want - s.at) < 0.002 ? want : s.at + (want - s.at) * Math.min(1, dt * 7)
     if (slider.current) slider.current.position.z = -DRAWER.out * s.at
@@ -2344,7 +2357,7 @@ function BarDrawer({ x, seat, grain }: { x: number; seat: number; grain: number 
           if (getEdit().on) return
           toggle()
         }}>
-        <BarPiece name="BarDrawer" grain={grain} />
+        <group ref={own}><BarPiece name="BarDrawer" grain={grain} /></group>
         <group ref={inside} position={DRAWER.tissue} visible={false}>
           {/* (the box itself: a click on it pulls a tissue. Shut away it isn't drawn, but it's still in the pointer's way (the pointer's
               rays don't mind what's hidden): there it's the drawer, which a click opens) */}
