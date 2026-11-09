@@ -78,9 +78,10 @@ export function panOf(p: THREE.Vector3, camera: THREE.Camera) {
 let ear: THREE.Camera | null = null
 export const setEar = (c: THREE.Camera) => { ear = c }
 const earAt = new THREE.Vector3()
-/** how loud (0..1, nothing past `reach`) and how far left or right a sound at `p` (world) is heard from the view (`reach` 22: from the
- * overview, some 16 away, the room's sounds were past 12 and not heard at all) */
-export const EAR_REACH = 22
+/** how loud (0..1, nothing past `reach`) and how far left or right a sound at `p` (world) is heard from the view (`reach` 34: the
+ * overview's camera, drawn back for its longer lens, is 23 from the fire, 22 from the till, 24 from the door and 30 from the toilets; at
+ * 22 none of them was heard from it, the grill's sizzle and seasonings silent in the view the game opens on) */
+export const EAR_REACH = 34
 export function heard(p: THREE.Vector3, reach = EAR_REACH) {
   if (!ear) return { near: 0.6, pan: 0 }
   ear.getWorldPosition(earAt)
