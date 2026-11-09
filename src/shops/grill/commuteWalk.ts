@@ -78,10 +78,12 @@ export function tripStep(tr: Trip, dt: number, speed: number, world: (v: THREE.V
   }
   // (giving way to whoever's just ahead on their own way)
   // (face to face, only the one of the two whose name comes later gives way: both did, and the two crept past each other)
+  // (not in the doorway, though: one held up there by whoever was through it before them (or a place left of someone gone) stood in it
+  // faded to nothing, never out, and the shop waited its 40 s for them to go)
   let slow = 1
   const me = world(along(tr.way, tr.d).p)
   const go = tr.last ? me.clone().sub(tr.last).setY(0) : new THREE.Vector3()
-  if (go.lengthSq() > 1e-10) {
+  if (go.lengthSq() > 1e-10 && !atDoor) {
     go.normalize()
     for (const [id, o] of COMMUTERS) {
       if (id === tr.id) continue
@@ -106,7 +108,7 @@ export function tripStep(tr: Trip, dt: number, speed: number, world: (v: THREE.V
     vis = Math.max(0, 1 - (tr.d - (tr.len - doorLen)) / Math.max(1e-4, doorLen), 1 - tr.door / FADE_S)
   }
   if (tr.dir === 'in' && tr.d < inLen) vis = Math.min(1, tr.d / Math.max(1e-4, inLen))
-  if (tr.d >= tr.len && (tr.dir !== 'out' || vis <= 0)) {
+  if ((tr.d >= tr.len && (tr.dir !== 'out' || vis <= 0)) || (tr.dir === 'out' && atDoor && (tr.door ?? 0) >= FADE_S && vis <= 0.02)) {
     tr.done = true
     COMMUTERS.delete(tr.id)
   }
