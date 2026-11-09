@@ -45,6 +45,7 @@ import { RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeou
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { partName, type Seasoning as Dab } from '@/data/recipes'
+import { tipIn } from '@/data/tipText'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
@@ -6990,7 +6991,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       ))}
       {active && toolLabel && (
         <Html position={toolLabel.at} center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
-          <span className="tool-tag">{toolLabel.kind === 'water' ? '水（退火用）' : TOOL_NAMES[toolLabel.kind]}<small>{toolLabel.kind === 'water' ? '拖至炭火／爐心' : '拖到食物上'}</small></span>
+          <span className="tool-tag">{tipIn(toolLabel.kind === 'water' ? '水（退火用）' : TOOL_NAMES[toolLabel.kind], lang)}<small>{tipIn(toolLabel.kind === 'water' ? '拖至炭火／爐心' : '拖到食物上', lang)}</small></span>
         </Html>
       )}
       {wisps.map((w) => (
