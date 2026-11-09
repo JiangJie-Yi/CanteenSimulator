@@ -295,8 +295,9 @@ export function fridgesOf(cs: Counter[]) {
 export const FRIDGE_GAP = 0.055
 /** the fridge's size: across, up, deep */
 export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
-/** each fridge's door: how many are at it just now (GuestBar3D), and whether the player's opened it (a click) */
-export const FRIDGE_STATE = [{ passing: 0, open: false }, { passing: 0, open: false }]
+/** each fridge's door: how many are at it just now (GuestBar3D), whether the stocker's filling it (its door held open for him), and whether
+ * the player's opened it (a click) */
+export const FRIDGE_STATE = [{ passing: 0, stocker: false, open: false }, { passing: 0, stocker: false, open: false }]
 /** where each fridge's doors are in the world (DiningRoom keeps it): its sounds heard from there */
 export const FRIDGE_AT = [new THREE.Vector3(), new THREE.Vector3()]
 /** whether a drink's a can (its clink a can's) */

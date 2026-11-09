@@ -363,7 +363,9 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       if (c.kind === 'drinks') {
         const f = fridges.find((x) => x.n === c.unit)!
         s.yaw = Math.atan2(f.at.x - s.pos.x, f.at.z - s.pos.z)
-        if (s.t < dt * 1.5) FRIDGE_STATE[c.unit].passing++
+        // (its door open while he fills it: his own mark, as the bar counts those at it afresh each frame (a count added to here was lost to
+        // that, and he filled it through the shut glass))
+        FRIDGE_STATE[c.unit].stocker = true
         if (s.t > 1.6) {
           const run = restockRun(FRIDGE_STOCK.units[c.unit], FRIDGE_UNITS[c.unit].shelves.map((sh) => sh.ids), DRINK_BACK.back, STOCK_CARRY)
           run.rows.forEach((r, i) => { FRIDGE_STOCK.units[c.unit][i] = r })
@@ -371,7 +373,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           DRINK_BACK.ver++
           FRIDGE_STOCK.ver++
           bottleClink(false, FRIDGE_AT[c.unit])
-          FRIDGE_STATE[c.unit].passing = Math.max(0, FRIDGE_STATE[c.unit].passing - 1)
+          FRIDGE_STATE[c.unit].stocker = false
           s.phase = 'back'
         }
       } else if (c.kind === 'roll') {
@@ -445,7 +447,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     if (h.box) h.box.visible = out && c?.kind === 'tissue' && !s.done
   })
   // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
-  useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear() }, [])
+  useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear(); for (const f of FRIDGE_STATE) f.stocker = false }, [])
   return (
     <group ref={g} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id }}>
       <BlobShadow r={0.17} />
@@ -2873,7 +2875,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SERVICE.carried.clear()
     SEATS_TAKEN.clear()
     PLATES_SET.clear()
-    for (const f of FRIDGE_STATE) f.passing = 0
+    for (const f of FRIDGE_STATE) { f.passing = 0; f.stocker = false }
     // (the toilets swept before the day, nobody in them; the paper as it was left)
     for (const w of [TOILETS.m, TOILETS.f]) { w.passing = 0; w.inside = 0; w.room = openRoom(w.room) }
     WC_GRUMBLE.clear()
@@ -3277,6 +3279,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (fridges) for (const fr of fridges) {
       FRIDGE_STATE[fr.n].passing = shown.filter((x) => x.wc?.who === 'drink' && (x.wc.unit ?? 0) === fr.n && (x.phase === 'wcIn'
         || ((x.phase === 'wcGo' || x.phase === 'wcBack') && (groups.current.get(x.id)?.position.distanceTo(fr.front) ?? 9) < 0.7))).length
+        + (FRIDGE_STATE[fr.n].stocker ? 1 : 0)
       // (a door left open by hand shuts as soon as anyone else has to go by it: the door swings out over the way, so nobody
       // walks through it)
       if (FRIDGE_STATE[fr.n].open && !FRIDGE_STATE[fr.n].passing) {

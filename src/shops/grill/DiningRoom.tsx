@@ -4721,6 +4721,7 @@ function useFreezer(n: number) {
     for (const side of ['L', 'R'] as const) {
       const door = root.getObjectByName(`FridgeDoor${side}`)
       const pivot = new THREE.Group()
+      pivot.name = `fridge-door-${side}`
       if (door) {
         const box = new THREE.Box3().setFromObject(door)
         pivot.position.set(side === 'L' ? box.min.x : box.max.x, 0, box.max.z)
