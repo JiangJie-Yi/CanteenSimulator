@@ -115,7 +115,14 @@ M = {
     "red": pbr("FolkRed", lin("#c8302a"), rough=0.5),
     "yellow": pbr("FolkYellow", lin("#f2c62a"), rough=0.5),
     "straw": pbr("FolkStraw", lin("#e4c88a"), rough=0.8),
-    "bag": pbr("FolkBag", lin("#b8261c"), rough=0.4),
+    # (the randoseru: a glossy red leather (the owner's: #c52222, roughness 0.35, a touch of metal), its straps a shade deeper; its piping a
+    # dark red, its lock and D-rings silver; the light caught on its flap, drawn flat (unlit) in the game: the figure is one toon material,
+    # its gloss and its metal painted)
+    "bag": pbr("FolkBag", lin("#c52222"), rough=0.35, metal=0.1),
+    "bagStrap": pbr("FolkBagStrap", lin("#b31e1e"), rough=0.4),
+    "bagTrim": pbr("FolkBagTrim", lin("#861515"), rough=0.4),
+    "silver": pbr("FolkSilver", lin("#d8dde4"), rough=0.2, metal=0.85),
+    "gloss": pbr("FolkGloss", lin("#ffdcd4"), rough=0.3),
     "pack": pbr("FolkPack", lin("#3a4a5a"), rough=0.7),
     "phones": pbr("FolkPhones", lin("#2a2c30"), rough=0.4),
     "cup": pbr("FolkPhonesCup", lin("#e86a4a"), rough=0.4),
@@ -692,6 +699,207 @@ acc("schoolhat", [lathe("sch", [(C.y + 0.06, R + 0.05), (C.y + 0.085, R + 0.045)
                   lathe("schb", [(C.y + 0.06, R + 0.01), (C.y + 0.055, R + 0.06)], M["yellow"], seg=10, solid=0.008)])
 
 
+def surf_at(phi, y, out=0.0):
+    """the body's surface at bearing `phi` (0 its front, +z; pi/2 its side, +x; pi its back) and height y, `out` off it along its normal; and
+    that normal"""
+    r = rb(y)
+    dr = (rb(y + 0.004) - rb(y - 0.004)) / 0.008
+    n = Vector((math.sin(phi), -dr, math.cos(phi))).normalized()
+    return Vector((r * math.sin(phi), y, r * math.cos(phi))) + n * out, n
+
+
+def surf_x(x, y, back, out=0.0):
+    """the body's surface at height y, `x` across, on its back (`back`) or its front; `out` off it along its normal"""
+    r = rb(y)
+    return surf_at(math.copysign(math.asin(max(-1.0, min(1.0, x / r))), x) if not back else math.copysign(math.pi - math.asin(min(1.0, abs(x) / r)), x), y, out)
+
+
+def band(name, pts, ups, w, t, mat):
+    """a flat belt through `pts` (three's frame), `w` wide and `t` thick, its broad face toward `ups` (the body's normals where it lies):
+    four-sided as a tube is, but flat; its ends closed"""
+    bm = bmesh.new()
+    rows = []
+    for k, (p, n) in enumerate(zip(pts, ups)):
+        tan = (pts[min(k + 1, len(pts) - 1)] - pts[max(k - 1, 0)]).normalized()
+        side = tan.cross(n).normalized()
+        nn = side.cross(tan).normalized()
+        rows.append([bm.verts.new(P(*(p + side * (sx * w / 2) + nn * (sy * t / 2)))) for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1))])
+    for k in range(len(rows) - 1):
+        for i in range(4):
+            bm.faces.new((rows[k][i], rows[k][(i + 1) % 4], rows[k + 1][(i + 1) % 4], rows[k + 1][i]))
+    bm.faces.new(rows[0])
+    bm.faces.new(list(reversed(rows[-1])))
+    return from_bm(name, bm, mat)
+
+
+def straps(name, top, foot, mat, w=0.034, t=0.007):
+    """a bag's two shoulder straps, laid on the body as straps lie (the owner saw them come out through the chest: they ran straight from
+    the front of it to the bag's foot, through the body): from the bag's top up the back and over the shoulder, down the chest, out under the
+    arm and round the side to the bag's foot; each point off the body by half the strap and a little. `top(sd)`, `foot(sd)`: where each
+    side's is made fast to the bag, and which way it faces there"""
+    out = t / 2 + 0.004
+    objs = []
+    for sd in (-1, 1):
+        way = [top(sd)]
+        way += [surf_x(sd * 0.085, 0.5, True, out), surf_x(sd * 0.12, 0.545, True, out)]
+        # (over the shoulder: the body's top, under the head's edge)
+        way.append(surf_at(sd * math.pi / 2, 0.566, out))
+        way += [surf_x(sd * x, y, False, out) for (x, y) in ((0.125, 0.54), (0.14, 0.46), (0.18, 0.4))]
+        # (out under the arm and round the side, to the back)
+        way += [surf_at(sd * math.radians(a), y, out) for (a, y) in ((62, 0.37), (95, 0.35), (128, 0.32), (150, 0.285))]
+        way.append(foot(sd))
+        objs.append(band(f"{name}{sd}", [p for p, _ in way], [n for _, n in way], w, t, mat))
+    return objs
+
+
+TAU = math.radians(12)
+
+
+def randoseru(name):
+    """a randoseru, the Japanese schoolchild's hard leather satchel (the owner's: not a red brick): taller than it's wide (about 1 : 1.35),
+    a little wider at its top than at its foot, its top rounded over from back to front; the big flap (kabuse) over its top and down the
+    whole of its front to near its foot, its edge piped, the silver turn-lock at the middle of its lower edge; its sides in two steps (the
+    main compartment, the front pocket a little narrower, under the flap); a silver D-ring on each side on a tab; the light caught on the
+    flap's shoulder; its straps over the shoulders and round under the arms. Leaning in to the back at its top (TAU), its back against the
+    body where it meets it (0.38 up)"""
+    Hb, Wt, Wb = 0.335, 0.27, 0.248
+    DA, DB = 0.105, 0.155
+    y0, meet = 0.195, 0.38
+    up = Vector((0.0, math.cos(TAU), math.sin(TAU)))
+    away = Vector((0.0, math.sin(TAU), -math.cos(TAU)))
+    O = Vector((0.0, y0, -rb(meet) + 0.005 - (meet - y0) / math.cos(TAU) * math.sin(TAU)))
+
+    def at(x, y, w):
+        """the bag's frame (x across, y up its back, w out from its back) to the figure's"""
+        return O + Vector((x, 0.0, 0.0)) + up * y + away * w
+
+    def half(y):
+        return (Wb + (Wt - Wb) * max(0.0, min(1.0, y / Hb))) / 2
+
+    # (its top's curve from its back over to its front: a quarter ellipse, (0.025, Hb) to (0.155, Hb - 0.095))
+    def top_at(th, d=0.0):
+        w, y = 0.025 + 0.13 * math.cos(th), Hb - 0.095 + 0.095 * math.sin(th)
+        nw, ny = math.cos(th) / 0.13, math.sin(th) / 0.095
+        k = math.hypot(nw, ny)
+        return w + d * nw / k, y + d * ny / k
+
+    def block(nm, prof, inset, bevel):
+        """a block across the bag, its side's outline `prof` [(w, y)...] (convex), as wide as the bag at each height less `inset` each side,
+        the edges round its sides taken off"""
+        bm = bmesh.new()
+        L = [bm.verts.new(P(*at(-(half(y) - inset), y, w))) for (w, y) in prof]
+        R = [bm.verts.new(P(*at(half(y) - inset, y, w))) for (w, y) in prof]
+        for i in range(len(prof)):
+            j = (i + 1) % len(prof)
+            bm.faces.new((L[i], L[j], R[j], R[i]))
+        fl, fr = bm.faces.new(L), bm.faces.new(list(reversed(R)))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bmesh.ops.bevel(bm, geom=list(set(fl.edges) | set(fr.edges)), offset=bevel, segments=1, affect="EDGES", profile=0.5)
+        return from_bm(nm, bm, M["bag"], smooth=False)
+
+    arc = [math.radians(a) for a in (90, 67.5, 45, 22.5, 0)]
+    th_a = math.acos((DA - 0.025) / 0.13)
+    main = block(name + "main", [(0.0, 0.0), (0.0, Hb), (0.025, Hb), top_at(math.radians(67.5)), top_at(th_a), (DA, 0.0)], 0.0, 0.012)
+    pocket = block(name + "pocket", [(DA - 0.01, 0.015), top_at(th_a), top_at(math.radians(45)), top_at(math.radians(22.5)), (DB, Hb - 0.095),
+                                     (DB, 0.015)], 0.013, 0.008)
+    # ---- the flap: over the top from the back's edge, down the front to near the foot, its lower corners rounded
+    FD, yb, rc = 0.007, 0.03, 0.045
+    rows = [((0.004, Hb + 0.004), 0.0)] + [(top_at(th, FD), 0.0) for th in arc]
+    rows += [((DB + FD, 0.15), 0.0), ((DB + FD, yb + rc), 0.0), ((DB + FD, yb + rc * (1 - math.sin(math.pi / 4))), rc * (1 - math.cos(math.pi / 4))),
+             ((DB + FD, yb), rc)]
+    U = (-1.0, -0.62, -0.22, 0.22, 0.62, 1.0)
+    # (each row's way out from the bag: up on the top, along the curve, out from the front)
+    outw = [(0.0, 1.0)] + [(lambda th: (math.cos(th) / 0.13 / math.hypot(math.cos(th) / 0.13, math.sin(th) / 0.095),
+                                        math.sin(th) / 0.095 / math.hypot(math.cos(th) / 0.13, math.sin(th) / 0.095)))(th) for th in arc] + [(1.0, 0.0)] * 4
+    grid = [[at(u * (half(y) + 0.006 - shrink), y, w) for u in U] for (w, y), shrink in rows]
+    bm = bmesh.new()
+    vs = [[bm.verts.new(P(*p)) for p in row] for row in grid]
+    for k in range(len(vs) - 1):
+        for c in range(len(U) - 1):
+            bm.faces.new((vs[k][c], vs[k + 1][c], vs[k + 1][c + 1], vs[k][c + 1]))
+    # (a sheet: facing out, away from the bag's inside, every face as its first is)
+    bm.normal_update()
+    mid = Vector(P(*at(0.0, Hb * 0.5, 0.06)))
+    f0 = next(iter(bm.faces))
+    if (f0.calc_center_median() - mid).dot(f0.normal) < 0:
+        for f in bm.faces:
+            f.normal_flip()
+    me = bpy.data.meshes.new(name + "flap")
+    bm.to_mesh(me)
+    bm.free()
+    flap = bpy.data.objects.new(name + "flap", me)
+    bpy.context.collection.objects.link(flap)
+    fin(flap, name + "flap", M["bag"])
+    # ---- its piping: round the flap's edge, down one side, along its foot, up the other
+    def edge_pt(k, c, sd):
+        ow, oy = outw[k]
+        (w, y), shrink = rows[k]
+        hw = half(y) + 0.006 - shrink
+        return at(U[c] * hw + sd * 0.0015, y + oy * 0.002, w + ow * 0.002)
+    side_rows = [0, 2, 4, 5, 6, 7, 8]
+    run = [edge_pt(k, 0, -1) for k in side_rows] + [edge_pt(9, 0, -1), edge_pt(9, 5, 1)] + [edge_pt(k, 5, 1) for k in reversed(side_rows)]
+    piping = tube(name + "pipe", run, 0.0055, M["bagTrim"], most=len(run))
+    # ---- the turn-lock at the middle of the flap's foot: a rounded silver plate, its knob
+    wf = DB + FD
+    lock = [at(sx * 0.026, yb + 0.03 + sy * 0.017, wf + sw) for sw in (0.0, 0.008) for sy in (-1, 1) for sx in (-1, 1)]
+    bm = bmesh.new()
+    lv = [bm.verts.new(P(*p)) for p in lock]
+    for f in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+        bm.faces.new([lv[i] for i in f])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.003, segments=1, affect="EDGES", profile=0.5)
+    plate = from_bm(name + "lock", bm, M["silver"], smooth=False)
+    bm = bmesh.new()
+    knob = [[bm.verts.new(P(*at(0.011 * math.cos(2 * math.pi * k / 8), yb + 0.03 + 0.011 * math.sin(2 * math.pi * k / 8), wf + 0.008 + sw)))
+             for k in range(8)] for sw in (0.0, 0.006)]
+    for k in range(8):
+        bm.faces.new((knob[0][k], knob[0][(k + 1) % 8], knob[1][(k + 1) % 8], knob[1][k]))
+    bm.faces.new(knob[1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    knob_o = from_bm(name + "knob", bm, M["silver"])
+    # ---- a D-ring on each side, on a little tab of the leather, half way up the main compartment
+    rings = []
+    yr = Hb * 0.55
+    for sd in (-1, 1):
+        x0 = sd * half(yr)
+        bm = bmesh.new()
+        tab = [bm.verts.new(P(*at(x0 + sd * sx, yr + sy * 0.016, 0.07 + sw * 0.012))) for sx in (0.0, 0.006) for sy in (-1, 1) for sw in (-1, 1)]
+        for f in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+            bm.faces.new([tab[i] for i in f])
+        rings.append(from_bm(f"{name}tab{sd}", bm, M["bagTrim"], smooth=False))
+        xr = x0 + sd * 0.009
+        d = [(0.058, yr - 0.006), (0.082, yr - 0.006), (0.084, yr - 0.02), (0.07, yr - 0.03), (0.056, yr - 0.02)]
+        rings.append(tube(f"{name}ring{sd}", [at(xr, y, w) for (w, y) in d], 0.0035, M["silver"], cyclic=True, most=len(d)))
+    # ---- the light caught on the flap: along its shoulder, left of the middle, and a short stroke down its front
+    gl = []
+    # (a long thin glint following the flap's curve from its shoulder down the front, left of the middle; a shorter one beside it)
+    for (ks, us, lift) in (((2, 3, 4, 5, 6), (-0.52, -0.42), 0.0016), ((2, 3), (-0.35, -0.31), 0.0016)):
+        bm = bmesh.new()
+        sv = []
+        for k in ks:
+            ow, oy = outw[k]
+            (w, y), _ = rows[k]
+            y_ = y if k != 6 else 0.2
+            sv.append([bm.verts.new(P(*at(u * (half(y_) + 0.006), y_ + oy * lift, w + ow * lift))) for u in us])
+        for k in range(len(sv) - 1):
+            bm.faces.new((sv[k][0], sv[k + 1][0], sv[k + 1][1], sv[k][1]))
+        bm.normal_update()
+        f0 = next(iter(bm.faces))
+        if (f0.calc_center_median() - mid).dot(f0.normal) < 0:
+            for f in bm.faces:
+                f.normal_flip()
+        me = bpy.data.meshes.new(f"{name}gloss{len(gl)}")
+        bm.to_mesh(me)
+        bm.free()
+        g = bpy.data.objects.new(f"{name}gloss{len(gl)}", me)
+        bpy.context.collection.objects.link(g)
+        gl.append(fin(g, f"{name}gloss{len(gl)}", M["gloss"]))
+    # ---- the straps: made fast to its back near the top and at its foot's corners, round the body between
+    # (their broad faces outward, as the body's normals are where they lie: away from the back)
+    belts = straps(name + "s", lambda sd: (at(sd * 0.07, Hb - 0.035, -0.004), away), lambda sd: (at(sd * 0.105, 0.035, -0.004), away), M["bagStrap"])
+    return [main, pocket, flap, piping, plate, knob_o] + rings + gl + belts
+
+
 def backpack(name, mat, w, hgt, d, y0, round_top=0.05):
     z = -(rb(y0 + hgt / 2) + d / 2 - 0.01)
     bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, y0 + hgt / 2, z))
@@ -704,12 +912,14 @@ def backpack(name, mat, w, hgt, d, y0, round_top=0.05):
     bpy.context.view_layer.objects.active = b
     bpy.ops.object.modifier_apply(modifier="b")
     fin(b, name + "box", mat)
-    straps = [tube(f"{name}s{sd}", [Vector((sd * 0.09, y0 + hgt - 0.02, z + d / 2 - 0.02)), on_body(sd * 0.12, 0.6, 0.012), on_body(sd * 0.15, 0.42, 0.012),
-                                    Vector((sd * 0.12, y0 + 0.04, z + d / 2 - 0.02))], 0.012, mat) for sd in (-1, 1)]
-    return [b] + straps
+    # (its straps round the body, not through it, as the randoseru's)
+    outward = Vector((0.0, 0.0, -1.0))
+    belts = straps(f"{name}s", lambda sd: (Vector((sd * 0.09, y0 + hgt - 0.02, z + d / 2 - 0.02)), outward),
+                   lambda sd: (Vector((sd * 0.12, y0 + 0.04, z + d / 2 - 0.02)), outward), mat)
+    return [b] + belts
 
 
-acc("randoseru", backpack("rs", M["bag"], 0.3, 0.3, 0.16, 0.24))
+acc("randoseru", randoseru("rs"))
 acc("backpack", backpack("bp", M["pack"], 0.32, 0.3, 0.14, 0.2, 0.08))
 # (the maid's cap: a frilled white band over the crown)
 frill = tube("mfb", [head_at(math.radians(85) * (2 * u - 1), math.radians(60) + math.radians(30) * (1 - abs(2 * u - 1)), 0.03) for u in [k / 10 for k in range(11)]], 0.018, M["white"], most=5)

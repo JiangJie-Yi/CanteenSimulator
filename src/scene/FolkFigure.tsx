@@ -137,8 +137,11 @@ const X_AXIS = new THREE.Vector3(1, 0, 0)
 export const SEAT = 0.31
 /** how tall the figure stands, to the top of its head (blender/folk.py: the head's top), in its own frame */
 export const FOLK_HEIGHT = 1.07
-/** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers) */
-const UNINKED = /FolkFrame|FolkGold|FolkRed/
+/** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers; the
+ * randoseru's piping, its silver and the light on it) */
+const UNINKED = /FolkFrame|FolkGold|FolkRed|FolkBagTrim|FolkSilver|FolkGloss/
+/** parts drawn flat, unlit, as they're coloured (the light caught on the randoseru's leather: its gloss painted, the figure one toon material) */
+const FLAT = /FolkGloss/
 /** which picture a vertex is painted from (its `paint`'s z): its colour alone, the clothes', the face's strip over the skin's colour, the knit's */
 const PIC = { none: 0, outfit: 1, face: 2, knit: 3 } as const
 /** the parts that move, in the order the vertices name them: the body, the head and the hands, what's in the hands, the briefcase by the stool */
@@ -310,7 +313,8 @@ function template(scene: THREE.Group, hair: string, acc: string[], briefcase: bo
     colourVertices(geo, pic === PIC.outfit ? new THREE.Color('#ffffff') : src.name === 'FolkGold' ? new THREE.Color('#e0b040') : src.color)
     // (the head takes no shadows: the shop's one shadow map is too coarse for a face, and the hair's and the hat's fell on it in blotches and
     // streaks; its toon light shades it)
-    pieces.push({ geo, bone: FOLK_BONES.indexOf(part), inked: !UNINKED.test(src.name) && !UNINKED.test(named), pic, tint, shadowless: part === 'head' })
+    pieces.push({ geo, bone: FOLK_BONES.indexOf(part), inked: !UNINKED.test(src.name) && !UNINKED.test(named), pic, tint, shadowless: part === 'head',
+      flat: FLAT.test(src.name) })
   })
   for (const h of heldShapes(briefcase)) {
     const b = groups.get(h.part)!
