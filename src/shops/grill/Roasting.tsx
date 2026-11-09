@@ -72,7 +72,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
-import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, type Counter } from './bar'
+import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -1885,11 +1885,11 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
             gap between it and the door */}
         {/* (a hair wider, deeper and taller than the base it stands against, so its faces don't lie in the base's own planes and z-fight) */}
         <mesh position={[-end * 0.022, (BAR_TOP - 0.06) / 2 + 0.002, 0]} castShadow>
-          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, 0.436, 0.01)} attach="geometry" />
+          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, BAR_BASE_Z[1] - BAR_BASE_Z[0] + 0.036, 0.01)} attach="geometry" />
           <meshToonMaterial color="#d8b88a" map={GATE_WOOD.up} />
         </mesh>
         <mesh position={[-end * 0.022, (BAR_TOP - 0.06) / 2 + 0.002, 0]} scale={[1.12, 1.01, 1.03]}>
-          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, 0.436, 0.01)} attach="geometry" />
+          <primitive object={gateGeo(0.056, BAR_TOP - 0.056, BAR_BASE_Z[1] - BAR_BASE_Z[0] + 0.036, 0.01)} attach="geometry" />
           <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
         </mesh>
       </group>
@@ -2169,14 +2169,14 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
       {/* the cove light: a warm strip tucked into the inside corner where the top's underside meets the base, behind a little lip of the
           base's dark wood, so it's the base it lights and not the strip that's seen; its glow washing a little way down the base (it was
           out under the top's front edge, a bright bar in plain sight) */}
-      <mesh name="bar-cove" position={[baseX, BAR_TOP - 0.066, -0.132]} rotation-x={Math.PI / 2}>
+      <mesh name="bar-cove" position={[baseX, BAR_TOP - 0.066, BAR_BASE_Z[0] - 0.012]} rotation-x={Math.PI / 2}>
         <planeGeometry args={[baseL, 0.012]} /><meshBasicMaterial color="#ffcf88" toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[baseX, BAR_TOP - 0.074, -0.142]}>
+      <mesh position={[baseX, BAR_TOP - 0.074, BAR_BASE_Z[0] - 0.022]}>
         <boxGeometry args={[baseL, 0.022, 0.006]} /><meshToonMaterial color="#3a281a" />
       </mesh>
       {/* (held well off the base's face and drawn over it: a hair's breadth off, it fought the face for the same depth and flickered) */}
-      <mesh position={[baseX, (BAR_TOP - 0.06) * 0.62, -0.127]} rotation-y={Math.PI}>
+      <mesh position={[baseX, (BAR_TOP - 0.06) * 0.62, BAR_BASE_Z[0] - 0.007]} rotation-y={Math.PI}>
         <planeGeometry args={[baseL, (BAR_TOP - 0.06) * 0.76]} />
         {/* (laid on as light, added to the boards under it, not painted over them: their grain shows through the glow) */}
         <meshBasicMaterial map={COVE_GLOW} transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
@@ -2184,7 +2184,9 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
       {/* the base stands back on the cook's side, so the customers' knees go under the top: dark cedar boards standing in a frame, their
           grain at one scale along it (the table's own panelling, darker), the cove light washing down them */}
       {/* (it stands in the top's shadow, lit by nothing but the cove light: its boards glow a little with it, grain and all, or they'd be black) */}
-      <mesh position={[baseX + run / 2, (BAR_TOP - 0.06) / 2, 0.08]} castShadow geometry={panelBox(baseL + run, BAR_TOP - 0.06, 0.4, 0.55)}>
+      {/* (set back from the top's front edge clear of the drawer cases under the top: BAR_BASE_Z) */}
+      <mesh position={[baseX + run / 2, (BAR_TOP - 0.06) / 2, (BAR_BASE_Z[0] + BAR_BASE_Z[1]) / 2]} castShadow
+        geometry={panelBox(baseL + run, BAR_TOP - 0.06, BAR_BASE_Z[1] - BAR_BASE_Z[0], 0.55)}>
         <meshToonMaterial color="#d4c2b0" map={BAR_BASE_WOOD} emissive="#ffffff" emissiveMap={BAR_BASE_WOOD} emissiveIntensity={0.26} />
       </mesh>
       {/* the raised lip on the cook's side, the step the food is handed over */}

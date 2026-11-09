@@ -193,9 +193,15 @@ export const BAR_GATES: Gate[] = [{ end: 1, w: 0.43, leaf: 0.47 }, { end: -1, w:
 /** how far the counter's base and top stop short of its end for a gate: its width, less however far the gate's been slid toward the end */
 export const gateCut = (g: { w: number; shift?: number }) => g.w - (g.shift ?? 0)
 /** a gate's hinge (along its counter, from the middle), and the middle of its doorway, in the bar's frame */
+/**
+ * The bar's base under its top (lay from–to, the counter's frame): standing back on the cook's side so the customers' knees go under the
+ * top. Its front set back to clear the drawer cases hung under the top (the owner's, 2026-11-10: a case's back corner ran 8 cm into the
+ * base, a post through it; the case is 26 deep from the top's front edge, its back at -0.036): 3 cm behind them, the cove light's lip too
+ */
+export const BAR_BASE_Z = [0.02, 0.28] as const
 export function gateOf(c: Counter, g: Gate) {
   const hinge = g.end * ((c.length + 0.2) / 2 - gateCut(g))
-  return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, 0.08) }
+  return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, (BAR_BASE_Z[0] + BAR_BASE_Z[1]) / 2) }
 }
 /**
  * The little dish of sauce at a seat (the bar's frame, on its top): to the customer's left of their place (+ along: the owner's), or their
