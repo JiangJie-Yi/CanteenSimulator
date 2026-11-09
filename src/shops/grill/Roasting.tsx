@@ -12,7 +12,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
-import { colourVertices, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
+import { bakeable, colourVertices, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
+import { atlasModel } from '@/scene/atlasMerge'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
 import { FLOWS, flowOf, wantOf, type FlowKind } from '@/game/flow'
@@ -2982,6 +2983,121 @@ function warmCharring(root: THREE.Object3D, isFood: (id: string) => boolean) {
 
 const inkScale = new THREE.Vector3()
 /**
+ * The seasoning ledge (its board, the pots on it, their spoons and brushes, the fan's holder) drawn as one while all of it sits at home: a
+ * copy of it as it stands, under the dish, its pots' little pictures packed into one atlas (scene/atlasMerge) and their lines merged into one,
+ * so some fifty draws are a handful. `home(true)` shows the copy and hides the pieces (still pointed at: the pointer's rays don't mind what's
+ * hidden); `home(false)` the other way, as soon as anything on it is picked up or pointed at.
+ */
+function ledgeCopy(dish: THREE.Object3D, members: THREE.Object3D[]) {
+  dish.updateWorldMatrix(true, true)
+  const inv = new THREE.Matrix4().copy(dish.matrixWorld).invert()
+  const shown = (o: THREE.Object3D) => { for (let q: THREE.Object3D | null = o; q && q !== dish; q = q.parent) if (!q.visible) return false; return true }
+  const tmp = new THREE.Group()
+  const inks: THREE.BufferGeometry[] = []
+  let ink: THREE.ShaderMaterial | null = null
+  const side = new Map<THREE.Mesh, THREE.Side>()
+  let ok = true
+  for (const mv of members) mv.traverse((m) => {
+    if (!(m instanceof THREE.Mesh) || !shown(m)) return
+    if (Array.isArray(m.material) || m instanceof THREE.SkinnedMesh || m instanceof THREE.InstancedMesh || m.morphTargetInfluences?.length) { ok = false; return }
+    const rel = new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)
+    if (m.material instanceof THREE.ShaderMaterial) {
+      // (an ink line: its hull's shape only, all of them under one copy of the line's material)
+      if (!m.material.uniforms?.uWidth) { ok = false; return }
+      ink ??= m.material
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', m.geometry.attributes.position)
+      g.setAttribute('normal', m.geometry.attributes.normal)
+      if (m.geometry.index) g.setIndex(m.geometry.index)
+      inks.push(bakeable(g, rel))
+      return
+    }
+    const c = new THREE.Mesh(m.geometry, m.material)
+    c.matrixAutoUpdate = false
+    c.matrix.copy(rel)
+    c.castShadow = m.castShadow
+    side.set(c, (m.material as THREE.Material).side)
+    tmp.add(c)
+  })
+  // (the pictures that fit an atlas: small, laid once over the part (not tiled), on a plain toon material)
+  const fits = (c: THREE.Mesh) => {
+    const mt = c.material as THREE.MeshToonMaterial
+    if (!(mt instanceof THREE.MeshToonMaterial) || mt.transparent || mt.emissiveMap || mt.alphaMap || mt.normalMap) return false
+    const img = mt.map?.image as { width?: number } | undefined
+    if (img && (img.width ?? 0) > 512) return false
+    const uv = c.geometry.attributes.uv as THREE.BufferAttribute | undefined
+    if (uv) for (let i = 0; i < uv.count; i++) { const u = uv.getX(i), v = uv.getY(i); if (u < -0.03 || u > 1.03 || v < -0.03 || v > 1.03) return false }
+    return true
+  }
+  const gradient = (tmp.children.find((c) => fits(c as THREE.Mesh)) as THREE.Mesh | undefined)?.material as THREE.MeshToonMaterial | undefined
+  const front = ok ? atlasModel(tmp, fits, (map) => new THREE.MeshToonMaterial({ map, gradientMap: gradient?.gradientMap ?? null, vertexColors: true })) : null
+  // (what's drawn from both sides (a pot's inside), on a copy of it that is)
+  let both: THREE.Material | null = null
+  for (const c of tmp.children as THREE.Mesh[]) if (front && c.material === front && side.get(c) !== THREE.FrontSide) {
+    if (!both) { both = front.clone(); both.side = THREE.DoubleSide }
+    c.material = both
+  }
+  const copy = new THREE.Group()
+  copy.name = 'ledge-copy'
+  copy.visible = false
+  const groups = new Map<THREE.Material, { geos: THREE.BufferGeometry[]; shadow: boolean }>()
+  for (const c of tmp.children as THREE.Mesh[]) {
+    const mat = c.material as THREE.Material
+    const g = groups.get(mat) ?? { geos: [], shadow: false }
+    g.geos.push(bakeable(c.geometry, c.matrix))
+    g.shadow ||= c.castShadow
+    groups.set(mat, g)
+    // (the atlas's own copies of the geometries, done with)
+    if (mat === front || mat === both) c.geometry.dispose()
+  }
+  for (const [mat, { geos, shadow }] of groups) {
+    const geo = mergeGeometries(geos)
+    for (const g of geos) g.dispose()
+    if (!geo) { ok = false; continue }
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.castShadow = shadow
+    mesh.receiveShadow = true
+    mesh.raycast = () => {}
+    copy.add(mesh)
+  }
+  let line: THREE.ShaderMaterial | null = null
+  if (inks.length && ink) {
+    const geo = mergeGeometries(inks)
+    for (const g of inks) g.dispose()
+    if (geo) {
+      const mat = (ink as THREE.ShaderMaterial).clone()
+      line = mat
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.raycast = () => {}
+      // (its width the same on screen as the dish's own lines)
+      const at = new THREE.Vector3()
+      mesh.onBeforeRender = () => { dish.getWorldScale(at); mat.uniforms.uWidth.value = OUTLINE_WIDTH / ((at.x + at.y + at.z) / 3) }
+      copy.add(mesh)
+    } else ok = false
+  }
+  const dispose = () => {
+    copy.removeFromParent()
+    copy.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose() })
+    ;(front as THREE.MeshToonMaterial | null)?.map?.dispose()
+    front?.dispose()
+    both?.dispose()
+    line?.dispose()
+  }
+  if (!ok) { dispose(); return null }
+  dish.add(copy)
+  let at = false
+  return {
+    home(h: boolean) {
+      if (h === at) return
+      at = h
+      copy.visible = h
+      for (const mv of members) mv.visible = !h
+    },
+    dispose() { if (at) for (const mv of members) mv.visible = true; dispose() },
+  }
+}
+
+/**
  * A piece's food drawn with one ink line round all its parts, not one for each (a fish's body, fins and eyes, a rice ball's rice and its
  * seaweed: the grill's food was some eighty draws of ink alone). The parts lying in one frame (a model's several materials, one node) have
  * their hulls merged into one mesh beside them, on a copy of their bitten ink (its bites the piece's own); their own hulls are kept but
@@ -5168,6 +5284,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   /** the dipper pouring out what it scooped, where it was let go: how long it has left (s) */
   const pouring = useRef<{ tool: Tool; left: number; at: THREE.Vector3 } | null>(null)
+  // (the seasoning ledge drawn as one while all of it is at home (ledgeCopy): made once it has settled, again whenever the ledge is moved)
+  const ledge = useRef<{ key: string; since: number; copy: ReturnType<typeof ledgeCopy> }>({ key: '', since: 0, copy: null })
+  useEffect(() => () => { ledge.current.copy?.dispose(); ledge.current = { key: '', since: 0, copy: null } }, [root])
   /** the water standing in the dipper's cup (shown once it's scooped some up, gone as it's poured out) */
   const dipperWater = useMemo(() => root.getObjectByName('DipperWater') ?? null, [root])
   useLayoutEffect(() => { if (dipperWater) dipperWater.visible = false }, [dipperWater])
@@ -6209,6 +6328,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           o.material.emissive.set(lit ? HOVER_GLOW : 0x000000)
         }
       })
+    }
+    {
+      // (the ledge as one: once it's been still a second where it is, and only while nothing on it is held, pointed at or carried back)
+      const L = ledge.current
+      const n = nudge('box')
+      const key = `${n.x.toFixed(4)},${n.y.toFixed(4)},${n.z.toFixed(4)}`
+      if (key !== L.key) { L.copy?.dispose(); L.copy = null; L.key = key; L.since = 0 }
+      const still = !d && !pouring.current && !hoveredTool.current && !shift.current && tools.every((t) => t.back >= 1)
+      if (!L.copy && still && carriers.box && (L.since += dt) > 1) {
+        const members = [...carriers.box.map((b) => b.node), ...tools.filter((t) => carrierOf(t.node.name) === 'box').map((t) => t.node)]
+        L.copy = ledgeCopy(root, members)
+        // (couldn't be made: not tried again till the ledge moves)
+        if (!L.copy) L.since = -Infinity
+      }
+      L.copy?.home(still)
     }
     {
       const { pos, vel, life } = grains
