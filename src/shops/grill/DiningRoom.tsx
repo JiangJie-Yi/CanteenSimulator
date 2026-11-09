@@ -5173,7 +5173,11 @@ function HoverLift({ active, onDone, children }: { active: boolean; onDone: () =
   return <group ref={g}>{children}</group>
 }
 /** a drink's name, for its tag */
-const drinkName = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? '飲料'
+// (in the page's language)
+const drinkName = (id: string) => {
+  const d = DRINKS.find((x) => x.id === id), lang = document.documentElement.lang
+  return (lang === 'ja' ? d?.ja : lang === 'en' ? d?.en : d?.zh) ?? (lang === 'ja' ? '飲み物' : lang === 'en' ? 'Drink' : '飲料')
+}
 /** a bottle of one of the drinks, standing (its foot at the origin): its glass or can, its label printed round it,
  * its neck and cap */
 /** how much bigger each drink stands than it's modelled, to be the size it is in a shop (a 350 ml can is 12 cm tall) */
