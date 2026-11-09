@@ -8,7 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { warmLater } from '@/scene/Prewarm'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
+import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
@@ -3552,6 +3552,8 @@ function ShrineDoors() {
         mergeByMaterial(leaf)
       }
       d.userData.wide = true
+      // (all six shut, drawn as one: a copy of them shut, a draw a material, not four a leaf)
+      d.userData.home = homeCopy(d, [...d.children])
     }
     return d
   }, [gltf])
@@ -3563,7 +3565,11 @@ function ShrineDoors() {
     // (each time they start to swing, their creak and knock)
     if (want !== wasOpen.current) { wasOpen.current = want; shrineDoor(want) }
     k.current += ((want ? 1 : 0) - k.current) * Math.min(1, dt * 4)
+    // (home and shut: settled at nothing, so the one drawing of them all takes over)
+    if (!want && k.current < 1e-3) k.current = 0
+    ;(doors.userData.home as ReturnType<typeof homeCopy>).home(k.current === 0)
     for (const leaf of doors.children) {
+      if (leaf.name === 'home-copy') continue
       // (each leaf swings out to the front, the left one one way and the right the other, as far as it can without meeting the railing round
       // the deck (the owner saw them go through its posts and rails, swung 100°): the middle doors' hinges stand right behind the posts at the
       // foot of the steps, the side bays' leaves a short way behind the front rails)

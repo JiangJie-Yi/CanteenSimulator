@@ -244,6 +244,51 @@ export function countedBatch(root: THREE.Object3D, pieces: THREE.Mesh[]) {
   }
 }
 
+/**
+ * Parts that move only now and then (a shrine's doors, swung open on a click), drawn as one while they're all home: a copy of them as they're
+ * posed now, one mesh per material, put under `root`, hidden till `home(true)`, when it's shown and the parts themselves hidden (still pointed
+ * at: the pointer's rays don't mind what's hidden); `home(false)` the other way, as soon as any is to move. Six doors of four draws each are
+ * four. If any material's pieces don't merge, the copy's left out and the parts are drawn as they were.
+ */
+export function homeCopy(root: THREE.Object3D, movers: THREE.Object3D[]) {
+  root.updateWorldMatrix(true, true)
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert()
+  const groups = new Map<THREE.Material, { geos: THREE.BufferGeometry[]; shadow: boolean; order: number }>()
+  for (const mv of movers) mv.traverse((m) => {
+    if (!(m instanceof THREE.Mesh) || m instanceof THREE.SkinnedMesh || m instanceof THREE.InstancedMesh || Array.isArray(m.material) || !m.visible) return
+    const g = groups.get(m.material) ?? { geos: [], shadow: false, order: m.renderOrder }
+    g.geos.push(bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)))
+    g.shadow ||= m.castShadow
+    groups.set(m.material, g)
+  })
+  const copy = new THREE.Group()
+  copy.name = 'home-copy'
+  copy.visible = false
+  let whole = groups.size > 0
+  for (const [mat, { geos, shadow, order }] of groups) {
+    const geo = mergeGeometries(geos)
+    for (const x of geos) x.dispose()
+    if (!geo) { whole = false; continue }
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.castShadow = shadow
+    mesh.receiveShadow = true
+    mesh.renderOrder = order
+    mesh.raycast = () => {}
+    copy.add(mesh)
+  }
+  if (whole) root.add(copy)
+  else for (const c of copy.children) (c as THREE.Mesh).geometry.dispose()
+  let at = false
+  return {
+    home(h: boolean) {
+      if (!whole || h === at) return
+      at = h
+      copy.visible = h
+      for (const mv of movers) mv.visible = !h
+    },
+  }
+}
+
 export function mergeByMaterial(root: THREE.Object3D, keep: (o: THREE.Object3D) => boolean = () => false) {
   root.updateWorldMatrix(true, true)
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert()

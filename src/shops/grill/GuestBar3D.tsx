@@ -10,7 +10,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
+import { homeCopy, StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { warmLater } from '@/scene/Prewarm'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { QUALITY } from '@/scene/quality'
@@ -1535,35 +1535,9 @@ function ShoeCupboard() {
     for (const d of doors) together(d.o)
     if (cab) together(cab)
     // (all nine shut, drawn as one with one ink line, two draws not eighteen; any of them swinging, each its own again)
-    root.updateWorldMatrix(true, true)
-    const rinv = root.matrixWorld.clone().invert()
-    const body: THREE.BufferGeometry[] = [], ink: THREE.BufferGeometry[] = []
-    let inkMat: THREE.Material | null = null
-    for (const d of doors) d.o.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const geo = m.geometry.clone().applyMatrix4(rinv.clone().multiply(m.matrixWorld))
-      if (m.material === SHOE_MAT) body.push(geo)
-      else { ink.push(geo); inkMat ??= m.material as THREE.Material }
-    })
-    const shut = new THREE.Group()
-    shut.name = 'ShoeDoorsShut'
-    // (hidden till the first frame finds them all shut and swaps them over)
-    shut.visible = false
-    for (const [geos, mat] of [[body, SHOE_MAT], [ink, inkMat]] as const) {
-      const geo = geos.length && mat ? mergeGeometries(geos) : null
-      for (const x of geos) x.dispose()
-      if (!geo || !mat) continue
-      const mesh = new THREE.Mesh(geo, mat)
-      mesh.raycast = () => {}
-      shut.add(mesh)
-    }
-    // (only if both came out: otherwise the doors are drawn as they were)
-    const whole = shut.children.length === 2
-    if (whole) root.add(shut)
-    return { root, doors, cells, shut, whole }
+    const shut = homeCopy(root, doors.map((d) => d.o))
+    return { root, doors, cells, shut }
   }, [gltf])
-  useEffect(() => () => { for (const c of model.shut.children) (c as THREE.Mesh).geometry.dispose() }, [model])
   const st = useRef({ open: false, k: 0 })
   const g = useRef<THREE.Group>(null)
   const pairs = useRef<(THREE.Group | null)[]>([])
@@ -1581,11 +1555,7 @@ function ShoeCupboard() {
       d.o.rotation.y = d.s * e * (75 * Math.PI / 180)
     })
     // (shut, the one drawing of them all; the doors themselves hidden (still pointed at: the pointer's rays don't mind))
-    const allShut = model.whole && model.doors.every((d) => d.o.rotation.y === 0)
-    if (model.shut.visible !== allShut) {
-      model.shut.visible = allShut
-      for (const d of model.doors) d.o.visible = !allShut
-    }
+    model.shut.home(model.doors.every((d) => d.o.rotation.y === 0))
     pairs.current.forEach((p, i) => {
       const c = SHOE_CELLS.shoes.get(i)
       if (!p) return
