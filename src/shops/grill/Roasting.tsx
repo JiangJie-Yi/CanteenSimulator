@@ -31,7 +31,7 @@ import { Steam } from '@/scene/Steam'
 import { sameProps } from '@/scene/sameProps'
 import { StaffFigure, StaffWarm, TRAY_AT } from '@/scene/StaffFigure'
 import { commuteOf, delayOf, paceOf } from '@/game/commute'
-import { COMMUTERS, makeTrip, through, tripStep, type Trip } from './commuteWalk'
+import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { fireCall, HOT_AT } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { SHAPE_S, takeRice } from '@/game/rice'
@@ -1012,7 +1012,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       w.gone = Math.min(w.len, w.gone + dt * CHEF_PACE * paceOfStaff(id))
       const { p, dir } = alongPath(w.way, w.gone)
       o.position.copy(p)
-      if (dir.x || dir.z) o.rotation.y = Math.atan2(dir.x, dir.z)
+      if (dir.x || dir.z) o.rotation.y = turnToward(o.rotation.y, Math.atan2(dir.x, dir.z), dt)
       if (w.gone >= w.len) {
         trip.current = null
         T.t = 0
@@ -1020,7 +1020,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
           // (the lid lifted, the doors opened part way, as he reaches in)
           if (T.store === 'freezer') FRIDGE_KICK.at = performance.now()
           else if (T.store === 'cubby') CUBBY_KICK.left = performance.now()
-        } else { o.position.copy(at); o.rotation.y = yaw }
+        } else o.position.copy(at)
         T.phase = afterPhase(T.phase)
       }
       hand()
@@ -1028,7 +1028,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     }
     if (T.phase === 'taking') {
       o.position.copy(T.spot)
-      o.rotation.y = Math.atan2(T.face.x - T.spot.x, T.face.z - T.spot.z)
+      o.rotation.y = turnToward(o.rotation.y, Math.atan2(T.face.x - T.spot.x, T.face.z - T.spot.z), dt)
       T.t += dt * paceOfStaff(id)
       if (T.t >= TAKE_S) {
         // (a rice ball's rice out of the tub, for each one he's bringing (game/rice))
@@ -1085,7 +1085,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     const tr = commute.current!
     const pose = tripStep(tr, Math.min(dt, 0.1), 1.6, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
     o.position.copy(pose.p)
-    if (pose.yaw !== null) o.rotation.y = pose.yaw
+    if (pose.yaw !== null) o.rotation.y = turnToward(o.rotation.y, pose.yaw, Math.min(dt, 0.1))
     o.visible = pose.shown
     o.userData.fade = pose.vis
     o.userData.nod = pose.nod
@@ -1131,7 +1131,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
         }
       }
       o.position.copy(placeOf())
-      o.rotation.y = yaw
+      // (turned back to their work a frame at a time: home from the stores, they snapped round to it)
+      o.rotation.y = turnToward(o.rotation.y, yaw, Math.min(dt, 0.1))
       return
     }
     // (still out with plates, the coal or the rice (GuestBar3D walks them): home first, what's in hand put down, and only then out; set off

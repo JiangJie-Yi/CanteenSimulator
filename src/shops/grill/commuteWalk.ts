@@ -53,6 +53,10 @@ export type TripPose = {
   /** how far into their nod (0..1..0); stretching while they finish up */
   nod: number; stretch: boolean; walking: boolean
 }
+/** a facing turned toward the way they're to face, quickly but not at once (setting off from where they'd stood, they snapped round to the
+ * way in a frame, as much as 90°) */
+export const turnToward = (cur: number, want: number, dt: number) => cur + Math.atan2(Math.sin(want - cur), Math.cos(want - cur)) * Math.min(1, dt * 10)
+
 /**
  * A step along a trip: `dt` seconds, `speed` everyone's walking pace in the walker's frame, `world` the walker's frame to the world (for
  * giving way). Out: finishing up, then the way to the door, the nod, the step through it fading; in: unseen till their moment, through

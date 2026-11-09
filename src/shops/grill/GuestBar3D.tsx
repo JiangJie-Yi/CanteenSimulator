@@ -21,7 +21,7 @@ import { Glyph } from '@/ui/GameIcons'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
-import { makeTrip, through, tripStep, type Trip } from './commuteWalk'
+import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_TALK, paceOfStaff } from '@/game/shopState'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
@@ -266,7 +266,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       const apply = (tr: Trip) => {
         const pose = tripStep(tr, dt, 1.0, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
         s.pos.copy(pose.p)
-        if (pose.yaw !== null) s.yaw = pose.yaw
+        if (pose.yaw !== null) s.yaw = turnToward(s.yaw, pose.yaw, dt)
         o.position.copy(s.pos)
         o.rotation.y = s.yaw
         o.visible = pose.shown
@@ -416,7 +416,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     } else { STOCKER_WC.near = false; STOCKER_WC.inside = false }
     if (g.current) {
       g.current.position.copy(s.pos)
-      g.current.rotation.y = s.yaw
+      // (turned toward the way he's to face a frame at a time: set at once, he spun round at each corner and at the fridge, 130° in a frame)
+      g.current.rotation.y = turnToward(g.current.rotation.y, s.yaw, dt)
       // (unseen while he's in the toilet's stall changing the roll: faded out as he goes in and in again as he comes out, as the customers
       // are (put out of sight at once, seen from above through the slats, he went in a blink))
       const inStall = c?.kind === 'roll' && s.phase === 'work'
@@ -2599,6 +2600,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'toBox' | 'boxTake' | 'toTill' | 'hand'
   const waiters = useRef<{ phase: WaiterPhase
     t: number; seat: number; keys: string[]; run: number | null
+    /** the way they're drawn facing, turned toward `yaw` a frame at a time (set at once, they spun round at each corner of their way, by as
+     * much as 150° in a frame) */
+    look?: number
     /** (serving) the plating place's slot they've come for */
     slot?: number
     /** (clearing) the dirty plates they've come for, on their tray once taken; (from the dryer) how many dried plates are on their tray */
@@ -3779,9 +3783,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const walkCommute = (o: THREE.Group, tr: Trip, w: { pos: THREE.Vector3; yaw: number }) => {
       const pose = tripStep(tr, Math.min(dt, 0.1), 1.1, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
       w.pos.copy(pose.p)
-      if (pose.yaw !== null) w.yaw = pose.yaw
+      if (pose.yaw !== null) w.yaw = turnToward(w.yaw, pose.yaw, Math.min(dt, 0.1))
       o.position.copy(w.pos)
       o.rotation.y = w.yaw
+      ;(w as { look?: number }).look = w.yaw
       o.visible = pose.shown
       o.userData.fade = tr.done ? 1 : pose.vis
       o.userData.nod = pose.nod
@@ -3909,10 +3914,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // the tray and never came down off the dais)
           const d = w.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
           const onDais = a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]
-          b.position.copy(w.pos).add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, w.yaw))
+          b.position.copy(w.pos).add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, w.look ?? w.yaw))
           // (not down into the genkan with the step's edge under them: they stand on the step up, the room's floor, as they hand it over)
           if (KITCHEN_DROP < 0 && !onDais) b.position.y += KITCHEN_DROP / scale
-          b.rotation.y = w.yaw
+          b.rotation.y = w.look ?? w.yaw
         }
       })
     }
@@ -3947,7 +3952,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         return a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]
       }
       const trayAt = () => w.pos.clone().add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE)
-        .applyAxisAngle(UP_Y, w.yaw)).add(new THREE.Vector3(0, onDais() ? 0 : -rise, 0))
+        .applyAxisAngle(UP_Y, w.look ?? w.yaw)).add(new THREE.Vector3(0, onDais() ? 0 : -rise, 0))
       const run = () => runs.current.find((x) => x.key === w.run)
       const setMove = (on: boolean) => setMoving((m) => { if (!!m[wi] === on) return m; const n = [...m]; n[wi] = on; return n })
       const go = (path: THREE.Vector3[], phase: WaiterPhase) => { w.path = path; w.len = pathLength(path); w.phase = phase; w.t = 0; setMove(true) }
@@ -4271,10 +4276,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (the owner's figure here only while he's out: at his place, Roasting draws him)
         o.visible = !ownerServes || OWNER_OUT.on
         o.position.copy(w.pos)
-        o.rotation.y = w.yaw
+        w.look = turnToward(w.look ?? w.yaw, w.yaw, step)
+        o.rotation.y = w.look
         if (wipeAt) {
           o.position.lerp(wipeAt.p, wipeAt.k)
-          o.rotation.y = w.yaw + Math.atan2(Math.sin(wipeAt.yaw - w.yaw), Math.cos(wipeAt.yaw - w.yaw)) * wipeAt.k
+          o.rotation.y = w.look + Math.atan2(Math.sin(wipeAt.yaw - w.look), Math.cos(wipeAt.yaw - w.look)) * wipeAt.k
         }
       }
       // (up on the kitchen's dais while they're over it)
