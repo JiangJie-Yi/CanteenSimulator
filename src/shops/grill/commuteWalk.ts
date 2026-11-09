@@ -4,6 +4,11 @@
 // GuestBar3D's servers and stock keeper) steps its own along in its own frame; where they all are in the world is kept here, to keep apart.
 import * as THREE from 'three'
 import { FADE_S, NOD_S, yieldTo } from '@/game/commute'
+import { STAFF_TALK, SWITCH_SPOT } from '@/game/shopState'
+import { getLights, pressLightSwitch } from '@/scene/lightsStore'
+import { LIGHTS_ON } from '@/data/commuteLines'
+import type { Lang } from '@/data/i18n'
+import { lightSwitchSound } from './restroomSound'
 
 /** where everyone on their way is just now (the world), and which way they're going, by id */
 export const COMMUTERS = new Map<string, { p: THREE.Vector3; go: THREE.Vector3 }>()
@@ -27,6 +32,9 @@ export type Trip = {
   done: boolean
   /** where they were in the world last step (which way they're going, for giving way) */
   last: THREE.Vector3 | null
+  /** coming in to a dark shop, the first through the front door goes to the switch by it (the owner's): where they stand at it, where
+   * they'll take up their way again (their own frame), where they are just now, how far into pressing it */
+  lamp?: { phase: 'to' | 'press' | 'back' | 'done'; at: THREE.Vector3; back: THREE.Vector3; pos: THREE.Vector3; face: number; t: number; pressed: boolean }
 }
 
 const lengthOf = (w: THREE.Vector3[]) => w.reduce((s, p, i) => (i ? s + p.distanceTo(w[i - 1]) : 0), 0)
@@ -67,6 +75,8 @@ export function tripStep(tr: Trip, dt: number, speed: number, world: (v: THREE.V
   const n = tr.way.length
   // (the last stretch going out, the first coming in: through the doorway)
   const doorLen = n > 1 ? tr.way[n - 1].distanceTo(tr.way[n - 2]) : 0, inLen = n > 1 ? tr.way[1].distanceTo(tr.way[0]) : 0
+  const lamp = lampStep(tr, dt, speed, world, inLen)
+  if (lamp) return lamp
   if (tr.t < tr.wait) {
     const p = tr.way[0].clone()
     return { p, yaw: null, vis: tr.dir === 'out' ? 1 : 0, shown: tr.dir === 'out', nod: 0, stretch: tr.dir === 'out' && tr.t > tr.wait * 0.35, walking: false }
@@ -121,3 +131,75 @@ export function tripStep(tr: Trip, dt: number, speed: number, world: (v: THREE.V
 /** a step through a door: the point that far on past `door` from `from` (out through it), for the way's last stretch */
 export const through = (from: THREE.Vector3, door: THREE.Vector3, by: number) => door.clone().add(door.clone().sub(from).setY(0).normalize().multiplyScalar(by))
 export { FADE_S }
+
+/** how near the switch (the world's) someone just in at the door must be for it to be on their way */
+const SWITCH_NEAR = 3.2
+/** where they stand at it: this far out from the wall (the world's); how long the press takes (s), the light going on part way into it */
+const SWITCH_STAND = 0.5
+const PRESS_S = 0.6
+/** a claim on the switch let go if it's not been seen to (a walker gone mid-way) */
+const CLAIM_S = 30
+/** the walker's frame from the world (the inverse of `world`, an affine map: from where it puts the origin and the three axes) */
+function inverseOf(world: (v: THREE.Vector3) => THREE.Vector3) {
+  const o = world(new THREE.Vector3())
+  const m = new THREE.Matrix4().makeBasis(world(new THREE.Vector3(1, 0, 0)).sub(o), world(new THREE.Vector3(0, 1, 0)).sub(o), world(new THREE.Vector3(0, 0, 1)).sub(o))
+  m.setPosition(o)
+  return m.invert()
+}
+/**
+ * Coming in at the opening to a dark shop (the room's lights off): the first through the front door says so, walks over to the switch by
+ * it, turns to the wall and leans in to press it (the lights coming on), and walks back onto their way. Null when it's not their turn.
+ */
+function lampStep(tr: Trip, dt: number, speed: number, world: (v: THREE.Vector3) => THREE.Vector3, inLen: number): TripPose | null {
+  const now = performance.now()
+  if (!tr.lamp) {
+    const S = SWITCH_SPOT
+    if (tr.dir !== 'in' || tr.done || tr.t < tr.wait || tr.d < inLen || !S.at || getLights().on) return null
+    if (S.by && S.by !== tr.id && now - S.since < CLAIM_S * 1000) return null
+    const here = along(tr.way, tr.d).p, me = world(here.clone())
+    if (Math.hypot(me.x - S.at.x, me.z - S.at.z) > SWITCH_NEAR) return null
+    const inv = inverseOf(world)
+    const stand = new THREE.Vector3(S.at.x + S.front.x * SWITCH_STAND, me.y, S.at.z + S.front.z * SWITCH_STAND).applyMatrix4(inv)
+    const wall = new THREE.Vector3(S.at.x, me.y, S.at.z).applyMatrix4(inv).sub(stand)
+    S.by = tr.id
+    S.since = now
+    tr.lamp = { phase: 'to', at: stand, back: here.clone(), pos: here.clone(), face: Math.atan2(wall.x, wall.z), t: 0, pressed: false }
+    const lang = (document.documentElement.lang.startsWith('ja') ? 'ja' : document.documentElement.lang.startsWith('en') ? 'en' : 'zh') as Lang
+    const pool = LIGHTS_ON[lang]
+    STAFF_TALK.push({ key: now, id: tr.id, text: pool[Math.floor(Math.random() * pool.length)], until: now + 3600 })
+  }
+  const L = tr.lamp
+  if (L.phase === 'done') return null
+  const pose = (walking: boolean, yaw: number | null, nod = 0): TripPose => {
+    const w = world(L.pos.clone())
+    COMMUTERS.set(tr.id, { p: w, go: new THREE.Vector3() })
+    return { p: L.pos.clone(), yaw, vis: 1, shown: true, nod, stretch: false, walking }
+  }
+  const walkTo = (to: THREE.Vector3) => {
+    const d = to.clone().sub(L.pos)
+    const step = dt * speed * tr.pace
+    const yaw = Math.atan2(d.x, d.z)
+    if (d.length() <= step) { L.pos.copy(to); return { yaw, there: true } }
+    L.pos.addScaledVector(d.normalize(), step)
+    return { yaw, there: false }
+  }
+  if (L.phase === 'to') {
+    const { yaw, there } = walkTo(L.at)
+    if (there) L.phase = 'press'
+    return pose(true, yaw)
+  }
+  if (L.phase === 'press') {
+    L.t += dt
+    const k = Math.min(1, L.t / PRESS_S)
+    // (part way into reaching for it, the click and the lights; someone else may have put them on meanwhile)
+    if (k > 0.45 && !L.pressed) {
+      L.pressed = true
+      if (!getLights().on) { pressLightSwitch('room'); lightSwitchSound(true) }
+    }
+    if (k >= 1) L.phase = 'back'
+    return pose(false, L.face, Math.sin(Math.PI * k))
+  }
+  const { yaw, there } = walkTo(L.back)
+  if (there) { L.phase = 'done'; SWITCH_SPOT.by = '' }
+  return pose(true, yaw)
+}

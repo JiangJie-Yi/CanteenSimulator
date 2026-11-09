@@ -5,6 +5,7 @@ import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer
 import { bottleClink, coolerDoorSound, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { SWITCH_SPOT } from '@/game/shopState'
 import * as THREE from 'three'
 import { warmLater } from '@/scene/Prewarm'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -6469,8 +6470,19 @@ function LightSwitch({ circuit = 'room', slim = false }: { circuit?: Circuit; sl
     model.lamp.color.set(on ? '#7c8a72' : '#8dffb0')
   }, [model, on])
   useEffect(() => { for (const t of model.toon) t.emissive.set(lit ? '#2a2a30' : '#000000') }, [model, lit])
+  // (the room's switch: where it is in the world, for one of the staff coming in to a dark shop to walk to (SWITCH_SPOT); now and then, it
+  // may be moved)
+  const at = useRef<THREE.Group>(null)
+  const since = useRef(1)
+  useFrame((_, dt) => {
+    if (circuit !== 'room' || !at.current || (since.current += dt) < 1) return
+    since.current = 0
+    const p = at.current.getWorldPosition(new THREE.Vector3()), f = at.current.getWorldDirection(new THREE.Vector3())
+    SWITCH_SPOT.at = { x: p.x, y: p.y, z: p.z }
+    SWITCH_SPOT.front = { x: f.x, y: 0, z: f.z }
+  })
   return (
-    <group rotation-y={-Math.PI / 2} onClick={press}
+    <group ref={at} rotation-y={-Math.PI / 2} onClick={press}
       onPointerOver={(e: { stopPropagation: () => void }) => { e.stopPropagation(); if (getEdit().on) return; setLit(true); handOver.onPointerOver(e as never); tag() }}
       onPointerOut={(e: { stopPropagation: () => void }) => { setLit(false); handOver.onPointerOut(e as never); setTip(null) }}>
       {/* (the handlers on a group round it: a primitive's own aren't attached) */}

@@ -33,3 +33,9 @@ export const OPEN_HOME: Lines = {
   ja: ['おはようございます～！いい天気ですね、ホール開けます！', '店長おはようございます！コーヒー買ってきました、今日もよろしくお願いします！', 'みなさんおはようございます、卓の調味料を補充してきます。'],
   en: ["Morning~! Lovely day, I'll get the floor open!", 'Morning, boss! Picked up coffee on the way. Here we go again!', "Morning, all. I'll top up the condiments on the counters first."],
 }
+/** coming in at the front door to a dark shop, on the way to the switch by the door (the owner's) */
+export const LIGHTS_ON: Lines = {
+  zh: ['店裡好暗，來開燈吧！', '怎麼黑漆漆的，我先開個燈。'],
+  ja: ['店が暗いな、電気つけよう！', '真っ暗ですね、先に電気つけます。'],
+  en: ["It's dark in here, let's get the lights on!", "Pitch dark! I'll put the lights on first."],
+}

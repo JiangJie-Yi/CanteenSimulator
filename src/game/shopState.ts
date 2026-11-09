@@ -33,6 +33,10 @@ export const paceOfStaff = (id: string | null | undefined) =>
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }
 export const STAFF_TALK: StaffWord[] = []
+/** the room's light switch by the way in (DiningRoom's, the world's: where it is and the way its face looks out into the room), and who's
+ * gone to switch the lights on (one coming in at the opening, the room dark: commuteWalk), since when */
+export const SWITCH_SPOT = { at: null as { x: number; y: number; z: number } | null, front: { x: 0, y: 0, z: 1 }, by: '', since: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __switchSpot: SWITCH_SPOT })
 /** each speaker's tag over their words (the owner's: every bubble says who): a staff member's id, 'owner', 'role:cashier' (whoever's at the
  * till) to their role and name (老闆 江老闆, 外場 小美…); App keeps it up to date with who's hired and the owner's name */
 export const SPEAKERS = new Map<string, string>()
