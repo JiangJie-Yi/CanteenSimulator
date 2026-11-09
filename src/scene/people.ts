@@ -13,4 +13,4 @@ export const moodOf = (g: { rating: number | null; state: string }): Mood | null
  */
 export const walkOf = (kind: string) => kind === 'grandma' || kind === 'grandpa' ? 'WalkO' : kind === 'uncle' ? 'WalkU'
   : ['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'gyaru', 'staffF'].includes(kind) ? 'WalkF' : 'Walk'
-export const walkSpeedOf = (kind: string) => ({ WalkO: 0.55, WalkU: 0.82, WalkF: 0.92, Walk: kind === 'kid' ? 1.12 : 1 })[walkOf(kind)]
+export const walkSpeedOf = (kind: string) => ({ WalkO: 0.55, WalkU: 0.82, WalkF: 0.92, Walk: kind === 'kid' ? 1.35 : 1 })[walkOf(kind)]

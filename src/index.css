@@ -8059,3 +8059,40 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   color: #e0a72e;
   vertical-align: -0.1em;
 }
+
+/* the view's name as the camera's changed to it (ui/ViewToast): a dark glass capsule at the foot of the screen, there under two seconds */
+.view-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(24, 20, 18, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(230, 200, 160, 0.3);
+  border-radius: 20px;
+  padding: 6px 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  color: #f7f4ed;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1000;
+  animation: view-toast 1.8s ease-in-out both;
+}
+.view-toast svg { color: #e6c8a0; }
+.view-toast b { color: #e6c8a0; font-weight: 600; letter-spacing: 0; }
+@keyframes view-toast {
+  0% { opacity: 0; translate: 0 6px; }
+  12%, 82% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; translate: 0 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-toast { animation-name: view-toast-still; }
+  @keyframes view-toast-still { 0%, 100% { opacity: 0; } 10%, 85% { opacity: 1; } }
+}

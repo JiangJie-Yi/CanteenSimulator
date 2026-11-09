@@ -252,7 +252,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const walk = pace.current
     if (!tall.current) { const b = new THREE.Box3().setFromObject(fig.root); if (!b.isEmpty()) tall.current = b.max.y - b.min.y }
     // (not on the character viewer's turntable: its own little canvas, the puffs are the room's)
-    if (tall.current && o.visible && !id.startsWith('viewer-')) footDust(steps.current, at, walk, tall.current, dt)
+    if (tall.current && o.visible && !id.startsWith('viewer-')) footDust(steps.current, at, walk, tall.current, dt, 'staff')
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))

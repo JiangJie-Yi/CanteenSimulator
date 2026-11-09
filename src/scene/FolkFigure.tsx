@@ -473,7 +473,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const walk = pace.current
     if (!tall.current) { const bx = new THREE.Box3().setFromObject(fig.root); if (!bx.isEmpty()) tall.current = bx.max.y - bx.min.y }
     // (not on the character viewer's turntable (`ground`): its own little canvas, the puffs are the room's)
-    if (tall.current && going && !ground) footDust(steps.current, v3, walk, tall.current, dt)
+    if (tall.current && going && !ground) footDust(steps.current, v3, walk, tall.current, dt, spec.kind === 'kid' ? 'kid' : 'guest')
     // (the food's come: a crouch, a hop up stretched tall and down again squashed, half a second; their eyes shut happy a moment)
     if (eating !== served.current.was) { served.current.was = eating; if (eating && !walking) { served.current.at = t; fig.root.userData.served = (fig.root.userData.served ?? 0) + 1 } }
     const since = t - served.current.at

@@ -558,7 +558,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const moving = speed > 0
     // (his footfalls' puffs of dust (scene/DustPuffs); not the viewer's copy of him)
     if (!tall.current) { const bx = new THREE.Box3().setFromObject(m); if (!bx.isEmpty()) tall.current = bx.max.y - bx.min.y }
-    if (tall.current && m.visible) footDust(steps.current, m.getWorldPosition(FEET), moving ? Math.min(1, 0.6 + speed * 0.4) : 0, tall.current, dt)
+    if (tall.current && m.visible) footDust(steps.current, m.getWorldPosition(FEET), moving ? Math.min(1, 0.6 + speed * 0.4) : 0, tall.current, dt, 'boss')
     const run = speed > 1
     const bob = moving ? Math.abs(Math.sin(step * Math.PI)) * (run ? 0.055 : 0.035) : 0
     const squash = moving ? 1 - Math.abs(Math.cos(step * Math.PI)) * 0.04 : 1 + Math.sin(T * 1.6) * 0.012

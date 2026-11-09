@@ -8,7 +8,7 @@ export type GlyphPart = { d: string; stroke?: number; cut?: boolean; o?: number 
 export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
-  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus'
+  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -56,6 +56,8 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
   arrowU: [{ d: 'M8 13.8V3.2M4 7.2 8 3.2l4 4', stroke: S }],
   // (no entry: a ring struck through)
   ban: [{ d: 'M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2Z', stroke: 1.8 }, { d: 'M3.8 3.8l8.4 8.4', stroke: 1.8 }],
+  // (an eye: the view's, as on the views button)
+  eye: [{ d: 'M1.4 8S3.8 3.6 8 3.6 14.6 8 14.6 8 12.2 12.4 8 12.4 1.4 8 1.4 8Z', stroke: 1.3 }, { d: 'M8 5.9a2.1 2.1 0 1 1 0 4.2A2.1 2.1 0 1 1 8 5.9Z' }],
 }
 
 /** the icon as SVG markup, for the DOM the developer panel builds by hand */

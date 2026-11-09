@@ -9,7 +9,7 @@ const MAX = 80
 type Puff = { on: boolean; x: number; y: number; z: number; vx: number; vz: number; rise: number; t: number; life: number; size: number }
 const POOL: Puff[] = Array.from({ length: MAX }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vz: 0, rise: 0, t: 0, life: 0.4, size: 0 }))
 let next = 0
-const SEEN = { calls: 0, walking: 0, puffs: 0 }
+const SEEN = { calls: 0, walking: 0, puffs: 0, speeds: {} as Record<string, number[]> }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dust: SEEN })
 
 /** one puff at `at` (the world's), drifting along (vx, vz) a second, `size` across at its biggest */
@@ -20,23 +20,32 @@ export function puff(at: THREE.Vector3, vx: number, vz: number, size: number) {
   Object.assign(p, { on: true, x: at.x, y: at.y, z: at.z, vx, vz, rise: size * 1.4, t: 0, life: 0.35 + Math.random() * 0.1, size })
 }
 
+/** how fast (the world's, a second) someone must be going for a puff at their heels: a run (the staff at their work go about 4.2, a child
+ * about 3.6; a grown-up customer about 2.4, who never puffs anyway) */
+export const RUN_SPEED = 3.1
 /** a walker's own count between footfalls, and which foot */
-export type Steps = { t: number; side: number; last: THREE.Vector3 | null }
-export const newSteps = (): Steps => ({ t: 0, side: 1, last: null })
+export type Steps = { t: number; side: number; last: THREE.Vector3 | null; v: number }
+export const newSteps = (): Steps => ({ t: 0, side: 1, last: null, v: 0 })
 const AT = new THREE.Vector3()
 /**
  * A walker's footfalls, called each frame with where they are (their feet, the world's), how much they're walking (0..1, their waddle's
- * pace) and how tall they stand (the world's): a puff at a heel every 0.16 s, a little quicker the faster they go, behind them, a foot to
+ * pace), how tall they stand (the world's) and who they are ('staff', 'boss', 'kid' or 'guest'): a puff at a heel every 0.16 s, a little quicker the faster they go, behind them, a foot to
  * either side in turn
  */
-export function footDust(s: Steps, feet: THREE.Vector3, walk: number, height: number, dt: number) {
+export function footDust(s: Steps, feet: THREE.Vector3, walk: number, height: number, dt: number, who: string) {
   SEEN.calls++
   if (walk >= 0.5) SEEN.walking++
   const was = s.last
   // (the way they're going, from last frame's place, before it's put by)
   const dx = was ? feet.x - was.x : 0, dz = was ? feet.z - was.z : 0, d = Math.hypot(dx, dz)
   s.last = (s.last ?? new THREE.Vector3()).copy(feet)
+  // (their speed in the world, a little smoothed over the frames)
+  if (was && dt > 0) s.v += (d / dt - s.v) * Math.min(1, dt * 8)
+  if (import.meta.env?.DEV && walk >= 0.5 && dt > 0) { const k = who; (SEEN.speeds[k] ??= []).push(+s.v.toFixed(2)); if (SEEN.speeds[k].length > 4000) SEEN.speeds[k].shift() }
   if (!was || walk < 0.5 || dt <= 0) { s.t = 0; return }
+  // (only the staff and the children kick up dust (the owner's): the grown-up customers walk in and out unhurried; and only at a run, not
+  // setting off, slowing to a stop or at a stroll)
+  if (who === 'guest' || s.v < RUN_SPEED) { s.t = 0; return }
   if (d < 1e-5) return
   s.t += dt
   if (s.t < 0.16 - 0.04 * Math.min(1, walk)) return

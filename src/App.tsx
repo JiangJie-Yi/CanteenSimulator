@@ -97,6 +97,7 @@ import { Prewarm } from '@/scene/Prewarm'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
+import { ViewToast } from '@/ui/ViewToast'
 import { tl } from '@/data/i18n'
 import { skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
 import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
@@ -3004,6 +3005,8 @@ export default function App() {
           aria-label={UI[lang].resetView} title={UI[lang].resetView} aria-expanded={viewMenu}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
+        {/* the view's name a moment at the foot of the screen as the camera's changed to it */}
+        <ViewToast view={view} lang={lang} quiet={editOn} />
         {/* the views: the grill's own, the whole shop, and each part of it (data/views); the one chosen again glides back to it */}
         {viewMenu && (
           <ul className="view-menu" role="menu">

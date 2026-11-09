@@ -89,7 +89,7 @@ const SOUND_AT = new THREE.Vector3()
 
 const LAY = new THREE.Vector3(0.59, 0, 0.81)       // toward the camera (the cook's side)
 const ALONG = new THREE.Vector3(0.81, 0, -0.59)    // along the first counter
-const SPEED = 1.5                                   // how fast they walk in and out (per second)
+const SPEED = 1.32                                  // how fast they walk in and out (per second: unhurried, the owner's)
 const SERVER_SPEED = 2.1                            // and the servers, carrying (brisk)
 const INK = '#3b2a20'
 
