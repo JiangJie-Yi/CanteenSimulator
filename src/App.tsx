@@ -1292,6 +1292,8 @@ export default function App() {
   const [omikiAt, setOmikiAt] = useState<number | null>(null)
   const [blessed, setBlessed] = useState(false)
   // closing: shut by the owner, the last customers finishing; leaving: they've gone and the staff are walking out
+  // (past midnight: the sign's 深夜 stamp (the owner's: only then, not all evening))
+  const lateNow = useClock((c) => isLate(c.minute))
   const [closing, setClosing] = useState(false)
   /**
    * The day's sheet put away (收工, or its own countdown): the clock on to the next day's getting ready (PREP_AT, half an hour before opening),
@@ -2841,7 +2843,7 @@ export default function App() {
             top={ai ? <GuestCounter guests={guests} shop={dish.id} lang={lang} staff={{ chef: staffOf(dish.id, 'chef').length,
               cashier: staffOf(dish.id, 'cashier').length, server: staffOf(dish.id, 'server').length }} /> : undefined} />
         )}
-        <Brand night={theme === 'dark'} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
+        <Brand night={theme === 'dark'} late={lateNow} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
           onClick={editOn ? undefined : () => setShowRating((v) => !v)} />
         {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars; a drawer out from the left, kept
             drawn so it slides back in as it slid out) */}

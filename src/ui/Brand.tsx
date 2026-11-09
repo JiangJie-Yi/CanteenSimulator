@@ -30,10 +30,10 @@ const FISH_BOARD_PATH = (() => {
 const FISH_RULE = 'M3 25Q6 11 18 7Q40 3 64 7Q76 10 83 22L94 9Q91 25 94 41L83 28Q76 40 64 43Q40 47 18 43Q6 39 3 25Z'
 /**
  * The shop's sign, top-left: it hangs from two cords and sways a little in the breeze, and at night its lettering
- * lights up (and a 深夜 stamp is pressed on beside it).
+ * lights up; past midnight a 深夜 stamp is pressed on beside it.
  */
-export function Brand({ night, lang, shop = 'grilledfish', dark = false, ignite = 0, onClick }:
-  { night: boolean; lang: Lang; shop?: string; dark?: boolean; ignite?: number; onClick?: () => void }) {
+export function Brand({ night, late = false, lang, shop = 'grilledfish', dark = false, ignite = 0, onClick }:
+  { night: boolean; late?: boolean; lang: Lang; shop?: string; dark?: boolean; ignite?: number; onClick?: () => void }) {
   const { main, sub } = (NAMES[shop] ?? NAMES.grilledfish)[lang]
   // (its tag taken down if the sign goes (lit afresh, as when the shop's founded) with the pointer still on it)
   const tipped = useRef(false)
@@ -41,7 +41,7 @@ export function Brand({ night, lang, shop = 'grilledfish', dark = false, ignite 
   return (
     // dark: the business hasn't been founded yet (the sign is unlit); ignite: it's just been founded (it comes to life)
     <h1 key={`${shop}-${ignite}`} className={`brand brand-${shop}${night ? ' brand-night' : ''} brand-${lang}${dark ? ' brand-dark' : ''}${ignite ? ' brand-ignite' : ''}`}
-      lang={tl(lang, 'zh-Hant', 'ja', 'en')} aria-label={`${main}${sub}${night ? ' 深夜' : ''}`}
+      lang={tl(lang, 'zh-Hant', 'ja', 'en')} aria-label={`${main}${sub}${late ? ' 深夜' : ''}`}
       onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
       // (pointed at, the same paper tag as anything in the room that can be used: what it is and what a click does)
@@ -71,7 +71,8 @@ export function Brand({ night, lang, shop = 'grilledfish', dark = false, ignite 
         <span className="brand-main">{main}</span>
         <span className="brand-sub">{sub}</span>
       </span>
-      {night && (
+      {/* (the 深夜 stamp only past midnight (game/hours' isLate; the owner's): the evening's the sign lit, no stamp) */}
+      {late && (
         <>
           {/* (the stamp's ink: its edges roughened as a seal pressed onto paper leaves them) */}
           <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
