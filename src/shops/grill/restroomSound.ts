@@ -451,3 +451,16 @@ export function gateSound(at: THREE.Vector3, kind: 'push' | 'tap') {
   k.connect(lp).connect(o); k.start(t)
   ping(a, t, kind === 'push' ? 180 : 240, 0.25, 0.08, o)
 }
+
+/** a bar stool pulled out over the boards: a short wooden scrape, low, its feet's rub dying away */
+export function stoolSound(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate(`stool${at.x.toFixed(1)}${at.z.toFixed(1)}`)) return
+  const t = a.currentTime, o = out(a, 0.14 * near, pan)
+  const r = noise(a, 0.22, (x) => Math.sin(Math.PI * Math.min(1, x * 1.6)) * (1 - x) * (0.7 + 0.3 * Math.sin(x * 90)), 0.25)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 2.5
+  bp.frequency.setValueAtTime(420, t); bp.frequency.linearRampToValueAtTime(300, t + 0.22)
+  r.connect(bp).connect(o); r.start(t)
+  ping(a, t + 0.2, 140, 0.15, 0.06, o)
+}

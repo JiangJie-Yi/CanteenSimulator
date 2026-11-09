@@ -46,13 +46,13 @@ def P(x, y, z):
 # (the glaze: a deep celadon grey-green, mottled; from the rim a paler glaze run down in drips of different lengths; the foot bare clay)
 S = 256
 gu, gv = grid01(S)            # (u round the pot, v up it: row 0 at the foot)
-base = mix((0.22, 0.3, 0.26), (0.3, 0.38, 0.32), fbm(S, 5, 9, 4))
+base = mix((0.1, 0.11, 0.115), (0.17, 0.18, 0.185), fbm(S, 5, 9, 4))     # (a dark ink-grey stoneware glaze (the owner's), mottled)
 drip_len = np.array([0.18 + 0.32 * rnd.random() ** 2 for _ in range(S)], np.float32)
 drip_len = np.convolve(np.concatenate([drip_len[-4:], drip_len, drip_len[:4]]), np.ones(5) / 5, mode="same")[4:-4]
 run = smooth(0.0, 0.06, gv - (1 - drip_len[None, :]))           # (1 from where each drip reaches up to the rim)
-glaze = mix(base, (0.5, 0.58, 0.5), run * 0.8)
-glaze = mix(glaze, (0.18, 0.24, 0.2), smooth(0.02, 0.0, np.abs(gv - (1 - drip_len[None, :]))) * 0.5)   # (a darker bead where a drip ends)
-glaze = mix(glaze, (0.56, 0.43, 0.31), smooth(0.06, 0.03, gv))   # (the foot's bare clay)
+glaze = mix(base, (0.27, 0.31, 0.33), run * 0.7)                 # (a blue-grey glaze run down from the rim)
+glaze = mix(glaze, (0.07, 0.08, 0.08), smooth(0.02, 0.0, np.abs(gv - (1 - drip_len[None, :]))) * 0.5)   # (a darker bead where a drip ends)
+glaze = mix(glaze, (0.42, 0.33, 0.25), smooth(0.06, 0.03, gv))   # (the foot's bare clay)
 glaze = np.clip(glaze * (0.94 + 0.12 * fbm(S, 40, 40, 2)[..., None]), 0, 1)
 pot_tex = image("WillowPotGlaze", glaze)
 
@@ -101,11 +101,22 @@ while y < LH - 40:
     alpha[st] = 1
     y += 19 + 10 * rnd.random()
     side = -side
-leaves_tex = image("WillowLeafStrip", rgb[::-1], alpha=alpha[::-1])   # (Blender's rows go up from the bottom)
+
+# (the leaves deeper toward the branch and fresher toward the tips (the owner's): a dark ink green to a young yellow green down each strip)
+ramp = np.linspace(0, 1, LH, dtype=np.float32)[::-1][:, None, None]      # (rgb's row 0 is the strip's top, by the branch: 1 there)
+deep, fresh = np.array((0.24, 0.37, 0.165), np.float32), np.array((0.55, 0.7, 0.29), np.float32)
+tint = deep * ramp + fresh * (1 - ramp)
+rgb = np.where(alpha[..., None] > 0, np.clip(rgb * 0.45 + tint * 0.75, 0, 1), rgb)
+leaves_tex = image("WillowLeafStrip", rgb[::-1], alpha=alpha[::-1])
+# (the moss: speckled greens, a darker hollow here and there)
+mu, mv = grid01(S)
+moss = mix((0.16, 0.26, 0.1), (0.3, 0.45, 0.16), fbm(S, 18, 18, 3))
+moss = mix(moss, (0.1, 0.16, 0.07), smooth(0.6, 0.8, fbm(S, 5, 5, 3)) * 0.5)
+moss_tex = image("WillowMossPic", np.clip(moss * (0.85 + 0.3 * fbm(S, 60, 60, 2)[..., None]), 0, 1))
 
 M = {
     "pot": pbr("WillowPot", (1, 1, 1), tex=pot_tex, rough=0.3),
-    "soil": pbr("WillowSoil", (0.24, 0.16, 0.1), rough=0.9),
+    "soil": pbr("WillowSoil", (1, 1, 1), tex=moss_tex, rough=0.95),
     "bark": pbr("WillowBark", (1, 1, 1), tex=bark_tex, rough=0.85),
     "leaves": pbr("WillowLeaves", (1, 1, 1), tex=leaves_tex, rough=0.6, blend=True),
 }
@@ -132,8 +143,9 @@ def mesh_from(name, verts, faces, uvs, mat, smooth_shade=True):
 # The pot: turned from its profile on 16 sides, the soil's disc in it
 # =====================================================================
 SEG = 16
-PROFILE = [(0.094, 0.0), (0.1, 0.012), (0.112, 0.12), (0.124, 0.25), (0.13, 0.312), (0.137, 0.332), (0.138, 0.342),
-           (0.127, 0.344), (0.122, 0.33), (0.12, 0.31)]
+# (a wide-mouthed stoneware pot (the owner's): a foot ring, drawn in at the waist, swelling to a broad rim with a soft bevel)
+PROFILE = [(0.1, 0.0), (0.108, 0.012), (0.12, 0.06), (0.113, 0.14), (0.122, 0.22), (0.142, 0.29), (0.154, 0.312), (0.158, 0.326),
+           (0.152, 0.336), (0.14, 0.332), (0.136, 0.31)]
 SOIL_Y = 0.31
 verts, faces, uvs = [], [], []
 n = len(PROFILE)
@@ -156,9 +168,27 @@ uvs.append([(k / SEG, 0.01) for k in range(SEG)])
 pot = mesh_from("WillowPotBody", verts, faces, uvs, M["pot"])
 parts.append(pot)
 # (the soil: a disc at the soil's level inside the rim, a ladder across it)
-sv = [(0.12 * math.cos(2 * math.pi * k / SEG), SOIL_Y, 0.12 * math.sin(2 * math.pi * k / SEG)) for k in range(SEG)]
-soil = mesh_from("WillowSoilTop", sv, [tuple(reversed(range(SEG)))], [[(0.5, 0.5)] * SEG], M["soil"], smooth_shade=False)
+sv = [(0.135 * math.cos(2 * math.pi * k / SEG), SOIL_Y, 0.135 * math.sin(2 * math.pi * k / SEG)) for k in range(SEG)]
+soil = mesh_from("WillowSoilTop", sv, [tuple(reversed(range(SEG)))], [[(0.5 + 0.5 * math.cos(2 * math.pi * k / SEG), 0.5 + 0.5 * math.sin(2 * math.pi * k / SEG)) for k in reversed(range(SEG))]], M["soil"], smooth_shade=False)
 parts.append(soil)
+# (moss over it: a few low cushions, flattened, here and there round the trunk)
+for k in range(6):
+    a = k / 6 * 2 * math.pi + rnd.uniform(-0.3, 0.3)
+    rr = rnd.uniform(0.04, 0.1)
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=1, location=P(rr * math.cos(a), SOIL_Y, rr * math.sin(a)))
+    mound = bpy.context.active_object
+    sz = rnd.uniform(0.028, 0.045)
+    mound.scale = (sz, sz, sz * 0.35)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    mound.name = f"WillowMoss{k}"
+    mound.data.materials.append(M["soil"])
+    me = mound.data
+    uvl = me.uv_layers.new().data
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            uvl[li].uv = (0.5 + co.x * 4, 0.5 + co.y * 4)
+    parts.append(mound)
 
 
 # =====================================================================
@@ -190,15 +220,18 @@ def tube(name, pts, r0, r1, sides, mat):
     return mesh_from(name, verts, faces, uvs, mat)
 
 
-TOP = Vector((0.004, 1.06, -0.004))
-trunk_pts = [(0.0, 0.29, 0.0), (0.014, 0.48, 0.006), (-0.01, 0.7, -0.002), (0.012, 0.9, -0.01), tuple(TOP)]
-parts.append(tube("WillowTrunk", trunk_pts, 0.024, 0.012, 6, M["bark"]))
+# (the trunk thicker at the foot, leaning and bending as a bunjin tree does (the owner's), not a straight stick)
+TOP = Vector((0.03, 1.08, -0.006))
+trunk_pts = [(0.0, 0.29, 0.0), (0.03, 0.44, 0.012), (0.008, 0.6, -0.008), (0.05, 0.78, -0.018), (0.046, 0.94, -0.012), tuple(TOP)]
+parts.append(tube("WillowTrunk", trunk_pts, 0.036, 0.011, 8, M["bark"]))
+TRUNK = [Vector(p) for p in trunk_pts]
 hang = []   # (where twigs hang from: (point, outward direction))
-for b in range(6):
-    a = b / 6 * 2 * math.pi + rnd.uniform(-0.25, 0.25)
+# (four main branches from up the trunk at different heights, round it at uneven turns, reaching out different lengths: not one fan)
+for b, (at, a, reach) in enumerate([(0.62, 0.3, 0.3), (0.76, 2.4, 0.26), (0.88, 4.2, 0.24), (1.0, 5.4, 0.2)]):
+    a += rnd.uniform(-0.2, 0.2)
     d = Vector((math.cos(a), 0, math.sin(a)))
-    reach = rnd.uniform(0.17, 0.27)
-    start = TOP + Vector((0, rnd.uniform(-0.05, 0.03), 0))
+    i0 = max(1, min(len(TRUNK) - 1, int(at * (len(TRUNK) - 1))))
+    start = TRUNK[i0 - 1].lerp(TRUNK[i0], at * (len(TRUNK) - 1) - (i0 - 1)) if at < 1 else TOP.copy()
     ctrl = [start, start + d * reach * 0.45 + Vector((0, 0.07, 0)), start + d * reach * 0.85 + Vector((0, 0.06, 0)),
             start + d * reach * 1.1 + Vector((0, 0.0, 0)), start + d * reach * 1.25 + Vector((0, -0.08, 0))]
     # (a smooth arch through those: a Catmull-Rom curve, 9 points)
@@ -209,15 +242,14 @@ for b in range(6):
         t = f - k
         p0, p1, p2, p3 = ctrl[max(0, k - 1)], ctrl[k], ctrl[k + 1], ctrl[min(len(ctrl) - 1, k + 2)]
         pts.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t))
-    parts.append(tube(f"WillowBranch{b}", [tuple(p) for p in pts], 0.007, 0.003, 4, M["bark"]))
-    for f in (0.3, 0.5, 0.68, 0.84, 1.0):
+    parts.append(tube(f"WillowBranch{b}", [tuple(p) for p in pts], 0.011, 0.003, 5, M["bark"]))
+    for f in (0.25, 0.4, 0.55, 0.7, 0.85, 1.0):
         # (along its outer part, and its tip)
         i = f * (len(pts) - 1)
         p = pts[int(i)].lerp(pts[min(len(pts) - 1, int(i) + 1)], i - int(i))
         hang.append((p, d))
     # (a twig or two from the trunk's top between the branches)
-    if b % 2 == 0:
-        hang.append((TOP + d.copy() * 0.05 + Vector((0, 0.02, 0)), d))
+    hang.append((TOP + d.copy() * 0.05 + Vector((0, 0.02, 0)), d))
 
 
 # =====================================================================

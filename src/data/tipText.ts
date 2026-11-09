@@ -11,6 +11,8 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   '【廊燈】神前廊燈': ['【灯籠】神前灯籠', '[Lantern] Shrine lantern'],
   '【掛軸】三味線美人圖': ['【掛軸】三味線美人図', '[Scroll] Beauty with shamisen'],
   '【觀賞盆栽】青竹': ['【観葉鉢】青竹', '[Potted plant] Green bamboo'],
+  '【觀賞盆栽】垂柳': ['【観葉鉢】枝垂れ柳', '[Potted plant] Weeping willow'],
+  '墨色粗陶盆裡的垂柳，枝條隨意垂下，盆面鋪著青苔': ['墨色の焼き締め鉢に枝垂れ柳、鉢の土には苔', 'A weeping willow in a dark stoneware pot, moss over its soil'],
   保溫餐檯: ['保温台', 'Warming counter'],
   候位長凳: ['待合ベンチ', 'Waiting bench'],
   '備長炭（麻袋）': ['備長炭（麻袋）', 'Binchotan (sack)'],

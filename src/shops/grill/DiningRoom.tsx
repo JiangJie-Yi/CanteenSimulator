@@ -5864,11 +5864,13 @@ function WillowModel() {
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, (m) => /Leaves|Soil/.test(m.name), { width: 0.004, weld: true })
+    inkModel(r, (m) => /Leaves|Soil|Moss/.test(m.name), { width: 0.004, weld: true })
     return r
   }, [gltf])
-  return <primitive object={obj} />
+  // (pointed at, what it is (the owner's); a group round it: a primitive's own handlers aren't attached)
+  return <group {...WILLOW_SAYS}><primitive object={obj} /></group>
 }
+const WILLOW_SAYS = nameOver('【觀賞盆栽】垂柳', '墨色粗陶盆裡的垂柳，枝條隨意垂下，盆面鋪著青苔')
 /** plastic crates of bottles (P箱), stacked by the fridges, where the stock's seen to (blender/bottlecrate.py: the owner's, their hand-holds
  * cut through and plastic to look at; they were boxes with a black slot painted on) */
 const CRATE_URL = import.meta.env.BASE_URL + 'models/bottlecrate.glb'

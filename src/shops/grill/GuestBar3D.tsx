@@ -61,7 +61,7 @@ import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore,
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { SCOOP_S, WASH_S, kamaTick, riceGoes, scoopIn, setOn } from '@/game/rice'
-import { bottleClink, plateClink, washSplash } from './restroomSound'
+import { bottleClink, plateClink, stoolSound, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
@@ -69,7 +69,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -2069,9 +2069,17 @@ function Counter({ length }: { length: number }) {
   )
 }
 
+/** a stool pulled out and pushed in (the bar's frame): where its customer stops behind it, how far it's pulled out, how far they push it back
+ * getting up; how long pulling it out, stepping onto it, sliding in (or home) take, and how long after they're off before it's pushed home */
+const STOOL_STAND = 0.42, STOOL_OUT = 0.25, STOOL_LEAVE = 0.22
+const STOOL_PULL_S = 0.25, STOOL_STEP_S = 0.3, STOOL_SLIDE_S = 0.4, STOOL_HOME_WAIT = 0.3
+/** the way back from a place's stool toward the aisle (level) */
+const backOf = (st: { stool: THREE.Vector3; aisle: THREE.Vector3 }) => st.aisle.clone().sub(st.stool).setY(0).normalize()
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
   /** done eating, a tissue to their mouth a moment before they get up (the owner's): since when */
   wipeAt?: number
+  /** at their stool: seconds into pulling it out and stepping up onto it (coming in), into sliding in with it (sat) */
+  pullT?: number; slideT?: number; pulledSound?: boolean
   /** called to their stool off the genkan's bench: where they sat, and their way in from there */
   from?: THREE.Vector3
   fromWay?: { path: THREE.Vector3[]; len: number }
@@ -3027,14 +3035,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // in to their own stool
         // (stopping at the genkan's step a moment, to step out of their shoes and up into slippers)
         const v = SPEED * walkSpeedOf(kindOf(s.id).kind), raw = s.t * v
-        const d = Math.min(len, withPause(raw, stepAt(path), SHOES_S * v))
+        // (behind their stool they stop, pull it out, step up onto it (the owner's), then sit and slide in with it)
+        const stand = len - STOOL_STAND
+        const d = Math.min(stand, withPause(raw, stepAt(path), SHOES_S * v))
         const { p, dir } = alongPath(path, d)
-        s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < len
+        if (d >= stand) {
+          s.pullT = (s.pullT ?? 0) + dt
+          const k1 = Math.min(1, s.pullT / STOOL_PULL_S), k2 = Math.min(1, Math.max(0, s.pullT - STOOL_PULL_S) / STOOL_STEP_S)
+          SEAT_PULL.set(s.seat, STOOL_OUT * k1 * k1 * (3 - 2 * k1))
+          if (k1 >= 1 && !s.pulledSound) { s.pulledSound = true; if (g) stoolSound(g.getWorldPosition(new THREE.Vector3())) }
+          // (stepping from where they stood onto the stool where it's been pulled to)
+          p.copy(alongPath(path, stand + (STOOL_STAND - STOOL_OUT) * k2).p)
+        }
+        s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && (d < stand || (s.pullT ?? 0) < STOOL_PULL_S)
         s.lastD = d
         // (in through the door faded in, as the takeaways are (they were there at once, whole, in the doorway); one off the bench is in already)
         if (!s.from) s.fade = d >= 0.6 && s.t >= FADE_S ? undefined : Math.min(1, d / 0.6 + s.t / FADE_S)
         g?.position.copy(p)
-        if (g) g.rotation.y = d < len ? Math.atan2(dir.x, dir.z) : st.yaw
+        if (g) g.rotation.y = d < stand ? Math.atan2(dir.x, dir.z) : st.yaw
         // (welcomed in as they come through the noren: the servers and the owner)
         if (!s.welcomed && s.t > 0.5) {
           s.welcomed = true
@@ -3045,13 +3063,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (at the step: their shoes off and into a cubby of the cupboard, turned to it, a little bow)
         shoeStep(s, g, (raw - stepAt(path)) / (SHOES_S * v), true)
         s.slippers = d > stepAt(path)
-        if (d >= len) {
+        if (d >= stand && (s.pullT ?? 0) >= STOOL_PULL_S + STOOL_STEP_S) {
           s.phase = 'sit'
+          s.slideT = 0
           // a plate is set in front of them (or, with a server, brought with the first thing they ordered)
           if (!SERVICE.servers) serve(s.seat, s.id)
         }
       } else if (s.phase === 'sit') {
-        g?.position.copy(st.stool)
+        // (sliding in to the bar with their stool, then sat where it's always stood)
+        if (s.slideT !== undefined && s.slideT < STOOL_SLIDE_S) {
+          s.slideT += dt
+          const k = Math.min(1, s.slideT / STOOL_SLIDE_S)
+          SEAT_PULL.set(s.seat, STOOL_OUT * (1 - k * k * (3 - 2 * k)))
+        } else SEAT_PULL.delete(s.seat)
+        g?.position.copy(st.stool).addScaledVector(backOf(st), SEAT_PULL.get(s.seat) ?? 0)
         if (g) g.rotation.y = st.yaw
         if (s.wipeAt && performance.now() - s.wipeAt > WIPE_MOUTH_MS) { s.phase = 'leave'; s.t = 0; redraw() }
         // (now and then, while they wait, off to the toilet: their kind's own)
@@ -3175,8 +3200,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.said = 1
           if (guestsRef.current.find((x) => x.id === s.id)?.state !== 'angry') onSay?.('guest', LINES[lang].payGo(s.id, s.id), s.id)
         }
-        const d = Math.max(0, Math.min(lp.len, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v)))
+        // (getting up: their stool pushed back with them first, and they walk off from there; it's pushed home behind them once they're
+        // a little way off)
+        const back = STOOL_LEAVE * Math.min(1, s.t / STOOL_PULL_S)
+        const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v))))
         const { p, dir } = alongPath(lp.path, lp.len - d)
+        const home = Math.max(0, s.t - 0.8 - STOOL_LEAVE / v - STOOL_HOME_WAIT)
+        if (home < STOOL_SLIDE_S) SEAT_PULL.set(s.seat, s.t < 0.8 ? back : STOOL_LEAVE * (1 - home / STOOL_SLIDE_S))
+        else SEAT_PULL.delete(s.seat)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
         // (at the step on the way out: their shoes out of their cubby and on)
         const shoeFrom = lp.len - stepAt(lp.path)
@@ -4739,15 +4770,28 @@ const Fridges = memo(function Fridges({ fridges }: { fridges: NonNullable<Return
 
 /** the stools, each its own piece for edit mode: drawn again only if the seats change */
 const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsOf> }) {
+  // (each stool where it's been pulled out to, back toward the aisle (SEAT_PULL): its customer pulling it out and sliding in with it)
+  const pulls = useRef<(THREE.Group | null)[]>([])
+  useFrame(() => {
+    seats.forEach((st, n) => {
+      const o = pulls.current[n]
+      if (!o) return
+      const k = SEAT_PULL.get(n) ?? 0
+      const b = backOf(st)
+      if (Math.abs(o.position.x - b.x * k) > 1e-5 || Math.abs(o.position.z - b.z * k) > 1e-5) o.position.set(b.x * k, 0, b.z * k)
+    })
+  })
   return (
     <>
       {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
           sits and the way to it stay as they are, so no one is put out of a seat) */}
       {seats.map((st, n) => (
         <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
+          <group ref={(o) => { pulls.current[n] = o }}>
           <StaticBatch plain>
             <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel red={n % 2 === 1} /></group>
           </StaticBatch>
+          </group>
         </Movable>
       ))}
     </>

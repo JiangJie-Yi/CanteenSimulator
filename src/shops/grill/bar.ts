@@ -116,6 +116,10 @@ export const STAFF_DOOR_HOLD = { until: -1e9 }
  * shoes in each (by cell, 0..8), when each one's door was last opened for them (performance.now(): open a moment), and where the cupboard
  * stands (the world: the customers turn to it)
  */
+/** each place's stool pulled out from the bar this far (the bar's frame, back toward the aisle; GuestBar3D: a customer pulls it out, sits,
+ * slides in with it; gets up with it pushed back, and it's pushed home behind them) */
+export const SEAT_PULL = new Map<number, number>()
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __seatPull?: unknown }).__seatPull = SEAT_PULL
 export const SHOE_CELLS = { shoes: new Map<number, string>(), kick: new Map<number, number>(), at: new THREE.Vector3(), ready: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shoes?: typeof SHOE_CELLS }).__shoes = SHOE_CELLS
 export const TISSUES_KEY = 'jgs-tissues-1'
