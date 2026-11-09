@@ -95,3 +95,8 @@
 - 原因：客人的朝向在十幾個地方直接設定（沿路線、到座位、到收銀台、去廁所、拿飲料），開店 45 秒量到二十多次 90～180° 的單格轉身。
 - 修正：`GuestBar3D.tsx` 每格結尾一道緩轉：這一格被設成新方向就記成目標（`userData.want`），畫出來的朝向（`userData.shown`）用 `turnToward` 逐格追過去；沒有改各處的設定。
 - 驗證：`_turnsnap.mjs`（加了客人）45 秒內客人只剩 3 次 47～54°（掉幀的格）；吧台近拍坐著的客人正對吧台；`npm test` 415 過；`npm run e2e` 全過。
+
+## 17:28 — 調味架的圖集其實沒拼成（修正）
+- 原因：灶台視角量到調味架那批還是 151 次：複本建成了，但每個罐子仍是自己的材質。`scene/materialNormalize.ts` 在材質第一次畫之前替它補上 1×1 白色自發光圖與平的法線圖（讓有圖、沒圖的共用一個著色程式），`ledgeCopy` 把「有自發光圖、法線圖」的排除了；而且補上的白圖是資料貼圖，不能畫進 canvas，`atlasModel` 也要把它當成沒有圖。總覽那次量到 69，是複本剛好在那些材質畫之前做的。
+- 修正：`materialNormalize.ts` 多一個 `isFlatNormal`；`atlasModel` 忽略 `isDummyMap` 的白圖；`ledgeCopy` 的條件忽略這兩種佔位圖。
+- 驗證：灶台視角營業中 Scene/GrilledFish 151 → 48、整格 812 → 748 次；與原件逐像素比對平均差 0.04（圖集取樣）；研製時指到、拿起、放回照舊（`_ledgehover.mjs`）；`npm test` 415 過；`npm run e2e` 全過。

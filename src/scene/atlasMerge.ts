@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { colourVertices } from './StaticBatch'
+import { isDummyMap } from './materialNormalize'
 
 /**
  * A model drawn in one material however many it came with, so that merged by material (StaticBatch's mergeByMaterial) it's a draw or two
@@ -16,8 +17,10 @@ export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolea
   if (!meshes.length) return null
   type Pic = { img: CanvasImageSource; w: number; h: number; x: number; y: number }
   const pics = new Map<unknown, Pic>()
+  // (a picture of its own: not the white one scene/materialNormalize gives a material without, which is data, not a picture to draw)
+  const picOf = (mt: THREE.MeshStandardMaterial) => (mt.map && !isDummyMap(mt.map) ? mt.map : null)
   for (const m of meshes) {
-    const img = (m.material as THREE.MeshStandardMaterial).map?.image as (CanvasImageSource & { width: number; height: number }) | undefined
+    const img = picOf(m.material as THREE.MeshStandardMaterial)?.image as (CanvasImageSource & { width: number; height: number }) | undefined
     if (img && img.width && !pics.has(img)) pics.set(img, { img, w: img.width, h: img.height, x: 0, y: 0 })
   }
   // (packed in shelves, the tallest first, across a sheet a power of two wide; a white patch for the plain after them)
@@ -66,7 +69,8 @@ export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolea
   const mat = make(atlas)
   for (const m of meshes) {
     const src = m.material as THREE.MeshStandardMaterial
-    const p = src.map ? pics.get(src.map.image) : undefined
+    const pic = picOf(src)
+    const p = pic ? pics.get(pic.image) : undefined
     const geo = m.geometry.clone()
     const uv = geo.attributes.uv as THREE.BufferAttribute | undefined
     const n = geo.attributes.position.count

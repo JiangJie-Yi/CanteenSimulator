@@ -1,5 +1,5 @@
 import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { isDummyMap } from '@/scene/materialNormalize'
+import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
@@ -3023,8 +3023,10 @@ function ledgeCopy(dish: THREE.Object3D, members: THREE.Object3D[]) {
   // (the pictures that fit an atlas: small, laid once over the part (not tiled), on a plain toon material)
   const fits = (c: THREE.Mesh) => {
     const mt = c.material as THREE.MeshToonMaterial
-    if (!(mt instanceof THREE.MeshToonMaterial) || mt.transparent || mt.emissiveMap || mt.alphaMap || mt.normalMap) return false
-    const img = mt.map?.image as { width?: number } | undefined
+    // (the white and flat maps scene/materialNormalize gives every material are none of its own)
+    if (!(mt instanceof THREE.MeshToonMaterial) || mt.transparent || mt.alphaMap || (mt.emissiveMap && !isDummyMap(mt.emissiveMap))
+      || (mt.normalMap && !isFlatNormal(mt.normalMap))) return false
+    const img = (isDummyMap(mt.map) ? undefined : mt.map?.image) as { width?: number } | undefined
     if (img && (img.width ?? 0) > 512) return false
     const uv = c.geometry.attributes.uv as THREE.BufferAttribute | undefined
     if (uv) for (let i = 0; i < uv.count; i++) { const u = uv.getX(i), v = uv.getY(i); if (u < -0.03 || u > 1.03 || v < -0.03 || v > 1.03) return false }

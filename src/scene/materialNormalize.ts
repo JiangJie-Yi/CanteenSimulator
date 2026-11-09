@@ -39,6 +39,8 @@ const toonSteps = (() => {
 
 /** whether a texture is the white one given here to a material without a picture (not a picture of its own) */
 export const isDummyMap = (t: THREE.Texture | null | undefined) => t === white
+/** whether a normal map is the flat one given here to a material without one */
+export const isFlatNormal = (t: THREE.Texture | null | undefined) => t === flatNormal
 
 const done = new WeakSet<THREE.Material>()
 const plainCompile = THREE.Material.prototype.onBeforeCompile
