@@ -3,7 +3,7 @@ import { CHEF_TALK } from '@/data/chefTalk'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice,
-  type Entry, type Part } from '@/data/recipes'
+  type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { starsOf } from '@/game/taste'
 import { Stars } from './GameIcons'
 import { idealSteps, recipeSteps, timingTips } from '@/game/research'
@@ -97,7 +97,13 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const onMenu = new Set(entries.map((e) => e.key))
   const full = entries.length >= MENU_MAX
   const min = MENU_MIN[dish.id] ?? 1
-  const nameOf = (p: { name: string; ja: string }) => (lang === 'ja' ? p.ja : p.name)
+  // (in English, made the menu's way from the food's English name: the dishes carry only their Chinese and Japanese)
+  const enOf = (p: { id: string; dabs: Seasoning[]; name: string }) => {
+    const item = findItem(dish, p.id)
+    return item ? partName(item, item.en ?? p.name, p.id, p.dabs, 'en', roast ? 'grill' : 'plain') : p.name
+  }
+  const nameOf = (p: { name: string; ja: string; id?: string; dabs?: Seasoning[]; parts?: { id: string; dabs: Seasoning[]; name: string }[] }) =>
+    lang === 'ja' ? p.ja : lang !== 'en' ? p.name : p.parts ? p.parts.map(enOf).join(' & ') : p.id && p.dabs ? enOf({ id: p.id, dabs: p.dabs, name: p.name }) : p.name
   const priceOf = (key: string, fallback: number) => {
     const v = Number(prices[key])
     return Number.isFinite(v) && v > 0 ? Math.round(v) : fallback
