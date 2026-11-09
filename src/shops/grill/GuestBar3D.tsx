@@ -2461,6 +2461,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   guestsRef.current = guests
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestStates?: typeof guestsRef }).__guestStates = guestsRef
   const groups = useRef(new Map<number, THREE.Group>())
+  /** two customers passing each other: which way each steps aside, as they first met (keyed by their ids, low|high) */
+  const passing = useRef(new Map<string, { x: number; z: number }>())
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestGroups?: typeof groups }).__guestGroups = groups
   const clock = useRef(0)
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
@@ -3168,8 +3170,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       } else if (s.phase === 'wcIn') {
         // (in the stall: the last of them faded out, then out of sight)
         if (s.wc?.who !== 'drink' && (s.fade ?? 0) > 0) s.fade = Math.max(0, (s.fade ?? 0) - Math.min(dt, 0.1) * WC_FADE_IN / WC_FADE_LAST)
-        // (at the fridge: facing it, choosing; then their drink in hand, back to their stool)
-        if (s.wc?.who === 'drink' && g && fridges) g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
+        // (at the fridge: facing it, choosing; then their drink in hand, back to their stool. Stood where their way ends each frame, the
+        // stepping aside for others on top of it: left where it was, that piled up while someone stood by them, and they jumped back as
+        // they set off)
+        if (s.wc?.who === 'drink' && g && fridges) {
+          g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
+          g.position.copy(s.wc.path[s.wc.path.length - 1])
+        }
         if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : wcStayOf(s.id))) {
           // (out of the toilet: it flushes behind them, and they say what they thought of it, if it's worth saying)
           if (s.wc && s.wc.who !== 'drink') {
@@ -3350,29 +3357,61 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // nobody walks through anybody: those walking (in, out, to the toilet or the fridge) keep a body's width apart,
     // stepping aside for each other and for the servers (who keep to their way, their trays held level)
     {
-      const walkers: { p: THREE.Vector3; give: boolean }[] = []
+      const walkers: { p: THREE.Vector3; give: boolean; id: number }[] = []
       for (const x of shown) {
         if (x.phase === 'wcIn' && x.wc?.who !== 'drink') continue
         const gp = groups.current.get(x.id)?.position
         // (those sitting don't move aside, but nobody walks through them either: the ones going by step round them)
-        if (gp) walkers.push({ p: gp, give: x.phase !== 'sit' })
+        if (gp) walkers.push({ p: gp, give: x.phase !== 'sit', id: x.id })
       }
-      for (const w of waiters.current) walkers.push({ p: waiterObjs.current[waiters.current.indexOf(w)]?.position ?? w.pos, give: false })
+      waiters.current.forEach((w, wi) => walkers.push({ p: waiterObjs.current[wi]?.position ?? w.pos, give: false, id: -1 - wi }))
       // (a body's width, the round bodies' shoulders and all, so no two ever overlap)
       const R = 0.38
+      const met = new Set<string>()
       for (let i = 0; i < walkers.length; i++) for (let j = i + 1; j < walkers.length; j++) {
         const a = walkers[i], b = walkers[j]
         const dx = a.p.x - b.p.x, dz = a.p.z - b.p.z, d = Math.hypot(dx, dz)
         if (d >= R || (!a.give && !b.give)) continue
-        // (straight on into each other: aside to the left)
-        const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0
-        const push = R - d
-        const ka = a.give ? (b.give ? 0.5 : 1) : 0, kb = b.give ? (a.give ? 0.5 : 1) : 0
-        a.p.x += nx * push * ka
-        a.p.z += nz * push * ka
-        b.p.x -= nx * push * kb
-        b.p.z -= nz * push * kb
+        if (a.give && b.give) {
+          // (two walking into each other, or one up behind another: each steps aside, to either side of the line between them as they first
+          // met (kept till they're past: it doesn't turn about as they pass, nor as one turns a corner), the more the nearer, and they slide
+          // by. Pushed apart along the line between them, they stood stuck head on in the aisle till their ways crossed, and the push turned
+          // about with it: they swapped places in a frame (tests/e2e/_poptrail.mjs))
+          const lo = a.id < b.id ? a : b, hi = lo === a ? b : a
+          const key = `${lo.id}|${hi.id}`
+          met.add(key)
+          let side = passing.current.get(key)
+          if (!side) {
+            const ex = lo.p.x - hi.p.x, ez = lo.p.z - hi.p.z, e = Math.hypot(ex, ez) || 1
+            side = { x: -ez / e, z: ex / e }
+            passing.current.set(key, side)
+          }
+          const push = (R - d) * 0.5
+          lo.p.x += side.x * push; lo.p.z += side.z * push
+          hi.p.x -= side.x * push; hi.p.z -= side.z * push
+          continue
+        }
+        // (into someone who doesn't give (sat, or a server with a tray): round them, aside to the side of their own way they were on as
+        // they first came up to them (kept till they're by: along the line between them it turned about as they went by, a jump of
+        // 0.4 to 0.7 where their way ran close by the other)
+        {
+          const w = a.give ? a : b, o = w === a ? b : a
+          const key = `${w.id}|o${o.id}`
+          met.add(key)
+          let side = passing.current.get(key)
+          if (!side) {
+            const g = groups.current.get(w.id)
+            const yaw = g ? g.rotation.y : 0
+            const px = Math.cos(yaw), pz = -Math.sin(yaw)
+            const sgn = (w.p.x - o.p.x) * px + (w.p.z - o.p.z) * pz >= 0 ? 1 : -1
+            side = { x: px * sgn, z: pz * sgn }
+            passing.current.set(key, side)
+          }
+          const push = R - d
+          w.p.x += side.x * push; w.p.z += side.z * push
+        }
       }
+      for (const k of passing.current.keys()) if (!met.has(k)) passing.current.delete(k)
     }
     // the fridge's door opens for whoever's at it (as they come up to it, while they take their drink, as they leave it)
     if (fridges) for (const fr of fridges) {
