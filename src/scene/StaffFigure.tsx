@@ -11,7 +11,9 @@ import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
 import { crewFaceSheet, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
-import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
+import { RUSH, SPEAKERS, STAFF_IDLE, STAFF_TALK } from '@/game/shopState'
+import { activityOf } from '@/data/staff'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { FigureHit } from './FigureHit'
 
 /*
@@ -42,6 +44,24 @@ const UNINKED = /(Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
+/** a handheld game (the owner's: what one of the staff slacking has out, their thumbs at it): a dark body with its screen lit, a red grip on its
+ * left and a blue one on its right, made once (its colours in its points, one draw), in the figure's frame where it's held up before the
+ * chest, tipped toward the face */
+const HANDHELD_AT = new THREE.Vector3(0, 0.43, 0.33)
+const HANDHELD_GEO = (() => {
+  const box = (w: number, h: number, d: number, x: number, colour: string, z = 0) => {
+    const g = new THREE.BoxGeometry(w, h, d).toNonIndexed()
+    g.translate(x, 0, z)
+    colourVertices(g, new THREE.Color(colour))
+    return g
+  }
+  const parts = [box(0.11, 0.07, 0.012, 0, '#2b2d31'), box(0.09, 0.055, 0.002, 0, '#7fb8e6', 0.007),
+    box(0.028, 0.07, 0.016, -0.069, '#ff4554'), box(0.028, 0.07, 0.016, 0.069, '#00b3e3')]
+  const g = mergeGeometries(parts)!
+  for (const x of parts) x.dispose()
+  return g
+})()
+const HANDHELD_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 
 const AV_SKIN = ['#f3d2b0', '#eac39c', '#e2b48a', '#f6dcc0', '#d9a77e']
 const AV_HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020', '#6b4a32']
@@ -239,6 +259,17 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   const inks = useRef<THREE.Mesh[]>([])
   useEffect(() => () => { if (faded.current) { for (const [m, mat] of faded.current.was) m.material = mat; for (const c of faded.current.mats) c.dispose(); faded.current = null } }, [fig])
   useEffect(() => { fig.fan?.scale.setScalar(0) }, [fig])
+  // (their handheld game, put away till they slack (in the scene from the first, hidden: its program made with the rest at loading))
+  const handheld = useMemo(() => {
+    const m = new THREE.Mesh(HANDHELD_GEO, HANDHELD_MAT)
+    m.position.copy(HANDHELD_AT)
+    m.rotation.x = -0.9
+    m.visible = false
+    m.castShadow = false
+    m.raycast = () => {}
+    return m
+  }, [])
+  useEffect(() => { fig.root.add(handheld); return () => { fig.root.remove(handheld) } }, [fig, handheld])
   useFrame((_, delta) => {
     const dt = Math.min(0.1, delta)
     const t = (clock.current += dt)
@@ -293,7 +324,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     fig.body.position.y = walk * Math.abs(Math.sin(ph)) * 0.035
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
     // (a bow of the head and shoulders at the door)
-    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0)
+    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0) + (!id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' ? 0.1 : 0)
     // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
     // wait (RUSH); talking while a word of theirs is up (STAFF_TALK); a blink every few seconds; the viewer's face over all of it
     const now = performance.now()
@@ -313,8 +344,19 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const [jw, jh] = jelly(t - fw.at)
     fig.body.scale.set(jw, (1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008) * jh, jw)
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
+    // (slacking, a good while with nothing to do (data/staff's activityOf): their handheld game out before their chest, head down over it,
+    // thumbs going; not as they walk)
+    const slack = !id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack'
+    handheld.visible = slack
+    if (slack) handheld.position.y = HANDHELD_AT.y + Math.sin(t * 2.2 + seed) * 0.004
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
       if (!hand) continue
+      if (slack) {
+        const thumb = Math.max(0, Math.sin(t * (sd > 0 ? 13 : 11) + seed + (sd > 0 ? 1.7 : 0))) * 0.012
+        hand.position.set(sd * 0.085, HANDHELD_AT.y + thumb, HANDHELD_AT.z - 0.01)
+        hand.rotation.set(-0.9, 0, 0)
+        continue
+      }
       if (seated) {
         // (on the counter in front, a little apart; a spell of tapping at the keys every so often, a hand at a time)
         const tap = (t + seed) % 7 < 2.2 ? Math.max(0, Math.sin(t * 14 + (sd > 0 ? Math.PI : 0))) * 0.03 : 0
@@ -360,7 +402,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       if (shown) { fig.fan.position.copy(fig.handR.position).add(new THREE.Vector3(0, 0.03, 0.02)); fig.fan.rotation.z = fig.handR.rotation.z }
     }
     // (the stock keeper's clipboard, held up while they stand)
-    fig.clip?.scale.setScalar(role === 'stock' && !moving ? 1 : 0)
+    fig.clip?.scale.setScalar(role === 'stock' && !moving && !slack ? 1 : 0)
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>

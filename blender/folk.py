@@ -560,7 +560,8 @@ SPIKY = (
 )
 spikes = [clump(f"spike{k}", frm, to, r) for k, (frm, to, r) in enumerate(SPIKY)]
 style("spiky", [back_shell(), crown()] + spikes)
-style("kid", [back_shell(), crown(fringe=True), tuft("ahoge", head_at(0.0, 1.3, -0.006), Vector((0.1, 1, 0.75)), 0.032, 0.1, M["hair"], 0.45)])
+# (no tuft standing up off the crown: every schoolchild wears the yellow cap, and it stood up through it (the owner saw))
+style("kid", [back_shell(), crown(fringe=True)])
 def hair_cap(name, hairline, seg=14, rings=4, full=0.02):
     """a cap of hair in clean quads: every column from the crown down to the hairline (`hairline(bearing)` its elevation there, bearing 0 the
     front), a little off the head and fuller over the top, drawn in to the scalp along its edge so it sits on the head there; a ring of
@@ -684,8 +685,10 @@ fin(ln, "camlens", M["frame"])
 strap = tube("camstrap", [on_body(-0.05, 0.5, 0.01), on_body(-0.12, 0.58, 0.004), Vector((-0.14, 0.62, 0.0)), Vector((0, 0.6, -0.18)),
                           Vector((0.14, 0.62, 0.0)), on_body(0.12, 0.58, 0.004), on_body(0.05, 0.5, 0.01)], 0.006, M["dark"])
 acc("camera", [cb, ln, strap])
-# (a schoolchild's yellow cap, round, with a short brim all round)
-acc("schoolhat", [lathe("sch", [(C.y + 0.06, R + 0.05), (C.y + 0.08, R + 0.02), (C.y + 0.2, R - 0.02), (C.y + 0.27, 0.16), (C.y + 0.296, 0.06)], M["yellow"], seg=10, shut=(False, True)),
+# (a schoolchild's yellow cap, round, with a short brim all round; big enough to hold the hair under it, even between its ten sides: a
+# ten-sided cap is only cos(18 degrees) of its radius across its faces' middles, and the hair's corners came out through them, black
+# points in the yellow (the owner saw); its crown over the hair's (0.298 up from the head's middle))
+acc("schoolhat", [lathe("sch", [(C.y + 0.06, R + 0.05), (C.y + 0.085, R + 0.045), (C.y + 0.2, R + 0.0), (C.y + 0.28, 0.18), (C.y + 0.315, 0.07)], M["yellow"], seg=10, shut=(False, True)),
                   lathe("schb", [(C.y + 0.06, R + 0.01), (C.y + 0.055, R + 0.06)], M["yellow"], seg=10, solid=0.008)])
 
 

@@ -140,15 +140,19 @@ const BAR_FOOD_SCALE = 0.3 * GRILL_SCALE
 const PLATING_FRAME = platingOf()
 /** the skewers' holder and used tray drawn at the cook table's size (the fire's drawn big) */
 const SKEWER_SCALE = 2.2
-/** the used skewers' channel: let into the top of the hearth's frame on the cook's side, to his right past the seasonings' ledge (the
- * owner's: pulled out hot, dropped straight in to cool), along the frame (the frame's top, IRORI_H high, and its middle, a frame's width in from
- * its edge, as drawn: PIT_SCALE over blender/grilledfish.py's) */
-const skewerTrayAt = () => new THREE.Vector3().addScaledVector(ALONG, 1.05).addScaledVector(LAY, HEARTH_HALF - 0.13 * PIT_SCALE / 2).setY(0.15 * PIT_SCALE + 0.004)
-const skewerTrayYaw = Math.atan2(-ALONG.z, ALONG.x)
-/** the clean skewers' holder: hung on the cook table's front, on the strip of table right of the notch (right of the knives: the owner's red
- * box), its rim a little below the table's top, so the skewers stand up out of it past the edge */
-const skewerHolderAt = () => new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[1] + CUBBY.along[0]) / 2 - FIRE_SHIFT.dot(ALONG))
-  .addScaledVector(LAY, COOK_NOTCH.lay[1] + 0.06 * SKEWER_SCALE).setY(-0.22 * SKEWER_SCALE)
+/** the skewers' two holders, hung on the cook table's front on the strips of table either side of the notch (the owner's, 2026-11-10: the
+ * used ones moved from a channel on the hearth's frame into a holder of their own, then the two swapped): the clean ones' left of the notch,
+ * by the cutting board, where they're pushed through what's prepared; the used ones' right of it, by the plating, where they're pulled out.
+ * Low on the face, the rods' tops just under the table top's edge and out in front of it (they splay only outward): clear of the cutting
+ * board's overhang, the bowl, anything on the table (the owner's red box: they stood up through the bowl's rim; at the board, 16 of 30
+ * stood up into it); short, its foot just over the bucket and the bin on the floor below (it stood down into the bin) */
+const SKEWER_HANG = { lay: COOK_NOTCH.lay[1] + 0.062 * SKEWER_SCALE, y: -0.225 * SKEWER_SCALE }
+/** how near (the scene's, across the table) a skewer must be let go to what's on the board to go through it */
+const SKEWER_DROP = 0.5
+const skewerHolderAt = () => new THREE.Vector3().addScaledVector(ALONG, (CUBBY2.along[1] + COOK_NOTCH.along[0]) / 2 - FIRE_SHIFT.dot(ALONG))
+  .addScaledVector(LAY, SKEWER_HANG.lay).setY(SKEWER_HANG.y)
+const skewerUsedAt = () => new THREE.Vector3().addScaledVector(ALONG, (COOK_NOTCH.along[1] + CUBBY.along[0]) / 2 - FIRE_SHIFT.dot(ALONG))
+  .addScaledVector(LAY, SKEWER_HANG.lay).setY(SKEWER_HANG.y)
 const PLATING_TOP = PLATING_FRAME.top * GRILL_SCALE + GRILL_OFFSET.y
 /** the way back across the table at the plating place (bar.ts's platingOf `dir`): a plated piece lies so, its length toward the table's back
  * (the plating place is near the table's end: lying along the table, a fish ran off it) */
@@ -1127,7 +1131,11 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       if (seat && o.parent) {
         if (!mark.current?.parent) mark.current = scene.getObjectByName(seat) ?? null
         const m = mark.current
-        if (m) {
+        // (the seat's mark measured where it is now; one not yet placed in the world (its world matrix still the origin's: the till's chair
+        // not drawn yet, or just put back) isn't sat on: they stand at their own place meanwhile. Read as it was, it sat the cashier in the
+        // middle of the scene, which is the hearth's: a head over the fire (the owner saw two))
+        m?.updateWorldMatrix(true, false)
+        if (m && m.matrixWorld.elements[12] ** 2 + m.matrixWorld.elements[14] ** 2 > 0.01) {
           const inv = o.parent.matrixWorld.clone().invert()
           o.position.setFromMatrixPosition(m.matrixWorld).applyMatrix4(inv)
           const dir = new THREE.Vector3(0, 0, -1).transformDirection(m.matrixWorld).transformDirection(inv)
@@ -3378,7 +3386,7 @@ type RoastingProps = {
   /** the player's best way with each food, from the tasting notes: the chef may cook to it */
   notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
-  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => void
+  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer') => void
   /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
   smoke?: RefObject<number>
   /** likewise for black smoke, from food left on until it burns */
@@ -4320,6 +4328,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** carry a piece from the tray onto the fire (skewers only while there's room among the coals) */
   const putOnFire = (p: Piece) => {
     if (!p.staged) return false
+    // (researching: not on the fire till it's been skewered by hand)
+    if (space !== 'open' && p.sticks.length && p.skewerAt === undefined) {
+      onNotice?.('needSkewer')
+      p.node.userData.onPlate = true
+      return false
+    }
     const skewer = !p.loose
     const onFire = pieces.current.filter((q) => present(q) && !q.loose && !q.collected && !q.staged && !q.eaten).length
     if (skewer && onFire >= FIRE_SKEWERS) {
@@ -4414,7 +4428,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** a stick of charcoal or the fan in hand (see Decor), and the heat the fanning has added */
   const held = useRef<Held>(null)
   const fanned = useRef({ extra: 0, last: 0, pending: 0 })
-  const [decorTip, setDecorTip] = useState<'charcoal' | 'fan' | null>(null)
+  const [decorTip, setDecorTip] = useState<'charcoal' | 'fan' | 'skewer' | null>(null)
   // how many things have gone in the bin (it starts empty), and the fire glowing as raw food is carried over it
   const trashedRef = useRef(0)
   const flashUntil = useRef(new Map<string, number>())
@@ -5522,7 +5536,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!soup && !p && !hovered.current) setTasteTip(null)
       if (soup && !p) setTasteTip({ at: soup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.32, 0)).toArray() as [number, number, number], taste: SOUP_TASTE })
       const dec = tool || p || soup ? null : pickDecor()
-      setDecorTip(dec)
+      // (the skewer holder says itself, with its count, by its own pointer events)
+      setDecorTip(dec === 'skewer' ? null : dec)
       // (what's under the pointer, other than the food (which shows its own taste tip), lights up)
       const cont = tool || p || soup || dec ? null : pickContainer()
       let lit: THREE.Object3D | null = null
@@ -5644,7 +5659,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       world.traverse((o) => { if (typeof o.userData.decor === 'string') groups.push(o) })
       const hit = raycaster.intersectObjects(groups, true)[0]
       for (let o: THREE.Object3D | null = hit?.object ?? null; o; o = o.parent) {
-        if (typeof o.userData.decor === 'string') return o.userData.decor as 'charcoal' | 'fan'
+        if (typeof o.userData.decor === 'string') {
+          const d = o.userData.decor as 'charcoal' | 'fan' | 'skewer'
+          // (a clean skewer taken from the holder only while there's one in it)
+          return d === 'skewer' && SKEWERS.s.clean <= 0 ? null : d
+        }
       }
       return null
     }
@@ -5658,7 +5677,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!h) return
       const tNow = performance.now()
       aim(e)
-      const y = root.localToWorld(new THREE.Vector3(0, h.kind === 'fan' ? 0.62 : 0.5, 0)).y
+      const y = root.localToWorld(new THREE.Vector3(0, h.kind === 'fan' ? 0.62 : h.kind === 'skewer' ? 0.3 : 0.5, 0)).y
       holdPlane.set(UP, -y)
       const hit = raycaster.ray.intersectPlane(holdPlane, new THREE.Vector3())
       if (!hit) return
@@ -5704,6 +5723,22 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (!canPlaceCoal()) onNotice?.('heapFull')
         else if (fire && fire.current >= 1 - 1e-6) onNotice?.('heapFull')
         else if (dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1, force) > 0) { onAddCharcoal?.(1, true); takeFromCrate() }
+      }
+      // (a clean skewer let go over something on the board not yet on one: pushed through it (the owner's: while researching, it's skewered by
+      // hand); let go anywhere else, it goes back in the holder)
+      if (h?.kind === 'skewer') {
+        let best: Piece | null = null, d = SKEWER_DROP
+        for (const p of pieces.current) {
+          if (!present(p) || !p.staged || p.fetching || !p.sticks.length || p.skewerAt !== undefined || p.trash >= 0) continue
+          const q = Math.hypot(p.node.position.x - h.at.x, p.node.position.z - h.at.z)
+          if (q < d) { d = q; best = p }
+        }
+        const t = best ? takeSkewer(SKEWERS.s) : null
+        if (best && t) {
+          SKEWERS.s = t
+          best.skewerAt = performance.now()
+          pierceSound()
+        }
       }
       held.current = null
       if (controls) controls.enabled = true
@@ -6459,7 +6494,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       for (const p of pieces.current) {
         if (!p.sticks.length) continue
         const here = present(p) && p.trash < 0 && !p.eaten
-        if (here && p.skewerAt === undefined && !p.fetching) {
+        // (researching, what's on the board is skewered by hand: a clean skewer dragged from the holder onto it (the owner's))
+        // (nor in the frame it's taken out, before it's set on the board: it was skewered then, on its way there)
+        if (here && p.skewerAt === undefined && !p.fetching && !(space !== 'open' && (p.staged || !p.wasPresent))) {
           const ready = !p.staged || p.prepUntil === undefined || now >= p.prepUntil - 600
           if (ready) {
             let t = takeSkewer(SKEWERS.s)
@@ -7084,9 +7121,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       )}
       {roast.tray && <Tray container="tray" position={trayAt().toArray() as [number, number, number]} />}
       {/* (the iron skewers' holder by the board and their used tray by the plating place) */}
-      {roast.tray && bar && <group scale={SKEWER_SCALE}><SkewerStore lang={lang}
-        holderAt={skewerHolderAt().divideScalar(SKEWER_SCALE).toArray() as [number, number, number]} holderYaw={Math.atan2(LAY.x, LAY.z)}
-        trayAt={skewerTrayAt().divideScalar(SKEWER_SCALE).toArray() as [number, number, number]} trayYaw={skewerTrayYaw} /></group>}
+      {roast.tray && bar && <group scale={SKEWER_SCALE}><SkewerStore lang={lang} byHand={space !== 'open'} yaw={Math.atan2(LAY.x, LAY.z)}
+        holderAt={skewerHolderAt().divideScalar(SKEWER_SCALE).toArray() as [number, number, number]}
+        usedAt={skewerUsedAt().divideScalar(SKEWER_SCALE).toArray() as [number, number, number]} /></group>}
       {/* (edit mode's boxes for what the nudge moves: an unseen block the size of each, in a group the edit moves; the pieces themselves follow by the nudge) */}
       {roast.tray && <EditProxy id="cutboard" label="大砧板" at={containerAt('tray')} size={[TRAY_W, 0.12, TRAY_D]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}
       {carriers.box && <EditProxy id="seasoning" label="調味架" at={containerAt('box').add(new THREE.Vector3(0, -0.12, 0))} size={[LEDGE_L, 0.42, 0.22]} yaw={-Math.atan2(STACK_DIR.z, STACK_DIR.x)} />}

@@ -12,7 +12,7 @@ import { Stars } from './GameIcons'
 export const AUTO_S = 10
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString('en-US')}`
 
-export function DaySummary({ s, day, lang, nameOf, onClose }: { s: Summary; day: number; lang: Lang; nameOf: (key: string) => string; onClose: () => void }) {
+export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summary; day: number; hours?: [string, string]; lang: Lang; nameOf: (key: string) => string; onClose: () => void }) {
   const t = (zh: string, ja: string, en: string) => tl(lang, zh, ja, en)
   const [left, setLeft] = useState(AUTO_S)
   // (counted from when it came up, once: the page above redraws every second or so (the staff resting), each time with a new onClose)
@@ -45,6 +45,8 @@ export function DaySummary({ s, day, lang, nameOf, onClose }: { s: Summary; day:
           <button type="button" className="panel-x" onClick={onClose} aria-label={t('關閉', '閉じる', 'Close')}>×</button>
         </header>
         <div className="day-sum-body">
+          {/* (when it opened and when it closed (the owner's: the sheet says what time the day's business ended)) */}
+          {hours && <p className="day-sum-hours">{t(`${hours[0]} 開店・${hours[1]} 結束營業`, `${hours[0]} 開店・${hours[1]} 閉店`, `Opened ${hours[0]} · closed ${hours[1]}`)}</p>}
           <p className={`day-sum-profit${s.profit < 0 ? ' is-loss' : ''}`}>
             <span>{t('今日利潤', '本日の利益', "Today's profit")}</span>
             <strong>{s.profit < 0 ? '−' : ''}{nt(Math.abs(s.profit))}</strong>

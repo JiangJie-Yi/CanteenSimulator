@@ -49,6 +49,7 @@ export const RATING_FLOW = { more: 1, patience: 1 }
 /** how long (the game's seconds) each of the staff has had nothing to do just now (none: at something), kept by whoever draws them at work
  * (GuestBar3D's servers, stock keeper and plater; Roasting's second cook; App's cashier): App tires them by it (data/staff's activityOf) */
 export const STAFF_IDLE = new Map<string, number>()
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffIdle: STAFF_IDLE })
 export const idleTick = (id: string | undefined, idle: boolean, dt: number) => {
   if (!id) return
   if (idle) STAFF_IDLE.set(id, (STAFF_IDLE.get(id) ?? 0) + dt)

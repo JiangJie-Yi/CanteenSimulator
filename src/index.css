@@ -7782,6 +7782,15 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   gap: 14px;
   padding: 16px 18px 18px;
 }
+/* (the hours it was open, small over the profit) */
+.day-sum-hours {
+  margin: 0 0 6px;
+  color: #8a7562;
+  font-size: 12px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
 .day-sum-profit {
   display: grid;
   justify-items: center;
@@ -7918,6 +7927,14 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   animation: staff-badge-bob 1.8s ease-in-out infinite;
 }
 .staff-badge .game-icon:first-child { color: #d6ecff; }
+/* (slacking at a handheld game: a see-through deep teal, a game pad (the owner's)) */
+.staff-badge.is-slack {
+  border-color: rgb(255 255 255 / 0.3);
+  background: rgb(18 96 96 / 0.78);
+  color: #e6fffb;
+  --icon-cut: rgb(18 96 96);
+}
+.staff-badge.is-slack .game-icon:first-child { color: #9ff3e6; }
 @keyframes staff-badge-bob {
   0%, 100% { transform: translateY(0); opacity: 1; }
   50% { transform: translateY(2px); opacity: 0.85; }
@@ -8080,7 +8097,6 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   background: rgba(24, 20, 18, 0.82);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(230, 200, 160, 0.3);
   border-radius: 20px;
   padding: 6px 18px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -8094,14 +8110,21 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   white-space: nowrap;
   pointer-events: none;
   z-index: 1000;
-  animation: view-toast 1.8s ease-in-out both;
+  animation: view-toast-r 1.8s ease-in-out both;
 }
+/* (in from the side the view lies toward in the list (the owner's): on to a later one from the right, out to the left; back to an earlier
+   one the other way) */
+.view-toast.is-from-left { animation-name: view-toast-l; }
 .view-toast svg { color: #e6c8a0; }
-.view-toast b { color: #e6c8a0; font-weight: 600; letter-spacing: 0; }
-@keyframes view-toast {
-  0% { opacity: 0; translate: 0 6px; }
-  12%, 82% { opacity: 1; translate: 0 0; }
-  100% { opacity: 0; translate: 0 4px; }
+@keyframes view-toast-r {
+  0% { opacity: 0; translate: 28px 0; }
+  14%, 80% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; translate: -28px 0; }
+}
+@keyframes view-toast-l {
+  0% { opacity: 0; translate: -28px 0; }
+  14%, 80% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; translate: 28px 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .view-toast { animation-name: view-toast-still; }
@@ -8196,5 +8219,10 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   font-size: 13px;
   white-space: nowrap;
   pointer-events: none;
-  animation: view-toast 2.6s ease-in-out both;
+  animation: ofc-done 2.6s ease-in-out both;
+}
+@keyframes ofc-done {
+  0% { opacity: 0; translate: 0 6px; }
+  12%, 82% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; translate: 0 4px; }
 }

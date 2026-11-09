@@ -5,7 +5,8 @@ import { memo, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { SPEAKERS, STAFF_TALK, STAFF_TIRED, type StaffWord } from '@/game/shopState'
+import { SPEAKERS, STAFF_IDLE, STAFF_TALK, STAFF_TIRED, type StaffWord } from '@/game/shopState'
+import { activityOf } from '@/data/staff'
 import { Glyph } from '@/ui/GameIcons'
 import { setTip } from '@/scene/hoverTip'
 
@@ -124,8 +125,12 @@ const TIRED_SAYS: Record<string, [string, string, string]> = {
   zh: ['疲勞中', '疲勞', '能力減半、動作變慢・可安排休息或換班'], ja: ['疲労中', '疲労', '能力半減・動きが遅い・休憩かシフト交代を'],
   en: ['Tired', 'Worn out', 'Half as able, half as quick; give them a rest or a shift off'],
 }
-type Marks = { tired: boolean }
-const marksOf = (id: string): Marks => ({ tired: STAFF_TIRED.has(id) })
+type Marks = { tired: boolean; slack: boolean }
+const marksOf = (id: string): Marks => ({ tired: STAFF_TIRED.has(id), slack: activityOf(STAFF_IDLE.get(id)) === 'slack' })
+/** slacking, in the page's language */
+const SLACK_SAYS: Record<string, [string, string]> = {
+  zh: ['偷閒中', '沒事做，拿出遊戲機玩一下・疲勞慢慢回復'], ja: ['サボり中', '暇なのでゲーム中・疲れが少し戻る'], en: ['Slacking', 'Nothing to do, so a game: getting a little rest back'],
+}
 
 /**
  * Beside each of the staff, what's on them (the owner's): worn out (data/staff's isTired: game/shopState's STAFF_TIRED, App keeps it), a
@@ -136,8 +141,8 @@ export const TiredBadges = memo(function TiredBadges() {
   const [on, setOn] = useState<{ id: string; m: Marks }[]>([])
   useEffect(() => {
     const t = window.setInterval(() => {
-      const next = [...STAFF_TIRED].map((id) => ({ id, m: marksOf(id) }))
-      setOn((was) => (was.length === next.length && was.every((x, i) => x.id === next[i].id) ? was : next))
+      const next = [...new Set([...STAFF_TIRED, ...STAFF_IDLE.keys()])].map((id) => ({ id, m: marksOf(id) })).filter((x) => x.m.tired || x.m.slack)
+      setOn((was) => (was.length === next.length && was.every((x, i) => x.id === next[i].id && x.m.tired === next[i].m.tired && x.m.slack === next[i].m.slack) ? was : next))
     }, 500)
     return () => window.clearInterval(t)
   }, [])
@@ -171,10 +176,14 @@ function TiredBadge({ id, marks }: { id: string; marks: Marks }) {
     const [mark, name, says] = TIRED_SAYS[lang] ?? TIRED_SAYS.zh
     return <span key="tired" className="staff-badge is-tired" aria-label={`${name}：${says}`} {...tipOn(name, says)}><Glyph id="drop" size={12} />{mark}</span>
   }
+  const slack = () => {
+    const [mark, says] = SLACK_SAYS[lang.slice(0, 2)] ?? SLACK_SAYS.zh
+    return <span key="slack" className="staff-badge is-slack" aria-label={`${mark}：${says}`} {...tipOn(mark, says)}><Glyph id="gamepad" size={13} />{mark}</span>
+  }
   return (
     <group ref={g} visible={false}>
       <Html center zIndexRange={BADGE_Z}>
-        <span className="staff-badges" ref={el}>{marks.tired && tired()}</span>
+        <span className="staff-badges" ref={el}>{marks.tired && tired()}{marks.slack && slack()}</span>
       </Html>
     </group>
   )

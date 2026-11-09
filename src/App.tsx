@@ -106,7 +106,7 @@ const CLOSE_HARD = 60
 const PREP_AT = 16 * 60
 const gameMinutes = () => getClock().day * 1440 + getClock().minute
 import { tl } from '@/data/i18n'
-import { skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
+import { hhmm, skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
 import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
 import { GameClock } from '@/ui/GameClock'
 import { ageFresh } from '@/game/freshness'
@@ -207,8 +207,8 @@ const CAMERA_FOV = 40
 const WIDE_FOV = 85
 /** how long the camera takes flying from one view to another (s), eased in and out */
 const FLY_S = 0.9
-/** which way along his own z the owner faces (+1 or -1): his portrait's taken from there */
-const PORTRAIT_FACE = 1
+/** which way along his own z the owner faces (+1 or -1): his view's looked out along it */
+const OWNER_FACING = 1
 
 const ITEM_IDS = Object.fromEntries(DISHES.map((d) => [d.id, d.items.map((it) => it.id)]))
 /** every menu item by id (for its calories when it's eaten) */
@@ -416,7 +416,7 @@ type SceneProps = {
   view: ViewId
   /** a view chosen from its numbered marker in edit mode */
   onView: (v: ViewId) => void
-  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => void
+  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer') => void
   lang: Lang
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
@@ -603,7 +603,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
   // the owner's eyes a wide one; edit mode the usual)
   const spotNow = VIEW_SPOTS.find((v) => v.id === view)
   const fovGoal = useRef(CAMERA_FOV)
-  fovGoal.current = editing ? CAMERA_FOV : spotNow?.follow && !spotNow.portrait ? WIDE_FOV : spotNow?.fov ?? CAMERA_FOV
+  fovGoal.current = editing ? CAMERA_FOV : spotNow?.follow ? WIDE_FOV : spotNow?.fov ?? CAMERA_FOV
   const scene = useThree((s) => s.scene)
   const size = useThree((s) => s.size)
   // frame the dish on the stage rather than the whole canvas: shift the projection so the stage's centre is
@@ -722,30 +722,18 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
     const floor = OVERVIEW_TARGET.y - 1.5
     if (at.y < floor + 0.3) at.y += 0.9
     if (spot.shift) at.add(new THREE.Vector3(spot.shift[0], 0, spot.shift[1]))
-    // (one that follows: from his eyes, carried along wherever he goes, but held facing one way (toward the fire from his place), never
-    // turning as he turns about; a little in front of his face so it isn't in the way, looking a little down)
+    // (one that follows: through his eyes (the owner's, 2026-11-10: first person; it was a portrait of him), carried along wherever he goes and
+    // turning as he turns: from just in front of his face (so none of him's in the way), at his eyes' height, looking the way he faces and a
+    // little down, at what's before him)
     if (spot.follow) {
       const frame = anchor.parent ?? anchor
       frame.updateWorldMatrix(true, false)
+      anchor.updateWorldMatrix(true, false)
       const p = anchor.position
-      // (a portrait of him (the owner's): from in front of him and a little to one side, a three-quarter view, at his eyes' height, looking
-      // at his face; carried along as he goes)
-      if (spot.portrait) {
-        // (the way he faces, his own (he turns as he goes), level; his eyes' and face's heights, and how big a unit of his frame is)
-        anchor.updateWorldMatrix(true, false)
-        const fwd = new THREE.Vector3(0, 0, PORTRAIT_FACE).transformDirection(anchor.matrixWorld).setY(0).normalize()
-        const side = new THREE.Vector3(0, 1, 0).cross(fwd)
-        const unit = frame.getWorldScale(new THREE.Vector3()).x
-        const base = anchor.getWorldPosition(new THREE.Vector3())
-        const eyeY = frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.98, p.z)).y, faceY = frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.86, p.z)).y
-        return { pos: base.clone().setY(eyeY + 0.08 * unit).addScaledVector(fwd, 2.1 * unit).addScaledVector(side, 1.0 * unit), target: base.clone().setY(faceY - 0.04 * unit) }
-      }
-      // (looking at the fire, wherever he's standing: what he's minding; from where he was looking straight ahead the view was the
-      // underside of the table by him)
-      const eye = frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.98, p.z + 0.42))
-      const pit = scene.getObjectByName('FirePit')
-      const fire = pit ? pit.getWorldPosition(new THREE.Vector3()) : null
-      return { pos: eye, target: fire && fire.distanceTo(eye) < 6 ? fire : frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.58, p.z + 1.6)) }
+      const fwd = new THREE.Vector3(0, 0, OWNER_FACING).transformDirection(anchor.matrixWorld).setY(0).normalize()
+      const unit = frame.getWorldScale(new THREE.Vector3()).x
+      const eye = anchor.getWorldPosition(new THREE.Vector3()).setY(frame.localToWorld(new THREE.Vector3(p.x, p.y + 0.98, p.z)).y).addScaledVector(fwd, 0.42 * unit)
+      return { pos: eye, target: eye.clone().addScaledVector(fwd, 1.6 * unit).add(new THREE.Vector3(0, -0.55 * unit, 0)) }
     }
     // (seen from the way the whole shop's overview looks in: from the open side of the room, so the walls are always behind what's seen,
     // never the empty outside; from the room's middle a part by the open side looked out into nothing)
@@ -958,8 +946,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
     const c = controls.current
     // (a view that follows what it looks at (the owner, about his grill): its aim moved on with him every frame, the camera gliding after)
     const follow = VIEW_SPOTS.find((v) => v.id === view)?.follow && spotLock ? poseOf(view) : null
-    // (his portrait flown to like any view, then held on him; first person held to his eyes at once)
-    if (c && follow && !(homing.current && spotNow?.portrait)) {
+    // (first person: held to his eyes at once)
+    if (c && follow) {
       // (first person: held to his eyes every frame, no gliding after)
       camera.position.copy(follow.pos)
       c.target.copy(follow.target)
@@ -1279,7 +1267,8 @@ export default function App() {
   // (the game stands still while developer mode's on during business (the owner's): the customers, the clock, the wages, the fire, the
   // cooks; on again, at its speed, as the mode ends)
   // the day's closing sheet (ui/DaySummary), up once the shop's shut: the game stands still while it's up (the owner's), going on as it goes
-  const [daySum, setDaySum] = useState<{ s: DaySum; day: number } | null>(null)
+  // (and the hours it was open: when it opened and when it closed, by the game's clock (the owner's: the sheet says when the day ended))
+  const [daySum, setDaySum] = useState<{ s: DaySum; day: number; from: string; to: string } | null>(null)
   // (and each day's sheet kept in the books (the owner's), shown under the ledger: kept in the browser, cleared with a fresh start)
   const [dayLog, setDayLog] = useState<DayRecord[]>(() => { try { return JSON.parse(localStorage.getItem(DAYS_KEY) ?? '[]') as DayRecord[] } catch { return [] } })
   useEffect(() => { GAME_SPEED.value = (editOn && ai) || daySum ? 0 : speed }, [speed, editOn, ai, daySum])
@@ -1359,7 +1348,7 @@ export default function App() {
       setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, r]) => [id, openDay(r, today)]))])))
     }
     // (the day's books as they stand at opening, for its closing sheet; one still up from the last day put away)
-    dayStart.current = { ledger: { ...ledgerNow.current }, seen: new Set(visitsNow.current.map((v) => v.id)), sold: { ...entryCountNow.current }, day: getClock().day }
+    dayStart.current = { ledger: { ...ledgerNow.current }, seen: new Set(visitsNow.current.map((v) => v.id)), sold: { ...entryCountNow.current }, day: getClock().day, from: hhmm(getClock().minute) }
     setDaySum(null)
     const day = SHOP.day
     const timers = [window.setTimeout(() => sayStaff.current('owner', OPEN_DORM, day), 1200)]
@@ -1671,7 +1660,7 @@ export default function App() {
   const entryCountNow = useRef(entryCount)
   entryCountNow.current = entryCount
   // the day's closing sheet (ui/DaySummary): the books, the customers seen and the orders as they stood at opening; the sheet once shut
-  const dayStart = useRef<{ ledger: typeof ledger; seen: Set<number>; sold: Record<string, number>; day: number } | null>(null)
+  const dayStart = useRef<{ ledger: typeof ledger; seen: Set<number>; sold: Record<string, number>; day: number; from: string } | null>(null)
   const ledgerNow = useRef(ledger)
   ledgerNow.current = ledger
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
@@ -2136,7 +2125,7 @@ export default function App() {
   // (by the screen's size: a tablet, touch screen or not, keeps the 3D grill)
   const flatGrill = phone && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
-  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
+  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
   const sceneOrder = (id: string, guest?: number, reuse = false) => {
     const ok = changeQty(id, 1, reuse)
     // a customer's order is written onto the menu below, so you see it come in
@@ -2513,7 +2502,7 @@ export default function App() {
         if (st) {
           dayStart.current = null
           const sum = daySummary(st.ledger, ledgerNow.current, visitsNow.current.filter((v) => !st.seen.has(v.id)), soldBetween(st.sold, entryCountNow.current))
-          setDaySum({ s: sum, day: st.day })
+          setDaySum({ s: sum, day: st.day, from: st.from, to: hhmm(getClock().minute) })
           setDayLog((log) => {
             const next = addDay(log, st.day, sum)
             try { localStorage.setItem(DAYS_KEY, JSON.stringify(next)) } catch { /* (not kept) */ }
@@ -3227,7 +3216,7 @@ export default function App() {
         {speed > 1 ? '×2' : <Glyph id="fast" size="1.15em" />}
       </button>
       <Bgm />
-      {daySum && <DaySummary s={daySum.s} day={daySum.day} lang={lang} onClose={dayDone}
+      {daySum && <DaySummary s={daySum.s} day={daySum.day} hours={[daySum.from, daySum.to]} lang={lang} onClose={dayDone}
         nameOf={(key) => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === key); return e ? nameIn(lang, e) : key }} />}
       <HoverTip hidden={editOn} />
       <RegisterManual lang={lang} />

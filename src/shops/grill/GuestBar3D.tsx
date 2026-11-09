@@ -236,8 +236,9 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   const c1 = counters[1]
   const home = useMemo(() => {
     const last = fridges[fridges.length - 1]
-    // (a step out from the cartons into the aisle (the owner's: stood against them, he read as staring at the wall))
-    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.55 - 0.15)
+    // (a step out from the cartons into the aisle (the owner's: stood against them, he read as staring at the wall); and out of the gap between
+    // them and the fridge, into the open aisle (the owner's, 2026-11-10: he stood squeezed half into it))
+    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.55 - 0.5)
   }, [c1, fridges])
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => toiletsOf(counters), [counters])
@@ -3525,9 +3526,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         return { at, edge, front: at.clone().add(edge.clone().sub(at).setY(0).setLength(0.34)) }
       }
       const tubSpot = () => { marks.current.delete('ricetub-mid'); return inBar('ricetub-mid', home()).add(kamaSpot().sub(kamaTop()).setY(0)).setY(0) }
-      /** where they stand at the used skewers' tray (the plating place's own spot) and at the holder by the board (on the floor below it) */
-      const skTraySpot = () => plating.in.clone().setY(0)
-      const skHolderSpot = () => { marks.current.delete('skewer-holder'); return inBar('skewer-holder', home()).setY(0) }
+      /** where they stand at the two skewer holders on the cook table's front (the used ones' right of the notch, the clean ones' left of it):
+       * the nearest spot on the floor clear of the table (right under one, they stood half in the table's face) */
+      const skTraySpot = () => { marks.current.delete('skewer-tray'); return reachOf(inBar('skewer-tray', home())) }
+      const skHolderSpot = () => { marks.current.delete('skewer-holder'); return reachOf(inBar('skewer-holder', home())) }
       const faceTo = (v: THREE.Vector3) => { pl.yaw = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
       /** where they stand on the kitchen's floor to reach something on (or by) the cook table: the nearest spot clear of it */
       const reachOf = (v: THREE.Vector3) => {

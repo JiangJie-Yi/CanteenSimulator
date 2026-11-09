@@ -25,8 +25,6 @@ export type ViewSpot = {
   faceOn?: boolean
   /** seen through the eyes of what it's on (the owner), following him as he goes, a wide lens */
   follow?: boolean
-  /** (with follow) not through his eyes but of him: a three-quarter portrait at his eyes' height, following him */
-  portrait?: boolean
   /** its lens (degrees, vertical): each view its own, as a cameraman would pick (the owner's) */
   fov?: number
 }
@@ -48,8 +46,8 @@ export const VIEW_SPOTS: ViewSpot[] = [
     about: { zh: '後場：碗盤架、飯桶與作業台', ja: '裏方：食器ラック、飯びつと作業台', en: 'Behind the scenes: dish racks, rice tub, work table' } },
   { id: 'window', zh: '窗口', ja: '丸窓', en: 'Window', anchor: 'look-window', back: 4.6, up: 0.6, faceOn: true, fov: 40,
     about: { zh: '牆上的圓窗：白天是竹影，夜晚有月光與飄浮的塵埃', ja: '丸窓：昼は竹の影、夜は月明かりと舞う塵', en: 'The round window: bamboo shadows by day, moonlight and drifting dust by night' } },
-  { id: 'boss', zh: '老闆', ja: '店主', en: 'Owner', anchor: 'BossFollow', follow: true, portrait: true, fov: 35,
-    about: { zh: '老闆的肖像：3/4 側臉，跟著他走（閉店時）', ja: '店主の肖像：斜め前から、ついて回る（閉店中）', en: 'The owner, a three-quarter portrait following him (while closed)' } },
+  { id: 'boss', zh: '老闆', ja: '店主', en: 'Owner', anchor: 'BossFollow', follow: true,
+    about: { zh: '老闆的第一人稱：從他的眼睛看出去，跟著他走、跟著他轉（閉店時）', ja: '店主の目線：店主の目から、歩けばついて、向けば向く（閉店中）', en: 'Through the owner’s eyes: where he goes and where he looks (while closed)' } },
 ]
 
 export const viewName = (v: ViewSpot, lang: Lang) => (lang === 'ja' ? v.ja : lang === 'en' ? v.en : v.zh)

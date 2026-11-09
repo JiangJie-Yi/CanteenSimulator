@@ -49,7 +49,7 @@ const WARMER_FACE = Math.atan2(-ALONG.x, -ALONG.z)
 
 /** what's being carried from here: a stick of charcoal or the fan, where it is (Roasting sets it), and how far the
  * fan has been waved (it swings with it) */
-export type Held = { kind: 'charcoal' | 'fan'; at: THREE.Vector3; wave: number } | null
+export type Held = { kind: 'charcoal' | 'fan' | 'skewer'; at: THREE.Vector3; wave: number } | null
 
 const INK = '#3b2a20'
 
@@ -480,6 +480,26 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
   return (
     <group ref={g} visible={false} rotation={[0.3, 0.4, Math.PI / 2]}>
       <Inked geometry={geo} map={bin.face ?? undefined} grow={1.07} sideOnly />
+    </group>
+  )
+}
+
+/** a clean iron skewer taken from its holder while researching, carried over the board to be pushed through what's there (the owner's): a
+ * steel rod lying level in the hand, the way the board's skewers lie */
+const HELD_ROD = new THREE.CylinderGeometry(0.01, 0.01, 0.79, 6)
+const HELD_ROD_MAT = new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.85, roughness: 0.35 })
+function HeldRod({ held }: { held: RefObject<Held> }) {
+  const g = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const o = g.current
+    if (!o) return
+    const h = held.current
+    o.visible = h?.kind === 'skewer'
+    if (o.visible) o.position.copy(h!.at)
+  })
+  return (
+    <group ref={g} visible={false} rotation={[0, Math.atan2(0.59, 0.81), Math.PI / 2]}>
+      <mesh geometry={HELD_ROD} material={HELD_ROD_MAT} />
     </group>
   )
 }
@@ -1104,6 +1124,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="crate" label="備長炭籃" baseScale={1.75} baseTurn={[0, 44, 0]}><Crate /></Movable>
       <Movable id="fan" label="團扇"><Fan held={held} at={fanAt} /></Movable>
       <HeldStick held={held} />
+      <HeldRod held={held} />
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="warmer" label="保溫餐檯"><Warmer /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>

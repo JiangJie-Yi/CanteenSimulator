@@ -8,7 +8,7 @@ export type GlyphPart = { d: string; stroke?: number; cut?: boolean; o?: number 
 export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
-  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye'
+  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -56,6 +56,9 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
   arrowU: [{ d: 'M8 13.8V3.2M4 7.2 8 3.2l4 4', stroke: S }],
   // (no entry: a ring struck through)
   ban: [{ d: 'M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2Z', stroke: 1.8 }, { d: 'M3.8 3.8l8.4 8.4', stroke: 1.8 }],
+  // (a game pad: a rounded body, a cross on its left, two buttons on its right: one of the staff slacking at their handheld game)
+  gamepad: [{ d: 'M4.6 4.4h6.8c2 0 3.3 1.6 3.6 3.6l.6 3.4c.2 1.4-1.3 2.4-2.4 1.5L11.2 11H4.8l-2 1.9c-1.1.9-2.6-.1-2.4-1.5L1 8c.3-2 1.6-3.6 3.6-3.6Z' },
+    { d: 'M4.6 6.4v3M3.1 7.9h3', stroke: 1.1, cut: true }, { d: 'M10.6 7.3a.75.75 0 1 1 0 1.5a.75.75 0 1 1 0-1.5ZM12.4 8.6a.75.75 0 1 1 0 1.5a.75.75 0 1 1 0-1.5Z', cut: true }],
   // (an eye: the view's, as on the views button)
   eye: [{ d: 'M1.4 8S3.8 3.6 8 3.6 14.6 8 14.6 8 12.2 12.4 8 12.4 1.4 8 1.4 8Z', stroke: 1.3 }, { d: 'M8 5.9a2.1 2.1 0 1 1 0 4.2A2.1 2.1 0 1 1 8 5.9Z' }],
 }
