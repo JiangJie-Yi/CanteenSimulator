@@ -3677,6 +3677,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]) o.position.y += -KITCHEN_DROP / scale
         }
       }
+      // (what's in their hands is held at the height a server's tray is: as it's held up on the kitchen's dais, a step lower off it (their
+      // figure's own place has the dais's height in it already, and what they held rode 16 cm over their hands))
+      const heldBase = () => {
+        const d = pl.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
+        const on = a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]
+        return pl.pos.clone().setY(pl.pos.y + (KITCHEN_DROP < 0 && !on ? KITCHEN_DROP / scale : 0))
+      }
       // (the rice in its bowl in their hands: washing it, to the pot with it (going in at 'load'); scooped out of the pot, to the tub with it)
       const pb = platerBowl.current
       if (pb && o) {
@@ -3685,7 +3692,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (both hands out in front, holding it (or the plates))
         o.userData.carry = holding || (pl.n > 0 && pl.phase !== 'idle')
         if (holding) {
-          const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
+          const hands = heldBase().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
           // (swirled in the water as it's washed)
           if (pl.phase === 'wash') hands.add(new THREE.Vector3(Math.sin(pl.t * 9) * 0.02, -0.03, Math.cos(pl.t * 9) * 0.02))
           const k = pl.phase === 'load' || pl.phase === 'fill' ? Math.min(1, pl.t / 0.6) : pl.phase === 'scoop' || pl.phase === 'scoopRaw' ? Math.min(1, pl.t / SCOOP_S) : 0
@@ -3703,7 +3710,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         sk.visible = has
         if (has) {
           o.userData.carry = true
-          sk.position.copy(o.position).add(new THREE.Vector3(pl.phase === 'washSk' ? Math.sin(pl.t * 12) * 0.03 : 0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
+          sk.position.copy(heldBase()).add(new THREE.Vector3(pl.phase === 'washSk' ? Math.sin(pl.t * 12) * 0.03 : 0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
           sk.rotation.set(0, pl.yaw, 0)
         }
       }
@@ -3711,7 +3718,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const pc = platerCoal.current, pd = platerDipper.current
       if (o && pc && pd) {
         // (where the hands are, bent forward with them)
-        const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE)
+        const hands = heldBase().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE)
           .applyAxisAngle(X_AXIS, o.userData.lean ?? 0).applyAxisAngle(UP_Y, pl.yaw))
         const coal = (pl.phase === 'takeCoal' && pl.t > 0.3) || (pl.phase === 'toHearth' && pl.fire === 'coal') || pl.phase === 'feedCoal'
         pc.visible = coal
@@ -3750,7 +3757,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         ps.visible = pl.n > 0 && pl.phase !== 'idle'
         if (ps.visible) {
           const k = pl.phase === 'take' ? Math.min(1, pl.t / 0.4) : pl.phase === 'put' ? 1 - Math.min(1, pl.t / 0.4) : 1
-          const hands = o.position.clone().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
+          const hands = heldBase().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
           const from = pl.phase === 'put' ? platingPlace(PLATE_STACK_ALONG) : rackTop(rackNow())
           ps.position.lerpVectors(from, hands, k * k * (3 - 2 * k))
           ps.children.forEach((c, i) => { c.visible = i < pl.n })
@@ -4473,7 +4480,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       )}
       {given && (
-        <group ref={platerBowl} visible={false}>
+        <group ref={platerBowl} name="plater-bowl" visible={false}>
           {/* (a wooden rice-washing bowl, the rice in it) */}
           <mesh geometry={RICE_BOWL_GEO}><meshToonMaterial color="#b98b56" side={THREE.DoubleSide} /></mesh>
           <mesh name="bowl-rice" geometry={RICE_IN_GEO} position={[0, 0.045, 0]}><meshToonMaterial color="#f6f2e8" /></mesh>
