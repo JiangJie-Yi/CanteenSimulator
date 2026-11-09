@@ -1472,7 +1472,6 @@ export default function App() {
   const [boardsOpen, setBoardsOpen] = useState(false)
   // the guest board and the books can be dragged anywhere on the screen
   const dragBoard = useDrag('guests')
-  const dragChat = useDrag('chat')
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
@@ -1934,6 +1933,20 @@ export default function App() {
   const chatEl = useRef<HTMLUListElement>(null)
   const chatPinned = useRef(true)
   useLayoutEffect(() => { const el = chatEl.current; if (el && chatPinned.current) el.scrollTop = el.scrollHeight }, [chat])
+  // (the wheel over the log scrolls it, though the pointer goes through it: taken before the view's zoom has it)
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      const el = chatEl.current
+      if (!el || el.scrollHeight <= el.clientHeight + 1) return
+      const r = el.getBoundingClientRect()
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return
+      el.scrollTop += e.deltaY
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    window.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => window.removeEventListener('wheel', onWheel, { capture: true })
+  }, [])
   /** what each customer's saying just now (over their head) */
   const [speech, setSpeech] = useState<Record<number, { key: number; text: string; ms: number }>>({})
   const chatId = useRef(0)
@@ -3031,9 +3044,10 @@ export default function App() {
         {chat.length > 0 && (
           // (the day's log, as an online game's chat window (the owner's): the newest at the foot, older ones up it fading, the wheel to read
           // back; held at the newest unless it's been scrolled up to read)
-          <ul ref={chatEl} className="ai-chat is-draggable" aria-live="polite" style={{ ...dragChat.style, pointerEvents: 'auto' }}
-            onScroll={(e) => { const el = e.currentTarget; chatPinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24 }}
-            onPointerDown={dragChat.onPointerDown} onDoubleClick={dragChat.onDoubleClick}>
+          // (not dragged about, and not in the way (the owner's, 2026-11-10: it took the pointer over the room's corner, so a drag there moved
+          // it instead of turning the view or carrying a customer): the pointer goes through it to the room; the wheel over it reads back)
+          <ul ref={chatEl} className="ai-chat" aria-live="polite"
+            onScroll={(e) => { const el = e.currentTarget; chatPinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24 }}>
             {chat.map((m) => (
               <li key={m.id} className={`ai-line ai-${m.who}`}>
                 <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : m.who === 'order' ? (tl(lang, '點單', '注文', 'Orders'))

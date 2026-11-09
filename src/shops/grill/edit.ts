@@ -121,12 +121,16 @@ const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.05
 /** offsets made defaults by how far they went, whichever way the panel's axes ran when they were set (the way-in switches moved 0.54 along
  * their wall by the owner, then made so) */
 const SETTLED_BY: Record<string, number> = { 'lightswitch-room': 0.54, 'lightswitch-door': 0.54 }
-/** pieces laid out afresh since a browser may have moved them by hand (the rice tub, the miso pot, the rice pot and the cooker put up on the
- * warming counter, 2026-11-09): what it held for them was from where they stood before, so it's dropped, once (RELAID_KEY marks it done) */
-const RELAID = ['ricetub', 'misopot', 'hagama', 'denkinabe', 'warmer']
-const RELAID_KEY = 'jgs-edit-relaid-2'
-const relaid = (() => { try { return !!localStorage.getItem(RELAID_KEY) } catch { return true } })()
-const dropRelaid = (o: Record<string, V3>) => { if (!relaid) for (const id of RELAID) delete o[id]; return o }
+/** pieces laid out afresh, or put back, since a browser may have moved them by hand: what it held for them (where, how turned, how big) is
+ * dropped, once each (its key marks it done): the rice tub, the miso pot, the rice pot and the cooker put up on the warming counter
+ * (2026-11-09); the till's beckoning cat, flown off its corner of the till (the owner's: put it back, 2026-11-10) */
+const RELAIDS: [string, string[]][] = [
+  ['jgs-edit-relaid-2', ['ricetub', 'misopot', 'hagama', 'denkinabe', 'warmer']],
+  ['jgs-edit-relaid-3', ['till-cat']],
+]
+const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
+const relaid = !relaidDue.length
+const dropRelaid = (o: Record<string, V3>) => { for (const [, ids] of relaidDue) for (const id of ids) delete o[id]; return o }
 const loadOffsets = () => {
   const o = dropRelaid(load(KEY))
   for (const [id, v] of Object.entries(SETTLED)) if (o[id]?.every((x, i) => Math.abs(x - v[i]) < 0.002)) delete o[id]
@@ -152,10 +156,12 @@ if (!relaid) try {
   localStorage.setItem(KEY, JSON.stringify(dropRelaid(load(KEY))))
   localStorage.setItem(KEY_R, JSON.stringify(dropRelaid(load(KEY_R))))
   localStorage.setItem(KEY_S, JSON.stringify(dropRelaid(load(KEY_S))))
-  localStorage.setItem(RELAID_KEY, '1')
+  // (and its pivot, if it was moved: turning about where it was put)
+  localStorage.setItem(KEY_P, JSON.stringify(dropRelaid(load(KEY_P))))
+  for (const [k] of relaidDue) localStorage.setItem(k, '1')
 } catch { /* private window */ }
 let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
-  pivots: load(KEY_P), pivotMode: false, space: 'local', wire: false }
+  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
 let lastSelected: string | null = null

@@ -4,6 +4,8 @@ import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/gam
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
+import { ironSkewer } from './skewerShape'
+import { BONES_GEO, HEAD_GEO, BONE_MAT, BONE_HEAD_MAT } from './fishBones'
 import { heard } from '@/scene/sfx'
 import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
@@ -228,8 +230,8 @@ const FLIGHT_SECONDS = 0.7
 // LAY_DIR points at the camera and STACK_DIR runs across the screen, so the row reads left to right
 const LAY_DIR = new THREE.Vector3(0.59, 0, 0.81).normalize()
 const STACK_DIR = new THREE.Vector3(0.81, 0, -0.59).normalize()
-/** skewers on the board: the other way along it from STACK_DIR, the point away from the cook and the foot to his hand */
-const ON_BOARD = STACK_DIR.clone().negate()
+/** skewers on the board: their top (its loop, the handle) toward the cook, their point (the end that was in the ash) away from him */
+const ON_BOARD = STACK_DIR.clone()
 const ONE = new THREE.Vector3(1, 1, 1)
 const PLATE_R = 0.5
 const SLOT_GAP = 0.2       // wider than the broadest piece (a fish lying flat)
@@ -256,6 +258,9 @@ const CONTAINER_TIP = (key: string) => {
  * and out past the edge); in the room's frame along 1.72, back from the front 0.43, the fire's frame here */
 const BOWL_TOP: [number, number, number] = [1.85, 0, 0.72]
 const BOWL_R = 0.4
+/** a fish's bones (fishBones, drawn at the customers' size) at the size the fire's fish are drawn, and what pointing at them says */
+const BONE_SCALE = 3
+const BONES_TIP = tipOver('魚骨', '吃剩的魚骨｜點一下丟進廚餘桶')
 /** something on the table drawn only while `holds` says it holds something (a plate, a side dish: brought from the dish cabinet when it's
  * wanted), looked at every frame, drawn again only when that changes */
 function WhenHeld({ holds, children }: { holds: () => boolean; children: React.ReactNode }) {
@@ -2290,6 +2295,32 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
     if (slider.current) slider.current.position.z = -DRAWER.out * s.at
     if (inside.current) inside.current.visible = s.at > 0.02
   })
+  /** whether the pointer's ray reached it through the top (the owner's, 2026-11-10: pointing at the bar top over a drawer lit it and named it,
+   * the drawer under the wood): it crossed the top's face behind its rounded front edge before it got to the drawer */
+  const topHides = (e: { ray: THREE.Ray; point: THREE.Vector3 }) => {
+    const frame = slider.current?.parent?.parent
+    if (!frame) return false
+    const inv = frame.matrixWorld.clone().invert()
+    const o = e.ray.origin.clone().applyMatrix4(inv)
+    const d = e.point.clone().applyMatrix4(inv).sub(o)
+    if (d.y >= 0) return false
+    const t = (BAR_TOP - o.y) / d.y
+    return t > 0 && t < 1 && o.z + d.z * t > -BAR_DEPTH / 2 + 0.004
+  }
+  /** pointed at (not through the top): lit and named as the pointer moves over it (its name kept up to date: the drawer, or the tissues in
+   * it); through the top, as if it weren't */
+  const hover = (e: { ray: THREE.Ray; point: THREE.Vector3; stopPropagation: () => void }, title: string, hint: () => string) => {
+    if (getEdit().on) return
+    const ev = e as unknown as Parameters<ReturnType<typeof tipOver>['onPointerOver']>[0]
+    if (topHides(e)) { if (hov.current) { hov.current = false; tipOver(title, '').onPointerOut(ev) } return }
+    e.stopPropagation()
+    if (!hov.current) { hov.current = true; tipOver(title, hint()).onPointerOver(ev) } else setTip({ title, hint: hint() })
+  }
+  const unhover = (e: Parameters<ReturnType<typeof tipOver>['onPointerOut']>[0]) => {
+    if (!hov.current) return
+    hov.current = false
+    if (!getEdit().on) tipOver('抽屜', '').onPointerOut(e)
+  }
   /** the drawer clicked: out, or back in */
   const toggle = () => {
     if (SEATS_TAKEN.has(seat)) { setTip({ title: '抽屜', hint: '客人坐著，等他走了再開' }); return }
@@ -2301,22 +2332,21 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
     <group position={[x, BAR_TOP - 0.06, DRAWER.z]}>
       {/* (handlers on a group round it: a primitive's own aren't attached) */}
       <group ref={slider}
-        onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; hov.current = true; tipOver('抽屜', says()).onPointerOver(e) }}
-        onPointerOut={(e) => { hov.current = false; if (getEdit().on) return; tipOver('抽屜', says()).onPointerOut(e) }}
+        onPointerMove={(e) => hover(e, '抽屜', says)}
+        onPointerOut={unhover}
         onClick={(e) => {
+          if (getEdit().on || topHides(e)) return
           e.stopPropagation()
-          if (getEdit().on) return
           toggle()
         }}>
         <group ref={own}><BarPiece name="BarDrawer" grain={grain} /></group>
         <group ref={inside} position={DRAWER.tissue} visible={false}>
           {/* (the box itself: a click on it pulls a tissue. Shut away it isn't drawn, but it's still in the pointer's way (the pointer's
               rays don't mind what's hidden): there it's the drawer, which a click opens) */}
-          <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; if (st.current.open) tipOver('衛生紙', tissueSays()).onPointerOver(e); else tipOver('抽屜', says()).onPointerOver(e) }}
-            onPointerOut={(e) => { if (getEdit().on) return; tipOver('衛生紙', '').onPointerOut(e) }}
+          <group onPointerMove={(e) => (st.current.open ? hover(e, '衛生紙', tissueSays) : hover(e, '抽屜', says))}
             onClick={(e) => {
+              if (getEdit().on || topHides(e)) return
               e.stopPropagation()
-              if (getEdit().on) return
               if (!st.current.open) { toggle(); return }
               // (one out of the box: it's counted, as the customers' are)
               if (st.current.pulled < 0 && tissuesAt(seat) > 0) {
@@ -3099,20 +3129,25 @@ function inkOneLine(p: Piece) {
 }
 
 /**
- * Every skewer the same iron rod (the owner's: the model's came each its own length and thickness, made at random, so on the board one was half
- * again as long as the next): its foot where the model's was, straight up its line, STICK_LEN long and STICK_R round, a short point at the top.
- * One rod per model rod, shared by every copy; also where the rod's middle is (its own frame), for laying it centred on the board.
+ * Every skewer the same iron one (the owner's: the model's rods came each its own length and thickness, made at random, so on the board one was
+ * half again as long as the next; and a plain rod didn't read as a skewer): a flat steel bar (skewerShape), its sharp point down where the
+ * model's rod stood in the salt (pushed into the ash, as at a robata), up its line past the food to a loop for a handle; its flat (and the loop)
+ * turned out from the fire, so it lies flat, loop and all, on the board. One per model rod and piece, shared by every copy; also where the
+ * rod's middle is (its own frame), for laying it centred on the board.
  */
-const STICK_LEN = 1.474
-const STICK_R = 0.0075
-const STICK_POINT = 0.06
+const STICK_LEN = 1.4
+const STICK_W = 0.0095
+const STICK_T = 0.0045
+const STICK_POINT = 0.14
+const STICK_RING = 0.034
 /** the size of piece the rod is STICK_LEN long in (its world length the same in every one) */
 const STICK_BASE = 0.95
 const RODS = new WeakMap<THREE.BufferGeometry, Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3 }>>()
 /** `scale`: its piece's own (each piece is authored at its own size in the dish's model, some not even alike every way: the rod drawn that
- * much the other way, so it doesn't grow and shrink with the food) */
-function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: THREE.Quaternion) {
-  const key = [...scale.toArray(), ...turn.toArray()].map((x) => x.toFixed(3)).join()
+ * much the other way, so it doesn't grow and shrink with the food); `turn`: the rod's own frame in its piece's, where the scale is; `out`: the
+ * way out from the fire, in the rod's own frame */
+function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: THREE.Quaternion, out: THREE.Vector3) {
+  const key = [...scale.toArray(), ...turn.toArray(), ...out.toArray()].map((x) => x.toFixed(3)).join()
   const mine = RODS.get(src) ?? new Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3 }>()
   RODS.set(src, mine)
   const had = mine.get(key)
@@ -3120,7 +3155,7 @@ function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: TH
   const P = src.attributes.position as THREE.BufferAttribute
   const pts: THREE.Vector3[] = []
   for (let i = 0; i < P.count; i++) pts.push(new THREE.Vector3().fromBufferAttribute(P, i))
-  // (its two ends: the farthest two points; the point is the end whose last few millimetres all close in on one spot, the foot a ring)
+  // (its two ends: the farthest two points; the model's point is the end whose last few millimetres all close in on one spot, its foot a ring)
   let a = pts[0], b = pts[0], far = -1
   for (const p of pts) for (const q of pts) { const d = p.distanceToSquared(q); if (d > far) { far = d; a = p; b = q } }
   const axis = b.clone().sub(a).normalize()
@@ -3133,57 +3168,25 @@ function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: TH
   const foot = ea.spread > eb.spread ? ea.c : eb.c
   const tip = ea.spread > eb.spread ? b : a
   const up = tip.clone().sub(foot).normalize()
-  const u = new THREE.Vector3().crossVectors(up, Math.abs(up.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize()
-  const v = new THREE.Vector3().crossVectors(up, u)
+  // (its flat's face out from the fire: across it, the bar's width and the loop's plane)
+  const face = out.clone().addScaledVector(up, -out.dot(up))
+  if (face.lengthSq() < 1e-6) face.crossVectors(up, Math.abs(up.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0))
+  face.normalize()
+  const across = new THREE.Vector3().crossVectors(up, face).normalize()
   // (how long a unit of each of these is in the world, the piece's scale taken off)
-  // (`turn`: the rod's own frame in its piece's, where the scale is)
   const along = (d: THREE.Vector3) => STICK_BASE / Math.max(0.05, d.clone().applyQuaternion(turn).multiply(scale).length())
-  const LEN = STICK_LEN * along(up), POINT = STICK_POINT * along(up)
-  const Ru = STICK_R * along(u), Rv = STICK_R * along(v)
-  // (eight round: the foot, where the point starts, half way down the point; then the point itself)
-  const SEG = 8
-  const rings = [[0, 1], [LEN - POINT, 1], [LEN - POINT * 0.4, 0.45]] as const
-  const pos: number[] = [], uv: number[] = [], idx: number[] = []
-  rings.forEach(([h, w], r) => {
-    for (let j = 0; j < SEG; j++) {
-      const t = (j / SEG) * Math.PI * 2
-      const at = foot.clone().addScaledVector(up, h).addScaledVector(u, Math.cos(t) * Ru * w).addScaledVector(v, Math.sin(t) * Rv * w)
-      pos.push(at.x, at.y, at.z)
-      uv.push(j / SEG, h / LEN)
-    }
-    if (r) for (let j = 0; j < SEG; j++) {
-      const j2 = (j + 1) % SEG, o = (r - 1) * SEG, n = r * SEG
-      idx.push(o + j, o + j2, n + j2, o + j, n + j2, n + j)
-    }
-  })
-  const top = foot.clone().addScaledVector(up, LEN)
-  const tipI = pos.length / 3
-  pos.push(top.x, top.y, top.z)
-  uv.push(0.5, 1)
-  for (let j = 0; j < SEG; j++) idx.push(2 * SEG + j, 2 * SEG + ((j + 1) % SEG), tipI)
-  // (the foot closed across in a ladder, no fan to a middle)
-  const L = [[0, 1, 7], [1, 6, 7], [1, 2, 6], [2, 5, 6], [2, 3, 5], [3, 4, 5]]
-  for (const [x, y, z] of L) idx.push(x, z, y)
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
-  geo.setIndex(idx)
-  // (which way round the triangles go, checked: they face out from the rod)
+  const geo = ironSkewer(STICK_LEN, STICK_W, STICK_T, STICK_POINT, STICK_RING)
+  geo.applyMatrix4(new THREE.Matrix4().makeBasis(across.clone().multiplyScalar(along(across)), up.clone().multiplyScalar(along(up)),
+    face.clone().multiplyScalar(along(face))).setPosition(foot))
   geo.computeVertexNormals()
-  const n0 = new THREE.Vector3().fromBufferAttribute(geo.attributes.normal as THREE.BufferAttribute, 0)
-  if (n0.dot(u) < 0) {
-    const ix = geo.index!.array as Uint16Array | Uint32Array
-    for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t }
-    geo.computeVertexNormals()
-  }
   for (const name of Object.keys(src.attributes)) {
     if (geo.attributes[name]) continue
     const s0 = src.attributes[name] as THREE.BufferAttribute
-    geo.setAttribute(name, new THREE.Float32BufferAttribute(new Array((pos.length / 3) * s0.itemSize).fill(1), s0.itemSize))
+    geo.setAttribute(name, new THREE.Float32BufferAttribute(new Array(geo.attributes.position.count * s0.itemSize).fill(1), s0.itemSize))
   }
-  const out = { geo, mid: foot.clone().addScaledVector(up, LEN / 2) }
-  mine.set(key, out)
-  return out
+  const res = { geo, mid: foot.clone().addScaledVector(up, (STICK_LEN / 2) * along(up)) }
+  mine.set(key, res)
+  return res
 }
 
 /** A small repeatable random generator, so a piece always gets the same crumple. */
@@ -3634,7 +3637,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.mats.push({ mat, mesh: m, base: mat.color.clone(), emissive: mat.emissive.clone(), foil, show, eye })
       if (mat.name.startsWith('BambooSkewer')) {
         // (every rod the one iron skewer, whatever the model made it)
-        const rod = standardStick(m.geometry, (p.node.userData.home?.s as THREE.Vector3 | undefined) ?? ONE, m.quaternion)
+        // (the way out from the fire, in the rod's own frame: from its place's bearing round the hearth, brought back through the piece's turn and
+        // size and the rod's own turn in it)
+        const sc = (p.node.userData.home?.s as THREE.Vector3 | undefined) ?? ONE
+        const phi = Math.atan2(p.homeP.z, p.homeP.x)
+        const outward = new THREE.Vector3(Math.cos(phi), 0, Math.sin(phi)).applyQuaternion(p.homeQ0.clone().invert()).divide(sc)
+          .applyQuaternion(m.quaternion.clone().invert()).normalize()
+        const rod = standardStick(m.geometry, sc, m.quaternion, outward)
         m.geometry = rod.geo
         for (const c of m.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) c.geometry = rod.geo
         p.stickMid = rod.mid.clone().applyQuaternion(m.quaternion).add(m.position)
@@ -4433,6 +4442,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const trashedRef = useRef(0)
   const flashUntil = useRef(new Map<string, number>())
   const [trashed, setTrashed] = useState(0)
+  /** a whole fish's bones left in the tasting bowl once the owner's eaten it (the owner's, 2026-11-10), till they're clicked into the bin or the
+   * shop opens: where in the bowl, which way they lie */
+  const [bones, setBones] = useState<{ key: number; at: [number, number, number]; yaw: number }[]>([])
+  const bonesSeq = useRef(0)
   const [fireHint, setFireHint] = useState(0)
   const lockedRef = useRef(locked)
   lockedRef.current = locked
@@ -4448,8 +4461,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     stacks: Map<string, string> }
   const snaps = useRef(new Map<string, Snap>())
   const lastSpace = useRef(space)
+  // (its skewer too (skewerAt, pullAt): put away without them, what was on the fire came back off its skewer, standing in the air over the
+  // coals (the owner's, 2026-11-10), and what had been skewered by hand on the board had to be skewered again)
   const SCALARS = ['progress', 'collected', 'flight', 'stickOnly', 'netSpot', 'container', 'staged', 'stagedAt', 'wasPresent',
-    'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten', 'guest', 'seat'] as const
+    'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten', 'guest', 'seat', 'skewerAt', 'pullAt'] as const
   const VECS = ['fromP', 'fromQ', 'toP', 'toQ', 'local', 'trashFrom'] as const
   const save = (): Snap => {
     const out = new Map<string, Record<string, unknown>>()
@@ -4588,6 +4603,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     load(space === 'open' ? undefined : snaps.current.get(space))
     if (space === 'open') for (const [k, v] of stands) moved.current.set(k, v)
     lastSpace.current = space
+    // (the bones in the bowl gone with the table's clearing)
+    if (space === 'open') setBones([])
     // (shut: the customers are gone, and what they'd ordered with them)
     if (space === 'closed') {
       guests.current = []
@@ -5528,8 +5545,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       if (p !== hovered.current) {
         setHover(p)
-        // pointing at a piece shows how good it'd be to eat right now
-        setTasteTip(p ? { at: p.node.position.clone().add(new THREE.Vector3(0, 0.42, 0)).toArray() as [number, number, number],
+        // pointing at a piece shows how good it'd be to eat right now (not a bare skewer: there's nothing on it to eat)
+        setTasteTip(p && !p.stickOnly ? { at: p.node.position.clone().add(new THREE.Vector3(0, 0.42, 0)).toArray() as [number, number, number],
           taste: tasteOf(p) } : null)
       }
       const soup = tool || p ? null : pickDrink()
@@ -5727,10 +5744,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (a clean skewer let go over something on the board not yet on one: pushed through it (the owner's: while researching, it's skewered by
       // hand); let go anywhere else, it goes back in the holder)
       if (h?.kind === 'skewer') {
-        let best: Piece | null = null, d = SKEWER_DROP
+        // (the one the pointer's over: the nearest to its ray, measured to the middle of what's on the board (the owner's, 2026-11-10: it was
+        // judged where the ray met a level 0.3 over the table, off to the side of what the eye saw under the pointer: let go over one fish,
+        // the one beside it got the skewer, or none did))
+        let best: Piece | null = null
+        let d = SKEWER_DROP * root.getWorldScale(new THREE.Vector3()).x
         for (const p of pieces.current) {
           if (!present(p) || !p.staged || p.fetching || !p.sticks.length || p.skewerAt !== undefined || p.trash >= 0) continue
-          const q = Math.hypot(p.node.position.x - h.at.x, p.node.position.z - h.at.z)
+          const c = new THREE.Box3().setFromObject(p.food[0] ?? p.node).getCenter(new THREE.Vector3())
+          const q = raycaster.ray.distanceToPoint(c)
           if (q < d) { d = q; best = p }
         }
         const t = best ? takeSkewer(SKEWERS.s) : null
@@ -6509,7 +6531,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             }
           }
         }
-        if (here && space === 'open' && p.skewerAt !== undefined && p.pullAt === undefined && p.collected && p.flight >= 1) {
+        // (researching too: what's tasted is in the bowl without its skewer (the owner's: no skewer in a bowl or on a plate; one was left
+        // lying in the bowl when the food was eaten off it, a taste shown for it))
+        if (here && p.skewerAt !== undefined && p.pullAt === undefined && p.collected && p.flight >= 1) {
           p.pullAt = now
           SKEWERS.s = usedSkewer(SKEWERS.s)
           clinkSound()
@@ -6867,6 +6891,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (p.eat >= 1) {
           // (he's had it: what he thinks of it, then off back to his round)
           if (p.byBoss) { BOSS_TASTE.verdict = tasteOf(p); BOSS_TASTE.chewing = false }
+          // (a whole fish eaten off its bones: they're left in the bowl, a few lying about it one over another)
+          if (p.byBoss && WHOLE_FISH.has(p.id)) {
+            const k = ++bonesSeq.current
+            const at = bowlAt().add(new THREE.Vector3(Math.cos(k * 2.4) * 0.035, 0.055 + ((k - 1) % 3) * 0.012, Math.sin(k * 2.4) * 0.035))
+            setBones((all) => [...all.slice(-2), { key: k, at: at.toArray() as [number, number, number], yaw: k * 1.9 }])
+          }
           if (!p.node.userData.byGuest) BOSS_TASTE.at = null
           p.byBoss = false
           // (what an AI customer eats fills their stomach, not yours)
@@ -7100,6 +7130,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <WhenHeld key={n} holds={() => holds(`dish-${n}`)}><SideDish container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} /></WhenHeld>
       ))}
       <TasteBowl container="bowl-0" position={bowlAt().toArray() as [number, number, number]} />
+      {/* (a whole fish's bones in the bowl, once eaten: clicked, into the bin with the rest) */}
+      {bones.map((b) => (
+        <group key={b.key} position={b.at} rotation-y={b.yaw} scale={BONE_SCALE} {...BONES_TIP}
+          onClick={(e) => { e.stopPropagation(); if (locked) return; setBones((all) => all.filter((x) => x.key !== b.key)); trashedRef.current += 1; setTrashed(trashedRef.current); clinkSound() }}>
+          <mesh geometry={BONES_GEO} material={BONE_MAT} />
+          <mesh geometry={HEAD_GEO} material={BONE_HEAD_MAT} />
+        </group>
+      ))}
       {/* the takeaway box, while one's being packed (game/takeout) */}
       {space === 'open' && <TakeoutBox position={containerAt('takeout').toArray() as [number, number, number]} />}
       <EmberBed fuel={fuel} />

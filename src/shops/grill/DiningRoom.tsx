@@ -154,26 +154,62 @@ const seal = (g: CanvasRenderingContext2D, x: number, y: number, s: number) => {
   g.strokeRect(x + 3, y + 3, s - 6, s - 6)
 }
 
-/** the frieze under the beam: seigaiha, overlapping waves of rings in indigo on cream */
-const SEIGAIHA = canvasTex(64 * 8, 32 * 8, (g) => {
-  // (drawn eight times over its laid-out size, so the rings' edges stay clean along the whole frieze)
-  g.setTransform(8, 0, 0, 8, 0, 0)
-  g.fillStyle = '#e9dcc0'
-  g.fillRect(0, 0, 64, 32)
-  for (let row = 0; row < 3; row++) {
-    for (let col = -1; col < 3; col++) {
-      const cx = col * 32 + (row % 2 ? 16 : 0), cy = 8 + row * 12
-      for (let r = 16; r > 0; r -= 4) {
-        g.beginPath()
-        g.arc(cx, cy + 8, r, Math.PI, 0)
-        g.fillStyle = r % 8 ? '#e9dcc0' : '#3a5578'
-        g.fill()
-        // (a fine pale thread at each ring's crest, as a dyed pattern's resist line)
-        g.strokeStyle = r % 8 ? 'rgba(58,85,120,0.35)' : 'rgba(233,220,192,0.5)'
-        g.lineWidth = 0.25
-        g.stroke()
+/**
+ * The frieze under the beam: seigaiha (青海波) as a dyed band (the owner's, 2026-11-10: it was big waves of two thick flat rings each, like
+ * a diagram): waves half the size, eight rows of them, each four fine indigo rings about a little solid heart, the outer ring the boldest;
+ * a soft indigo wash in each deepening toward its heart; the line work a little uneven (every wave its own indigo, its rings' widths and
+ * places a hair different) and softened at its edges as dye bleeds; the dye mottled, a cotton weave and a few resist specks over it all.
+ * A tile is 0.4 wide by the band's 0.2 (four waves across), joining with the next along the wall.
+ */
+const SEIGAIHA = canvasTex(1024, 512, (g) => {
+  const W = 1024, H = 512, R = 128, COLS = W / (2 * R)
+  const GROUND = '#ece2c9'
+  const INDIGO = ['#1d3253', '#223a5f', '#283f66', '#1a2d4a', '#243d63']
+  let seed = 1
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  g.fillStyle = GROUND; g.fillRect(0, 0, W, H)
+  // (rows half a wave apart, odd rows half a wave along, each row over the one above; from the band's top to past its foot)
+  for (let row = 0; row * (R / 2) <= H + R / 2; row++) {
+    const cy = row * (R / 2)
+    for (let col = -1; col <= COLS; col++) {
+      const cx = col * 2 * R + (row % 2 ? R : 0)
+      // (a wave and its copy a tile along are the same, so the frieze joins)
+      seed = 7919 + ((((col % COLS) + COLS) % COLS) * 17 + row * 131) * 97
+      rnd(); rnd()
+      const ink = INDIGO[Math.floor(rnd() * INDIGO.length)]
+      const half = new Path2D(); half.moveTo(cx - R, cy); half.arc(cx, cy, R, Math.PI, 0); half.closePath()
+      g.fillStyle = GROUND; g.fill(half)
+      const wash = g.createRadialGradient(cx, cy, R * 0.12, cx, cy, R)
+      wash.addColorStop(0, 'rgba(34,58,95,0.22)'); wash.addColorStop(0.65, 'rgba(34,58,95,0.07)'); wash.addColorStop(1, 'rgba(34,58,95,0)')
+      g.fillStyle = wash; g.fill(half)
+      // (its rings, each drawn twice: a faint wide one where the dye's bled, then its line)
+      for (const [f, w] of [[0.93, 12], [0.73, 8], [0.54, 7.5], [0.35, 7]] as const) {
+        const r = R * f + (rnd() - 0.5) * 2.4, lw = w + (rnd() - 0.5) * 2
+        g.beginPath(); g.arc(cx, cy, r, Math.PI, 0)
+        g.strokeStyle = 'rgba(34,58,95,0.16)'; g.lineWidth = lw + 5; g.stroke()
+        g.strokeStyle = ink; g.lineWidth = lw; g.stroke()
       }
+      g.beginPath(); g.moveTo(cx - R * 0.17, cy); g.arc(cx, cy, R * 0.17, Math.PI, 0); g.closePath()
+      g.fillStyle = ink; g.fill()
     }
+  }
+  // (over it all, wrapped round the tile's ends: the dye's mottle, broad and faint; the cotton's weave; pale resist specks and a few darker)
+  seed = 4242
+  const wrap = (x: number, draw: (x: number) => void) => { draw(x); if (x < 80) draw(x + W); if (x > W - 80) draw(x - W) }
+  for (let k = 0; k < 14; k++) {
+    const x = rnd() * W, y = rnd() * H, r = 60 + rnd() * 90, dark = rnd() < 0.5
+    wrap(x, (xx) => {
+      const m = g.createRadialGradient(xx, y, 0, xx, y, r)
+      m.addColorStop(0, dark ? 'rgba(60,50,40,0.06)' : 'rgba(255,250,236,0.08)'); m.addColorStop(1, 'rgba(0,0,0,0)')
+      g.fillStyle = m; g.fillRect(xx - r, y - r, r * 2, r * 2)
+    })
+  }
+  for (let y = 0; y < H; y += 3) { g.fillStyle = 'rgba(96,80,56,0.035)'; g.fillRect(0, y, W, 1) }
+  for (let x = 0; x < W; x += 3) { g.fillStyle = 'rgba(255,250,236,0.03)'; g.fillRect(x, 0, 1, H) }
+  for (let k = 0; k < 2600; k++) {
+    const x = rnd() * W, y = rnd() * H, w = 1 + rnd() * 2.5, pale = rnd() < 0.7
+    g.fillStyle = pale ? `rgba(246,240,224,${0.12 + rnd() * 0.18})` : `rgba(40,34,26,${0.05 + rnd() * 0.07})`
+    wrap(x, (xx) => g.fillRect(xx, y, w, 1))
   }
 }, true)
 
@@ -421,9 +457,34 @@ const ART = {
     const bg = g.createLinearGradient(0, 0, 0, 476)
     bg.addColorStop(0, '#f4ebd8'); bg.addColorStop(1, '#eadcc0')
     g.fillStyle = bg; g.fillRect(0, 0, 200, 476)
-    g.fillStyle = 'rgba(220,168,150,0.32)'
-    for (const [y, x0, x1] of [[16, -12, 112], [31, 46, 214], [438, -12, 84], [453, 70, 214]]) { g.beginPath(); g.roundRect(x0, y, x1 - x0, 11, 5.5); g.fill() }
     const line = (w = 1.1, c = INK) => { g.lineWidth = w; g.strokeStyle = c }
+    // (the mist, すやり霞 (the owner's, 2026-11-10: finer than the flat bars it was): long bands in three tiers stepping back from their open
+    // end, each rounded at its ends, a pale rose deepening down it, a fine darker line round it all, flecks of gold leaf (砂子) in it)
+    let seed = 23
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    const kasumi = (x0: number, x1: number, y: number, h: number, open: 'l' | 'r') => {
+      const len = x1 - x0, band = new Path2D()
+      for (const [inset, dy] of [[0, 0], [len * 0.16, -h * 0.62], [len * 0.3, h * 0.6]]) {
+        const l = len - inset
+        band.roundRect(open === 'r' ? x0 : x0 + inset, y + dy - h / 2, l, h, h / 2)
+      }
+      g.save()
+      line(1.5, 'rgba(172,110,96,0.6)'); g.stroke(band)
+      const fill = g.createLinearGradient(0, y - h * 1.2, 0, y + h * 1.2)
+      fill.addColorStop(0, '#f4ded2'); fill.addColorStop(1, '#e6bfb0')
+      g.fillStyle = fill; g.fill(band)
+      g.clip(band)
+      for (let k = 0; k < len * 0.7; k++) {
+        const s = 0.3 + rnd() * 0.9
+        g.fillStyle = rnd() < 0.5 ? `rgba(206,166,82,${0.5 + rnd() * 0.4})` : `rgba(236,206,128,${0.5 + rnd() * 0.4})`
+        g.fillRect(x0 + rnd() * len, y - h * 1.2 + rnd() * h * 2.4, s, s * (0.5 + rnd()))
+      }
+      g.restore()
+    }
+    kasumi(-20, 112, 20, 8, 'r')
+    kasumi(42, 222, 40, 7.5, 'l')
+    kasumi(-20, 92, 440, 8, 'r')
+    kasumi(66, 222, 458, 7.5, 'l')
     // ---- her kimono: an S of a robe, swaying in at her waist and flaring to a hem trailing off to her right
     const robe = new Path2D()
     robe.moveTo(80, 176)
@@ -588,46 +649,101 @@ const ART = {
       g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y + 14 + q * 3); g.stroke()
       g.fillStyle = '#e8c45a'; g.beginPath(); g.ellipse(x + 1, y + 16 + q * 3, 1.4, 2.2, 0, 0, Math.PI * 2); g.fill()
     }
-    // ---- the shamisen across her (the owner's: it was a round fan with a goldfish on it): its body (胴) at her waist, turned to the neck's
-    // slope, a dark wooden rim round its white skin with the dark guard (撥皮) where the plectrum strikes; its slender lacquered neck (棹)
-    // up to her right, past her sleeve, to the pegbox (天神) bent back with its three ivory pegs; three strings from the bridge up the neck;
-    // the plectrum (撥), ivory, fanning out from her hand over the skin
-    const ang = Math.atan2(160 - 300, 186 - 124)
+    // ---- the shamisen across her (the owner's, 2026-11-10: finer, it was a few flat shapes): its body (胴) at her waist turned to the neck's
+    // slope, a wooden frame a little round at its sides about a cream skin with a soft shade at its edge, the plectrum's guard (撥皮) a crescent
+    // of mottled tortoiseshell across the skin's top, the ivory bridge (駒) low on it, the tail cord (根緒) a loop of purple silk from its foot;
+    // its slender neck (棹) lacquered near black, a warm gleam down one edge, tapering up past her sleeve to the ivory top nut and the pegbox
+    // (天神) curling back, three ivory pegs (糸巻) through it, two to one side, one to the other; the three strings from the cord over the
+    // bridge and guard up to the pegs
+    const ang = Math.atan2(160 - 300, 186 - 124), NECK = 124
     g.save(); g.translate(124, 300); g.rotate(ang + Math.PI / 2)
-    const dou = new Path2D(); dou.roundRect(-21, -22, 42, 44, 7)
-    g.fillStyle = '#5a3018'; g.fill(dou)
-    g.fillStyle = '#f4eee2'; g.beginPath(); g.roundRect(-17.5, -18.5, 35, 37, 5); g.fill()
-    g.fillStyle = '#2c2420'; g.beginPath(); g.ellipse(0, -8, 11, 6, 0, Math.PI, Math.PI * 2); g.fill()
+    // (in here: up the neck is -y, across the body x)
+    line(1.6, '#7a3462'); g.beginPath(); g.moveTo(-4, 21); g.bezierCurveTo(-7.5, 33, 5.5, 35, 3, 22); g.stroke()
+    line(0.5, 'rgba(255,214,236,0.6)'); g.beginPath(); g.moveTo(-3.8, 22.4); g.bezierCurveTo(-6.6, 32, 4.6, 33.4, 2.8, 23); g.stroke()
+    const dou = new Path2D()
+    dou.moveTo(-15, -22.5); dou.quadraticCurveTo(0, -24.5, 15, -22.5); dou.quadraticCurveTo(21.5, -22, 21.5, -16)
+    dou.quadraticCurveTo(23, 0, 21.5, 16); dou.quadraticCurveTo(21.5, 22, 15, 22.5); dou.quadraticCurveTo(0, 24.5, -15, 22.5)
+    dou.quadraticCurveTo(-21.5, 22, -21.5, 16); dou.quadraticCurveTo(-23, 0, -21.5, -16); dou.quadraticCurveTo(-21.5, -22, -15, -22.5); dou.closePath()
+    const wood = g.createLinearGradient(-22, 0, 22, 0)
+    wood.addColorStop(0, '#7e4624'); wood.addColorStop(0.5, '#5a2e14'); wood.addColorStop(1, '#3a1c0b')
+    g.fillStyle = wood; g.fill(dou)
     line(0.9); g.stroke(dou)
-    // (the bridge (駒) low on the skin)
-    g.fillStyle = '#e9dcae'; g.fillRect(-7, 11, 14, 2.2)
+    const skin = new Path2D(); skin.roundRect(-18, -19, 36, 38, 5)
+    const hide = g.createRadialGradient(-3, -2, 2, 0, 0, 27)
+    hide.addColorStop(0, '#fbf6ea'); hide.addColorStop(0.72, '#efe5d0'); hide.addColorStop(1, '#d6c4a2')
+    g.fillStyle = hide; g.fill(skin)
+    line(0.6, 'rgba(70,40,20,0.7)'); g.stroke(skin)
+    const guard = new Path2D()
+    guard.moveTo(-15, -19); guard.lineTo(15, -19); guard.quadraticCurveTo(15, -5, 0, -4); guard.quadraticCurveTo(-15, -5, -15, -19); guard.closePath()
+    g.fillStyle = '#6e3e18'; g.fill(guard)
+    g.save(); g.clip(guard)
+    g.fillStyle = 'rgba(30,14,6,0.55)'
+    for (const [x, y, r] of [[-9, -15, 2.6], [-2, -11, 2], [6, -16, 2.4], [10, -10, 1.8], [-6, -8, 1.5], [2, -6.5, 1.2]]) { g.beginPath(); g.ellipse(x, y, r * 1.3, r, 0.3, 0, Math.PI * 2); g.fill() }
+    g.fillStyle = 'rgba(236,176,96,0.35)'
+    for (const [x, y, r] of [[-12, -17, 1.4], [3, -13, 1.6], [12, -14, 1.1]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill() }
     g.restore()
-    const ux = Math.cos(ang), uy = Math.sin(ang)
-    const neckA = [124 + ux * 22, 300 + uy * 22], neckB = [124 + ux * 162, 300 + uy * 162]
-    line(5.5, '#24160e'); g.beginPath(); g.moveTo(neckA[0], neckA[1]); g.lineTo(neckB[0], neckB[1]); g.stroke()
-    line(1, 'rgba(200,150,100,0.45)'); g.beginPath(); g.moveTo(neckA[0] - 1.6, neckA[1]); g.lineTo(neckB[0] - 1.6, neckB[1]); g.stroke()
-    // (the pegbox bent back from the neck's top, and its three pegs out to either side)
-    const tx = neckB[0] + ux * 4, ty = neckB[1] + uy * 4
-    line(6.5, '#1c120c'); g.beginPath(); g.moveTo(neckB[0], neckB[1]); g.quadraticCurveTo(tx + ux * 8, ty + uy * 8, tx + ux * 10 + 5, ty + uy * 10 + 2); g.stroke()
-    line(2.2, '#efe3c4')
-    for (const [k, sd] of [[2, 1], [6, -1], [10, 1]] as [number, number][]) {
-      const px = neckB[0] + ux * k, py = neckB[1] + uy * k
-      g.beginPath(); g.moveTo(px - uy * sd * 2, py + ux * sd * 2); g.lineTo(px - uy * sd * 9, py + ux * sd * 9); g.stroke()
+    line(0.5, 'rgba(40,20,8,0.8)'); g.stroke(guard)
+    g.fillStyle = 'rgba(60,40,20,0.25)'; g.fillRect(-6.5, 12.6, 13, 1.2)
+    g.fillStyle = '#f2e6c4'; g.beginPath(); g.moveTo(-7, 12.4); g.lineTo(7, 12.4); g.lineTo(5.5, 10); g.lineTo(-5.5, 10); g.closePath(); g.fill()
+    line(0.4, 'rgba(90,70,40,0.9)'); g.stroke()
+    const neck = new Path2D()
+    neck.moveTo(-2.7, -22); neck.lineTo(-2.1, -22 - NECK); neck.lineTo(2.1, -22 - NECK); neck.lineTo(2.7, -22); neck.closePath()
+    g.fillStyle = '#22140c'; g.fill(neck)
+    line(0.7, 'rgba(214,160,104,0.55)'); g.beginPath(); g.moveTo(1.9, -24); g.lineTo(1.5, -20 - NECK); g.stroke()
+    line(0.5); g.stroke(neck)
+    // (the pegbox, curling back to the side away from the picture's edge)
+    const head = new Path2D()
+    head.moveTo(2.2, -22 - NECK); head.bezierCurveTo(2.6, -34 - NECK, -1, -41 - NECK, -7, -43 - NECK)
+    head.bezierCurveTo(-10.5, -43.6 - NECK, -11.5, -40.5 - NECK, -8.6, -39.6 - NECK)
+    head.bezierCurveTo(-4.4, -38.6 - NECK, -2.6, -33 - NECK, -2.2, -22 - NECK); head.closePath()
+    g.fillStyle = '#1c100a'; g.fill(head)
+    line(0.6, 'rgba(214,160,104,0.5)'); g.beginPath(); g.moveTo(1.6, -24 - NECK); g.bezierCurveTo(1.8, -33 - NECK, -1.4, -39.5 - NECK, -6.6, -41.6 - NECK); g.stroke()
+    line(0.5); g.stroke(head)
+    g.fillStyle = '#efe3c4'; g.fillRect(-2.3, -21 - NECK, 4.6, 1.4)
+    for (const [y, sd] of [[-26, -1], [-30.5, 1], [-35, -1]] as [number, number][]) {
+      g.save(); g.translate(sd * 2.2, y - NECK); g.scale(sd, 1)
+      const peg = new Path2D()
+      peg.moveTo(0, -0.9); peg.lineTo(5.6, -1.3); peg.quadraticCurveTo(8.6, -2, 8.6, 0); peg.quadraticCurveTo(8.6, 2, 5.6, 1.3); peg.lineTo(0, 0.9); peg.closePath()
+      g.fillStyle = '#f1e5c6'; g.fill(peg); line(0.4, 'rgba(90,70,40,0.9)'); g.stroke(peg)
+      line(0.5, 'rgba(120,90,50,0.7)'); g.beginPath(); g.moveTo(5.3, -1.3); g.lineTo(5.3, 1.3); g.stroke()
+      g.restore()
     }
-    // (the three strings, from the bridge up to the pegs)
-    line(0.45, 'rgba(250,244,228,0.95)')
-    for (const o of [-1.4, 0, 1.4]) {
-      const bx = 124 - ux * 12 - uy * o, by = 300 - uy * 12 + ux * o
-      g.beginPath(); g.moveTo(bx, by); g.lineTo(neckB[0] - uy * o * 0.4, neckB[1] + ux * o * 0.4); g.stroke()
-    }
-    // (her hand out of her sleeve with the plectrum, over the skin)
+    line(0.4, 'rgba(252,246,230,0.95)')
+    for (const o of [-1.2, 0, 1.2]) { g.beginPath(); g.moveTo(o * 1.3, 20); g.lineTo(o, 10); g.lineTo(o * 0.75, -22); g.lineTo(o * 0.55, -20 - NECK); g.stroke() }
+    g.restore()
+    // (her hand out of her sleeve with the plectrum (撥): its ivory handle in her palm, its blade fanning out over the guard; the back of her
+    // hand to us, four slim fingers curled round under the handle, her thumb along its top toward the blade; at her wrist the sleeve's mouth,
+    // its red lining showing)
+    g.save(); g.translate(145, 280.5); g.rotate(Math.atan2(290.5 - 280.5, 128.9 - 145)); g.scale(1.35, -1.35)
+    // (in here: +x down the plectrum toward its blade, +y to the side her fingers curl round)
     const bachi = new Path2D()
-    bachi.moveTo(146, 282); bachi.lineTo(128, 266); bachi.lineTo(140, 254); bachi.lineTo(152, 276); bachi.closePath()
-    g.fillStyle = '#ecdcae'; g.fill(bachi); line(0.8, '#6a5030'); g.stroke(bachi)
-    const hand = new Path2D()
-    hand.moveTo(142, 290); hand.bezierCurveTo(146, 280, 158, 280, 160, 288); hand.bezierCurveTo(160, 296, 152, 300, 146, 298); hand.closePath()
-    g.fillStyle = '#faf5ec'; g.fill(hand); line(0.8); g.stroke(hand)
-    line(0.6); g.beginPath(); g.moveTo(150, 285); g.lineTo(152, 293); g.moveTo(154, 284); g.lineTo(156, 291); g.stroke()
+    bachi.moveTo(-9, -1.4); bachi.lineTo(4, -1.7); bachi.quadraticCurveTo(10, -3, 19, -8.5); bachi.lineTo(19.5, 8.5); bachi.quadraticCurveTo(10, 3, 4, 1.7); bachi.lineTo(-9, 1.4); bachi.closePath()
+    const ivory = g.createLinearGradient(0, -8, 0, 8)
+    ivory.addColorStop(0, '#f8f0da'); ivory.addColorStop(0.5, '#ece0be'); ivory.addColorStop(1, '#d6c498')
+    g.fillStyle = ivory; g.fill(bachi); line(0.45, 'rgba(110,84,48,0.95)'); g.stroke(bachi)
+    line(0.35, 'rgba(255,255,255,0.75)'); g.beginPath(); g.moveTo(6, 1.6); g.quadraticCurveTo(11, 3, 18, 7); g.stroke()
+    const SKIN = '#faf3e8'
+    const piece = (p: Path2D) => { g.fillStyle = SKIN; g.fill(p); line(0.42); g.stroke(p) }
+    const wrist = new Path2D(); wrist.moveTo(-18, -3.3); wrist.lineTo(-8, -3.7); wrist.lineTo(-8, 3.9); wrist.lineTo(-18, 3.5); wrist.closePath()
+    piece(wrist)
+    const back = new Path2D(); back.moveTo(-10.4, -3.9); back.bezierCurveTo(-5, -5.8, 1.2, -5.2, 2.8, -1.8); back.bezierCurveTo(3.2, 1.5, 1.6, 4.6, -1, 5)
+    back.lineTo(-9.4, 4.7); back.bezierCurveTo(-11.4, 3.9, -11.8, -2.6, -10.4, -3.9); back.closePath()
+    piece(back)
+    for (let k = 0; k < 4; k++) {
+      const f = new Path2D(); f.roundRect(-8.8 + k * 2.75, 1.4, 2.6, 5.6 - Math.abs(k - 1.4) * 0.55, 1.3)
+      piece(f)
+    }
+    line(0.3, 'rgba(160,110,90,0.65)')
+    for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(-8.4 + k * 2.75, 4.6); g.lineTo(-6.6 + k * 2.75, 4.6); g.stroke() }
+    const thumb = new Path2D(); thumb.moveTo(-3.5, -3.7); thumb.bezierCurveTo(0, -4.5, 4.6, -3.7, 6.2, -2.3); thumb.bezierCurveTo(6.8, -1.4, 5.8, -0.6, 4.7, -1)
+    thumb.bezierCurveTo(2, -1.6, -1, -1.6, -3.3, -1.2); thumb.closePath()
+    piece(thumb)
+    line(0.3, 'rgba(160,110,90,0.7)'); g.beginPath(); g.moveTo(4.3, -2.9); g.quadraticCurveTo(5.5, -2.7, 5.8, -1.9); g.stroke()
+    const cuff = new Path2D(); cuff.moveTo(-15.5, -7); cuff.quadraticCurveTo(-13, 0, -15.5, 7.4); cuff.lineTo(-25, 8.4); cuff.lineTo(-25, -7.6); cuff.closePath()
+    g.fillStyle = NAVY; g.fill(cuff)
+    line(1.3, '#b8261c'); g.beginPath(); g.moveTo(-16.1, -6.4); g.quadraticCurveTo(-13.7, 0, -16.1, 6.8); g.stroke()
+    line(0.55); g.stroke(cuff)
+    g.restore()
     // ---- the title in its cartouche, top right, and a seal at the foot
     g.fillStyle = '#efe2c2'; g.fillRect(162, 12, 28, 96)
     line(1); g.strokeRect(162, 12, 28, 96); g.strokeRect(164.5, 14.5, 23, 91)
@@ -1752,9 +1868,10 @@ function WallPiece({ z0, z1, y0, y1, plaster = false }: { z0: number; z1: number
  * dark (its emissive map) */
 const WC_SIGN_MADE = new Map<string, THREE.Texture | null>()
 const WC_ICON = { m: '#38bdf8', f: '#fb7185' }
-function wcFigure(g: CanvasRenderingContext2D, who: 'm' | 'f', x: number, y: number, fill: string) {
+function wcFigure(g: CanvasRenderingContext2D, who: 'm' | 'f', x: number, y: number, fill: string, size = 1) {
   g.save()
   g.translate(x, y)
+  g.scale(size, size)
   g.fillStyle = fill
   const round = (path: Path2D) => g.fill(path)
   if (who === 'm') {
@@ -1784,16 +1901,33 @@ function wcFigure(g: CanvasRenderingContext2D, who: 'm' | 'f', x: number, y: num
   }
   g.restore()
 }
+/** the figure, a little smaller (the owner's, 2026-11-10), left of the middle, and its character (男 or 女) in the sign's brush hand on its
+ * right, both in `fill`; `shade` under them first */
+function wcMark(g: CanvasRenderingContext2D, who: 'm' | 'f', fill: string, shade = false) {
+  const draw = (colour: string) => {
+    wcFigure(g, who, 112, 99, colour, 0.76)
+    g.fillStyle = colour
+    g.font = `900 104px ${SIGN_FONT}`
+    g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.fillText(who === 'm' ? '男' : '女', 221, 102)
+  }
+  if (shade) { g.save(); g.translate(0, 2.5); g.globalAlpha = 0.35; draw('#2a170a'); g.restore() }
+  draw(fill)
+}
 function wcSign(who: 'm' | 'f', glow = false) {
   const key = `${who}|${glow}`
-  if (!WC_SIGN_MADE.has(key)) WC_SIGN_MADE.set(key, canvasTex(320, 192, (g) => {
+  if (!WC_SIGN_MADE.has(key)) WC_SIGN_MADE.set(key, canvasTex(480, 288, (g) => {
     g.save()
+    // (drawn half again over its laid-out size: the character's strokes stay crisp)
+    g.scale(1.5, 1.5)
     if (glow) {
       g.fillStyle = '#000'; g.fillRect(0, 0, 320, 192)
-      wcFigure(g, who, 160, 100, '#ffffff')
+      wcMark(g, who, '#ffffff')
       g.restore()
       return
     }
+    // (its edges and rim (the board's thickness and bevel take theirs from round the picture's border): end grain, a little darker)
+    g.fillStyle = '#5c3c22'; g.fillRect(0, 0, 320, 192)
     // (the board: walnut, lighter at its middle, its edge rounded off (a pale bevel above, a soft shade below), no dark rim)
     const face = new Path2D(); face.roundRect(2, 2, 316, 188, 12)
     const wood = g.createLinearGradient(0, 0, 0, 192)
@@ -1824,13 +1958,28 @@ function wcSign(who: 'm' | 'f', glow = false) {
       n.addColorStop(0, '#f6dc94'); n.addColorStop(0.6, '#b98a2e'); n.addColorStop(1, '#5a3a10')
       g.fillStyle = n; g.beginPath(); g.arc(x, 96, 6, 0, Math.PI * 2); g.fill()
     }
-    // (the figure: a faint shade under it, then the bright colour)
-    g.save(); g.translate(0, 2.5); g.globalAlpha = 0.35; wcFigure(g, who, 160, 100, '#2a170a'); g.restore()
-    wcFigure(g, who, 160, 100, WC_ICON[who])
+    // (the figure and its character: a faint shade under them, then the bright colour)
+    wcMark(g, who, WC_ICON[who], true)
     g.restore()
   }))
   return WC_SIGN_MADE.get(key) ?? null
 }
+/** the plaque's board (the owner's, 2026-11-10: it had no thickness, a picture flat on the wall): a slab of walnut WC_PLAQUE wide, high and
+ * thick, its corners rounded and its edges bevelled; its uvs laid from its face, so its edges and bevel take the picture's rim (end grain);
+ * its back on the wall at z 0, its face out along +z */
+const WC_PLAQUE = { w: 0.4, h: 0.24, d: 0.022, r: 0.016, b: 0.004 }
+const WC_PLAQUE_GEO = (() => {
+  const { w, h, d, r, b } = WC_PLAQUE
+  const x = w / 2 - b, y = h / 2 - b, q = r - b
+  const s = new THREE.Shape()
+  s.moveTo(-x + q, -y); s.lineTo(x - q, -y); s.quadraticCurveTo(x, -y, x, -y + q); s.lineTo(x, y - q); s.quadraticCurveTo(x, y, x - q, y)
+  s.lineTo(-x + q, y); s.quadraticCurveTo(-x, y, -x, y - q); s.lineTo(-x, -y + q); s.quadraticCurveTo(-x, -y, -x + q, -y)
+  const geo = new THREE.ExtrudeGeometry(s, { depth: d - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 1, curveSegments: 3 })
+  const P = geo.attributes.position as THREE.BufferAttribute, uv = geo.attributes.uv as THREE.BufferAttribute
+  for (let i = 0; i < P.count; i++) uv.setXY(i, (P.getX(i) + w / 2) / w, (P.getY(i) + h / 2) / h)
+  geo.translate(0, 0, b)
+  return geo
+})()
 
 /** a family crest (紋) in one colour, centred at x, y, `R` its radius: 梅鉢 (plum blossom: five round petals, a dot in its heart and a ring of
  * small ones round it) or 桜 (cherry blossom: five petals each notched at its tip, stamens in its heart), after the owner's two references */
@@ -3297,12 +3446,14 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
           it, up over the head (from the room seen from above, nothing of the shoji shows over it: the owner's) */}
       {/* (its pole (暖簾棒, the owner's: it seemed to hang from nothing): a round of pale wood through the cloth's top sleeve, showing in front
           of it and past its two ends, held off the head on three small dark L brackets, at its ends and in its middle) */}
+      {/* (each door's own pole, a little past its cloth and no more: the two doors' poles had run on to meet over the post between them,
+          one rod across both (the owner's, 2026-11-10); now a gap of some 5 cm there) */}
       <mesh position={[NOREN_X - 0.006, NOREN_TOP - 0.022, 0]} rotation-x={Math.PI / 2}>
-        <cylinderGeometry args={[0.011, 0.011, WC_NOREN_W + 0.1, 10]} />
+        <cylinderGeometry args={[0.011, 0.011, WC_NOREN_W + 0.04, 10]} />
         <meshToonMaterial color="#d9b884" />
       </mesh>
       {[-1, 0, 1].map((k) => (
-        <group key={k} position={[0, NOREN_TOP - 0.022, k * (WC_NOREN_W / 2 + 0.03)]}>
+        <group key={k} position={[0, NOREN_TOP - 0.022, k * (WC_NOREN_W / 2 + 0.008)]}>
           <mesh position={[(NOREN_X - 0.006 - 0.07) / 2, -0.016, 0]}><boxGeometry args={[-(NOREN_X - 0.006) - 0.07 + 0.012, 0.01, 0.016]} /><meshToonMaterial color="#3a2416" /></mesh>
           <mesh position={[NOREN_X - 0.024, -0.004, 0]}><boxGeometry args={[0.008, 0.032, 0.016]} /><meshToonMaterial color="#3a2416" /></mesh>
         </group>
@@ -3312,9 +3463,9 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
           <meshToonMaterial color="#ffffff" map={WC_NOREN[who]} side={THREE.DoubleSide} />
         </mesh>
       ))}
-      {/* the plaque over it, up on the wall clear of the noren's top */}
-      <mesh position={[-0.075, NOREN_TOP + 0.13, 0]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[0.4, 0.24]} />
+      {/* the plaque over it, up on the wall clear of the noren's top: a board with its thickness, its back on the wall's face (the frieze, at
+          -0.004; the flat picture had stood 7 cm out in front of it, where a board would be seen floating from the side) */}
+      <mesh geometry={WC_PLAQUE_GEO} position={[-0.006, NOREN_TOP + 0.13, 0]} rotation-y={-Math.PI / 2}>
         <meshToonMaterial color="#ffffff" map={wcSign(who)} emissive={WC_ICON[who]} emissiveMap={wcSign(who, true)} emissiveIntensity={0.2} />
       </mesh>
     </group>

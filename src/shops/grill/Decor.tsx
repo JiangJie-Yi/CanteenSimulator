@@ -13,6 +13,7 @@ import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { RICE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
+import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
@@ -486,7 +487,12 @@ function HeldStick({ held }: { held: RefObject<Held> }) {
 
 /** a clean iron skewer taken from its holder while researching, carried over the board to be pushed through what's there (the owner's): a
  * steel rod lying level in the hand, the way the board's skewers lie */
-const HELD_ROD = new THREE.CylinderGeometry(0.01, 0.01, 0.79, 6)
+/** (the skewer in hand: the one iron skewer (skewerShape), its middle at its origin) */
+const HELD_ROD = (() => {
+  const g = ironSkewer(0.73, 0.009, 0.004, 0.08, 0.03)
+  g.translate(0, -0.395, 0)
+  return g
+})()
 const HELD_ROD_MAT = new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.85, roughness: 0.35 })
 function HeldRod({ held }: { held: RefObject<Held> }) {
   const g = useRef<THREE.Group>(null)

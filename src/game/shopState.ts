@@ -1,4 +1,4 @@
-import { paceBoost, paceOf, TIRED_AT, type SkillId } from '@/data/staff'
+import { paceBoost, paceOf, SLACK_AFTER, TIRED_AT, type SkillId } from '@/data/staff'
 
 /**
  * Where the shop is in closing (App writes it, the scenes read it): `closing` once the owner has shut up for the day, so no
@@ -50,8 +50,10 @@ export const RATING_FLOW = { more: 1, patience: 1 }
  * (GuestBar3D's servers, stock keeper and plater; Roasting's second cook; App's cashier): App tires them by it (data/staff's activityOf) */
 export const STAFF_IDLE = new Map<string, number>()
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffIdle: STAFF_IDLE })
-export const idleTick = (id: string | undefined, idle: boolean, dt: number) => {
+// (only the stock keeper slacks, his game out (the owner's, 2026-11-10): the rest, with nothing to do, only ever stand by, their idle time
+// held short of SLACK_AFTER)
+export const idleTick = (id: string | undefined, idle: boolean, dt: number, slacks = false) => {
   if (!id) return
-  if (idle) STAFF_IDLE.set(id, (STAFF_IDLE.get(id) ?? 0) + dt)
+  if (idle) STAFF_IDLE.set(id, Math.min(slacks ? Infinity : SLACK_AFTER - 1, (STAFF_IDLE.get(id) ?? 0) + dt))
   else STAFF_IDLE.delete(id)
 }

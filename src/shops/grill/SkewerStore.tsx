@@ -5,10 +5,15 @@ import { aimTip, setTip } from '@/scene/hoverTip'
 import { SKEWER_POOL } from '@/game/skewers'
 import { tl, type Lang } from '@/data/i18n'
 import { SKEWERS } from './bar'
+import { ironSkewer } from './skewerShape'
 
-/** an iron skewer: a thin steel rod, its ring at the end */
-/** (as much of one as shows standing in a holder: they stand down in it, only their upper part out of it) */
-const ROD = new THREE.CylinderGeometry(0.0045, 0.0045, 0.2, 5, 1)
+/** an iron skewer (skewerShape: the same one as on the food, a flat bar to a point, a loop at its top for a handle), as long as shows standing
+ * in a holder (they stand point down in it, their upper part and loop out of it); its middle at its origin */
+const ROD = (() => {
+  const g = ironSkewer(0.176, 0.0045, 0.002, 0.02, 0.012)
+  g.translate(0, -0.1, 0)
+  return g
+})()
 const STEEL = new THREE.MeshStandardMaterial({ color: '#c9ccd1', metalness: 0.85, roughness: 0.35 })
 const SOOTY = new THREE.MeshStandardMaterial({ color: '#7d7a75', metalness: 0.7, roughness: 0.6 })
 

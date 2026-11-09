@@ -1,6 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { IDLE_TIRE, LATE_TIRE, ROLES, SKILLS, SLACK_AFTER, TIER_ODDS, TIRED_AT, activityOf, effective, fair, paceBoost, paceOf, restPerHour, tireNow, tirePerHour, workFatigue, type SkillId, type Worker } from '@/data/staff'
+import { STAFF_IDLE, idleTick } from '@/game/shopState'
 import { CANDIDATES, ROLLS_PER_DAY, canDismiss, canHire, makeCandidates, pickHires, refreshApplicants, replaceOf, seeded, skillDraw, statScore, valueOf, wageOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
@@ -184,5 +185,15 @@ feature('上班時忙、待命、偷閒的疲勞不同（店主要的）', () =>
       expect(50 - f).toBeLessThan(restPerHour)
     })
     and('不會低於 0', () => { expect(workFatigue(1, 10, 'slack', 5)).toBe(0) })
+  })
+})
+
+feature('偷閒只限倉儲（店主要的，2026-11-10）', () => {
+  scenario('其他人沒事做只會待命，不會偷閒', ({ given, when, then, and }) => {
+    given('一位外場、一位倉儲都沒事做', () => { STAFF_IDLE.clear() })
+    when(`都過了 ${SLACK_AFTER * 3} 秒`, () => { idleTick('server-x', true, SLACK_AFTER * 3); idleTick('stock-x', true, SLACK_AFTER * 3, true) })
+    then('外場還是待命', () => { expect(activityOf(STAFF_IDLE.get('server-x'))).toBe('idle') })
+    and('倉儲在偷閒', () => { expect(activityOf(STAFF_IDLE.get('stock-x'))).toBe('slack') })
+    and('有事做了就都不算閒著', () => { idleTick('stock-x', false, 1); expect(activityOf(STAFF_IDLE.get('stock-x'))).toBe('busy') })
   })
 })

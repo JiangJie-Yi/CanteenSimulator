@@ -23,14 +23,14 @@ import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
-import { STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
+import { STAFF_IDLE, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
-import type { Look as StaffLook } from '@/data/staff'
+import { activityOf, type Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { setTip } from '@/scene/hoverTip'
@@ -70,6 +70,7 @@ import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
 import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 import { Kabuto } from './Kabuto'
@@ -236,9 +237,11 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   const c1 = counters[1]
   const home = useMemo(() => {
     const last = fridges[fridges.length - 1]
-    // (a step out from the cartons into the aisle (the owner's: stood against them, he read as staring at the wall); and out of the gap between
-    // them and the fridge, into the open aisle (the owner's, 2026-11-10: he stood squeezed half into it))
-    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.55 - 0.5)
+    // (out from the crates and the cartons into the aisle (the owner's: stood against them, he read as staring at the wall), clear of the
+    // fridge's front and its doors, a little along from it (the owner's: squeezed half into the gap by it). The wall's at farOf (the crates
+    // 0.32 in from it): a move into the room is +lay (the last move went the other way, and stood him in the middle of the beer crates: the
+    // owner saw him sunk in a red box, 2026-11-10))
+    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.42).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.95)
   }, [c1, fridges])
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => toiletsOf(counters), [counters])
@@ -309,12 +312,15 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     }
     const set = (path: THREE.Vector3[]) => { s.path = path; s.len = pathLength(path); s.d = 0 }
     const c = s.chore
-    idleTick(who.id, s.phase === 'idle' && !SHOP.leaving, dt)
+    idleTick(who.id, s.phase === 'idle' && !SHOP.leaving, dt, true)
     if (s.phase === 'idle') {
       s.check += dt
       s.t += dt
       // (standing by: facing the room most of the while, now and then turned to the stock behind him, bent over his clipboard counting it)
-      const counting = s.t % 14 > 9
+      // (slacking at his game instead, past a while with nothing to do: the only one who does (the owner's), his status plate put away for
+      // its own badge over him)
+      const slacking = activityOf(STAFF_IDLE.get(who.id)) === 'slack'
+      const counting = !slacking && s.t % 14 > 9
       const face = counting ? Math.atan2(c1.lay.x, c1.lay.z) : Math.atan2(-c1.lay.x, -c1.lay.z)
       s.yaw += Math.atan2(Math.sin(face - s.yaw), Math.cos(face - s.yaw)) * Math.min(1, dt * 4)
       if (g.current) { g.current.userData.lean = counting ? 0.18 : 0; g.current.userData.prep = undefined }
@@ -437,14 +443,15 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       const zh = document.documentElement.lang !== 'ja' && document.documentElement.lang !== 'en', ja = document.documentElement.lang === 'ja'
       const tl3 = (a: string, b: string, e: string) => (ja ? b : zh ? a : e)
       const pct = (k: number) => ` ${Math.round(Math.min(1, k) * 100)}%`
-      const text = s.phase === 'idle' ? (s.t % 14 > 9 ? tl3('庫存清點中', '在庫チェック中', 'Counting stock') : tl3('待命', '待機中', 'Standing by'))
+      const slacking = s.phase === 'idle' && activityOf(STAFF_IDLE.get(who.id)) === 'slack'
+      const text = s.phase === 'idle' ? (s.t % 14 > 9 && !slacking ? tl3('庫存清點中', '在庫チェック中', 'Counting stock') : tl3('待命', '待機中', 'Standing by'))
         : s.phase === 'take' ? tl3('取貨中', '荷出し中', 'Picking up a case')
         : s.phase === 'back' ? tl3('返回待命', '戻り中', 'Heading back')
         : c?.kind === 'drinks' ? (s.phase === 'work' ? tl3('補貨中', '補充中', 'Restocking') + pct(s.t / 1.6) : tl3('搬運飲料中', '飲み物運搬中', 'Carrying drinks'))
         : c?.kind === 'roll' ? tl3('更換衛生紙', 'トイレ紙交換', 'Changing the toilet roll') + (s.phase === 'work' ? pct(s.t / 2.8) : '')
         : tl3('補充面紙', 'ティッシュ補充', 'Refilling tissues') + (s.phase === 'work' ? pct(s.t / 2.0) : '')
       if (el.textContent !== text) el.textContent = text
-      el.style.visibility = g.current?.visible === false || (g.current?.userData.fade ?? 1) < 0.5 ? 'hidden' : ''
+      el.style.visibility = slacking || g.current?.visible === false || (g.current?.userData.fade ?? 1) < 0.5 ? 'hidden' : ''
     }
     if (h.roll) h.roll.visible = out && c?.kind === 'roll' && !s.done
     if (h.box) h.box.visible = out && c?.kind === 'tissue' && !s.done
@@ -452,7 +459,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
   useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear(); for (const f of FRIDGE_STATE) f.stocker = false }, [])
   return (
-    <group ref={g} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id }}>
+    <group ref={g} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
       <BlobShadow r={0.17} />
       <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
       <Html position={[0, 1.95, 0]} center zIndexRange={[19, 9]} style={{ pointerEvents: 'none' }}>
@@ -2304,38 +2311,6 @@ const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
 const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.18, 5)
 /** where on a done-with plate its used sticks lie, criss-cross (as many as were eaten off it, up to four drawn) */
 const STICKS_ON = [[-0.02, 0.6], [0.015, -0.4], [-0.035, 1.3], [0.03, 0.15]] as const
-/**
- * A grilled fish's bones as they're left on the plate (the owner's): the spine, a comb of ribs either side of it, the tail fin; and the
- * head, browned. One geometry each (shared by every plate), lying along x, about 15 cm.
- */
-const BONES_GEO = (() => {
-  const parts: THREE.BufferGeometry[] = []
-  const spine = new THREE.CylinderGeometry(0.0028, 0.0022, 0.12, 5)
-  spine.rotateZ(Math.PI / 2)
-  parts.push(spine)
-  for (let i = 0; i < 7; i++) for (const sd of [-1, 1]) {
-    const len = 0.03 - Math.abs(i - 2.5) * 0.003
-    const rib = new THREE.CylinderGeometry(0.0011, 0.0007, len, 4)
-    rib.translate(0, len / 2, 0)
-    rib.rotateZ(sd * 0.5)
-    rib.rotateX(sd * Math.PI / 2)
-    rib.translate(-0.045 + i * 0.014, 0, 0)
-    parts.push(rib)
-  }
-  const tail = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.028, 0.016), new THREE.Vector2(0.022, 0), new THREE.Vector2(0.028, -0.016)]))
-  tail.rotateX(-Math.PI / 2)
-  tail.translate(0.058, 0.001, 0)
-  parts.push(tail)
-  const g = mergeGeometries(parts.map((p) => p.index ? p.toNonIndexed() : p).map((p) => { p.deleteAttribute('uv'); return p }))
-  for (const p of parts) p.dispose()
-  return g
-})()
-const HEAD_GEO = (() => {
-  const g = new THREE.IcosahedronGeometry(0.016, 1)
-  g.scale(1.3, 0.55, 0.8)
-  g.translate(-0.074, 0.004, 0)
-  return g
-})()
 /** where the bones lie on a done-with plate (as many fish as were eaten off it, up to two drawn) */
 const BONES_ON = [[0.0, -0.025, 0.25], [0.01, 0.03, -0.35]] as const
 /** a customer's emptied glass, beside the plate, cleared with it (open, a little beer foam left round its foot) */
