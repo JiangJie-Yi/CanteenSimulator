@@ -3916,8 +3916,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       }
       const duty = ownerServes ? 'all' : dutyOf(wi, nServers)
+      // (the tray at their hands wherever they are: its height is as it's held standing up on the kitchen's dais, so down on the customers'
+      // floor it comes down the dais's step with them (it stayed up, a plate riding 14 cm over their hands out on the floor))
+      const rise = KITCHEN_DROP < 0 ? -KITCHEN_DROP / scale : 0
+      const onDais = () => {
+        const d = w.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
+        return a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]
+      }
       const trayAt = () => w.pos.clone().add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE)
-        .applyAxisAngle(UP_Y, w.yaw))
+        .applyAxisAngle(UP_Y, w.yaw)).add(new THREE.Vector3(0, onDais() ? 0 : -rise, 0))
       const run = () => runs.current.find((x) => x.key === w.run)
       const setMove = (on: boolean) => setMoving((m) => { if (!!m[wi] === on) return m; const n = [...m]; n[wi] = on; return n })
       const go = (path: THREE.Vector3[], phase: WaiterPhase) => { w.path = path; w.len = pathLength(path); w.phase = phase; w.t = 0; setMove(true) }
