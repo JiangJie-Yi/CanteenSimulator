@@ -1,6 +1,9 @@
 // What the chefs and the customers say, in three languages.
 import type { Lang } from './i18n'
 
+/** one of a few ways of saying it, picked by a number (a customer's id, a count): the same customer says it the same way */
+const pick = <T,>(k: number, ways: T[]) => ways[Math.abs(Math.trunc(k)) % ways.length]
+
 /** the part of the day an hour (0..23) is in, for what's said at the till: morning 6 to 13, afternoon 14 to 17, night the rest */
 export const partOfDay = (hour: number): 'morning' | 'afternoon' | 'night' => (hour >= 6 && hour < 14 ? 'morning' : hour >= 14 && hour < 18 ? 'afternoon' : 'night')
 
@@ -52,7 +55,12 @@ const ZH = {
   orphanAgain: (n: string) => `運氣太好了！這份熱騰騰的${n}剛好有客人點，直接送上！`,
 
   // 客人點餐與反應（移除前置編號 #ID）
-  order: (_id: number, names: string[]) => `老闆！先來一份${names.join('、')}，現烤最讚！`,
+  order: (id: number, names: string[]) => pick(id, [
+    `老闆！先來一份${names.join('、')}，現烤最讚！`,
+    `我要${names.join('、')}！聞到炭香就忍不住了～`,
+    `麻煩來個${names.join('、')}，火候交給老闆了！`,
+    `今天就點${names.join('、')}吧，聽說這家烤得超香！`,
+  ]),
   nothing: (_id: number) => `看了一圈沒有特別對胃口的…下次路過再來試試！`,
   wcDirty: (_id: number) => `哇…這洗手間地板跟馬桶有點嚇人，該打掃啦！`,
   wcPaper: (_id: number) => `救命啊！廁所裡居然連一張衛生紙都沒有了？！`,
@@ -80,36 +88,46 @@ const ZH = {
   riceDone: '[內場] 呼～新潟越光米剛炊熟！粒粒分明、米香撲鼻！',
 
   // 結帳與離店
-  payGo: (_id: number, k: number) => [
+  payGo: (_id: number, k: number) => pick(k, [
     '肚子飽到不行！老闆，買單～！',
     '吃得太過癮了！來去櫃檯算一下帳！',
-  ][Math.abs(k) % 2],
-  payThanks: (_id: number, k: number) => [
+    '最後一口收工！差不多該結帳了。',
+    '撐死我了……老闆，麻煩算一下！',
+  ]),
+  payThanks: (_id: number, k: number) => pick(k, [
     '多謝款待！烤魚油脂豐厚超下酒，下次一定揪朋友來！',
     'ごちそうさまでした！水準真的高，太美味了！',
-  ][Math.abs(k) % 2],
+    '吃完整個人都暖起來了，謝謝老闆！',
+    '這家我記住了，下班還要再來！',
+  ]),
   // (by the game's hour (the owner's: "late at night, mind the road" at half past eight in the morning): morning to 13:59, afternoon to
   // 17:59, night the rest)
   cashierThanks: (bill: string, hour = 20) => `非常感謝您的捧場！一共是 ${bill}，${partOfDay(hour) === 'morning' ? '祝您今天用餐愉快、上班加油喔！' : partOfDay(hour) === 'afternoon' ? '午後微風正好，慢走喔！' : '夜深了路上小心慢走喔！'}`,
-  wcBack: (_id: number, k: number) => [
+  wcBack: (_id: number, k: number) => pick(k, [
     '呼～神清氣爽！滿血復活，繼續開吃！',
     '洗完手了，這撲鼻的炭烤香氣真受不了！',
-  ][Math.abs(k) % 2],
-  angry: (_id: number) => `等得我都快餓暈了！到底還要多久？不吃了，退單！`,
+    '回來啦～我的菜應該還熱著吧？',
+    '輕鬆多了！再來一輪也沒問題！',
+  ]),
+  angry: (id: number) => pick(id, [
+    `等得我都快餓暈了！到底還要多久？不吃了，退單！`,
+    `菜一直不來，我先走了，下次再說吧！`,
+    `再等下去天都亮了……算了，換一家！`,
+  ]),
   dark: (_id: number) => `怎麼瞬間眼前一片黑？！跳電還是打烊啦？`,
   darkGone: (_id: number) => `伸手不見五指黑漆漆的，連魚刺都看不見怎麼吃？走人了！`,
   // (every stool taken: sat on the bench in the genkan to wait a turn; waited too long there, off)
-  benchWait: (_id: number) => `客滿了啊⋯⋯那我在這邊坐著等一下。`,
-  benchGone: (_id: number) => `等不到位子，下次再來吧。`,
-  verdict: (_id: number, n: string, stars: number) => {
+  benchWait: (id: number) => pick(id, [`客滿了啊⋯⋯那我在這邊坐著等一下。`, `生意真好！我坐這裡排一下。`, `沒位子了？那我等等，一定要吃到！`]),
+  benchGone: (id: number) => pick(id, [`等不到位子，下次再來吧。`, `還是沒空位……改天早點來好了。`, `肚子等不及了，先去別家！`]),
+  verdict: (id: number, n: string, stars: number) => {
     const comments = [
-      '火候好像沒控制好…有點失望。',
-      '普普通通，就是一般居酒屋的味道。',
-      '烤得滿香的，吃起來挺順口！',
-      '外酥內嫩、肉汁全鎖住了！好好吃！',
-      '天啊這炭香跟肉質！簡直是極品神作！太幸福了！',
+      ['火候好像沒控制好…有點失望。', '有點焦苦，跟想像的不太一樣。'],
+      ['普普通通，就是一般居酒屋的味道。', '還可以啦，沒什麼特別的。'],
+      ['烤得滿香的，吃起來挺順口！', '炭香不錯，配啤酒剛好！'],
+      ['外酥內嫩、肉汁全鎖住了！好好吃！', '這火候抓得真準，一口接一口！'],
+      ['天啊這炭香跟肉質！簡直是極品神作！太幸福了！', '這是我吃過最好吃的烤物，沒有之一！'],
     ]
-    return `這道${n}…${comments[Math.max(0, Math.min(4, stars - 1))]}`
+    return `這道${n}…${pick(id, comments[Math.max(0, Math.min(4, stars - 1))])}`
   },
   sick: (_id: number, n: string) => `唔…這盤${n}味道怪怪的…肚子一陣絞痛！洗手間在哪裡啊啊！`,
   trial: (who: string, names: string[]) => `【試菜研發】${who}端出了全新私房菜：${names.join('、')}！已謄錄在研發秘笈！`,
@@ -163,7 +181,12 @@ const JA: typeof ZH = {
   orphanAgain: (n: string) => `ツイてる！${n}の注文がちょうど入った、出来立てをそのまま出そう！`,
 
   // 客の注文と反応（ID番号除去）
-  order: (_id, names) => `大将！${names.join('と')}を焼いてくれ、楽しみにしてるよ！`,
+  order: (id, names) => pick(id, [
+    `大将！${names.join('と')}を焼いてくれ、楽しみにしてるよ！`,
+    `${names.join('と')}ください！炭の匂いでもう我慢できない～`,
+    `${names.join('と')}お願い！焼き加減は大将にお任せで！`,
+    `今日は${names.join('と')}にしよう、ここのは香ばしいって評判だし！`,
+  ]),
   nothing: (_id) => `うーん、今日はピンとくるものがないな…また寄らせてもらうよ！`,
   wcDirty: (_id) => `おっと…トイレの床がちょっと汚れてるな。掃除した方がいいかも。`,
   wcPaper: (_id) => `大変だ！トイレットペーパーが完全に切れてるぞ？！`,
@@ -191,33 +214,43 @@ const JA: typeof ZH = {
   riceDone: '[厨房] 新潟産コシヒカリがふっくら艶やかに炊き上がりました！',
 
   // 会計と退店
-  payGo: (_id, k) => [
+  payGo: (_id, k) => pick(k, [
     'お腹いっぱい大満足！大将、お勘定頼むよ！',
     'いやあ食った食った！レジで会計しようか！',
-  ][Math.abs(k) % 2],
-  payThanks: (_id, k) => [
+    '最後の一口ごちそうさま！そろそろお会計で。',
+    'もう食べられない……大将、お勘定！',
+  ]),
+  payThanks: (_id, k) => pick(k, [
     'ごちそうさま！焼き魚の脂の乗りが最高だったよ、また来るね！',
     '大将、絶品だったよ！今度は仲間を連れて食べに来るよ！',
-  ][Math.abs(k) % 2],
+    '体の芯まで温まったよ、ありがとう！',
+    'この店、覚えたよ。仕事帰りにまた寄るね！',
+  ]),
   cashierThanks: (bill, hour = 20) => `ありがとうございました！お会計は${bill}になります。${partOfDay(hour) === 'morning' ? 'いってらっしゃいませ、良い一日を！' : partOfDay(hour) === 'afternoon' ? '午後もどうぞお気をつけて！' : '夜道お気をつけて！'}`,
-  wcBack: (_id, k) => [
+  wcBack: (_id, k) => pick(k, [
     'ふぅ～すっきりした！さあ、焼き魚の続きを平らげるぞ！',
     'さっぱりした！香ばしい匂いに胃袋がまた刺激されるな！',
-  ][Math.abs(k) % 2],
-  angry: (_id) => `待たせすぎだ！腹ペコで倒れちまうよ！もう帰る、キャンセルだ！`,
+    'ただいま～料理まだ温かいかな？',
+    'すっきり！これでまだまだ食べられるぞ！',
+  ]),
+  angry: (id) => pick(id, [
+    `待たせすぎだ！腹ペコで倒れちまうよ！もう帰る、キャンセルだ！`,
+    `全然出てこないな、今日は帰るよ！`,
+    `これ以上待ったら夜が明けちまう……他の店に行くわ！`,
+  ]),
   dark: (_id) => `うわっ、急に真っ暗？！停電か？それとも閉店かい？`,
   darkGone: (_id) => `一寸先も闇じゃ魚の骨も見えやしない！お暇させてもらうよ！`,
-  benchWait: (_id) => `満席かぁ⋯⋯じゃあここで座って待つよ。`,
-  benchGone: (_id) => `席が空かないな、また今度にするよ。`,
-  verdict: (_id, n, stars) => {
+  benchWait: (id) => pick(id, [`満席かぁ⋯⋯じゃあここで座って待つよ。`, `繁盛してるね！ここで順番待ちするよ。`, `席がない？じゃあ待つよ、絶対食べたいし！`]),
+  benchGone: (id) => pick(id, [`席が空かないな、また今度にするよ。`, `やっぱり空かないか……次は早めに来よう。`, `腹が限界だ、他を当たるよ！`]),
+  verdict: (id, n, stars) => {
     const comments = [
-      'ちょっと焼き加減が微妙だったかな…',
-      'まあ、普通の居酒屋クオリティだね。',
-      '香ばしくてなかなか旨いよ！',
-      '皮パリ中ジューシー！これはうまい！',
-      '言葉が出ないほど絶品！炭火の魔術師かよ、最高だ！',
+      ['ちょっと焼き加減が微妙だったかな…', '少し焦げて苦いな、思ってたのと違う。'],
+      ['まあ、普通の居酒屋クオリティだね。', '悪くはないけど、特別でもないかな。'],
+      ['香ばしくてなかなか旨いよ！', '炭の香りがいいね、ビールに合う！'],
+      ['皮パリ中ジューシー！これはうまい！', '焼き加減が絶妙、箸が止まらない！'],
+      ['言葉が出ないほど絶品！炭火の魔術師かよ、最高だ！', '今まで食べた焼き物で一番うまい！'],
     ]
-    return `この${n}…${comments[Math.max(0, Math.min(4, stars - 1))]}`
+    return `この${n}…${pick(id, comments[Math.max(0, Math.min(4, stars - 1))])}`
   },
   sick: (_id, n) => `うっ…この${n}、なんか傷んでないか…お腹が激痛だ、トイレどこだーっ！`,
   trial: (who, names) => `【新作開発】${who}が自慢の逸品を考案：${names.join('、')}！レシピ帖に記録完了！`,
@@ -271,7 +304,12 @@ const EN: typeof ZH = {
   orphanAgain: (n: string) => `What luck! An order just rolled in for ${n}—send it out piping hot!`,
 
   // Customer Ordering & Feedback (Stripped #ID prefix)
-  order: (_id, names) => `Chef! We’ll start with ${names.join(', ')}, fresh off the coals!`,
+  order: (id, names) => pick(id, [
+    `Chef! We’ll start with ${names.join(', ')}, fresh off the coals!`,
+    `${names.join(', ')}, please! That charcoal smell is too much~`,
+    `Could I get ${names.join(', ')}? I’ll leave the grilling to you!`,
+    `I’ll go with ${names.join(', ')} today, heard it’s the best here!`,
+  ]),
   nothing: (_id) => `Nothing catching my eye right now... Catch you next time!`,
   wcDirty: (_id) => `Yikes... the restroom floor is rather grimy. Needs a scrub!`,
   wcPaper: (_id) => `Emergency! There is not a single scrap of toilet paper in here?!`,
@@ -299,33 +337,43 @@ const EN: typeof ZH = {
   riceDone: '[Kitchen] Freshly steamed Koshihikari rice is ready! Fluffy and fragrant!',
 
   // Checkout & Departure
-  payGo: (_id, k) => [
+  payGo: (_id, k) => pick(k, [
     'Bursting at the seams! Check please, Chef!',
     'What a feast! Let’s head to the register and settle up!',
-  ][Math.abs(k) % 2],
-  payThanks: (_id, k) => [
+    'Last bite done! Time to pay up.',
+    'I can’t eat another thing… check, please!',
+  ]),
+  payThanks: (_id, k) => pick(k, [
     'Thanks for the feast! The fish was grilled to perfection, definitely coming back!',
     'Gochisousama! Top-notch grilling, bringing the whole crew next time!',
-  ][Math.abs(k) % 2],
+    'Warmed me right through. Thank you, Chef!',
+    'I’m remembering this place. Back after work for sure!',
+  ]),
   cashierThanks: (bill, hour = 20) => `Thank you so much! Your total comes to ${bill}. ${partOfDay(hour) === 'morning' ? 'Have a great day!' : partOfDay(hour) === 'afternoon' ? 'Enjoy the rest of your afternoon!' : 'Get home safe tonight!'}`,
-  wcBack: (_id, k) => [
+  wcBack: (_id, k) => pick(k, [
     'Whew, refreshed and recharged! Back to the grilled fish feast!',
     'All washed up! That charcoal smoke aroma has my appetite roaring again!',
-  ][Math.abs(k) % 2],
-  angry: (_id) => `This is ridiculous, I’m starving here! Cancel my order, I’m out!`,
+    'I’m back~ hope my food’s still warm!',
+    'Much better! Ready for another round!',
+  ]),
+  angry: (id) => pick(id, [
+    `This is ridiculous, I’m starving here! Cancel my order, I’m out!`,
+    `Nothing’s coming out. I’m off, maybe next time!`,
+    `At this rate it’ll be dawn… I’m trying somewhere else!`,
+  ]),
   dark: (_id) => `Whoa, lights out?! Did a breaker flip or are we closing?!`,
   darkGone: (_id) => `Pitch black in here—can’t even see the fish bones! I’m out!`,
-  benchWait: (_id) => `Full up, huh… I’ll sit here and wait my turn.`,
-  benchGone: (_id) => `No seat coming free. Another time, then.`,
-  verdict: (_id, n, stars) => {
+  benchWait: (id) => pick(id, [`Full up, huh… I’ll sit here and wait my turn.`, `Busy place! I’ll wait here in line.`, `No seats? I’ll wait, I really want to eat here!`]),
+  benchGone: (id) => pick(id, [`No seat coming free. Another time, then.`, `Still nothing… I’ll come earlier next time.`, `I’m too hungry to wait, trying elsewhere!`]),
+  verdict: (id, n, stars) => {
     const comments = [
-      'Heat control was a bit off... disappointing.',
-      'Pretty average, standard tavern fare.',
-      'Nicely charred and tasty enough!',
-      'Crispy skin, tender and juicy inside! Delicious!',
-      'Out of this world! Pure grilling magic, absolute perfection!',
+      ['Heat control was a bit off... disappointing.', 'A bit burnt and bitter, not what I hoped.'],
+      ['Pretty average, standard tavern fare.', 'Not bad, nothing special either.'],
+      ['Nicely charred and tasty enough!', 'Lovely smoky flavour, great with a beer!'],
+      ['Crispy skin, tender and juicy inside! Delicious!', 'Grilled just right, I can’t stop eating!'],
+      ['Out of this world! Pure grilling magic, absolute perfection!', 'The best grilled food I’ve ever had, hands down!'],
     ]
-    return `This ${n}... ${comments[Math.max(0, Math.min(4, stars - 1))]}`
+    return `This ${n}... ${pick(id, comments[Math.max(0, Math.min(4, stars - 1))])}`
   },
   sick: (_id, n) => `Ugh... that ${n} tasted funky... My stomach is cramping! Restroom, stat!`,
   trial: (who, names) => `[Culinary R&D] ${who} concocted an inventive new recipe: ${names.join(', ')}! Saved to notebook!`,
