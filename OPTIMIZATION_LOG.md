@@ -39,7 +39,7 @@
 | 14:50 | 滑鼠指著東西的標籤（新增 `data/tipText.ts`、`ui/HoverTip.tsx`） | 3D 裡的名稱標籤多半直接寫中文，日文、英文介面也是中文 → 畫標籤時照網頁語言查對照表（約 120 句＋帶數字的句型），沒列到的照舊 | BDD `tip-text`；英文、日文各實際指一次飯桶：Rice tub／おひつ | — |
 | 15:01 | 英文介面的其他面板（`Notebook.tsx`、`DiningRoom.tsx`、`data/tipText.ts`） | 研發筆記整個檔案只有中、日兩種（英文顯示中文）；飲料櫃瓶子名稱只有中文；庫存類的動態標籤（根莖蔬菜各幾份、白米、炭麻袋、清酒）沒有翻 → 補英文、照網頁語言取名稱、補句型 | 英文廚房頁截圖；`_wraps.mjs` 三種語言 0 處斷行；BDD `tip-text` | — |
 
-## 15:15 — 二廚聽懂英文指令（i18n）
+## 15:12 — 二廚聽懂英文指令（i18n）
 - 模組：`src/game/chefChat.ts` 的 `understand`
 - 原因：快捷鈕在英文介面送出英文句子（Make a 10-dish menu、Try 3 at random、Enough stock?、Any recommendations?），解析只認中日文的關鍵字，二廚只回一句「You say, I grill…」。
 - 修正：菜單、庫存、隨便試幾道、推薦、交給你決定都加上英文；份數也認 10-dish、3 dishes、3 at random。
@@ -51,23 +51,23 @@
 - 修正：食材英文名開頭的那個字就是菜名已經說過的調味時拿掉（只在那份調味有加時）。
 - 驗證：BDD `dish-names` 新情境；`npm test` 413 過。
 
-## 15:40 — 員工名字在英文介面拼成英文
+## 15:28 — 員工名字在英文介面拼成英文
 - 模組：`src/data/people.ts` 的 `personName`、`JP_ROMAJI`、`TW_ROMAN`；App、經營頁顯示名字的地方
 - 原因：英文介面裡員工、說話者標籤、二廚在筆記本的名字仍是漢字（太田 健二、林冠鈞）。
 - 修正：顯示時拼出來（不改存檔）：日本名照平文式羅馬字、台灣名照護照的威妥瑪拼法，名在前、姓在後（Kenji Ota、Kuan-chun Lin）。
 - 驗證：BDD `person-names`（詞庫裡每個姓、名、字都拼得出來）；`_nbnames.mjs` 英文：「Yuto Aoki and Tomoko Mori put together 10 dishes」；`_wraps.mjs` 三種語言 0 處斷行；`npm test` 全過。
 
-## 15:55 — 英文介面掃描：剩下的中文
+## 15:32 — 英文介面掃描：剩下的中文
 - 工具：`tests/e2e/_cjk.mjs`（在 git 外：英文介面打開每個面板與頁籤，列出畫面上還有中日文字的元素）
 - 找到並修好：開發者模式的十三件擺設沒有英文名（兩扇閘門、刀具組、逃生出口燈、收銀凳……：`editText.ts` 的 `PIECES_EN`）；左下 Dock 的「開發工具」「角色預覽」只在第一次建立時寫字，之後換語言不變（`edit.ts` 的 `dockLang`）；換語言時老闆頭上那句舊語言的話留著（`Boss.tsx` 換語言時收掉）；經營頁的「M・40yrs」用日文中點，英文改成「M, 40 yrs」、天賦標籤「Elite: …」。
 - 驗證：`_cjk.mjs` 只剩語言鈕上的「中」（刻意的：按下去換到中文）；`_wraps.mjs` 英文 0 處斷行；`npm test` 415 過。
 
-## 16:20 — 英文營業中的掃描
+## 15:37 — 英文營業中的掃描
 - 工具：`tests/e2e/_cjkopen.mjs`（在 git 外：英文介面自動營運開店，每 3 秒收集畫面上帶中日文字的元素，`SHOT=` 截圖）
 - 找到並修好：試做時飄出的「美味 +n」（英文 Taste +n，`Roasting.tsx` 的 `pop`）；菜單直條的價格是漢數字（英文用阿拉伯數字，原本就有的英文規則讓它橫寫）；英文菜單卡名字下面又重複一行同樣的英文小字（英文不畫，`tagFit` 也不算它）；日誌與說話者後面用全形冒號「：」（英文用 ": "）；「took from the fridge Bottled beer」改成「took a bottled beer from the fridge」。
 - 驗證：`_cjkopen.mjs` 開店 2.5 分鐘 0 處；截圖看過菜單與日誌；`npm test` 415 過。
 
-## 16:40 — 日文日誌的點菜語序
+## 15:41 — 日文日誌的點菜語序
 - 工具：`tests/e2e/_jpopen.mjs`、`_jplog.mjs`（在 git 外：日文介面開店，找只有中文會用的字、列出日誌每一行）
 - 原因：點菜與拿飲料的日誌照中文的語序拼（「小学生「から 塩・レモン焼き秋刀魚」」「が冷蔵庫から 生ビール」）。
 - 修正：App 的 `ordered`：中文「點了 X」、日文「Xを注文」、英文「ordered X」；拿飲料日文「冷蔵庫からXを取った」。
