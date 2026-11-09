@@ -38,3 +38,9 @@
 | 14:46 | 英文庫存卡片、結算（`StockPanel.tsx`） | 英文時卡片名稱下面又寫一次英文名（Ayu／Ayu） → 英文時那一行留白（卡片高度不變）；英文打烊結算、帳簿、店家評價看過都是英文 | 英文庫存、帳簿、評價、結算截圖 | — |
 | 14:50 | 滑鼠指著東西的標籤（新增 `data/tipText.ts`、`ui/HoverTip.tsx`） | 3D 裡的名稱標籤多半直接寫中文，日文、英文介面也是中文 → 畫標籤時照網頁語言查對照表（約 120 句＋帶數字的句型），沒列到的照舊 | BDD `tip-text`；英文、日文各實際指一次飯桶：Rice tub／おひつ | — |
 | 15:01 | 英文介面的其他面板（`Notebook.tsx`、`DiningRoom.tsx`、`data/tipText.ts`） | 研發筆記整個檔案只有中、日兩種（英文顯示中文）；飲料櫃瓶子名稱只有中文；庫存類的動態標籤（根莖蔬菜各幾份、白米、炭麻袋、清酒）沒有翻 → 補英文、照網頁語言取名稱、補句型 | 英文廚房頁截圖；`_wraps.mjs` 三種語言 0 處斷行；BDD `tip-text` | — |
+
+## 15:15 — 二廚聽懂英文指令（i18n）
+- 模組：`src/game/chefChat.ts` 的 `understand`
+- 原因：快捷鈕在英文介面送出英文句子（Make a 10-dish menu、Try 3 at random、Enough stock?、Any recommendations?），解析只認中日文的關鍵字，二廚只回一句「You say, I grill…」。
+- 修正：菜單、庫存、隨便試幾道、推薦、交給你決定都加上英文；份數也認 10-dish、3 dishes、3 at random。
+- 驗證：BDD `chef-chat`（三種語言的快捷鈕意思一樣、英文點 salt-grilled corn）；`npm test` 412 過；`_nbnames.mjs` 英文按「Make a 10-dish menu」排出 10 道英文菜名並上架。

@@ -100,26 +100,27 @@ export function understand(text: string, d: Dish): Intent {
   const plain = /原味|什麼都不加|不加|不要加|素烤|白燒|白焼|そのまま|何もつけ/.test(s)
   const dabs: Seasoning[] | null = hit?.dabs?.length ? [...new Set([...hit.dabs, ...said])]
     : said.length ? said : plain || hit?.dabs ? [] : null
-  const asks = /推薦|建議|什麼好|配什麼|加什麼|怎麼(做|烤|弄)|意見|好吃嗎|適合|搭嗎|搭不搭|呢[？?]?$|おすすめ|何が(いい|合う)|どう(する|かな)|\?|？/.test(s)
-  const wants = /做|烤|試|來|弄|煮|炸|作って|焼いて|お願い|ください|頼む|make|cook|try/.test(s)
-  const count = s.match(/(\d+|[一兩二三四五六七八九十])\s*(道|樣|個|種|品|款)/)
+  const asks = /推薦|建議|什麼好|配什麼|加什麼|怎麼(做|烤|弄)|意見|好吃嗎|適合|搭嗎|搭不搭|呢[？?]?$|おすすめ|何が(いい|合う)|どう(する|かな)|recommend|suggest|what goes|\?|？/.test(s)
+  const wants = /做|烤|試|來|弄|煮|炸|作って|焼いて|お願い|ください|頼む|make|cook|try|grill/.test(s)
+  // (how many: 3 道, 3品, and in English 3 dishes, a 10-dish …, 3 at random)
+  const count = s.match(/(\d+|[一兩二三四五六七八九十])\s*(道|樣|個|種|品|款)/) ?? s.match(/(\d+)(?:\s*-?\s*(?:dishes|dish|plates?|kinds?)(?![a-z])|\s+at random)/)
   if (hit) {
     if (asks && !said.length && !(hit.dabs?.length)) return { kind: 'advise', id: hit.id }
     return { kind: 'make', id: hit.id, dabs: dabs?.slice(0, 3) ?? null }
   }
-  if (/庫存|材料|食材|還有多少|夠不夠|在庫|仕入れ/.test(s)) return { kind: 'stock' }
+  if (/庫存|材料|食材|還有多少|夠不夠|在庫|仕入れ|stock|ingredients|supplies/.test(s)) return { kind: 'stock' }
   // 「一鍵生成菜單」「幫我排個菜單」「メニューを作って」
-  if (/(生成|排|開|做|擬|定|弄|設計|組).{0,3}菜單|菜單.{0,3}(生成|排|做|定)|一鍵|メニュー(を|作)/.test(s)) {
-    const m = s.match(/(\d+|[一兩二三四五六七八九十])\s*(道|樣|個|品|種)/)
+  if (/(生成|排|開|做|擬|定|弄|設計|組).{0,3}菜單|菜單.{0,3}(生成|排|做|定)|一鍵|メニュー(を|作)|(^|[^a-z])menu($|[^a-z])/.test(s)) {
+    const m = count
     return { kind: 'menu', n: Math.max(1, Math.min(20, (m && (Number(m[1]) || NUMBERS[m[1]])) || 10)) }
   }
-  if (count && (wants || /隨便|你看|你決定|任せ/.test(s))) {
+  if (count && (wants || /隨便|你看|你決定|任せ|random|you pick|your choice/.test(s))) {
     const n = Number(count[1]) || NUMBERS[count[1]] || 3
     return { kind: 'batch', n: Math.max(1, Math.min(5, n)) }
   }
-  if (/隨便|都來|各來|每樣|全部來|什麼都好/.test(s)) return { kind: 'batch', n: 3 }
+  if (/隨便|都來|各來|每樣|全部來|什麼都好|at random|surprise me/.test(s)) return { kind: 'batch', n: 3 }
   // left to him, one dish: 「你決定」「交給你」「幫我客製化」「你的拿手菜」
-  if (/客製|你決定|你看著辦|交給你|你來配|你配|你安排|你挑|你拿手|拿手菜|招牌|都可以|隨意|自由發揮|任せ|おまかせ/.test(s)) return { kind: 'batch', n: 1 }
+  if (/客製|你決定|你看著辦|交給你|你來配|你配|你安排|你挑|你拿手|拿手菜|招牌|都可以|隨意|自由發揮|任せ|おまかせ|up to you|you choose|your choice|you pick|speciality|specialty/.test(s)) return { kind: 'batch', n: 1 }
   // a kind of food
   const shop = new Set(cookable(d).map((x) => x.id))
   for (const food of FOOD_KINDS) {
