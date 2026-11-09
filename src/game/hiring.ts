@@ -152,6 +152,10 @@ export function pickHires(people: Worker[], roles: { role: Role; max: number }[]
   return out
 }
 
+/** who's let go to take on someone new in a job that's full (the owner's: 雇用並替換): the weakest there by skill, speed and stamina */
+export const replaceOf = <W extends { skill: number; speed: number; stamina: number }>(mine: W[]): W | null =>
+  mine.reduce<W | null>((low, w) => (!low || statScore(w) < statScore(low) ? w : low), null)
+
 /** whether someone can be let go now: not while the shop's open (there are customers in, and the hands can't just walk off mid-service) */
 export const canDismiss = (shopOpen: boolean) => !shopOpen
 /** whether someone can be taken on now: any time (a hand called in to help mid-service is fine) */

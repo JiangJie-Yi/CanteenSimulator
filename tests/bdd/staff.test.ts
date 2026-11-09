@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { LATE_TIRE, ROLES, SKILLS, TIER_ODDS, TIRED_AT, effective, fair, paceBoost, paceOf, restPerHour, tireNow, tirePerHour, type SkillId, type Worker } from '@/data/staff'
-import { CANDIDATES, ROLLS_PER_DAY, canDismiss, canHire, makeCandidates, pickHires, refreshApplicants, seeded, skillDraw, valueOf, wageOf } from '@/game/hiring'
+import { CANDIDATES, ROLLS_PER_DAY, canDismiss, canHire, makeCandidates, pickHires, refreshApplicants, replaceOf, seeded, skillDraw, statScore, valueOf, wageOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
   scenario('營業中不能解雇員工，閉店後才可以', ({ given, when, then, and }) => {
@@ -150,5 +150,19 @@ feature('員工與徵人', () => {
     })
     when('再一鍵徵人', (w) => { w.more = pickHires(w.people, w.roles, w.hired) })
     then('沒有人被加進來', (w) => { expect(w.more).toEqual([]) })
+  })
+
+  scenario('滿員時雇用應徵者，替換掉同職位裡能力最弱的那位', ({ given, when, then, and }) => {
+    given('外場已經雇滿', (w) => {
+      w.people = makeCandidates('grilledfish', seeded(11))
+      w.mine = (w.people as Worker[]).filter((p) => p.role === 'server').slice(0, 4)
+      w.newcomer = (w.people as Worker[]).filter((p) => p.role === 'server')[5]
+    })
+    when('雇用一位新的外場並替換', (w) => { w.out = replaceOf(w.mine) })
+    then('被換掉的是在職外場裡手藝、速度、體力綜合最低的', (w) => {
+      const low = Math.min(...(w.mine as Worker[]).map(statScore))
+      expect(statScore(w.out)).toBe(low)
+    })
+    and('沒有人在職時沒有人可換', () => { expect(replaceOf([])).toBeNull() })
   })
 })

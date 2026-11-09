@@ -5,7 +5,7 @@ import { useDrag } from './useDrag'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
-import { CANDIDATES, pickHires, ROLLS_PER_DAY } from '@/game/hiring'
+import { CANDIDATES, pickHires, replaceOf, ROLLS_PER_DAY } from '@/game/hiring'
 import { DiceIcon, Glyph, SkillIcon } from './GameIcons'
 import { setTip } from '@/scene/hoverTip'
 import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts'
@@ -62,7 +62,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   // (English for what has it; the rest falls back to the Chinese)
   const EN: Record<string, string> = { 一鍵徵人: 'Hire all', 人事: 'Staff', '大廚（你）': 'Head chef (you)', 女: 'F', 廚房: 'Kitchen', 手藝: 'Skill', 歲: 'yrs',
     每個空缺各雇一位最划算的人: 'Fill every opening with the best-value hire', '營業中不能解雇，請先閉店': 'Can’t dismiss while open: close first', 現金: 'Cash',
-    男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 體力: 'Stamina', 點我徵人: 'Hiring',
+    男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 替換: 'Swap in', '營業中不能替換，請先閉店': 'Not while open: close the shop first', 體力: 'Stamina', 點我徵人: 'Hiring',
     關閉: 'Close', 大廚: 'Head chef' }
   // (each job's name in English: the roster's, the cards' headings)
   const ROLE_EN: Record<string, string> = { chef: 'Sous chef', sous: 'Prep cook', server: 'Floor', cashier: 'Cashier', stock: 'Stockroom' }
@@ -193,8 +193,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                     </div>
                     <div className="ofc-hire">
                       <b className="money">{money(w.wage)}<small>/h</small></b>
-                      <button type="button" disabled={mine.length >= r.max * 2} onClick={() => onHire(w)}
-                        title={mine.length >= r.max * 2 ? t('這個職位已經滿了，先解雇一位才能雇用', '枠がいっぱいです') : undefined}>{mine.length >= r.max * 2 ? t('滿員', '満員') : t('雇用', '雇う')}</button>
+                      {mine.length < r.max * 2
+                        ? <button type="button" onClick={() => onHire(w)}>{t('雇用', '雇う')}</button>
+                        // (the job full: taken on in place of the weakest there (the owner's: 雇用並替換); not while the shop's open, as firing isn't)
+                        : (() => {
+                            const out = replaceOf(mine), can = !!out && canDismiss(shopOpen)
+                            return <button type="button" className="is-swap" disabled={!can} onClick={() => { if (out && can) { onFire(out); onHire(w) } }}
+                              title={!can ? t('營業中不能替換，請先閉店', '営業中は入れ替えできません') : (lang === 'en' ? `Hire in place of ${out!.zh}, the weakest here` : t(`雇用並替換 ${out!.zh}（同職位能力最弱）`, `${out!.ja} と入れ替えて雇う`))}>{t('替換', '入替')}</button>
+                          })()}
                     </div>
                   </div>
                 ))}

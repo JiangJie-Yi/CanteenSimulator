@@ -4504,7 +4504,7 @@ button {
   font-size: 10px;
 }
 
-.ofc-person .ofc-hire button:not(:disabled) {
+.ofc-person .ofc-hire button:not(:disabled, .is-swap) {
   background: #c4442f !important;
   color: #fff !important;
 }
@@ -4911,7 +4911,15 @@ button {
 .ofc-person .ofc-hire button:not(:disabled):hover {
   background: #a8352a;
 }
-/* (the job full: who could fill it still shown, their button a quiet 滿員) */
+/* (the job full: taken on in place of the weakest there, 替換: the deep wood amber of the shift switch, not the hire's red) */
+.ofc-person .ofc-hire button.is-swap:not(:disabled) {
+  border-color: #6b4423;
+  background: #8a5a2b;
+}
+.ofc-person .ofc-hire button.is-swap:not(:disabled):hover {
+  background: #6b4423;
+}
+/* (the job full while open: who could fill it still shown, their button quiet) */
 .ofc-person .ofc-hire button:disabled {
   border-color: rgb(59 42 32 / 0.2);
   background: rgb(59 42 32 / 0.08);
