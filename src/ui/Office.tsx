@@ -61,8 +61,10 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
+  // (what runs between two words: ・ in Chinese and Japanese, a comma in English)
+  const dot = lang === 'en' ? ', ' : '・'
   // (English for what has it; the rest falls back to the Chinese)
-  const EN: Record<string, string> = { 一鍵徵人: 'Hire all', 人事: 'Staff', '大廚（你）': 'Head chef (you)', 女: 'F', 廚房: 'Kitchen', 手藝: 'Skill', 歲: 'yrs',
+  const EN: Record<string, string> = { 一鍵徵人: 'Hire all', 人事: 'Staff', '大廚（你）': 'Head chef (you)', 女: 'F', 廚房: 'Kitchen', 手藝: 'Skill', 歲: ' yrs',
     每個空缺各雇一位最划算的人: 'Fill every opening with the best-value hire', '營業中不能解雇，請先閉店': 'Can’t dismiss while open: close first', 現金: 'Cash',
     男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 全: 'All', 班別: 'Shift', 疲勞: 'Tired', 空缺: 'Open', '能力減半・動作變慢': 'Half as able, slower', 替換: 'Swap in', '營業中不能替換，請先閉店': 'Not while open: close the shop first', 體力: 'Stamina', 點我徵人: 'Hiring',
     關閉: 'Close', 大廚: 'Head chef' }
@@ -104,7 +106,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
             <div className="ofc-roster-group">
               <span className="ofc-roster-role">{t('大廚', '大将')}</span>
               <span className="ofc-roster-seats">
-                <span className="ofc-seat is-owner" title={`${owner || t('老闆', '店主')}・${t('大廚（你）', '大将（あなた）')}`}>
+                <span className="ofc-seat is-owner" title={`${owner || t('老闆', '店主')}${dot}${t('大廚（你）', '大将（あなた）')}`}>
                   <Avatar id="owner" look={{ female: false, age: 'middle' }} role="owner" size={38} />
                 </span>
               </span>
@@ -167,7 +169,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                       <span className="ofc-energy" title={t('精神', '元気')}>
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
-                      <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}{isTired(hired[w.id].fatigue) && <em className="ofc-tired" title={t('能力減半・動作變慢', '能力半減・動きが遅い')}>{t('疲勞', '疲労')}</em>}・{money(w.wage)}/h</small>
+                      <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}{isTired(hired[w.id].fatigue) && <em className="ofc-tired" title={t('能力減半・動作變慢', '能力半減・動きが遅い')}>{t('疲勞', '疲労')}</em>}{dot}{money(w.wage)}/h</small>
                     </div>
                     {/* (their shift: A, B, or both (the owner's); not while the shop's open: they'd vanish from their place) */}
                     <span className="ofc-shift" role="group" aria-label={t('班別', '班')}>
@@ -186,7 +188,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
                       <b>{personName(w, lang)}<span className={`ofc-tag-who${w.look.female ? ' is-f' : ''}`}>
-                        {w.look.female ? t('女', '女性') : t('男', '男性')}・{w.years}{t('歲', '歳')}</span><Traits w={w} lang={lang} /></b>
+                        {w.look.female ? t('女', '女性') : t('男', '男性')}{dot}{w.years}{t('歲', '歳')}</span><Traits w={w} lang={lang} /></b>
                       <span className="ofc-stars">
                         <Stat label={t('手藝', '腕')} v={w.skill} />
                         <Stat label={t('速度', '速さ')} v={w.speed} />
@@ -229,7 +231,7 @@ function Traits({ w, lang }: { w: Worker; lang: Lang }) {
   return <>{w.skills.map((k) => {
     const sk = SKILLS[k], tier = TIERS[sk.tier]
     // (pointed at: the quality and what it does in the shop's own paper label, as everything pointed at in the room says itself (the owner's))
-    const title = `${ja ? tier.ja : lang === 'en' ? tier.en : tier.zh}・${ja ? sk.ja : lang === 'en' ? sk.en : sk.zh}`, hint = ja ? sk.jaSays : lang === 'en' ? sk.enSays : sk.zhSays
+    const title = `${ja ? tier.ja : lang === 'en' ? tier.en : tier.zh}${lang === 'en' ? ': ' : '・'}${ja ? sk.ja : lang === 'en' ? sk.en : sk.zh}`, hint = ja ? sk.jaSays : lang === 'en' ? sk.enSays : sk.zhSays
     return <em key={k} className={`ofc-trait is-${sk.tier}`} aria-label={`${title}：${hint}`}
       onPointerEnter={() => setTip({ title, hint })} onPointerLeave={() => setTip(null)}><SkillIcon id={k} />{ja ? sk.ja : lang === 'en' ? sk.en : sk.zh}</em>
   })}</>

@@ -237,7 +237,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       h = window.setTimeout(() => { setSay(null); h = window.setTimeout(next, 1000 + Math.random() * 1800) }, 4200)
     }
     h = window.setTimeout(next, 1500)
-    return () => window.clearTimeout(h)
+    // (a line said in the language just left goes with it)
+    return () => { window.clearTimeout(h); setSay(null) }
   }, [open, lang])
   const sayRef = useRef(say)
   sayRef.current = say

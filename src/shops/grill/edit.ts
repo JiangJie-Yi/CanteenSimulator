@@ -673,7 +673,7 @@ let el: HTMLDivElement | null = null
  */
 let tucked = false
 let dock: HTMLDivElement | null = null
-let devPill: HTMLButtonElement | null = null, charPill: HTMLButtonElement | null = null
+let devPill: HTMLButtonElement | null = null, charPill: HTMLButtonElement | null = null, dockLang: Lang | null = null
 let charHidden = (() => { try { return localStorage.getItem('jgs-char-view-hidden-1') === '1' } catch { return false } })()
 const charSubs = new Set<() => void>()
 export const getCharHidden = () => charHidden
@@ -699,9 +699,13 @@ function showDock() {
     }
     devPill = pill(T().devPill, () => setTucked(false))
     charPill = pill(T().charPill, () => setCharHidden(false))
-    withGlyph(devPill, 'tools', T().devPill, 13)
-    withGlyph(charPill, 'person', T().charPill, 13)
     document.body.appendChild(dock)
+  }
+  // (their words in the panel's language, again whenever it changes)
+  if (dockLang !== lang) {
+    dockLang = lang
+    withGlyph(devPill!, 'tools', T().devPill, 13)
+    withGlyph(charPill!, 'person', T().charPill, 13)
   }
   const on = state.on
   devPill!.classList.toggle('on', on && tucked)

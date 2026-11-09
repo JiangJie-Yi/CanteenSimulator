@@ -196,6 +196,9 @@ const PIECES_JA: Record<string, string> = {
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
 const PIECES_EN: Record<string, string> = {
+  小判金幣: 'Koban coin', 刀具組: 'Knife rack', 切魚砧板: 'Fish board', 櫃檯尾閘門門板: 'Till-end gate', 水槽旁閘門門板: 'Sink-side gate',
+  神龕旁花瓶與杯: 'Shrine vases and cups', 供桌上的供品: 'Offerings on the altar', 結帳牌: 'Pay sign', 逃生出口燈: 'Exit sign',
+  收銀高腳凳: 'Cashier stool (high)', 收銀矮凳: 'Cashier stool (low)', 餐盤堆: 'Plate stack', '攝影機 1（研製視角）': 'Camera 1 (cooking view)',
   備長炭籃: 'Charcoal crate', 團扇: 'Fan', 行燈: 'Paper lantern', 飯桶: 'Rice tub', 味噌湯鍋: 'Miso soup pot', 冷藏櫃: 'Fridge', 碗盤櫃架: 'Dish rack', '碗盤架 1': 'Dish rack 1', '碗盤架 2': 'Dish rack 2', 大砧板: 'Cutting board', 流理台: 'Sink', 根莖蔬菜: 'Root vegetables',
   調味架: 'Seasoning ledge', 水桶: 'Water bucket', 竹簍: 'Bamboo basket', 試吃碗: 'Tasting bowl', 廚餘桶: 'Scraps bin', 飯糰小碟: 'Rice-ball dish', 木台階: 'Wooden step', 供桌: 'Offering shelf', 神龕: 'Shrine', 御神酒壺: 'Sake flask', 橘子盤: 'Ponkan dish', 經書: 'Sutra',
   '神前廊燈（左）': 'Shrine corridor lamp (left)', '神前廊燈（右）': 'Shrine corridor lamp (right)',
