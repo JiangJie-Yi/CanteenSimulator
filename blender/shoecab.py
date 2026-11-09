@@ -18,8 +18,11 @@ Run:
 import os
 import sys
 
+import math
+
 import bmesh
 import bpy
+import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -43,15 +46,33 @@ def P(x, y, z):
     return Vector((x, -z, y))
 
 
-W, D, H = 0.9, 0.4, 0.56          # across, deep, tall (top board included): long and low (the owner's)
+W, D, H = 0.9, 0.2, 0.56          # across, deep, tall (top board included): long and low (the owner's); half as deep (2026-11-10)
 T = 0.022                          # the carcass's boards
 PLINTH = 0.06                     # the recessed plinth's height
 TOP = 0.035                        # the top board, overhanging
+def walnut(N=512):
+    """walnut's grain (the owner's, 2026-11-10: pressed into it, as the other furniture's is; it was flat colours): along v, the late wood's
+    lines a little wavering, the long runs lighter and darker, a pore or two in streaks; near white, to be tinted by each part's own colour"""
+    seed(29)
+    u, v = grid01(N)
+    wob = fbm(N, 3, 2, 4) - 0.5
+    ring = u * 7.0 + 0.12 * np.sin(2 * math.pi * v * 2) + wob * 0.35
+    late = smooth(0.5, 0.97, np.sin(2 * math.pi * ring * 2.0))
+    col = np.ones((N, N, 3), np.float32) * (1.0 - 0.32 * late)[..., None]
+    fine = np.sin(2 * math.pi * (u * 41 + wob * 3 + fbm(N, 6, 2, 3) * 1.2))
+    col *= (1.0 - 0.12 * smooth(0.7, 1.0, fine))[..., None]
+    pores = smooth(0.82, 0.95, vnoise(N, 110, 8)) * smooth(0.3, 0.8, vnoise(N, 24, 5))
+    col *= (1.0 - 0.3 * pores)[..., None]
+    col *= (0.9 + 0.2 * fbm(N, 8, 2, 3))[..., None]
+    return np.clip(col, 0, 1).astype(np.float32)
+
+
+GRAIN = image("shoe_walnut", walnut())
 M = {
-    # (a deep walnut, matt (the owner's: roughness 0.85); the lattice a shade lighter, the washi behind it pale)
-    "wood": pbr("ShoeWood", lin("#5a3a22"), rough=0.85),
-    "top": pbr("ShoeTop", lin("#4a2e18"), rough=0.85),
-    "slat": pbr("ShoeSlat", lin("#6a4428"), rough=0.85),
+    # (a deep walnut, matt (the owner's: roughness 0.85), its grain pressed in; the lattice a shade lighter, the washi behind it pale)
+    "wood": pbr("ShoeWood", lin("#6a4429"), tex=GRAIN, rough=0.85),
+    "top": pbr("ShoeTop", lin("#553520"), tex=GRAIN, rough=0.85),
+    "slat": pbr("ShoeSlat", lin("#7a5232"), tex=GRAIN, rough=0.85),
     "ring": pbr("ShoeRing", lin("#9a6a34"), rough=0.4),
     "paper": pbr("ShoePaper", lin("#efe6d0"), rough=0.9),
     "back": pbr("ShoeBack", lin("#1c120c"), rough=0.8),
@@ -60,9 +81,16 @@ M = {
 }
 
 
-def box(name, x0, x1, y0, y1, z0, z1, mat, drop=()):
-    """a box from (x0, y0, z0) to (x1, y1, z1) in the game's frame; `drop`: which of its faces to leave off ('-y' its bottom, '+z' its front...)"""
+TILE = 0.45
+
+
+def box(name, x0, x1, y0, y1, z0, z1, mat, drop=(), bevel=0.0):
+    """a box from (x0, y0, z0) to (x1, y1, z1) in the game's frame; `drop`: which of its faces to leave off ('-y' its bottom, '+z' its front...);
+    its grain (uvs) along its longest side, a tile to TILE; `bevel`: its edges taken off that much"""
     bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    size = {'x': x1 - x0, 'y': y1 - y0, 'z': z1 - z0}
+    long_ = max(size, key=size.get)
     vs = {}
     for ix, x in enumerate((x0, x1)):
         for iy, y in enumerate((y0, y1)):
@@ -73,10 +101,21 @@ def box(name, x0, x1, y0, y1, z0, z1, mat, drop=()):
         '-y': [(0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)], '+y': [(0, 1, 0), (0, 1, 1), (1, 1, 1), (1, 1, 0)],
         '-z': [(0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)], '+z': [(0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)],
     }
+    seedu = (hash(name) % 97) / 97.0
     for k, f in faces.items():
         if k not in drop:
-            bm.faces.new([vs[c] for c in f])
+            face = bm.faces.new([vs[c] for c in f])
+            # (in the face's plane: v along the board's length (its grain), u across; offset per board, so no two are alike)
+            ax = k[1]
+            plane = [a for a in 'xyz' if a != ax]
+            along_ = long_ if long_ in plane else plane[1]
+            across_ = plane[0] if along_ == plane[1] else plane[1]
+            for lp, c in zip(face.loops, f):
+                co = {'x': (x0, x1)[c[0]], 'y': (y0, y1)[c[1]], 'z': (z0, z1)[c[2]]}
+                lp[uvl].uv = (co[across_] / TILE + seedu, co[along_] / TILE + seedu * 3)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    if bevel:
+        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bevel, segments=1, affect='EDGES', profile=0.5)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
@@ -106,7 +145,7 @@ carcass.append(box("Plinth", x0 + 0.02, x1 - 0.02, 0, PLINTH, z0 + 0.01, z1 - 0.
 carcass.append(box("SideL", x0, x0 + T, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
 carcass.append(box("SideR", x1 - T, x1, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
 carcass.append(box("Floor", x0 + T, x1 - T, PLINTH, y_in0, z0, z1, "wood", drop=('-y', '-x', '+x', '-z')))
-carcass.append(box("Top", x0 - 0.015, x1 + 0.015, H - TOP, H, z0, z1 + 0.018, "top", drop=('-z',)))
+carcass.append(box("Top", x0 - 0.015, x1 + 0.015, H - TOP, H, z0, z1 + 0.018, "top", drop=('-z',), bevel=0.004))
 carcass.append(box("Back", x0 + T, x1 - T, y_in0, y_in1, z0, z0 + 0.008, "inside", drop=('-z', '-x', '+x', '-y', '+y')))
 for c in range(1, COLS):
     carcass.append(box("Divider", xs[c] - T / 2, xs[c] + T / 2, y_in0, y_in1, z0 + 0.008, z1, "wood", drop=('-y', '+y', '-z')))
@@ -129,8 +168,8 @@ for k, (col, row) in enumerate(CELLS):
     S = 0.016                      # the frame's width
     # (the washi, set in the frame; over it the kumiko: two uprights and three rails, proud of the paper (the owner's: the shoji face kept))
     parts.append(box("Washi", a0 + S, a1 - S, b0 + S, b1 - S, ZD + 0.004, ZD + 0.006, "paper", drop=('-z', '-x', '+x', '-y', '+y')))
-    parts.append(box("StileL", a0, a0 + S, b0, b1, ZD, ZD + DT, "wood", drop=('-z',)))
-    parts.append(box("StileR", a1 - S, a1, b0, b1, ZD, ZD + DT, "wood", drop=('-z',)))
+    parts.append(box("StileL", a0, a0 + S, b0, b1, ZD, ZD + DT, "wood", drop=('-z',), bevel=0.002))
+    parts.append(box("StileR", a1 - S, a1, b0, b1, ZD, ZD + DT, "wood", drop=('-z',), bevel=0.002))
     parts.append(box("RailB", a0 + S, a1 - S, b0, b0 + S, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
     parts.append(box("RailT", a0 + S, a1 - S, b1 - S, b1, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
     K = 0.005                      # a kumiko bar's width

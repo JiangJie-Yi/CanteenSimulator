@@ -1481,7 +1481,8 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
 const CAT_STAND_Z = -1.92, SHOE_CAB_Z = -0.62 - (0.56 * 1.27) / 2 + 0.9 / 2
 /** the shoe cupboard's middle off the wall: its back 5 cm in from where the first one's was (0.51), now it's 1.27 times as deep (at 0.51 the
  * floor's edge strip along the wall ran 4 cm into its back) */
-const SHOE_CAB_X = 0.46 - 0.4 / 2
+// (half as deep since (the owner's, 2026-11-10): its back stays on the wall at 0.46)
+const SHOE_CAB_X = 0.46 - 0.2 / 2
 /** the shoe cupboard's top (blender/shoecab.py's H): what stands on it stands there */
 const SHOE_TOP = 0.56
 /** its cubbies (two rows of four: one to each of the eight places) */
@@ -1493,8 +1494,11 @@ useGLTF.preload(SHOE_URL)
  * cubbies, one to each place (the guests' own shoes go in them). Pointed at, it says what it is; a click swings all eight open 75 degrees or
  * shut, a wooden knock as they go.
  */
-/** the shoe cupboard's one material: its parts' colours on their points */
+/** the shoe cupboard's materials: its parts' colours on their points; its wood's grain (blender/shoecab.py's walnut: the owner's, 2026-11-10,
+ * it was flat colour) under its boards' colours, made once with the model's picture */
 const SHOE_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
+let SHOE_WOOD_MAT: THREE.MeshToonMaterial | null = null
+const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#6a4429'), ShoeTop: new THREE.Color('#553520'), ShoeSlat: new THREE.Color('#7a5232') }
 /** one of a pair of shoes put away in a cubby */
 const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
 function ShoeCupboard() {
@@ -1515,24 +1519,39 @@ function ShoeCupboard() {
       if (!ms.length) return
       node.updateWorldMatrix(true, true)
       const inv = node.matrixWorld.clone().invert()
-      const geos = ms.map((m) => {
+      // (the grained wood apart from the rest: its points' uvs kept, drawn with the grain)
+      const grained = (m: THREE.Mesh) => !!(m.material as THREE.MeshStandardMaterial).map
+      const woodGrain = ms.find(grained)
+      if (woodGrain && !SHOE_WOOD_MAT) SHOE_WOOD_MAT = new THREE.MeshToonMaterial({ vertexColors: true, map: (woodGrain.material as THREE.MeshStandardMaterial).map })
+      const geoOf = (m: THREE.Mesh) => {
         const g = new THREE.BufferGeometry()
         g.setAttribute('position', m.geometry.attributes.position.clone())
         g.setAttribute('normal', m.geometry.attributes.normal.clone())
+        if (grained(m) && m.geometry.attributes.uv) g.setAttribute('uv', m.geometry.attributes.uv.clone())
         if (m.geometry.index) g.setIndex(m.geometry.index.clone())
-        const c = (m.material as THREE.MeshStandardMaterial).color
+        // (the grained boards' own colours (the model's are white over their grain picture: the colour's in the picture there))
+        const c = SHOE_TINT[(m.material as THREE.Material).name] ?? (m.material as THREE.MeshStandardMaterial).color
         const n = g.attributes.position.count, col = new Float32Array(n * 3)
         for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3)
         g.setAttribute('color', new THREE.BufferAttribute(col, 3))
         g.applyMatrix4(inv.clone().multiply(m.matrixWorld))
         return g
-      })
+      }
+      const geos = ms.filter((m) => !grained(m)).map(geoOf)
+      const woodGeos = ms.filter(grained).map(geoOf)
       const wood = ms.filter((m) => /^Shoe(Wood|Top)$/.test((m.material as THREE.Material).name))
       const hull = inkTogether(wood.map((m) => { const k = new THREE.Mesh(m.geometry.clone().applyMatrix4(inv.clone().multiply(m.matrixWorld))); return k }), { width: 0.0015, weld: true })
       for (const m of ms) if (m !== node) m.removeFromParent()
-      const one = new THREE.Mesh(mergeGeometries(geos)!, SHOE_MAT)
-      one.name = node.name + 'Drawn'
-      node.add(one)
+      if (geos.length) {
+        const one = new THREE.Mesh(mergeGeometries(geos)!, SHOE_MAT)
+        one.name = node.name + 'Drawn'
+        node.add(one)
+      }
+      if (woodGeos.length && SHOE_WOOD_MAT) {
+        const wood = new THREE.Mesh(mergeGeometries(woodGeos)!, SHOE_WOOD_MAT)
+        wood.name = node.name + 'Wood'
+        node.add(wood)
+      }
       if (hull) node.add(hull)
     }
     const doors: { o: THREE.Object3D; s: number; cell: number; k: number }[] = []
@@ -1544,7 +1563,8 @@ function ShoeCupboard() {
     const cells: THREE.Vector3[] = []
     for (const d of doors) {
       const b = new THREE.Box3().setFromObject(d.o), c = b.getCenter(new THREE.Vector3())
-      cells[d.cell] = new THREE.Vector3(c.x, b.min.y + 0.004, (cabBox.min.z + cabBox.max.z) / 2 + 0.03)
+      // (the shoes in the middle of its depth: it's shallow now, a pair just fits)
+      cells[d.cell] = new THREE.Vector3(c.x, b.min.y + 0.004, (cabBox.min.z + cabBox.max.z) / 2)
     }
     for (const d of doors) together(d.o)
     if (cab) together(cab)
