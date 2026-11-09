@@ -22,7 +22,45 @@ const OPEN = /^(ProduceSack|CharcoalSack)/
  * it as if it were round */
 const BAKED = /^ProduceTuber/
 /** how much brighter each sack's burlap is drawn than it's woven */
-const BURLAP_LIFT: Record<string, number> = { ProduceSackPotato: 1.28, ProduceSackSweet: 1.28, ProduceSackOnion: 1.28, CharcoalSackCloth: 1.18 }
+const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18 }
+/** the produce sacks' cloth dyed another colour (the owner's): the potatoes' and sweet potatoes' a clean bleached cotton-hemp, the onions' an
+ * unbleached linen a shade duller; their woven bands kept as they are */
+const BURLAP_DYE: Record<string, string> = { ProduceSackPotato: '#f4f1ea', ProduceSackSweet: '#f4f1ea', ProduceSackOnion: '#d5cebf' }
+
+/** a burlap picture in another colour: each point that colour by how light it was against the cloth's own mean (the weave's light and dark
+ * kept, a little softened); what's woven in another colour (a red or green band: far from the cloth's brown) left as it was */
+function dyeBurlap(map: THREE.Texture, hex: string) {
+  const img = map.image as CanvasImageSource & { width: number; height: number }
+  const c = document.createElement('canvas')
+  c.width = img.width
+  c.height = img.height
+  const g = c.getContext('2d')!
+  g.drawImage(img, 0, 0)
+  const px = g.getImageData(0, 0, c.width, c.height)
+  const d = px.data
+  const lum = (i: number) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+  let sum = 0
+  for (let i = 0; i < d.length; i += 4) sum += lum(i)
+  const mean = sum / (d.length / 4)
+  const to = new THREE.Color(hex)
+  const T = [to.r * 255, to.g * 255, to.b * 255]
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], gr = Math.max(1, d[i + 1])
+    // (how much of the band this is: a red far redder than the cloth, or a green above its red)
+    const band = Math.min(1, Math.max(0, (r / gr - 1.6) / 0.6) + Math.max(0, (d[i + 1] - r) / 25))
+    const k = Math.min(1.12, 0.62 + 0.38 * (lum(i) / mean))
+    for (let j = 0; j < 3; j++) d[i + j] = Math.min(255, T[j] * k) * (1 - band) + d[i + j] * band
+  }
+  g.putImageData(px, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.flipY = map.flipY
+  t.colorSpace = map.colorSpace
+  t.wrapS = map.wrapS
+  t.wrapT = map.wrapT
+  t.anisotropy = map.anisotropy
+  t.name = map.name
+  return t
+}
 /** too small or too fine for an ink line (the skewers, their ties, the labels and the marks on things) */
 const UNINKED = /Skewer|Label|Mark|Spice\d|SpiceCap|FoilRoll|Lemon\d/
 
@@ -51,6 +89,8 @@ function partOf(scene: THREE.Group, node: string, width: number, keep?: (o: THRE
           // one less so)
           const lift = BURLAP_LIFT[sm.name]
           if (lift) toon.color.multiplyScalar(lift)
+          const dye = BURLAP_DYE[sm.name]
+          if (dye && sm.map?.image) toon.map = dyeBurlap(sm.map, dye)
           t = toon
           if (BAKED.test(sm.name) && sm.normalMap) Object.assign(t, { normalMap: sm.normalMap, normalScale: sm.normalScale.clone() })
         }
