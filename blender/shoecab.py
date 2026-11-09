@@ -1,10 +1,11 @@
 """The genkan's shoe cupboard (下駄箱), as a ryotei's or an izakaya's is (the owner's: low, broad and solid, not a tall narrow cupboard of
 paper panes with brass knobs): shoecab.glb.
 
-A low cabinet of dark walnut on a recessed plinth, its top board overhanging a little (a vase stands on it); inside, three columns of three
-empty cubbies (the guests' own shoes go in them); each one's door a frame with a kumiko lattice over washi (the owner's: the shoji face of
-the first one kept), a sunk pull (引手) cut into its free edge. Every piece a plain box (no subdivisions), the faces against the floor, the
-wall and each other left off: some 750 triangles.
+A low, long cabinet of walnut on a recessed plinth, its top board overhanging a little all round (a vase stands on it); inside, two
+rows of four empty cubbies (the owner's, 2026-11-09: lower and longer than the three by three it was, a third lower, one cubby to each of
+the eight places; the guests' own shoes go in them); each one's door a fine frame with a kumiko lattice (two uprights, two rails) over washi,
+a little bronze ring pull at the top of its free edge. Every piece a plain box (no subdivisions) but the rings, the faces against the
+floor, the wall and each other left off.
 
 Nodes the game finds: "ShoeCab" (the carcass and what's inside, still), "ShoeDoorL<k>" / "ShoeDoorR<k>" (each door, hinged on its left or
 right edge, its origin on its hinge: the game swings it open 75 degrees), numbered row by row from the bottom left.
@@ -42,16 +43,16 @@ def P(x, y, z):
     return Vector((x, -z, y))
 
 
-SC = 1.27                         # (the owner's: the whole of it 1.25 to 1.3 times the first one)
-W, D, H = 0.56 * SC, 0.34 * SC, 0.66 * SC   # across, deep, tall (top board included)
+W, D, H = 0.9, 0.4, 0.56          # across, deep, tall (top board included): long and low (the owner's)
 T = 0.022                          # the carcass's boards
 PLINTH = 0.06                     # the recessed plinth's height
 TOP = 0.035                        # the top board, overhanging
 M = {
     # (a deep walnut, matt (the owner's: roughness 0.85); the lattice a shade lighter, the washi behind it pale)
-    "wood": pbr("ShoeWood", lin("#3e2616"), rough=0.85),
-    "top": pbr("ShoeTop", lin("#33200f"), rough=0.85),
-    "slat": pbr("ShoeSlat", lin("#4a2e1a"), rough=0.85),
+    "wood": pbr("ShoeWood", lin("#5a3a22"), rough=0.85),
+    "top": pbr("ShoeTop", lin("#4a2e18"), rough=0.85),
+    "slat": pbr("ShoeSlat", lin("#6a4428"), rough=0.85),
+    "ring": pbr("ShoeRing", lin("#9a6a34"), rough=0.4),
     "paper": pbr("ShoePaper", lin("#efe6d0"), rough=0.9),
     "back": pbr("ShoeBack", lin("#1c120c"), rough=0.8),
     "inside": pbr("ShoeInside", lin("#2e2016"), rough=0.8),
@@ -92,7 +93,7 @@ x0, x1 = -W / 2, W / 2
 z0, z1 = -D / 2, D / 2
 y_in0, y_in1 = PLINTH + T, H - TOP          # the compartments' floor and ceiling
 # (three columns and three rows of empty cubbies, for the guests' own shoes (the owner's: nothing in them, and more of them))
-COLS = ROWS = 3
+COLS, ROWS = 4, 2
 xs = [x0 + T + (W - 2 * T + T) * c / COLS - (T / 2 if c else 0) for c in range(COLS + 1)]
 xs[-1] = x1 - T
 ys = [y_in0 + (y_in1 - y_in0 + T) * r / ROWS - (T / 2 if r else 0) for r in range(ROWS + 1)]
@@ -105,7 +106,7 @@ carcass.append(box("Plinth", x0 + 0.02, x1 - 0.02, 0, PLINTH, z0 + 0.01, z1 - 0.
 carcass.append(box("SideL", x0, x0 + T, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
 carcass.append(box("SideR", x1 - T, x1, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
 carcass.append(box("Floor", x0 + T, x1 - T, PLINTH, y_in0, z0, z1, "wood", drop=('-y', '-x', '+x', '-z')))
-carcass.append(box("Top", x0 - 0.012, x1 + 0.012, H - TOP, H, z0, z1 + 0.015, "top", drop=('-z',)))
+carcass.append(box("Top", x0 - 0.015, x1 + 0.015, H - TOP, H, z0, z1 + 0.018, "top", drop=('-z',)))
 carcass.append(box("Back", x0 + T, x1 - T, y_in0, y_in1, z0, z0 + 0.008, "inside", drop=('-z', '-x', '+x', '-y', '+y')))
 for c in range(1, COLS):
     carcass.append(box("Divider", xs[c] - T / 2, xs[c] + T / 2, y_in0, y_in1, z0 + 0.008, z1, "wood", drop=('-y', '+y', '-z')))
@@ -125,24 +126,34 @@ for k, (col, row) in enumerate(CELLS):
     a0, a1, b0, b1 = cx0 + g, cx1 - g, cy0 + g, cy1 - g
     hinge_left = col < COLS - 1    # (the right column hinges on the right, the others on the left: none swings into the next one open)
     parts = []
-    S = 0.02                       # the frame's width
+    S = 0.016                      # the frame's width
     # (the washi, set in the frame; over it the kumiko: two uprights and three rails, proud of the paper (the owner's: the shoji face kept))
     parts.append(box("Washi", a0 + S, a1 - S, b0 + S, b1 - S, ZD + 0.004, ZD + 0.006, "paper", drop=('-z', '-x', '+x', '-y', '+y')))
     parts.append(box("StileL", a0, a0 + S, b0, b1, ZD, ZD + DT, "wood", drop=('-z',)))
     parts.append(box("StileR", a1 - S, a1, b0, b1, ZD, ZD + DT, "wood", drop=('-z',)))
     parts.append(box("RailB", a0 + S, a1 - S, b0, b0 + S, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
     parts.append(box("RailT", a0 + S, a1 - S, b1 - S, b1, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
-    K = 0.006                      # a kumiko bar's width
-    xmid = (a0 + a1) / 2           # (one upright and two rails: the doors are small now)
-    parts.append(box("Kumiko", xmid - K / 2, xmid + K / 2, b0 + S, b1 - S, ZD + 0.006, ZD + DT - 0.004, "slat", drop=('-z', '-y', '+y')))
+    K = 0.005                      # a kumiko bar's width
+    # (two uprights and two rails: a fine three-by-three lattice; the rails broken at the uprights)
+    xs_k = [a0 + S + (a1 - a0 - 2 * S) * i / 3 for i in (1, 2)]
+    for xk in xs_k:
+        parts.append(box("Kumiko", xk - K / 2, xk + K / 2, b0 + S, b1 - S, ZD + 0.006, ZD + DT - 0.004, "slat", drop=('-z', '-y', '+y')))
+    edges = [a0 + S] + [v for xk in xs_k for v in (xk - K / 2, xk + K / 2)] + [a1 - S]
     for i in (1, 2):
         y = b0 + S + (b1 - b0 - 2 * S) * i / 3
-        for xa, xb in ((a0 + S, xmid - K / 2), (xmid + K / 2, a1 - S)):
+        for xa, xb in zip(edges[0::2], edges[1::2]):
             parts.append(box("Kumiko", xa, xb, y - K / 2, y + K / 2, ZD + 0.006, ZD + DT - 0.004, "slat", drop=('-z', '-x', '+x')))
-    # (the pull: a dark recess cut into the free stile, as a hikite is)
+    # (the pull: a small bronze ring hanging from a round plate, at the top of the free stile)
     px = (a1 - S / 2) if hinge_left else (a0 + S / 2)
-    py = (b0 + b1) / 2
-    parts.append(box("Pull", px - 0.006, px + 0.006, py - 0.022, py + 0.022, ZD + DT - 0.004, ZD + DT + 0.0005, "pull", drop=('-z',)))
+    py = b1 - 0.03
+    parts.append(box("Pull", px - 0.006, px + 0.006, py - 0.006, py + 0.006, ZD + DT, ZD + DT + 0.002, "ring", drop=('-z',)))
+    bpy.ops.mesh.primitive_torus_add(major_segments=8, minor_segments=4, major_radius=0.009, minor_radius=0.0018,
+                                     location=P(px, py - 0.008, ZD + DT + 0.004), rotation=(1.5708, 0, 0))
+    ring = bpy.context.active_object
+    ring.name = "Ring"
+    ring.data.materials.append(M["ring"])
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    parts.append(ring)
     d = join(parts, f"ShoeDoor{'L' if hinge_left else 'R'}{k}")
     # (its origin on its hinge: the outer edge's back corner)
     hx = a0 if hinge_left else a1

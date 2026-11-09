@@ -1468,17 +1468,21 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
  * clear of the door and under the altar's shelf; the shoe cupboard down on the genkan's stone, its end against the step, the helmet on it
  * (both moved along away from the door, the owner's wish, the doorway and the till's end left open)
  */
-const CAT_STAND_Z = -1.92, SHOE_CAB_Z = -0.62
+/** (the shoe cupboard's end toward the step where the old one's was, now it's 0.9 long, not 0.71: its middle that much nearer the door) */
+const CAT_STAND_Z = -1.92, SHOE_CAB_Z = -0.62 - (0.56 * 1.27) / 2 + 0.9 / 2
 /** the shoe cupboard's middle off the wall: its back 5 cm in from where the first one's was (0.51), now it's 1.27 times as deep (at 0.51 the
  * floor's edge strip along the wall ran 4 cm into its back) */
-const SHOE_CAB_X = 0.46 - (0.34 * 1.27) / 2
+const SHOE_CAB_X = 0.46 - 0.4 / 2
 /** the shoe cupboard's top (blender/shoecab.py's H): what stands on it stands there */
-const SHOE_TOP = 0.66 * 1.27
+const SHOE_TOP = 0.56
+/** its cubbies (two rows of four: one to each of the eight places) */
+const SHOE_CUBBIES = 8
 const SHOE_URL = import.meta.env.BASE_URL + 'models/shoecab.glb'
 useGLTF.preload(SHOE_URL)
 /**
- * The genkan's shoe cupboard (blender/shoecab.py; the owner's): a low walnut cabinet, nine shoji-latticed doors over empty cubbies (the guests' own shoes go in them).
- * Pointed at, it says what it is; a click swings all nine open 75 degrees or shut, a wooden knock as they go.
+ * The genkan's shoe cupboard (blender/shoecab.py; the owner's): a low, long walnut cabinet, two rows of four shoji-latticed doors over empty
+ * cubbies, one to each place (the guests' own shoes go in them). Pointed at, it says what it is; a click swings all eight open 75 degrees or
+ * shut, a wooden knock as they go.
  */
 /** the shoe cupboard's one material: its parts' colours on their points */
 const SHOE_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
@@ -1535,7 +1539,7 @@ function ShoeCupboard() {
     }
     for (const d of doors) together(d.o)
     if (cab) together(cab)
-    // (all nine shut, drawn as one with one ink line, two draws not eighteen; any of them swinging, each its own again)
+    // (all eight shut, drawn as one with one ink line, two draws not eighteen; any of them swinging, each its own again)
     const shut = homeCopy(root, doors.map((d) => d.o))
     return { root, doors, cells, shut }
   }, [gltf])
@@ -2126,7 +2130,7 @@ const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at 
 function shoeStep(s: Shown, g: THREE.Object3D | undefined, f: number, entering: boolean) {
   if (!g) return
   if (f < 0 || f > 1) { g.rotation.x = 0; return }
-  const cell = s.seat % 9
+  const cell = s.seat % SHOE_CUBBIES
   if (SHOE_CELLS.ready && g.parent) {
     const at = g.parent.worldToLocal(SHOE_CELLS.at.clone())
     g.rotation.y = Math.atan2(at.x - g.position.x, at.z - g.position.z)
@@ -2986,8 +2990,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       drag.current = null
       if (a.ok && s) {
         // (their shoes into the cubby of the stool they're on now: they're taken out of it on the way home)
-        const shoes = SHOE_CELLS.shoes.get(s.seat % 9)
-        if (shoes) { SHOE_CELLS.shoes.delete(s.seat % 9); SHOE_CELLS.shoes.set(a.to % 9, shoes) }
+        const shoes = SHOE_CELLS.shoes.get(s.seat % SHOE_CUBBIES)
+        if (shoes) { SHOE_CELLS.shoes.delete(s.seat % SHOE_CUBBIES); SHOE_CELLS.shoes.set(a.to % SHOE_CUBBIES, shoes) }
         s.seat = a.to
       }
       return
