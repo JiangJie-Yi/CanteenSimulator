@@ -109,7 +109,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
         <button type="button" className="panel-x" onClick={onClose} aria-label={t('關閉', '閉じる')}>×</button>
       </header>
       {tab === 'book' ? book : tab === 'ledger' ? <div className="ofc-ledger ledger">{ledger}</div> : (
-        <div className="ofc-staff">
+        <div className="ofc-staff" onScroll={(e) => { e.currentTarget.querySelector('.ofc-roster-bar')?.classList.toggle('is-scrolled', e.currentTarget.scrollTop > 2) }}>
           {/* the team as it stands, a strip of seats by job (the owner's: the big cards took over half the panel): the owner, then each job's
               places, a small round face with its shift on it, or a dashed ring where one's open; a face takes you down to that person's card,
               an open ring hires the best value for the job */}
@@ -172,8 +172,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                   {can.map((w) => (
                     <li key={w.id}>
                       <Avatar id={w.id} look={w.look} role={w.role} size={30} />
-                      <span className="ofc-pick-who">{personName(w, lang)}<small>{w.look.female ? t('女', '女性') : t('男', '男性')}{dot}{w.years}{t('歲', '歳')}</small></span>
-                      <span className="ofc-pick-stats">{t('手藝', '腕')} {w.skill}{dot}{t('速度', '速さ')} {w.speed}{dot}{t('體力', '体力')} {w.stamina}</span>
+                      <span className="ofc-pick-who">{personName(w, lang)}<small>{w.look.female ? t('女', '女性') : t('男', '男性')}{dot}{w.years}{t('歲', '歳')}</small>
+                        {w.skills?.length ? <span className="ofc-pick-traits"><Traits w={w} lang={lang} /></span> : null}</span>
+                      {/* (their three as bars, as on their card below (the owner's: a glance shows the strong and the weak)) */}
+                      <span className="ofc-pick-stats ofc-stars">
+                        <Stat label={t('手藝', '腕')} v={w.skill} />
+                        <Stat label={t('速度', '速さ')} v={w.speed} />
+                        <Stat label={t('體力', '体力')} v={w.stamina} />
+                      </span>
                       <b className="money">{money(w.wage)}<small>/h</small></b>
                       <button type="button" disabled={full} onClick={() => { onHire(w); setPicking(null) }}>{t('雇用', '雇う')}</button>
                     </li>

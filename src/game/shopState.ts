@@ -46,3 +46,11 @@ export const RUSH = { at: -1e9 }
 /** what the shop's name brings in today (game/reputation's flowOf, taken as the day's business opens: App): how many more customers come
  * (the gap between them divided by it), how patient they are */
 export const RATING_FLOW = { more: 1, patience: 1 }
+/** how long (the game's seconds) each of the staff has had nothing to do just now (none: at something), kept by whoever draws them at work
+ * (GuestBar3D's servers, stock keeper and plater; Roasting's second cook; App's cashier): App tires them by it (data/staff's activityOf) */
+export const STAFF_IDLE = new Map<string, number>()
+export const idleTick = (id: string | undefined, idle: boolean, dt: number) => {
+  if (!id) return
+  if (idle) STAFF_IDLE.set(id, (STAFF_IDLE.get(id) ?? 0) + dt)
+  else STAFF_IDLE.delete(id)
+}

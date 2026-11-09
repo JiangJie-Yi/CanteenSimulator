@@ -4377,6 +4377,10 @@ button {
   z-index: 20;
   margin: -6px -12px 0;
   padding: 6px 12px 4px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+/* (its paper and the shade under it only once the list's scrolled under it (the owner's: no band across the page at rest)) */
+.ofc-roster-bar.is-scrolled {
   background: rgb(246 238 224 / 0.96);
   box-shadow: 0 6px 10px -8px rgb(59 42 32 / 0.4);
 }
@@ -4403,12 +4407,13 @@ button {
   background: rgb(255 250 240 / 0.8);
 }
 .ofc-pick > b { display: block; margin-bottom: 4px; color: #6b4423; font-size: 12px; white-space: nowrap; }
-.ofc-pick ul { display: flex; flex-direction: column; gap: 4px; max-height: 200px; margin: 0; padding: 0; overflow: auto; list-style: none; }
-.ofc-pick li { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; }
+.ofc-pick ul { display: flex; flex-direction: column; gap: 4px; max-height: 260px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.ofc-pick li { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgb(59 42 32 / 0.08); font-size: 13px; white-space: nowrap; }
 .ofc-pick .avatar { flex: none; border-radius: 50%; }
-.ofc-pick-who { display: flex; flex-direction: column; min-width: 5.5em; line-height: 1.2; }
-.ofc-pick-who small, .ofc-pick-stats { color: #8a7562; font-size: 11px; }
-.ofc-pick-stats { flex: 1; }
+.ofc-pick-who { display: flex; flex-direction: column; min-width: 6.5em; line-height: 1.25; }
+.ofc-pick-who small { color: #8a7562; font-size: 11px; }
+.ofc-pick-traits { display: flex; gap: 3px; margin-top: 2px; }
+.ofc-pick-stats { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 120px; }
 .ofc-pick li button { padding: 3px 10px; border: 1px solid #a8352a; border-radius: 8px; background: #c4442f; color: #fff; font: inherit; font-size: 12px; cursor: pointer; }
 .ofc-pick li button:disabled { opacity: 0.4; cursor: default; }
 .ofc-person[draggable='true'] { cursor: grab; }
@@ -4978,7 +4983,7 @@ button {
   :root:not([data-theme='light']) .ofc-person,
   :root:not([data-theme='light']) .ofc-roster { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
   :root:not([data-theme='light']) .ofc-person.is-hired { background: rgba(232, 176, 74, 0.1); }
-  :root:not([data-theme='light']) .ofc-roster-bar { background: rgb(39 33 28 / 0.97); }
+  :root:not([data-theme='light']) .ofc-roster-bar.is-scrolled { background: rgb(39 33 28 / 0.97); }
   :root:not([data-theme='light']) .ofc-pick { background: rgba(255, 255, 255, 0.06); }
   :root:not([data-theme='light']) .ofc-stat,
   :root:not([data-theme='light']) .ofc-note { color: #c8b8a4; }

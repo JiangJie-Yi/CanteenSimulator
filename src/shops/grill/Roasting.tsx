@@ -69,7 +69,7 @@ import { ColdMist } from '@/scene/ColdMist'
 import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
-import { SHOP, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
+import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
 import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
@@ -990,6 +990,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     T.seenAt = performance.now()
     FETCHER.id = id
     FETCHER.busy = T.phase !== 'idle'
+    // (at the board with nothing to fetch or prepare, and not out plating either: for how he tires (data/staff's activityOf))
+    idleTick(id, T.phase === 'idle' && PLATER_OUT.id !== id && !SHOP.leaving, dt)
     o.userData.fetcher = true
     o.userData.lean = 0
     o.userData.carry = T.phase === 'toBoard' || (T.phase === 'taking' && T.t > TAKE_S * 0.5)

@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { LATE_TIRE, ROLES, SKILLS, TIER_ODDS, TIRED_AT, effective, fair, paceBoost, paceOf, restPerHour, tireNow, tirePerHour, type SkillId, type Worker } from '@/data/staff'
+import { IDLE_TIRE, LATE_TIRE, ROLES, SKILLS, SLACK_AFTER, TIER_ODDS, TIRED_AT, activityOf, effective, fair, paceBoost, paceOf, restPerHour, tireNow, tirePerHour, workFatigue, type SkillId, type Worker } from '@/data/staff'
 import { CANDIDATES, ROLLS_PER_DAY, canDismiss, canHire, makeCandidates, pickHires, refreshApplicants, replaceOf, seeded, skillDraw, statScore, valueOf, wageOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
@@ -164,5 +164,25 @@ feature('員工與徵人', () => {
       expect(statScore(w.out)).toBe(low)
     })
     and('沒有人在職時沒有人可換', () => { expect(replaceOf([])).toBeNull() })
+  })
+})
+
+feature('上班時忙、待命、偷閒的疲勞不同（店主要的）', () => {
+  scenario('忙的時候照常累積，待命時累積得很慢', ({ then, and }) => {
+    then('忙一小時：疲勞多一小時的量', () => { expect(workFatigue(20, 10, 'busy', 1)).toBe(30) })
+    and(`待命一小時：只多 ${IDLE_TIRE * 100}%`, () => { expect(workFatigue(20, 10, 'idle', 1)).toBeCloseTo(20 + 10 * IDLE_TIRE, 5) })
+  })
+  scenario('沒事做久了就偷閒，疲勞反而慢慢回復一些', ({ then, and }) => {
+    then(`沒事做 ${SLACK_AFTER} 秒以內是待命，之後是偷閒`, () => {
+      expect(activityOf(undefined)).toBe('busy')
+      expect(activityOf(SLACK_AFTER - 1)).toBe('idle')
+      expect(activityOf(SLACK_AFTER)).toBe('slack')
+    })
+    and('偷閒一小時：疲勞少了，但比休息恢復得慢', () => {
+      const f = workFatigue(50, 10, 'slack', 1)
+      expect(f).toBeLessThan(50)
+      expect(50 - f).toBeLessThan(restPerHour)
+    })
+    and('不會低於 0', () => { expect(workFatigue(1, 10, 'slack', 5)).toBe(0) })
   })
 })

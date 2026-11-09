@@ -45,11 +45,11 @@ import { getLights, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { dutyDay, LAST_CALL, LATE, RATING_FLOW, SHOP, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { dutyDay, idleTick, LAST_CALL, LATE, RATING_FLOW, SHOP, STAFF_IDLE, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
-import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH } from '@/shops/grill/bar'
+import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import type { ViewCam } from '@/game/editGroups'
@@ -74,7 +74,7 @@ import { LINES } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
-import { effective, isTired, restPerHour, ROLES, tireNow, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
+import { activityOf, effective, isTired, restPerHour, ROLES, tireNow, workFatigue, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
 import { hoursEnd, hoursText, inHours, isLate, lastCall } from '@/game/hours'
 import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
@@ -2310,7 +2310,10 @@ export default function App() {
             const working = aiRef.current.ai && aiRef.current.shop === shop && onShift(st.shift, dutyDay(true))
             // (by the game's clock: a minute of it a second, sped up with the game)
             // (faster in the deep night, and as their special skills make it (the owner's); resting, not below what a run of days leaves)
-            const fatigue = working ? Math.min(100, st.fatigue + tireNow(w, LATE.on) / 60 * GAME_SPEED.value)
+            // (at work, as they're about (the owner's): busy, tiring; standing by, hardly; slacking, getting a little back (data/staff's
+            // workFatigue); the cashier idle while no one's paying)
+            if (working && w.role === 'cashier') idleTick(wid, TILL_STATE.k < 0, GAME_SPEED.value)
+            const fatigue = working ? workFatigue(st.fatigue, tireNow(w, LATE.on), activityOf(STAFF_IDLE.get(wid)), GAME_SPEED.value / 60)
               : Math.max(Math.min(st.fatigue, st.floor ?? 0), st.fatigue - restPerHour / 60 * GAME_SPEED.value)
             if (w.skills?.length) STAFF_SKILLS.set(wid, w.skills)
             else STAFF_SKILLS.delete(wid)

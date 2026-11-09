@@ -23,7 +23,7 @@ import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
-import { STAFF_TALK, paceOfStaff } from '@/game/shopState'
+import { STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
@@ -308,6 +308,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     }
     const set = (path: THREE.Vector3[]) => { s.path = path; s.len = pathLength(path); s.d = 0 }
     const c = s.chore
+    idleTick(who.id, s.phase === 'idle' && !SHOP.leaving, dt)
     if (s.phase === 'idle') {
       s.check += dt
       s.t += dt
@@ -3475,6 +3476,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // kitchen to the racks for a few and back with them to the plating place, set down there for plating on, and back to their place
     {
       const pl = platerRun.current
+      // (the third cook at their place with nothing to do (the second cook doing it is Roasting's to tell: he may be off fetching))
+      if (plater?.role === 'sous') idleTick(plater.id, pl.phase === 'idle' && FIRE_TEND.want === null && !SHOP.leaving, dt)
       // (someone to keep the fire: the grill asks them rather than dropping the coals in itself)
       FIRE_TEND.tender = !!given && !ownerServes && open
       const home = () => (plater ? inBar(`crew-${plater.id}`, ownerAt()) : ownerAt()).setY(0)
@@ -3989,6 +3992,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           w.yaw = home.yaw
         }
       }
+      // (nothing to do just now, or at something: for how they tire (game/shopState's STAFF_IDLE, data/staff's activityOf))
+      if (!ownerServes) idleTick(servers[wi]?.id, w.phase === 'idle' && w.run === null && !SHOP.leaving, dt)
       const duty = ownerServes ? 'all' : dutyOf(wi, nServers)
       // (the tray at their hands wherever they are: its height is as it's held standing up on the kitchen's dais, so down on the customers'
       // floor it comes down the dais's step with them (it stayed up, a plate riding 14 cm over their hands out on the floor))

@@ -116,3 +116,21 @@ export const tireNow = (w: Pick<Worker, 'stamina' | 'skills'>, late: boolean) =>
   tirePerHour(w) * (late && skillsOf(w).every((k) => k.lateTire !== false) ? LATE_TIRE : 1) * product(skillsOf(w).map((k) => k.tire))
 /** fatigue shed per hour with the shop shut: the twelve hours between closing and opening rest anyone fully */
 export const restPerHour = 12
+
+/**
+ * What they're about just now, at work (the owner's, 2026-11-09): busy at something; standing by with nothing to do (待命), tiring very
+ * slowly; or, nothing to do a good while, slacking (偷閒: their handheld game out), resting a little. `idle`: how long (the game's seconds)
+ * they've had nothing to do, none if they're at something.
+ */
+export type Activity = 'busy' | 'idle' | 'slack'
+/** how long (the game's seconds) with nothing to do before standing by turns to slacking */
+export const SLACK_AFTER = 20
+/** standing by: this much of their tiring; slacking: this much of a rest's shedding */
+export const IDLE_TIRE = 0.2
+export const SLACK_REST = 0.35
+export const activityOf = (idle: number | undefined): Activity => (idle === undefined ? 'busy' : idle >= SLACK_AFTER ? 'slack' : 'idle')
+/** their fatigue after `hours` (the game's) at work, tiring at `perHour` (tireNow) busy, as they're about */
+export function workFatigue(fatigue: number, perHour: number, act: Activity, hours: number) {
+  if (act === 'slack') return Math.max(0, fatigue - restPerHour * SLACK_REST * hours)
+  return Math.min(100, fatigue + perHour * (act === 'idle' ? IDLE_TIRE : 1) * hours)
+}
