@@ -228,7 +228,9 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
           <FitLine className="chiller-bin-name">{name}</FitLine>
           {n > 0 && <span key={n} className="chiller-taken" aria-hidden="true">{tl(lang, '試', '試', 'Try')}×{n}</span>}
         </span>
-        {x.en && <span className="chiller-bin-en" lang="en">{stockNameOf(x.id, 'en') ?? x.en}</span>}
+        {/* (its English under it, for the Chinese and Japanese: in English it'd only say the name again, so its line's left blank, the card
+            as tall as the others) */}
+        {x.en && <span className="chiller-bin-en" lang="en" aria-hidden={lang === 'en' || undefined}>{lang === 'en' ? ' ' : stockNameOf(x.id, 'en') ?? x.en}</span>}
         <span className={`chiller-level${out ? ' is-zero' : have < par ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / par) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
           <b className={out ? 'is-zero' : ''}>{tl(lang, '庫存', '在庫', 'Stock')} <em>{have}</em>{pack > 1 && tl(lang, '份', '人前', '')}</b>
