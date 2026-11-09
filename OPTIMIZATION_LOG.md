@@ -18,5 +18,5 @@
 | 09:33 | 下駄箱（`GuestBar3D.tsx` 的 `ShoeCupboard`） | 九扇門各自畫門與描線 → 全部關著時合成一個網格加一條描線，有門在轉（點開、客人放鞋）時換回各自的門 | `_shoecab2.mjs`：關著、打開各一張；`_drawdetail.mjs` 鞋櫃 23 → 5 次 | 總覽 → 約 1,295 |
 | 09:39 | 神龕的門（`DiningRoom.tsx` 的 `ShrineDoors`）＋共用工具 `homeCopy`（`scene/StaticBatch.tsx`） | 六扇門每扇各畫 4 次 → 歸位時依材質合成一份、門一動就換回各自的（鞋櫃也改用同一個工具） | `_shrinedoors.mjs`：開門時 6 扇轉到 1.62／1.70、合併的藏起；關上後合併的回來、門歸零；神龕 34 → 19 次 | 總覽 1,284 次 |
 | 09:44 | 飲料櫃門、收銀台座抽屜（`DiningRoom.tsx`、`TillDesk.tsx`）＋座位抽屜的發光 | 同上，用 `homeCopy`；抽屜類滑鼠指著時也換回本身（發光加在抽屜本身，合併時看不到） | `_stockdoor.mjs` 補貨時門照樣開到 1.6；`_drawerbatch.mjs` 指著時抽屜發光 | 總覽 1,260 次 |
-| 10:05 | 完整 e2e | — | `npm run e2e`：all passed | — |
-| 10:12 | 對話氣泡淡出與上限（`App.tsx`、`GuestBar3D.tsx`、`StaffWords.tsx`、`index.css`） | 句子時間到就突然消失；客人一多，牆上一片氣泡 → 每句帶自己的顯示時間，最後 0.3 秒淡出（`--out`）；同時最多 6 句、藏起最舊的 | `_bubblepos.mjs` 60 秒：淡出中的氣泡透明度 0.48→0.30→0；同時最多 6 句 | — |
+| 09:55 | 完整 e2e | — | `npm run e2e`：all passed | — |
+| 09:59 | 對話氣泡淡出與上限（`App.tsx`、`GuestBar3D.tsx`、`StaffWords.tsx`、`index.css`） | 句子時間到就突然消失；客人一多，牆上一片氣泡 → 每句帶自己的顯示時間，最後 0.3 秒淡出（`--out`）；同時最多 6 句、藏起最舊的 | `_bubblepos.mjs` 60 秒：淡出中的氣泡透明度 0.48→0.30→0；同時最多 6 句 | — |
