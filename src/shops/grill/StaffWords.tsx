@@ -31,8 +31,10 @@ const AT = new THREE.Vector3()
 function spreadBubbles() {
   const placed: { l: number; r: number; t: number; h: number }[] = []
   const all = [...document.querySelectorAll<HTMLElement>('.g3-bubble')].map((el) => {
-    const r = el.getBoundingClientRect(), dy = +(el.dataset.dy ?? 0)
-    return { el, r, base: r.top + dy, shown: r.width > 0 && el.closest<HTMLElement>('[style*="visibility: hidden"]') === null }
+    // (where it stands unlifted: its place now less the lift it has just now, mid-ease, not the lift it's easing to (that set it a
+    // little higher each time while it eased, and a bubble crept up off its speaker onto the wall))
+    const r = el.getBoundingClientRect(), now = -parseFloat(getComputedStyle(el).translate.split(' ')[1] ?? '0') || 0
+    return { el, r, base: r.top + now, shown: r.width > 0 && el.closest<HTMLElement>('[style*="visibility: hidden"]') === null }
   }).filter((x) => x.shown).sort((a, b) => b.base - a.base)
   for (const x of all) {
     const h = x.r.height
@@ -42,8 +44,9 @@ function spreadBubbles() {
       if (!hit) break
       top = hit.t - h - 4
     }
-    const dy = Math.min(140, Math.max(0, x.base - top))
-    placed.push({ l: x.r.left, r: x.r.right, t: top, h })
+    // (lifted a little at most: further, the bubble's off its speaker's head, over someone else or the wall)
+    const dy = Math.min(60, Math.max(0, x.base - top))
+    placed.push({ l: x.r.left, r: x.r.right, t: x.base - dy, h })
     if (Math.abs(dy - +(x.el.dataset.dy ?? 0)) > 1) { x.el.dataset.dy = String(dy); x.el.style.translate = dy ? `0 ${-dy}px` : '' }
   }
 }
@@ -84,7 +87,10 @@ function Word({ word }: { word: StaffWord }) {
       } else scene.traverse((q) => { if (!who.current && q.userData.staffId === word.id) who.current = q })
     }
     const t = who.current
-    o.visible = !!t && t.visible
+    // (shown only while they are: not while a stand-in walks for them, nor once they've faded out of a doorway)
+    let shown = !!t
+    for (let q: THREE.Object3D | null = t; q && shown; q = q.parent) if (!q.visible || (q.userData.fade ?? 1) < 0.5) shown = false
+    o.visible = shown
     showEl(el.current, o.visible)
     if (!t) return
     o.position.copy(o.parent.worldToLocal(t.localToWorld(AT.copy(HEAD))))

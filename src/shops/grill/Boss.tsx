@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -330,11 +330,20 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   const [joy, setJoy] = useState(0)
   const gulps = useRef({ next: 0, n: 0 })
   const joySeen = useRef(BOSS_FX.joyAt)
+  /** what floats over him (his words, gulps, coins): drei's Html draws them whether he's shown or not, so with him out on the floor his
+   * words hung on at his empty place; hidden with him */
+  const floats = useRef(new Set<HTMLElement>())
+  const floatEl = useCallback((el: HTMLElement | null) => { if (el) floats.current.add(el) }, [])
   useFrame(({ camera: cam, clock }) => {
     const m = mover.current
     if (!m) return
     // (out on the floor serving, drawn there by GuestBar3D: not here at his place meanwhile)
     m.visible = !OWNER_OUT.on
+    for (const el of floats.current) {
+      if (!el.isConnected) { floats.current.delete(el); continue }
+      const vis = m.visible ? '' : 'hidden'
+      if (el.style.visibility !== vis) el.style.visibility = vis
+    }
     // (the step from the clock itself, as for his walk: the frame's delta runs short while the frames are paced)
     const dt = Math.min(Math.max(0, clock.elapsedTime - fadeClock.current), 0.1)
     fadeClock.current = clock.elapsedTime
@@ -683,17 +692,17 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       {/* (what he's muttering, over his head) */}
       {say && !getEdit().on && (
         <Html position={[0, 1.42, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
-          <span key={say.key} className="g3-bubble g3-say boss-say"><b className="say-who">{SPEAKERS.get('owner') ?? '老闆'}</b>{say.text}</span>
+          <div className="g3-label" ref={floatEl}><span key={say.key} className="g3-bubble g3-say boss-say"><b className="say-who">{SPEAKERS.get('owner') ?? '老闆'}</b>{say.text}</span></div>
         </Html>
       )}
       {gulu > 0 && !getEdit().on && (
         <Html position={[0.18, 1.2, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
-          <span key={gulu} className="boss-float boss-gulu">{lang === 'ja' ? 'ゴクゴク〜' : lang === 'en' ? 'Glug glug~' : '咕嚕咕嚕～'}<Glyph id="note" size="0.95em" /></span>
+          <span key={gulu} ref={floatEl} className="boss-float boss-gulu">{lang === 'ja' ? 'ゴクゴク〜' : lang === 'en' ? 'Glug glug~' : '咕嚕咕嚕～'}<Glyph id="note" size="0.95em" /></span>
         </Html>
       )}
       {joy > 0 && !getEdit().on && (
         <Html position={[0, 1.3, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
-          <span key={joy} className="boss-joy" aria-hidden="true">
+          <span key={joy} ref={floatEl} className="boss-joy" aria-hidden="true">
             {(['coin', 'heart', 'coin', 'heart', 'coin', 'heart'] as const).map((c, i) => <i key={i} className={`is-${c}`} style={{ '--i': i } as React.CSSProperties}><Glyph id={c} size={18} /></i>)}
           </span>
         </Html>

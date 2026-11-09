@@ -4057,6 +4057,9 @@ button {
   align-items: center;
   gap: 2px;
   white-space: nowrap;
+  /* (its bottom edge on the point over the head, not its middle (drei's center): a line wrapping to two or three grew down over the face,
+     and a longer bubble sat lower than a short one) */
+  translate: 0 -50%;
 }
 
 .g3-label .mood-face {

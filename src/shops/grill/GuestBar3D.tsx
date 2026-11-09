@@ -439,7 +439,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         : c?.kind === 'roll' ? tl3('更換衛生紙', 'トイレ紙交換', 'Changing the toilet roll') + (s.phase === 'work' ? pct(s.t / 2.8) : '')
         : tl3('補充面紙', 'ティッシュ補充', 'Refilling tissues') + (s.phase === 'work' ? pct(s.t / 2.0) : '')
       if (el.textContent !== text) el.textContent = text
-      el.style.visibility = g.current?.visible === false ? 'hidden' : ''
+      el.style.visibility = g.current?.visible === false || (g.current?.userData.fade ?? 1) < 0.5 ? 'hidden' : ''
     }
     if (h.roll) h.roll.visible = out && c?.kind === 'roll' && !s.done
     if (h.box) h.box.visible = out && c?.kind === 'tissue' && !s.done
@@ -3198,8 +3198,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // (the name tag goes with the body: gone a little before they are, so none is left hanging in the doorway)
       const tag = labels.current.get(s.id)
-      if (tag) tag.style.opacity = s.fade !== undefined ? String(Math.max(0, Math.min(1, s.fade * 1.6 - 0.5))) : ''
-      if (g) g.visible = !(s.phase === 'wcIn' && s.wc?.who !== 'drink')
+      const hidden = s.phase === 'wcIn' && s.wc?.who !== 'drink'
+      if (g) g.visible = !hidden
+      // (drei's Html draws its page bit whether its group's shown or not: inside the stall, their words hung on the toilet's wall with no
+      // one under them, the owner's ghost bubble; hidden here with the body)
+      if (tag) {
+        tag.style.opacity = s.fade !== undefined ? String(Math.max(0, Math.min(1, s.fade * 1.6 - 0.5))) : ''
+        const vis = hidden ? 'hidden' : ''
+        if (tag.style.visibility !== vis) tag.style.visibility = vis
+      }
       // (down a step, standing in the genkan)
       if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
     }
@@ -4526,7 +4533,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
                 onPointerDown={grab(s)} grabbable={() => !getEdit().on && canMove(s)} />
             </group>
             {/* (their label just over their head, sat up on the seat or standing) */}
-            <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.15}
+            <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.08}
               say={speech[s.id]} dots={!!g && !walking && g.state === 'waiting' && g.rating === null} rating={g?.rating ?? null} angry={g?.state === 'angry'}
               partner={g?.partner !== undefined} name={guestLabel(s.id, lang)} onEl={labelEl} />
           </group>
