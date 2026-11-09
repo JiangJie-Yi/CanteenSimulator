@@ -17,4 +17,4 @@
 | 09:26 | 座位抽屜（`Roasting.tsx` 的 `BarDrawers`） | 8 個抽屜各畫本體、黃銅把手與兩條描線 → 全部關著時畫一份依材質合併的複本（`StaticBatch` 的 `parts`），拉出來的那個從複本藏起、自己畫 | `_drawerbatch.mjs`：拉開、推回各拍一張，沒有重複的抽屜；點擊與標籤照舊 | 總覽 1,333 → 1,313 |
 | 09:33 | 下駄箱（`GuestBar3D.tsx` 的 `ShoeCupboard`） | 九扇門各自畫門與描線 → 全部關著時合成一個網格加一條描線，有門在轉（點開、客人放鞋）時換回各自的門 | `_shoecab2.mjs`：關著、打開各一張；`_drawdetail.mjs` 鞋櫃 23 → 5 次 | 總覽 → 約 1,295 |
 | 09:39 | 神龕的門（`DiningRoom.tsx` 的 `ShrineDoors`）＋共用工具 `homeCopy`（`scene/StaticBatch.tsx`） | 六扇門每扇各畫 4 次 → 歸位時依材質合成一份、門一動就換回各自的（鞋櫃也改用同一個工具） | `_shrinedoors.mjs`：開門時 6 扇轉到 1.62／1.70、合併的藏起；關上後合併的回來、門歸零；神龕 34 → 19 次 | 總覽 1,284 次 |
-| 09:52 | 飲料櫃門、收銀台座抽屜（`DiningRoom.tsx`、`TillDesk.tsx`）＋座位抽屜的發光 | 同上，用 `homeCopy`；抽屜類滑鼠指著時也換回本身（發光加在抽屜本身，合併時看不到） | `_stockdoor.mjs` 補貨時門照樣開到 1.6；`_drawerbatch.mjs` 指著時抽屜發光 | 總覽 1,260 次 |
+| 09:44 | 飲料櫃門、收銀台座抽屜（`DiningRoom.tsx`、`TillDesk.tsx`）＋座位抽屜的發光 | 同上，用 `homeCopy`；抽屜類滑鼠指著時也換回本身（發光加在抽屜本身，合併時看不到） | `_stockdoor.mjs` 補貨時門照樣開到 1.6；`_drawerbatch.mjs` 指著時抽屜發光 | 總覽 1,260 次 |
