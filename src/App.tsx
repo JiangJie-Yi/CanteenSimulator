@@ -1906,6 +1906,8 @@ export default function App() {
   /** what each customer's saying just now (over their head) */
   const [speech, setSpeech] = useState<Record<number, { key: number; text: string; ms: number }>>({})
   const chatId = useRef(0)
+  // (a guest's order in the log, each language's way round: 點了 X, Xを注文, ordered X)
+  const ordered = (name: string) => (lang === 'ja' ? `${name}を注文` : lang === 'en' ? `ordered ${name}` : `點了 ${name}`)
   const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner', raw: string, guest?: number) => {
     // what a customer says is shown in a bubble over their head, where there's a 3D bar to show it on: whose it is passed with it (their
     // words carry no number now: the bubble's yellow tag says who)
@@ -2109,7 +2111,7 @@ export default function App() {
       const key = ++feedSeq.current
       setFeed((f) => [...f.slice(-2), { key, id, guest }])
       const it = findItem(dish, id)
-      talk('order', `${tl(lang, '點了', 'から', ' ordered ')} ${it ? nameIn(lang, it) : id}`, guest)
+      talk('order', ordered(it ? nameIn(lang, it) : id), guest)
       window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
     }
     return ok
@@ -2691,7 +2693,7 @@ export default function App() {
     setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
     // (in English, its name made the menu's way, from its parts: the entry carries only the Chinese and the Japanese)
     const en = e.parts.map((pt) => partEn(findItem(d, pt.id)?.en, pt.dabs, d.roast ? 'grill' : 'plain') ?? pt.name).join(' & ')
-    talk('order', `${tl(lang, '點了', 'から', ' ordered ')} ${nameIn(lang, { ...e, en })}`, guest)
+    talk('order', ordered(nameIn(lang, { ...e, en })), guest)
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }
@@ -2701,7 +2703,7 @@ export default function App() {
     if (!d) return
     book('revenue', d.price)
     book('food', Math.round(d.price * 0.35))
-    talk('order', lang === 'en' ? `took a ${((d as { en?: string }).en ?? d.zh).toLowerCase()} from the fridge` : `${tl(lang, '從冰箱拿了', 'が冷蔵庫から', '')} ${lang === 'ja' ? d.ja : d.zh}`, guest)
+    talk('order', lang === 'en' ? `took a ${((d as { en?: string }).en ?? d.zh).toLowerCase()} from the fridge` : lang === 'ja' ? `冷蔵庫から${d.ja}を取った` : `從冰箱拿了 ${d.zh}`, guest)
   }
   const sellDrinkRef = useRef(sellDrink)
   sellDrinkRef.current = sellDrink
