@@ -1,0 +1,178 @@
+// The labels over the room's things when pointed at (scene/hoverTip's title and hint), most of them written in Chinese where they're set:
+// their Japanese and English, looked up as the label's drawn (ui/HoverTip), each line of a hint on its own ('｜' between them, '・' too); a
+// few with a number in them matched by their shape. What isn't here is shown as it was written.
+import type { Lang } from './i18n'
+
+export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
+  // ---- names
+  '2F 員工休息室／倉庫': ['2F 休憩室／倉庫', '2F staff room / store'],
+  '【下駄箱】': ['【下駄箱】', '[Shoe cupboard]'],
+  '【常溫食材】白米存量': ['【常温食材】白米の在庫', '[Larder] Rice in stock'],
+  '【廊燈】神前廊燈': ['【灯籠】神前灯籠', '[Lantern] Shrine lantern'],
+  '【掛軸】三味線美人圖': ['【掛軸】三味線美人図', '[Scroll] Beauty with shamisen'],
+  '【觀賞盆栽】青竹': ['【観葉鉢】青竹', '[Potted plant] Green bamboo'],
+  保溫餐檯: ['保温台', 'Warming counter'],
+  候位長凳: ['待合ベンチ', 'Waiting bench'],
+  '備長炭（麻袋）': ['備長炭（麻袋）', 'Binchotan (sack)'],
+  免治馬桶: ['温水洗浄便座', 'Washlet toilet'],
+  免治馬桶操作面板: ['温水洗浄便座の操作パネル', 'Washlet panel'],
+  冷藏櫃門: ['冷蔵庫の扉', 'Fridge door'],
+  櫃門: ['戸棚の扉', 'Cupboard door'],
+  味噌湯鍋: ['味噌汁の鍋', 'Miso soup pot'],
+  員工專用門: ['従業員用ドア', 'Staff door'],
+  圓窗: ['丸窓', 'Round window'],
+  女廁電燈: ['女子トイレの照明', 'Women’s light'],
+  男廁電燈: ['男子トイレの照明', 'Men’s light'],
+  店內電燈: ['店内の照明', 'Room lights'],
+  門口燈籠: ['入口の提灯', 'Door lanterns'],
+  小判金幣: ['小判', 'Koban coin'],
+  平板: ['タブレット', 'Tablet'],
+  廁所門: ['トイレの戸', 'Toilet door'],
+  御守: ['お守り', 'Omamori charm'],
+  御神酒: ['御神酒', 'Sacred sake'],
+  惠比壽石像: ['恵比寿像', 'Ebisu figure'],
+  抽屜: ['引き出し', 'Drawer'],
+  收納櫃: ['収納棚', 'Cupboard'],
+  收銀抽屜: ['レジの引き出し', 'Till drawer'],
+  收銀機操作說明書: ['レジ取扱説明書', 'Register manual'],
+  服務鈴: ['呼び鈴', 'Service bell'],
+  根莖蔬菜: ['根菜', 'Root vegetables'],
+  椪柑: ['ポンカン', 'Ponkan oranges'],
+  '武士頭盔（兜）': ['兜', 'Samurai helmet'],
+  水龍頭: ['蛇口', 'Tap'],
+  洗手台水龍頭: ['手洗いの蛇口', 'Washbasin tap'],
+  清酒杯: ['盃', 'Sake cups'],
+  溫控旋鈕: ['温度調節つまみ', 'Thermostat knob'],
+  炭堆已滿: ['炭がいっぱい', 'The fire’s full'],
+  發票: ['レシート', 'Receipt'],
+  神棚: ['神棚', 'Kamidana shrine'],
+  神棚門: ['神棚の扉', 'Shrine doors'],
+  經書: ['経本', 'Sutra book'],
+  羽釜與爐灶: ['羽釜とかまど', 'Rice pot and stove'],
+  老闆: ['店主', 'Owner'],
+  '菰樽（清酒）': ['菰樽（清酒）', 'Komodaru (sake)'],
+  行燈: ['行灯', 'Andon lamp'],
+  衛生棉: ['ナプキン', 'Sanitary pads'],
+  衛生紙: ['ティッシュ', 'Tissues'],
+  衛生紙與清潔用品: ['ティッシュと掃除用品', 'Tissues and cleaning supplies'],
+  鐵串筒: ['鉄串立て', 'Skewer holder'],
+  髒鐵串盤: ['使用済み鉄串', 'Used skewers'],
+  電鍋: ['電気釜', 'Rice cooker'],
+  音箱: ['スピーカー', 'Speaker'],
+  食材冷凍櫃: ['食材の冷凍庫', 'Freezer'],
+  飯桶: ['おひつ', 'Rice tub'],
+  飲料庫存區: ['飲み物の在庫', 'Drinks stock'],
+  飲料櫃: ['飲み物の冷蔵庫', 'Drinks fridge'],
+  // ---- what they're for, and what a click does
+  '一直保溫著的味噌湯（豆腐、海帶芽、蔥）': ['いつも温かい味噌汁（豆腐・わかめ・ねぎ）', 'Miso soup kept hot (tofu, wakame, spring onion)'],
+  '七福神之一，保佑生意興隆、漁獲豐收': ['七福神の一柱、商売繁盛と大漁の神', 'One of the seven lucky gods: good trade and good catches'],
+  '使用中：裡面有人': ['使用中：中に人がいます', 'Occupied'],
+  '使用中：點一下敲門': ['使用中：クリックでノック', 'Occupied: click to knock'],
+  '供品，圓滿吉祥': ['お供え、円満吉祥', 'An offering, for good fortune'],
+  '供在神前的木造廊燈，柔和照亮神龕門戶。': ['神前に供える木の灯籠、神棚の扉をやわらかく照らす。', 'A wooden lantern before the shrine, lighting its doors softly.'],
+  '供奉惠比壽；點御神酒供酒，點門開關': ['恵比寿様を祀る；御神酒でお供え、扉はクリックで開閉', 'Ebisu’s shrine: offer sake with the flask, click the doors'],
+  '供神的酒杯；點御神酒壺倒酒': ['お供えの盃；御神酒の徳利で注ぐ', 'Cups for the gods: pour from the sake flask'],
+  先點櫃門打開: ['先に扉を開けて', 'Open the door first'],
+  '免費提供・歡迎取用': ['ご自由にどうぞ', 'Free, help yourself'],
+  '前面有人，打不開': ['前に人がいて開かない', 'Someone’s in the way'],
+  '客人坐著，等他走了再開': ['お客さんが座っている、帰ってから', 'A customer’s sat there: wait till they go'],
+  客滿時客人坐在這裡等位子: ['満席のときお客さんがここで待つ', 'Where customers wait when it’s full'],
+  '很乾淨・點一下沖水': ['きれい・クリックで流す', 'Clean · click to flush'],
+  '拖出來，放到桌上或客人面前': ['引き出して、台やお客さんの前へ', 'Drag it out, onto a table or before a customer'],
+  拖曳移動: ['ドラッグで移動', 'Drag to move'],
+  '拖曳移動，放回櫃子或遞給客人': ['ドラッグで移動、棚に戻すかお客さんへ', 'Drag: back in the fridge, or to a customer'],
+  招財納福的金幣: ['福を招く金貨', 'A coin to bring in luck'],
+  '放不下了，等底下的炭燒成灰再加': ['いっぱい、下の炭が灰になってから', 'No room: wait till the coals below burn down'],
+  '正在洗碗；點一下也能自己開水': ['皿洗い中；クリックで水も出せる', 'Washing up; click to run it yourself'],
+  '江戶浮世繪藝伎，洋溢典雅古韻': ['江戸の浮世絵美人、雅な趣', 'An Edo ukiyo-e beauty, elegant and old'],
+  老式的炊飯爐灶: ['昔ながらのかまど', 'An old rice stove'],
+  '老式的炊飯爐灶（現在用電鍋煮飯）': ['昔ながらのかまど（今は電気釜で炊く）', 'An old rice stove (the rice is cooked in the electric cooker now)'],
+  '般若心經，供在神前': ['般若心経、神前に供える', 'The Heart Sutra, offered at the shrine'],
+  '象徵節節高升，增添店內沉靜綠意': ['すくすく伸びる縁起物、店に静かな緑', 'Rising joint by joint: quiet green for the room'],
+  '鍬形與吹返，裝飾用': ['鍬形と吹返し、飾り', 'Crest and wings, for show'],
+  '開運招福：保佑生意興隆': ['開運招福：商売繁盛', 'Good luck: may trade prosper'],
+  '閒人勿進・禁止進入': ['関係者以外立入禁止', 'Staff only · no entry'],
+  '飯桶、味噌湯、羽釜與電鍋都放在加熱座上保溫': ['おひつ・味噌汁・羽釜・電気釜を保温台で温める', 'Rice tub, miso, rice pot and cooker kept warm on its wells'],
+  '飯煮好了（保溫中），等著盛進飯桶': ['炊き上がり（保温中）、おひつに移すのを待つ', 'Cooked (keeping warm), waiting for the tub'],
+  '衛生紙與清潔用品・點一下看耗材': ['ティッシュと掃除用品・クリックで消耗品を見る', 'Tissues and cleaning supplies · click for supplies'],
+  點一下供清酒: ['クリックで御神酒を供える', 'Click to offer sake'],
+  點一下打開: ['クリックで開ける', 'Click to open'],
+  點一下打開食材櫃: ['クリックで食材庫を開く', 'Click to open the stock'],
+  '點一下打開（員工休息室）': ['クリックで開ける（休憩室）', 'Click to open (staff room)'],
+  '點一下打開（左右拉開）': ['クリックで開ける（左右に引く）', 'Click to slide open'],
+  點一下拉開: ['クリックで引き出す', 'Click to pull out'],
+  '點一下拉開／推回（上鎖時拉不開）': ['クリックで開閉（施錠中は開かない）', 'Click to open / shut (not while locked)'],
+  點一下按鈴: ['クリックで鳴らす', 'Click to ring'],
+  點一下掀開蓋子: ['クリックでふたを開ける', 'Click to lift the lid'],
+  點一下撕下: ['クリックで切り取る', 'Click to tear off'],
+  點一下熄掉燈籠: ['クリックで提灯を消す', 'Click to put the lanterns out'],
+  點一下熄燈: ['クリックで消灯', 'Click to turn off'],
+  點一下翻閱: ['クリックで読む', 'Click to read'],
+  點一下蓋上蓋子: ['クリックでふたを閉める', 'Click to put the lid on'],
+  點一下開啟音樂: ['クリックで音楽をかける', 'Click for music'],
+  點一下開水: ['クリックで水を出す', 'Click to run water'],
+  '點一下開水（開著會一直計水費）': ['クリックで水を出す（出しっぱなしは水道代）', 'Click to run water (it’s metered while on)'],
+  點一下開燈: ['クリックで点灯', 'Click to turn on'],
+  點一下開關: ['クリックで切り替え', 'Click to switch'],
+  點一下開關門: ['クリックで開閉', 'Click to open or shut'],
+  '點一下開關（有人時會敲門）': ['クリックで開閉（使用中はノック）', 'Click to open or shut (knocks if occupied)'],
+  點一下關上: ['クリックで閉める', 'Click to shut'],
+  '點一下關上（員工休息室）': ['クリックで閉める（休憩室）', 'Click to shut (staff room)'],
+  點一下關水: ['クリックで水を止める', 'Click to turn off the water'],
+  點一下關燈: ['クリックで消灯', 'Click to turn off'],
+  點一下關閉音樂: ['クリックで音楽を止める', 'Click to stop the music'],
+  點一下點亮燈籠: ['クリックで提灯を灯す', 'Click to light the lanterns'],
+  點一下點燈: ['クリックで点灯', 'Click to light'],
+  '點一下：溫水洗淨': ['クリック：温水洗浄', 'Click: warm-water wash'],
+  '點擊打開・備用的衛生紙、擦手紙與洗手乳補充包': ['クリックで開く・予備のトイレットペーパー、ペーパータオル、詰め替え用ハンドソープ', 'Click to open · spare rolls, paper towels and soap refills'],
+  點擊開啟: ['クリックで開く', 'Click to open'],
+  '點擊開啟 / 關閉': ['クリックで開閉', 'Click to open / shut'],
+  點擊關上: ['クリックで閉める', 'Click to shut'],
+  點擊關閉: ['クリックで閉じる', 'Click to close'],
+  '點螢幕操作：點單、分類、結帳': ['画面をタップ：注文・分類・会計', 'Tap the screen: orders, categories, bill'],
+}
+
+/** what's put together with a number in it: its shape, and the same said in Japanese and in English */
+const SHAPES: [RegExp, (m: string[]) => string, (m: string[]) => string][] = [
+  [/^剩 (\d+)\/(\d+)$/, (m) => `残り ${m[1]}/${m[2]}`, (m) => `${m[1]}/${m[2]} left`],
+  [/^點一下抽一張$/, () => 'クリックで1枚取る', () => 'Click to take one'],
+  [/^(\d+)\/(\d+)$/, (m) => `${m[1]}/${m[2]}`, (m) => `${m[1]}/${m[2]}`],
+  [/^空了，開店前會換新的一盒$/, () => '空、開店前に新しい箱に替える', () => 'Empty: a new box goes in before opening'],
+  [/^一個座位一盒衛生紙（(\d+)\/(\d+)）$/, (m) => `一席にティッシュ一箱（${m[1]}/${m[2]}）`, (m) => `A box of tissues to each place (${m[1]}/${m[2]})`],
+  [/^點一下拉開$/, () => 'クリックで引き出す', () => 'Click to pull it out'],
+  [/^衛生紙 (\d+)\/(\d+)$/, (m) => `ティッシュ ${m[1]}/${m[2]}`, (m) => `Tissues ${m[1]}/${m[2]}`],
+  [/^點衛生紙抽一張$/, () => 'ティッシュをクリックで1枚', () => 'Click the tissues for one'],
+  [/^點抽屜推回去$/, () => '引き出しをクリックで戻す', () => 'Click the drawer to push it in'],
+  [/^煮飯中⋯⋯還要 (\d+) 秒$/, (m) => `炊飯中……あと ${m[1]} 秒`, (m) => `Cooking… ${m[1]} s to go`],
+  [/^空著（飯桶裡還有 (\d+) 份飯）$/, (m) => `空（おひつに残り ${m[1]} 人前）`, (m) => `Empty (${m[1]} portions left in the tub)`],
+  [/^乾淨鐵串 (\d+)\/(\d+)$/, (m) => `きれいな鉄串 ${m[1]}/${m[2]}`, (m) => `Clean skewers ${m[1]}/${m[2]}`],
+  [/^待洗鐵串 (\d+)$/, (m) => `洗い待ち ${m[1]} 本`, (m) => `${m[1]} to wash`],
+  [/^清潔度 (\d+)%$/, (m) => `清潔度 ${m[1]}%`, (m) => `Clean ${m[1]}%`],
+  [/^點一下打掃$/, () => 'クリックで掃除', () => 'Click to clean'],
+  [/^衛生紙備品 (\d+) 盒$/, (m) => `ティッシュ予備 ${m[1]} 箱`, (m) => `${m[1]} spare tissue boxes`],
+  [/^點一下看耗材$/, () => 'クリックで消耗品を見る', () => 'Click for supplies'],
+  [/^左鍵調冷、右鍵調暖，(-?\d+)～(-?\d+)℃$/, (m) => `左クリックで冷たく、右クリックで暖かく、${m[1]}～${m[2]}℃`, (m) => `Left-click colder, right-click warmer, ${m[1]} to ${m[2]}℃`],
+]
+
+/** one line of a label in the page's language */
+function lineIn(line: string, k: 0 | 1): string {
+  const whole = TIP_TEXT[line]
+  if (whole) return whole[k]
+  for (const [re, ja, en] of SHAPES) {
+    const m = re.exec(line)
+    if (m) return (k ? en : ja)([...m])
+  }
+  // (pieces joined by ・: each on its own)
+  if (line.includes('・')) {
+    const parts = line.split('・'), done = parts.map((p) => lineIn(p, k))
+    if (done.some((d, i) => d !== parts[i])) return done.join(k ? ' · ' : '・')
+  }
+  return line
+}
+
+/** a label's title or hint as it's shown in the page's language (its lines, between ｜, each on its own) */
+export function tipIn(text: string, lang: Lang) {
+  if (lang === 'zh' || !text) return text
+  const k = lang === 'ja' ? 0 : 1
+  return text.split('｜').map((l) => lineIn(l, k)).join('｜')
+}

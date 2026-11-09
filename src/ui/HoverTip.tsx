@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { TIP_AIM, useTip } from '@/scene/hoverTip'
 import { Glyph } from './GameIcons'
+import { tipIn } from '@/data/tipText'
 
 /** how tall on screen a thing may be (px) for its tag to stand over its top; anything bigger, the tag stays by the pointer */
 const ANCHOR_MAX = 220
@@ -82,13 +83,17 @@ export function HoverTip({ hidden = false }: { hidden?: boolean }) {
     return () => cancelAnimationFrame(raf)
   }, [tip])
   if (!tip || hidden) return null
+  // (in the page's language: most labels are written in Chinese where they're set (data/tipText))
+  const docLang = document.documentElement.lang
+  const lang = docLang === 'ja' ? 'ja' : docLang === 'en' ? 'en' : 'zh'
+  const title = tipIn(tip.title, lang), hint = tipIn(tip.hint, lang)
   return (
     <div ref={el} className={`hover-tip${leaving ? ' is-leaving' : ''}`} aria-hidden="true">
       {/* (the name on one line; what it says under it, and after a ｜ what to do, on a line of its own, smaller and fainter (the owner's: a
           long line ran out past the tag's edges)) */}
       <span className={`tool-tag${tip.warn ? ' is-warn' : ''}${tip.who ? ' is-who' : ''}`}>
-        <b className="tip-title">{tip.title}</b>
-        {tip.hint.split('｜').map((line, i) => line && <small key={i} className={i ? 'tip-act' : undefined}>{tip.warn && !i && <Glyph id="ban" size="1em" />}{line}</small>)}
+        <b className="tip-title">{title}</b>
+        {hint.split('｜').map((line, i) => line && <small key={i} className={i ? 'tip-act' : undefined}>{tip.warn && !i && <Glyph id="ban" size="1em" />}{line}</small>)}
       </span>
     </div>
   )
