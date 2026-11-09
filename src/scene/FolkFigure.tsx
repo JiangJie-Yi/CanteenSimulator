@@ -458,6 +458,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const tall = useRef(0)
   const lastPos = useRef<THREE.Vector3 | null>(null)
   const outer = useRef<THREE.Group>(null)
+  /** how far up they're lifted, eased to the seat's height as they sit (null till first drawn) */
+  const lifted = useRef<number | null>(null)
   const exprNow = useRef<Expr | null>('neutral')
   const v3 = useMemo(() => new THREE.Vector3(), [])
   const chopDir = useMemo(() => new THREE.Vector3(), [])
@@ -494,6 +496,14 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     applyFade(fade?.() ?? 1)
     const o = outer.current
     if (!o) return
+    // (up onto the stool's seat as they sit, down off it as they stand, over a quarter of a second: it was put there at once, a hop of 0.8 in a
+    // frame (tests/e2e/_popguest.mjs found it); the first time, where they are already)
+    {
+      const want = walking || ground ? 0 : SEAT
+      lifted.current = lifted.current === null ? want : lifted.current + (want - lifted.current) * Math.min(1, dt * 7)
+      if (Math.abs(want - lifted.current) < 1e-4) lifted.current = want
+      o.position.y = lifted.current
+    }
     // (walking: how fast they're going, from how far they've come since the last frame; stood still on the way, they stand)
     o.getWorldPosition(v3)
     const moved = lastPos.current ? Math.hypot(v3.x - lastPos.current.x, v3.z - lastPos.current.z) / Math.max(dt, 1e-3) : 0
@@ -634,7 +644,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     fig.carried?.scale.setScalar(spec.briefcase && walking ? 1.4 : 0)
     // (by the stool while they sit: in the figure's frame, which is scaled to their size and lifted to the seat)
     if (fig.parked) {
-      const kk = fit * spec.size, lift = walking || ground ? 0 : SEAT
+      // (on the floor by the stool, however far up onto the seat they've got)
+      const kk = fit * spec.size, lift = lifted.current ?? (walking || ground ? 0 : SEAT)
       if (spec.briefcase && !walking) {
         fig.parked.position.set(-0.22 / kk, -lift / kk, 0.12 / kk)
         fig.parked.rotation.y = 0.3
@@ -650,10 +661,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   })
 
   const k = fit * spec.size
-  const seatLift = walking || ground ? 0 : SEAT
   return (
-    // (sat, the round body sits on the stool's seat; standing or walking, on the floor)
-    <group ref={outer} position-y={seatLift}>
+    // (sat, the round body sits on the stool's seat; standing or walking, on the floor: its height eased there each frame (lifted))
+    <group ref={outer}>
       <group scale={k}>
         {/* (the chopsticks and their bite, the phone, the briefcase in hand and by the stool: parts of the one mesh) */}
         <primitive object={fig.root} />
