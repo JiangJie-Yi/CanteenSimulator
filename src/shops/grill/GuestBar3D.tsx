@@ -3081,7 +3081,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (in through the door faded in, as the takeaways are (they were there at once, whole, in the doorway); one off the bench is in already)
         if (!s.from) s.fade = d >= 0.6 && s.t >= FADE_S ? undefined : Math.min(1, d / 0.6 + s.t / FADE_S)
         g?.position.copy(p)
-        if (g) g.rotation.y = d < stand ? Math.atan2(dir.x, dir.z) : st.yaw
+        // (turned to their way quickly but not at once: at each corner of it they snapped round in a frame)
+        if (g) g.rotation.y = s.t < dt * 1.5 ? Math.atan2(dir.x, dir.z) : turnToward(g.rotation.y, d < stand ? Math.atan2(dir.x, dir.z) : st.yaw, dt * 1.5)
         // (welcomed in as they come through the noren: the servers and the owner)
         if (!s.welcomed && s.t > 0.5) {
           s.welcomed = true
@@ -3156,7 +3157,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const d = Math.min(w.len, Math.max(0, s.t - wait) * SPEED * walkSpeedOf(kindOf(s.id).kind))
         const { p, dir } = alongPath(w.path, s.phase === 'wcGo' ? d : w.len - d)
         g?.position.copy(p)
-        if (g) g.rotation.y = s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z)
+        if (g) g.rotation.y = turnToward(g.rotation.y, s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z), dt * 1.5)
         // (into the stall round the corner, faded out over the last step: put out of sight there at once, they went in a blink, seen from above
         // through the slats of its ceiling)
         // (to a third of themselves at the stall's door, the rest just inside it (below): at x2 the last step was two or three frames, and
@@ -3261,7 +3262,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         s.lastD = d
         s.slippers = lp.len - d > stepAt(lp.path)
         g?.position.copy(p)
-        if (g) g.rotation.y = s.t < 0.8 ? st.yaw : Math.atan2(-dir.x, -dir.z)
+        if (g) g.rotation.y = s.t < 0.8 ? st.yaw : turnToward(g.rotation.y, Math.atan2(-dir.x, -dir.z), dt * 1.5)
         shoeStep(s, g, (paid - shoeFrom) / (SHOES_S * v), false)
         // (at the till, facing it: the register's reading follows what they owe)
         // (waiting to pay: on the way out and not yet past the till)
