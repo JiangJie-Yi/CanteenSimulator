@@ -1,4 +1,4 @@
-import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes } from '@/game/skewers'
 import { rattleSound } from './skewerSound'
 import { getClock } from '@/ui/clockStore'
@@ -2419,7 +2419,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
     people?: boolean
     /** what each customer's saying just now, shown over their head */
-    speech?: Record<number, { key: number; text: string }>
+    speech?: Record<number, { key: number; text: string; ms: number }>
     /** a customer's taken a drink from the fridge (it's paid for) */
     onDrink?: (guest: number, drink: DrinkId) => void
     /** the shop's open: shut, nobody's in the room and the plates are back where they started */
@@ -4704,8 +4704,9 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
 })
 
 /** the whole line at once (the owner's: said a piece at a time, each piece ended in …, and looked cut short), wrapping inside the bubble */
-function Say({ text, who, heart }: { text: string; who: string; heart?: boolean }) {
-  return <span className="g3-bubble g3-say"><b className="say-who">{heart && <i className="say-heart"><Glyph id="heart" size="0.9em" /></i>}{who}</b>{text}</span>
+// (faded out over its last 0.3 s: `ms`, how long it's up)
+function Say({ text, who, heart, ms }: { text: string; who: string; heart?: boolean; ms: number }) {
+  return <span className="g3-bubble g3-say" style={{ '--out': `${Math.max(0, ms - 300)}ms` } as CSSProperties}><b className="say-who">{heart && <i className="say-heart"><Glyph id="heart" size="0.9em" /></i>}{who}</b>{text}</span>
 }
 
 const LABEL_STYLE = { pointerEvents: 'none' } as const
@@ -4714,7 +4715,7 @@ const LABEL_Z = [20, 10]
  * again only when one of those changes. Each is a page of its own (drei's Html renders its children into a root of their own), so drawn again
  * with every redraw of the bar, several times a second, every label was laid out again each time */
 const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, partner, name, onEl }: { id: number; y: number
-  say?: { key: number; text: string }; dots: boolean; rating: number | null; angry: boolean; partner: boolean; name: string
+  say?: { key: number; text: string; ms: number }; dots: boolean; rating: number | null; angry: boolean; partner: boolean; name: string
   onEl: (id: number, el: HTMLElement | null) => void }) {
   const at = useMemo(() => [0, y, 0] as [number, number, number], [y])
   return (
@@ -4722,7 +4723,7 @@ const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, p
       <div className="g3-label" ref={(el) => onEl(id, el)}>
         {/* (a bubble only while there's something to say (the owner's): a line, or the dots of waiting to order; their kind over it in
             yellow, no number; nothing at all over someone just sitting there, not even their name) */}
-        {say ? <Say key={say.key} text={say.text} who={name} heart={partner} />
+        {say ? <Say key={say.key} text={say.text} who={name} heart={partner} ms={say.ms} />
           : dots && <span className="g3-bubble"><b className="say-who">{partner && <i className="say-heart"><Glyph id="heart" size="0.9em" /></i>}{name}</b>…</span>}
         {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
       </div>

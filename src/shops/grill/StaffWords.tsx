@@ -1,7 +1,7 @@
 // What the staff (and the owner) say as the day ends and begins, over their heads (game/shopState's STAFF_TALK, App says them): a bubble
 // that follows whoever said it as they walk, gone after a few seconds. Only those speaking just now are drawn (each one its own little
 // page root, so none are kept about between times).
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -22,6 +22,8 @@ const HEAD = new THREE.Vector3(0, 1.62, 0)
  */
 const showEl = (el: HTMLElement | null, on: boolean) => { if (el && (el.style.visibility === 'hidden') === on) el.style.visibility = on ? '' : 'hidden' }
 const AT = new THREE.Vector3()
+/** how many lines may be up over heads at once */
+const MAX_LINES = 6
 
 /**
  * The bubbles kept from lying over one another (the owner's: two heads near together, their words piled up unreadable): a few times a
@@ -29,12 +31,19 @@ const AT = new THREE.Vector3()
  * one already placed lifted just clear above it; eased there (the bubble's own transition), back down as the way clears
  */
 function spreadBubbles() {
+  // (at most so many lines up at once, the newest: the oldest put away (not the dots of those waiting to order); a shop full of talk
+  // was a wall of bubbles)
+  const lines = [...document.querySelectorAll<HTMLElement>('.g3-say')]
+  const now = performance.now()
+  for (const el of lines) if (!el.dataset.born) el.dataset.born = String(now)
+  lines.sort((a, b) => +b.dataset.born! - +a.dataset.born!)
+  lines.forEach((el, i) => el.classList.toggle('is-crowded', i >= MAX_LINES))
   const placed: { l: number; r: number; t: number; h: number }[] = []
   const all = [...document.querySelectorAll<HTMLElement>('.g3-bubble')].map((el) => {
     // (where it stands unlifted: its place now less the lift it has just now, mid-ease, not the lift it's easing to (that set it a
     // little higher each time while it eased, and a bubble crept up off its speaker onto the wall))
-    const r = el.getBoundingClientRect(), now = -parseFloat(getComputedStyle(el).translate.split(' ')[1] ?? '0') || 0
-    return { el, r, base: r.top + now, shown: r.width > 0 && el.closest<HTMLElement>('[style*="visibility: hidden"]') === null }
+    const r = el.getBoundingClientRect(), lift = -parseFloat(getComputedStyle(el).translate.split(' ')[1] ?? '0') || 0
+    return { el, r, base: r.top + lift, shown: r.width > 0 && !el.classList.contains('is-crowded') && el.closest<HTMLElement>('[style*="visibility: hidden"]') === null }
   }).filter((x) => x.shown).sort((a, b) => b.base - a.base)
   for (const x of all) {
     const h = x.r.height
@@ -70,6 +79,8 @@ export const StaffWords = memo(function StaffWords() {
 })
 
 function Word({ word }: { word: StaffWord }) {
+  // (faded out over its last 0.3 s, as it's taken away)
+  const [fadeAt] = useState(() => ({ '--out': `${Math.max(0, word.until - performance.now() - 300)}ms` }) as CSSProperties)
   const g = useRef<THREE.Group>(null)
   const el = useRef<HTMLDivElement>(null)
   const scene = useThree((s) => s.scene)
@@ -98,7 +109,7 @@ function Word({ word }: { word: StaffWord }) {
   return (
     <group ref={g} visible={false}>
       <Html center zIndexRange={Z} style={STYLE}>
-        <div className="g3-label" ref={el}><span className="g3-bubble g3-say staff-say"><b className="say-who">{SPEAKERS.get(word.id) ?? ''}</b>{word.text}</span></div>
+        <div className="g3-label" ref={el}><span className="g3-bubble g3-say staff-say" style={fadeAt}><b className="say-who">{SPEAKERS.get(word.id) ?? ''}</b>{word.text}</span></div>
       </Html>
     </group>
   )

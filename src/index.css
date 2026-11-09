@@ -5696,17 +5696,26 @@ button {
 
 /* what a customer says, over their head */
 .g3-say {
-  /* (the whole line, wrapping inside the bubble past 220 px: never cut, never a long banner) */
+  /* (the whole line, wrapping inside the bubble past 220 px: never cut, never a long banner; in with a little pop, out with a fade as its
+     time ends (--out, set on it: how long till then)) */
   width: max-content;
   max-width: 220px;
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: center;
-  animation: g3-say-in 0.25s ease-out;
+  animation: g3-say-in 0.25s ease-out, g3-say-out 0.3s ease-in var(--out, 600s) forwards;
+}
+/* (more lines up than are let be at once: the oldest put away, StaffWords' spreadBubbles) */
+.g3-say.is-crowded {
+  visibility: hidden;
 }
 
 @keyframes g3-say-in {
   from { opacity: 0; transform: translateY(4px) scale(0.9); }
+}
+
+@keyframes g3-say-out {
+  to { opacity: 0; transform: translateY(-4px) scale(0.96); }
 }
 
 .ai-order .ai-who {

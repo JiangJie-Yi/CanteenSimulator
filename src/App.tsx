@@ -421,7 +421,7 @@ type SceneProps = {
   onGuests: (dishId: string, g: GuestView[]) => void
   spotOn: boolean
   guestsBy: Record<string, GuestView[]>
-  speech: Record<number, { key: number; text: string }>
+  speech: Record<number, { key: number; text: string; ms: number }>
   /** shops with food out on either table (tasting or open): they stay loaded, so nothing on them is lost */
   inUse: string[]
   /** on a phone the customers are drawn in 2D on the guest board, not at the bar in 3D */
@@ -1903,7 +1903,7 @@ export default function App() {
   }
   const [chat, setChat] = useState<{ id: number; who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner'; text: string }[]>([])
   /** what each customer's saying just now (over their head) */
-  const [speech, setSpeech] = useState<Record<number, { key: number; text: string }>>({})
+  const [speech, setSpeech] = useState<Record<number, { key: number; text: string; ms: number }>>({})
   const chatId = useRef(0)
   const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner', raw: string, guest?: number) => {
     // what a customer says is shown in a bubble over their head, where there's a 3D bar to show it on: whose it is passed with it (their
@@ -1911,9 +1911,9 @@ export default function App() {
     if (who === 'guest' && guest !== undefined && !phoneRef.current) {
       const gid = guest
       const key = ++chatId.current
-      setSpeech((sp) => ({ ...sp, [gid]: { key, text: raw } }))
-      // (long enough for a long line to be said a piece at a time)
+      // (long enough for a long line to be said a piece at a time; the bubble's told, so it fades out as its time ends)
       const ms = Math.max(4500, sayChunks(raw).length * SAY_EACH * 1000 + 1500)
+      setSpeech((sp) => ({ ...sp, [gid]: { key, text: raw, ms } }))
       window.setTimeout(() => setSpeech((sp) => (sp[gid]?.key === key ? Object.fromEntries(Object.entries(sp).filter(([k]) => +k !== gid)) : sp)), ms)
       return
     }
