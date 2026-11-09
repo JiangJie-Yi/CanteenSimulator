@@ -44,3 +44,9 @@
 - 原因：快捷鈕在英文介面送出英文句子（Make a 10-dish menu、Try 3 at random、Enough stock?、Any recommendations?），解析只認中日文的關鍵字，二廚只回一句「You say, I grill…」。
 - 修正：菜單、庫存、隨便試幾道、推薦、交給你決定都加上英文；份數也認 10-dish、3 dishes、3 at random。
 - 驗證：BDD `chef-chat`（三種語言的快捷鈕意思一樣、英文點 salt-grilled corn）；`npm test` 412 過；`_nbnames.mjs` 英文按「Make a 10-dish menu」排出 10 道英文菜名並上架。
+
+## 15:22 — 英文菜名不重複調味
+- 模組：`src/data/recipes.ts` 的 `bareEn`（`partName`、`partEn` 共用）
+- 原因：飯糰的英文名是 Soy Onigiri，加了醬油的菜名變成「Soy & miso grilled soy onigiri」。
+- 修正：食材英文名開頭的那個字就是菜名已經說過的調味時拿掉（只在那份調味有加時）。
+- 驗證：BDD `dish-names` 新情境；`npm test` 413 過。

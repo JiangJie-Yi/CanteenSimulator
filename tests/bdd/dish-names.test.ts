@@ -15,6 +15,16 @@ feature('菜名', () => {
     })
   })
 
+  scenario('英文菜名不會把調味說兩次', ({ when, then, and }) => {
+    when('醬油與味噌烤的醬油飯糰（Soy Onigiri）', (w) => {
+      w.name = partName({ name: '飯糰', en: 'Soy Onigiri' }, '飯糰', 'Onigiri', ['soy', 'miso'], 'en')
+    })
+    then('只有一個 soy', (w) => { expect((w.name as string).match(/soy/gi)?.length).toBe(1) })
+    and('沒加醬油時照原名', () => {
+      expect(partName({ name: '飯糰', en: 'Soy Onigiri' }, '飯糰', 'Onigiri', ['salt'], 'en')).toBe('Salt grilled soy onigiri')
+    })
+  })
+
   scenario('日文菜名照調味排在前面', ({ when, then }) => {
     when('醬油與檸檬烤的秋刀魚', (w) => { w.name = partName({ name: '秋刀魚', ja: '秋刀魚' }, '秋刀魚', 'Saury', ['soy', 'lemon'], 'ja') })
     then('是「…焼き秋刀魚」', (w) => { expect(w.name).toMatch(/焼き秋刀魚$/) })
