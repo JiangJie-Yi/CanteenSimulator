@@ -2284,6 +2284,8 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
   const slider = useRef<THREE.Group>(null)
   /** the drawer as drawn on its own (hidden while it's shut and the batch has it; still pointed at: the pointer's rays don't mind) */
   const own = useRef<THREE.Group>(null)
+  /** pointed at: drawn on its own then too, its glow being on it, not on the batch */
+  const hov = useRef(false)
   const inside = useRef<THREE.Group>(null)
   const sheet = useRef<THREE.Group>(null)
   const box = useRef<THREE.Group>(null)
@@ -2332,7 +2334,7 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
     const want = s.open || DRAWER_HELD.has(seat) ? 1 : 0
     if (inside.current && want) inside.current.visible = true
     // (drawn on its own while it's anything but home and shut, the batch's copy of it put away meanwhile; the batch not made yet, on its own)
-    const alone = want > 0 || s.at > 0 || !batch.current
+    const alone = want > 0 || s.at > 0 || hov.current || !batch.current
     if (own.current && own.current.visible !== alone) { own.current.visible = alone; batch.current?.show(part, !alone) }
     if (Math.abs(want - s.at) < 1e-4) return
     s.at = Math.abs(want - s.at) < 0.002 ? want : s.at + (want - s.at) * Math.min(1, dt * 7)
@@ -2350,8 +2352,8 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
     <group position={[x, BAR_TOP - 0.06, DRAWER.z]}>
       {/* (handlers on a group round it: a primitive's own aren't attached) */}
       <group ref={slider}
-        onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; tipOver('抽屜', says()).onPointerOver(e) }}
-        onPointerOut={(e) => { if (getEdit().on) return; tipOver('抽屜', says()).onPointerOut(e) }}
+        onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; hov.current = true; tipOver('抽屜', says()).onPointerOver(e) }}
+        onPointerOut={(e) => { hov.current = false; if (getEdit().on) return; tipOver('抽屜', says()).onPointerOut(e) }}
         onClick={(e) => {
           e.stopPropagation()
           if (getEdit().on) return

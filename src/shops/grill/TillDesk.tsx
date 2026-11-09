@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { mergeByMaterial, plainColours } from '@/scene/StaticBatch'
+import { homeCopy, mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { TILL_STATE, yen } from './bar'
@@ -232,13 +232,17 @@ export function TillMatLive({ tip, editing }: { tip: (open: boolean) => Record<s
     return m
   }, [gltf])
   const drawers = useMemo(() => [0, 1].map((k) => mat.getObjectByName(`DeskMatDrawer${k}`)!), [mat])
+  // (both shut and not pointed at, drawn as one: a draw a material, not six a drawer; pointed at, each its own, its glow on it)
+  const home = useMemo(() => (mat.userData.home ??= homeCopy(mat, drawers.filter(Boolean))) as ReturnType<typeof homeCopy>, [mat, drawers])
   const open = useRef([false, false])
   const at = useRef([0, 0])
   useFrame((_, dt) => {
+    home.home(hover.current < 0 && at.current.every((v, k) => v === 0 && !open.current[k]))
     drawers.forEach((d, k) => {
       if (!d) return
       const want = open.current[k] ? 1 : 0
       at.current[k] += (want - at.current[k]) * Math.min(1, dt * 7)
+      if (!want && at.current[k] < 1e-4) at.current[k] = 0
       // (out along the drawer's own +z, toward the cashier, about two thirds of its depth)
       d.position.z = at.current[k] * 0.2
     })

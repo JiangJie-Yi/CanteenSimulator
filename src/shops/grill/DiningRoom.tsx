@@ -4666,7 +4666,7 @@ const fridgeTagTex = (n: number) => {
   if (t) t.anisotropy = 4
   return t
 }
-const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; doors: THREE.Group[] }>()
+const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; doors: THREE.Group[]; home: ReturnType<typeof homeCopy> }>()
 /** the glass (cool, clear, its glare streaks; the studio's room in it), made once */
 const FRIDGE_GLASS = new THREE.MeshStandardMaterial({ color: '#ffffff', map: FRIDGE_GLASS_TEX, transparent: true, roughness: 0.05, metalness: 0.1,
   side: THREE.DoubleSide, depthWrite: false })
@@ -4742,7 +4742,9 @@ function useFreezer(n: number) {
     for (const d of doors) mergeByMaterial(d)
     const doorRoot = new THREE.Group()
     for (const d of doors) doorRoot.add(d)
-    const out = { body, doorRoot, doors }
+    // (both shut, drawn as one: a draw a material, not four a door)
+    const home = homeCopy(doorRoot, doors)
+    const out = { body, doorRoot, doors, home }
     freezers.set(n, out)
     return out
   }, [gltf, n])
@@ -4796,7 +4798,7 @@ export const FridgeDoor = memo(FridgeDoorImpl)
 const FRIDGE_DOOR_AT = new THREE.Vector3()
 function FridgeDoorImpl({ n = 0 }: { n?: number }) {
   const { W, D } = FRIDGE
-  const { doors, doorRoot } = useFreezer(n)
+  const { doors, doorRoot, home } = useFreezer(n)
   const door = doors[0]
   const open = useRef(0)
   const mist = useRef(0)
@@ -4815,6 +4817,7 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
     // (the pair swing out from the middle: the left on its left edge, the right on its right)
     doors[0].rotation.y = -e * (Math.PI / 2)
     doors[1].rotation.y = e * (Math.PI / 2)
+    home.home(e === 0)
     mist.current = e
   })
   return (
