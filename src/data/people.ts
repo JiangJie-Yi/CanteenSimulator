@@ -144,3 +144,41 @@ export const INTRO = {
     '喜歡泡湯', '寫得一手好書法', '愛看相撲', '喜歡拍照', '收集清酒瓶', '週末去海邊衝浪', '喜歡玩桌遊', '會做和菓子'],
   when: ['晚班週末都可以', '只能排平日', '可以配合排班', '希望排早班', '隨時可以上班', '下個月才能報到', '只能做晚上', '週末不行', '可以加班'],
 }
+
+// How the names read in English: Japanese ones in Hepburn romaji, Taiwanese ones the way a Taiwanese passport spells
+// them (Wade-Giles, the given name hyphenated); given name first either way
+const romaji = (list: string) => Object.fromEntries(list.trim().split(/\s+/).map((x) => [x.replace(/[A-Za-z]+$/, ''), x.match(/[A-Za-z]+$/)![0]]))
+export const JP_ROMAJI: Record<string, string> = romaji(`
+  佐藤Sato 鈴木Suzuki 高橋Takahashi 田中Tanaka 渡辺Watanabe 伊藤Ito 中村Nakamura 小林Kobayashi 加藤Kato 吉田Yoshida 山田Yamada
+  佐々木Sasaki 山口Yamaguchi 松本Matsumoto 井上Inoue 木村Kimura 清水Shimizu 山崎Yamazaki 森Mori 池田Ikeda 橋本Hashimoto 阿部Abe
+  石川Ishikawa 前田Maeda 藤田Fujita 小川Ogawa 岡田Okada 後藤Goto 長谷川Hasegawa 村上Murakami 近藤Kondo 石井Ishii 坂本Sakamoto
+  遠藤Endo 青木Aoki 藤井Fujii 西村Nishimura 福田Fukuda 太田Ota 三浦Miura
+  武Takeshi 茂Shigeru 勇Isamu 清Kiyoshi 勝Masaru 博Hiroshi 実Minoru 正雄Masao 一郎Ichiro 健一Kenichi 昭Akira 進Susumu 三郎Saburo
+  秀夫Hideo 大輔Daisuke 健太Kenta 誠Makoto 剛Tsuyoshi 浩二Koji 正樹Masaki 直樹Naoki 隆Takashi 達也Tatsuya 和也Kazuya 修Osamu
+  智之Tomoyuki 亮Ryo 健二Kenji 翔太Shota 蓮Ren 大翔Hiroto 悠真Yuma 陽斗Haruto 湊Minato 颯太Sota 拓海Takumi 健Ken 翼Tsubasa
+  陸Riku 樹Itsuki 悠斗Yuto 海斗Kaito 和子Kazuko 洋子Yoko 幸子Sachiko 節子Setsuko 久美子Kumiko 恵子Keiko 明美Akemi 順子Junko
+  美代子Miyoko 良子Yoshiko 由美Yumi 直美Naomi 裕子Yuko 智子Tomoko 真由美Mayumi 香織Kaori 美穂Miho 恵Megumi 理恵Rie 亜希子Akiko
+  美咲Misaki さくらSakura 陽菜Hina 結衣Yui 葵Aoi 凛Rin 花Hana 芽衣Mei 彩Aya 莉子Riko 美月Mizuki 杏An`)
+export const TW_ROMAN: Record<string, string> = romaji(`
+  陳Chen 林Lin 黃Huang 張Chang 李Lee 王Wang 吳Wu 劉Liu 蔡Tsai 楊Yang 許Hsu 鄭Cheng 謝Hsieh 郭Kuo 洪Hung 曾Tseng 邱Chiu 廖Liao
+  賴Lai 周Chou 徐Hsu 蘇Su 葉Yeh 莊Chuang 呂Lu 江Chiang 何Ho 蕭Hsiao 羅Lo 高Kao 潘Pan 簡Chien 朱Chu 鍾Chung 彭Peng 游Yu 詹Chan
+  胡Hu 施Shih 沈Shen 余Yu 盧Lu 梁Liang 趙Chao 顏Yen 柯Ko 翁Weng 魏Wei 孫Sun 戴Tai
+  德Te 國Kuo 金Chin 永Yung 清Ching 文Wen 明Ming 正Cheng 榮Jung 春Chun 福Fu 雄Hsiung 財Tsai 輝Hui 隆Lung 發Fa 昌Chang 義Yi 仁Jen
+  生Sheng 志Chih 建Chien 家Chia 俊Chun 宗Tsung 冠Kuan 政Cheng 嘉Chia 信Hsin 世Shih 振Chen 育Yu 立Li 宏Hung 豪Hao 傑Chieh 翰Han
+  哲Che 偉Wei 華Hua 誠Cheng 銘Ming 峰Feng 賢Hsien 強Chiang 鈞Chun 子Tzu 宇Yu 承Cheng 品Pin 柏Po 彥Yen 宥Yu 睿Jui 浩Hao 博Po
+  恩En 翔Hsiang 廷Ting 霖Lin 安An 凱Kai 瑋Wei 辰Chen 叡Jui 勳Hsun 秀Hsiu 玉Yu 美Mei 淑Shu 麗Li 月Yueh 素Su 寶Pao 蘭Lan 芬Fen
+  珠Chu 英Ying 琴Chin 霞Hsia 鳳Feng 雲Yun 娥O 雅Ya 怡Yi 佳Chia 佩Pei 惠Hui 曉Hsiao 靜Ching 慧Hui 婉Wan 宜Yi 婷Ting 君Chun 琪Chi
+  玲Ling 雯Wen 娟Chuan 如Ju 萍Ping 心Hsin 依Yi 筱Hsiao 詩Shih 語Yu 欣Hsin 芷Chih 思Szu 于Yu 涵Han 萱Hsuan 妤Yu 彤Tung 晴Ching
+  瑄Hsuan 柔Jou 璇Hsuan 甯Ning 潔Chieh 庭Ting`)
+
+/** someone's name in the page's language (in English spelled out from the Chinese or Japanese; a character with no
+ * spelling, as it is) */
+export function personName(w: { zh: string; ja: string }, lang: 'zh' | 'ja' | 'en') {
+  if (lang === 'ja') return w.ja
+  if (lang !== 'en') return w.zh
+  const jp = w.zh.split(' ')
+  if (jp.length === 2) return `${JP_ROMAJI[jp[1]] ?? jp[1]} ${JP_ROMAJI[jp[0]] ?? jp[0]}`
+  const [sur, ...given] = [...w.zh]
+  const g = given.map((c) => (TW_ROMAN[c] ?? c).toLowerCase()).join('-')
+  return `${g ? g[0].toUpperCase() + g.slice(1) + ' ' : ''}${TW_ROMAN[sur] ?? sur}`
+}

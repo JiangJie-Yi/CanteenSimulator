@@ -1,3 +1,4 @@
+import { personName } from '@/data/people'
 import { setTip } from '@/scene/hoverTip'
 import { normalizeRenderer } from '@/scene/materialNormalize'
 import { useLowPower } from '@/scene/power'
@@ -1313,7 +1314,7 @@ export default function App() {
     const text = lineOf(pool[lang], k, day)
     STAFF_TALK.push({ key: ++chatId.current, id, text, until: performance.now() + 4800 })
     const w = id === 'owner' ? null : staffOf(DISHES[active].id).find((x) => x.id === id)
-    const name = w ? (lang === 'ja' ? w.ja : w.zh) : ''
+    const name = w ? personName(w, lang) : ''
     talk(id === 'owner' ? 'owner' : 'staff', name ? `${name}${lang === 'ja' ? '「' : '：'}${text}${lang === 'ja' ? '」' : ''}` : text)
   }
   // (opened: the staff walk in from now, each at their own moment (Roasting, GuestBar3D); the owner says good morning, then one or two of
@@ -1722,7 +1723,7 @@ export default function App() {
       }).filter((e) => !cur.some((c) => c.key === e.key))
       return { ...m, [d.id]: [...cur, ...add].slice(0, MENU_MAX) }
     })
-    const who = cooks.length > 1 ? CHEF_TALK[lang].together(lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh, lang === 'ja' ? cooks[1].c.ja : cooks[1].c.zh) : lang === 'ja' ? cooks[0].c.ja : cooks[0].c.zh
+    const who = cooks.length > 1 ? CHEF_TALK[lang].together(personName(cooks[0].c, lang), personName(cooks[1].c, lang)) : personName(cooks[0].c, lang)
     return { up, who }
   }
   // talking with the second chef, at each shop: what was said both ways, and the dish he last offered to make
@@ -1824,7 +1825,7 @@ export default function App() {
         const guests = (guestsBy[d.id] ?? []).filter((g) => g.state === 'waiting' || g.state === 'eating').length
         reply = intent.topic === 'confused' ? T.confused()
           : intent.topic === 'tired' ? C.tired(fatigue)
-          : intent.topic === 'who' ? C.who(lang === 'ja' ? c.ja : c.zh, c.note ? `${c.note}。` : '')
+          : intent.topic === 'who' ? C.who(personName(c, lang), c.note ? `${c.note}。` : '')
           : intent.topic === 'business' ? C.business(open, guests)
           : C[intent.topic]()
         break
@@ -1995,10 +1996,10 @@ export default function App() {
     // (the owner's own name after it, unless they've kept the default (老闆 老闆))
     const boss = owner && owner !== '老闆' ? `${bossRole} ${owner}` : bossRole
     SPEAKERS.set('owner', boss)
-    for (const w of crew) SPEAKERS.set(w.id, tag(w.role, lang === 'ja' ? w.ja : w.zh))
+    for (const w of crew) SPEAKERS.set(w.id, tag(w.role, personName(w, lang)))
     SPEAKERS.set('house-server', tag('server', ''))
     const cashier = crew.find((w) => w.role === 'cashier')
-    SPEAKERS.set('role:cashier', cashier ? tag('cashier', lang === 'ja' ? cashier.ja : cashier.zh) : boss)
+    SPEAKERS.set('role:cashier', cashier ? tag('cashier', personName(cashier, lang)) : boss)
   }
   // (what a customer says at the till with no receipt to be had)
   useEffect(() => {
@@ -2251,7 +2252,7 @@ export default function App() {
             const it = ALL_ITEMS.get(k) ?? d.bases.find((b) => b.id === k)
             return `${(it ? nameIn(lang, it) : null) ?? supplyName(k, lang) ?? k} ${n}`
           })
-          talk('stock', UI[lang].restocked(lang === 'ja' ? keeper.ja : keeper.zh, names.join('、')))
+          talk('stock', UI[lang].restocked(personName(keeper, lang), names.join('、')))
         }
       }
     }, 1000)
@@ -2895,7 +2896,7 @@ export default function App() {
             book={(
               <Notebook dish={dish} lang={lang} notes={notes} entries={entriesOf(dish.id)}
                 partCost={(p) => partCost(dish, p)}
-                chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? (lang === 'ja' ? c.ja : c.zh) : null })()}
+                chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? personName(c, lang) : null })()}
                 talk={talkBy[dish.id] ?? []} onTalk={(text) => chefChat(dish, text)}
                 onPublish={(e) => setMenuBy((m) => {
                   const cur = m[e.shop] ?? []
@@ -2958,7 +2959,7 @@ export default function App() {
               onPointerDown={dragBoard.onPointerDown} onDoubleClick={dragBoard.onDoubleClick}>
               <div className="chef-pick">
                 <span>{UI[lang].chefPick}</span>
-                <b>{[owner || (tl(lang, '老闆', '店主', 'Owner')), ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : lang === 'ja' ? w.ja : w.zh)).filter(Boolean).join('、')}</b>
+                <b>{[owner || (tl(lang, '老闆', '店主', 'Owner')), ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : personName(w, lang))).filter(Boolean).join('、')}</b>
                 <button type="button" onClick={() => setOffice('staff')}>{tl(lang, '人事', '人事', 'Staff')}</button>
               </div>
               <p className="guest-count">

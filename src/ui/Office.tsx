@@ -1,3 +1,4 @@
+import { personName } from '@/data/people'
 import { canDismiss } from '@/game/hiring'
 import { createPortal } from 'react-dom'
 import { useEffect, type ReactNode } from 'react'
@@ -120,7 +121,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                       if (w) {
                         const k = hired[w.id].shift ?? 'A'
                         return (
-                          <button key={i} type="button" className={`ofc-seat${onToday(w) ? '' : ' is-off'}`} title={ja ? w.ja : w.zh}
+                          <button key={i} type="button" className={`ofc-seat${onToday(w) ? '' : ' is-off'}`} title={personName(w, lang)}
                             onClick={() => document.getElementById(`ofc-${w.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
                             <Avatar id={w.id} look={w.look} role={w.role} size={38} />
                             <span className={`ofc-shift-tag is-${k}`}>{k === 'both' ? t('全', '通') : k}</span>
@@ -162,7 +163,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                   <div key={w.id} id={`ofc-${w.id}`} className="ofc-person is-hired">
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
-                      <b>{ja ? w.ja : w.zh}<Traits w={w} lang={lang} /></b>
+                      <b>{personName(w, lang)}<Traits w={w} lang={lang} /></b>
                       <span className="ofc-energy" title={t('精神', '元気')}>
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
@@ -184,7 +185,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                   <div key={w.id} className="ofc-person">
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
-                      <b>{ja ? w.ja : w.zh}<span className={`ofc-tag-who${w.look.female ? ' is-f' : ''}`}>
+                      <b>{personName(w, lang)}<span className={`ofc-tag-who${w.look.female ? ' is-f' : ''}`}>
                         {w.look.female ? t('女', '女性') : t('男', '男性')}・{w.years}{t('歲', '歳')}</span><Traits w={w} lang={lang} /></b>
                       <span className="ofc-stars">
                         <Stat label={t('手藝', '腕')} v={w.skill} />

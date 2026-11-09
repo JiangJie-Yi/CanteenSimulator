@@ -50,3 +50,9 @@
 - 原因：飯糰的英文名是 Soy Onigiri，加了醬油的菜名變成「Soy & miso grilled soy onigiri」。
 - 修正：食材英文名開頭的那個字就是菜名已經說過的調味時拿掉（只在那份調味有加時）。
 - 驗證：BDD `dish-names` 新情境；`npm test` 413 過。
+
+## 15:40 — 員工名字在英文介面拼成英文
+- 模組：`src/data/people.ts` 的 `personName`、`JP_ROMAJI`、`TW_ROMAN`；App、經營頁顯示名字的地方
+- 原因：英文介面裡員工、說話者標籤、二廚在筆記本的名字仍是漢字（太田 健二、林冠鈞）。
+- 修正：顯示時拼出來（不改存檔）：日本名照平文式羅馬字、台灣名照護照的威妥瑪拼法，名在前、姓在後（Kenji Ota、Kuan-chun Lin）。
+- 驗證：BDD `person-names`（詞庫裡每個姓、名、字都拼得出來）；`_nbnames.mjs` 英文：「Yuto Aoki and Tomoko Mori put together 10 dishes」；`_wraps.mjs` 三種語言 0 處斷行；`npm test` 全過。
