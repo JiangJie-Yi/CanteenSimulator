@@ -44,6 +44,8 @@ const UNINKED = /(Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
+/** the hand wiping the bar down: up on the cloth, out in front (GuestBar3D lays the cloth under it, from the same reach) */
+export const WIPE_HAND = { y: 0.83, z: 0.44 }
 /** a handheld game (the owner's: what one of the staff slacking has out, their thumbs at it): a dark body with its screen lit, a red grip on its
  * left and a blue one on its right, made once (its colours in its points, one draw), in the figure's frame where it's held up before the
  * chest, tipped toward the face */
@@ -245,7 +247,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   // (their name tag's words (App keeps who's who); their role alone before it's known)
   const nameTag = useMemo(() => () => SPEAKERS.get(id) ?? ROLE_TAG[role], [id, role])
   // (their face (setExpression): what they're doing says it; a squash and stretch as it changes, or as they start to say something)
-  const faceWas = useRef<{ face: CrewFace; at: number; said: number; carry: boolean }>({ face: 'idle', at: -1e9, said: 0, carry: false })
+  const faceWas = useRef<{ face: CrewFace; at: number; said: number; carry: boolean; wipe: boolean }>({ face: 'idle', at: -1e9, said: 0, carry: false, wipe: false })
   // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
   const [fanning, setFanning] = useState(false)
   const clock = useRef(0)
@@ -336,7 +338,12 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     if ((t + seed * 0.9) % 3.4 < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
     const fw = faceWas.current
     const settled = (f: CrewFace) => (f === 'blink' || f === 'talk' ? 'idle' : f)
-    if (settled(face) !== settled(fw.face) || (word && word.key !== fw.said) || (!!job?.carry && !fw.carry)) fw.at = t
+    // (not as they set to wiping the bar down or leave off it: the squash took their head a fifth of a metre down, and the bar's top is
+    // at their shoulders, their face went under it (the owner saw a server's face in the bar))
+    const wiping = job?.wipe !== undefined
+    if ((settled(face) !== settled(fw.face) && wiping === fw.wipe) || (word && word.key !== fw.said) || (!!job?.carry && !fw.carry)) fw.at = t
+    if (wiping) fw.at = Math.min(fw.at, t - 1)
+    fw.wipe = wiping
     fw.face = face
     fw.said = word?.key ?? fw.said
     fw.carry = !!job?.carry
@@ -387,8 +394,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
         }
       }
       if (job?.wipe !== undefined && sd > 0) {
-        // (wiping the bar down: the hand out in front on the cloth on the bar's top (0.79: the bar at a server's height), along and back twice)
-        hand.position.set(0.06 + Math.sin(job.wipe * Math.PI * 4) * 0.12, 0.79, 0.4)
+        // (wiping the bar down: the hand out in front, its palm down on the cloth on the bar's top (0.79 the cloth at a server's height, the
+        // hand's middle a hand's thickness up from it: at 0.79 half of it was in the bar), along and back twice)
+        hand.position.set(0.06 + Math.sin(job.wipe * Math.PI * 4) * 0.12, WIPE_HAND.y, WIPE_HAND.z)
         hand.rotation.x = -1.3
       }
       if (cook && fanning && sd > 0) {

@@ -24,7 +24,7 @@ import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
-import { StaffFigure, TRAY_AT as HELD_AT } from '@/scene/StaffFigure'
+import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
 import { moodOf, walkSpeedOf } from '@/scene/people'
@@ -2315,8 +2315,9 @@ const RICE_BOWL_GEO = new THREE.CylinderGeometry(0.1, 0.07, 0.07, 16, 1, true).t
 const RICE_IN_GEO = new THREE.CylinderGeometry(0.092, 0.08, 0.025, 16)
 /** how long a server wipes the bar down where a plate was cleared: two strokes along and back */
 const WIPE_S = 1.1
-/** where they stand to wipe it: along the bar from the seat's middle (between its stool and the next), and back from the bar's middle line */
-const WIPE_STAND = [0.34, 0.48] as const
+/** where they stand to wipe it: along the bar from the seat's middle (between its stool and the next), and back from the bar's middle line
+ * (a step back from its edge, reaching to it: right up against it, their face was just over the top, at their shoulders) */
+const WIPE_STAND = [0.34, 0.53] as const
 /** the cloth they wipe it with: a folded white towel */
 const RAG_GEO = new RoundedBoxGeometry(0.085, 0.007, 0.05, 1, 0.003)
 const PASS_STACK_SHOWN = STACK_CAP + 3
@@ -4335,7 +4336,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const k = Math.min(1, p / 0.15, (1 - p) / 0.15)
         wipeAt = { p: stand, yaw, k: k * k * (3 - 2 * k) }
         if (rag) {
-          const hand = new THREE.Vector3(0.06 + Math.sin(p * Math.PI * 4) * 0.12, 0, 0.4).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, yaw)
+          const hand = new THREE.Vector3(0.06 + Math.sin(p * Math.PI * 4) * 0.12, 0, WIPE_HAND.z).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, yaw)
           rag.position.copy(stand).add(hand).setY(top + 0.006)
           rag.rotation.y = yaw + Math.PI / 2 + Math.sin(p * Math.PI * 4) * 0.25
         }
