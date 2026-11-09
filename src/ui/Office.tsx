@@ -1,14 +1,15 @@
 import { personName } from '@/data/people'
 import { canDismiss } from '@/game/hiring'
 import { createPortal } from 'react-dom'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useDrag } from './useDrag'
 import type { Lang } from '@/data/i18n'
 import { peopleIn } from '@/data/peopleText'
 import type { Dish } from '@/data/menu'
 import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
 import { CANDIDATES, pickHires, replaceOf, ROLLS_PER_DAY } from '@/game/hiring'
-import { DiceIcon, Glyph, SkillIcon } from './GameIcons'
+import { DiceIcon, Glyph, SkillIcon, StatusIcon } from './GameIcons'
+import { usePanelSound } from './uiSound'
 import { setTip } from '@/scene/hoverTip'
 import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts'
 import { Avatar } from './Avatar'
@@ -83,6 +84,16 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   const onToday = (w: Worker) => !!hired[w.id] && worksOn(hired[w.id].shift, today)
   const wages = people.filter(onToday).reduce((s, w) => s + w.wage, 0)
   const shiftLabel = (k: Shift) => (k === 'both' ? t3('全勤', '通し', 'Both') : t3(`${k} 班`, `${k} 番`, `Shift ${k}`))
+  // (taking someone on in a full job (替換): who they'd replace, chosen from those in it, the two compared side by side first (the owner's));
+  // and a word as it's done
+  const [swap, setSwap] = useState<{ w: Worker; out: string } | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  // (an open place clicked: its job's applicants listed; an applicant being dragged: their job, its open places lit)
+  const [picking, setPicking] = useState<string | null>(null)
+  const [dragRole, setDragRole] = useState<string | null>(null)
+  usePanelSound(!!swap)
+  useEffect(() => { if (!done) return; const k = window.setTimeout(() => setDone(null), 2600); return () => window.clearTimeout(k) }, [done])
+  const roleName = (role: string) => { const r = roles.find((x) => x.role === role); return r ? roleOf(r) : role }
   // (put on the page itself, over the menu and everything else)
   return createPortal(
     <>
@@ -102,6 +113,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
           {/* the team as it stands, a strip of seats by job (the owner's: the big cards took over half the panel): the owner, then each job's
               places, a small round face with its shift on it, or a dashed ring where one's open; a face takes you down to that person's card,
               an open ring hires the best value for the job */}
+          <div className="ofc-roster-bar">
           <div className="ofc-roster">
             <div className="ofc-roster-group">
               <span className="ofc-roster-role">{t('大廚', '大将')}</span>
@@ -130,9 +142,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                           </button>
                         )
                       }
+                      // (an open place: clicked, who could fill it listed under the strip; an applicant of this job dragged onto it, taken on)
+                      const fits = dragRole === r.role
                       return (
-                        <button key={i} type="button" className="ofc-seat is-open" disabled={!best} onClick={() => { if (best) onHire(best) }}
-                          title={best ? t(`點一下雇用 ${best.zh}（最划算）`, `クリックで${best.ja}を採用`) : ''}>
+                        <button key={i} type="button" className={`ofc-seat is-open${fits ? ' is-drop' : ''}${picking === r.role ? ' is-picking' : ''}`} disabled={!best}
+                          onClick={() => setPicking((p) => (p === r.role ? null : r.role))}
+                          onDragOver={(e) => { if (fits) e.preventDefault() }}
+                          onDrop={(e) => { e.preventDefault(); const w = people.find((x) => x.id === e.dataTransfer.getData('text/plain')); if (w && w.role === r.role && !hired[w.id]) onHire(w); setDragRole(null) }}
+                          title={best ? t3('點一下選人，或把應徵者拖到這裡', 'クリックで選ぶ／応募者をここへドラッグ', 'Click to choose, or drag an applicant here') : ''}>
                           <span className="ofc-seat-ring"><Glyph id="plus" size={14} /></span>
                           <small>{t('空缺', '空き')}</small>
                         </button>
@@ -142,6 +159,29 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                 </div>
               )
             })}
+          </div>
+          {/* (the place clicked: who could fill it, each with what they're paid and a button to take them on) */}
+          {picking && (() => {
+            const can = people.filter((x) => x.role === picking && !hired[x.id])
+            const r = roles.find((x) => x.role === picking)!
+            const full = people.filter((x) => x.role === picking && hired[x.id]).length >= r.max * 2
+            return (
+              <div className="ofc-pick">
+                <b>{t3(`選擇要指派至【${roleName(picking)}】的夥伴`, `【${roleName(picking)}】に入れる人を選ぶ`, `Choose someone for ${roleName(picking)}`)}</b>
+                <ul>
+                  {can.map((w) => (
+                    <li key={w.id}>
+                      <Avatar id={w.id} look={w.look} role={w.role} size={30} />
+                      <span className="ofc-pick-who">{personName(w, lang)}<small>{w.look.female ? t('女', '女性') : t('男', '男性')}{dot}{w.years}{t('歲', '歳')}</small></span>
+                      <span className="ofc-pick-stats">{t('手藝', '腕')} {w.skill}{dot}{t('速度', '速さ')} {w.speed}{dot}{t('體力', '体力')} {w.stamina}</span>
+                      <b className="money">{money(w.wage)}<small>/h</small></b>
+                      <button type="button" disabled={full} onClick={() => { onHire(w); setPicking(null) }}>{t('雇用', '雇う')}</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })()}
           </div>
           <p className="ofc-today">{t3(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`, `Day ${today} on duty: ${shiftLabel(crewOf(today))} (and those on both)`)}</p>
           <div className="ofc-wages">
@@ -165,7 +205,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                   <div key={w.id} id={`ofc-${w.id}`} className="ofc-person is-hired">
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
-                      <b>{personName(w, lang)}<Traits w={w} lang={lang} /></b>
+                      <b>{personName(w, lang)}<span className={`ofc-tag-who${w.look.female ? ' is-f' : ''}`}>
+                        {w.look.female ? t('女', '女性') : t('男', '男性')}{dot}{w.years}{t('歲', '歳')}</span><Traits w={w} lang={lang} /></b>
                       <span className="ofc-energy" title={t('精神', '元気')}>
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
@@ -184,7 +225,9 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                 ))}
                 {/* (who could fill it, shown when the job's full too (the owner's: they went missing): only not hireable till a place opens) */}
                 {open.map((w) => (
-                  <div key={w.id} className="ofc-person">
+                  <div key={w.id} className="ofc-person" draggable
+                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', w.id); e.dataTransfer.effectAllowed = 'move'; setDragRole(w.role) }}
+                    onDragEnd={() => setDragRole(null)}>
                     <Avatar id={w.id} look={w.look} role={w.role} />
                     <div className="ofc-who">
                       <b>{personName(w, lang)}<span className={`ofc-tag-who${w.look.female ? ' is-f' : ''}`}>
@@ -204,8 +247,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                         // (the job full: taken on in place of the weakest there (the owner's: 雇用並替換); not while the shop's open, as firing isn't)
                         : (() => {
                             const out = replaceOf(mine), can = !!out && canDismiss(shopOpen)
-                            return <button type="button" className="is-swap" disabled={!can} onClick={() => { if (out && can) { onFire(out); onHire(w) } }}
-                              title={!can ? t('營業中不能替換，請先閉店', '営業中は入れ替えできません') : (lang === 'en' ? `Hire in place of ${out!.zh}, the weakest here` : t(`雇用並替換 ${out!.zh}（同職位能力最弱）`, `${out!.ja} と入れ替えて雇う`))}>{t('替換', '入替')}</button>
+                            return <button type="button" className="is-swap" disabled={!can} onClick={() => { if (out && can) setSwap({ w, out: out.id }) }}
+                              title={!can ? t('營業中不能替換，請先閉店', '営業中は入れ替えできません') : t3('選擇要換掉誰，先比較再決定', '誰と入れ替えるか選んで比べる', 'Choose who goes, and compare first')}>{t('替換', '入替')}</button>
                           })()}
                     </div>
                   </div>
@@ -218,6 +261,69 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
         </div>
       )}
     </section>
+    {swap && (() => {
+      const { w } = swap
+      const mine = people.filter((x) => x.role === w.role && hired[x.id])
+      const o = mine.find((x) => x.id === swap.out) ?? mine[0]
+      if (!o) return null
+      const rows: [string, number, number, boolean][] = [
+        [t('手藝', '腕'), o.skill, w.skill, false], [t('速度', '速さ'), o.speed, w.speed, false], [t('體力', '体力'), o.stamina, w.stamina, false],
+        [t3('時薪', '時給', 'Wage'), o.wage, w.wage, true],
+      ]
+      const confirm = () => {
+        if (!canDismiss(shopOpen)) return
+        const shift = hired[o.id]?.shift ?? 'A'
+        onFire(o)
+        onHire(w)
+        onShift(w, shift)
+        setSwap(null)
+        setDone(t3(`${personName(w, lang)} 正式上任【${roleName(w.role)}】！`, `${personName(w, lang)} が【${roleName(w.role)}】に就任！`, `${personName(w, lang)} is now on as ${roleName(w.role)}!`))
+      }
+      return (
+        <div className="ofc-swap-veil" onClick={() => setSwap(null)}>
+          <div className="ofc-swap" role="dialog" aria-label={t3('選擇要替換的現役夥伴', '入れ替える人を選ぶ', 'Choose who to replace')} onClick={(e) => e.stopPropagation()}>
+            <header>
+              <b>{t3('選擇要替換的現役夥伴', '入れ替える人を選ぶ', 'Choose who to replace')}</b>
+              <button type="button" className="panel-x" onClick={() => setSwap(null)} aria-label={t('關閉', '閉じる')}>×</button>
+            </header>
+            {/* (those in the same job: the one picked lit; the weakest picked to begin with) */}
+            <ul className="ofc-swap-list">
+              {mine.map((x) => (
+                <li key={x.id}>
+                  <button type="button" aria-pressed={x.id === o.id} onClick={() => setSwap({ w, out: x.id })}>
+                    <Avatar id={x.id} look={x.look} role={x.role} />
+                    <span><small>{roleName(x.role)}</small>{personName(x, lang)}</span>
+                    <em>{shiftLabel(hired[x.id]?.shift ?? 'A')}</em>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {/* (the two side by side: what each has, and what the change makes of it, better green, worse red (the wage the other way)) */}
+            <table className="ofc-swap-cmp">
+              <thead><tr><th /><th>{personName(o, lang)}</th><th>{personName(w, lang)}</th><th>{t3('差異', '差', 'Change')}</th></tr></thead>
+              <tbody>
+                {rows.map(([label, a, b, cost]) => {
+                  const d = b - a, good = cost ? d < 0 : d > 0
+                  return (
+                    <tr key={label}>
+                      <th>{label}</th>
+                      <td>{cost ? `${money(a)}/h` : a}</td>
+                      <td>{cost ? `${money(b)}/h` : b}</td>
+                      <td className={d === 0 ? '' : good ? 'is-up' : 'is-down'}>{d !== 0 && <StatusIcon up={d > 0} />}{d > 0 ? '+' : ''}{cost ? money(d) : d}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <footer>
+              <button type="button" className="ofc-swap-cancel" onClick={() => setSwap(null)}>{t3('取消', 'やめる', 'Cancel')}</button>
+              <button type="button" className="ofc-swap-go" disabled={!canDismiss(shopOpen)} onClick={confirm}>{t3('確認交接換人', '入れ替える', 'Swap them')}</button>
+            </footer>
+          </div>
+        </div>
+      )
+    })()}
+    {done && <div className="ofc-swap-done" role="status">{done}</div>}
     </>,
     document.body,
   )

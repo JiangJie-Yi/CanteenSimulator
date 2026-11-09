@@ -4369,16 +4369,49 @@ button {
 
 /* 人事: the team as it stands, a strip of seats by job (the owner's, 2026-11-09: the big cards took over half the panel), then who could fill
    each; a seat a small round face with its shift on its shoulder (A green, B amber, both gold), a dashed ring where one's open */
+/* (it and the list of who could fill a place stay at the top as the cards scroll under them (the owner's, 2026-11-09): the panel's own paper
+   behind them, so what scrolls under doesn't show through) */
+.ofc-roster-bar {
+  position: sticky;
+  top: -6px;
+  z-index: 20;
+  margin: -6px -12px 0;
+  padding: 6px 12px 4px;
+  background: rgb(246 238 224 / 0.96);
+  box-shadow: 0 6px 10px -8px rgb(59 42 32 / 0.4);
+}
 .ofc-roster {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 14px;
-  margin: 10px 14px 4px;
+  margin: 4px 2px 4px;
   padding: 8px 10px;
   border: 1px solid rgb(59 42 32 / 0.12);
   border-radius: 10px;
   background: rgb(255 255 255 / 0.45);
 }
+/* (an applicant being dragged: the open places of their job glow green, breathing; the one clicked to choose for, ringed amber) */
+.ofc-seat.is-drop .ofc-seat-ring { border-color: #3d9a5a; box-shadow: 0 0 0 3px rgb(61 154 90 / 0.25); animation: ofc-drop 1.1s ease-in-out infinite; }
+.ofc-seat.is-picking .ofc-seat-ring { border-color: #8a5a2b; border-style: solid; }
+@keyframes ofc-drop { 50% { box-shadow: 0 0 0 6px rgb(61 154 90 / 0.12); } }
+/* (who could fill the place clicked: a row each, under the strip) */
+.ofc-pick {
+  margin: 2px 2px 6px;
+  padding: 8px 10px;
+  border: 1px solid rgb(138 90 43 / 0.35);
+  border-radius: 10px;
+  background: rgb(255 250 240 / 0.8);
+}
+.ofc-pick > b { display: block; margin-bottom: 4px; color: #6b4423; font-size: 12px; white-space: nowrap; }
+.ofc-pick ul { display: flex; flex-direction: column; gap: 4px; max-height: 200px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.ofc-pick li { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; }
+.ofc-pick .avatar { flex: none; border-radius: 50%; }
+.ofc-pick-who { display: flex; flex-direction: column; min-width: 5.5em; line-height: 1.2; }
+.ofc-pick-who small, .ofc-pick-stats { color: #8a7562; font-size: 11px; }
+.ofc-pick-stats { flex: 1; }
+.ofc-pick li button { padding: 3px 10px; border: 1px solid #a8352a; border-radius: 8px; background: #c4442f; color: #fff; font: inherit; font-size: 12px; cursor: pointer; }
+.ofc-pick li button:disabled { opacity: 0.4; cursor: default; }
+.ofc-person[draggable='true'] { cursor: grab; }
 .ofc-roster-group {
   display: flex;
   flex-direction: column;
@@ -4945,6 +4978,8 @@ button {
   :root:not([data-theme='light']) .ofc-person,
   :root:not([data-theme='light']) .ofc-roster { background: rgba(255, 255, 255, 0.05); border-color: rgba(246, 236, 216, 0.12); }
   :root:not([data-theme='light']) .ofc-person.is-hired { background: rgba(232, 176, 74, 0.1); }
+  :root:not([data-theme='light']) .ofc-roster-bar { background: rgb(39 33 28 / 0.97); }
+  :root:not([data-theme='light']) .ofc-pick { background: rgba(255, 255, 255, 0.06); }
   :root:not([data-theme='light']) .ofc-stat,
   :root:not([data-theme='light']) .ofc-note { color: #c8b8a4; }
   :root:not([data-theme='light']) .ofc-stat em,
@@ -8079,4 +8114,95 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .view-toast { animation-name: view-toast-still; }
   @keyframes view-toast-still { 0%, 100% { opacity: 0; } 10%, 85% { opacity: 1; } }
+}
+
+/* 人事's 替換 (ui/Office): who to replace, chosen from those in the job, the two compared side by side before it's done; over the office,
+   its wood bar and paper as the office's own */
+.ofc-swap-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgb(20 14 10 / 0.35);
+}
+.ofc-swap {
+  width: min(400px, calc(100vw - 32px));
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgb(250 244 232 / 0.97);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 0.4);
+  color: #3b2a20;
+}
+.ofc-swap header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 8px 0 14px;
+  background: var(--wood-bar);
+  box-shadow: var(--wood-bar-lip);
+  color: #f3e3c4;
+  white-space: nowrap;
+}
+.ofc-swap-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px 4px;
+  list-style: none;
+}
+.ofc-swap-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid rgb(59 42 32 / 0.18);
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.6);
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ofc-swap-list button[aria-pressed='true'] { border-color: #8a5a2b; background: #f1dfbf; box-shadow: inset 0 0 0 1px #8a5a2b; }
+.ofc-swap-list .avatar { width: 30px; height: 30px; border-radius: 50%; }
+.ofc-swap-list span { display: flex; flex-direction: column; font-size: 13px; line-height: 1.2; }
+.ofc-swap-list small { color: #8a7562; font-size: 10px; }
+.ofc-swap-list em { color: #8a5a2b; font-size: 11px; font-style: normal; }
+.ofc-swap-cmp {
+  width: calc(100% - 28px);
+  margin: 8px 14px;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ofc-swap-cmp th, .ofc-swap-cmp td { padding: 5px 6px; border-bottom: 1px solid rgb(59 42 32 / 0.1); text-align: right; }
+.ofc-swap-cmp th:first-child { text-align: left; color: #6b5442; }
+.ofc-swap-cmp thead th { color: #6b5442; font-size: 11px; font-weight: 700; }
+.ofc-swap-cmp .is-up { color: #2f8a4a; font-weight: 700; }
+.ofc-swap-cmp .is-down { color: #c4442f; font-weight: 700; }
+.ofc-swap-cmp .game-icon { margin-right: 2px; vertical-align: -1px; }
+.ofc-swap footer { display: flex; justify-content: flex-end; gap: 8px; padding: 6px 14px 14px; }
+.ofc-swap footer button { padding: 6px 14px; border: 1px solid transparent; border-radius: 8px; font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.ofc-swap footer .ofc-swap-cancel { border-color: rgb(59 42 32 / 0.25); background: transparent; color: #6b5442; }
+.ofc-swap footer .ofc-swap-go { border-color: #6b4423; background: #8a5a2b; color: #fff; }
+.ofc-swap footer .ofc-swap-go:not(:disabled):hover { background: #6b4423; }
+.ofc-swap footer .ofc-swap-go:disabled { opacity: 0.45; cursor: default; }
+/* (and the word as it's done: a paper slip at the foot of the screen, gone after a moment) */
+.ofc-swap-done {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  z-index: 70;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: rgb(24 20 18 / 0.85);
+  color: #f7f4ed;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: view-toast 2.6s ease-in-out both;
 }
