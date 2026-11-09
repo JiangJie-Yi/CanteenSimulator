@@ -7021,22 +7021,6 @@ html[lang='en'] .heat-label { font-size: 13px; }
   .dock-title small { font: 600 11px/1 var(--brush); letter-spacing: 0.25em; opacity: 0.8; }
 }
 
-/* how many more raw pieces wait in the fridge for room on the tray */
-.tray-more {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-  padding: 2px 8px 3px;
-  border: 1.5px solid rgb(59 42 32 / 0.55);
-  border-radius: 9px;
-  background: rgb(255 250 240 / 0.88);
-  color: #3b2a20;
-  font: 700 14px/1 var(--brush, serif);
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
-}
-.tray-more small { font-size: 10px; opacity: 0.75; }
-
 /* ---- on a wide screen the cash is the way into the office (the books first): no 經營 button beside it; the cash a pane of frosted glass
    (phones keep their 經營 button: the cash isn't shown on its own there) ---- */
 @media (min-width: 600px) {

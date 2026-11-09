@@ -3768,8 +3768,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       .addScaledVector(STACK_DIR, 0.05)
       .add(new THREE.Vector3(0, top ? 0.115 : 0.07, 0))
   }
-  /** how many more are waiting in the fridge for room on the tray (shown by it) */
-  const [trayMore, setTrayMore] = useState(0)
 
   /**
    * Plate n of the run. They go around the fire at the first plate's distance: the 2nd to its front-right, the
@@ -6517,7 +6515,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (the tray takes so many: the rest wait in the fridge, unseen, until there's room)
     const boardSticks = onBoard.filter((q) => !q.loose), boardLoose = onBoard.filter((q) => q.loose)
     const inFridge = new Set([...boardSticks.slice(TRAY_CAP), ...boardLoose.slice(LOOSE_CAP)])
-    if (inFridge.size !== trayMore) setTrayMore(inFridge.size)
 
     // ---- the iron skewers (the owner's: fifty of them, game/skewers): a piece's pushed onto one from the holder in the last of its preparing on
     // the board (none clean: it waits there, said once); pulled out as it lands on its plate (the shop open) into the used tray; its rod drawn
@@ -7210,12 +7207,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </group>
       )}
       <points geometry={grains.geometry} material={grainMaterial} frustumCulled={false} renderOrder={3} />
-      {active && trayMore > 0 && roast.tray && (
-        <Html position={trayAt().addScaledVector(STACK_DIR, TRAY_W / 2 - 0.1).addScaledVector(LAY_DIR, TRAY_D / 2 - 0.05).add(new THREE.Vector3(0, 0.12, 0))}
-          center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
-          <span className="tray-more" title="冷藏櫃裡還有，砧板空出位置就會拿出來">+{trayMore}<small>冷藏</small></span>
-        </Html>
-      )}
       {Array.from({ length: RINGS }, (_, k) => (
         <mesh key={`ring${k}`} ref={(m) => { ringObjs.current[k] = m }} visible={false} rotation-x={-Math.PI / 2} renderOrder={4}>
           <ringGeometry args={[0.07, 0.085, 32]} />
