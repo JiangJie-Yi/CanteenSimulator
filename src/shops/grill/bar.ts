@@ -199,6 +199,8 @@ export const gateCut = (g: { w: number; shift?: number }) => g.w - (g.shift ?? 0
  * base, a post through it; the case is 26 deep from the top's front edge, its back at -0.036): 3 cm behind them, the cove light's lip too
  */
 export const BAR_BASE_Z = [0.02, 0.28] as const
+/** where each place's soy dish stands (the world's; Roasting's BarTableware, as it may be moved in edit mode): the soy's poured there */
+export const SOY_DISH_AT = new Map<number, THREE.Vector3>()
 export function gateOf(c: Counter, g: Gate) {
   const hinge = g.end * ((c.length + 0.2) / 2 - gateCut(g))
   return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, (BAR_BASE_Z[0] + BAR_BASE_Z[1]) / 2) }

@@ -14,7 +14,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
-import { bakeable, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
+import { bakeable, homeCopy, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
 import { atlasModel } from '@/scene/atlasMerge'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
@@ -72,7 +72,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
-import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, type Counter } from './bar'
+import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -783,6 +783,7 @@ function BarImpl() {
       </StaticBatch>
       {GRILL_COUNTERS.map((c, i) => BAR_GATES[i] && <BarGate key={i} c={c} gate={BAR_GATES[i]} />)}
       {GRILL_COUNTERS.map((c, i) => <BarDrawers key={`drawers-${i}`} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)} />)}
+      <BarTableware />
       <BarChopsticks />
     </group>
   )
@@ -2213,21 +2214,13 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
             {/* (each customer's plate is set down a little back of the middle of their place and cleared away by GuestBar3D) in front of it,
                 nearest them, the pair of chopsticks laid across, their tips to the customer's left (+x) up on the rest, which lies across
                 them; behind on the left the little soy dish (on the right instead at a seat where it'd be off the top, by the gate) */}
-            <group position={[SETTING.restX, 0, PLACE.chop]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group>
-            {/* (the chopsticks on it: BarChopsticks, out of the batch, so a pair can be picked up) */}
+            {/* (the chopsticks and their rest, the soy dish, the soy pot and wasabi: pieces of their own now, BarTableware) */}
             {/* (the place's number, on the screen behind it; standing, where there's none) */}
             <SeatTag k={first + n} onLip={x - SEAT_TAG.r - 0.03 > lipSpan[0] && x + SEAT_TAG.r + 0.03 < lipSpan[1]} />
-            <group position={[sauceSide(c, gate, x), 0.001, PLACE.sauce[1]]}>
-              <BarPiece name="BarSoyDish" design={n} />
-              {/* (empty till someone sits down there: GuestBar3D pours them their soy) */}
-            </group>
           </group>
         )
       })}
-      {/* the soy pot and the wasabi that each two places share, at the back between them; and their little waste basket in front of those */}
-      {sharedAlong(c).map((x, k) => (
-        <group key={`shared${k}`} position={[x, BAR_TOP + 0.001, PLACE.shared]}><BarPiece name="BarCondiments" /></group>
-      ))}
+      {/* the little waste basket each two places share, in front of their soy pot and wasabi */}
       {sharedAlong(c).map((x, k) => (
         <group key={`basket${k}`} position={[x, BAR_TOP + 0.001, PLACE.basket]} rotation-y={(k % 2 ? 1 : -1) * 0.25}><TableBasket /></group>
       ))}
@@ -2235,6 +2228,96 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
   )
 }
 
+/**
+ * The bar's tableware, each piece its own (the owner's, 2026-11-10: they were part of the bar's one batch, nothing when pointed at and not
+ * to be moved in edit mode): at each place its chopsticks on their rest (one piece: they go together) and its little soy dish; each two
+ * places' soy pot and wasabi on their tray. Pointed at, each is named (nameOver: there's nothing to do with them, so no glow); in edit mode
+ * each is moved as any other piece. The chopsticks themselves are BarChopsticks' (a pair is picked up as someone eats), laid where their
+ * set's piece stands; the soy GuestBar3D pours is poured where the dish is (SOY_DISH_AT). Out of edit mode it's all drawn as one copy
+ * (homeCopy: a draw or two for each of its materials, as when it was in the bar's batch), made again as edit mode's left.
+ */
+const BarTableware = memo(function BarTableware() {
+  const root = useRef<THREE.Group>(null)
+  const pieces = useRef<THREE.Group[]>([])
+  const copy = useRef<{ made: number; home: ReturnType<typeof homeCopy> | null; group: THREE.Object3D | null }>({ made: 0, home: null, group: null })
+  const frames = useRef(0)
+  const { on: editing } = useEdit()
+  useFrame(() => {
+    const r = root.current
+    if (!r) return
+    frames.current++
+    const c = copy.current
+    // (where each soy dish stands, in the world: for the soy poured into it)
+    if (frames.current % 30 === 1 || editing) for (const p of pieces.current) {
+      const seat = p.userData.soySeat as number | undefined
+      if (seat !== undefined) SOY_DISH_AT.set(seat, p.getWorldPosition(SOY_DISH_AT.get(seat) ?? new THREE.Vector3()))
+    }
+    if (editing) {
+      // (each piece drawn itself while it may be moved; the copy put away, made again after)
+      if (c.home) { c.home.home(false); c.group?.removeFromParent(); c.group?.traverse((m) => { if ((m as THREE.Mesh).isMesh) (m as THREE.Mesh).geometry.dispose() }); c.home = null; c.group = null }
+      return
+    }
+    // (made once everything in it has been drawn a while: each piece's own batch made, the edit offsets on them)
+    const shown = (p: THREE.Object3D) => { for (let q: THREE.Object3D | null = p; q && q !== r; q = q.parent) if (!q.visible) return false; return true }
+    if (!c.home && frames.current > 60 && pieces.current.length && pieces.current.every((p) => p.parent && shown(p))) {
+      const before = new Set(r.children)
+      c.home = homeCopy(r, pieces.current)
+      c.group = r.children.find((k) => !before.has(k)) ?? null
+      c.home.home(true)
+    }
+  })
+  useEffect(() => () => {
+    const c = copy.current
+    c.group?.traverse((m) => { if ((m as THREE.Mesh).isMesh) (m as THREE.Mesh).geometry.dispose() })
+  }, [])
+  const keep = (k: number) => (g: THREE.Group | null) => { if (g) pieces.current[k] = g }
+  let k = 0, first = 0
+  return (
+    <group ref={root}>
+      {GRILL_COUNTERS.map((c, ci) => {
+        const yaw = Math.atan2(-c.along.z, c.along.x), gate = BAR_GATES[ci]
+        const base = first
+        first += c.seats
+        return (
+          <group key={ci} position={c.at} rotation-y={yaw}>
+            {Array.from({ length: c.seats }, (_, n) => {
+              const x = seatAlong(c, n), seat = base + n, no = seatLabel(seat)
+              return (
+                <group key={n}>
+                  <Movable id={`chopsticks${seat}`} label={`筷子與筷架（座位 ${no}）`}>
+                    {/* (the set's middle: the chopsticks' middle across the place, nearest the customer; the rest under their tips) */}
+                    <group ref={keep(k++)} name={`chop-set-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷子與筷架', '黑漆塗箸擱在靛藍釉筷架上，客人開動時拿起來')}>
+                      <StaticBatch plain><group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group></StaticBatch>
+                      {/* (the chopsticks' own reach, to be pointed at: they're BarChopsticks', instanced) */}
+                      <mesh visible={false} position={[0, 0.012, 0]}><boxGeometry args={[SETTING.chopL + 0.01, 0.026, 0.04]} /></mesh>
+                    </group>
+                  </Movable>
+                  <Movable id={`soydish${seat}`} label={`醬油碟（座位 ${no}）`}>
+                    <group ref={keep(k++)} userData={{ soySeat: seat }} position={[sauceSide(c, gate, x), BAR_TOP + 0.001, PLACE.sauce[1]]}
+                      {...nameOver('醬油碟', '染付的小碟，客人坐下時倒醬油、放一點蘿蔔泥')}>
+                      <StaticBatch plain><BarPiece name="BarSoyDish" design={n} /></StaticBatch>
+                    </group>
+                  </Movable>
+                </group>
+              )
+            })}
+            {/* the soy pot and the wasabi that each two places share, at the back between them */}
+            {sharedAlong(c).map((x, j) => {
+              const a = seatLabel(base + 2 * j), b = 2 * j + 1 < c.seats ? seatLabel(base + 2 * j + 1) : null
+              return (
+                <Movable key={`shared${j}`} id={`condiments${base}-${j}`} label={`醬油壺與山葵（座位 ${b === null ? a : `${Math.min(a, b)}・${Math.max(a, b)}`}）`}>
+                  <group ref={keep(k++)} position={[x, BAR_TOP + 0.001, PLACE.shared]} {...nameOver('醬油壺與山葵', '兩個座位共用的染付醬油壺與青瓷山葵罐')}>
+                    <StaticBatch plain><BarPiece name="BarCondiments" /></StaticBatch>
+                  </group>
+                </Movable>
+              )
+            })}
+          </group>
+        )
+      })}
+    </group>
+  )
+})
 /** each place's drawer under the top: where it is along the place (to the customer's left: the owner's; half as wide as it was, and for a
  * while on their right),
  * where its case's front edge stands (just behind the top's rounded edge, on the customers' side), how far the drawer slides out, and where its
@@ -2436,15 +2519,17 @@ const BarChopsticks = memo(function BarChopsticks() {
     if (geo.index) shape.setIndex(geo.index)
     const hull = mergeVertices(shape, 1e-5)
     hull.computeVertexNormals()
-    // (each place's two sticks where they lie, in the bars' frame: its counter, its place along it, and each stick on the rest)
+    // (each place's two sticks where they lie, in the bars' frame: its counter, its place along it, and each stick on the rest; as laid
+    // there, and moved with their set's piece once it's drawn (BarTableware's chop-set-<place>, moved in edit mode as it may be))
     const places: THREE.Matrix4[][] = []
     const e = new THREE.Euler(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1)
+    const onSet = [-1, 1].map((sd) => new THREE.Matrix4().compose(new THREE.Vector3(-SETTING.chopL / 2, 0.0015, sd * 0.0075),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, sd * 0.012, SETTING.chopTilt)), one))
     for (const c of GRILL_COUNTERS) {
       const bar = new THREE.Matrix4().compose(c.at, q.setFromEuler(e.set(0, Math.atan2(-c.along.z, c.along.x), 0)), one)
       for (let n = 0; n < c.seats; n++) {
-        const at = bar.clone().multiply(new THREE.Matrix4().makeTranslation(seatAlong(c, n), BAR_TOP, 0))
-        places.push([-1, 1].map((sd) => at.clone().multiply(new THREE.Matrix4().compose(new THREE.Vector3(-SETTING.chopL / 2, 0.0015, PLACE.chop + sd * 0.0075),
-          q.setFromEuler(e.set(0, sd * 0.012, SETTING.chopTilt)), one))))
+        const at = bar.clone().multiply(new THREE.Matrix4().makeTranslation(seatAlong(c, n), BAR_TOP, PLACE.chop))
+        places.push(onSet.map((s) => at.clone().multiply(s)))
       }
     }
     const sticks = new THREE.InstancedMesh(geo, mat, places.length * 2)
@@ -2452,14 +2537,31 @@ const BarChopsticks = memo(function BarChopsticks() {
     ink.instanceMatrix = sticks.instanceMatrix
     sticks.receiveShadow = true
     sticks.frustumCulled = ink.frustumCulled = false
-    return { sticks, ink, places, geo, hull, mat }
+    return { sticks, ink, places, geo, hull, mat, onSet }
   }, [gltf])
+  // (the sets' pieces as they stand: looked up once they're drawn; read again while editing, as they're moved)
+  const sets = useRef<(THREE.Object3D | null)[]>([])
+  const settled = useRef(0)
+  const scene = useThree((s) => s.scene)
   useEffect(() => () => { if (made) { made.geo.dispose(); made.hull.dispose(); made.mat.dispose(); made.sticks.dispose(); made.ink.dispose() } }, [made])
   // (which places' pairs are up, last laid out: laid out again only when that changes)
   const shown = useRef('-')
   useFrame(() => {
     if (!made) return
-    const key = [...CHOPS_UP].sort((a, b) => a - b).join()
+    let key = [...CHOPS_UP].sort((a, b) => a - b).join()
+    // (laid where their set's piece is: found once it's drawn, and followed while edit mode's on)
+    const parent = made.sticks.parent
+    if (parent && (settled.current < 2 || getEdit().on)) {
+      let all = true
+      made.places.forEach((pair, i) => {
+        const o = sets.current[i]?.parent ? sets.current[i] : (sets.current[i] = scene.getObjectByName(`chop-set-${i}`) ?? null)
+        if (!o) { all = false; return }
+        o.updateWorldMatrix(true, false)
+        const m = new THREE.Matrix4().copy(parent.matrixWorld).invert().multiply(o.matrixWorld)
+        pair.forEach((p, k) => p.copy(m).multiply(made.onSet[k]))
+      })
+      if (all) { settled.current++; key += `|${settled.current}|${getEdit().on ? performance.now() : ''}` }
+    }
     if (key === shown.current) return
     shown.current = key
     made.places.forEach((pair, i) => pair.forEach((m, k) => made.sticks.setMatrixAt(i * 2 + k, CHOPS_UP.has(i) ? CHOP_GONE : m)))

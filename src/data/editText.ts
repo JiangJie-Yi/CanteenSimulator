@@ -218,10 +218,22 @@ const WORDS_JA: [string, string][] = [
   ['廁所牌', 'お手洗い札'], ['竹花瓶', '竹の花入れ'], ['烘手機', 'ハンドドライヤー'], ['擦手紙盒', 'ペーパータオルホルダー'],
   ['吊燈', '吊り灯'], ['馬桶', '便器'], ['紙燈', '紙の灯り'], ['招財貓', '招き猫'], ['飲料櫃', 'ドリンク冷蔵庫'], ['座位', '席'],
   ['圓窗', '丸窓'], ['掛軸', '掛け軸'], ['男廁', '男性用'], ['女廁', '女性用'], ['畫', '絵'],
+  ['筷子與筷架', '箸と箸置き'], ['醬油碟', '醤油皿'], ['醬油壺與山葵', '醤油差しと山葵'],
+]
+/** and in English: the made-up names' words, and their brackets (the rest keep their Chinese) */
+const WORDS_EN: [string, string][] = [
+  ['筷子與筷架', 'Chopsticks and rest'], ['醬油碟', 'Soy dish'], ['醬油壺與山葵', 'Soy pot and wasabi'], ['座位', 'seat'], ['（', ' ('], ['）', ')'], ['・', ', '],
 ]
 /** a piece's name in the panel's language */
 export function pieceName(zh: string, lang: Lang) {
-  if (lang === 'en') return PIECES_EN[zh] ?? zh
+  if (lang === 'en') {
+    if (PIECES_EN[zh]) return PIECES_EN[zh]
+    // (a numbered piece whose name's words are all known: put into English; else its Chinese, as it was)
+    if (!WORDS_EN.slice(0, 3).some(([a]) => zh.startsWith(a))) return zh
+    let s = zh
+    for (const [a, b] of WORDS_EN) s = s.split(a).join(b)
+    return s
+  }
   if (lang !== 'ja') return zh
   if (PIECES_JA[zh]) return PIECES_JA[zh]
   let s = zh
