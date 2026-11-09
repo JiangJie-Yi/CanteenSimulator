@@ -101,7 +101,9 @@ function Fitted({ children, onStats, spin, look, normals }: { children: React.Re
       const n = (geo.index ? geo.index.count : geo.attributes.position.count) / 3
       const mats = Array.isArray(m.material) ? m.material : [m.material]
       if (mats.every(isInk)) ink += n
-      else { tris += n; box.expandByObject(m) }
+      // (a skinned figure (the owner, the staff, the customers: one mesh on bones) measured as it's posed, point by point: its bounding box is
+      // worked out once at rest and never follows the bones, and the owner stood on it sank to his middle in the stand (the owner saw))
+      else { tris += n; box.expandByObject(m, (m as THREE.SkinnedMesh).isSkinnedMesh) }
     })
     if (box.isEmpty()) return
     const size = box.getSize(new THREE.Vector3())
