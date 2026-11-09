@@ -3475,7 +3475,7 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
 /** the two vases' arrangements (blender/shrinevase.py): 0 white and gold chrysanthemums, 1 pink, crimson and violet blooms */
 const VASE_URLS = ['shrinevase', 'shrinevase0', 'shrinevase1'].map((v) => import.meta.env.BASE_URL + `models/${v}.glb`)
 /** a shrine vase (榊立て, blender/shrinevase.py): white porcelain with a cobalt band of waves, a spray of glossy sakaki and small chrysanthemums */
-function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number }) {
+function Bouquet({ variant = 0 }: { variant?: number }) {
   const gltf = useGLTF(VASE_URLS[variant]) as unknown as { scene: THREE.Group }
   const root = useMemo(() => {
     const r = gltf.scene.clone(true)
@@ -3492,6 +3492,7 @@ function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number })
           : src.name === 'VaseLeaf'
             ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.DoubleSide })
             : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: THREE.DoubleSide })
+        t.name = src.name
         mats.set(src, t)
       }
       m.material = t
@@ -3500,25 +3501,46 @@ function Bouquet({ lean = 0, variant = 0 }: { lean?: number; variant?: number })
     inkModel(r, (m) => /Leaves|Mum|Stems|Stalk|Bud|Breath|Flower/.test(m.name), { width: 0.0008, weld: true })
     plainColours(r)
     mergeByMaterial(r)
-    return r
+    // (its foot measured, the vase stood on it: at 0 here is the table's top (the owner's: the vases sat 3 mm up, and leaning, one side of
+    // the foot more); the porcelain alone, not the flowers' ink)
+    let foot = Infinity
+    r.updateWorldMatrix(true, true)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || (m.material as THREE.Material).name !== 'VasePorcelain') return
+      const pos = m.geometry.attributes.position, v = new THREE.Vector3()
+      for (let i = 0; i < pos.count; i++) foot = Math.min(foot, v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld).y)
+    })
+    return { r, foot: Number.isFinite(foot) ? foot : 0 }
   }, [gltf])
-  return <group rotation-z={lean}><primitive object={root} /></group>
+  return <group position-y={-root.foot}><primitive object={root.r} /></group>
 }
 VASE_URLS.forEach((u) => useGLTF.preload(u))
+/**
+ * each arrangement's own turn and size (the owner's, 2026-11-10): the sakaki as it was made; the white and gold turned a little under half
+ * round, 2 cm along, a touch slimmer and taller; the pink and crimson turned the other way past half round (its blooms to the right and
+ * back), a touch wider and lower. Upright, all of them: no lean, so the whole foot is down on the table
+ */
+const VASE_POSE: { turn: number; along: number; scale: [number, number, number] }[] = [
+  { turn: 0, along: 0, scale: [1, 1, 1] },
+  { turn: Math.PI * 0.45, along: 0.02, scale: [0.95, 1.05, 0.95] },
+  { turn: -Math.PI * 0.65, along: 0, scale: [1.05, 0.92, 1.05] },
+]
 /** a vase whose flowers change at a click: the sakaki with small chrysanthemums, the white and gold, the pink and crimson, each bringing its
- * own blessing while it stands there (game/shrineFlowers); each time set at a slightly different turn and lean, so the two sides never
- * look stamped out alike. `slot`: 0 the left vase, 1 the right */
-function BouquetPick({ lean = 0, slot }: { lean?: number; slot: number }) {
+ * own blessing while it stands there (game/shrineFlowers), each set at its own turn and size (VASE_POSE). `slot`: 0 the left vase, 1 the right */
+function BouquetPick({ slot }: { slot: number }) {
   const [v, setV] = useState<Flower>(SHRINE_FLOWERS[slot] ?? 0)
-  // (its turn and lean worked out from which side and which flowers, not drawn at random: drawn again each time the vase was mounted (a view
-  // switched, a model loading nearby), it turned on the spot (the owner saw both vases jumping about); still different either side)
-  const turn = (((slot * 7 + v * 13 + 3) % 11) / 10 - 0.5) * 1.2
-  const tilt = (((slot * 5 + v * 3 + 2) % 7) / 6 - 0.5) * 0.06
+  const pose = VASE_POSE[v] ?? VASE_POSE[0]
   return (
     // (smaller than they were: the vases stood nearly as tall as the shrine; a sakaki vase comes to about two thirds of it)
-    <group rotation-y={turn} scale={0.78} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const n = nextFlower(v); setShrineFlower(slot, n); setV(n) }}
+    <group position-z={pose.along} rotation-y={pose.turn} scale={[0.78 * pose.scale[0], 0.78 * pose.scale[1], 0.78 * pose.scale[2]]}
+      onClick={(e) => {
+        e.stopPropagation(); if (getEdit().on) return; const n = nextFlower(v); setShrineFlower(slot, n); setV(n)
+        // (its tag says the flowers now there: it was still naming the ones just taken out, till the pointer moved off and back)
+        setTip({ title: `供花・${FLOWERS[n].name}`, hint: `${FLOWERS[n].buff}｜點一下換一組花` })
+      }}
       {...tipOver(`供花・${FLOWERS[v].name}`, `${FLOWERS[v].buff}｜點一下換一組花`)}>
-      <Bouquet lean={lean + tilt} variant={v} />
+      <Bouquet variant={v} />
     </group>
   )
 }
@@ -3752,6 +3774,8 @@ function ShrineDoors() {
  * so no line shows (it was 0.015 up: with the altar's own scale on top of the shrine's, 4.5 cm clear of the table in the room, the owner's
  * "floating apart") */
 const SHRINE_LIFT = -0.0003
+/** the vases' feet: on the table's top where they stand, a hair into it (measured: tests/e2e/_vases.mjs) */
+const VASE_LIFT = -0.00004
 function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase1' | 'cups' }) {
   return (
     <group>
@@ -3760,7 +3784,9 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
       {(part === 'all' || part === 'shrine') && <group position={[-0.14, SHRINE_LIFT, 0]}><KamidanaModel /></group>}
       {/* the bouquets in their vases, leaning in a little, each its own piece */}
       {[-1, 1].filter((sd) => part === 'all' || part === `vase${sd}`).map((sd) => (
-        <group key={sd} position={[-0.15, 0.015, sd * 0.3]}><BouquetPick lean={sd * -0.08} slot={sd < 0 ? 0 : 1} /><ContactShadow r={0.05} y={-0.014} /></group>
+        // (the vase's foot down on the table's top, a hair into it (it stood 1.5 cm up here: 3 mm in the room); the top's a hair above the
+        // shrine's foot out here at the front)
+        <group key={sd} position={[-0.15, VASE_LIFT, sd * 0.3]}><BouquetPick slot={sd < 0 ? 0 : 1} /><ContactShadow r={0.05} y={0.0013} /></group>
       ))}
       {/* the cups' stand (blender/kamidana.py), the cups on it */}
       {(part === 'all' || part === 'cups') && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /><ContactShadow r={0.15} /></group>}
