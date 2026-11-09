@@ -12,8 +12,6 @@ import { warmLater } from './Prewarm'
  * on its original (before, it kept the copy for good, and with it the colour it had then: a lamp once faded stayed lit with the lights off).
  */
 const FADED = 0.18
-/** nearer the camera than this, faded further, to this */
-const CLOSE = 1.5, CLOSE_FADED = 0.06
 /** the rays: a grid round where what's looked at is on the screen (in the screen's -1..1, about a third of it across) */
 const AIM: [number, number][] = [-0.3, -0.15, 0, 0.15, 0.3].flatMap((x) => [-0.3, -0.15, 0, 0.15, 0.3].map((y) => [x, y] as [number, number]))
 
@@ -112,22 +110,17 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
     if (++tick.current % 3 === 0) {
       const far = camera.position.distanceTo(aim) * 0.97
       const hits = new Set<Fader>()
-      // (and how near the camera each is: right before it, filling half the picture (the door curtain in the genkan's view), its usual
-      // faintness was still a grey haze over all of it; there, all but gone)
-      const near = new Map<Fader, number>()
       // (round where the target is on the screen, which needn't be its middle: the view is shifted to frame the stage)
       const c = aim.clone().project(camera)
       for (const [x, y] of AIM) {
         ray.current.setFromCamera(new THREE.Vector2(c.x + x, c.y + y), camera)
         ray.current.far = far
         for (const f of faders.current) {
-          const hit = ray.current.intersectObjects(f.hit, false)[0]
-          if (!hit) continue
-          hits.add(f)
-          near.set(f, Math.min(near.get(f) ?? Infinity, hit.distance))
+          if (hits.has(f)) continue
+          if (ray.current.intersectObjects(f.hit, false).length) hits.add(f)
         }
       }
-      for (const f of faders.current) f.want = hits.has(f) ? ((near.get(f) ?? Infinity) < CLOSE ? Math.min(f.low, CLOSE_FADED) : f.low) : 1
+      for (const f of faders.current) f.want = hits.has(f) ? f.low : 1
     }
     for (const f of faders.current) {
       if (Math.abs(f.k - f.want) >= 0.002) {
