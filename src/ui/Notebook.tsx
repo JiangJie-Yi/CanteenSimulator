@@ -43,7 +43,7 @@ type Props = {
   onTalk: (text: string) => void
 }
 
-const t = (lang: Lang, zh: string, ja: string) => (lang === 'ja' ? ja : zh)
+const t = (lang: Lang, zh: string, ja: string, en?: string) => (lang === 'ja' ? ja : lang === 'en' ? en ?? zh : zh)
 
 /**
  * 廚房 (a tab of the office window, beside 人事): what's been tried with the shop closed, as dishes — at the grill a food with its seasonings is a dish of
@@ -105,7 +105,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
   const describe = (r: Recipe) => {
     const bits: string[] = []
     if (r.best.doneness !== undefined) bits.push(donenessWord(r.best.doneness, lang))
-    if (seasoned) bits.push(r.part.dabs.length ? r.part.dabs.map((k) => SEASON_NAME[lang][k]).join('＋') : t(lang, '原味', '味付けなし'))
+    if (seasoned) bits.push(r.part.dabs.length ? r.part.dabs.map((k) => SEASON_NAME[lang][k]).join('＋') : t(lang, '原味', '味付けなし', 'Plain'))
     return bits.join('・')
   }
 
@@ -116,17 +116,17 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
 
   return (
     // (a tab of the office window: 廚房 beside 人事)
-    <div className="nb-embedded" aria-label={t(lang, '廚房', '厨房')}>
+    <div className="nb-embedded" aria-label={t(lang, '廚房', '厨房', 'Kitchen')}>
           {/* how far the menu is from opening: a bar to the minimum, and what's left to do */}
           <div className={`nb-progress${entries.length >= min ? ' is-ready' : ''}`}>
-            <span>{t(lang, `菜單 ${entries.length}/${MENU_MAX}`, `メニュー ${entries.length}/${MENU_MAX}`)}</span>
+            <span>{t(lang, `菜單 ${entries.length}/${MENU_MAX}`, `メニュー ${entries.length}/${MENU_MAX}`, `Menu ${entries.length}/${MENU_MAX}`)}</span>
             <i><b style={{ width: `${Math.min(100, (entries.length / min) * 100)}%` }} /></i>
-            <small>{entries.length >= min ? t(lang, '可以營業了', '営業できます')
-              : t(lang, `至少 ${min} 樣才能開業`, `${min}品から開業できます`)}</small>
+            <small>{entries.length >= min ? t(lang, '可以營業了', '営業できます', 'Ready to open')
+              : t(lang, `至少 ${min} 樣才能開業`, `${min}品から開業できます`, `${min} dishes to open`)}</small>
           </div>
           <nav className="nb-views" role="tablist">
-            {([['tried', t(lang, '試菜', '試作'), recipes.length], ['menu', t(lang, '菜單', 'メニュー'), entries.length],
-              ['chef', t(lang, '料理研製', '料理研究'), null]] as const).map(([k, label, n]) => (
+            {([['tried', t(lang, '試菜', '試作', 'Tried'), recipes.length], ['menu', t(lang, '菜單', 'メニュー', 'Menu'), entries.length],
+              ['chef', t(lang, '料理研製', '料理研究', 'Recipes'), null]] as const).map(([k, label, n]) => (
               <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)}>
                 {label}{n !== null && <em>{n}</em>}
               </button>
@@ -134,7 +134,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
           </nav>
           {view === 'tried' && (recipes.length === 0 ? (
             <p className="notebook-empty">{t(lang, '還沒試做過。關店時在右邊的牌子點菜試做、調味、吃一口，做過的菜就會記在這裡，好吃的按「上架」放上菜單。也可以到「料理研製」請二廚幫忙試做。',
-              '閉店中に試作して食べると、ここに記録されます。おいしいものをメニューに。')}</p>
+              '閉店中に試作して食べると、ここに記録されます。おいしいものをメニューに。',
+              'Nothing tried yet. While closed, take a dish from the board on the right, season it, taste it: it’s noted here, and the good ones go on the menu with “List”. Or ask the sous chef in “Recipes”.')}</p>
           ) : (
             <ul>
               {recipes.map((r) => {
@@ -145,9 +146,9 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                     <div className="nb-head">
                       <b>{nameOf(r.part)}</b>
                       <span className="nb-stars"><Stars value={starsOf(r.best.taste)} size="1em" /></span>
-                      <small>{t(lang, '美味', '美味')} {Math.round(r.best.taste)}</small>
+                      <small>{t(lang, '美味', '美味', 'Taste')} {Math.round(r.best.taste)}</small>
                     </div>
-                    <p>{t(lang, '最好：', 'ベスト：')}{describe(r)}・{t(lang, `試了 ${r.tries} 次`, `${r.tries}回`)}・{t(lang, '成本', '原価')} NT${r.cost}</p>
+                    <p>{t(lang, '最好：', 'ベスト：', 'Best: ')}{describe(r)}・{t(lang, `試了 ${r.tries} 次`, `${r.tries}回`, `${r.tries} tries`)}・{t(lang, '成本', '原価', 'Cost')} NT${r.cost}</p>
                     {roast && (() => {
                       // written out as a recipe: what goes on when, and how long over the fire
                       const steps = r.best.steps ?? idealSteps(r.part.dabs)
@@ -156,18 +157,18 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                       return (
                         <>
                           <ol className="nb-recipe">{recipeSteps(steps, secs, donenessWord(r.best.doneness ?? 1.1, lang), lang).map((x, i) => <li key={i}>{x}</li>)}</ol>
-                          {tips.length > 0 && <p className="nb-tip">{t(lang, '小提醒：', 'ひとこと：')}{tips.join('；')}</p>}
+                          {tips.length > 0 && <p className="nb-tip">{t(lang, '小提醒：', 'ひとこと：', 'Tip: ')}{tips.join('；')}</p>}
                         </>
                       )
                     })()}
                     <div className="nb-publish">
-                      {listed ? <span className="nb-listed">{t(lang, '已上架', '掲載中')}</span> : (
+                      {listed ? <span className="nb-listed">{t(lang, '已上架', '掲載中', 'Listed')}</span> : (
                         <>
                           <label>NT$<input type="number" min={1} inputMode="numeric" value={prices[r.key] ?? fallback}
                             onChange={(e) => setPrices((p) => ({ ...p, [r.key]: e.target.value }))} /></label>
-                          <small>{t(lang, '毛利', '粗利')} {Math.round((1 - r.cost / priceOf(r.key, fallback)) * 100)}%</small>
+                          <small>{t(lang, '毛利', '粗利', 'Margin')} {Math.round((1 - r.cost / priceOf(r.key, fallback)) * 100)}%</small>
                           <button type="button" disabled={full} onClick={() => onPublish({ key: r.key, shop: dish.id, name: r.part.name,
-                            ja: r.part.ja, price: priceOf(r.key, fallback), parts: [r.part] })}>{t(lang, '上架', '掲載')}</button>
+                            ja: r.part.ja, price: priceOf(r.key, fallback), parts: [r.part] })}>{t(lang, '上架', '掲載', 'List')}</button>
                         </>
                       )}
                     </div>
@@ -180,7 +181,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
           {view === 'menu' && (
             <>
               {entries.length === 0 ? (
-                <p className="notebook-empty">{t(lang, '菜單還是空的：到「試菜」把做過的菜上架。上架兩樣以上，就能在這裡組套餐。', 'メニューはまだ空です。')}</p>
+                <p className="notebook-empty">{t(lang, '菜單還是空的：到「試菜」把做過的菜上架。上架兩樣以上，就能在這裡組套餐。', 'メニューはまだ空です。', 'The menu’s empty: list dishes you’ve tried under “Tried”. With two or more, you can make sets here.')}</p>
               ) : (
                 <ul>
                   {entries.map((e) => {
@@ -194,8 +195,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                         <div className="nb-publish">
                           <label>NT$<input type="number" min={1} inputMode="numeric" value={e.price}
                             onChange={(ev) => { const v = Math.round(Number(ev.target.value)); if (v > 0) onReprice(e.key, v) }} /></label>
-                          <small>{t(lang, '成本', '原価')} {cost}・{t(lang, '毛利', '粗利')} {Math.round((1 - cost / e.price) * 100)}%</small>
-                          <button type="button" className="nb-off" onClick={() => onUnpublish(e.key)}>{t(lang, '下架', '外す')}</button>
+                          <small>{t(lang, '成本', '原価', 'Cost')} {cost}・{t(lang, '毛利', '粗利', 'Margin')} {Math.round((1 - cost / e.price) * 100)}%</small>
+                          <button type="button" className="nb-off" onClick={() => onUnpublish(e.key)}>{t(lang, '下架', '外す', 'Unlist')}</button>
                         </div>
                       </li>
                     )
@@ -205,7 +206,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
               {/* make up a set from what's on the menu */}
               {singles.length >= 2 && (
                 <div className="nb-set">
-                  <b>{t(lang, '組套餐', 'セットを作る')}</b>
+                  <b>{t(lang, '組套餐', 'セットを作る', 'Make a set')}</b>
                   <div className="nb-set-picks">
                     {singles.map((e) => (
                       <label key={e.key} className={picked.includes(e.key) ? 'is-on' : ''}>
@@ -217,11 +218,11 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                   </div>
                   {setParts.length >= 2 && (
                     <div className="nb-publish">
-                      <input className="nb-set-name" value={setName} placeholder={t(lang, `${setParts[0].name}套餐`, `${setParts[0].ja}セット`)}
+                      <input className="nb-set-name" value={setName} placeholder={t(lang, `${setParts[0].name}套餐`, `${setParts[0].ja}セット`, `${setParts[0].ja} set`)}
                         onChange={(e) => setSetName(e.target.value)} maxLength={14} />
                       <label>NT$<input type="number" min={1} inputMode="numeric" value={prices.__set ?? Math.round((setSum * 0.9) / 5) * 5}
                         onChange={(e) => setPrices((p) => ({ ...p, __set: e.target.value }))} /></label>
-                      <small>{t(lang, `單點合計 ${setSum}`, `単品計 ${setSum}`)}</small>
+                      <small>{t(lang, `單點合計 ${setSum}`, `単品計 ${setSum}`, `À la carte ${setSum}`)}</small>
                       <button type="button" disabled={full} onClick={() => {
                         const name = setName.trim() || `${setParts[0].name}套餐`
                         onPublish({ key: `set|${picked.join(',')}|${Date.now()}`, shop: dish.id, name, ja: setName.trim() || `${setParts[0].ja}セット`,
@@ -229,7 +230,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                         setPicked([])
                         setSetName('')
                         setPrices((p) => ({ ...p, __set: '' }))
-                      }}>{t(lang, '上架套餐', 'セット掲載')}</button>
+                      }}>{t(lang, '上架套餐', 'セット掲載', 'List the set')}</button>
                     </div>
                   )}
                 </div>
@@ -261,7 +262,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                 </>
               ) : (
                 <p className="notebook-empty">{t(lang, '還沒有二廚。到「經營／人事」雇用廚師後，就能問他做菜的意見。',
-                  'まだ二番手がいません。人事で料理人を雇うと相談できます。')}</p>
+                  'まだ二番手がいません。人事で料理人を雇うと相談できます。', 'No sous chef yet. Hire a cook under Office / Staff and you can ask them about dishes.')}</p>
               )}
             </div>
           )}
