@@ -1873,10 +1873,9 @@ function KitchenDais({ counters, rise }: { counters: Counter[]; rise: number }) 
     <>
       <mesh position={[-(ky0 + ky1) / 2, rise / 2, (kx0 + kx1) / 2]} geometry={timberBox(ky1 - ky0, rise, kx1 - kx0, BASE_TILE.along, BASE_TILE.across)} material={BASE_TIMBER[1]} receiveShadow />
       <FloorPiece w={ky1 - ky0} l={kx1 - kx0} tint="#d2c4b2" position={[-(ky0 + ky1) / 2, rise + 0.004, (kx0 + kx1) / 2]} />
-      {/* (the steps: half its height, outside its edge at the first counter's gate, at the side counter's, and along its open end) */}
-      <mesh position={[-(ky0 - S / 2), rise / 4, (gates.first[0] + gates.first[1]) / 2]} geometry={timberBox(S, rise / 2, gates.first[1] - gates.first[0] + 0.2)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />
-      {gates.side && <mesh position={[-(gates.side[0] + gates.side[1]) / 2, rise / 4, kx0 - S / 2]} geometry={timberBox(gates.side[1] - gates.side[0] + 0.2, rise / 2, S)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />}
-      <mesh position={[-(ky0 + ky1) / 2, rise / 4, kx1 + S / 2]} geometry={timberBox(ky1 - ky0, rise / 2, S)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />
+      {/* (one step: half its height, outside its edge at the side counter's gate; the first counter's gate's and the one along its open end
+          taken away (the owner's: pale planks lying across the aisle by the stools' feet)) */}
+      {gates.side && <mesh name="dais-step-side" position={[-(gates.side[0] + gates.side[1]) / 2, rise / 4, kx0 - S / 2]} geometry={timberBox(gates.side[1] - gates.side[0] + 0.2, rise / 2, S)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />}
     </>
   )
 }
