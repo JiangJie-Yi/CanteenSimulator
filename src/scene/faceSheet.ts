@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 
 /**
- * Every face in the shop, painted (the owner's: Overcooked's way, bold enough to read from above): big dark oval eyes with a large and a
- * small glint, thick brows that tilt and lift, a mouth for every mood (a smile, a toothy D, a round O, a pout, a pressed line with the
- * tongue out), a nose and the owner's moustache left as shapes. Painted in degrees round the head (az across, el up from the eyes' line's
+ * Every face in the shop, painted (the owner's, 2026-11-09: Overcooked's simple cartoon way, not the big glossy anime eyes there were):
+ * small solid dark bean eyes with one tiny white dot, closed into arcs ^ ^ when happy, a little lidded at work, rounder in a fright; thick
+ * rounded brows that carry the mood (pressed in at work, lifted in a fright, drooped when sad); a mouth of a line or two (a short curve,
+ * a small O, a little open D when it tastes good); a faint apricot blush; a nose and the owner's moustache left as shapes. Painted in degrees round the head (az across, el up from the eyes' line's
  * middle) so one painter draws them all: the owner's and the staff's face patch (blender/boss.py: a sheet of four by two, the patch's UVs
  * slid from one frame to the next) and the customers' strips of eight (blender/folk.py's order, slid by their material).
  */
@@ -30,7 +31,8 @@ type Frame = { place: (az: number, el: number) => [number, number]; sx: number; 
 /** one face painted into `f` */
 function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: Face) {
   const big = BIG[kind]
-  const rx = 8.8 * big, ry = 12 * big
+  // (bean eyes: a little taller than wide, small in the face)
+  const rx = 5.4 * big, ry = 6.8 * big
   const lip = kind === 'female' ? '#b8483e' : '#6a2a20'
   const browC = kind === 'elder' ? '#8a8580' : '#2e1c12'
   const browW = { boss: 3.4, male: 2.8, female: 1.9, elder: 2.4, kid: 2.4 }[kind]
@@ -45,66 +47,44 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
     draw()
     g.restore()
   }
-  const blush = (colour: string, a: number) => {
-    for (const sd of [-1, 1]) at(sd * 31, -15, () => { g.globalAlpha = a; g.fillStyle = colour; g.beginPath(); g.ellipse(0, 0, 6.2, 3.6, 0, 0, Math.PI * 2); g.fill() })
+  const blush = (colour: string, w: number) => {
+    for (const sd of [-1, 1]) at(sd * 30, -12, () => { g.fillStyle = colour; g.beginPath(); g.ellipse(0, 0, w, w * 0.6, 0, 0, Math.PI * 2); g.fill() })
   }
-  // (solid: the figures are hashed on their alpha, and a see-through blush came out a scatter of dots)
-  if (kind !== 'boss' && kind !== 'male') blush('#f7ab9c', 1)
-  if (face === 'proud') blush('#ff7f78', 1)
+  // (faint, a soft apricot: solid all the same, the figures being hashed on their alpha (a see-through blush came out a scatter of dots), so
+  // a pale tint near the skin's own rather than a see-through one)
+  blush(face === 'proud' || face === 'happy' ? '#f4ae9a' : '#f6c3b2', kind === 'boss' || kind === 'male' ? 4.6 : 5.4)
   for (const sd of [-1, 1]) {
     const cx = sd * EYE_AZ
     // ---- the eyes
     at(cx, EYE_EL, () => {
-      const glints = (k = 1) => {
-        g.fillStyle = '#ffffff'
-        g.beginPath(); g.arc(0.32 * rx, -0.38 * ry, 0.34 * rx * k, 0, Math.PI * 2); g.fill()
-        g.beginPath(); g.arc(-0.3 * rx, 0.42 * ry, 0.16 * rx * k, 0, Math.PI * 2); g.fill()
-      }
-      const oval = (sx = 1, sy = 1) => { g.fillStyle = INK; g.beginPath(); g.ellipse(0, 0, rx * sx, ry * sy, 0, 0, Math.PI * 2); g.fill() }
+      // (one tiny white dot, up toward the outside: no more)
+      const dot = (k = 1) => { g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0.3 * rx * sd, -0.4 * ry, 0.26 * rx * k, 0, Math.PI * 2); g.fill() }
+      const bean = (sx = 1, sy = 1) => { g.fillStyle = INK; g.beginPath(); g.ellipse(0, 0, rx * sx, ry * sy, 0, 0, Math.PI * 2); g.fill() }
       const stroke = (w: number, path: () => void, colour = INK) => { g.strokeStyle = colour; g.lineWidth = w; g.beginPath(); path(); g.stroke() }
-      if (face === 'blink') stroke(2.2, () => { g.moveTo(-rx, 0); g.quadraticCurveTo(0, 0.5 * ry, rx, 0) })
-      else if (face === 'happy') stroke(2.4, () => { g.moveTo(-rx * 0.9, 0.25 * ry); g.quadraticCurveTo(0, -0.85 * ry, rx * 0.9, 0.25 * ry) })
-      else if (face === 'drink' || face === 'chew') stroke(2.4, () => { g.moveTo(sd * 0.8 * rx, -0.55 * ry); g.lineTo(-sd * 0.7 * rx, 0); g.lineTo(sd * 0.8 * rx, 0.55 * ry) })
-      else if (face === 'panic' || face === 'surprised') {
-        // (the whites showing, a dark ring round them, the pupil shrunk to a dot)
-        g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(0, 0, rx * 1.05, ry * 1.1, 0, 0, Math.PI * 2); g.fill()
-        g.strokeStyle = INK; g.lineWidth = 1.5; g.stroke()
-        g.fillStyle = INK; g.beginPath(); g.arc(0, 0.5, 0.26 * rx, 0, Math.PI * 2); g.fill()
-      } else if (face === 'proud') {
-        // (a shining star)
-        g.beginPath()
-        for (let i = 0; i < 10; i++) {
-          const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 0.42 * ry : 0.98 * ry
-          g.lineTo(Math.cos(a) * r, Math.sin(a) * r)
-        }
-        g.closePath()
-        g.fillStyle = '#ffd23a'; g.fill()
-        g.strokeStyle = INK; g.lineWidth = 1.3; g.stroke()
-        g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0.18 * rx, -0.3 * ry, 0.16 * rx, 0, Math.PI * 2); g.fill()
-      } else {
-        // (open: the lid cut across for a look (focused and cross: low at the inside; sad: low at the outside))
-        const lid = face === 'focused' || face === 'mad' ? [-0.15, -0.95] : face === 'sad' ? [-0.95, -0.2] : null
-        g.save()
-        if (lid) {
-          g.beginPath()
-          g.moveTo(-sd * 1.6 * rx, lid[0] * ry); g.lineTo(sd * 1.6 * rx, lid[1] * ry); g.lineTo(sd * 1.6 * rx, 2 * ry); g.lineTo(-sd * 1.6 * rx, 2 * ry)
-          g.closePath(); g.clip()
-        }
-        oval()
-        glints()
-        g.restore()
-        if (lid) stroke(1.8, () => { g.moveTo(-sd * 1.05 * rx, (lid[0] + (lid[1] - lid[0]) * 0.17) * ry); g.lineTo(sd * 1.05 * rx, (lid[1] - (lid[1] - lid[0]) * 0.17) * ry) })
-        if (kind === 'female') for (const k of [0, 1, 2]) stroke(1.1, () => { const a = -0.5 - k * 0.32; g.moveTo(sd * Math.cos(a) * rx * 0.95, Math.sin(a) * ry * 0.95); g.lineTo(sd * Math.cos(a) * rx * 1.35, Math.sin(a) * ry * 1.3) })
-      }
+      if (face === 'blink') stroke(2.2, () => { g.moveTo(-rx * 1.1, 0.5); g.quadraticCurveTo(0, 0.35 * ry, rx * 1.1, 0.5) })
+      // (happy, proud, a mouthful that's good: closed into arcs, ^ ^)
+      else if (face === 'happy' || face === 'proud' || face === 'chew') stroke(2.6, () => { g.moveTo(-rx * 1.2, 0.35 * ry); g.quadraticCurveTo(0, -1.0 * ry, rx * 1.2, 0.35 * ry) })
+      // (gulping it down: > <)
+      else if (face === 'drink') stroke(2.4, () => { g.moveTo(sd * 1.1 * rx, -0.6 * ry); g.lineTo(-sd * 0.8 * rx, 0); g.lineTo(sd * 1.1 * rx, 0.6 * ry) })
+      // (a fright: rounder and a touch bigger, the dot as ever)
+      else if (face === 'panic' || face === 'surprised') { bean(1.15, 1.0); dot(1.1) }
+      // (at work, cross: the top of the bean cut flat by a lid, a little smaller)
+      else if (face === 'focused' || face === 'mad') {
+        g.save(); g.beginPath(); g.rect(-2 * rx, -0.25 * ry, 4 * rx, 2 * ry); g.clip(); bean(0.95, 0.95); g.restore()
+        stroke(1.8, () => { g.moveTo(-1.15 * rx, -0.25 * ry); g.lineTo(1.15 * rx, -0.25 * ry) })
+        g.save(); g.beginPath(); g.rect(-2 * rx, -0.25 * ry, 4 * rx, 2 * ry); g.clip(); dot(0.85); g.restore()
+      } else if (face === 'sad') { bean(0.9, 0.85); dot(0.9) }
+      else { bean(); dot() }
       if (kind === 'elder' && face !== 'happy') stroke(0.8, () => { g.moveTo(sd * 1.15 * rx, 0.55 * ry); g.quadraticCurveTo(sd * 1.35 * rx, 0.7 * ry, sd * 1.3 * rx, 0.95 * ry) }, '#b07a5a')
     })
     // ---- the brows: thick, tilted and lifted by the mood (inner end down when focused or cross, up when worried)
-    const tilt = face === 'focused' || face === 'mad' || face === 'drink' ? 4.5 : face === 'sad' || face === 'panic' ? -3.6 : 0
-    const lift = face === 'panic' || face === 'surprised' ? 5 : face === 'happy' || face === 'proud' ? 1.8 : face === 'mad' ? -1 : 0
-    at(cx, BROW_EL + lift, () => {
-      g.strokeStyle = browC; g.lineWidth = browW
+    // (the inner end down when at work or cross, up and the whole brow sagging when sad, lifted high in a fright)
+    const tilt = face === 'focused' || face === 'mad' || face === 'drink' ? 3.6 : face === 'sad' ? -4.2 : face === 'panic' ? -2.4 : 0
+    const lift = face === 'panic' || face === 'surprised' ? 6 : face === 'happy' || face === 'proud' ? 2 : face === 'mad' ? -1.5 : face === 'sad' ? -1 : 0
+    at(cx, BROW_EL - 3 + lift, () => {
+      g.strokeStyle = browC; g.lineWidth = browW * 1.25
       g.beginPath()
-      g.moveTo(-sd * 5.6, tilt); g.quadraticCurveTo(0, -1.4 - Math.abs(tilt) * 0.2, sd * 5.6, -tilt * 0.4)
+      g.moveTo(-sd * 4.6, tilt); g.quadraticCurveTo(0, -1.2 - Math.abs(tilt) * 0.15, sd * 4.6, -tilt * 0.3)
       g.stroke()
     })
   }
@@ -112,38 +92,27 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
   at(0, MOUTH_EL[kind], () => {
     const dark = '#5a1810', tongue = '#e8786a'
     const line = (w: number, path: () => void) => { g.strokeStyle = lip; g.lineWidth = w; g.beginPath(); path(); g.stroke() }
-    if (face === 'idle' || face === 'blink') line(1.7, () => { g.moveTo(-5, -0.6); g.quadraticCurveTo(0, 2.6, 5, -0.6) })
+    // (a short gentle curve at rest)
+    if (face === 'idle' || face === 'blink') line(1.7, () => { g.moveTo(-3.4, -0.2); g.quadraticCurveTo(0, 2, 3.4, -0.2) })
     else if (face === 'happy' || face === 'proud') {
-      // (a big toothy D: its top flat, teeth along it, the tongue at the bottom)
-      const w = face === 'proud' ? 7 : 6.2
-      g.beginPath(); g.moveTo(-w, -1.5); g.lineTo(w, -1.5); g.ellipse(0, -1.5, w, 7, 0, 0, Math.PI); g.closePath()
+      // (a little open D: its top flat, a hint of tongue at the bottom)
+      const w = face === 'proud' ? 4.8 : 4.2
+      g.beginPath(); g.moveTo(-w, -1); g.lineTo(w, -1); g.ellipse(0, -1, w, w * 0.95, 0, 0, Math.PI); g.closePath()
       g.fillStyle = dark; g.fill()
       g.save(); g.clip()
-      g.fillStyle = '#fffaf0'; g.fillRect(-w, -1.6, 2 * w, 2.2)
-      g.fillStyle = tongue; g.beginPath(); g.ellipse(0, 4.6, 3.6, 2.4, 0, 0, Math.PI * 2); g.fill()
+      g.fillStyle = tongue; g.beginPath(); g.ellipse(0, w * 0.75, w * 0.6, w * 0.4, 0, 0, Math.PI * 2); g.fill()
       g.restore()
-      g.strokeStyle = lip; g.lineWidth = 1; g.beginPath(); g.moveTo(-w, -1.5); g.lineTo(w, -1.5); g.ellipse(0, -1.5, w, 7, 0, 0, Math.PI); g.closePath(); g.stroke()
     } else if (face === 'panic' || face === 'surprised' || face === 'talk') {
-      // (wide open: an O as they gasp, rounder and lower; as they talk, wider and shallower)
-      const [w, h, y] = face === 'talk' ? [4.6, 3.4, 0.8] : [3.8, 4.8, 1.2]
-      g.beginPath(); g.ellipse(0, y, w, h, 0, 0, Math.PI * 2)
+      // (a small O: rounder as they gasp, wider and shallower as they talk)
+      const [w, h] = face === 'talk' ? [2.8, 2.2] : [2.4, 3.2]
+      g.beginPath(); g.ellipse(0, 0.8, w, h, 0, 0, Math.PI * 2)
       g.fillStyle = dark; g.fill()
-      g.save(); g.clip()
-      g.fillStyle = tongue; g.beginPath(); g.ellipse(0, y + h * 0.75, w * 0.6, h * 0.45, 0, 0, Math.PI * 2); g.fill()
-      g.restore()
-      g.strokeStyle = lip; g.lineWidth = 1; g.beginPath(); g.ellipse(0, y, w, h, 0, 0, Math.PI * 2); g.stroke()
-    } else if (face === 'focused') {
-      // (pressed tight, the tongue poking out at a corner)
-      g.fillStyle = tongue; g.beginPath(); g.arc(2.6, 0.6, 1.6, 0, Math.PI); g.fill()
-      g.strokeStyle = lip; g.lineWidth = 0.7; g.stroke()
-      line(1.7, () => { g.moveTo(-4.4, 0.6); g.lineTo(4.4, 0) })
-    } else if (face === 'drink') {
-      // (a pout, pushed out at the bottle)
-      g.fillStyle = dark; g.beginPath(); g.ellipse(0, 0.4, 1.4, 1.1, 0, 0, Math.PI * 2); g.fill()
-      line(1.5, () => g.ellipse(0, 0.4, 2.6, 2.1, 0, 0, Math.PI * 2))
-    } else if (face === 'mad') line(1.7, () => { g.moveTo(-4.6, 1.6); g.quadraticCurveTo(0, -2, 4.6, 1.6) })
-    else if (face === 'sad') line(1.5, () => { g.moveTo(-4, 1.4); g.quadraticCurveTo(0, -1.2, 4, 1.4) })
-    else if (face === 'chew') line(1.6, () => { g.moveTo(-4.2, 0); g.bezierCurveTo(-2.4, -2, -1.2, 2, 0, 0); g.bezierCurveTo(1.2, -2, 2.4, 2, 4.2, 0) })
+    } else if (face === 'focused') line(1.7, () => { g.moveTo(-3, 0.4); g.lineTo(3, 0.2) })
+    else if (face === 'drink') { g.fillStyle = dark; g.beginPath(); g.ellipse(0, 0.4, 1.6, 1.4, 0, 0, Math.PI * 2); g.fill() }
+    else if (face === 'mad') line(1.7, () => { g.moveTo(-3.6, 1.4); g.quadraticCurveTo(0, -1.6, 3.6, 1.4) })
+    else if (face === 'sad') line(1.5, () => { g.moveTo(-3.2, 1.2); g.quadraticCurveTo(0, -0.8, 3.2, 1.2) })
+    // (munching: a little wobbly line)
+    else if (face === 'chew') line(1.6, () => { g.moveTo(-3.4, 0); g.bezierCurveTo(-2, -1.6, -1, 1.6, 0, 0); g.bezierCurveTo(1, -1.6, 2, 1.6, 3.4, 0) })
   })
   // ---- a bead of sweat on the brow (focused at its work; two in a panic)
   if (face === 'focused' || face === 'panic') for (const sd of face === 'panic' ? [-1, 1] : [1]) {
