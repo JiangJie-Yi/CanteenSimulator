@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useEffect, type ReactNode } from 'react'
 import { useDrag } from './useDrag'
 import type { Lang } from '@/data/i18n'
+import { peopleIn } from '@/data/peopleText'
 import type { Dish } from '@/data/menu'
 import { isTired, ROLES, SKILLS, TIERS, type Worker } from '@/data/staff'
 import { CANDIDATES, pickHires, replaceOf, ROLLS_PER_DAY } from '@/game/hiring'
@@ -62,13 +63,15 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   // (English for what has it; the rest falls back to the Chinese)
   const EN: Record<string, string> = { 一鍵徵人: 'Hire all', 人事: 'Staff', '大廚（你）': 'Head chef (you)', 女: 'F', 廚房: 'Kitchen', 手藝: 'Skill', 歲: 'yrs',
     每個空缺各雇一位最划算的人: 'Fill every opening with the best-value hire', '營業中不能解雇，請先閉店': 'Can’t dismiss while open: close first', 現金: 'Cash',
-    男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 替換: 'Swap in', '營業中不能替換，請先閉店': 'Not while open: close the shop first', 體力: 'Stamina', 點我徵人: 'Hiring',
+    男: 'M', 精神: 'Spirit', 經營: 'Office', 帳簿: 'Ledger', 老闆: 'Owner', 解雇: 'Dismiss', 速度: 'Speed', 重新開始遊戲: 'Start over', 雇用: 'Hire', 全: 'All', 班別: 'Shift', 疲勞: 'Tired', 空缺: 'Open', '能力減半・動作變慢': 'Half as able, slower', 替換: 'Swap in', '營業中不能替換，請先閉店': 'Not while open: close the shop first', 體力: 'Stamina', 點我徵人: 'Hiring',
     關閉: 'Close', 大廚: 'Head chef' }
   // (each job's name in English: the roster's, the cards' headings)
   const ROLE_EN: Record<string, string> = { chef: 'Sous chef', sous: 'Prep cook', server: 'Floor', cashier: 'Cashier', stock: 'Stockroom' }
   const roleOf = (r: { role: string; zh: string; ja: string }, short = false) =>
     ja ? r.ja : lang === 'en' ? ROLE_EN[r.role] ?? r.zh : short ? r.zh.split('（')[0] : r.zh
   const t = (zh: string, jp: string) => (ja ? jp : lang === 'en' ? EN[zh] ?? zh : zh)
+  /** the same with its English given (what's put together, a number in it, isn't in EN's table) */
+  const t3 = (zh: string, jp: string, en: string) => (ja ? jp : lang === 'en' ? en : zh)
   const drag = useDrag('office')
   // (a skill's label taken away with the office, if it was up when it shut)
   useEffect(() => () => setTip(null), [])
@@ -76,7 +79,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   const shiftRoles = roles.map((r) => ({ ...r, max: r.max * 2 }))
   const onToday = (w: Worker) => !!hired[w.id] && worksOn(hired[w.id].shift, today)
   const wages = people.filter(onToday).reduce((s, w) => s + w.wage, 0)
-  const shiftLabel = (k: Shift) => (k === 'both' ? t('全勤', '通し') : t(`${k} 班`, `${k} 番`))
+  const shiftLabel = (k: Shift) => (k === 'both' ? t3('全勤', '通し', 'Both') : t3(`${k} 班`, `${k} 番`, `Shift ${k}`))
   // (put on the page itself, over the menu and everything else)
   return createPortal(
     <>
@@ -137,9 +140,9 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
               )
             })}
           </div>
-          <p className="ofc-today">{t(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`)}</p>
+          <p className="ofc-today">{t3(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`, `Day ${today} on duty: ${shiftLabel(crewOf(today))} (and those on both)`)}</p>
           <div className="ofc-wages">
-            <span>{t(`今天這班的人事成本 ${money(wages)}/小時（營業時才計薪）`, `本日の班の人件費 ${money(wages)}/時（営業中のみ）`)}</span>
+            <span>{t3(`今天這班的人事成本 ${money(wages)}/小時（營業時才計薪）`, `本日の班の人件費 ${money(wages)}/時（営業中のみ）`, `This shift: ${money(wages)}/h while open`)}</span>
             {/* every open job filled at once, by who's the best value for their pay */}
             <button type="button" className="ofc-hireall" disabled={!pickHires(people, shiftRoles, hired).length}
               onClick={() => { for (const w of pickHires(people, shiftRoles, hired)) onHire(w) }}
@@ -147,7 +150,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
             {/* (the dice: the applicants drawn again, twice a day; a new lot comes each day by itself as well) */}
             <button type="button" className="ofc-roll" disabled={rollsLeft <= 0} onClick={onRoll}
               title={t(`重新刷新應徵名單（每天 ${ROLLS_PER_DAY} 次，隔天重置；每天也會自動換一批）`, `応募者を引き直す（1 日 ${ROLLS_PER_DAY} 回、翌日リセット。毎日自動でも入れ替わる）`)}>
-              <DiceIcon />{t('刷新', '引き直し')} {rollsLeft}/{ROLLS_PER_DAY}</button>
+              <DiceIcon />{t3('刷新', '引き直し', 'Reroll')} {rollsLeft}/{ROLLS_PER_DAY}</button>
           </div>
           {roles.map((r) => {
             const mine = people.filter((w) => w.role === r.role && hired[w.id])
@@ -169,7 +172,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                     <span className="ofc-shift" role="group" aria-label={t('班別', '班')}>
                       {(['A', 'B', 'both'] as Shift[]).map((k) => (
                         <button key={k} type="button" aria-pressed={(hired[w.id].shift ?? 'A') === k} disabled={shopOpen} onClick={() => onShift(w, k)}
-                          title={shopOpen ? t('營業中不能換班', '営業中は変更できません') : k === 'both' ? t('兩班都上（連續上班，休息恢復會打折）', '両方出勤（連勤は回復が減る）') : undefined}>{shiftLabel(k)}</button>
+                          title={shopOpen ? t3('營業中不能換班', '営業中は変更できません', 'Not while open') : k === 'both' ? t3('兩班都上（連續上班，休息恢復會打折）', '両方出勤（連勤は回復が減る）', 'On both shifts (days back to back rest you less)') : undefined}>{shiftLabel(k)}</button>
                       ))}
                     </span>
                     <button type="button" className="ofc-fire" disabled={!canDismiss(shopOpen)} onClick={() => { if (canDismiss(shopOpen)) onFire(w) }}
@@ -188,8 +191,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                         <Stat label={t('速度', '速さ')} v={w.speed} />
                         <Stat label={t('體力', '体力')} v={w.stamina} />
                       </span>
-                      <small className="ofc-note">{w.note}</small>
-                      {!ja && <small className="ofc-intro">「{w.intro}」</small>}
+                      <small className="ofc-note">{peopleIn(w.note, lang)}</small>
+                      <small className="ofc-intro">{lang === 'en' ? `“${peopleIn(w.intro, lang, true)}”` : `「${peopleIn(w.intro, lang, true)}」`}</small>
                     </div>
                     <div className="ofc-hire">
                       <b className="money">{money(w.wage)}<small>/h</small></b>
