@@ -365,7 +365,13 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const near = lookD < 9
     // (or right by the camera anywhere in the picture, while it looks past him at something else: the back room's view had his face filling
     // a third of it as he went by)
-    const close = inView && along > 0 && along < BOSS_CLOSE
+    // (near by his size on the screen too, not his distance alone: through a long lens (the grill's, the back room's) he was a head filling
+    // the foot of the picture from 4.7 away, past BOSS_CLOSE, and solid)
+    // (his head's size in the picture: a quarter of its height or more across is a head in the way, from above or level)
+    const fov = (cam as THREE.PerspectiveCamera).fov ?? 40
+    const headR = 0.3 * m.getWorldScale(new THREE.Vector3()).y / Math.max(0.01, along * Math.tan((fov * Math.PI) / 360))
+    const big = headR > 0.25
+    const close = inView && along > 0 && (along < BOSS_CLOSE || big)
     const want = !getEdit().on && !lookedAt && ((near && inView && over && along > 0 && along < lookD - 1.2) || close) ? 0.35 : 1
     ghost.current += (want - ghost.current) * Math.min(1, Math.min(dt, 0.1) * 6)
     const k = ghost.current
