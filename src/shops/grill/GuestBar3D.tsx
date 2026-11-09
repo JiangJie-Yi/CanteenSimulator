@@ -3899,8 +3899,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (!b) return
         b.visible = w.phase === 'toTill' || w.phase === 'hand'
         if (b.visible) {
-          b.position.copy(w.pos).add(new THREE.Vector3(...HELD_AT).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, w.yaw))
-          if (inGenkan(counters, w.pos)) b.position.y -= GENKAN.depth
+          // (on their tray, where a plate rides (trayAt, below): up on the kitchen's dais as it's held, a step lower off it; it was 2 cm into
+          // the tray and never came down off the dais)
+          const d = w.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
+          const onDais = a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]
+          b.position.copy(w.pos).add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, w.yaw))
+          // (not down into the genkan with the step's edge under them: they stand on the step up, the room's floor, as they hand it over)
+          if (KITCHEN_DROP < 0 && !onDais) b.position.y += KITCHEN_DROP / scale
           b.rotation.y = w.yaw
         }
       })
