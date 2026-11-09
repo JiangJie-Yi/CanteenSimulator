@@ -7797,6 +7797,8 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   padding: 16px 18px 18px;
 }
 /* (the hours it was open, small over the profit) */
+.day-sum-late { font-size: 11px; color: #9a8a78; }
+.day-sum-late.is-late { color: #b0452c; }
 .day-sum-hours {
   margin: 0 0 6px;
   color: #8a7562;

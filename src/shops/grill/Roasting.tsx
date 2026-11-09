@@ -14,7 +14,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
-import { bakeable, colourVertices, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
+import { bakeable, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
 import { atlasModel } from '@/scene/atlasMerge'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
@@ -391,110 +391,81 @@ const TRASH_LABEL = signTexture(96, 180, (g) => {
   brushText(g, '屑', 48, 160, 18, { fill: '#f3ecd9' })
 })
 
-const TrashBin = memo(TrashBinImpl, sameProps)
-function TrashBinImpl({ position, container, contents = 0 }: { position: [number, number, number]; container: string; contents?: number }) {
-  const R = TRASH_R
-  // a Japanese waste basket (屑籠): split bamboo woven in a twill (網代編み) round a slightly flaring body, its rim
-  // and foot bound in dark rattan, a strip of washi on the front with ごみ brushed on it; open-topped, so the
-  // woven inside shows
-  const body = useMemo(() => {
-    const g = new THREE.CylinderGeometry(R * 1.04, R * 0.86, TRASH_H, 24, 1, true)
-    g.translate(0, TRASH_H / 2, 0)
-    return g
-  }, [R])
-  const inner = useMemo(() => {
-    const g = new THREE.CylinderGeometry(R * 0.99, R * 0.82, TRASH_H - 0.02, 24, 1, true)
-    g.translate(0, TRASH_H / 2 + 0.01, 0)
-    return g
-  }, [R])
-  const floor = useMemo(() => new THREE.CircleGeometry(R * 0.84, 40), [R])
-  // what's been thrown in: bare skewers, crumpled paper napkins, burnt scraps — heaped up as more goes in
-  const heap = useMemo(() => {
-    let seed = 21
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    return Array.from({ length: 24 }, (_, i) => {
-      const kind = i % 3 === 0 ? 'stick' : i % 3 === 1 ? 'paper' : 'scrap'
-      const a = rnd() * Math.PI * 2
-      const d = R * 0.6 * Math.sqrt(rnd())
-      const geo = kind === 'paper' ? new THREE.IcosahedronGeometry(0.045 + rnd() * 0.02, 1)
-        : kind === 'scrap' ? new THREE.DodecahedronGeometry(0.03 + rnd() * 0.015, 0) : null
-      if (geo) {
-        const pp = geo.attributes.position
-        for (let k = 0; k < pp.count; k++) pp.setXYZ(k, pp.getX(k) * (0.7 + rnd() * 0.5), pp.getY(k) * (0.6 + rnd() * 0.4), pp.getZ(k) * (0.7 + rnd() * 0.5))
-        geo.computeVertexNormals()
-      }
-      return { kind, geo, x: Math.cos(a) * d, z: Math.sin(a) * d, rot: [rnd() * 3, rnd() * 3, rnd() * 3] as [number, number, number],
-        tilt: (rnd() - 0.5) * 1.6, shade: ['#f4efe2', '#e6dcc4', '#efe8d6'][i % 3] }
-    })
-  }, [R])
-  const shown = Math.min(contents, heap.length)
-  const level = (n: number) => Math.min(TRASH_H - 0.03, 0.17 + n * 0.008)
-  // (the heap one mesh, each thing's colour carried by its vertices, in the order they go in: as many drawn as are in (its draw range), one
-  // draw where there were two dozen)
-  const heapGeo = useMemo(() => {
-    const parts: THREE.BufferGeometry[] = []
-    const ends: number[] = []
-    let n = 0
-    heap.forEach((h, i) => {
-      const y = level(i + 1) - 0.02
-      const src = h.kind === 'stick' ? new THREE.CylinderGeometry(0.005, 0.004, 0.32, 5) : h.geo!
-      const g = src.index ? src.toNonIndexed() : src.clone()
-      if (src !== h.geo) src.dispose()
-      const rot = h.kind === 'stick' ? new THREE.Euler(h.tilt, h.rot[1], h.tilt * 0.6) : new THREE.Euler(...h.rot)
-      g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(h.x, h.kind === 'stick' ? y + 0.08 : y, h.z), new THREE.Quaternion().setFromEuler(rot),
-        new THREE.Vector3(1, 1, 1)))
-      g.deleteAttribute('uv')
-      colourVertices(g, new THREE.Color(h.kind === 'stick' ? '#c9a46a' : h.kind === 'paper' ? h.shade : '#2a1d14'))
-      parts.push(g)
-      ends.push(n += g.attributes.position.count)
-    })
-    const geo = mergeGeometries(parts)!
-    for (const g of parts) g.dispose()
-    return { geo, ends }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [heap])
-  useEffect(() => () => heapGeo.geo.dispose(), [heapGeo])
-  heapGeo.geo.setDrawRange(0, shown ? heapGeo.ends[shown - 1] : 0)
-  const face = Math.atan2(LAY_DIR.x, LAY_DIR.z)
-  const fr = R * 1.04 + 0.004
+/**
+ * The little waste basket on the bar (the owner's, 2026-11-10: the woven basket that stood on the floor by the cook, put out for the customers,
+ * one between each two places, in front of their soy and wasabi): the same twill-woven bamboo and rattan rims and its strip of washi with
+ * ごみ, a third the size, a crumpled napkin or two in it; its shapes and looks shared by them all (the bar's batch draws them all at once)
+ */
+const BASKET_K = 0.34
+const BASKET_GEO = (() => {
+  const R = TRASH_R * BASKET_K, H = TRASH_H * BASKET_K
+  const body = new THREE.CylinderGeometry(R * 1.04, R * 0.86, H, 16, 1, true).translate(0, H / 2, 0)
+  const inner = new THREE.CylinderGeometry(R * 0.99, R * 0.82, H - 0.006, 16, 1, true).translate(0, H / 2 + 0.003, 0)
+  const floor = new THREE.CircleGeometry(R * 0.84, 16).rotateX(-Math.PI / 2).translate(0, 0.006, 0)
+  const rim = new THREE.TorusGeometry(R * 1.04, 0.006, 5, 16).rotateX(Math.PI / 2).translate(0, H, 0)
+  const foot = new THREE.TorusGeometry(R * 0.87, 0.005, 5, 16).rotateX(Math.PI / 2).translate(0, 0.005, 0)
+  // (its strip of washi on the front, toward the customers (-z))
+  const label = new THREE.PlaneGeometry(0.03, 0.057).rotateY(Math.PI).translate(0, H * 0.48, -(R * 1.04 * 0.95 + 0.002))
+  const paper = new THREE.IcosahedronGeometry(0.016, 0).translate(0.006, H * 0.62, 0.004)
+  return { body, inner, floor, rim, foot, label, paper, ink: body }
+})()
+const BASKET_MAT = {
+  body: new THREE.MeshToonMaterial({ color: '#ffffff', map: TRASH_WEAVE }),
+  inner: new THREE.MeshToonMaterial({ color: '#9a8058', map: TRASH_WEAVE, side: THREE.BackSide }),
+  floor: new THREE.MeshToonMaterial({ color: '#6e5634' }),
+  rim: new THREE.MeshToonMaterial({ color: '#4a2e18', map: RATTAN }),
+  label: new THREE.MeshToonMaterial({ map: TRASH_LABEL }),
+  paper: new THREE.MeshToonMaterial({ color: '#f1ece0' }),
+  ink: new THREE.MeshBasicMaterial({ color: '#3b2a20', side: THREE.BackSide }),
+}
+function TableBasket() {
+  const G = BASKET_GEO, M = BASKET_MAT
   return (
-    <group position={position} userData={{ container }}>
-      <mesh geometry={body} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={TRASH_WEAVE} side={THREE.FrontSide} />
-      </mesh>
-      <mesh geometry={inner}>
-        <meshToonMaterial color="#9a8058" map={TRASH_WEAVE} side={THREE.BackSide} />
-      </mesh>
-      <mesh geometry={body} scale={[1.03, 1.01, 1.03]}>
-        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
-      <mesh geometry={floor} rotation-x={-Math.PI / 2} position-y={0.02}>
-        <meshToonMaterial color="#6e5634" />
-      </mesh>
-      {/* the rattan-bound rim, a second band below it, and the foot */}
-      <mesh position-y={TRASH_H} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 1.04, 0.016, 6, 24]} />
-        <meshToonMaterial color="#4a2e18" map={RATTAN} />
-      </mesh>
-      <mesh position-y={TRASH_H * 0.82} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 1.01, 0.007, 5, 24]} />
-        <meshToonMaterial color="#5a3820" />
-      </mesh>
-      <mesh position-y={0.014} rotation-x={Math.PI / 2}>
-        <torusGeometry args={[R * 0.87, 0.014, 6, 24]} />
-        <meshToonMaterial color="#4a2e18" map={RATTAN} />
-      </mesh>
-      {/* the washi strip with ごみ */}
-      <mesh position={[LAY_DIR.x * fr * 0.97, TRASH_H * 0.48, LAY_DIR.z * fr * 0.97]} rotation-y={face}>
-        <planeGeometry args={[0.09, 0.17]} />
-        <meshToonMaterial map={TRASH_LABEL} />
-      </mesh>
-      <mesh geometry={heapGeo.geo} visible={shown > 0}>
-        <meshToonMaterial vertexColors />
-      </mesh>
+    <group>
+      <mesh geometry={G.body} material={M.body} />
+      <mesh geometry={G.inner} material={M.inner} />
+      <mesh geometry={G.ink} material={M.ink} scale={[1.04, 1.01, 1.04]} />
+      <mesh geometry={G.floor} material={M.floor} />
+      <mesh geometry={G.rim} material={M.rim} />
+      <mesh geometry={G.foot} material={M.rim} />
+      <mesh geometry={G.label} material={M.label} />
+      <mesh geometry={G.paper} material={M.paper} />
     </group>
   )
 }
+
+/**
+ * The food-waste bin on the floor by the cook (blender/foodwaste.py; the owner's, 2026-11-10: it was the woven waste basket, which went out on the
+ * bar for the customers): olive-green plastic, its lid sat on a little askew; its label written here (生ごみ, and 廚餘 under it). Burnt scraps
+ * and the like go in it as they did the basket (its `container`, 'trash')
+ */
+const FOOD_WASTE_URL = import.meta.env.BASE_URL + 'models/foodwaste.glb'
+const FOOD_WASTE_LABEL = signTexture(256, 160, (g) => {
+  g.fillStyle = '#f7f6f0'; g.fillRect(0, 0, 256, 160)
+  g.strokeStyle = '#3f6a2a'; g.lineWidth = 6; g.strokeRect(8, 8, 240, 144)
+  brushText(g, '生ごみ', 128, 66, 58, { fill: '#2f4a1f', shadow: 'rgba(60,80,40,0.25)' })
+  g.fillStyle = '#3f6a2a'; g.font = '700 30px "Noto Sans TC", "Microsoft JhengHei", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText('廚餘', 128, 122)
+})
+const FoodWasteBin = memo(function FoodWasteBin({ position, container }: { position: [number, number, number]; container: string }) {
+  const gltf = useGLTF(FOOD_WASTE_URL) as unknown as { scene: THREE.Group }
+  const root = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('FoodWaste') ?? gltf.scene).clone(true)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      m.material = new THREE.MeshToonMaterial({ color: src.color, map: src.name === 'WasteLabel' ? FOOD_WASTE_LABEL : src.map })
+      if (src.name === 'WasteLabel' && FOOD_WASTE_LABEL) { FOOD_WASTE_LABEL.flipY = false; (m.material as THREE.MeshToonMaterial).color.set('#ffffff') }
+      m.castShadow = src.name !== 'WasteLabel'
+      m.receiveShadow = true
+    })
+    return r
+  }, [gltf])
+  // (it stands with its label to the cook's way out, as the basket's strip faced)
+  return <group position={position} rotation-y={Math.atan2(LAY_DIR.x, LAY_DIR.z)} userData={{ container }}><primitive object={root} /></group>
+})
+useGLTF.preload(FOOD_WASTE_URL)
 
 /** the tray for raw food waiting to go on the fire: a row of sticks across it, a few more laid in the gaps on top; loose food in a row along
  * its back. It holds no more than that: the rest wait in the fridge until there's room, brought out as the tray's cleared */
@@ -2198,9 +2169,12 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
           </group>
         )
       })}
-      {/* the soy pot and the wasabi that each two places share, at the back between them */}
+      {/* the soy pot and the wasabi that each two places share, at the back between them; and their little waste basket in front of those */}
       {sharedAlong(c).map((x, k) => (
         <group key={`shared${k}`} position={[x, BAR_TOP + 0.001, PLACE.shared]}><BarPiece name="BarCondiments" /></group>
+      ))}
+      {sharedAlong(c).map((x, k) => (
+        <group key={`basket${k}`} position={[x, BAR_TOP + 0.001, PLACE.basket]} rotation-y={(k % 2 ? 1 : -1) * 0.25}><TableBasket /></group>
       ))}
     </group>
   )
@@ -4441,7 +4415,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // how many things have gone in the bin (it starts empty), and the fire glowing as raw food is carried over it
   const trashedRef = useRef(0)
   const flashUntil = useRef(new Map<string, number>())
-  const [trashed, setTrashed] = useState(0)
+  const [, setTrashed] = useState(0)
   /** a whole fish's bones left in the tasting bowl once the owner's eaten it (the owner's, 2026-11-10), till they're clicked into the bin or the
    * shop opens: where in the bowl, which way they lie */
   const [bones, setBones] = useState<{ key: number; at: [number, number, number]; yaw: number }[]>([])
@@ -7200,8 +7174,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           <SideDish container="rawdish" position={containerAt('rawdish').toArray() as [number, number, number]} />
         </WhenHeld>
       )}
-      {roast.trash && <TrashBin container="trash" contents={trashed}
-        position={containerAt('trash').toArray() as [number, number, number]} />}
+      {/* (the floor's bin by the cook a food-waste bin now (the owner's, 2026-11-10): the woven basket's on the bar for the customers) */}
+      {roast.trash && <FoodWasteBin container="trash" position={containerAt('trash').toArray() as [number, number, number]} />}
       {fireHint > 0 && (
         // where carried food can be set down: the fire bed glows
         <mesh rotation-x={-Math.PI / 2} position-y={0.07}>

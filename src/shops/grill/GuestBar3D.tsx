@@ -40,7 +40,7 @@ import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { HAND_MS } from './Restroom'
-import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps } from './DiningRoom'
+import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps, SakeCup, cupped } from './DiningRoom'
 import { Koban } from './Koban'
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
@@ -69,7 +69,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINKS, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2087,6 +2087,9 @@ const backOf = (st: { stool: THREE.Vector3; aisle: THREE.Vector3 }) => st.aisle.
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
   /** done eating, a tissue to their mouth a moment before they get up (the owner's): since when */
   wipeAt?: number
+  /** their drink, sipped now and then as they sit (the bar's clock): when this sip began (none under way: undefined), when the next is
+   * due; how much of it's gone (0 to 1) */
+  sipAt?: number; sipNext?: number; drunk?: number
   /** at their stool: seconds into pulling it out and stepping up onto it (coming in), into sliding in with it (sat) */
   pullT?: number; slideT?: number; pulledSound?: boolean
   /** called to their stool off the genkan's bench: where they sat, and their way in from there */
@@ -2258,7 +2261,9 @@ type PlateRun = { key: number; seat: number; guest: number; phase: 'ready' | 'se
   /** (done with) the sticks left on it, of what was eaten off it: into the bin by the sink with them */
   sticks?: number
   /** (done with) the whole fish eaten off it, their bones left on it; and the customer's emptied glass beside it, cleared with it */
-  bones?: number; glass?: [number, number, number] }
+  bones?: number; glass?: [number, number, number]
+  /** (done with) what they drank, its bottle or can left where it stood (and a sake's cup), and how much was left in it */
+  drink?: DrinkId; level?: number }
 const STACK_GAP = 0.026
 const UP_Y = new THREE.Vector3(0, 1, 0)
 /** how many used sticks the bin by the sink shows at most (a bundle standing up out of it) */
@@ -2313,9 +2318,6 @@ const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.18, 5)
 const STICKS_ON = [[-0.02, 0.6], [0.015, -0.4], [-0.035, 1.3], [0.03, 0.15]] as const
 /** where the bones lie on a done-with plate (as many fish as were eaten off it, up to two drawn) */
 const BONES_ON = [[0.0, -0.025, 0.25], [0.01, 0.03, -0.35]] as const
-/** a customer's emptied glass, beside the plate, cleared with it (open, a little beer foam left round its foot) */
-const GLASS_GEO = new THREE.CylinderGeometry(0.03, 0.025, 0.1, 14, 1, true)
-const GLASS_FOOT = new THREE.CylinderGeometry(0.0255, 0.0255, 0.006, 14)
 /** where it rides once the plate's up on the tray: on the plate, at its middle */
 const GLASS_ON: [number, number, number] = [0.02, 0, 0.02]
 /** a used tissue crumpled into a ball (a lumpy little ball, its points pushed in and out); on the plate once it's taken up with it */
@@ -2337,21 +2339,27 @@ const WC_FADE_LEN = 0.45
 const WC_FADE_IN = 0.35, WC_FADE_LAST = 0.35
 /** how long a customer wipes their mouth with a tissue before getting up */
 const WIPE_MOUTH_MS = 900
-// (a done-with plate's bones and glass, and the plater's rice bowl, first shown mid-shift: their shaders made with the rest at load (scene/Prewarm))
+/** a sip of their drink: how long (the bar's clock), about how long between sips, how many to a drink */
+const SIP_S = 2.4
+const SIP_GAP = 11
+const SIPS = 4
+// (a done-with plate's bones, and the plater's rice bowl, first shown mid-shift: their shaders made with the rest at load (scene/Prewarm))
 {
   const g = new THREE.Group()
-  g.add(new THREE.Mesh(GLASS_GEO, new THREE.MeshBasicMaterial({ color: '#d8eef4', transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide })))
   g.add(new THREE.Mesh(BONES_GEO, new THREE.MeshToonMaterial({ color: '#efe6cf' })))
-  g.add(new THREE.Mesh(GLASS_FOOT, new THREE.MeshToonMaterial({ color: '#b98b56', side: THREE.DoubleSide })))
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.0255, 0.0255, 0.006, 14), new THREE.MeshToonMaterial({ color: '#b98b56', side: THREE.DoubleSide })))
   warmLater(g)
 }
 
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and the sticks left on it, of what was eaten off it,
  * thrown away with it at the sink (the owner's)); drawn again only when it gets dirty */
 const Plate = memo(PlateImpl)
-function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass, tissue }: { dirty?: boolean; design?: number; sticks?: number; bones?: number
-  /** the emptied glass, where it stands from the plate's middle (on the bar where it was drunk, or on the plate being cleared) */
+function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass, tissue, drink, level = 0 }: { dirty?: boolean; design?: number; sticks?: number; bones?: number
+  /** where what they drank was left, from the plate's middle (on the bar where it was drunk, or on the plate being cleared): its own bottle or
+   * can (the owner's, 2026-11-10: a glass from nowhere stood there), as much left in it as they left, and a sake's cup by it */
   glass?: readonly [number, number, number]
+  drink?: DrinkId
+  level?: number
   /** the crumpled tissue left by it, from its middle (on the bar, or on the plate being cleared) */
   tissue?: readonly [number, number, number] }) {
   return (
@@ -2381,13 +2389,11 @@ function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass, ti
           ))}
           {/* (the tissue they wiped their mouth with, crumpled up) */}
           {tissue && <mesh name="plate-tissue" geometry={CRUMPLE_GEO} position={[tissue[0], tissue[1] + 0.016, tissue[2]]} material={CRUMPLE_MAT} />}
-          {/* (their glass, drunk up) */}
-          {glass && (
-            <group name="plate-glass" position={[glass[0], glass[1] + 0.05, glass[2]]}>
-              <mesh geometry={GLASS_GEO}>
-                <meshBasicMaterial color="#d8eef4" transparent opacity={0.35} depthWrite={false} side={THREE.DoubleSide} />
-              </mesh>
-              <mesh geometry={GLASS_FOOT} position={[0, -0.047, 0]}><meshToonMaterial color="#f3ead2" /></mesh>
+          {/* (what they drank, its bottle or can left, drunk down (and a sake's cup by it)) */}
+          {glass && drink && (
+            <group name="plate-glass" position={[glass[0], glass[1], glass[2]]}>
+              <DrinkBottle id={drink} level={level} />
+              {cupped(drink) && <group position={[0.05, 0, -0.03]}><SakeCup level={0} /></group>}
             </group>
           )}
         </>
@@ -2679,6 +2685,23 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // where the plates are kept (the dish racks, game/plates) and washed (the sink): found in the room and taken into the bar's own frame each
   // time, as they can be moved by hand in edit mode (a bar on its own, with no room round it, has them at its two ends)
   const frame = useRef<THREE.Group>(null)
+  /** a seat's plate's middle, in the world (where the customer there puts their chopsticks: FolkFigure's `plate`) */
+  const plateWorldAt = useRef(new THREE.Vector3())
+  const plateWorld = useCallback((seat: number) => {
+    const f = frame.current, st = seats[seat]
+    return f && st ? f.localToWorld(plateWorldAt.current.copy(st.plate).setY(top + 0.015)) : null
+  }, [seats, top])
+  /** where a seat's drink stands on the bar, in the bar's frame (its sake cup a little nearer the customer than the bottle) */
+  const drinkSpot = useCallback((seat: number, cup: boolean) => {
+    const st = seats[seat], c = counters[st.counter]
+    return st.mid.clone().addScaledVector(c.along, PLACE.drink[0] + (cup ? CUP_SIDE : 0)).addScaledVector(c.lay, PLACE.drink[1] - (cup ? CUP_AHEAD : 0)).setY(top).toArray() as [number, number, number]
+  }, [seats, counters, top])
+  /** the same in the world (for the customer's hand to go to) */
+  const drinkWorldAt = useRef(new THREE.Vector3())
+  const drinkWorld = useCallback((seat: number, cup: boolean) => {
+    const f = frame.current
+    return f && seats[seat] ? f.localToWorld(drinkWorldAt.current.fromArray(drinkSpot(seat, cup))) : null
+  }, [seats, drinkSpot])
   const scene = useThree((st) => st.scene)
   const marks = useRef(new Map<string, THREE.Object3D | null>())
   const markOf = (name: string) => {
@@ -2808,7 +2831,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (shownRef.current.find((x) => x.id === r.guest)?.drink) {
       const st = seats[r.seat], c = counters[st.counter]
       r.glass = st.mid.clone().addScaledVector(c.along, PLACE.drink[0]).addScaledVector(c.lay, PLACE.drink[1]).setY(top).sub(plateAt(r.seat)).toArray() as [number, number, number]
-    } else r.glass = undefined
+      const who = shownRef.current.find((x) => x.id === r.guest)!
+      r.drink = who.drink as DrinkId
+      r.level = 1 - (who.drunk ?? 0)
+    } else { r.glass = undefined; r.drink = undefined }
     if (waiters.current.length) { r.phase = 'dirty'; r.t = 0 } else { r.phase = 'clear'; r.t = -CLEAR_DELAY }
   }
   /** (every second) the plates out at seats looked over for any left where nobody sits */
@@ -2826,7 +2852,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v) })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
 
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
@@ -3056,6 +3082,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(st.stool).addScaledVector(backOf(st), SEAT_PULL.get(s.seat) ?? 0)
         if (g) g.rotation.y = st.yaw
         if (s.wipeAt && performance.now() - s.wipeAt > WIPE_MOUTH_MS) { s.phase = 'leave'; s.t = 0; redraw() }
+        // (their drink, sipped now and then as they sit (the owner's, 2026-11-10: it stood untouched, gone the moment they left): one every
+        // SIP_GAP seconds or so, SIP_S long, SIPS to a drink; none while they wipe their mouth to go)
+        if (s.drink && !s.wipeAt && (s.drunk ?? 0) < 1) {
+          const now = clock.current
+          if (s.sipNext === undefined) s.sipNext = now + 2.5 + (s.id % 4)
+          if (s.sipAt !== undefined && now - s.sipAt >= SIP_S) {
+            s.sipAt = undefined
+            s.drunk = Math.min(1, (s.drunk ?? 0) + 1 / SIPS)
+            s.sipNext = now + SIP_GAP * (0.75 + ((s.id * 7 + Math.round(now)) % 6) / 10)
+            redraw()
+          } else if (s.sipAt === undefined && now >= s.sipNext) s.sipAt = now
+        } else if (s.sipAt !== undefined && clock.current - s.sipAt >= SIP_S) s.sipAt = undefined
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
         if (guest) s.items = guest.items
@@ -4436,17 +4474,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         <pointLight position={fridges[0].at.clone().lerp(fridges[1].at, 0.5).setY(FRIDGE.H * 0.55)} color="#eaf4ff" intensity={1.1} distance={FRIDGE.H * 2.4} decay={1.4} />
       )}
       {fridges && <Later stage={2}><Fridges fridges={fridges} /></Later>}
-      {/* what each has fetched from the fridge, stood beside their plate, toward the cook */}
-      {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => {
-        const st = seats[s.seat], c = counters[st.counter]
-        const d = DRINKS.find((x) => x.id === s.drink)!
-        const at = st.mid.clone().addScaledVector(c.along, PLACE.drink[0]).addScaledVector(c.lay, PLACE.drink[1]).setY(top)
-        return (
-          <group key={`drink${s.id}`} position={at}>
-            <DrinkBottle id={d.id} wet />
-          </group>
-        )
-      })}
+      {/* what each has fetched from the fridge, stood beside their plate, toward the cook (a sake's cup a little nearer them): drunk down sip by
+          sip, off the bar in their hand while it's up at their mouth */}
+      {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => (
+        <SeatDrink key={`drink${s.id}`} s={s} id={s.drink as DrinkId} at={drinkSpot(s.seat, false)} cupAt={cupped(s.drink!) ? drinkSpot(s.seat, true) : null}
+          clock={clock} level={1 - (s.drunk ?? 0)} />
+      ))}
       {/* (each seated customer's soy in the little dish at their place, a dab of grated daikon in it: drawn with the shoes, SeatBits) */}
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
       {Array.from({ length: dirty.current }, (_, i) => (
@@ -4557,7 +4590,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.position.copy(r.from)
           }
         }}>
-          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)}
+          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} drink={r.drink} level={r.level}
             tissue={r.tissue && (r.phase === 'taken' ? TISSUE_ON : r.tissue)} />
         </group>
       ))}
@@ -4600,7 +4633,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
               <PersonClock s={s} phase={s.phase} drink={s.drink} eating={s.phase === 'sit' && FED.has(s.id)}
-                clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} />
+                clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} plateOf={plateWorld} drinkOf={drinkWorld} drunk={s.drunk} />
               {/* (named as the pointer's over them; picked up and carried to another stool while they wait) */}
               <FigureHit title={() => guestLabel(s.id, lang)} hint={() => (canMove(s) ? (lang === 'ja' ? 'ドラッグして空席へ' : lang === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : '')}
                 onPointerDown={grab(s)} grabbable={() => !getEdit().on && canMove(s)} />
@@ -4808,17 +4841,55 @@ const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, p
   )
 })
 
+/** a sake's cup beside its bottle: this much nearer the customer (lay) and along to their right */
+const CUP_AHEAD = 0.07
+const CUP_SIDE = -0.03
+/**
+ * A seated customer's drink on the bar (its sake cup by it): as much left in it as they've not drunk; the one they sip from (the cup, or the
+ * bottle) off the bar while it's up in their hand (FolkFigure's sip)
+ */
+const SeatDrink = memo(function SeatDrink({ s, id, at, cupAt, clock, level }: { s: Shown; id: DrinkId; at: [number, number, number]
+  cupAt: [number, number, number] | null; clock: { current: number }; level: number }) {
+  const bottle = useRef<THREE.Group>(null)
+  const cup = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const k = s.sipAt === undefined ? -1 : (clock.current - s.sipAt) / SIP_S
+    const up = k >= 0.2 && k < 0.86
+    const sipped = cupAt ? cup.current : bottle.current
+    if (sipped && sipped.visible === up) sipped.visible = !up
+  })
+  return (
+    <>
+      <group ref={bottle} position={at}><DrinkBottle id={id} wet level={level} /></group>
+      {cupAt && <group ref={cup} position={cupAt}><SakeCup level={level > 0.01 ? 0.8 : 0} /></group>}
+    </>
+  )
+}, (a, b) => a.s === b.s && a.id === b.id && a.level === b.level && a.at.every((v, i) => v === b.at[i]) && (a.cupAt === null) === (b.cupAt === null))
+
 /** one customer's figure, moved by the bar's clock each frame (read from the ref: nothing re-renders for it) */
 // (drawn again only when what's shown of them changes (their phase, eating or not, the drink in hand, who they turn to, how they're
 // getting on), not each time the bar above them redraws, several times a second; `phase` and `drink` are passed only so it notices them)
 const PersonClock = memo(PersonClockImpl)
-function PersonClockImpl({ s, eating, clock, talk, mood }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
-  talk: number; mood: ReturnType<typeof moodOf> }) {
+function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
+  talk: number; mood: ReturnType<typeof moodOf>; plateOf: (seat: number) => THREE.Vector3 | null; drinkOf: (seat: number, cup: boolean) => THREE.Vector3 | null
+  drunk?: number }) {
+  // (a drink in hand: carried back from the fridge, or up off the bar for a sip (a sake's cup for it, not its bottle); at the size it stands on
+  // the bar (the hand's frame is the figure's, smaller), held round its middle)
+  const cup = !!s.drink && cupped(s.drink)
+  const sipK = () => (s.sipAt === undefined ? -1 : (clock.current - s.sipAt) / SIP_S)
+  const sat = s.phase === 'sit'
+  const inHand = s.drink && (s.phase === 'wcBack' || sat) ? (
+    <group scale={1 / (1.1 * STAFF_SCALE * folkSpec(s.id).size)}>
+      <group position-y={cup && sat ? -0.012 : -0.07}>{cup && sat ? <SakeCup level={0.8} /> : <DrinkBottle id={s.drink as DrinkId} wet level={1 - (s.drunk ?? 0)} />}</group>
+    </group>
+  ) : undefined
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them)
   return <Suspense fallback={null}><FolkFigure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : s.phase === 'sit' && s.wipeAt ? 'Wipe' : undefined} fit={FOLK_FIT}
-    held={s.drink && s.phase === 'wcBack' ? <DrinkBottle id={s.drink} wet /> : undefined} /></Suspense>
+    held={inHand} heldShown={() => s.phase === 'wcBack' || (sipK() >= 0.2 && sipK() < 0.86)} cup={cup}
+    sip={() => (s.phase === 'sit' && s.drink ? sipK() : -1)} drinkAt={() => (s.drink ? drinkOf(s.seat, cup) : null)}
+    plate={() => (s.phase === 'sit' ? plateOf(s.seat) : null)} /></Suspense>
 }
 
 // (drawn again only when their own props change, not each time the page above them redraws: while the shop's open that's many times a second)

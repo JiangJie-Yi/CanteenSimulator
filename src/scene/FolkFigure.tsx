@@ -112,6 +112,24 @@ const BITE_GEO = new THREE.OctahedronGeometry(0.014, 0)
 /** where the chopsticks' tips go, in the figure's frame: down to their plate on the bar in front of them (measured: the bar's top 0.3 up from
  * the seat, the plate 0.72 out), or up to the mouth (the head's middle 0.8 up, blender/folk.py's C) */
 const CHOP_PLATE = new THREE.Vector3(-0.03, 0.3, 0.72)
+/** reaching their own plate (the owner's, 2026-11-10: the tips stopped short of the food, a grandmother picking at the air): the right
+ * shoulder, in the body's frame, and how far the arm reaches from it; the chopsticks' tips beyond the hand (in it a little: the tips in the
+ * food); how far forward they lean in at most when it's further */
+// (their hands are round mitts with no arm drawn to them: one goes as far as it must, and the body leans in past the arm's own reach)
+const SHOULDER_R = new THREE.Vector3(-0.2, 0.6, 0.08)
+const ARM = 0.42
+const ARM_MOST = 0.66
+const TIP_IN = (CHOP_LEN - CHOP_GRIP) * 0.93
+const LEAN_MAX = 0.32
+const REACH = new THREE.Vector3()
+/** a sip: the hand at the drink on the bar (from its foot up to where it's held), at the mouth with a bottle or can (tipped up, its top at the
+ * lips) or with a sake cup (nearer, tipped less); with no drink to go to, just out in front */
+const SIP_AT = new THREE.Vector3()
+const SIP_GRIP = new THREE.Vector3(0, 0.06, 0)
+const SIP_REST = new THREE.Vector3(-0.12, 0.36, 0.42)
+const SIP_MOUTH = new THREE.Vector3(-0.03, 0.74, 0.36)
+const SIP_MOUTH_CUP = new THREE.Vector3(-0.02, 0.68, 0.33)
+const REACH_U = new THREE.Vector3()
 const CHOP_MOUTH = new THREE.Vector3(0, 0.7, 0.26)
 const UP = new THREE.Vector3(0, 1, 0)
 const X_AXIS = new THREE.Vector3(1, 0, 0)
@@ -348,9 +366,19 @@ export function FolkWarm() {
  * passing the time (looking about, at their phone, chin in hand), their mood on their face, a hop of delight when their food comes,
  * fading as they go; `fit`: their size in the frame they're drawn in (the boss's height there).
  */
-export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false }: {
+export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false }: {
   id: number; eating: boolean; walking: boolean; still?: () => boolean; clock?: { current: number }; talk?: number; mood?: Mood | null
   fade?: () => number; slippers?: () => boolean; pose?: string; held?: ReactNode; fit?: number
+  /** (sat eating) where their food is, in the world: their plate's middle, for the chopsticks to come down on */
+  plate?: () => THREE.Vector3 | null
+  /** (sat with a drink) how far into a sip they are (0 to 1; below 0, not sipping), and where their drink stands on the bar, in the world:
+   * a sip is the hand out to it, up to the mouth with it, drunk, and back down (the owner's, 2026-11-10: it was never drunk); and whether
+   * what's in their hand is showing (a drink in hand only while it's up off the bar) */
+  sip?: () => number
+  drinkAt?: () => THREE.Vector3 | null
+  heldShown?: () => boolean
+  /** (what's sipped is a sake cup: held nearer the mouth and tipped less) */
+  cup?: boolean
   /** stood on the floor, not sat on a stool's seat, when not walking (the character viewer's turntable: there's no stool there, and sat
    * at the seat's height over it they floated, the briefcase set down by them on the floor) */
   ground?: boolean }) {
@@ -420,6 +448,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const showPhone = !walking && !eating && !talk && !pose && idle === 'phone'
   const last = useRef<number | null>(null)
   const served = useRef<{ was: boolean; at: number }>({ was: eating, at: -99 })
+  const eatLean = useRef(0)
+  const leanWant = useRef(0)
   const faded = useRef(1)
   const look = useRef({ yaw: 0, pitch: 0 })
   const pace = useRef(0)
@@ -481,11 +511,17 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const lift = yay >= 0 ? Math.max(0, Math.sin(yay * Math.PI)) * 0.08 : 0
     const squash = yay >= 0 ? (yay < 0.15 ? -0.08 * Math.sin((yay / 0.15) * Math.PI) : yay < 0.8 ? 0.07 * Math.sin(((yay - 0.15) / 0.65) * Math.PI) : -0.05 * Math.sin(((yay - 0.8) / 0.2) * Math.PI)) : 0
     const hop = mood === 'joy' && !walking ? Math.max(0, Math.sin(t * 9 + id)) * 0.02 * Math.max(0, Math.sin(t * 0.7 + id * 2)) : 0
+    // (a sip under way: the chopsticks put down meanwhile, the head tipped back a little as it's drunk)
+    const sipK = !walking && sip ? sip() : -1
+    const sipping = sipK >= 0 && sipK < 1
+    const sipCup = sipping && cup
     const ph = t * 9 + id
     const b = fig.body
     b.position.y = walk * Math.abs(Math.sin(ph)) * 0.035 + lift + hop
     b.rotation.z = walk * Math.sin(ph) * 0.07
-    b.rotation.x = walk * 0.08
+    // (leaning in to reach their plate, if it's further than the arm goes (below))
+    eatLean.current += ((eating && !walking ? leanWant.current : 0) - eatLean.current) * Math.min(1, dt * 3)
+    b.rotation.x = walk * 0.08 + eatLean.current
     // (talking to the one they came with: turned toward them)
     const turn = !walking && talk && !eating ? talk * 0.35 : 0
     b.rotation.y += (turn - b.rotation.y) * Math.min(1, dt * 4)
@@ -502,6 +538,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         if (showPhone || eating) { pitch = -0.28 + (eating && hash(id * 7 + n, 3) > 0.7 ? 0.3 : 0); yaw *= 0.3 }
         if (idle === 'chin' && !eating && !talk) { yaw *= 0.4; pitch = 0.06 }
         if (talk && !eating) { yaw = talk * 0.25; pitch = 0.05 + Math.sin(t * 7 + id) * 0.05 * (Math.sin(t * 1.3 + id) > 0 ? 1 : 0) }
+        if (sipping && sipK > 0.36 && sipK < 0.72) { yaw *= 0.2; pitch = sipCup ? 0.12 : 0.28 }
       }
       const ease = 1 - Math.exp(-dt * 3)
       look.current.yaw += (yaw - look.current.yaw) * ease
@@ -512,16 +549,30 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     // up in the left; the chin on the left hand; reaching into the fridge; a drink held in the right)
     const L = fig.handL, Rh = fig.handR
     const chew = eating && ((t * 0.7 + id * 0.3) % 1) > 0.55
+    // (their food, in the body's frame)
+    const where = eating && !walking && !sipping ? plate?.() : null
+    if (import.meta.env?.DEV) fig.root.userData.reach = where ? where.clone() : null
+    const reach = where ? fig.body.worldToLocal(REACH.copy(where)) : null
     if (L && Rh) {
       const swing = walk * Math.sin(ph) * 0.08
       const lp = REST.L.clone(), rp = REST.R.clone()
       let lr = 0, rr = 0
       if (walking) { lp.z += swing; rp.z -= swing }
-      if (eating) {
+      if (eating && !sipping) {
         // (the right hand, the chopsticks in it, out over their plate on the bar, then up beside the face with a bite (out in front of it:
         // right at it the sticks went into the head); the left resting on the bar's edge (it held up a bowl, which nobody could make out))
         const k = chew ? 1 : 0
         lp.set(-0.07 - 0.08 * k, 0.38 + 0.26 * k, 0.5 - 0.14 * k)
+        // (at the plate: put out from the shoulder toward their own food, so the tips come down in it, as far as the arm goes; past that they
+        // lean in)
+        leanWant.current = 0
+        if (!chew && reach) {
+          REACH_U.copy(SHOULDER_R).sub(reach).normalize()
+          lp.copy(reach).addScaledVector(REACH_U, TIP_IN)
+          const d = lp.distanceTo(SHOULDER_R)
+          leanWant.current = Math.min(LEAN_MAX, Math.max(0, (d - ARM) * 1.2))
+          if (d > ARM_MOST) lp.sub(SHOULDER_R).setLength(ARM_MOST).add(SHOULDER_R)
+        }
         lr = -0.7 - 0.6 * k
         rp.set(0.17, 0.31, 0.36)
         rr = -0.3
@@ -546,18 +597,31 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         lp.set(-0.03 + w, 0.64, 0.34); rp.set(0.05 + w, 0.62, 0.34)
         lr = rr = -1.4
       }
-      if (held && !eating) { lp.set(-0.22, 0.34, 0.2); lr = -0.3 }
-      L.position.lerp(lp, Math.min(1, dt * 10))
+      // (a sip: the right hand out to the drink on the bar, up to the mouth with it, tipped up and drunk, and down to the bar again)
+      if (sipping) {
+        const k = sipK
+        const at = drinkAt?.()
+        const on = at ? fig.body.worldToLocal(SIP_AT.copy(at)).add(SIP_GRIP) : SIP_REST
+        const mouth = sipCup ? SIP_MOUTH_CUP : SIP_MOUTH, tip = sipCup ? 0.9 : 1.3, more = sipCup ? 0.5 : 0.75
+        if (k < 0.2) { lp.copy(REST.L).lerp(on, THREE.MathUtils.smoothstep(k, 0, 0.2)); lr = 0 }
+        else if (k < 0.42) { lp.copy(on).lerp(mouth, THREE.MathUtils.smoothstep(k, 0.2, 0.42)); lr = -THREE.MathUtils.smoothstep(k, 0.2, 0.42) * tip }
+        else if (k < 0.66) { lp.copy(mouth); lr = -tip - Math.sin(((k - 0.42) / 0.24) * Math.PI) * more }
+        else if (k < 0.86) { lp.copy(mouth).lerp(on, THREE.MathUtils.smoothstep(k, 0.66, 0.86)); lr = -(1 - THREE.MathUtils.smoothstep(k, 0.66, 0.86)) * tip }
+        else { lp.copy(on).lerp(REST.L, THREE.MathUtils.smoothstep(k, 0.86, 1)); lr = 0 }
+      }
+      if (held && !eating && !sipping) { lp.set(-0.22, 0.34, 0.2); lr = -0.3 }
+      if (heldRef.current) heldRef.current.visible = !!held && (heldShown ? heldShown() : true)
+      L.position.lerp(lp, Math.min(1, dt * (sipping ? 14 : 10)))
       Rh.position.lerp(rp, Math.min(1, dt * 10))
       L.rotation.x += (lr - L.rotation.x) * Math.min(1, dt * 10)
       Rh.rotation.x += (rr - Rh.rotation.x) * Math.min(1, dt * 10)
     }
     // (what's in their hands, shown by its part of the one mesh being its size, hidden by its being nothing)
     if (fig.chop) {
-      fig.chop.scale.setScalar(eating ? 1 : 0)
+      fig.chop.scale.setScalar(eating && !sipping ? 1 : 0)
       // (the tips at the plate, or at the mouth: their way from the hand in the figure's frame, taken into the hand's (turned about x))
-      if (eating && L) {
-        const to = chew ? CHOP_MOUTH : CHOP_PLATE
+      if (eating && L && !sipping) {
+        const to = chew ? CHOP_MOUTH : reach ?? CHOP_PLATE
         chopDir.copy(to).sub(L.position).normalize().applyAxisAngle(X_AXIS, -L.rotation.x)
         chopQ.setFromUnitVectors(UP, chopDir)
         fig.chop.quaternion.slerp(chopQ, Math.min(1, dt * 12))

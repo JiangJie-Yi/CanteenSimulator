@@ -3,6 +3,7 @@
 // In the middle of the page over the shut shop; × , the button below, Esc or a click outside put it away, and it goes by itself after
 // AUTO_S seconds (the owner's: the game stands still while it's up, App's GAME_SPEED; it goes on after); a bar along its foot runs down.
 import { useEffect, useRef, useState } from 'react'
+import { CLOSE_AT, OPEN_AT, lateBy, minutesOf } from '@/game/hours'
 import { createPortal } from 'react-dom'
 import { tl, type Lang } from '@/data/i18n'
 import type { DaySummary as Summary } from '@/game/daySummary'
@@ -13,6 +14,17 @@ export const AUTO_S = 10
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString('en-US')}`
 
 export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summary; day: number; hours?: [string, string]; lang: Lang; nameOf: (key: string) => string; onClose: () => void }) {
+  /** how far off its hour a time was, as a small note after it (none if on the minute) */
+  const offBy = (hour: number, hhmm: string) => {
+    const at = minutesOf(hhmm)
+    if (at === null) return null
+    const d = lateBy(hour, at)
+    if (d === 0) return null
+    const n = Math.abs(d), hm = n >= 60 ? (lang === 'en' ? `${Math.floor(n / 60)} h ${n % 60} min` : lang === 'ja' ? `${Math.floor(n / 60)}時間${n % 60}分` : `${Math.floor(n / 60)} 小時 ${n % 60} 分`)
+      : (lang === 'en' ? `${n} min` : lang === 'ja' ? `${n}分` : `${n} 分`)
+    return <small className={`day-sum-late${d > 0 ? ' is-late' : ''}`}>{d > 0 ? (lang === 'en' ? ` (${hm} late)` : lang === 'ja' ? `（${hm}遅れ）` : `（晚 ${hm}）`)
+      : (lang === 'en' ? ` (${hm} early)` : lang === 'ja' ? `（${hm}早い）` : `（提早 ${hm}）`)}</small>
+  }
   const t = (zh: string, ja: string, en: string) => tl(lang, zh, ja, en)
   const [left, setLeft] = useState(AUTO_S)
   // (counted from when it came up, once: the page above redraws every second or so (the staff resting), each time with a new onClose)
@@ -46,7 +58,14 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
         </header>
         <div className="day-sum-body">
           {/* (when it opened and when it closed (the owner's: the sheet says what time the day's business ended)) */}
-          {hours && <p className="day-sum-hours">{t(`${hours[0]} 開店・${hours[1]} 結束營業`, `${hours[0]} 開店・${hours[1]} 閉店`, `Opened ${hours[0]} · closed ${hours[1]}`)}</p>}
+          {/* (and how late either was, past 16:30 and 04:30 (the owner's, 2026-11-10); early, how early) */}
+          {hours && (
+            <p className="day-sum-hours">
+              {t(`${hours[0]} 開店`, `${hours[0]} 開店`, `Opened ${hours[0]}`)}{offBy(OPEN_AT, hours[0])}
+              {t('・', '・', ' · ')}
+              {t(`${hours[1]} 結束營業`, `${hours[1]} 閉店`, `closed ${hours[1]}`)}{offBy(CLOSE_AT, hours[1])}
+            </p>
+          )}
           <p className={`day-sum-profit${s.profit < 0 ? ' is-loss' : ''}`}>
             <span>{t('今日利潤', '本日の利益', "Today's profit")}</span>
             <strong>{s.profit < 0 ? '−' : ''}{nt(Math.abs(s.profit))}</strong>

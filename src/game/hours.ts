@@ -32,6 +32,17 @@ export const lastCall = (minute: number) => {
 }
 /** whether a customer's let in to sit down and eat at this minute: in the hours, before the last half hour */
 export const seatsOpen = (minute: number) => inHours(minute) && !lastCall(minute)
+/** how many minutes after its hour something happened (the shop opened after OPEN_AT, shut after CLOSE_AT; before it, less than 0), the
+ * day's clock going round: the nearer way, within twelve hours either side (the owner's, 2026-11-10: the day's sheet says how late) */
+export const lateBy = (hour: number, at: number) => {
+  const d = ((((Math.round(at) - hour) % 1440) + 1440) % 1440)
+  return d > 720 ? d - 1440 : d
+}
+/** "HH:MM" read back as minutes from midnight (null if it isn't one) */
+export const minutesOf = (hhmm: string) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm)
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
+}
 /** the hours as they read: 16:30–04:30 */
 export const hoursText = () => `${hm(OPEN_AT)}–${hm(CLOSE_AT)}`
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`

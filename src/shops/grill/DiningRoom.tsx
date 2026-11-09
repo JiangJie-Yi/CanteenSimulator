@@ -4806,7 +4806,7 @@ const FRIDGE_LED = (() => {
 /** each shelf's lip (the owner's: no price tags, a convenience store's): brushed steel, and in its middle a small black plaque edged in gold
  * naming what the shelf keeps (a quarter of the picture to a shelf, the lowest at the top) */
 // (as bar.ts's FRIDGE_UNITS fills each shelf, the lowest first)
-const SHELF_NAMES = [['冷茶', '炭酸・ゆず', '牛乳・珈琲', '乳酸菌'], ['日本酒・焼酎・梅酒', '缶ビール・酎ハイ', 'ハイボール・酎ハイ', '缶ビール・ハイボール']]
+const SHELF_NAMES = [['お茶・スポーツ', '炭酸', '牛乳・珈琲', '乳酸菌飲料'], ['瓶ビール・黒ビール', '日本酒・梅酒', '韓国焼酎', '缶ビール・ハイボール・酎ハイ']]
 const fridgeTagTex = (n: number) => {
   const t = canvasTex(1024, 256, (g) => {
     for (let k = 0; k < 4; k++) {
@@ -4931,12 +4931,176 @@ const COVE_WASH = (() => {
 // (the fridge, its door and its stock each drawn again only when its own props change: with eighty-odd bottles apiece they were redrawn every
 // time the room above them was, several times a second while the shop's open)
 export const DrinkFridge = memo(DrinkFridgeImpl)
+/**
+ * The flyers taped up on the fridges' outer sides (the owner's, 2026-11-10: the black sides were bare): the shop's own promotions and what's
+ * new in, as a small izakaya pins them up, a little askew, tape across their corners. All six drawn in one picture (a cell each), each fridge
+ * side's three made into one shape (one draw a side). `side`: the fridge's x side it's on (+1 its right as you face it, -1 its left); `z` along
+ * its depth from its middle, `y` up its side, `w` across, `tilt` turned in its own plane
+ */
+const FLYER_CELL = { w: 340, h: 480, cols: 3 }
+const FLYERS: { n: 0 | 1; side: 1 | -1; z: number; y: number; w: number; tilt: number; draw: (g: CanvasRenderingContext2D, W: number, H: number) => void }[] = [
+  // (the liquor fridge's left side: half-price first draught, Korean soju new in, all-you-can-drink)
+  { n: 1, side: -1, z: 0.13, y: 1.42, w: 0.24, tilt: 0.04, draw: (g, W, H) => {
+    g.fillStyle = '#f7d23c'; g.fillRect(0, 0, W, H)
+    g.fillStyle = '#c4161c'; g.fillRect(0, 0, W, H * 0.24)
+    flyerText(g, 'HAPPY HOUR', W / 2, H * 0.08, 34, '#fff3c8', SANS_BOLD)
+    flyerText(g, '16:30–18:00', W / 2, H * 0.18, 28, '#fff3c8', SANS_BOLD)
+    beerMug(g, W / 2, H * 0.47, 70)
+    flyerText(g, '生ビール', W / 2, H * 0.7, 54, '#1a1a1a', SANS_BOLD)
+    flyerText(g, '一杯目 半額', W / 2, H * 0.84, 50, '#c4161c', SANS_BOLD)
+  } },
+  { n: 1, side: -1, z: -0.17, y: 1.18, w: 0.21, tilt: -0.06, draw: (g, W, H) => {
+    g.fillStyle = '#eef6ea'; g.fillRect(0, 0, W, H)
+    g.fillStyle = '#1f7a3a'; g.fillRect(0, H * 0.82, W, H * 0.18)
+    flyerText(g, '新入荷！', W / 2, H * 0.1, 46, '#c62a2a', SANS_BOLD)
+    sojuBottle(g, W * 0.3, H * 0.5, 1)
+    sojuBottle(g, W * 0.52, H * 0.52, 0.92, true)
+    flyerText(g, '소주', W * 0.78, H * 0.36, 52, '#1f7a3a', HANGUL_BOLD)
+    flyerText(g, '韓国', W * 0.78, H * 0.5, 34, '#1a1a1a', SANS_BOLD)
+    flyerText(g, '焼酎', W * 0.78, H * 0.6, 34, '#1a1a1a', SANS_BOLD)
+    flyerText(g, '青ぶどうも', W / 2, H * 0.74, 30, '#3a7a2a', SANS_BOLD)
+    flyerText(g, '一本 ¥120〜', W / 2, H * 0.91, 36, '#ffffff', SANS_BOLD)
+  } },
+  { n: 1, side: -1, z: 0.12, y: 0.95, w: 0.2, tilt: -0.02, draw: (g, W, H) => {
+    g.fillStyle = '#fbf6ea'; g.fillRect(0, 0, W, H)
+    g.strokeStyle = '#1c2a4a'; g.lineWidth = 8; g.strokeRect(14, 14, W - 28, H - 28)
+    flyerText(g, '飲み放題', W / 2, H * 0.24, 62, '#1c2a4a', SANS_BOLD)
+    flyerText(g, '90分', W / 2, H * 0.46, 56, '#c4161c', SANS_BOLD)
+    flyerText(g, '¥1,500', W / 2, H * 0.64, 66, '#1a1a1a', SANS_BOLD)
+    flyerText(g, 'ビール・ハイボール', W / 2, H * 0.8, 24, '#4a4a4a', SANS_BOLD)
+    flyerText(g, 'サワー・ソフトドリンク', W / 2, H * 0.87, 22, '#4a4a4a', SANS_BOLD)
+  } },
+  // (the drinks fridge's right side: ramune for summer, two cultured milks for less, a second highball off)
+  { n: 0, side: 1, z: -0.12, y: 1.4, w: 0.22, tilt: -0.05, draw: (g, W, H) => {
+    const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#9fdcf6'); sky.addColorStop(1, '#e8f8ff')
+    g.fillStyle = sky; g.fillRect(0, 0, W, H)
+    ramuneBottle(g, W / 2, H * 0.48, 1)
+    flyerText(g, '夏季限定', W / 2, H * 0.1, 44, '#c62a2a', SANS_BOLD)
+    flyerText(g, 'ラムネ', W / 2, H * 0.8, 64, '#1f5ab0', SANS_BOLD)
+    flyerText(g, 'よく冷えてます', W / 2, H * 0.92, 28, '#1f5ab0', SANS_BOLD)
+  } },
+  { n: 0, side: 1, z: 0.17, y: 1.2, w: 0.2, tilt: 0.05, draw: (g, W, H) => {
+    g.fillStyle = '#fff6f8'; g.fillRect(0, 0, W, H)
+    g.fillStyle = '#e8708f'; for (let k = 0; k < 9; k++) { g.beginPath(); g.arc(30 + k * 36, 30, 10, 0, Math.PI * 2); g.fill() }
+    flyerText(g, '乳酸菌', W / 2, H * 0.24, 50, '#b8305a', SANS_BOLD)
+    flyerText(g, 'ドリンク', W / 2, H * 0.36, 44, '#b8305a', SANS_BOLD)
+    smallBottle(g, W * 0.38, H * 0.55); smallBottle(g, W * 0.62, H * 0.55)
+    flyerText(g, '2本で', W / 2, H * 0.74, 40, '#1a1a1a', SANS_BOLD)
+    flyerText(g, '¥30 引き', W / 2, H * 0.87, 52, '#c4161c', SANS_BOLD)
+  } },
+  { n: 0, side: 1, z: -0.14, y: 0.98, w: 0.21, tilt: 0.03, draw: (g, W, H) => {
+    g.fillStyle = '#1c2a4a'; g.fillRect(0, 0, W, H)
+    g.fillStyle = '#e8c45a'; g.fillRect(20, H * 0.62, W - 40, 4)
+    flyerText(g, 'ハイボール', W / 2, H * 0.16, 50, '#e8c45a', SANS_BOLD)
+    highballGlass(g, W / 2, H * 0.4)
+    flyerText(g, '2杯目から', W / 2, H * 0.72, 40, '#f4efe2', SANS_BOLD)
+    flyerText(g, '¥100 OFF', W / 2, H * 0.86, 56, '#e8c45a', SANS_BOLD)
+  } },
+]
+const SANS_BOLD = '900 {s}px "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", "Noto Sans JP", sans-serif'
+const HANGUL_BOLD = '800 {s}px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+function flyerText(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, fill: string, font: string) {
+  g.font = font.replace('{s}', String(size))
+  g.textAlign = 'center'; g.textBaseline = 'middle'
+  // (squeezed in if it's wider than the flyer)
+  const w = g.measureText(text).width, room = FLYER_CELL.w - 36
+  g.save(); g.translate(x, y); if (w > room) g.scale(room / w, 1)
+  g.fillStyle = fill; g.fillText(text, 0, 0)
+  g.restore()
+}
+function beerMug(g: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  g.fillStyle = '#e8a82a'; g.fillRect(x - s * 0.5, y - s * 0.4, s, s * 0.9)
+  g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(x, y - s * 0.42, s * 0.56, s * 0.2, 0, 0, Math.PI * 2); g.fill()
+  for (const k of [-0.3, 0, 0.3]) { g.beginPath(); g.arc(x + k * s, y - s * 0.52, s * 0.16, 0, Math.PI * 2); g.fill() }
+  g.strokeStyle = '#8a5a14'; g.lineWidth = 6; g.strokeRect(x - s * 0.5, y - s * 0.4, s, s * 0.9)
+  g.beginPath(); g.arc(x + s * 0.55, y + s * 0.05, s * 0.22, -Math.PI / 2, Math.PI / 2); g.stroke()
+  g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(x - s * 0.36, y - s * 0.3, s * 0.08, s * 0.7)
+}
+function sojuBottle(g: CanvasRenderingContext2D, x: number, y: number, k: number, grape = false) {
+  g.save(); g.translate(x, y); g.scale(k, k)
+  g.fillStyle = grape ? '#6aa84a' : '#3f8a4a'
+  g.beginPath(); g.moveTo(-12, -110); g.lineTo(12, -110); g.lineTo(12, -70); g.quadraticCurveTo(34, -55, 34, -20); g.lineTo(34, 90); g.lineTo(-34, 90); g.lineTo(-34, -20); g.quadraticCurveTo(-34, -55, -12, -70); g.closePath(); g.fill()
+  g.fillStyle = '#2e7d3a'; g.fillRect(-13, -122, 26, 14)
+  g.fillStyle = '#f7f8f3'; g.fillRect(-30, -5, 60, 60)
+  g.fillStyle = grape ? '#3a7a2a' : '#1f7a3a'; g.font = '800 20px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText(grape ? '청포도' : '소주', 0, 25)
+  g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(-26, -40, 8, 120)
+  g.restore()
+}
+function ramuneBottle(g: CanvasRenderingContext2D, x: number, y: number, k: number) {
+  g.save(); g.translate(x, y); g.scale(k, k)
+  g.fillStyle = 'rgba(120,200,230,0.85)'
+  g.beginPath(); g.moveTo(-14, -120); g.lineTo(14, -120); g.lineTo(14, -90); g.quadraticCurveTo(10, -60, 30, -40); g.lineTo(30, 80); g.lineTo(-30, 80); g.lineTo(-30, -40); g.quadraticCurveTo(-10, -60, -14, -90); g.closePath(); g.fill()
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0, -70, 11, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#1f5ab0'; g.fillRect(-15, -134, 30, 16)
+  g.fillStyle = '#1f5ab0'; g.fillRect(-30, -10, 60, 34)
+  g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(-22, -36, 7, 110)
+  g.restore()
+}
+function smallBottle(g: CanvasRenderingContext2D, x: number, y: number) {
+  g.fillStyle = '#fbf3ea'; g.beginPath(); g.moveTo(x - 20, y + 40); g.lineTo(x - 20, y); g.quadraticCurveTo(x - 10, y - 12, x - 18, y - 30); g.lineTo(x + 18, y - 30); g.quadraticCurveTo(x + 10, y - 12, x + 20, y); g.lineTo(x + 20, y + 40); g.closePath(); g.fill()
+  g.strokeStyle = '#c45a7a'; g.lineWidth = 3; g.stroke()
+  g.fillStyle = '#d42a24'; g.fillRect(x - 18, y - 38, 36, 9)
+  g.fillStyle = '#d42a24'; g.fillRect(x - 20, y + 4, 40, 18)
+}
+function highballGlass(g: CanvasRenderingContext2D, x: number, y: number) {
+  g.fillStyle = 'rgba(232,180,80,0.9)'; g.fillRect(x - 34, y - 50, 68, 110)
+  g.fillStyle = 'rgba(255,255,255,0.75)'; for (const [dx, dy] of [[-14, -30], [10, -6], [-6, 22], [16, 38]]) { g.beginPath(); g.arc(x + dx, y + dy, 6, 0, Math.PI * 2); g.fill() }
+  g.fillStyle = 'rgba(220,240,250,0.9)'; g.fillRect(x - 24, y - 46, 26, 22); g.fillRect(x + 2, y - 36, 22, 20)
+  g.strokeStyle = '#f4efe2'; g.lineWidth = 5; g.strokeRect(x - 34, y - 70, 68, 132)
+}
+/** the six flyers' picture: each its cell, paper's grain over it, a strip of tape across its two top corners */
+const FLYER_TEX = canvasTex(FLYER_CELL.w * FLYER_CELL.cols, FLYER_CELL.h * 2, (g) => {
+  const { w: W, h: H, cols } = FLYER_CELL
+  FLYERS.forEach((f, i) => {
+    const x0 = (i % cols) * W, y0 = Math.floor(i / cols) * H
+    g.save(); g.beginPath(); g.rect(x0, y0, W, H); g.clip(); g.translate(x0, y0)
+    f.draw(g, W, H)
+    // (the paper's grain, faintly; its edge a touch darker)
+    g.globalCompositeOperation = 'multiply'
+    g.fillStyle = g.createPattern(grain(), 'repeat')!; g.fillRect(0, 0, W, H)
+    g.globalCompositeOperation = 'source-over'
+    g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4)
+    // (tape across each top corner, see-through)
+    for (const sd of [-1, 1]) {
+      g.save(); g.translate(sd < 0 ? 26 : W - 26, 22); g.rotate(sd * 0.75)
+      g.fillStyle = 'rgba(246,240,214,0.72)'; g.fillRect(-34, -11, 68, 22)
+      g.restore()
+    }
+    g.restore()
+  })
+})
+/** each fridge's flyers as one shape: their planes, turned to face out from its side, at their places, each its cell of the picture */
+function flyerGeo(n: 0 | 1) {
+  const { W } = FRIDGE
+  const { w: CW, h: CH, cols } = FLYER_CELL
+  const parts: THREE.BufferGeometry[] = []
+  FLYERS.forEach((f, i) => {
+    if (f.n !== n) return
+    const h = f.w * (CH / CW)
+    const q = new THREE.PlaneGeometry(f.w, h)
+    const u0 = (i % cols) / cols, v1 = 1 - Math.floor(i / cols) / 2, uv = q.attributes.uv as THREE.BufferAttribute
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, u0 + uv.getX(k) / cols, v1 - 0.5 + uv.getY(k) / 2)
+    q.rotateZ(f.tilt)
+    q.rotateY(f.side * Math.PI / 2)
+    q.translate(f.side * (W / 2 + 0.004), f.y, f.z)
+    parts.push(q)
+  })
+  const g = mergeGeometries(parts)!
+  for (const q of parts) q.dispose()
+  return g
+}
+const FLYER_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: FLYER_TEX })
 function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
   const { W, H, D } = FRIDGE
   const { body } = useFreezer(n)
+  const flyers = useMemo(() => flyerGeo(n as 0 | 1), [n])
+  useEffect(() => () => flyers.dispose(), [flyers])
   return (
     <group>
       <primitive object={body} />
+      {/* (the flyers on its outer side) */}
+      <mesh geometry={flyers} material={FLYER_MAT} castShadow={false} />
       {/* the cove lights (槽燈): a narrow slot let into each inner side, a thin line of white light deep in it, and
           the light washing softly along the wall, shelf and drinks beside it (up each side only) */}
       <StaticBatch plain>
@@ -5013,6 +5177,8 @@ export const DrinkWarm = memo(function DrinkWarm() {
   return (
     <group ref={g} visible={false}>
       {DRINKS.map((d) => <group key={d.id}><DrinkBottle id={d.id} lit /><DrinkBottle id={d.id} wet /></group>)}
+      {/* (and the sake cup, its sake in it) */}
+      <SakeCup />
     </group>
   )
 })
@@ -5347,14 +5513,44 @@ const drinkName = (id: string) => {
 // (as sold: a 500 ml beer bottle 25 cm, a 300 ml sake 23 cm, a 2 l tea bottle 31 cm, ramune 18 cm, 350 ml cans 12.2 cm, 500 ml PET 20.5 cm,
 // the 65 ml cultured milk 9 cm, a 200 ml milk bottle 13 cm)
 const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.26, ramune: 1.06, beerCan: 1.36, highball: 1.36, coffee: 1.2, greenTea: 1.3,
-  cola: 1.3, yakult: 1.12, sports: 1.3, milk: 1.1, chuhai: 1.36, blackCoffee: 1.2, cafeAuLait: 1.2, yuzuSoda: 1.36, darkBeer: 1.2, shochu: 1.12, umeshu: 1.06 }
+  cola: 1.3, yakult: 1.12, sports: 1.3, milk: 1.1, chuhai: 1.36, blackCoffee: 1.2, cafeAuLait: 1.2, yuzuSoda: 1.36, darkBeer: 1.2, shochu: 1.08, umeshu: 1.06,
+  grapeSoju: 1.08, yogurt: 1.5, lacticSoda: 1.36 }
 /** what each drink's shaped as (its bottle or can): the newer ones as one of the first (a dark beer the beer's bottle, shochu and umeshu the
  * sake's) */
-const FORM: Partial<Record<DrinkId, DrinkId>> = { darkBeer: 'beer', shochu: 'sake', umeshu: 'sake', blackCoffee: 'coffee', cafeAuLait: 'coffee', yuzuSoda: 'chuhai' }
+const FORM: Partial<Record<DrinkId, DrinkId>> = { darkBeer: 'beer', shochu: 'sake', umeshu: 'sake', blackCoffee: 'coffee', cafeAuLait: 'coffee', yuzuSoda: 'chuhai',
+  grapeSoju: 'sake', lacticSoda: 'chuhai' }
 const formOf = (id: DrinkId): DrinkId => FORM[id] ?? id
 /** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */
 /** (`wet`: out of the fridge, misted over with beads of condensation, a few run down) */
 export const DrinkBottle = memo(DrinkBottleImpl)
+/**
+ * A sake cup (お猪口): what sake is drunk from at the bar (the owner's, 2026-11-10: not from its bottle), beside the bottle; white porcelain with
+ * an indigo ring inside its lip, the sake in it as high as `level`. Its shape turned from a profile (12 round), its foot ring and lip, the
+ * hollow inside; its middle at its foot
+ */
+const CHOKO_PTS: [number, number][] = [[0.012, 0], [0.0135, 0.004], [0.0105, 0.006], [0.017, 0.012], [0.0225, 0.028], [0.024, 0.036],
+  [0.0215, 0.0365], [0.0195, 0.028], [0.0135, 0.014], [0.008, 0.009]]
+const CHOKO_GEO = (() => {
+  const g = new THREE.LatheGeometry(CHOKO_PTS.map(([r, y]) => new THREE.Vector2(r, y)), 12)
+  g.computeVertexNormals()
+  return g
+})()
+const CHOKO_SAKE = new THREE.CircleGeometry(0.018, 12).rotateX(-Math.PI / 2)
+const CHOKO_MAT = new THREE.MeshToonMaterial({ color: '#f6f3ea', side: THREE.DoubleSide })
+const CHOKO_RING = new THREE.TorusGeometry(0.0205, 0.0012, 4, 16).rotateX(Math.PI / 2)
+const CHOKO_RING_MAT = new THREE.MeshToonMaterial({ color: '#2c4a7a' })
+const CHOKO_SAKE_MAT = new THREE.MeshToonMaterial({ color: '#f2ead0', transparent: true, opacity: 0.8 })
+export const SakeCup = memo(function SakeCup({ level = 1 }: { level?: number }) {
+  return (
+    <group>
+      <mesh geometry={CHOKO_GEO} material={CHOKO_MAT} />
+      <mesh geometry={CHOKO_RING} material={CHOKO_RING_MAT} position-y={0.0335} />
+      {level > 0.05 && <mesh geometry={CHOKO_SAKE} material={CHOKO_SAKE_MAT} position-y={0.012 + 0.018 * Math.min(1, level)} scale={0.62 + 0.38 * Math.min(1, level)} />}
+    </group>
+  )
+})
+/** whether a drink's poured into a cup to be drunk (sake, umeshu and the like, from their slim bottles) */
+export const cupped = (id: string) => id === 'sake' || id === 'umeshu'
 /**
  * A drink as it stands on a fridge's shelf among the hundred and sixty (the owner's: the fridges were the heaviest thing in the room): its
  * bottle or can in a few turned rings, opaque, its glass's and its drink's colour in its points; its label, and its cap. Two materials for
@@ -5367,7 +5563,7 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
   const shaped = f === 'beer' ? 'beer' : f === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'cola' || id === 'greenTea' || id === 'sports' ? 'pet500'
     : id === 'milk' ? 'milk' : id === 'ramune' ? 'ramune' : null
   // (its body's colour: the beer's brown glass, the ramune's aqua, the milk white; a clear bottle the colour of what's in it, paled by the glass)
-  const body = id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#bfe6f0' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : f === 'sake' ? '#e4ece6'
+  const body = id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#bfe6f0' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : soju(id) ? '#4f9658' : f === 'sake' ? '#e4ece6'
     : `#${new THREE.Color(d.color).lerp(new THREE.Color('#ffffff'), 0.25).getHexString()}`
   return (
     <group scale={DRINK_SCALE[id]}>
@@ -5387,20 +5583,23 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
     </group>
   )
 })
-function DrinkBottleImpl({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
-  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} wet={wet} /></group>
+/** (`level`: how much is left in it, 1 full: drunk down sip by sip at the customer's place, and left there empty, or nearly, when they've
+ * gone (the owner's, 2026-11-10: it vanished at the last moment and a glass from nowhere stood there); what's inside shown that high) */
+function DrinkBottleImpl({ id, lit = false, wet = false, level = 1 }: { id: DrinkId; lit?: boolean; wet?: boolean; level?: number }) {
+  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} wet={wet} level={level} /></group>
 }
-function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: boolean; wet?: boolean }) {
+function DrinkBottleRaw({ id, lit = false, wet = false, level = 1 }: { id: DrinkId; lit?: boolean; wet?: boolean; level?: number }) {
   const d = DRINKS.find((x) => x.id === id)!
   const kind = KIND_OF[id]
   const label = lit ? LABEL_LIT : LABEL_MAT
   const glassMat = kind === 'can' ? (lit ? CAN_LIT : CAN) : (lit ? GLASS_LIT : GLASS)
   // (the glass itself: the beer's brown, the ramune's pale aqua, the rest clear; the PET clear and thinner; its tint and clearness in its vertices)
   const glass = (g: THREE.BufferGeometry) => kind === 'can' ? g
-    : tinted(g, formOf(id) === 'beer' ? (id === 'darkBeer' ? '#2a1808' : '#5a3010') : id === 'ramune' ? '#a8dcea' : kind === 'pet' ? '#f2f6f8' : '#eef4f2', formOf(id) === 'beer' ? 0.88 : kind === 'pet' ? 0.22 : 0.28)
+    : tinted(g, formOf(id) === 'beer' ? (id === 'darkBeer' ? '#2a1808' : '#5a3010') : id === 'ramune' ? '#a8dcea' : soju(id) ? '#3f8a4a' : kind === 'pet' ? '#f2f6f8' : '#eef4f2',
+      formOf(id) === 'beer' ? 0.88 : soju(id) ? 0.7 : kind === 'pet' ? 0.22 : 0.28)
   // (the drink in it: its own colour, a little see-through (the milk not at all))
-  const fill = (g: THREE.BufferGeometry) => tinted(g, id === 'ramune' ? '#dff4fa' : id === 'sake' || id === 'shochu' ? '#f6f2de' : d.color,
-    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || id === 'shochu' || id === 'sports' ? 0.45 : 0.85)
+  const fill = (g: THREE.BufferGeometry) => tinted(g, id === 'ramune' ? '#dff4fa' : id === 'sake' ? '#f6f2de' : d.color,
+    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || soju(id) || id === 'sports' ? 0.45 : 0.85)
   // (turned so its label's name faces +z)
   if (d.shape === 'can' && id !== 'cola' && id !== 'greenTea') return (
     // a can: printed all over, its silver top and rim
@@ -5429,7 +5628,7 @@ function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: b
   if (shaped) return (
     <group rotation-y={-Math.PI / 2}>
       {/* (the drink inside, seen through the glass or plastic: made before the bottle, so at the same depth it is drawn first and the bottle over it) */}
-      <mesh geometry={fill(BOTTLE_DRINK[drinkKey])} material={FILL} />
+      {level > 0.03 && <mesh geometry={fill(BOTTLE_DRINK[drinkKey])} material={FILL} scale-y={Math.min(1, level)} />}
       <mesh geometry={glass(shaped.body)} material={glassMat} />
       {wet && <mesh geometry={shaped.body} material={DEW} scale={[1.006, 1, 1.006]} />}
       <mesh geometry={labelGeo(shaped.label, id)} position-y={shaped.labelY} material={label} />
@@ -5441,7 +5640,7 @@ function DrinkBottleRaw({ id, lit = false, wet = false }: { id: DrinkId; lit?: b
   // the ramune: its pale aqua glass, the fizzy drink in it, the glass marble held up in the neck's pinch, the blue plastic cap, a paper band
   return (
     <group rotation-y={-Math.PI / 2}>
-      <mesh geometry={fill(BOTTLE_GEO.ramuneDrink)} material={FILL} />
+      {level > 0.03 && <mesh geometry={fill(BOTTLE_GEO.ramuneDrink)} material={FILL} scale-y={Math.min(1, level)} />}
       <mesh geometry={BOTTLE_GEO.marble} position-y={0.1402} material={MARBLE} />
       <mesh geometry={glass(BOTTLE_GEO.ramune)} material={glassMat} />
       {wet && <mesh geometry={BOTTLE_GEO.ramune} material={DEW} scale={[1.006, 1, 1.006]} />}
@@ -5583,6 +5782,8 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
     return gr
   }
   const JP = '"Zen Antique", serif'
+  // (soju's Hangul: the system's own Korean face (Malgun Gothic on Windows, Apple SD Gothic Neo on a Mac))
+  const HANGUL = '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Nanum Gothic", sans-serif'
   switch (id) {
     case 'beerCan': {
       g.fillStyle = grad([[0, '#f4e3a0'], [0.5, '#d9b24a'], [1, '#a8822a']]); g.fillRect(0, 0, W, H)
@@ -5756,13 +5957,55 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
       break
     }
     case 'shochu': {
-      g.fillStyle = '#f4f2ec'; g.fillRect(0, 0, W, H)
-      g.fillStyle = 'rgba(120,120,120,0.12)'
-      for (let k = 0; k < 90; k++) g.fillRect((k * 83) % W, (k * 47) % H, 12, 1)
+      // (Korean soju's paper label (no maker's): white, a dewdrop of a bamboo leaf in green, 소주 in green, a red seal, the strength in small)
+      g.fillStyle = '#f7f8f3'; g.fillRect(0, 0, W, H)
+      g.fillStyle = '#2a8a44'; g.fillRect(0, 0, W, H * 0.07); g.fillRect(0, H * 0.93, W, H * 0.07)
       face((cx) => {
-        vtext('焼酎', cx, H * 0.46, 70, '#1a1a1a')
-        g.fillStyle = '#2a4a7a'; g.fillRect(cx + 44, H * 0.12, 26, 40)
-        vtext('本格', cx + 57, H * 0.12 + 20, 15, '#f2f2f2')
+        g.fillStyle = '#5bb36a'
+        g.beginPath(); g.ellipse(cx - 56, H * 0.36, 14, 34, -0.5, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#9fd6a4'; g.beginPath(); g.ellipse(cx - 40, H * 0.46, 9, 22, 0.4, 0, Math.PI * 2); g.fill()
+        htext('소주', cx + 14, H * 0.47, 66, '#1f7a3a', HANGUL, 800)
+        g.fillStyle = '#c62a2a'; g.beginPath(); g.roundRect(cx + 62, H * 0.17, 30, 30, 4); g.fill()
+        htext('真', cx + 77, H * 0.17 + 16, 20, '#fff4f0', JP)
+        htext('16.5%  360ml', cx + 6, H * 0.8, 18, '#2f6a3a', '"Arial", sans-serif', 700)
+      })
+      break
+    }
+    case 'grapeSoju': {
+      // (the green grape one: pale green, a bunch of grapes, 청포도 over 소주)
+      g.fillStyle = grad([[0, '#f2fae6'], [1, '#d6ecbc']]); g.fillRect(0, 0, W, H)
+      face((cx) => {
+        g.fillStyle = '#7ab84a'
+        for (let r = 0; r < 4; r++) for (let k = 0; k <= 3 - r; k++) { g.beginPath(); g.arc(cx - 70 + k * 15 + r * 7.5, H * 0.3 + r * 14, 8, 0, Math.PI * 2); g.fill() }
+        g.fillStyle = 'rgba(255,255,255,0.5)'
+        for (let r = 0; r < 4; r++) for (let k = 0; k <= 3 - r; k++) { g.beginPath(); g.arc(cx - 73 + k * 15 + r * 7.5, H * 0.3 + r * 14 - 3, 2.5, 0, Math.PI * 2); g.fill() }
+        g.strokeStyle = '#5a7a2a'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 48, H * 0.22); g.quadraticCurveTo(cx - 40, H * 0.12, cx - 30, H * 0.16); g.stroke()
+        htext('청포도', cx + 30, H * 0.4, 46, '#3a7a2a', HANGUL, 800)
+        htext('소주', cx + 30, H * 0.65, 34, '#1f5a2a', HANGUL, 800)
+      })
+      break
+    }
+    case 'yogurt': {
+      // (drinking yogurt: white, a pink band, ヨーグルト and a little strawberry)
+      g.fillStyle = '#fdf7f9'; g.fillRect(0, 0, W, H)
+      g.fillStyle = '#e8708f'; g.fillRect(0, H * 0.62, W, H * 0.24)
+      face((cx) => {
+        htext('のむ', cx, H * 0.28, 30, '#d94a7a', JP)
+        htext('ヨーグルト', cx, H * 0.46, 36, '#b8305a', JP)
+        g.fillStyle = '#e8384a'; g.beginPath(); g.moveTo(cx - 12, H * 0.68); g.quadraticCurveTo(cx, H * 0.88, cx + 12, H * 0.68); g.quadraticCurveTo(cx, H * 0.62, cx - 12, H * 0.68); g.fill()
+        g.fillStyle = '#3a8a3a'; g.fillRect(cx - 6, H * 0.64, 12, 4)
+      })
+      break
+    }
+    case 'lacticSoda': {
+      // (the cultured soda's can: white with blue polka dots, a wave of blue, its name)
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H)
+      g.fillStyle = '#3a6ac8'
+      for (let r = 0; r < 7; r++) for (let k = 0; k < 18; k++) { g.beginPath(); g.arc(k * 30 + (r % 2) * 15, r * 38 + 10, 6, 0, Math.PI * 2); g.fill() }
+      g.fillStyle = '#ffffff'; g.fillRect(0, H * 0.32, W, H * 0.4)
+      face((cx) => {
+        htext('乳酸菌', cx, H * 0.43, 34, '#1f4aa0', JP)
+        htext('ソーダ', cx, H * 0.62, 30, '#2a5ab0', JP)
       })
       break
     }
@@ -5789,10 +6032,12 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
     }
   }
 }
+/** the soju (green glass) */
+const soju = (id: string) => id === 'shochu' || id === 'grapeSoju'
 /** what each drink's made of: aluminium cans, glass bottles, PET bottles, the little cultured milk bottle */
 const KIND_OF: Record<DrinkId, 'can' | 'glass' | 'pet' | 'small'> = { beer: 'glass', sake: 'glass', oolong: 'pet', ramune: 'glass', beerCan: 'can', highball: 'can',
   coffee: 'can', greenTea: 'pet', cola: 'pet', yakult: 'small', sports: 'pet', milk: 'glass', chuhai: 'can', blackCoffee: 'can', cafeAuLait: 'can', yuzuSoda: 'can',
-  darkBeer: 'glass', shochu: 'glass', umeshu: 'glass' }
+  darkBeer: 'glass', shochu: 'glass', umeshu: 'glass', grapeSoju: 'glass', yogurt: 'small', lacticSoda: 'can' }
 /**
  * The drinks' looks, shared by them all, so a fridge's eighty bottles are a handful of draws (each drink's own glass, label, drink and cap
  * had been a material each: some fifty draws for the two fridges). Every label in one picture (LABEL_ATLAS, a cell each, a margin of itself

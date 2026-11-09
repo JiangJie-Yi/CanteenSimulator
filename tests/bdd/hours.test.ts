@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { hoursBegin, hoursEnd, hoursText, inHours, isLate } from '@/game/hours'
+import { CLOSE_AT, OPEN_AT, hoursBegin, hoursEnd, hoursText, inHours, isLate, lateBy, minutesOf } from '@/game/hours'
 
 const at = (h: number, m = 0) => h * 60 + m
 
@@ -22,5 +22,15 @@ feature('固定營業時間 16:30–04:30（12 小時）與深夜模式', () => 
   })
   scenario('營業時間的寫法', ({ then }) => {
     then('寫成 16:30–04:30', () => { expect(hoursText()).toBe('16:30–04:30') })
+  })
+})
+
+feature('打烊結算寫出晚了多久開、多久結束（店主要的，2026-11-10）', () => {
+  scenario('照 16:30 開店、04:30 打烊算', ({ then, and }) => {
+    then('16:34 開店是晚 4 分鐘', () => { expect(lateBy(OPEN_AT, at(16, 34))).toBe(4) })
+    and('05:30 結束是晚 60 分鐘（過了午夜也算對）', () => { expect(lateBy(CLOSE_AT, at(5, 30))).toBe(60) })
+    and('04:20 就關是提早 10 分鐘', () => { expect(lateBy(CLOSE_AT, at(4, 20))).toBe(-10) })
+    and('晚到半夜才開也是晚，不是提早', () => { expect(lateBy(OPEN_AT, at(0, 10))).toBe(460) })
+    and('時間字串讀得回來', () => { expect(minutesOf('05:30')).toBe(at(5, 30)); expect(minutesOf('x')).toBeNull() })
   })
 })
