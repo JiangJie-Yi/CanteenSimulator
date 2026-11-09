@@ -123,8 +123,8 @@ const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.05
 const SETTLED_BY: Record<string, number> = { 'lightswitch-room': 0.54, 'lightswitch-door': 0.54 }
 /** pieces laid out afresh since a browser may have moved them by hand (the rice tub, the miso pot, the rice pot and the cooker put up on the
  * warming counter, 2026-11-09): what it held for them was from where they stood before, so it's dropped, once (RELAID_KEY marks it done) */
-const RELAID = ['ricetub', 'misopot', 'hagama', 'denkinabe']
-const RELAID_KEY = 'jgs-edit-relaid-1'
+const RELAID = ['ricetub', 'misopot', 'hagama', 'denkinabe', 'warmer']
+const RELAID_KEY = 'jgs-edit-relaid-2'
 const relaid = (() => { try { return !!localStorage.getItem(RELAID_KEY) } catch { return true } })()
 const dropRelaid = (o: Record<string, V3>) => { if (!relaid) for (const id of RELAID) delete o[id]; return o }
 const loadOffsets = () => {

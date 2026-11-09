@@ -3536,7 +3536,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             // (nothing else wanting: to the miso soup now and then, to stir it as it's kept warm)
             soupAt.current = performance.now() / 1000
             pl.pos.copy(home())
-            setOff(reachOf(soupPot()), 'toSoup')
+            // (before it, as at the cooker beside it on the warming counter: the nearest clear spot to its middle was round its back, on the
+            // counter's edge of the kitchen's floor, and the way there went through the counter)
+            setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
             away(true)
           }
         }

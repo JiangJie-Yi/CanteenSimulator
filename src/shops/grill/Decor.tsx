@@ -40,9 +40,12 @@ export const DECOR = {
   // (the cooked rice the rice balls are made from: a shop's big tub, on a side table of its own just past the cook's
   // table's right-hand end, by the other cooks)
   // (moved up toward the back and in toward the table, by its back corner, as the owner drew: the miso soup's pot where it stood)
-  // (on the warming counter now, its first well (WARMER, below): along 3.12, back 1.2 toward the bar)
-  rice: { at: [1.819, -2.813], r: 1.1 },
+  // (on the warming counter now, its first well (WARMER, below): along 5.2, lay 2.42, at the end toward the cook table)
+  rice: { at: [5.640, -1.108], r: 1.1 },
 } satisfies Record<string, Spot>
+
+/** which way the warming counter and what's on it face: their fronts to the kitchen, back from its open end (toward minus ALONG) */
+const WARMER_FACE = Math.atan2(-ALONG.x, -ALONG.z)
 
 /** what's being carried from here: a stick of charcoal or the fan, where it is (Roasting sets it), and how far the
  * fan has been waved (it swings with it) */
@@ -875,7 +878,7 @@ const MISOPOT_URL = import.meta.env.BASE_URL + 'models/misopot.glb'
 useGLTF.preload(MISOPOT_URL)
 // (beside the rice tub, on its far side from the cook table, in a row with it (the owner's: it stood behind the tub, where the crew stand))
 // (on the warming counter's second well (WARMER): it stood on a little stand of its own)
-const MISO_AT = { along: 4.07, lay: -1.2 }
+const MISO_AT = { along: 5.2, lay: 3.37 }
 const MISO_SCALE = 1.05
 const MISO_TOP = -0.3
 function MisoPot() {
@@ -928,7 +931,7 @@ function MisoPot() {
 const HAGAMA_URL = import.meta.env.BASE_URL + 'models/hagama.glb'
 useGLTF.preload(HAGAMA_URL)
 // (on the warming counter's third well (WARMER), smaller: it stood on the floor, in the middle of the kitchen's way)
-const HAGAMA_AT = { along: 4.745, lay: -1.2 }
+const HAGAMA_AT = { along: 5.2, lay: 4.045 }
 const HAGAMA_SCALE = 0.6
 const GLOW_OFF = new THREE.Color('#2a1a12')
 function Hagama() {
@@ -955,7 +958,7 @@ function Hagama() {
   }, [gltf])
   const p = new THREE.Vector3().addScaledVector(ALONG, HAGAMA_AT.along).addScaledVector(LAY, HAGAMA_AT.lay)
   return (
-    <group position={[p.x, SIDE_TOP, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} scale={HAGAMA_SCALE} {...nameOver('羽釜與爐灶', '老式的炊飯爐灶（現在用電鍋煮飯）')}>
+    <group position={[p.x, SIDE_TOP, p.z]} rotation-y={WARMER_FACE} scale={HAGAMA_SCALE} {...nameOver('羽釜與爐灶', '老式的炊飯爐灶（現在用電鍋煮飯）')}>
       <primitive object={model.root} />
     </group>
   )
@@ -970,7 +973,7 @@ function Hagama() {
 const DENKI_URL = import.meta.env.BASE_URL + 'models/denkinabe.glb'
 useGLTF.preload(DENKI_URL)
 // (on the warming counter's last well (WARMER): it stood on a little stand of its own)
-const DENKI_AT = { along: 5.3, lay: -1.2 }
+const DENKI_AT = { along: 5.2, lay: 4.6 }
 const DENKI_SCALE = 1.1
 const DENKI_TOP = -0.3
 const LAMP_OFF = new THREE.Color('#3a1a14'), LAMP_COOK = new THREE.Color('#ff3a20'), LAMP_WARM = new THREE.Color('#ffb030')
@@ -1022,7 +1025,7 @@ function DenkiNabe() {
   const p = new THREE.Vector3().addScaledVector(ALONG, DENKI_AT.along).addScaledVector(LAY, DENKI_AT.lay)
   const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? '飯煮好了（保溫中），等著盛進飯桶' : `空著（飯桶裡還有 ${RICE.tub} 份飯）`)
   return (
-    <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)}>
+    <group position={[p.x, 0, p.z]} rotation-y={WARMER_FACE}>
       <group position-y={DENKI_TOP} scale={DENKI_SCALE}
         onPointerOver={(e) => { e.stopPropagation(); setTip({ title: '電鍋', hint: say() }) }}
         onPointerOut={() => setTip(null)}>
@@ -1048,7 +1051,10 @@ const WARMER_URL = import.meta.env.BASE_URL + 'models/warmer.glb'
 useGLTF.preload(WARMER_URL)
 /** its middle (along, back from the table's line) and its depth, as blender/warmer.py has it (its length 3.0, its wells at -0.98, -0.03,
  * 0.645, 1.2 along it: the tub, the soup, the rice pot, the cooker, above) */
-const WARMER_AT = { along: 4.1, lay: -1.2 }
+// (in the back of the kitchen beside the sink (the owner's, 2026-11-09): its back on the raised floor's open end (5.75), its length across
+// the kitchen from by the cook table's end to the sink's, its front to the kitchen, the cooker at the sink's end (its rice is washed there);
+// it stood along the bar's side and shut the way from the kitchen to the till's gate)
+const WARMER_AT = { along: 5.2, lay: 3.4 }
 const WARMER_D = 1.0
 function Warmer() {
   useStudio()
@@ -1087,7 +1093,7 @@ function Warmer() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, WARMER_AT.along).addScaledVector(LAY, WARMER_AT.lay)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(LAY.x, LAY.z)} {...nameOver('保溫餐檯', '飯桶、味噌湯、羽釜與電鍋都放在加熱座上保溫')}>
+    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('保溫餐檯', '飯桶、味噌湯、羽釜與電鍋都放在加熱座上保溫')}>
       <primitive object={model} />
     </group>
   )
