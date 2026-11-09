@@ -142,7 +142,7 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
           </div>
           <p className="ofc-today">{t3(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`, `Day ${today} on duty: ${shiftLabel(crewOf(today))} (and those on both)`)}</p>
           <div className="ofc-wages">
-            <span>{t3(`今天這班的人事成本 ${money(wages)}/小時（營業時才計薪）`, `本日の班の人件費 ${money(wages)}/時（営業中のみ）`, `This shift: ${money(wages)}/h while open`)}</span>
+            <span>{t3(`今天這班的人事成本 ${money(wages)}/小時（營業時才計薪）`, `本日の人件費 ${money(wages)}/時（営業中）`, `This shift: ${money(wages)}/h while open`)}</span>
             {/* every open job filled at once, by who's the best value for their pay */}
             <button type="button" className="ofc-hireall" disabled={!pickHires(people, shiftRoles, hired).length}
               onClick={() => { for (const w of pickHires(people, shiftRoles, hired)) onHire(w) }}
