@@ -3,7 +3,7 @@ import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
-import { coolerDoorSound, sizzleBurst } from './restroomSound'
+import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
 import { heard } from '@/scene/sfx'
 import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
@@ -1653,13 +1653,18 @@ function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [num
  * it), the side counter's outer edge squared up with the first's end, joined into an L and given rounded edges.
  */
 const BAR_DEPTH = 0.62
-/** how near someone has to come for a gate to swing open for them (the bar's sizes), and how quickly it swings */
+/** how near someone has to come for a gate to swing open for them (the bar's sizes); how far it opens (rad), how quickly (a rate: about
+ * 0.2 s), and its spring shutting again (a stiffness and damping: back past shut by some 12 degrees, then 4, settled in about half a second) */
 const GATE_NEAR = 0.75
-const GATE_SWING = 4
+const GATE_OPEN = 1.4
+const GATE_PUSH = 14
+const GATE_K = 196
+const GATE_C = 14
+const GATE_AT = new THREE.Vector3()
 /**
  * The swing door across a counter's gate: a leaf of slatted wood as high as the bar, its top capped in the bar's own
  * wood so it reads as the bar run on, hung on brass hinges on the base's end. It stands shut, flush with the bar, and
- * swings in toward the kitchen when one of the staff comes up to it (SERVICE.walkers), shutting again behind them.
+ * swings open away from whoever of the staff comes up to it (SERVICE.walkers, COMMUTERS), springing shut again behind them.
  */
 function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
@@ -1669,6 +1674,9 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
   const G = gate.leaf
   const leaf = useRef<THREE.Group>(null)
   const open = useRef(0)
+  // (its swing: the angle, how fast it's turning, which way it was pushed, whether it's tapped shut yet this time)
+  const swing = useRef({ ang: 0, vel: 0, side: 0, swinging: false, tapped: false })
+  const frame = useRef<THREE.Group>(null)
   const body = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
@@ -1740,11 +1748,43 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up, { once: true })
   }
-  useFrame((_, dt) => {
-    const near = SERVICE.walkers.some((w) => Math.hypot(w.x - middle.x, w.z - middle.z) < GATE_NEAR)
-    open.current = THREE.MathUtils.clamp(open.current + (near ? 1 : -1) * Math.min(dt, 0.1) * GATE_SWING, 0, 1)
-    const k = open.current
-    if (leaf.current) leaf.current.rotation.y = -end * (Math.PI / 2) * k * k * (3 - 2 * k)
+  useFrame((_, dt0) => {
+    const dt = Math.min(dt0, 0.05)
+    // (whoever's walking by it: the servers (and the owner serving), and the staff walking out at the day's end or in at its start
+    // (commuteWalk's COMMUTERS, the world's, brought into the bar's frame); the nearest, and which side of it they're on)
+    let near: THREE.Vector3 | null = null, best = GATE_NEAR
+    for (const w of SERVICE.walkers) { const d = Math.hypot(w.x - middle.x, w.z - middle.z); if (d < best) { best = d; near = w } }
+    const par = frame.current?.parent
+    if (par && COMMUTERS.size) for (const { p } of COMMUTERS.values()) {
+      const w = par.worldToLocal(GATE_AT.copy(p))
+      const d = Math.hypot(w.x - middle.x, w.z - middle.z)
+      if (d < best) { best = d; near = w.clone() }
+    }
+    const g = swing.current
+    if (near) {
+      // (pushed open away from them: in toward the kitchen from the floor, out toward the floor from the kitchen; the way it was going
+      // kept while it's open (someone just behind them keeps it open))
+      if (g.side === 0 || Math.abs(g.ang) < 0.08) {
+        const side = (near.x - middle.x) * c.lay.x + (near.z - middle.z) * c.lay.z
+        if (g.side === 0 && par) gateSound(par.localToWorld(GATE_AT.copy(middle)), 'push')
+        g.side = side > 0 ? -1 : 1
+      }
+      g.ang += (-end * GATE_OPEN * g.side - g.ang) * Math.min(1, dt * GATE_PUSH)
+      g.vel = 0
+      g.swinging = true
+    } else if (g.swinging) {
+      // (let go: sprung back shut, past it and back, and still; a tap as it first swings through shut)
+      for (let n = 0; n < 4; n++) {
+        const h = dt / 4
+        g.vel += (-GATE_K * g.ang - GATE_C * g.vel) * h
+        const before = g.ang
+        g.ang += g.vel * h
+        if (before !== 0 && Math.sign(before) !== Math.sign(g.ang) && !g.tapped) { g.tapped = true; if (par) gateSound(par.localToWorld(GATE_AT.copy(middle)), 'tap') }
+      }
+      if (Math.abs(g.ang) < 0.002 && Math.abs(g.vel) < 0.02) { g.ang = 0; g.vel = 0; g.swinging = false; g.side = 0; g.tapped = false }
+    }
+    open.current = Math.min(1, Math.abs(g.ang) / GATE_OPEN)
+    if (leaf.current) leaf.current.rotation.y = g.ang
     // (the whole gate where it's been put, the moment it's moved)
     if (body.current) {
       const n = positionOf(`gate${idx}`)
@@ -1753,7 +1793,7 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
   })
   const H = BAR_TOP - 0.02
   return (
-    <group position={c.at} rotation-y={yaw}>
+    <group ref={frame} position={c.at} rotation-y={yaw}>
       <group position={[hinge, 0, 0.08]}>
         {/* the swing door by itself: its own thing, apart from the post and the doorway, which stay where they are; it's this that's moved by hand */}
         <group ref={body} position={positionOf(`gate${idx}`)} onPointerDown={down}

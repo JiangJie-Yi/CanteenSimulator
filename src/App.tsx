@@ -102,6 +102,8 @@ import { ViewToast } from '@/ui/ViewToast'
 /** closing up, by the game's minutes past closing time: those still in hurried out (half an hour), the shop shut whoever's left (an hour) */
 const CLOSE_HURRY = 30
 const CLOSE_HARD = 60
+/** where the clock's put when the day's sheet is put away: the next day's getting ready, half an hour before opening (16:30) */
+const PREP_AT = 16 * 60
 const gameMinutes = () => getClock().day * 1440 + getClock().minute
 import { tl } from '@/data/i18n'
 import { skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
@@ -1291,6 +1293,20 @@ export default function App() {
   const [blessed, setBlessed] = useState(false)
   // closing: shut by the owner, the last customers finishing; leaving: they've gone and the staff are walking out
   const [closing, setClosing] = useState(false)
+  /**
+   * The day's sheet put away (收工, or its own countdown): the clock on to the next day's getting ready (PREP_AT, half an hour before opening),
+   * not the hours of the morning sat through (the owner's); the staff rested those hours as they would have, no more than a run of days lets
+   * them (game/shifts' floor: the owner keeps that rule)
+   */
+  const dayDone = () => {
+    setDaySum(null)
+    const c = getClock()
+    if (c.minute >= PREP_AT) return
+    const hours = (PREP_AT - c.minute) / 60
+    setClock({ day: c.day, minute: PREP_AT })
+    setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, st]) =>
+      [id, { ...st, fatigue: Math.max(Math.min(st.fatigue, st.floor ?? 0), st.fatigue - restPerHour * hours) }]))])))
+  }
   /** when closing up began (the game's minutes from day 0: gameMinutes) */
   const closingAt = useRef(0)
   useEffect(() => { if (closing) closingAt.current = gameMinutes(); else SHOP.hurry = false }, [closing])
@@ -3202,7 +3218,7 @@ export default function App() {
         {speed > 1 ? '×2' : <Glyph id="fast" size="1.15em" />}
       </button>
       <Bgm />
-      {daySum && <DaySummary s={daySum.s} day={daySum.day} lang={lang} onClose={() => setDaySum(null)}
+      {daySum && <DaySummary s={daySum.s} day={daySum.day} lang={lang} onClose={dayDone}
         nameOf={(key) => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === key); return e ? nameIn(lang, e) : key }} />}
       <HoverTip hidden={editOn} />
       <RegisterManual lang={lang} />

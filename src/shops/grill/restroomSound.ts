@@ -429,3 +429,25 @@ export function plateClink(at: THREE.Vector3) {
   const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500
   k.connect(hp).connect(o); k.start(t)
 }
+
+/** the bar's swing door: pushed open, a short dry creak of its hinges and a soft knock of the hand on the wood (`push`); swung back shut
+ * past its frame, a light wooden tap (`tap`) */
+export function gateSound(at: THREE.Vector3, kind: 'push' | 'tap') {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate(`swing${kind}${at.x.toFixed(1)}`)) return
+  const t = a.currentTime, o = out(a, (kind === 'push' ? 0.16 : 0.12) * near, pan)
+  if (kind === 'push') {
+    // (the hinge: a little rasp drawn up in pitch as it turns)
+    const r = noise(a, 0.16, (x) => Math.sin(Math.PI * x) * (0.6 + 0.4 * Math.sin(x * 60)), 0.2)
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 6
+    bp.frequency.setValueAtTime(620, t); bp.frequency.linearRampToValueAtTime(980, t + 0.16)
+    const rg = a.createGain(); rg.gain.value = 0.7
+    r.connect(bp).connect(rg).connect(o); r.start(t)
+  }
+  // (the knock: wood, hollow and low)
+  const k = noise(a, 0.03, (x) => (1 - x) ** 2, 0.15)
+  const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = kind === 'push' ? 900 : 1300
+  k.connect(lp).connect(o); k.start(t)
+  ping(a, t, kind === 'push' ? 180 : 240, 0.25, 0.08, o)
+}
