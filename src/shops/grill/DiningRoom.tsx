@@ -1746,38 +1746,58 @@ function WallPiece({ z0, z1, y0, y1, plaster = false }: { z0: number; z1: number
     </mesh>
   )
 }
-/** words fitted to a width: as big as `size` but never wider than `w` (measured in their own face), centred at x, y */
-function fitText(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, size: number, ink: string, face = 'sans-serif', weight = 'bold', spacing = 0) {
+/** the restroom's plaque (the owner's, 2026-11-09: a bright figure, not a dark character; no black rim): a warm walnut board, softly
+ * bevelled, a brass nail at either end, and in its middle a round little figure in one bright colour, a man in a haori with short hair
+ * (lapis blue) or a woman in kimono with her hair up (sakura pink); `glow`: the figure alone, white on black, for it to shine a little in the
+ * dark (its emissive map) */
+const WC_SIGN_MADE = new Map<string, THREE.Texture | null>()
+const WC_ICON = { m: '#38bdf8', f: '#fb7185' }
+function wcFigure(g: CanvasRenderingContext2D, who: 'm' | 'f', x: number, y: number, fill: string) {
   g.save()
-  g.font = `${weight} ${size}px ${face}`
-  const width = g.measureText(text).width + spacing * Math.max(0, [...text].length - 1)
-  const k = Math.min(1, w / Math.max(1, width))
-  g.font = `${weight} ${size * k}px ${face}`
-  ;(g as unknown as { letterSpacing: string }).letterSpacing = `${spacing * k}px`
-  g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText(text, x + (spacing * k) / 2, y)
+  g.translate(x, y)
+  g.fillStyle = fill
+  const round = (path: Path2D) => g.fill(path)
+  if (who === 'm') {
+    // (head, with short hair a cap over it)
+    g.beginPath(); g.arc(0, -52, 19, 0, Math.PI * 2); g.fill()
+    // (the haori: square shoulders, wide sleeves falling to the hands, the body straight down to the knees)
+    const p = new Path2D()
+    p.moveTo(-14, -30); p.lineTo(14, -30)
+    p.quadraticCurveTo(38, -30, 42, -12); p.lineTo(44, 14); p.quadraticCurveTo(44, 20, 37, 20); p.lineTo(24, 20)
+    p.lineTo(22, 34); p.lineTo(-22, 34); p.lineTo(-24, 20); p.lineTo(-37, 20); p.quadraticCurveTo(-44, 20, -44, 14)
+    p.lineTo(-42, -12); p.quadraticCurveTo(-38, -30, -14, -30); p.closePath()
+    round(p)
+    // (the legs, two, a gap between)
+    const l = new Path2D(); l.roundRect(-19, 32, 15, 40, 5); l.roundRect(4, 32, 15, 40, 5); round(l)
+  } else {
+    // (head and her hair up in a bun)
+    g.beginPath(); g.arc(0, -52, 18, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.arc(0, -74, 10, 0, Math.PI * 2); g.fill()
+    // (the kimono: narrow shoulders, sleeves hanging, drawn in at the obi, then down and out a little to its hem)
+    const p = new Path2D()
+    p.moveTo(-12, -31); p.lineTo(12, -31)
+    p.quadraticCurveTo(34, -30, 38, -10); p.lineTo(40, 10); p.quadraticCurveTo(40, 16, 33, 16); p.lineTo(20, 16)
+    p.lineTo(18, 4)
+    p.quadraticCurveTo(24, 40, 32, 70); p.quadraticCurveTo(0, 76, -32, 70); p.quadraticCurveTo(-24, 40, -18, 4)
+    p.lineTo(-20, 16); p.lineTo(-33, 16); p.quadraticCurveTo(-40, 16, -40, 10); p.lineTo(-38, -10); p.quadraticCurveTo(-34, -30, -12, -31); p.closePath()
+    round(p)
+  }
   g.restore()
 }
-/**
- * The plaque over each toilet's door (the owner's: a carved wooden board, as at an old inn or izakaya, not printed plastic; 2026-11-09): a
- * thick board of dark walnut, its grain along it, a bevelled edge catching the light, a brass nail at each end; carved into it (sunk, the
- * hollow's upper edge in shadow, its lower one catching the light) the room's crest on the left (梅鉢 the men's, 桜 the women's, as on their
- * noren) and the big character brushed (男, 女; in English MEN, WOMEN), the hollows filled with deep indigo or cinnabar. Made once for each
- * room and language.
- */
-const WC_SIGN_MADE = new Map<string, THREE.Texture | null>()
-function wcSign(who: 'm' | 'f', lang: string) {
-  const key = `${who}|${lang}`
+function wcSign(who: 'm' | 'f', glow = false) {
+  const key = `${who}|${glow}`
   if (!WC_SIGN_MADE.has(key)) WC_SIGN_MADE.set(key, canvasTex(320, 192, (g) => {
-    const ink = who === 'm' ? '#1a283e' : '#8c2626'
-    const en = lang.startsWith('en')
     g.save()
-    // (the board: its edge darker, bevelled, the face inside it)
-    const rim = new Path2D(); rim.roundRect(2, 2, 316, 188, 10)
-    g.fillStyle = '#24150c'; g.fill(rim)
-    const face = new Path2D(); face.roundRect(10, 10, 300, 172, 6)
-    const wood = g.createLinearGradient(0, 10, 0, 182)
-    wood.addColorStop(0, '#5e3c24'); wood.addColorStop(0.5, '#6e4a2e'); wood.addColorStop(1, '#53331e')
+    if (glow) {
+      g.fillStyle = '#000'; g.fillRect(0, 0, 320, 192)
+      wcFigure(g, who, 160, 100, '#ffffff')
+      g.restore()
+      return
+    }
+    // (the board: walnut, lighter at its middle, its edge rounded off (a pale bevel above, a soft shade below), no dark rim)
+    const face = new Path2D(); face.roundRect(2, 2, 316, 188, 12)
+    const wood = g.createLinearGradient(0, 0, 0, 192)
+    wood.addColorStop(0, '#7a5434'); wood.addColorStop(0.5, '#8a6240'); wood.addColorStop(1, '#6c4a2e')
     g.fillStyle = wood; g.fill(face)
     g.save(); g.clip(face)
     // (the grain: long flowing lines along it, deeper and paler, a knot's swirl)
@@ -1785,36 +1805,28 @@ function wcSign(who: 'm' | 'f', lang: string) {
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
     for (let k = 0; k < 26; k++) {
       const y0 = 8 + k * 7 + rnd() * 3
-      g.strokeStyle = rnd() < 0.5 ? 'rgba(30,16,6,0.32)' : 'rgba(150,104,64,0.22)'; g.lineWidth = 0.8 + rnd() * 1.4
+      g.strokeStyle = rnd() < 0.5 ? 'rgba(52,30,14,0.26)' : 'rgba(176,128,84,0.22)'; g.lineWidth = 0.8 + rnd() * 1.4
       g.beginPath()
       for (let x = 0; x <= 320; x += 6) { const y = y0 + Math.sin(x / (40 + k * 3) + k) * 3 + Math.sin(x / 13 + k * 2) * 0.8; if (x === 0) g.moveTo(x, y); else g.lineTo(x, y) }
       g.stroke()
     }
-    g.strokeStyle = 'rgba(30,16,6,0.3)'; g.lineWidth = 1
-    for (let r = 4; r < 22; r += 4) { g.beginPath(); g.ellipse(250, 160, r * 1.8, r * 0.6, 0.05, 0, Math.PI * 2); g.stroke() }
+    g.strokeStyle = 'rgba(52,30,14,0.24)'; g.lineWidth = 1
+    for (let r = 4; r < 22; r += 4) { g.beginPath(); g.ellipse(258, 162, r * 1.8, r * 0.6, 0.05, 0, Math.PI * 2); g.stroke() }
+    // (the bevel, soft: light falling over its top edge, shade under its foot)
+    const top = g.createLinearGradient(0, 0, 0, 16); top.addColorStop(0, 'rgba(236,200,150,0.5)'); top.addColorStop(1, 'rgba(236,200,150,0)')
+    g.fillStyle = top; g.fillRect(0, 0, 320, 16)
+    const foot = g.createLinearGradient(0, 176, 0, 192); foot.addColorStop(0, 'rgba(40,22,10,0)'); foot.addColorStop(1, 'rgba(40,22,10,0.4)')
+    g.fillStyle = foot; g.fillRect(0, 176, 320, 16)
     g.restore()
-    // (the bevel: a fine pale line along its top and left, dark along its foot and right)
-    g.strokeStyle = 'rgba(214,170,120,0.55)'; g.lineWidth = 2
-    g.beginPath(); g.moveTo(12, 178); g.lineTo(12, 12); g.lineTo(308, 12); g.stroke()
-    g.strokeStyle = 'rgba(10,5,2,0.6)'
-    g.beginPath(); g.moveTo(308, 12); g.lineTo(308, 180); g.lineTo(12, 180); g.stroke()
     // (a brass nail at either end)
-    for (const x of [26, 294]) {
+    for (const x of [24, 296]) {
       const n = g.createRadialGradient(x - 2, 94, 1, x, 96, 7)
       n.addColorStop(0, '#f6dc94'); n.addColorStop(0.6, '#b98a2e'); n.addColorStop(1, '#5a3a10')
       g.fillStyle = n; g.beginPath(); g.arc(x, 96, 6, 0, Math.PI * 2); g.fill()
     }
-    // (carved: the hollow's lit lower edge, its shadowed upper one, then the colour filling it)
-    const carve = (draw: (fill: string) => void) => {
-      g.save(); g.translate(1.5, 2); draw('rgba(232,190,140,0.45)'); g.restore()
-      g.save(); g.translate(-1.5, -2); draw('rgba(8,4,2,0.8)'); g.restore()
-      draw(ink)
-    }
-    carve((fill) => crest(g, who === 'm' ? 'ume' : 'sakura', 92, 96, 46, fill, fill))
-    carve((fill) => {
-      if (en) fitText(g, who === 'm' ? 'MEN' : 'WOMEN', 214, 98, 150, 64, fill, SIGN_FONT, 'bold', 2)
-      else brushText(g, who === 'm' ? '男' : '女', 214, 96, 118, { fill })
-    })
+    // (the figure: a faint shade under it, then the bright colour)
+    g.save(); g.translate(0, 2.5); g.globalAlpha = 0.35; wcFigure(g, who, 160, 100, '#2a170a'); g.restore()
+    wcFigure(g, who, 160, 100, WC_ICON[who])
     g.restore()
   }))
   return WC_SIGN_MADE.get(key) ?? null
@@ -3264,7 +3276,6 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
   const W = WC_W, H = WC_H
   const door = useWcDoor()
   const frame = useMemo(() => door.frame(), [door])
-  const lang = useDocLang()
   // (the noren's two panels, each showing its half of the one picture: the slit between them cuts the crest in half)
   const noren = useMemo(() => [-1, 1].map((sd) => {
     const w = (WC_NOREN_W - NOREN_SLIT) / 2
@@ -3304,7 +3315,7 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
       {/* the plaque over it, up on the wall clear of the noren's top */}
       <mesh position={[-0.075, NOREN_TOP + 0.13, 0]} rotation-y={-Math.PI / 2}>
         <planeGeometry args={[0.4, 0.24]} />
-        <meshToonMaterial color="#ffffff" map={wcSign(who, lang)} />
+        <meshToonMaterial color="#ffffff" map={wcSign(who)} emissive={WC_ICON[who]} emissiveMap={wcSign(who, true)} emissiveIntensity={0.2} />
       </mesh>
     </group>
   )
