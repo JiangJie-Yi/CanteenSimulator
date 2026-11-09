@@ -3223,6 +3223,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const vis = hidden ? 'hidden' : ''
         if (tag.style.visibility !== vis) tag.style.visibility = vis
       }
+      // (turned toward the way they're to face a frame at a time: each step above sets it outright (along their way, to their seat, to the
+      // till), and they spun round at every corner, up to 180° in a frame. A facing set this frame is the one to turn to; one left alone,
+      // the last such is still)
+      if (g) {
+        const u = g.userData as { shown?: number; want?: number }
+        if (u.shown === undefined || u.want === undefined) u.shown = u.want = g.rotation.y
+        else {
+          if (g.rotation.y !== u.shown) u.want = g.rotation.y
+          u.shown = turnToward(u.shown, u.want, dt)
+          g.rotation.y = u.shown
+        }
+      }
       // (down a step, standing in the genkan)
       if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
     }
