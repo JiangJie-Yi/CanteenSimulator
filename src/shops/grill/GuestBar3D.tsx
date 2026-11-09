@@ -3434,10 +3434,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const d = Math.min(pl.len, pl.t * SERVER_SPEED)
         const { p, dir } = alongPath(pl.path, d)
         pl.pos.copy(p)
-        if (dir.x || dir.z) pl.yaw = Math.atan2(dir.x, dir.z)
+        // (turned to the way quickly but not at once: setting off from their place, they snapped round from how they stood there)
+        if (dir.x || dir.z) { const want = Math.atan2(dir.x, dir.z); pl.yaw += Math.atan2(Math.sin(want - pl.yaw), Math.cos(want - pl.yaw)) * Math.min(1, step * 12) }
         if (d >= pl.len) { pl.t = 0; then() }
       }
-      const away = (on: boolean) => { if (plater) PLATER_OUT.id = on ? plater.id : null; else OWNER_OUT.on = on }
+      // (going: stood in for from just how the one at their place stands)
+      const away = (on: boolean) => {
+        if (on) { const y = yawOfCrew(); if (y !== null) pl.yaw = y }
+        if (plater) PLATER_OUT.id = on ? plater.id : null; else OWNER_OUT.on = on
+      }
       // (worn out, at half pace (the owner's))
       pl.t += step * paceOfStaff(plater?.id)
       // (the rice pot cooking on its stove, by the game's clock; cooked, said in the kitchen's log (the owner's))
@@ -4436,7 +4441,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (was && was !== o) KITCHEN_FOLK.delete(was)
           platerObj.current = o
           if (o) KITCHEN_FOLK.add(o)
-        }} scale={STAFF_SCALE} visible={false}>
+        }} name="plater-walker" scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.17} />
           {plater ? <StaffFigure id={plater.id} role={plater.role} look={plater.look} moving={platerMoving} /> : <OwnerWalker moving={platerMoving} />}
         </group>
