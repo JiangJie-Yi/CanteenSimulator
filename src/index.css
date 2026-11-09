@@ -7913,19 +7913,6 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
   animation: staff-badge-bob 1.8s ease-in-out infinite;
 }
 .staff-badge .game-icon:first-child { color: #d6ecff; }
-.staff-badge.is-buff {
-  --tier-a: #2f7d3f;
-  --tier-b: #1d5129;
-  --tier-ink: #e6ffe9;
-  --tier-glow: rgb(80 200 110 / 0.45);
-  border-color: rgb(255 255 255 / 0.3);
-  background: linear-gradient(180deg, var(--tier-a), var(--tier-b));
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 0 8px var(--tier-glow);
-  color: var(--tier-ink);
-  animation-direction: reverse;
-}
-.staff-badge.is-buff { --icon-cut: var(--tier-b); }
-.staff-badge.is-buff .game-icon:first-child { color: #b6ffc8; }
 @keyframes staff-badge-bob {
   0%, 100% { transform: translateY(0); opacity: 1; }
   50% { transform: translateY(2px); opacity: 0.85; }

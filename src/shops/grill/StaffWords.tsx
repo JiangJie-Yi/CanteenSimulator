@@ -5,9 +5,8 @@ import { memo, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { LATE, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED, type StaffWord } from '@/game/shopState'
-import { SKILLS, TIERS, type SkillId } from '@/data/staff'
-import { Glyph, SkillIcon, StatusIcon } from '@/ui/GameIcons'
+import { SPEAKERS, STAFF_TALK, STAFF_TIRED, type StaffWord } from '@/game/shopState'
+import { Glyph } from '@/ui/GameIcons'
 import { setTip } from '@/scene/hoverTip'
 
 const STYLE = { pointerEvents: 'none' } as const
@@ -125,23 +124,20 @@ const TIRED_SAYS: Record<string, [string, string, string]> = {
   zh: ['疲勞中', '疲勞', '能力減半、動作變慢・可安排休息或換班'], ja: ['疲労中', '疲労', '能力半減・動きが遅い・休憩かシフト交代を'],
   en: ['Tired', 'Worn out', 'Half as able, half as quick; give them a rest or a shift off'],
 }
-type Marks = { tired: boolean; buffs: SkillId[] }
-/** a skill working just now by the time of night (only those that have a time: before midnight, or in the deep night) */
-const timedNow = (k: SkillId) => { const sk = SKILLS[k]; return LATE.on ? !!(sk.late || sk.latePace) : !!sk.early }
-const marksOf = (id: string): Marks => ({ tired: STAFF_TIRED.has(id), buffs: (STAFF_SKILLS.get(id) ?? []).filter(timedNow) })
+type Marks = { tired: boolean }
+const marksOf = (id: string): Marks => ({ tired: STAFF_TIRED.has(id) })
 
 /**
  * Beside each of the staff, what's on them (the owner's): worn out (data/staff's isTired: game/shopState's STAFF_TIRED, App keeps it), a
- * little see-through deep red badge, a bead of sweat and 疲勞中; a special skill of theirs that's working just now by the time of night (the night owl in the deep
- * night, the early bird before midnight), its icon in its quality's colour, ▲. Each says what it means when pointed at; they follow them
- * about, gone as it passes.
+ * little see-through deep red badge, a bead of sweat and 疲勞中, saying what it means when pointed at; it follows them about, gone as it
+ * passes. (No badge for a special skill working by the time of night: the owner's, 2026-11-09, a ▲ and its icon were up over them.)
  */
 export const TiredBadges = memo(function TiredBadges() {
   const [on, setOn] = useState<{ id: string; m: Marks }[]>([])
   useEffect(() => {
     const t = window.setInterval(() => {
-      const next = [...new Set([...STAFF_TIRED, ...STAFF_SKILLS.keys()])].map((id) => ({ id, m: marksOf(id) })).filter((x) => x.m.tired || x.m.buffs.length)
-      setOn((was) => (was.length === next.length && was.every((x, i) => x.id === next[i].id && x.m.tired === next[i].m.tired && x.m.buffs.join() === next[i].m.buffs.join()) ? was : next))
+      const next = [...STAFF_TIRED].map((id) => ({ id, m: marksOf(id) }))
+      setOn((was) => (was.length === next.length && was.every((x, i) => x.id === next[i].id) ? was : next))
     }, 500)
     return () => window.clearInterval(t)
   }, [])
@@ -175,15 +171,10 @@ function TiredBadge({ id, marks }: { id: string; marks: Marks }) {
     const [mark, name, says] = TIRED_SAYS[lang] ?? TIRED_SAYS.zh
     return <span key="tired" className="staff-badge is-tired" aria-label={`${name}：${says}`} {...tipOn(name, says)}><Glyph id="drop" size={12} />{mark}</span>
   }
-  const buff = (k: SkillId) => {
-    const sk = SKILLS[k], tier = TIERS[sk.tier]
-    const [name, says, q] = lang === 'ja' ? [sk.ja, sk.jaSays, tier.ja] : lang === 'en' ? [sk.en, sk.enSays, tier.en] : [sk.zh, sk.zhSays, tier.zh]
-    return <span key={k} className={`staff-badge is-buff is-${sk.tier}`} aria-label={`${name}：${says}`} {...tipOn(`${q}・${name}`, says)}><StatusIcon up /><SkillIcon id={k} size={14} /></span>
-  }
   return (
     <group ref={g} visible={false}>
       <Html center zIndexRange={BADGE_Z}>
-        <span className="staff-badges" ref={el}>{marks.tired && tired()}{marks.buffs.map(buff)}</span>
+        <span className="staff-badges" ref={el}>{marks.tired && tired()}</span>
       </Html>
     </group>
   )
