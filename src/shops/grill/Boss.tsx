@@ -429,7 +429,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       BOSS_TASTE.verdict = null
       chewSaid.current = false
     }
-    let act: Phase['act'] | 'taste' | 'drink' | 'hold' = ph.act
+    let act: Phase['act'] | 'taste' | 'drink' | 'hold' | 'dab' = ph.act
     let speed = 0
     // (asked to taste: down his aisle to where it passes nearest the bowl, turned to it, and there he eats it; then back to his round)
     // (or handed a drink: the same, and he drinks it)
@@ -497,6 +497,10 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       const f = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.face))
       turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt * 10)
       act = 'hold'
+    } else if (grill && performance.now() < OWNER_GRILL.dabUntil) {
+      // (seasoning something on the fire: turned to it, a hand out over it)
+      turnTo(s, 0, dt * 6)
+      act = 'dab'
     } else if (grill && performance.now() < OWNER_GRILL.fanUntil) {
       // (the coals fanned a moment, half way through something salted)
       turnTo(s, 0, dt * 5)
@@ -561,7 +565,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // (and Overcooked's squash and stretch, as he starts to say something or his face changes (BOSS_FACE.at))
     const [jw, jh] = jelly((performance.now() - BOSS_FACE.at) / 1000)
     b.scale.set((2 - squash) * jw, squash * jh, (2 - squash) * jw)
-    const lean = moving ? (run ? 0.26 : 0.09) : act === 'hold' ? OWNER_GRILL.lean : act === 'fan' ? 0.06 : 0
+    const lean = moving ? (run ? 0.26 : 0.09) : act === 'hold' ? OWNER_GRILL.lean : act === 'fan' ? 0.06 : act === 'dab' ? 0.12 : 0
     b.rotation.x += (lean - b.rotation.x) * Math.min(1, dt * 8)
     b.rotation.z = moving ? Math.sin(step * Math.PI) * (run ? 0.13 : 0.09) : Math.sin(T * 0.7) * 0.025
     // (a little hop of joy as he waves)
@@ -582,6 +586,14 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     } else if (act === 'hold') {
       // (both hands out before him: low and forward reaching for it, up at his chest holding it)
       if (OWNER_GRILL.hold) { R.set(-0.07, 0.16, 0.3); L.set(0.07, 0.16, 0.3) } else { R.set(-0.05, 0.08, 0.34); L.set(0.06, 0.08, 0.3) }
+    } else if (act === 'dab') {
+      // (the right hand out over the fire: the fingers rubbing salt off in quick little flicks, a brush drawn to and fro, a spoon tapped;
+      // the left held at his chest)
+      const k = OWNER_GRILL.dab
+      if (k === 'pinch') R.set(-0.05, 0.2 + Math.max(0, Math.sin(T * 22)) * 0.018, 0.34)
+      else if (k === 'brush') R.set(-0.05 + Math.sin(T * 9) * 0.06, 0.12, 0.36)
+      else R.set(-0.05, 0.17 + Math.abs(Math.sin(T * 12)) * 0.025, 0.34)
+      L.set(0.08, 0.12, 0.16)
     } else if (act === 'fan') {
       R.set(-0.06, 0.18, 0.3)
       L.set(0.08, 0.06 + Math.sin(T * 1.6) * 0.01, 0.2)
@@ -670,7 +682,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const talking = !!sayRef.current
     const now = performance.now()
     const gape = talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2
-    let face: CrewFace = act === 'fan' || act === 'tongs' || act === 'hold' ? 'focused' : act === 'taste' ? (Math.sin((T - BOSS_TASTE.since) * 7) > 0.3 ? 'drink' : 'happy')
+    let face: CrewFace = act === 'fan' || act === 'tongs' || act === 'hold' || act === 'dab' ? 'focused' : act === 'taste' ? (Math.sin((T - BOSS_TASTE.since) * 7) > 0.3 ? 'drink' : 'happy')
       : act === 'drink' ? ((T - BOSS_DRINK.since) % 1.4 < 1 ? 'drink' : 'talk') : now - RUSH.at < 2500 ? 'panic' : now - BOSS_FX.joyAt < 2000 ? 'proud'
       : act === 'wave' ? 'happy' : 'idle'
     if (BOSS_FACE.face && now < BOSS_FACE.until) face = BOSS_FACE.face

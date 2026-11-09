@@ -721,9 +721,11 @@ export const RICE: { tub: number; kama: Kama; washing: boolean } = { tub: TUB_FU
  * The owner at the fire while the shop's open (the head chef, 大廚: the owner's three-way kitchen): Roasting says what he's carrying between
  * the board, the fire and the plating place (`on`), where he stands to it and what he faces (the world), how far he leans and whether it's in
  * his hands, and when he's to fan the coals (`fanUntil`, performance.now()); Boss.tsx stands him so and says where his hands are (`hand`,
- * the world) and when he was last there to do it (`seenAt`: away tasting or drinking, the food goes across by itself as it did).
+ * the world) and when he was last there to do it (`seenAt`: away tasting or drinking, the food goes across by itself as it did); and when he's
+ * seasoning something on the fire (`dabUntil`), how: a pinch of salt rubbed over it, a glaze brushed on, a powder tapped off a spoon (`dab`).
  */
-export const OWNER_GRILL = { on: false, stand: new THREE.Vector3(), face: new THREE.Vector3(), lean: 0, hold: false, hand: new THREE.Vector3(), seenAt: -1e9, fanUntil: 0 }
+export const OWNER_GRILL = { on: false, stand: new THREE.Vector3(), face: new THREE.Vector3(), lean: 0, hold: false, hand: new THREE.Vector3(), seenAt: -1e9, fanUntil: 0,
+  dabUntil: 0, dab: 'pinch' as 'pinch' | 'brush' | 'spoon' }
 /** the second cook (二廚), fetching the orders out of the stores and skewering them at the board (Roasting's CrewWalk): who he is, and
  * whether he's on a round now (with no third cook he plates and keeps the fire too: GuestBar3D sends him only between rounds) */
 export const FETCHER: { id: string | null; busy: boolean } = { id: null, busy: false }

@@ -4662,6 +4662,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (heard as by hand: its own sound, and over the coals the fire's sizzle (it was silent, the owner's))
       seasonSound(k)
       if (!p.collected && !p.staged) sizzleBurst(p.node.getWorldPosition(SIZZLE_AT), k === 'salt' ? 0.7 : 1)
+      // (his hand over it as it goes on, the way it goes on (the owner's: it went on with nobody doing it): salt rubbed off his fingers, a
+      // glaze brushed, a powder tapped off a spoon; not while it's in his hands to be carried)
+      if (handLive && !p.collected && !p.staged && CHEF_CARRY.key === null) {
+        OWNER_GRILL.dabUntil = performance.now() + 900
+        OWNER_GRILL.dab = k === 'salt' ? 'pinch' : k === 'soy' || k === 'milk' || k === 'miso' ? 'brush' : 'spoon'
+      }
       say(L().seasoned(nameOfP(p), k))
     }
     if (ready && !busy()) {
