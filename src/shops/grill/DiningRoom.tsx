@@ -1629,8 +1629,6 @@ function RoundShoji() {
           .replace('void main() {', `void main() {\n  if (vWin.y * vWin.y + vWin.z * vWin.z > ${(R * R).toFixed(5)}${lowerOnly ? ' || vWin.y > 0.0' : ''}) discard;`)
       }
       m.customProgramCacheKey = () => (lowerOnly ? 'round-cut-low' : 'round-cut')
-      // (no halo round it when pointed at: a hull of it wouldn't be cut to the round, and would show the halves slid into the wall)
-      m.userData.noGlowHull = true
       return m
     }
     return {
@@ -5719,6 +5717,14 @@ function HoverLift({ active, onDone, children }: { active: boolean; onDone: () =
   const k = useRef(0)
   const done = useRef(onDone)
   done.current = onDone
+  // (and lit while it's pointed at, as everything that can be picked up is (the owner's, 2026-11-10: the drinks in the fridges only rose,
+  // they didn't light up): the glow round its outline (scene/hoverGlow), put out as the pointer leaves it)
+  useEffect(() => {
+    const o = g.current
+    if (!active || !o) return
+    glowOnly(o)
+    return () => glowLeave(o)
+  }, [active])
   useFrame((_, dt) => {
     k.current += ((active ? 1 : 0) - k.current) * Math.min(1, dt * 14)
     const o = g.current
