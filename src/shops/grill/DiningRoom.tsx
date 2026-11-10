@@ -2,7 +2,8 @@ import { blessingChime, pourSake, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
-import { bottleClink, coolerDoorSound, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
+import { bottleClink, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
+import { landingOf } from '@/game/spills'
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { SWITCH_SPOT } from '@/game/shopState'
@@ -21,7 +22,7 @@ import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
 import { cartonMaterials } from './drinkCartons'
-import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, type Counter, type DrinkId } from './bar'
+import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -5433,6 +5434,8 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     }
     // (what's out: on the floor before the fridge, or set down on a table, upright, where it was put)
     const host = root.current
+    // (those broken as they landed this frame: taken out of what's out once it's gone through them)
+    const broken: number[] = []
     if (host) {
       host.updateWorldMatrix(true, false)
       FRIDGE_STOCK.out.forEach((o, i) => {
@@ -5449,6 +5452,16 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
             o.fy += o.vy * Math.min(dt, 0.05)
             if (o.fy <= 0) {
               o.fy = 0
+              // (what landing does to it (game/spills), the first time it lands from this fall, from as high as it fell (the fridge's own
+              // frame is in metres): a glass bottle from high enough breaks, its shards and its drink left on the floor where it hit (Spills),
+              // till a server sweeps it up; a can's knocked over and rolls, clanking)
+              if (!o.hit) {
+                o.hit = true
+                const at = host.localToWorld(new THREE.Vector3(o.x + (o.roll ?? 0), 0, o.z))
+                const land = landingOf(KIND_OF[o.id], o.fell ?? 0)
+                if (land === 'shatter') { broken.push(i); breakBottle(o.id, at.setY(floorAt(scene, at)), host.getWorldScale(LIFT_AT).y); return }
+                if (land === 'roll' && !o.tipped) { o.tipped = true; o.tip = 0; o.roll = 0; canClatter(at) }
+              }
               // (landing: a hard fall from high enough can't keep it upright, a tall bottle least of all: it tips over, and rolls)
               if (!o.tipped && o.vy < -2.2 && Math.random() < Math.min(0.95, (o.fell ?? 0) * 0.9 + 0.15)) { o.tipped = true; o.tip = 0; o.roll = 0 }
               if (o.vy < -0.8) o.vy = -o.vy * 0.25
@@ -5480,6 +5493,10 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           }
         }
       })
+    }
+    if (broken.length) {
+      for (const i of broken.sort((a, b) => b - a)) FRIDGE_STOCK.out.splice(i, 1)
+      FRIDGE_STOCK.ver++
     }
     // (what's been taken is put back by the stocker, carried out from the back (GuestBar3D's stocker), not by itself)
   })
@@ -5649,6 +5666,8 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
         if (o && py > 0.03) {
           o.fy = py
           o.vy = 0
+          o.fell = py
+          o.hit = false
           grp.position.set(o.x, py, o.z)
         }
       }
@@ -5752,6 +5771,39 @@ const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.
 const FORM: Partial<Record<DrinkId, DrinkId>> = { darkBeer: 'beer', shochu: 'sake', umeshu: 'sake', blackCoffee: 'coffee', cafeAuLait: 'coffee', yuzuSoda: 'chuhai',
   grapeSoju: 'sake', lacticSoda: 'chuhai' }
 const formOf = (id: DrinkId): DrinkId => FORM[id] ?? id
+/**
+ * The floor's real top under a point (the fridge's own floor, its frame's y = 0, is a centimetre under the boards' top: what was laid there
+ * flat, a spilt drink and its shards, was under the boards): a short ray straight down, against only what's near it (its originals too, if
+ * it's drawn merged: StaticBatch), not the figures nor the drinks; the highest top found within a few centimetres of it, or its own height
+ */
+function floorAt(scene: THREE.Object3D, p: THREE.Vector3) {
+  const near: THREE.Object3D[] = [], s = new THREE.Sphere()
+  scene.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || !m.geometry) return
+    if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere()
+    s.copy(m.geometry.boundingSphere!).applyMatrix4(m.matrixWorld)
+    if (Math.hypot(s.center.x - p.x, s.center.z - p.z) > s.radius + 0.05 || s.center.y - s.radius > p.y + 0.1) return
+    for (let q: THREE.Object3D | null = m.parent; q; q = q.parent) if (q.name.startsWith('drink-')) return
+    near.push(m)
+  })
+  const rc = new THREE.Raycaster(p.clone().setY(p.y + 0.1), new THREE.Vector3(0, -1, 0), 0, 0.2)
+  const hit = rc.intersectObjects(near, false).find((h) => h.face && h.face.normal.clone().transformDirection(h.object.matrixWorld).y > 0.7)
+  return hit ? hit.point.y : p.y
+}
+/**
+ * A glass bottle broken on the floor (game/spills): out of the stock for good, its shards and its drink left where it hit (bar.ts's SPILLS,
+ * Spills draws them; a server sweeps them up), the crash heard there. `unit`: the scene's units to a metre where it fell (the fridge's frame
+ * is in metres): what's left on the floor is drawn its real size
+ */
+function breakBottle(id: DrinkId, at: THREE.Vector3, unit: number) {
+  const d = DRINKS.find((x) => x.id === id)!
+  const f = formOf(id)
+  const glass = f === 'beer' ? (id === 'darkBeer' ? '#4a2c12' : '#7a4a1c') : id === 'ramune' ? '#a8dcea' : soju(id) ? '#4f9a58' : '#eef4f2'
+  const clear = id === 'milk' ? 0 : id === 'darkBeer' ? 0.15 : f === 'beer' ? 0.35 : id === 'umeshu' ? 0.4 : 0.8
+  SPILLS.list.push({ key: SPILLS.next++, at: [at.x, at.y, at.z], unit, drink: d.color, clear, glass, seed: Math.random() * 1000, t0: performance.now(), by: null, left: 1 })
+  glassShatter(at)
+}
 /** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */
 /** (`wet`: out of the fridge, misted over with beads of condensation, a few run down) */
 export const DrinkBottle = memo(DrinkBottleImpl)
@@ -5795,19 +5847,23 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
   const shaped = f === 'beer' ? 'beer' : f === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'cola' || id === 'greenTea' || id === 'sports' ? 'pet500'
     : id === 'milk' ? 'milk' : id === 'ramune' ? 'ramune' : null
   // (its body's colour: the beer's brown glass, the ramune's aqua, the milk white; a clear bottle the colour of what's in it, paled by the glass)
-  const body = id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#bfe6f0' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : soju(id) ? '#4f9658' : f === 'sake' ? '#e4ece6'
+  const body = id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#86d0e2' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : soju(id) ? '#3f8a4a' : f === 'sake' ? '#e4ece6'
     : `#${new THREE.Color(d.color).lerp(new THREE.Color('#ffffff'), 0.25).getHexString()}`
   return (
     <group scale={DRINK_SCALE[id]}>
       <group rotation-y={-Math.PI / 2}>
         {kind === 'can' && id !== 'cola' && id !== 'greenTea' ? <>
           <mesh geometry={shadedLabel(LITE_GEO.canLabel, id)} position-y={0.045} material={SHELF_LABEL} />
-          <mesh geometry={shaded(LITE_GEO.canTop, '#c4c8cc')} position-y={0.089} material={SHELF_PARTS} />
+          <mesh geometry={LITE_CAN_LID} material={SHELF_METAL} />
         </> : kind === 'small' ? <>
           <mesh geometry={shadedLabel(BOTTLE_GEO.small, id)} position-y={0.036} material={SHELF_LABEL} />
           <mesh geometry={shaded(BOTTLE_GEO.smallTop, d.cap)} position-y={0.074} material={SHELF_PARTS} />
         </> : shaped && <>
-          <mesh geometry={shaded(LITE_GEO[shaped].body, body)} material={SHELF_PARTS} />
+          {/* (the drink in it seen through its glass (the owner's: they were solid plastic colours), the neck above it only glass: the drink
+              first, so the glass is laid over it; the ramune's marble in its neck) */}
+          <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />
+          <mesh geometry={shadedGlass(LITE_GEO[shaped].body, body, glassAlpha(id))} material={SHELF_GLASS} />
+          {shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
           <mesh geometry={shadedLabel(LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
           <mesh geometry={shaded(LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
         </>}
@@ -5831,7 +5887,7 @@ function DrinkBottleRaw({ id, lit = false, wet = false, level = 1 }: { id: Drink
       formOf(id) === 'beer' ? 0.88 : soju(id) ? 0.7 : kind === 'pet' ? 0.22 : 0.28)
   // (the drink in it: its own colour, a little see-through (the milk not at all))
   const fill = (g: THREE.BufferGeometry) => tinted(g, id === 'ramune' ? '#dff4fa' : id === 'sake' ? '#f6f2de' : d.color,
-    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || soju(id) || id === 'sports' ? 0.45 : 0.85)
+    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || soju(id) || id === 'sports' ? 0.22 : 0.85)
   // (turned so its label's name faces +z)
   if (d.shape === 'can' && id !== 'cola' && id !== 'greenTea') return (
     // a can: printed all over, its silver top and rim
@@ -5839,9 +5895,9 @@ function DrinkBottleRaw({ id, lit = false, wet = false, level = 1 }: { id: Drink
       <mesh geometry={BOTTLE_GEO.can} material={glassMat} />
       <mesh geometry={labelGeo(BOTTLE_GEO.canLabel, id)} position-y={0.046} material={label} />
       {wet && <mesh geometry={BOTTLE_GEO.canLabel} position-y={0.046} material={DEW} scale={[1.012, 1, 1.012]} />}
-      <mesh geometry={BOTTLE_GEO.canTop} position-y={0.0905} material={glassMat} />
-      <mesh geometry={tinted(BOTTLE_GEO.canRim, '#aeb3b9')} position-y={0.09} material={PARTS} />
-      <mesh geometry={tinted(BOTTLE_GEO.canTab, '#d8dce0')} position={[0, 0.0928, 0.002]} material={PARTS} />
+      {/* (its top: the lid pressed down inside its rolled rim, the ring pull lying on it, all aluminium) */}
+      <mesh geometry={CAN_LID} material={glassMat} />
+      <mesh geometry={CAN_TAB} position={[0, 0.0915, 0.0035]} material={glassMat} />
     </group>
   )
   if (d.shape === 'small') return (
@@ -5962,8 +6018,8 @@ const LITE_GEO = {
   ramune: { body: liteBody([[0.012, 0], [0.025, 0.006], [0.025, 0.085], [0.0115, 0.122], [0.0152, 0.146], [0.0098, 0.16], [0.0122, 0.178], [0.004, 0.179]]),
     label: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 8, 1, true), labelY: 0.055, capY: 0.181, capR: 1.0 },
   cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 8),
+  marble: new THREE.IcosahedronGeometry(0.0108, 0),
   canLabel: new THREE.CylinderGeometry(0.0212, 0.0212, 0.088, 8, 1, true),
-  canTop: new THREE.CylinderGeometry(0.0178, 0.0205, 0.006, 8),
 }
 const BOTTLE_GEO = {
   body: new THREE.CylinderGeometry(0.026, 0.028, 0.13, 9),
@@ -5972,9 +6028,6 @@ const BOTTLE_GEO = {
   cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 8),
   can: bottleBody([[0, 0], [0.0168, 0], [0.0198, 0.004], [0.0212, 0.011], [0.0212, 0.078], [0.0202, 0.084], [0.0184, 0.0885], [0.0178, 0.09], [0, 0.09]]),
   canLabel: new THREE.CylinderGeometry(0.0215, 0.0215, 0.07, 8, 1, true),
-  canTop: new THREE.CylinderGeometry(0.0172, 0.0178, 0.004, 8),
-  canTab: new THREE.CylinderGeometry(0.0062, 0.0062, 0.0014, 8),
-  canRim: new THREE.CylinderGeometry(0.0182, 0.0182, 0.0026, 8, 1, true),
   small: new THREE.LatheGeometry([[0, 0], [0.016, 0], [0.017, 0.02], [0.013, 0.036], [0.016, 0.056], [0.015, 0.072], [0, 0.072]]
     .map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 8),
   smallTop: new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 8),
@@ -6305,7 +6358,8 @@ const LABEL_FINISH = (() => {
   for (const d of DRINKS) {
     const { c, r } = cellOf(d.id), kind = KIND_OF[d.id]
     // (red: its clear coat; green: how rough; blue: how metallic, as three's maps read them)
-    const [coat, rough, metal] = kind === 'can' ? [0, 0.28, 0.55] : formOf(d.id) === 'sake' ? [0, 0.8, 0] : [0.6, 0.3, 0]
+    // (the owner's, 2026-11-10: a can's print is on aluminium (metal 0.85, roughness 0.28); a bottle's label a little matt (0.4))
+    const [coat, rough, metal] = kind === 'can' ? [0.3, 0.28, 0.85] : [0.25, 0.4, 0]
     data.set([coat * 255, rough * 255, metal * 255, 255], ((ATLAS_ROWS - 1 - r) * ATLAS_COLS + c) * 4)
   }
   const t = new THREE.DataTexture(data, ATLAS_COLS, ATLAS_ROWS)
@@ -6355,12 +6409,13 @@ const GLASS = new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: t
   depthWrite: false, specularIntensity: 1 })
 const GLASS_LIT = glowByVertex(GLASS.clone(), 'bottle-glass-lit')
 GLASS_LIT.emissive = new THREE.Color('#ffffff'); GLASS_LIT.emissiveIntensity = 0.32
-const CAN = new THREE.MeshStandardMaterial({ color: '#d4d8dc', metalness: 0.9, roughness: 0.25 })
+const CAN = new THREE.MeshStandardMaterial({ color: '#d4d8dc', metalness: 0.88, roughness: 0.28 })
 const CAN_LIT = CAN.clone()
 CAN_LIT.emissive = new THREE.Color('#d4d8dc'); CAN_LIT.emissiveIntensity = 0.32
 reflectStudio(GLASS, GLASS_LIT, CAN, CAN_LIT, LABEL_MAT, LABEL_LIT)
-/** the drink in each bottle: its colour and how clear in its vertices, lit a touch from within so it glows in the fridge */
-const FILL = glowByVertex(new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.15, transparent: true, depthWrite: false,
+/** the drink in each bottle: its colour and how clear in its vertices, lit a touch from within so it glows in the fridge; smooth, the room's
+ * light caught on its top (the owner's: a gleam on the drink's surface inside) */
+const FILL = glowByVertex(new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.06, transparent: true, depthWrite: false,
   emissive: '#ffffff', emissiveIntensity: 0.12 }), 'bottle-fill')
 /** the caps, foils, collars and rims: their colours in their vertices */
 const PARTS = new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true })
@@ -6372,7 +6427,17 @@ const PARTS = new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true 
 const SHELF_PARTS = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.22, metalness: 0.25 })
 const SHELF_LABEL = LABEL_LIT.clone()
 SHELF_LABEL.vertexColors = true
-reflectStudio(SHELF_PARTS, SHELF_LABEL)
+/**
+ * The shelf's glass (the owner's, 2026-11-10: they were solid colours, plastic): each bottle's drink and its glass over it, see-through, their
+ * tints and how clear in their vertices, very smooth, the studio's light in it (no transmission: one material using it has three draw the
+ * whole room twice a frame); the gleams down each (shadedGlass) whiter and more solid. One draw for a fridge's every bottle
+ */
+const SHELF_GLASS = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.08, metalness: 0, transparent: true, depthWrite: false,
+  emissive: '#ffffff', emissiveIntensity: 0.03, envMapIntensity: 0.3 })
+SHELF_GLASS.name = 'ShelfGlass'
+/** the shelf's cans' tops: bright aluminium, a little light of the fridge's own on them */
+const SHELF_METAL = new THREE.MeshStandardMaterial({ color: '#cfd4d9', metalness: 0.88, roughness: 0.28, emissive: '#cfd4d9', emissiveIntensity: 0.16 })
+reflectStudio(SHELF_PARTS, SHELF_LABEL, SHELF_GLASS, SHELF_METAL, FILL)
 /** how a point round a bottle is lit, by which way it faces (in the bottle's own frame, its front (to the door) +x, the viewer's left +z):
  * [how much of its colour, how much white gleam] */
 function roundLight(x: number, z: number): [number, number] {
@@ -6400,6 +6465,61 @@ function shaded(g: THREE.BufferGeometry, hex: string) {
   }
   return out
 }
+/** glass shaded round it as `shaded` is, see-through: its tint and how clear (`alpha`) in its vertices, the gleams whiter and more solid */
+const GLASSY = new Map<string, THREE.BufferGeometry>()
+function shadedGlass(g: THREE.BufferGeometry, hex: string, alpha: number) {
+  const key = `${g.uuid}|${hex}|${alpha}`
+  let out = GLASSY.get(key)
+  if (!out) {
+    out = g.clone()
+    const c = new THREE.Color(hex), pos = out.attributes.position, a = new Float32Array(pos.count * 4)
+    for (let i = 0; i < pos.count; i++) {
+      const [k, w] = roundLight(pos.getX(i), pos.getZ(i))
+      const s = 0.72 + 0.28 * k
+      a[i * 4] = Math.min(1, c.r * s + w); a[i * 4 + 1] = Math.min(1, c.g * s + w); a[i * 4 + 2] = Math.min(1, c.b * s + w)
+      a[i * 4 + 3] = Math.min(1, alpha + w * 0.6)
+    }
+    out.setAttribute('color', new THREE.BufferAttribute(a, 4))
+    GLASSY.set(key, out)
+  }
+  return out
+}
+/** how see-through a shelf bottle's glass is: the beer's brown and the soju's green deep, the plastic thinnest */
+const glassAlpha = (id: DrinkId) => (formOf(id) === 'beer' ? 0.84 : soju(id) ? 0.58 : KIND_OF[id] === 'pet' ? 0.12 : id === 'ramune' ? 0.3 : 0.2)
+/** a shelf bottle's drink, inside its glass to as full as it's filled (the full bottle's own shapes), its colour and how clear in its vertices */
+function liteDrink(shaped: 'beer' | 'sake' | 'pet' | 'pet500' | 'milk' | 'ramune', id: DrinkId) {
+  const d = DRINKS.find((x) => x.id === id)!
+  const g = shaped === 'ramune' ? BOTTLE_GEO.ramuneDrink : BOTTLE_DRINK[shaped]
+  // (a clear drink all but clear: the glass's colour and the light through it are what's seen; a milk or a tea solid)
+  return tinted(g, id === 'ramune' ? '#c6ecf6' : id === 'sake' ? '#f2ecd4' : d.color,
+    id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || soju(id) || id === 'sports' ? 0.16 : 0.88)
+}
+/**
+ * A can's top (the owner's, 2026-11-10): its rolled rim, the lid pressed down inside it, flat, and, lying on it, the ring pull (its finger
+ * hole and its rivet); all aluminium. Turned from a profile (from its outside up over the rim and in: its faces up and out), 12 round, open
+ * at the very middle under the pull's rivet (no fan of triangles crowding to a point there)
+ */
+const CAN_LID = new THREE.LatheGeometry([[0.018, 0.0895], [0.0186, 0.0905], [0.0187, 0.0928], [0.0181, 0.0935], [0.0174, 0.0929], [0.0168, 0.0915],
+  [0.0164, 0.0909], [0.0045, 0.0911]].map(([r, y]) => new THREE.Vector2(r, y)), 12)
+CAN_LID.computeVertexNormals()
+/** the shelf's cans' top, 8 round: the same, its shoulder run down to the edge of their print, which is their whole body */
+const LITE_CAN_LID = new THREE.LatheGeometry([[0.0214, 0.0884], [0.0203, 0.0897], [0.0189, 0.0912], [0.0187, 0.0928], [0.0181, 0.0935], [0.0174, 0.0929],
+  [0.0168, 0.0915], [0.0164, 0.0909], [0.0045, 0.0911]].map(([r, y]) => new THREE.Vector2(r, y)), 8)
+LITE_CAN_LID.computeVertexNormals()
+const CAN_TAB = (() => {
+  // (the ring pull: a rounded tongue with its finger hole, lying flat, its rivet end over the lid's middle)
+  const s = new THREE.Shape()
+  s.absarc(0, 0.0045, 0.0042, 0, Math.PI, false)
+  s.lineTo(-0.0042, -0.0055)
+  s.absarc(0, -0.0055, 0.0042, Math.PI, Math.PI * 2, false)
+  s.lineTo(0.0042, 0.0045)
+  const hole = new THREE.Path()
+  hole.absarc(0, -0.0052, 0.0024, 0, Math.PI * 2, true)
+  s.holes.push(hole)
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.0006, bevelEnabled: false, curveSegments: 4 })
+  g.rotateX(-Math.PI / 2)
+  return g
+})()
 /** a label's band shaded round it the same way (white shaded: it multiplies the label's picture; the gleam lifts it a little) */
 function shadedLabel(g: THREE.BufferGeometry, id: DrinkId) {
   return shaded(labelGeo(g, id), '#ffffff')

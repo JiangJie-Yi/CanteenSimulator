@@ -85,6 +85,12 @@ const ZH = {
     '盤子交給我，泡泡洗淨、高溫烘乾歸位！',
     '洗碗也是基本功！唰唰唰兩下搞定！',
   ][Math.abs(k) % 3],
+  /** a floor server come with a broom to glass broken on the floor (game/spills) */
+  sweepSay: (k: number) => [
+    '小心腳下！碎玻璃我來掃。',
+    '哎呀，摔破了！大家別靠近，馬上清乾淨～',
+    '碎片交給我，掃一掃就好了！',
+  ][Math.abs(k) % 3],
   riceDone: '[內場] 呼～新潟越光米剛炊熟！粒粒分明、米香撲鼻！',
 
   // 結帳與離店
@@ -211,6 +217,11 @@ const JA: typeof ZH = {
     '洗い物は任せて！しっかり洗って乾かして元の棚へ！',
     '手際よくキュッキュッと！次のお客さんの準備完了！',
   ][Math.abs(k) % 3],
+  sweepSay: (k) => [
+    '足元お気をつけください！ガラスはすぐ片付けます。',
+    'あら、割れちゃった！近づかないでくださいね、すぐきれいにします～',
+    '破片はお任せください、さっと掃いちゃいます！',
+  ][Math.abs(k) % 3],
   riceDone: '[厨房] 新潟産コシヒカリがふっくら艶やかに炊き上がりました！',
 
   // 会計と退店
@@ -333,6 +344,11 @@ const EN: typeof ZH = {
     'A fresh stack of greasy plates! Time to make them sparkle!',
     'Leave the dishes to me—soaped, sanitized, and stacked!',
     'Squeaky clean dishes ready for the next round!',
+  ][Math.abs(k) % 3],
+  sweepSay: (k) => [
+    'Mind your step! I\'ll sweep up the glass.',
+    'Oops, it broke! Keep clear—I\'ll have it clean in a moment~',
+    'Leave the broken glass to me, it\'s a quick sweep!',
   ][Math.abs(k) % 3],
   riceDone: '[Kitchen] Freshly steamed Koshihikari rice is ready! Fluffy and fragrant!',
 

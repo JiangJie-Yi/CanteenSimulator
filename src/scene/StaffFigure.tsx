@@ -41,6 +41,73 @@ const variantOf = (role: Role, female: boolean): Variant =>
 const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
 const ROLE_TAG: Record<Role, string> = { chef: '二廚', sous: '三廚', server: '外場', cashier: '收銀', stock: '倉儲' }
 const UNINKED = /(Eye|Shine|Brow|Cheek|Mouth|Tongue|Print|Collar|Knot|Cord|Nose|Thumb|Glass|Hem|Fan|Comb|Towel|Sideburn)/
+/**
+ * The broom a floor server sweeps up broken glass with (blender/broom.py, 1.2 m made; game/spills, GuestBar3D): how long it's drawn in a
+ * figure's own frame, and its pose `t` seconds into sweeping: its foot on the floor before them, swept from side to side, its handle up
+ * through their hands, the right (-x) above the left. The vectors are shared: read them at once
+ */
+const BROOM_URL = import.meta.env.BASE_URL + 'models/broom.glb'
+const BROOM_LEN = 0.6
+const SWEEP = { foot: new THREE.Vector3(), dir: new THREE.Vector3(), upper: new THREE.Vector3(), lower: new THREE.Vector3() }
+const SWEEP_TOP = new THREE.Vector3()
+export function sweepPose(t: number) {
+  const s = Math.sin(t * Math.PI * 1.8)
+  // (the floor's top a little over their own foot's level, as they stand on the room's boards (measured: 4 of the figure's hundredths))
+  SWEEP.foot.set(-0.04 + s * 0.11, 0.04, 0.36)
+  SWEEP_TOP.set(-0.07 + s * 0.03, 0.5, 0.07)
+  SWEEP.dir.copy(SWEEP_TOP).sub(SWEEP.foot).normalize()
+  SWEEP.upper.copy(SWEEP.foot).addScaledVector(SWEEP.dir, BROOM_LEN * 0.84)
+  SWEEP.lower.copy(SWEEP.foot).addScaledVector(SWEEP.dir, BROOM_LEN * 0.6)
+  return SWEEP
+}
+const UP_Y = new THREE.Vector3(0, 1, 0)
+/** the broom, made over for the room (its toon light; its straw, bamboo and cord as they're made), a copy for each who might hold it, hidden */
+function makeBroom(src: THREE.Object3D) {
+  const r = src.clone(true)
+  r.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh) return
+    const was = m.material as THREE.MeshStandardMaterial
+    m.material = BROOM_MATS.get(was) ?? BROOM_MATS.set(was, new THREE.MeshToonMaterial({ color: was.color.clone(), map: was.map ?? null })).get(was)!
+    m.castShadow = true
+    m.raycast = () => {}
+  })
+  const g = new THREE.Group()
+  g.add(r)
+  r.scale.setScalar(BROOM_LEN / 1.2)
+  g.visible = false
+  return g
+}
+const BROOM_MATS = new Map<THREE.Material, THREE.Material>()
+/**
+ * The broom in the hands of whoever's holding it (its holder's userData: `sweep`, seconds into sweeping; `broom`, carried): swept with the
+ * pose; carried upright at their side, its foot clear of the floor. For a figure that isn't a StaffFigure (the owner out serving, GuestBar3D's
+ * OwnerWalker): it finds its holder's userData up the way
+ */
+export function SweepBroom() {
+  const gltf = useGLTF(BROOM_URL) as unknown as { scene: THREE.Group }
+  const broom = useMemo(() => makeBroom(gltf.scene), [gltf])
+  const g = useRef<THREE.Group>(null)
+  useFrame(() => {
+    let job: { sweep?: number; broom?: boolean } | undefined
+    for (let q = g.current?.parent ?? null, k = 0; q && k < 4; q = q.parent, k++) if ('broom' in q.userData) { job = q.userData; break }
+    poseBroom(broom, job?.sweep, !!job?.broom, null)
+  })
+  return <group ref={g}><primitive object={broom} /></group>
+}
+/** the broom posed: swept (`sweep` seconds in), carried (by `hand`, or at the side), or put away */
+function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: boolean, hand: THREE.Object3D | null) {
+  broom.visible = sweep !== undefined || carried
+  if (sweep !== undefined) {
+    const p = sweepPose(sweep)
+    broom.position.copy(p.foot)
+    broom.quaternion.setFromUnitVectors(UP_Y, p.dir)
+  } else if (carried) {
+    if (hand) broom.position.set(hand.position.x, hand.position.y - 0.25, hand.position.z + 0.015)
+    else broom.position.set(-0.3, 0.03, 0.12)
+    broom.quaternion.identity()
+  }
+}
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
@@ -217,7 +284,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     get('glasses')?.scale.setScalar(glasses ? 1 : 0)
     get('tray')?.scale.setScalar(role === 'server' ? 1 : 0)
     get('clip')?.scale.setScalar(0)
-    return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes'), clip: get('clip') }
+    return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes'), clip: get('clip'), tray: get('tray') }
   }, [gltf, v, h, who.age, role])
   // (their skeleton's picture let go as they go)
   useEffect(() => () => releaseFigure(fig.root), [fig])
@@ -272,6 +339,10 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     return m
   }, [])
   useEffect(() => { fig.root.add(handheld); return () => { fig.root.remove(handheld) } }, [fig, handheld])
+  // (and a broom, put away till they sweep up broken glass (in the scene from the first, hidden, as the game is))
+  const broomSrc = useGLTF(BROOM_URL) as unknown as { scene: THREE.Group }
+  const broom = useMemo(() => makeBroom(broomSrc.scene), [broomSrc])
+  useEffect(() => { fig.root.add(broom); return () => { fig.root.remove(broom) } }, [fig, broom])
   useFrame((_, delta) => {
     const dt = Math.min(0.1, delta)
     const t = (clock.current += dt)
@@ -289,7 +360,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
-    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number } | undefined
+    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number
+      sweep?: number; broom?: boolean } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -327,12 +399,13 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
     // (a bow of the head and shoulders at the door)
     fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0) + (!id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' ? 0.1 : 0)
+      + (job?.sweep !== undefined ? 0.1 : 0)
     // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
     // wait (RUSH); talking while a word of theirs is up (STAFF_TALK); a blink every few seconds; the viewer's face over all of it
     const now = performance.now()
     const word = STAFF_TALK.find((w) => w.id === id)
     const tapping = seated && (t + seed) % 7 < 2.2
-    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined ? 'focused'
+    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined || job?.sweep !== undefined ? 'focused'
       : job?.carry || job?.stretch || (job?.nod ?? 0) > 0.2 ? 'happy' : 'idle')
     if (!faceAsked && word && Math.sin(t * 17) + Math.sin(t * 7.3) * 0.6 > 0.2) face = 'talk'
     if ((t + seed * 0.9) % 3.4 < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
@@ -353,11 +426,18 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
     // (slacking, a good while with nothing to do (data/staff's activityOf): their handheld game out before their chest, head down over it,
     // thumbs going; not as they walk)
-    const slack = !id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack'
+    const slack = !id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' && job?.sweep === undefined && !job?.broom
     handheld.visible = slack
     if (slack) handheld.position.y = HANDHELD_AT.y + Math.sin(t * 2.2 + seed) * 0.004
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
       if (!hand) continue
+      // (sweeping up broken glass: both hands on the broom's handle, the right above the left, going with it from side to side)
+      if (job?.sweep !== undefined) {
+        const p = sweepPose(job.sweep)
+        hand.position.copy(sd < 0 ? p.upper : p.lower)
+        hand.rotation.set(-0.5, 0, 0)
+        continue
+      }
       if (slack) {
         const thumb = Math.max(0, Math.sin(t * (sd > 0 ? 13 : 11) + seed + (sd > 0 ? 1.7 : 0))) * 0.012
         hand.position.set(sd * 0.085, HANDHELD_AT.y + thumb, HANDHELD_AT.z - 0.01)
@@ -411,6 +491,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     }
     // (the stock keeper's clipboard, held up while they stand)
     fig.clip?.scale.setScalar(role === 'stock' && !moving && !slack ? 1 : 0)
+    // (a server's broom: swept, or carried at their side in their right hand, there and back; their tray put by meanwhile)
+    poseBroom(broom, job?.sweep, !!job?.broom, fig.handL)
+    fig.tray?.scale.setScalar(role === 'server' && !job?.broom ? 1 : 0)
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>
@@ -423,6 +506,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
 }
 
 for (const v of VARIANTS) useGLTF.preload(url(v))
+useGLTF.preload(BROOM_URL)
 
 /**
  * Every outfit built and drawn as the shop loads, out of sight under the kitchen's floor, a few frames, then gone (the loading veil held

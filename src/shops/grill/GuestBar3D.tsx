@@ -3,6 +3,7 @@ import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes }
 import { rattleSound } from './skewerSound'
 import { getClock } from '@/ui/clockStore'
 import { NO_RAY } from '@/scene/pickable'
+import { sweeps, SWEEP_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
@@ -25,7 +26,7 @@ import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
-import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND } from '@/scene/StaffFigure'
+import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
 import { BossModel } from './Boss'
@@ -72,7 +73,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -124,17 +125,22 @@ const OWNER_IN_STAFF = (1.05 * 0.8) / STAFF_SCALE
 /** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a black-lacquered tray held in front */
 function OwnerWalker({ moving }: { moving: boolean }) {
   const g = useRef<THREE.Group>(null)
+  const tray = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
     const o = g.current
     if (!o) return
     const t = clock.elapsedTime
     o.rotation.z = moving ? Math.sin(t * 9) * 0.05 : 0
     o.position.y = moving ? Math.abs(Math.sin(t * 9)) * 0.014 : 0
+    // (sweeping up broken glass, or the broom carried: the tray put by)
+    if (tray.current) tray.current.visible = !o.parent?.userData.broom
   })
   return (
     <group ref={g}>
       <group scale={OWNER_IN_STAFF}><BossModel /></group>
-      <mesh position={[HELD_AT[0], HELD_AT[1] + 0.005, HELD_AT[2]]}>
+      {/* (the broom, when he sweeps up broken glass in a server's stead) */}
+      <SweepBroom />
+      <mesh ref={tray} position={[HELD_AT[0], HELD_AT[1] + 0.005, HELD_AT[2]]}>
         <cylinderGeometry args={[0.15, 0.14, 0.016, 28]} />
         <meshToonMaterial color="#1c1412" />
       </mesh>
@@ -2623,11 +2629,30 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const turn = st.counter === h.counter ? [] : [aisleCorner(counters[st.counter === 0 ? h.counter : st.counter])]
     return [...h.way.map((v) => v.clone()), ...turn, st.aisle.clone(), besideSeat(n)]
   }
+  /**
+   * From a server's place to glass broken on the floor (bar.ts's SPILLS, in the scene's frame): out through their gate, along the aisle to the
+   * seat nearest it, and over to stand before it, the broom's reach short of its middle (StaffFigure's sweepPose: its foot that far out); walked
+   * backwards, it's their way back
+   */
+  const spillPath = (wi: number, s: Spill) => {
+    const f = frame.current
+    if (!f || !seats.length) return null
+    const p = f.worldToLocal(new THREE.Vector3(s.at[0], s.at[1], s.at[2]))
+    let best = 0, bd = Infinity
+    seats.forEach((st, n) => { const d = Math.hypot(st.aisle.x - p.x, st.aisle.z - p.z); if (d < bd) { bd = d; best = n } })
+    const a = seats[best].aisle
+    const to = new THREE.Vector3(p.x - a.x, 0, p.z - a.z)
+    const len = to.length(), reach = 0.36 * STAFF_SCALE
+    const stand = len > reach ? a.clone().addScaledVector(to, (len - reach) / len) : a.clone()
+    stand.y = a.y
+    return [...backPath(wi, best).slice(0, -1), stand]
+  }
   /** what a server's doing: across the kitchen to the chef for what he's plated, out to its seat with it, back; out to clear plates done with, to the sink with
    * them; at the sink washing them into the dryer; taking the dried ones out of it back to the racks */
   type WaiterPhase = 'idle' | 'fetch' | 'pickup' | 'go' | 'set' | 'back' | 'clearGo' | 'clearTake' | 'clearBack' | 'drop'
     | 'washGo' | 'wash' | 'unloadGo' | 'unloadTake' | 'unloadCarry' | 'unloadPut'
     | 'toBox' | 'boxTake' | 'toTill' | 'hand'
+    | 'sweepGo' | 'sweep'
   const waiters = useRef<{ phase: WaiterPhase
     t: number; seat: number; keys: string[]; run: number | null
     /** the way they're drawn facing, turned toward `yaw` a frame at a time (set at once, they spun round at each corner of their way, by as
@@ -2639,6 +2664,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     carry?: number[]; stack?: number
     /** (a takeaway) the order whose box they've gone for, and carry out to its customer waiting in the genkan */
     box?: number
+    /** (glass broken on the floor, bar.ts's SPILLS) the one they've gone to sweep up; and the broom in their hand, there and back */
+    spill?: number; broom?: boolean
     path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number
     /** their walk home once the shop's shut, and in as it opens (commuteWalk); whether they're in yet */
     out?: Trip; in?: Trip; arrived?: boolean }[]>([])
@@ -4114,6 +4141,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       })
     }
+    // (glass broken on the floor whose sweeper's no longer on it (gone home, let go): free for the next)
+    for (const sp of SPILLS.list) {
+      const by = sp.by === null ? null : waiters.current[sp.by]
+      if (sp.by !== null && (!by || by.spill !== sp.key || (by.phase !== 'sweepGo' && by.phase !== 'sweep'))) sp.by = null
+    }
     waiters.current.forEach((w, wi) => {
       const home = homeOf(wi)
       // (coming in as the shop opens: in at the front door, along the aisle and through their gate to their place, each at their own
@@ -4206,6 +4238,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             return
           }
           const slot = readySlot()
+          // (glass broken on the floor (game/spills; the owner's): a floor server with no plate ready to carry out goes with a broom and sweeps
+          // it up, no one else on it)
+          const spill = !SHOP.leaving && sweeps(duty, slot >= 0) ? SPILLS.list.find((x) => x.by === null) : undefined
+          const toSpill = spill ? spillPath(wi, spill) : null
+          if (spill && toSpill) {
+            spill.by = wi
+            w.spill = spill.key
+            w.broom = true
+            go(toSpill, 'sweepGo')
+            return
+          }
           const spoken = new Set(waiters.current.flatMap((x) => x.carry ?? []))
           const dirtyNow = runs.current.filter((r) => r.phase === 'dirty' && !spoken.has(r.key))
           // (the sink and the dryer one server's at a time)
@@ -4233,6 +4276,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
         }
       } else if (w.phase === 'fetch') walk(() => { w.phase = 'pickup'; face(plating.at) })
+      else if (w.phase === 'sweepGo') walk(() => {
+        // (at the broken glass: facing it, broom down, a word to the room)
+        w.phase = 'sweep'
+        const sp = SPILLS.list.find((x) => x.key === w.spill)
+        if (sp && frame.current) face(frame.current.worldToLocal(new THREE.Vector3(sp.at[0], sp.at[1], sp.at[2])))
+        const id = ownerServes ? 'owner' : servers[wi]?.id
+        if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].sweepSay(wi + (w.spill ?? 0)), until: performance.now() + 2800 })
+      })
+      else if (w.phase === 'sweep') {
+        // (swept up as they go (the shards drawn in, the puddle shrinking: Spills); done, gone, and back the way they came, the broom in hand)
+        const sp = SPILLS.list.find((x) => x.key === w.spill)
+        if (sp) sp.left = Math.max(0, 1 - w.t / SWEEP_S)
+        if (!sp || w.t >= SWEEP_S) {
+          SPILLS.list = SPILLS.list.filter((x) => x.key !== w.spill)
+          w.spill = undefined
+          go(w.path.slice(0, -1).concat(w.pos.clone()), 'back')
+        }
+      }
       else if (w.phase === 'toBox') walk(() => { w.phase = 'boxTake'; face(takeoutOf().at) })
       else if (w.phase === 'boxTake' && w.t > 0.45) {
         // (the box up off the cook table (Roasting lets its food go with it), back across the kitchen, out through their gate to the step)
@@ -4306,6 +4367,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           w.yaw = home.yaw
           w.t = 0
           w.seat = -1
+          w.broom = false
           setMove(false)
         }
       } else if (w.phase === 'clearGo' || w.phase === 'clearBack') walk(() => {
@@ -4433,6 +4495,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (the plate up on the tray, the bar where it was wiped down with a cloth, twice along and back (the owner's))
       const wiping = w.phase === 'clearTake' && w.t > 0.45 && w.t < 0.45 + WIPE_S && w.seat >= 0
       if (o) o.userData.wipe = wiping ? (w.t - 0.45) / WIPE_S : undefined
+      // (sweeping up broken glass: how long into it; the broom in hand there and back (StaffFigure, the owner's SweepBroom))
+      if (o) { o.userData.sweep = w.phase === 'sweep' ? w.t : undefined; o.userData.broom = !!w.broom }
       // (they step in to the bar's edge between the stools for it, facing it, and back out: the cloth's under their hand (StaffFigure's
       // wipe: the right hand out on the top, along and back), on the near edge of the top where the plate was)
       let wipeAt: { p: THREE.Vector3; yaw: number; k: number } | null = null

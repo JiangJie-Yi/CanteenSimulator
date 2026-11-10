@@ -331,7 +331,7 @@ export const DRINKS = [
   { id: 'beer', zh: '瓶裝啤酒', ja: '瓶ビール', en: 'Bottled beer', price: 120, color: '#7a4a1a', cap: '#d4b04a', glass: false, shape: 'bottle', label: ['#c8a040', '#7a1a12', '生ビール'] },
   { id: 'sake', zh: '清酒', ja: '日本酒', en: 'Sake', price: 150, color: '#e8eef0', cap: '#c4302a', glass: true, shape: 'bottle', label: ['#f4efe2', '#b8261c', '清酒'] },
   { id: 'oolong', zh: '烏龍茶', ja: 'ウーロン茶', en: 'Oolong tea', price: 50, color: '#9a5a1a', cap: '#2a6a3a', glass: false, shape: 'bottle', label: ['#3a6a3a', '#f2e6c8', '烏龍茶'] },
-  { id: 'ramune', zh: '彈珠汽水', ja: 'ラムネ', en: 'Ramune', price: 60, color: '#8ad0e8', cap: '#2a6ab0', glass: true, shape: 'bottle', label: ['#2a6ab0', '#ffffff', 'ラムネ'] },
+  { id: 'ramune', zh: '彈珠汽水', ja: 'ラムネ', en: 'Ramune', price: 60, color: '#8ad0e8', cap: '#2f9e5a', glass: true, shape: 'bottle', label: ['#2a6ab0', '#ffffff', 'ラムネ'] },
   // cans
   { id: 'beerCan', zh: '罐裝啤酒', ja: '缶ビール', en: 'Canned beer', price: 100, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#e8d070', '#b8261c', 'ビール'] },
   { id: 'highball', zh: '調酒', ja: 'ハイボール', en: 'Highball', price: 110, color: '#c8ccd2', cap: '#9aa0a8', glass: false, shape: 'can', label: ['#1c2a4a', '#e8c45a', 'ハイボール'] },
@@ -400,8 +400,9 @@ export const SHOP_PURSE = { cash: () => Infinity as number, spend: (n: number) =
 export const FRIDGE_STOCK = {
   units: (keptDrinks?.units as (DrinkId | null)[][][] | undefined) ?? FRIDGE_UNITS.map((u) => emptyFridge<DrinkId>(u.shelves.map((sh) => sh.ids))),
   /** (x, z: out on the floor before the fridge, in its own frame; w: set down on a table, anywhere, in the scene's) */
-  // (`lift`: how far a fallen one lying still is raised to rest on the floor, measured once it's come to rest (DiningRoom))
-  out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number]; fy?: number; vy?: number; fell?: number; tip?: number; roll?: number; tipped?: boolean; lift?: number }[],
+  // (`lift`: how far a fallen one lying still is raised to rest on the floor, measured once it's come to rest (DiningRoom); `hit`: it's
+  // landed from this fall (what landing does to it, game/spills, done once, not at every bounce))
+  out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number]; fy?: number; vy?: number; fell?: number; tip?: number; roll?: number; tipped?: boolean; lift?: number; hit?: boolean }[],
   ver: 0,
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
@@ -417,6 +418,16 @@ if (typeof window !== 'undefined') {
   // (stopped when a hot update swaps this module for a new copy: one more of them with every edit, before)
   replaces(import.meta.hot, () => window.clearInterval(id))
 }
+/**
+ * Glass broken on the floor (game/spills; the owner's, 2026-11-10): a bottle let fall from high enough, its shards and its drink there, a
+ * hazard (hazard_spill) till a floor server sweeps it up (GuestBar3D). Where it hit (the scene's frame, on the floor); its drink's colour
+ * and how clear its puddle is (0 milk, 1 water); its glass's tint; a seed (its shards, its puddle's shape); when (performance clock); which
+ * server's on it (their index) and how much of it's left (1, swept away to 0 as they work); `unit`, the scene's units to a metre there; Spills
+ * draws it
+ */
+export type Spill = { key: number; at: [number, number, number]; unit: number; drink: string; clear: number; glass: string; seed: number; t0: number; by: number | null; left: number }
+export const SPILLS: { list: Spill[]; next: number } = { list: [], next: 1 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __spills?: typeof SPILLS }).__spills = SPILLS
 /** the drinks' stock panel (shops/grill/DrinkStockPanel), opened from the back stock by the fridges: open or not, and who's watching */
 export const DRINK_PANEL = { open: false }
 const drinkPanelSubs = new Set<() => void>()

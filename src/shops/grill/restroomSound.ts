@@ -374,6 +374,61 @@ export function bottleClink(can: boolean, at: THREE.Vector3) {
   k.connect(hp).connect(o); k.start(t)
 }
 
+/**
+ * A glass bottle broken on the floor (game/spills), heard at `at`: the hard crack of it hitting the boards, a bright scatter of shards ringing
+ * and tinkling as they skitter and settle (a dozen little pings, high, each its own pitch, over half a second), and the drink's splash under it
+ */
+export function glassShatter(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('shatter', 150)) return
+  const t = a.currentTime, o = out(a, 0.34 * near, pan)
+  // (the crack: a burst of noise, bright, gone in a few hundredths)
+  const crack = noise(a, 0.09, (x) => (1 - x) ** 3, 0)
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800
+  crack.connect(hp).connect(o); crack.start(t)
+  const thud = noise(a, 0.07, (x) => (1 - x) ** 2, 0.6)
+  const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420
+  const tg = a.createGain(); tg.gain.value = 0.8
+  thud.connect(lp).connect(tg).connect(o); thud.start(t)
+  // (the shards: high pings, each a little later and quieter, skittering)
+  for (let k = 0; k < 14; k++) {
+    const dt = 0.01 + Math.random() ** 1.6 * 0.55, f = 2600 + Math.random() * 4200
+    ping(a, t + dt, f, 0.32 * (1 - dt * 1.2), 0.05 + Math.random() * 0.09, o)
+    if (k % 3 === 0) ping(a, t + dt + 0.002, f * 1.48, 0.14 * (1 - dt), 0.04, o)
+  }
+  // (and the drink out of it: a short wet splash)
+  const wet = noise(a, 0.3, (x) => Math.min(1, x * 25) * (1 - x) ** 2.2, 0.2)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8
+  const wg = a.createGain(); wg.gain.value = 0.55
+  wet.connect(bp).connect(wg).connect(o); wet.start(t + 0.012)
+}
+
+/**
+ * A can knocked to the floor (game/spills), heard at `at`: its hollow clank on the boards (a can's ring, two or three partials), a second
+ * smaller one as it bounces, then the rattle of it rolling away, slowing
+ */
+export function canClatter(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('clatter', 150)) return
+  const t = a.currentTime, o = out(a, 0.26 * near, pan)
+  for (const [dt, g] of [[0, 1], [0.16, 0.45]] as const) {
+    ping(a, t + dt, 640 + Math.random() * 40, 0.55 * g, 0.16, o, 'triangle')
+    ping(a, t + dt + 0.003, 1490 + Math.random() * 60, 0.32 * g, 0.11, o, 'triangle')
+    ping(a, t + dt + 0.005, 2730 + Math.random() * 90, 0.16 * g, 0.07, o)
+    const k = noise(a, 0.02, (x) => 1 - x, 0)
+    const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500
+    const kg = a.createGain(); kg.gain.value = g
+    k.connect(hp).connect(kg).connect(o); k.start(t + dt)
+  }
+  // (rolling: a low rumble ticking over the boards' joins, slowing and fading over a second)
+  const roll = noise(a, 1.1, (x) => (x < 0.04 ? x / 0.04 : 1) * (1 - x) ** 1.5 * (0.6 + 0.4 * Math.max(0, Math.sin(x * 70 * (1 - x * 0.6)))), 0.5)
+  const rb = a.createBiquadFilter(); rb.type = 'bandpass'; rb.frequency.value = 1300; rb.Q.value = 1.4
+  const rg = a.createGain(); rg.gain.value = 0.5
+  roll.connect(rb).connect(rg).connect(o); roll.start(t + 0.22)
+}
+
 /** a toilet's door latched behind someone, heard at `at`: a little brass bolt slid home, a click and its small ring, a softer click after */
 export function latchSound(at: THREE.Vector3) {
   const a = ctx()

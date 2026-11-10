@@ -38,6 +38,7 @@ import { OpeningSpot } from '@/scene/OpeningSpot'
 import { OccluderFade } from '@/scene/OccluderFade'
 import { RenderPrefsApply } from '@/shops/grill/renderPrefs'
 import { SceneTally } from '@/shops/grill/SceneTally'
+import { Spills } from '@/shops/grill/Spills'
 import { Reputation } from '@/ui/Reputation'
 import { CharacterViewer } from '@/shops/grill/CharacterViewer'
 import { BOSS_FX } from '@/shops/grill/Boss'
@@ -2842,6 +2843,8 @@ export default function App() {
           <SfxEar />
           <Prewarm />
           <DustPuffs />
+          {/* (glass broken on the floor, its drink spilt round it, till it's swept up: in the scene's own frame) */}
+          {!NO_SCENE && <Spills />}
           <FpsMeter />
           {!NO_SCENE && <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
             fire={fire} frame={frame} onOffFire={sceneOffFire}
