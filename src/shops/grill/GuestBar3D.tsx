@@ -74,7 +74,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2145,7 +2145,8 @@ const STOOL_STAND = 0.42, STOOL_OUT = 0.25, STOOL_LEAVE = 0.22
 const SEAT_MARKS = new Map<number, THREE.Object3D>()
 const BENCH_MARKS = new Map<number, THREE.Object3D>()
 const SEAT_SHIFT = new THREE.Vector3()
-const BENCH_AT = [new THREE.Vector3(), new THREE.Vector3()]
+const BENCH_AT = Array.from({ length: BENCH_SEATS }, () => new THREE.Vector3())
+const BENCH_A = new THREE.Vector3(), BENCH_B = new THREE.Vector3()
 const STOOL_PULL_S = 0.25, STOOL_STEP_S = 0.3, STOOL_SLIDE_S = 0.4, STOOL_HOME_WAIT = 0.3
 /** the way back from a place's stool toward the aisle (level) */
 const backOf = (st: { stool: THREE.Vector3; aisle: THREE.Vector3 }) => st.aisle.clone().sub(st.stool).setY(0).normalize()
@@ -2627,12 +2628,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const wait = alongPath(line, Math.max(0.3, edge - 0.32)).p.setY(0), hand = alongPath(line, Math.min(len, edge + 0.3)).p.setY(0)
     // (across the line in, for a second one waiting beside the first)
     const side = new THREE.Vector3(-(spot.z - door.z), 0, spot.x - door.x).normalize()
-    // (the waiting bench (BENCH): along the way in, a little in from the door, against the genkan's wall on the side away from the shoe
-    // cupboard (that side's the cupboard's, and a second takeaway waits there); its two places along it, those sat there facing the way in)
-    const u = wait.clone().sub(door).setY(0).normalize()
-    const bench = door.clone().addScaledVector(u, 0.32).addScaledVector(side, -BENCH_OFF).setY(0)
-    const benchSpots = [-1, 1].map((k) => bench.clone().addScaledVector(u, k * 0.17))
-    return { door: door.clone(), wait, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()], bench, benchYaw: Math.atan2(u.x, u.z), benchSpots }
+    // (the waiting bench (BENCH): against the wall by the genkan, where BENCH_PLACE has it; its places along it, those sat there facing into the room)
+    const bench = new THREE.Vector3(BENCH_PLACE.x, 0, BENCH_PLACE.z), u = new THREE.Vector3(Math.cos(BENCH_PLACE.yaw), 0, -Math.sin(BENCH_PLACE.yaw))
+    const benchSpots = Array.from({ length: BENCH_SEATS }, (_, k) => bench.clone().addScaledVector(u, (k - (BENCH_SEATS - 1) / 2) * BENCH_PLACE.pitch))
+    return { door: door.clone(), wait, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()], bench, benchYaw: BENCH_PLACE.yaw, benchSpots }
   }, [counters, seats, given])
   /** from a server's place out to the step where the takeaway's handed over (walked backwards, the way back) */
   const tillPath = (wi: number) => {
@@ -4123,7 +4122,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         for (const id of BENCH.ids) {
           if (sitters.current.has(id)) continue
           const taken = new Set([...sitters.current.values()].map((x) => x.spot))
-          const spot = taken.has(0) ? 1 : 0
+          const spot = Math.max(0, Array.from({ length: BENCH_SEATS }, (_, k) => k).findIndex((k) => !taken.has(k)))
           sitters.current.set(id, { id, phase: 'in', t: 0, fade: 0, fadeT: 0, pos: way.door.clone(), yaw: 0, spot })
           benchChanged = true
         }
@@ -4135,6 +4134,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const laid = way?.benchSpots[v.spot], bm = BENCH_MARKS.get(v.spot), fb = frame.current
         const at = laid && bm && fb ? fb.worldToLocal(bm.getWorldPosition(BENCH_AT[v.spot])) : laid
         if (!way || !at) { sitters.current.delete(v.id); benchChanged = true; continue }
+        // (which way the bench faces, as it stands now: across its row of places, away from the wall; and a step out in front of their place, the
+        // way to it and from it bending there, clear of the shoe cupboard by the wall)
+        const m0 = BENCH_MARKS.get(0), m1 = BENCH_MARKS.get(BENCH_SEATS - 1)
+        if (m0 && m1 && fb) { fb.worldToLocal(m0.getWorldPosition(BENCH_A)); fb.worldToLocal(m1.getWorldPosition(BENCH_B)); BENCH_B.sub(BENCH_A) }
+        else BENCH_B.set(Math.cos(BENCH_PLACE.yaw), 0, -Math.sin(BENCH_PLACE.yaw))
+        BENCH_B.set(-BENCH_B.z, 0, BENCH_B.x).normalize()
+        const before = at.clone().addScaledVector(BENCH_B, 0.42), walk = [way.door, before, at]
         if (BENCH.up.has(v.id)) {
           // (called: up off the bench and on in to their stool from here (setShown's way in starts where they sat))
           BENCH.up.delete(v.id)
@@ -4149,21 +4155,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
         if (BENCH.gone.has(v.id) && v.phase !== 'out') { v.phase = 'out'; v.t = 0; v.fadeT = 0 }
         if (v.phase === 'in') {
-          const len = way.door.distanceTo(at), d = Math.min(len, v.t * sp)
-          v.pos.lerpVectors(way.door, at, len ? d / len : 1)
-          v.yaw = Math.atan2(at.x - way.door.x, at.z - way.door.z)
+          const len = pathLength(walk), d = Math.min(len, v.t * sp), { p, dir } = alongPath(walk, d)
+          v.pos.copy(p)
+          v.yaw = Math.atan2(dir.x, dir.z)
           v.fade = Math.min(1, d / 0.6 + v.t / FADE_S)
           if (d >= len) { v.phase = 'sit'; v.t = 0; benchChanged = true }
         } else if (v.phase === 'sit') {
           v.fade = 1
           v.pos.copy(at)
-          // (sat facing the way in, across the genkan)
-          const yaw = Math.atan2(way.side.x, way.side.z)
+          // (sat facing into the room, their back to the wall)
+          const yaw = Math.atan2(BENCH_B.x, BENCH_B.z)
           v.yaw += Math.atan2(Math.sin(yaw - v.yaw), Math.cos(yaw - v.yaw)) * Math.min(1, step * 6)
         } else {
-          const from = at, len = from.distanceTo(way.door), d = Math.min(len, v.t * sp)
-          v.pos.lerpVectors(from, way.door, len ? d / len : 1)
-          v.yaw = Math.atan2(way.door.x - from.x, way.door.z - from.z)
+          const back = [at, before, way.door], len = pathLength(back), d = Math.min(len, v.t * sp), { p, dir } = alongPath(back, d)
+          v.pos.copy(p)
+          v.yaw = Math.atan2(dir.x, dir.z)
           if (len - d < 0.9) v.fadeT += step
           v.fade = Math.max(0, Math.min(1, Math.max((len - d) / 0.9, 1 - v.fadeT / FADE_S)))
           if (d >= len && v.fade <= 0) { BENCH.gone.delete(v.id); sitters.current.delete(v.id); benchChanged = true }
@@ -4964,11 +4970,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the waiting bench in the genkan, and those sat on it waiting for a stool */}
       {given && takeoutWay && (
         <Movable id="bench" label="候位長凳">
-          <group position={[takeoutWay.bench.x, -GENKAN.depth, takeoutWay.bench.z]} rotation-y={takeoutWay.benchYaw - Math.PI / 2}>
+          <group position={[takeoutWay.bench.x, BENCH_PLACE.y, takeoutWay.bench.z]} rotation-y={takeoutWay.benchYaw}>
             {/* (drawn at the customers' size, as the stools are: its seat a stool's height under them) */}
             <group scale={[0.48 * PEOPLE_SCALE, PEOPLE_SCALE, 0.8 * PEOPLE_SCALE]}><WaitingBench /></group>
           </group>
-          {/* (its two places, where those waiting sit: they go with it, moved by hand) */}
+          {/* (its places, where those waiting sit: they go with it, moved by hand) */}
           {takeoutWay.benchSpots.map((p, k) => (
             <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
           ))}
@@ -5030,10 +5036,9 @@ function useOwnLooks() {
   useEffect(() => () => { for (const m of Object.values(mats)) m.dispose() }, [mats])
   return mats
 }
-/** the waiting bench (blender/bench.py): two cedar planks on splayed dark legs, its seat a stool's height; how far off the way in it stands */
+/** the waiting bench (blender/bench.py): two cedar planks on six dark legs, its seat a stool's height, long enough for four */
 const BENCH_URL = import.meta.env.BASE_URL + 'models/bench.glb'
 useGLTF.preload(BENCH_URL)
-const BENCH_OFF = 0.3
 const WaitingBench = memo(function WaitingBench() {
   const gltf = useGLTF(BENCH_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {

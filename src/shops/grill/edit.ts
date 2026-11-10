@@ -47,10 +47,11 @@ export type Tool = 'select' | 'move' | 'rotate' | 'scale'
 export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: number; s: number; r?: V3 }
 /** groups the shop comes with (the owner's own are added to them): the door's cat stand with its four cats; their pivot is found the first time
  * edit mode opens, once the pieces have been measured. `spans`: it runs across the room, in no one view's area (see groupByViews) */
-const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean }> = {
-  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban', 'kabuto'] },
+const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean; t?: V3 }> = {
+  // (it and the shrine moved 3.4 along the wall toward the round window (the owner's, 2026-11-11), the waiting bench in their place: GENKAN_SHIFT)
+  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban', 'kabuto'], t: [-2.749, 0, 2.003] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
-  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'] },
+  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-2.749, 0, 2.003] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
     'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
@@ -86,11 +87,23 @@ const loadGroups = (): Record<string, Group> => {
       home ??= k
     }
     if (home) g[home] = { ...g[home], members: [...g[home].members, id] }
-    g[id] = { name: d.zh, members: d.members, pivot: [0, 0, 0], t: [0, 0, 0], yaw: 0, s: 1 }
+    g[id] = { name: d.zh, members: d.members, pivot: [0, 0, 0], t: d.t ?? [0, 0, 0], yaw: 0, s: 1 }
     unsettled.add(id)
+    made.add(id)
+  }
+  // (groups a browser kept from before their default place was moved: moved on by as much, once (its key marks it done))
+  for (const [key, id] of GENKAN_SHIFT) {
+    try { if (localStorage.getItem(key)) continue } catch { continue }
+    const d = DEFAULT_GROUPS[id].t
+    if (g[id] && d && !made.has(id)) g[id] = { ...g[id], t: [0, 1, 2].map((k) => g[id].t[k] + d[k]) as V3 }
+    try { localStorage.setItem(key, '1'); localStorage.setItem(KEY_G, JSON.stringify(g)) } catch { /* storage blocked */ }
   }
   return g
 }
+const made = new Set<string>()
+/** the default groups whose place was moved since a browser may have kept them (DEFAULT_GROUPS' t): the door's cat stand and the shrine,
+ * along the wall to make room for the waiting bench (2026-11-11) */
+const GENKAN_SHIFT: [string, string][] = [['jgs-edit-groupshift-1', 'grp-doorcats'], ['jgs-edit-groupshift-2', 'grp-altar']]
 /** a point in the world, where it stands inside a group as that group's own pivot is kept (the groups it's in undone, outermost first) */
 const intoGroup = (gid: string | null, v: V3): V3 => {
   if (!gid) return v
@@ -129,6 +142,8 @@ const SETTLED_BY: Record<string, number> = { 'lightswitch-room': 0.54, 'lightswi
 const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-2', ['ricetub', 'misopot', 'hagama', 'denkinabe', 'warmer']],
   ['jgs-edit-relaid-3', ['till-cat']],
+  // (the shoe cupboard and the waiting bench, laid out afresh about the genkan (2026-11-11))
+  ['jgs-edit-relaid-4', ['shoecab', 'bench']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -244,6 +259,8 @@ export const BASES: Record<string, V3> = {
   // (the free view's camera: moved X -0.45 along its own axes (object space), taken into its parent's (the world's) units; its turn of
   // Y 15° Z 5° is App's VIEWCAM_TURN)
   'viewcam-free': [0.0478, 0, 0.4475],
+  // (the shoe cupboard moved 0.5 along the wall toward the door (the owner's, 2026-11-11), taken into its parent's units)
+  shoecab: [0, 0, 0.25],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece (or a group) is in, if any: the one holding it directly (that one may be in a view's area in its turn) */

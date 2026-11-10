@@ -1,6 +1,7 @@
 """The waiting bench in the genkan (bench.glb; the owner's, 2026-11-09: somewhere for those who come in with every stool taken to sit and wait
-their turn): a long low bench of cedar, two planks for its seat with a gap between, four legs splayed a little, a stretcher along between each
-pair and one across, the ends of the planks rounded off. About 200 triangles.
+their turn): a long low bench of cedar, two planks for its seat with a gap between, six legs (a pair at each end splayed a little, a pair in the
+middle), a stretcher across each pair and one along, the ends of the planks rounded off; long enough for four (the owner's, 2026-11-11). About
+250 triangles.
 
 The game's frame: y up from the floor, x along the bench, z across it; its middle at the origin; SEAT_H the seat's top (a stool's, so those
 sat on it sit as at the bar), LENGTH long, DEPTH deep.
@@ -24,7 +25,7 @@ PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(_
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-LENGTH, DEPTH, SEAT_H, PLANK_T = 0.95, 0.34, 0.29, 0.035
+LENGTH, DEPTH, SEAT_H, PLANK_T = 1.8, 0.34, 0.29, 0.035
 
 
 def P(x, y, z):
@@ -89,7 +90,7 @@ for k, z in enumerate((-DEPTH / 2, gap / 2)):
 bench_seat = join(seat, "BenchSeat")
 legs = []
 lx, lz, splay = LENGTH / 2 - 0.1, DEPTH / 2 - 0.06, 0.03
-for sx in (-1, 1):
+for sx in (-1, 0, 1):
     for sz in (-1, 1):
         o = box(f"leg{sx}{sz}", -0.022, 0.022, 0, SEAT_H - PLANK_T, -0.022, 0.022, "leg")
         # (splayed out a little at the foot)
