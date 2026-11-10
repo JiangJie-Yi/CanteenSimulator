@@ -98,8 +98,10 @@ export function dryerSound(near: number, seconds = 1.5) {
   if (!a || near < 0.02) return
   const t = a.currentTime
   const air = noise(a, seconds + 0.3, (x) => Math.min(1, x * (seconds + 0.3) / 0.18) * Math.min(1, (1 - x) * (seconds + 0.3) / 0.3), 0.55)
-  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.6
-  air.connect(f).connect(out(a, 0.22 * near))
+  // (a warm wind blown down (the owner's, 2026-11-10: a dryer on the wall that blows down): broad and soft, its body low, a little hiss on top)
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 640; f.Q.value = 0.45
+  const soft = a.createBiquadFilter(); soft.type = 'lowpass'; soft.frequency.value = 2400
+  air.connect(f).connect(soft).connect(out(a, 0.26 * near))
   air.start(t)
   const hum = a.createOscillator(); hum.type = 'triangle'
   hum.frequency.setValueAtTime(70, t); hum.frequency.linearRampToValueAtTime(118, t + 0.2); hum.frequency.setValueAtTime(118, t + seconds); hum.frequency.linearRampToValueAtTime(60, t + seconds + 0.3)

@@ -379,12 +379,15 @@ function useBits() {
     const r = {
       remote: of('WcRemote'), flush: of('WcFlushKey'), oto: of('WcOtohime'), led: of('WcOtoLed'), holder: of('WcHolder'), roll: of('WcRoll'),
       core: of('WcCore'), fold: of('WcFold'), pot: of('WcBrushPot'), brush: of('WcBrush'), bin: of('WcBin'), pads: of('WcPads'),
-      jet: of('WcJetTowel'), towel: of('WcTowelBox'),
+      dryer: of('WcHandDryer'), towel: of('WcTowelBox'),
     }
     // (the dryer's lamp its own, lit as it blows)
     const jetLamp = new THREE.MeshBasicMaterial({ color: '#3a4048' })
-    const lampMesh = r.jet.getObjectByName('JetLamp') as THREE.Mesh | undefined
+    const lampMesh = r.dryer.getObjectByName('DryerLamp') as THREE.Mesh | undefined
     if (lampMesh) lampMesh.material = jetLamp
+    // (the towel box's window: smoked acrylic, the stack of white sheets behind it, glossy)
+    const win = r.towel.getObjectByName('TowelWindow') as THREE.Mesh | undefined
+    if (win && TOWEL_WINDOW) win.material = new THREE.MeshStandardMaterial({ map: TOWEL_WINDOW, roughness: 0.2, metalness: 0 })
     const lcd = r.remote.getObjectByName('RemLcd') as THREE.Mesh | undefined
     lit(lcd, '#7fe2ee')
     // (the faces' keys, frame and words: painted, not modelled (the owner's: the pair 30 triangles))
@@ -396,8 +399,8 @@ function useBits() {
     // (the parts that never move on their own, their buttons and ink lines, folded into a mesh or two per material: the remote and the
     // Otohime were near thirty draws apiece, in each of the two toilets; the lit screen keeps its own)
     for (const o of [r.remote, r.oto, r.holder, r.pot, r.bin, r.pads, r.towel]) { plainColours(o); mergeByMaterial(o) }
-    plainColours(r.jet)
-    mergeByMaterial(r.jet, (o) => o.name === 'JetLamp')
+    plainColours(r.dryer)
+    mergeByMaterial(r.dryer, (o) => o.name === 'DryerLamp')
     return { ...r, ledMat, jetLamp }
   }, [gltf])
 }
@@ -433,19 +436,38 @@ export function WcRemote({ who, flushAt = 0.14 }: { who: Who; flushAt?: number }
 
 /**
  * The washroom's hand drying (the owner's: no towel on a rod; a modern izakaya's), on the side wall by the washstand, their own frame the
- * wall at z=0 facing +z (blender/wc.py's WcTowelBox and WcJetTowel): a paper towel dispenser in brushed stainless (a little window onto the
- * stack, a sheet's edge showing at the slot under it), and a Jet Towel hand dryer (the owner's, 2026-11-10: it was a rounded white box on a
- * rounded hood, two boxes stacked, sat on the wainscot's rail): it blows 1.5 s after a guest's washed their hands (TOILETS' dryAt, GuestBar3D
- * steps them to it), or at a click: its lamp lit cyan, a soft whir, a tremble
+ * wall at z=0 facing +z (blender/wc.py's WcTowelBox and WcHandDryer): a paper towel dispenser in matt warm-white plastic, and a hand dryer
+ * on the wall that blows down (the owner's, 2026-11-10: a Jet Towel's big upright body before it, and a rounded box on a rounded hood before
+ * that): it blows 1.5 s after a guest's washed their hands (TOILETS' dryAt, GuestBar3D steps them to it), or at a click: its lamp lit cyan,
+ * a warm wind heard, a fine stream of air seen coming down out of its nozzle, a tremble
  */
-const TOWEL_EDGE = new THREE.PlaneGeometry(0.13, 0.026).translate(0, -0.013, 0)
-const TOWEL_SHEET = new THREE.PlaneGeometry(0.13, 0.12).translate(0, -0.06, 0)
-const PAPER_MAT = new THREE.MeshToonMaterial({ color: '#fbfaf6', side: THREE.DoubleSide })
-/** where the dispenser's slot is (wc.py: under its front edge, 13.5 cm below its middle, 5.4 cm out from the wall) */
-const SLOT_Y = -0.136, SLOT_Z = 0.054
+/** the end of a sheet hanging out of the dispenser's lip: a sheet with a little thickness, its top up inside the box (so nothing of it's
+ * seen going into the plastic), bowed out a little as it hangs; and one drawn out */
+const TOWEL_EDGE = new THREE.BoxGeometry(0.12, 0.036, 0.0012).translate(0, -0.016, 0)
+const TOWEL_SHEET = new THREE.PlaneGeometry(0.12, 0.12).translate(0, -0.06, 0)
+const PAPER_MAT = new THREE.MeshToonMaterial({ color: '#fbfaf6' })
+/** where the dispenser's lip is (wc.py: a curved slot under its front, 13.65 cm below its middle, its middle some 4.6 cm out from the wall) */
+const SLOT_Y = -0.1345, SLOT_Z = 0.046
+/** the window's picture: smoked brown acrylic, the stack of sheets behind it (their edges in fine lines, as high as the box is full), a
+ * gloss across it */
+const TOWEL_WINDOW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas'); c.width = 32; c.height = 160
+  const g = c.getContext('2d')!
+  g.fillStyle = '#2c2119'; g.fillRect(0, 0, 32, 160)
+  const top = 160 * 0.22
+  for (let y = top; y < 160; y += 2) { g.fillStyle = y % 4 < 2 ? '#8f7a62' : '#7b6754'; g.fillRect(0, y, 32, 2) }
+  g.fillStyle = 'rgba(30,18,10,0.35)'; g.fillRect(0, top, 32, 3)
+  const gl = g.createLinearGradient(0, 0, 32, 160)
+  gl.addColorStop(0.35, 'rgba(255,255,255,0)'); gl.addColorStop(0.45, 'rgba(255,255,255,0.22)'); gl.addColorStop(0.55, 'rgba(255,255,255,0)')
+  g.fillStyle = gl; g.fillRect(0, 0, 32, 160)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.flipY = false
+  return t
+})()
 /**
- * The paper towel dispenser: brushed stainless, its lid's seam across the front, a little window showing the stack inside, a slot under it
- * with a thin edge of paper showing. Pointed at it lights; clicked, a sheet's drawn down out of the slot and away (a paper sound)
+ * The paper towel dispenser: matt warm-white plastic, its lid's seam across the front, a smoked window onto the stack, a lock on its top,
+ * a curved lip under it with a sheet's end hanging out. Pointed at it lights; clicked, a sheet's drawn down out of the lip and away (a
+ * paper sound)
  */
 export function WcTowelBox() {
   const b = useBits()
@@ -469,33 +491,58 @@ export function WcTowelBox() {
     <group ref={g} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; pulled.current = now(); tissuePull() }}
       {...hover('擦手紙盒', () => '點一下抽一張擦手紙')}>
       <primitive object={b.towel} />
-      <mesh geometry={TOWEL_EDGE} position={[0, SLOT_Y - 0.0005, SLOT_Z]} rotation-x={-0.18} material={PAPER_MAT} />
+      <mesh geometry={TOWEL_EDGE} position={[0, SLOT_Y + 0.002, SLOT_Z]} rotation-x={-0.14} material={PAPER_MAT} />
       <mesh ref={sheet} geometry={TOWEL_SHEET} visible={false} raycast={() => {}}>
         <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} transparent />
       </mesh>
     </group>
   )
 }
+/** the air coming down out of the dryer's nozzle (wc.py: under it, 28 cm below its top, 7 cm out from the wall): fine pale streaks, one draw
+ * for them all, each its own place along the nozzle, its drift and its speed */
+const AIR_N = 28, NOZZLE_Y = -0.283, NOZZLE_Z = 0.07, AIR_FALL = 0.24
+const AIR_GEO = new THREE.PlaneGeometry(0.0018, 0.03)
+const AIR_MAT = new THREE.MeshBasicMaterial({ color: '#eef6ff', transparent: true, opacity: 0.3, depthWrite: false })
+const AIR = Array.from({ length: AIR_N }, (_, i) => {
+  const h = (k: number) => { const v = Math.sin((i + 1) * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v) }
+  return { x: (h(1) - 0.5) * 0.14, dx: (h(2) - 0.5) * 0.05, dz: (h(3) - 0.3) * 0.06, speed: 1.8 + h(4) * 1.1, at: h(5) }
+})
+const AIR_AT = new THREE.Object3D()
 /**
- * The hand dryer, a Jet Towel (blender/wc.py's WcJetTowel, its origin on the wall at its top): the hands go down into the slot along its top.
- * It blows 1.5 s after a guest's washed their hands (TOILETS' dryAt: GuestBar3D steps them to it), or at a click: the lamp in its front strip
- * lit cyan, a soft whir, a tremble
+ * The hand dryer on the wall, blowing down (blender/wc.py's WcHandDryer, its origin on the wall at its top): hands held under it. It blows
+ * 1.5 s after a guest's washed their hands (TOILETS' dryAt: GuestBar3D steps them to it), or at a click: the lamp on its front lit cyan, a
+ * warm wind heard, a fine stream of air seen coming down out of its nozzle, a tremble
  */
 export function WcDryer({ who }: { who: 'm' | 'f' }) {
   const b = useBits()
   const g = useRef<THREE.Group>(null)
+  const air = useRef<THREE.InstancedMesh>(null)
   const was = useRef(-1e9)
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
     const t = TOILETS[who], u = now() - t.dryAt
     if (t.dryAt !== was.current) { was.current = t.dryAt; if (u < 300) dryerSound(nearOf(g.current, camera)) }
     const on = u >= 0 && u < 1500
     b.jetLamp.color.set(on ? '#7fe2ee' : '#3a4048')
     if (g.current) g.current.position.x = on ? Math.sin(now() * 0.09) * 0.0015 : 0
+    const m = air.current
+    if (!m) return
+    m.visible = on
+    if (!on) return
+    const k = clock.elapsedTime
+    AIR.forEach((p, i) => {
+      const f = (k * p.speed + p.at) % 1
+      AIR_AT.position.set(p.x + p.dx * f, NOZZLE_Y - 0.016 - f * AIR_FALL, NOZZLE_Z + p.dz * f)
+      AIR_AT.scale.set(1, 1 - f * 0.65, 1)
+      AIR_AT.updateMatrix()
+      m.setMatrixAt(i, AIR_AT.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
   })
   return (
     <group ref={g} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].dryAt = now() }}
       {...hover('烘手機', () => '點一下吹風；客人洗完手會自己來烘乾')}>
-      <primitive object={b.jet} />
+      <primitive object={b.dryer} />
+      <instancedMesh ref={air} args={[AIR_GEO, AIR_MAT, AIR_N]} visible={false} frustumCulled={false} raycast={() => {}} renderOrder={2} />
     </group>
   )
 }

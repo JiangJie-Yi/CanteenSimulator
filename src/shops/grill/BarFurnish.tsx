@@ -14,7 +14,7 @@ const BAMBOO_URL = import.meta.env.BASE_URL + 'models/bamboopot.glb'
 const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
 const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashBowl', 'WashSoap', 'WashFrame', 'BitWalnut',
-  'JetPearl', 'JetSteel', 'JetAcrylic', 'TowelSteel'])
+  'JetPearl', 'JetSteel', 'JetAcrylic', 'TowelSteel', 'TowelAbs'])
 /** a few made as asked (the owner's): the toilet's china a warm ivory, glazed (clear coat, a little rough); its chrome bright metal; the
  * paper holder's walnut with a soft sheen */
 const FINISH: Record<string, { color?: string; roughness: number; metalness: number; clearcoat: number }> = {
@@ -27,9 +27,11 @@ const FINISH: Record<string, { color?: string; roughness: number; metalness: num
   JetAcrylic: { color: '#1b1e23', roughness: 0.1, metalness: 0, clearcoat: 0.8 },
   JetSteel: { roughness: 0.35, metalness: 0.85, clearcoat: 0 },
   TowelSteel: { color: '#c9ccd1', roughness: 0.38, metalness: 0.85, clearcoat: 0 },
+  // (the paper towel box's engineering plastic (the owner's, 2026-11-10): a matt warm white, a soft sheen, no metal)
+  TowelAbs: { color: '#f8fafc', roughness: 0.35, metalness: 0, clearcoat: 0.1 },
 }
 /** parts too thin or small for an ink line */
-const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d|Vent|Lamp|Acrylic|Slit|Seam|Window|Slot|Grille)/
+const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d|Vent|Lamp|Acrylic|Slit|Seam|Window|Slot|Grille|Nozzle|Sensor|Lock|TowelKey)/
 
 const made = new Map<string, THREE.Object3D>()
 function toonOf(url: string, scene: THREE.Group) {

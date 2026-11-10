@@ -5,9 +5,9 @@
   on the hinge, made closed, for the game to lift); the water (node "WcWater", to swirl); the cistern behind with the hand basin on its
   lid (手洗い付き), its spout curving over, the lever at its side.
 - wcbits.glb, node "WcBits": the room's small fittings, each its own node, made with its back to a wall at z=0 facing +z: the wall
-  remote "WcRemote" (screen, stop, wash and bidet keys), the flush keys "WcFlushKey", the hand dryer "WcJetTowel" (a Jet Towel: its
-  hands' slot open at the top and both ends; its origin on the wall at its top), the paper towel dispenser "WcTowelBox" (brushed steel;
-  its origin on the wall at its middle), the Otohime "WcOtohime" (sakura on its face) and
+  remote "WcRemote" (screen, stop, wash and bidet keys), the flush keys "WcFlushKey", the hand dryer "WcHandDryer" (wall-mounted, blowing down: its
+  nozzle and sensor underneath; its origin on the wall at its top), the paper towel dispenser "WcTowelBox" (matt warm-white ABS, a smoked
+  window on the stack, a lock on top, a curved lip under it; its origin on the wall at its middle), the Otohime "WcOtohime" (sakura on its face) and
   its lit ring "WcOtoLed", the walnut paper holder "WcHolder" with the roll "WcRoll" (unit radius, scaled by what's left), its core
   "WcCore" and the folded point "WcFold"; on the floor the brush pot "WcBrushPot" and brush "WcBrush", and the sanitary bin "WcBin"; the
   women's sanitary pads "WcPads" (a hinoki wall shelf, a rattan basket of them in pastel wrappers).
@@ -234,6 +234,7 @@ def bits():
          "jetlamp": pbr("JetLamp", lin("#3a4048"), rough=0.3),
          "steel": pbr("JetSteel", lin("#c4c8cd"), rough=0.35, metal=0.85),
          "towel": pbr("TowelSteel", lin("#c9ccd1"), rough=0.38, metal=0.85),
+         "abs": pbr("TowelAbs", lin("#f8fafc"), rough=0.35),
          "towelgap": pbr("TowelGap", lin("#202226"), rough=0.6),
          "towelwin": pbr("TowelWin", lin("#dfe7ea"), rough=0.3)}
     groups = {}
@@ -281,18 +282,17 @@ def bits():
     node("WcFlushKey")
     add("WcFlushKey", rbox("FlushPlate", (0.058, 0.084, 0.016), (0.0, 0.0, 0.008), 0.0, 1), "FlushPlate", M["ivory"], smooth=False)
     quad("FlushFace", 0.054, 0.08, (0.0, 0.0, 0.017), M["flushart"], "WcFlushKey")
-    # ---- the hand dryer (the owner's, 2026-11-10: a Jet Towel, not the rounded white box on a rounded hood that read as two boxes stacked,
-    # nor sat on the wainscot's rail): an upright slim unit 30 wide, 56 tall, 17 deep, flush on the wall under the rail, its top at the
-    # origin; seen from its end a U: its back half up to the top, the slot the hands go down into (3 cm across, 27 down, open at the top and
-    # both ends), its front half lower so the hands go in easily, the back's lip chamfered down into the slot, a row of jets along the inside
-    # of each lip; on its front a dark acrylic strip with the lamp in it (lit by the game as it blows) and down by its foot a steel grille
-    # where the air goes out. One piece of pearl white (a little metal in it), its edges eased
-    node("WcJetTowel")
-    JW = 0.30
-    prof = [(0.0, 0.0), (0.055, 0.0), (0.09, -0.035), (0.09, -0.27), (0.12, -0.27), (0.12, -0.10), (0.135, -0.085), (0.17, -0.10),
-            (0.17, -0.53), (0.15, -0.56), (0.0, -0.56)]
+    # ---- the hand dryer (the owner's, 2026-11-10, second go: a light one on the wall that blows down, as Panasonic's or TOTO's, not the
+    # Jet Towel's big upright body and its slot): 24 wide, 28 tall, 16 deep, its origin on the wall at its top. Its side a soft curve: the
+    # top rounding over into a full front, the foot tucked in under it; on its underside the long nozzle the air comes down out of and the
+    # sensor's dark eye; a fine seam across its front, the lamp under it (lit by the game as it blows). One piece of pearl white, its edges
+    # eased
+    node("WcHandDryer")
+    DW = 0.24
+    prof = [(0.0, 0.0), (0.1, 0.0), (0.135, -0.012), (0.155, -0.04), (0.16, -0.08), (0.16, -0.215), (0.152, -0.255), (0.13, -0.276),
+            (0.105, -0.28), (0.0, -0.28)]
     bm = bmesh.new()
-    ends = [[bm.verts.new(P(sx * JW / 2, y, z)) for (z, y) in prof] for sx in (-1, 1)]
+    ends = [[bm.verts.new(P(sx * DW / 2, y, z)) for (z, y) in prof] for sx in (-1, 1)]
     n = len(prof)
     for i in range(n):
         j = (i + 1) % n
@@ -300,34 +300,31 @@ def bits():
     bm.faces.new(ends[0])
     bm.faces.new(list(reversed(ends[1])))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    # (the edges eased (2 steps, 6 mm), the back's against the wall left square)
+    # (the edges eased (2 steps, 7 mm), the back's against the wall left square)
     eased = [e for e in bm.edges if not all(abs(v.co.y) < 1e-6 for v in e.verts)]
-    bmesh.ops.bevel(bm, geom=eased, offset=0.006, offset_type="OFFSET", segments=2, profile=0.5, affect="EDGES", clamp_overlap=True)
+    bmesh.ops.bevel(bm, geom=eased, offset=0.007, offset_type="OFFSET", segments=2, profile=0.5, affect="EDGES", clamp_overlap=True)
     bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
-    me = bpy.data.meshes.new("JetBody")
+    me = bpy.data.meshes.new("DryerBody")
     bm.to_mesh(me)
     bm.free()
-    jb = bpy.data.objects.new("JetBody", me)
-    bpy.context.collection.objects.link(jb)
-    add("WcJetTowel", jb, "JetBody", M["pearl"], smooth=True)
-    # (smooth only where the bevels round the edges: its flat faces flat)
-    for pg in jb.data.polygons:
+    db = bpy.data.objects.new("DryerBody", me)
+    bpy.context.collection.objects.link(db)
+    add("WcHandDryer", db, "DryerBody", M["pearl"], smooth=True)
+    # (smooth only where it curves and the bevels round its edges: its flat faces flat)
+    for pg in db.data.polygons:
         pg.use_smooth = max(abs(c) for c in pg.normal) < 0.999
 
-    def plate(name, w, h, at, mat, normal="front", g="WcJetTowel"):
-        # (a flat quad laid on a face: "front" facing +z at z, "back" facing -z (the slot's front wall, seen from the slot), "slant" on the back
-        # lip's chamfer, facing up and out into the slot)
+    def plate(name, w, h, at, mat, normal="front", g="WcHandDryer"):
+        # (a flat quad laid 1.5 mm off a face: "front" facing +z at z (w across, h up), "down" facing -y at y (w across, h deep))
         bm = bmesh.new()
         uvl = bm.loops.layers.uv.new()
         x, y, z = at
-        if normal == "slant":
-            dz, dy = 0.7071, -0.7071
-            hz, hy = h / 2 * 0.7071, h / 2 * 0.7071
-            pts = [(x - w / 2, y - hy, z + hz), (x + w / 2, y - hy, z + hz), (x + w / 2, y + hy, z - hz), (x - w / 2, y + hy, z - hz)]
+        if normal == "down":
+            pts = [(x - w / 2, y, z - h / 2), (x + w / 2, y, z - h / 2), (x + w / 2, y, z + h / 2), (x - w / 2, y, z + h / 2)]
         else:
             pts = [(x - w / 2, y - h / 2, z), (x + w / 2, y - h / 2, z), (x + w / 2, y + h / 2, z), (x - w / 2, y + h / 2, z)]
         vs = [bm.verts.new(P(*q)) for q in pts]
-        f = bm.faces.new(vs if normal != "back" else list(reversed(vs)))
+        f = bm.faces.new(vs)
         for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
             lp[uvl].uv = uv
         me = bpy.data.meshes.new(name)
@@ -337,27 +334,52 @@ def bits():
         bpy.context.collection.objects.link(o)
         add(g, o, name, mat, smooth=False)
         return o
-    # (the jets: a dark row along the back lip's chamfer and one along the inside of the front lip's top, a hair off them)
-    plate("JetVentBack", 0.25, 0.012, (0.0, -0.0175 + 0.0007, 0.0725 + 0.0007), M["vent"], "slant")
-    plate("JetVentFront", 0.25, 0.012, (0.0, -0.115, 0.1192), M["vent"], "back")
-    # (the strip on its front: dark acrylic, the lamp in its middle; the grille by its foot, its slits)
-    plate("JetAcrylic", 0.2, 0.024, (0.0, -0.15, 0.1712), M["acrylic"])
-    plate("JetLamp", 0.07, 0.007, (0.0, -0.15, 0.1716), M["jetlamp"])
-    plate("JetGrille", 0.19, 0.075, (0.0, -0.47, 0.1712), M["steel"])
-    for k in range(6):
-        plate(f"JetSlit{k}", 0.17, 0.005, (0.0, -0.4425 - k * 0.011, 0.1716), M["vent"])
-    # ---- the paper towel dispenser (brushed stainless): smaller and higher than it was (the owner's: it sat bulky on the wainscot's rail):
-    # 22 wide, 27 tall, 8.5 deep, its origin at its middle on the wall; its lid's seam across its front, a little window onto the stack, the
-    # slot under its front edge the sheets come out of (the game draws a sheet's edge hanging from it, and one drawn out)
+
+    def disc_down(name, r, at, mat, g, v=12):
+        # (a round dark eye on an underside, facing down, filled in rungs)
+        bm = bmesh.new()
+        bm.loops.layers.uv.new()
+        x, y, z = at
+        ring = [bm.verts.new(P(x + r * math.cos(-2 * math.pi * k / v), y, z + r * math.sin(-2 * math.pi * k / v))) for k in range(v)]
+        faces = ladder_fill(bm, ring)
+        bm.normal_update()
+        if faces[0].normal.z > 0:
+            for f in faces:
+                f.normal_flip()
+        me = bpy.data.meshes.new(name)
+        bm.to_mesh(me)
+        bm.free()
+        o = bpy.data.objects.new(name, me)
+        bpy.context.collection.objects.link(o)
+        add(g, o, name, mat, smooth=False)
+        return o
+    # (underneath: the nozzle, a long dark slot across it, and the sensor's eye toward its front corner)
+    plate("DryerNozzle", 0.15, 0.014, (0.0, -0.2815, 0.07), M["vent"], "down")
+    disc_down("DryerSensor", 0.0065, (0.085, -0.2815, 0.088), M["vent"], "WcHandDryer")
+    # (its front: a fine seam across where the cover meets, the lamp under it)
+    plate("DryerSeam", 0.2, 0.0018, (0.0, -0.1, 0.1615), M["vent"])
+    plate("DryerLamp", 0.026, 0.006, (0.0, -0.2, 0.1615), M["jetlamp"])
+    # ---- the paper towel dispenser (the owner's, 2026-11-10: engineering plastic, not the grey steel box): 22 wide, 27 tall, 8.5 deep, its
+    # origin at its middle on the wall; matt warm-white ABS with a soft sheen, its edges well rounded; its lid's seam across its front, an
+    # upright strip of smoked acrylic on its right showing the stack inside (the game paints it, as full as the box is), a little round lock
+    # on its top, and under its front a curved lip the sheets come out of (the game hangs a sheet's end from it, and draws one out)
     node("WcTowelBox")
-    add("WcTowelBox", rbox("TowelBody", (0.22, 0.27, 0.085), (0.0, 0.0, 0.0425), 0.018, 3), "TowelBody", M["towel"])
-    plate("TowelSeam", 0.2, 0.003, (0.0, 0.085, 0.0852), M["towelgap"], g="WcTowelBox")
-    # (the window onto the stack: pale, the white paper behind it showing through)
-    plate("TowelWindow", 0.085, 0.045, (0.0, 0.03, 0.0852), M["towelwin"], g="WcTowelBox")
-    # (the slot: a dark strip on its underside near the front, facing down)
+    add("WcTowelBox", rbox("TowelBody", (0.22, 0.27, 0.085), (0.0, 0.0, 0.0425), 0.024, 3), "TowelBody", M["abs"])
+    plate("TowelSeam", 0.17, 0.0025, (0.0, 0.085, 0.0865), M["towelgap"], g="WcTowelBox")
+    plate("TowelWindow", 0.03, 0.15, (0.058, -0.01, 0.0865), M["towelwin"], g="WcTowelBox")
+    add("WcTowelBox", cyl(0.006, 0.004, (0.058, 0.136, 0.0425), v=16), "TowelLock", M["chrome"])
+    add("WcTowelBox", rbox("TowelKey", (0.0016, 0.0012, 0.0065), (0.058, 0.1381, 0.0425), 0.0, 1), "TowelKey", M["towelgap"], False)
+    # (the lip: a slot under its front, its back edge straight, its front bowed out, the dark of the inside showing)
     bm = bmesh.new()
-    vs = [bm.verts.new(P(*q)) for q in ((-0.08, -0.1352, 0.045), (0.08, -0.1352, 0.045), (0.08, -0.1352, 0.062), (-0.08, -0.1352, 0.062))]
-    bm.faces.new(vs)
+    bm.loops.layers.uv.new()
+    SEGS, Y = 8, -0.1365
+    back = [bm.verts.new(P(-0.07 + 0.14 * k / SEGS, Y, 0.034)) for k in range(SEGS + 1)]
+    front = [bm.verts.new(P(-0.07 + 0.14 * k / SEGS, Y, 0.05 + 0.009 * math.sin(math.pi * k / SEGS))) for k in range(SEGS + 1)]
+    lip = [bm.faces.new((back[k], back[k + 1], front[k + 1], front[k])) for k in range(SEGS)]
+    bm.normal_update()
+    if lip[0].normal.z > 0:
+        for f in lip:
+            f.normal_flip()
     me = bpy.data.meshes.new("TowelSlot")
     bm.to_mesh(me)
     bm.free()
