@@ -139,6 +139,8 @@ export function StaticBatch({ children, parts, plain = false }: { children: Reac
       }
     }
     h.visible = false
+    // (hidden only because the merged meshes draw them: still what the edit mode picks (scene/pickable), as the merged ones take no rays)
+    h.userData.drawnElsewhere = true
     // (the originals, hidden, aren't drawn; nor need their places be worked out again every frame: thousands of them, in all the batches)
     const own = h.updateMatrixWorld
     h.updateMatrixWorld = () => {}
@@ -171,6 +173,7 @@ export function StaticBatch({ children, parts, plain = false }: { children: Reac
         m.geometry.dispose()
       }
       h.visible = true
+      h.userData.drawnElsewhere = false
       h.updateMatrixWorld = own
     }
   }, [parts, plain])
@@ -284,7 +287,7 @@ export function homeCopy(root: THREE.Object3D, movers: THREE.Object3D[]) {
       if (!whole || h === at) return
       at = h
       copy.visible = h
-      for (const mv of movers) mv.visible = !h
+      for (const mv of movers) { mv.visible = !h; mv.userData.drawnElsewhere = h }
     },
   }
 }

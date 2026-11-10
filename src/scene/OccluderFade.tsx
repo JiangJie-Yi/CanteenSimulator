@@ -23,6 +23,8 @@ function ownCopy(own: Map<THREE.Material, THREE.Material>, mat: THREE.Material) 
   if (!c) {
     c = mat.clone()
     c.userData.base = { opacity: mat.opacity }
+    // (still the solid thing it was, to the edit mode's pointer (scene/pickable), see-through as it's made)
+    c.userData.fadeCopy = true
     c.transparent = true
     c.depthWrite = false
     own.set(mat, c)

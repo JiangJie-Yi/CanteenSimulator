@@ -3421,9 +3421,9 @@ function ledgeCopy(dish: THREE.Object3D, members: THREE.Object3D[]) {
       if (h === at) return
       at = h
       copy.visible = h
-      for (const mv of members) mv.visible = !h
+      for (const mv of members) { mv.visible = !h; mv.userData.drawnElsewhere = h }
     },
-    dispose() { if (at) for (const mv of members) mv.visible = true; dispose() },
+    dispose() { if (at) for (const mv of members) { mv.visible = true; mv.userData.drawnElsewhere = false } dispose() },
   }
 }
 

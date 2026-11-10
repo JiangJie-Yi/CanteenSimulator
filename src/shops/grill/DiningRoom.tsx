@@ -7,6 +7,7 @@ import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useFrame, useThree } from '@react-three/fiber'
 import { SWITCH_SPOT } from '@/game/shopState'
 import * as THREE from 'three'
+import { NO_RAY } from '@/scene/pickable'
 import { warmLater } from '@/scene/Prewarm'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
@@ -4109,7 +4110,7 @@ function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: n
       {/* (a lamp casts no shadow: the moon threw the lit lanterns' onto the floor, well away under them) */}
       <group position-y={-drop - 0.13}>
         <mesh geometry={LANTERN_GEO} material={band ? LANTERN_SHADE_TATEWAKU : LANTERN_SHADE} />
-        <mesh geometry={LANTERN_GEO} scale={1.035}>
+        <mesh geometry={LANTERN_GEO} scale={1.035} raycast={NO_RAY}>
           <meshBasicMaterial color={INK} side={THREE.BackSide} />
         </mesh>
         {[LANTERN_END + 0.004, -LANTERN_END - 0.004].map((y) => (
@@ -4119,12 +4120,13 @@ function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: n
           </mesh>
         ))}
         <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 4, 8]} /><meshToonMaterial color="#8a6a3a" /></mesh>
-        <sprite scale={0.85} material={PENDANT_GLOW} />
+        {/* (light, not the lamp: the pointer goes through them (they took clicks meant for the drinks behind, 3.6 m of bloom there by day too)) */}
+        <sprite scale={0.85} material={PENDANT_GLOW} raycast={NO_RAY} />
         {/* (and by night a wide soft bloom round it) */}
-        <sprite scale={2.2} material={PENDANT_BLOOM} />
+        <sprite scale={2.2} material={PENDANT_BLOOM} raycast={NO_RAY} />
       </group>
       {/* (the pool of light on the bar top below, down from the lamp's height) */}
-      <mesh position-y={pool - WALL_H + 0.004} rotation-x={-Math.PI / 2} renderOrder={1}>
+      <mesh position-y={pool - WALL_H + 0.004} rotation-x={-Math.PI / 2} renderOrder={1} raycast={NO_RAY}>
         <planeGeometry args={[1.3, 1.3]} />
         <primitive object={PENDANT_POOL} attach="material" />
       </mesh>
@@ -4703,15 +4705,15 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
         <pointsMaterial map={STAR} vertexColors size={1} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
       </points>
       {/* (and the flash of light up from them) */}
-      <sprite ref={flash} position={[CUPS_FX, 0.07, 0]} visible={false} renderOrder={5}>
+      <sprite ref={flash} position={[CUPS_FX, 0.07, 0]} visible={false} renderOrder={5} raycast={NO_RAY}>
         <spriteMaterial map={GLOW} color="#ffe39a" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </sprite>
       {/* (the Ebisu's halo, a faint glow always (hidden behind the shut doors), bright while blessed) */}
-      <sprite ref={halo} position={[EBISU_AT[0] - 0.01, EBISU_AT[1], EBISU_AT[2]]} scale={0.16} renderOrder={4}>
+      <sprite ref={halo} position={[EBISU_AT[0] - 0.01, EBISU_AT[1], EBISU_AT[2]]} scale={0.16} renderOrder={4} raycast={NO_RAY}>
         <spriteMaterial map={GLOW} color="#ffd27a" transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
       {/* (a faint rainbow aura round him while blessed, its colours slowly turning) */}
-      <sprite ref={aura} position={[EBISU_AT[0] - 0.012, EBISU_AT[1], EBISU_AT[2]]} scale={0.17} visible={false} renderOrder={5}>
+      <sprite ref={aura} position={[EBISU_AT[0] - 0.012, EBISU_AT[1], EBISU_AT[2]]} scale={0.17} visible={false} renderOrder={5} raycast={NO_RAY}>
         <spriteMaterial map={AURA} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
       {/* (the ripple of light spreading once from the cups as the offering's poured) */}
@@ -6735,7 +6737,7 @@ function MusicNotes({ playing }: { playing: boolean }) {
   return (
     <>
       {notes.map((_, i) => (
-        <sprite key={i} ref={(o) => { refs.current[i] = o }} visible={false}>
+        <sprite key={i} ref={(o) => { refs.current[i] = o }} visible={false} raycast={NO_RAY}>
           <spriteMaterial map={NOTE_TEX[i % NOTE_TEX.length]} transparent depthWrite={false} toneMapped={false} />
         </sprite>
       ))}

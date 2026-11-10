@@ -2,6 +2,7 @@
 // charcoal), a paper fan by the seasonings (waved over the fire, it fans the coals up), and a paper floor lantern (行燈)
 // glowing behind the stones, which can be moved about like the dishes. Roasting does the carrying (see held); what's dragged across the table is pushed clear of
 // them like anything else (DECOR is their footprint, for its settle()).
+import { NO_RAY } from '@/scene/pickable'
 import { getLights } from '@/scene/lightsStore'
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -457,11 +458,11 @@ function Lantern({ at }: { at: [number, number, number] }) {
       <primitive object={model.r} scale={K} />
       {/* the flame inside, seen through the paper */}
       {/* (a soft glow, not a solid shape: a hard cone showing through the paper cut dark wedges across it) */}
-      <sprite ref={flame} position={[0, MID * K * 0.9, 0]} scale={0.22}>
+      <sprite ref={flame} position={[0, MID * K * 0.9, 0]} scale={0.22} raycast={NO_RAY}>
         <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.7} color="#ffcf80" />
       </sprite>
       {/* the glow round it, always facing the camera, laid on additively */}
-      <sprite ref={halo} position={[0, MID * K, 0]} scale={0.95}>
+      <sprite ref={halo} position={[0, MID * K, 0]} scale={0.95} raycast={NO_RAY}>
         <spriteMaterial map={GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
       </sprite>
       {QUALITY.tier === 'high' && <AnchoredLight light={lamp} position={[0, MID * K, 0]} color="#ffb060" intensity={0.7} distance={1.8} decay={2} />}
@@ -786,7 +787,7 @@ function IngredientFridge() {
           <meshPhysicalMaterial color="#ff3a2a" emissive="#ff2a18" emissiveIntensity={1.6} roughness={0.08} clearcoat={1} toneMapped={false} />
         </mesh>
         <mesh position={[-0.0035, 0.004, 0.0075]}><sphereGeometry args={[0.0022, 8, 6]} /><meshBasicMaterial color="#fff2ec" toneMapped={false} /></mesh>
-        <sprite scale={[0.06, 0.06, 1]} position-z={0.004}>
+        <sprite scale={[0.06, 0.06, 1]} position-z={0.004} raycast={NO_RAY}>
           <spriteMaterial map={GLOW_TEX} color="#ff5a3a" transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </sprite>
       </group>

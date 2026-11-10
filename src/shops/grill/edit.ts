@@ -114,7 +114,9 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
   /** each piece's pivot, moved from its middle by hand (in its own frame), what it turns and grows about; and whether the arrows move the pivot (D) */
   pivots: Record<string, V3>; pivotMode: boolean; space: Space
   /** the scene drawn as its wireframe (Maya's 4), to see each model's topology; off is shaded (5) */
-  wire: boolean }
+  wire: boolean
+  /** pieces hidden by hand for now (H), to reach and see what's behind them: not drawn, not picked; Alt+H or leaving the mode shows them */
+  hidden: string[] }
 /** offsets made defaults (BASES) since they were set by hand: a browser still holding just that offset drops it, so it isn't counted twice
  * (the rest it holds are kept, as a new KEY would lose them) */
 const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0], willow: [-0.465, 0, -0.367] }
@@ -161,7 +163,7 @@ if (!relaid) try {
   for (const [k] of relaidDue) localStorage.setItem(k, '1')
 } catch { /* private window */ }
 let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
-  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false }
+  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false, hidden: [] }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
 let lastSelected: string | null = null
@@ -632,10 +634,42 @@ function leave(text: string) {
   state.on = false
   state.selected = null
   state.picked = []
+  state.hidden = []
   state.tool = 'move'
   past.length = 0; future = []
   emit()
   toast(text, 'plain')
+}
+/** what a piece or a group is called, in the panel's language */
+const nameOf = (id: string) => (state.groups[id] ? pieceName(state.groups[id].name, lang) : registry.get(id) ? pieceName(registry.get(id)!.label, lang) : id)
+/**
+ * Clicked again where the last click was (Movable; the owner's, 2026-11-10: a piece behind another was never reached, the one in front taken
+ * every time): the next one back of what's under the pointer (`stack`, front to back), round to the front after the last; said which it is
+ */
+export function chooseNext(stack: string[], from: string) {
+  const k = (stack.indexOf(from) + 1) % stack.length
+  state.picked = []
+  select(stack[k])
+  toast(T().cycled(nameOf(stack[k]), k + 1, stack.length), 'plain')
+}
+/** H: what's chosen hidden for now (a piece, or each piece of a group), to reach and see what's behind it; let go of */
+export function hideSelected() {
+  const id = state.selected
+  if (!id) { toast(T().hideNone, 'plain'); return }
+  const ids = state.groups[id] ? leavesOf(state.groups, id) : [id]
+  state.hidden = [...new Set([...state.hidden, ...ids])]
+  state.selected = null
+  state.picked = []
+  emit()
+  toast(T().hid(nameOf(id)), 'plain')
+}
+/** Alt+H: all that's hidden shown again */
+export function showHidden() {
+  const n = state.hidden.length
+  if (!n) { toast(T().noneHidden, 'plain'); return }
+  state.hidden = []
+  emit()
+  toast(T().shownAll(n), 'plain')
 }
 /** 確認: the changes stay */
 export function confirmEdit() {
@@ -879,6 +913,7 @@ const PANEL_CSS = `
 .be-area::before { display:none }
 .be-row.multi { background:#2f4a73; color:#fff }
 .be-row.on { background:#4772b3; color:#fff }
+.be-row.off { opacity:.42; font-style:italic }
 .be-row.on::before { border-color:#fff; background:#ffd37a }
 .be-name { padding:2px 0 6px; color:#f0f0f0; font-weight:600; min-height:20px }
 .be-name em { font-style:normal; font-weight:400; color:#8a8a8a }
@@ -1062,6 +1097,8 @@ function panel() {
       row.onclick = (e) => {
         const ev = e as MouseEvent
         if (!group && (ev.ctrlKey || ev.metaKey || ev.shiftKey)) { pickToggle(id); return }
+        // (a piece hidden by hand (H), chosen from the list: shown again)
+        if (state.hidden.includes(id)) state.hidden = state.hidden.filter((x) => x !== id)
         if (!group) registry.get(id)?.focus()
         state.picked = []
         select(id)
@@ -1266,7 +1303,7 @@ function panel() {
   if (spaceButton) spaceButton.classList.toggle('local', state.space === 'local')
   if (spaceButton) { spaceButton.textContent = state.space === 'local' ? T().spaceLocalShort : T().spaceWorldShort; spaceButton.title = state.space === 'local' ? T().spaceLocal : T().spaceWorld }
   if (pivotButton) { pivotButton.textContent = 'D'; pivotButton.title = T().pivot; pivotButton.classList.toggle('on', state.pivotMode) }
-  for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)) }
+  for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)); row.classList.toggle('off', state.hidden.includes(id)) }
   // (a new pick shows its own tab: a camera picked in the scene brings up the cameras)
   if (state.selected !== tabFollows) {
     tabFollows = state.selected
@@ -1316,6 +1353,8 @@ if (typeof window !== 'undefined') {
       if (k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return }
       if (k === 'y') { e.preventDefault(); redo(); return }
     }
+    // (H hides what's chosen, Alt+H shows all that's hidden: by the key's place, as Alt+H types another letter on a Mac)
+    if (state.on && !typing && !e.repeat && !e.ctrlKey && !e.metaKey && e.code === 'KeyH') { e.preventDefault(); if (e.altKey) showHidden(); else hideSelected(); return }
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
     if (state.on && !typing) {
       const k = e.key.toLowerCase()

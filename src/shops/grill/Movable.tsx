@@ -1,7 +1,9 @@
 // A piece of the shop's furnishing that can be moved by hand in edit mode (edit.ts): its children sit in a group offset by the piece's saved
 // offset (in its parent's own units), and while editing a box of fine lines fitted to it shows it can be edited (brighter pointed at, amber
 // when chosen); it's taken hold of by the piece itself (whatever's nearest under the pointer, so a small thing in front of a big one is never
-// lost behind it) and dragged over the floor (Shift lifts it), or with the select tool (Q) only chosen. Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
+// lost behind it) and dragged over the floor (Shift lifts it), or with the select tool (Q) only chosen. Only what's drawn and solid takes the
+// pointer (scene/pickable: not a lamp's glow, its pool of light, an unseen hit box, a piece hidden by hand (H)); clicked again in the same
+// place, the next piece back is chosen. Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -9,7 +11,8 @@ import * as THREE from 'three'
 import { ALONG } from './bar'
 import { holdVeil } from '@/scene/Later'
 import { warmLater } from '@/scene/Prewarm'
-import { beginChange, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
+import { solidHit, pieceOf } from '@/scene/pickable'
+import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -26,6 +29,18 @@ export function focusCamera(camera: THREE.Camera, controls: Controls, p: THREE.V
 const DEG = Math.PI / 180
 /** how long the handles are on the screen, in pixels */
 const GIZMO_PX = 130
+
+/** each piece's own grab (its drag over the floor, begun from a press): a press over one piece may be another's to take, the one behind it */
+const GRABS = new Map<string, (ev: PointerEvent) => void>()
+/**
+ * The last click on a piece: where on the screen, the camera as it stood (the owner's, 2026-11-10: a piece behind another must be reached by
+ * clicking again in the same place). Pressed again there, the camera unmoved, the press takes what's chosen, wherever it is among what's under
+ * the pointer (to drag it); let go without a drag, the next one back is chosen, round to the front again after the last.
+ */
+const CYCLE = { x: -1e4, y: -1e4, cam: '' }
+const camKey = (c: THREE.Camera) => c.matrixWorld.elements.map((v) => v.toFixed(3)).join()
+/** one of what's under the pointer, as r3f books it for its way in and out */
+const overKey = (e: { object: THREE.Object3D; index?: number; instanceId?: number }) => `${e.object.uuid}/${e.index}/${e.instanceId}`
 
 /**
  * While editing, each piece that can be moved is outlined by a box of fine lines fitted to the model (its drawn meshes, measured in the piece's
@@ -565,8 +580,10 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   const laid = useRef(false)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, offsets, rotations, scales, selected, groups, tool, pivots, space } = useEdit()
+  const { on, offsets, rotations, scales, selected, groups, tool, pivots, space, hidden } = useEdit()
   void pivots
+  // (hidden by hand (H) for now, to reach and see what's behind it: not drawn, not picked; Alt+H, or leaving the mode, shows it again)
+  const hiddenHere = on && hidden.includes(id)
   /** the group the turn and scale act about (the pivot): its matrix, with what's inside it, is what moving the pivot must make up for */
   const pg = useRef<THREE.Group>(null)
   const [box, setBox] = useState<{ c: V3; s: V3; yaw: number; theta: number } | null>(null)
@@ -905,18 +922,47 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on, poseKey])
 
-  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; intersections?: { object: THREE.Object3D }[] }) => {
+  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; object: THREE.Object3D; intersections?: { object: THREE.Object3D }[] }) => {
     const grp = g.current
     if (!on || !grp || !grp.parent) return
     // (an axis arrow under the pointer takes it: the box is only for the free move)
     if (e.intersections?.some((i) => i.object.userData.gizmo)) return
+    // (what was hit isn't drawn and solid (a lamp's glow, its pool of light on the bar, an unseen hit box, a piece hidden by hand): not this
+    // piece's to take; the ray goes on to what's behind it)
+    if (!solidHit(e.object)) return
     e.stopPropagation()
-    // (a piece in a group is picked as its group, and the group's own handles move, turn and size it all together; Alt picks the piece alone.
-    // A view's whole area isn't picked so (that's from the list, or its tag): the piece in it is)
-    const grpId = clickPick(id)
-    if (grpId !== id && !e.nativeEvent.altKey) { select(grpId); return }
+    // (everything solid under the pointer, front to back, each once: a piece in a group as its group (the group's own handles move, turn and
+    // size it all together), Alt the piece alone; a view's whole area isn't picked so (that's from the list, or its tag): the piece in it is)
+    const alt = e.nativeEvent.altKey
+    const stack: string[] = []
+    for (const hit of e.intersections ?? []) {
+      const p = solidHit(hit.object) ? pieceOf(hit.object) : null
+      const s = p && (alt ? p : clickPick(p))
+      if (s && !stack.includes(s)) stack.push(s)
+    }
+    if (!stack.length) stack.push(alt ? id : clickPick(id))
+    // (pressed again where the last click was, the camera unmoved: what's chosen is taken, wherever it is among them, and a click (not a
+    // drag) goes on to the next one back)
+    const { clientX: x, clientY: y } = e.nativeEvent
+    const cam = camKey(camera)
+    const cur = getEdit().selected
+    const again = Math.hypot(x - CYCLE.x, y - CYCLE.y) < 6 && cam === CYCLE.cam && !!cur && stack.includes(cur)
+    const target = again ? cur! : stack[0]
+    window.addEventListener('pointerup', (ev) => {
+      if (Math.hypot(ev.clientX - x, ev.clientY - y) >= 4) { CYCLE.x = -1e4; return }
+      if (again && stack.length > 1) chooseNext(stack, target)
+      CYCLE.x = x; CYCLE.y = y; CYCLE.cam = cam
+    }, { once: true })
+    const take = GRABS.get(target)
+    if (take && !getEdit().groups[target]) take(e.nativeEvent)
+    else select(target)
+  }
+  /** its drag over the floor (Shift: up and down, square to the camera), from a press; with the select tool (Q) only chosen */
+  const grab = (ev0: PointerEvent) => {
+    const grp = g.current
+    if (!on || !grp || !grp.parent) return
     if (tool === 'select') { moveTo(id, offsetOf(id)); return }
-    const lift = e.nativeEvent.shiftKey
+    const lift = ev0.shiftKey
     const wp = grp.getWorldPosition(new THREE.Vector3())
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -wp.y)
     if (lift) {
@@ -928,7 +974,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camera)
       return raycaster.ray.intersectPlane(plane, new THREE.Vector3())
     }
-    let last = at(e.nativeEvent)
+    let last = at(ev0)
     if (!last) return
     beginChange()
     moveTo(id, offsetOf(id))
@@ -950,22 +996,33 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up, { once: true })
   }
+  useLayoutEffect(() => {
+    GRABS.set(id, grab)
+    return () => { if (GRABS.get(id) === grab) GRABS.delete(id) }
+  })
 
   const [hover, setHover] = useState(false)
+  // (what of it, solid, is under the pointer: lit while any of it is (one face's way out isn't the piece's, another face still under it))
+  const over = useRef(new Set<string>())
   const listed = useListHot(id)
   useEditBox(inner, on, selected === id || isPicked(id) ? 'chosen' : hover || listed ? 'hover' : 'idle', ready, inYaw)
-  useEffect(() => { if (!on) setHover(false) }, [on])
+  useEffect(() => { if (!on) { over.current.clear(); setHover(false) } }, [on])
 
   return (
-    <group ref={gw} matrixAutoUpdate={false}>
+    <group ref={gw} matrixAutoUpdate={false} visible={!hiddenHere}>
     <group ref={g} position={o} userData={{ editId: id }}>
       {/* (turned and scaled about the piece's own middle, not the group's origin, which may be far from it) */}
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
       <group ref={pg} position={piv} rotation-y={thetaW} visible={ready || !pivoted}
         onPointerDown={on ? down : undefined}
-        onPointerOver={on ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); setHover(true) } : undefined}
-        onPointerOut={on ? () => setHover(false) : undefined}>
+        onPointerOver={on ? (e: { stopPropagation: () => void; object: THREE.Object3D; index?: number; instanceId?: number }) => {
+          if (!solidHit(e.object)) return
+          e.stopPropagation(); over.current.add(overKey(e)); setHover(true)
+        } : undefined}
+        onPointerOut={on ? (e: { object: THREE.Object3D; index?: number; instanceId?: number }) => {
+          over.current.delete(overKey(e)); if (!over.current.size) setHover(false)
+        } : undefined}>
         <group rotation={[(rot[0] + baseTurn[0]) * DEG, (rot[1] + baseTurn[1]) * DEG, (rot[2] + baseTurn[2]) * DEG]}>
           {/* (sized along the piece's own axes, the way its own X, Y, Z handles point: turned from the room's into the content's own, scaled,
               turned back) */}

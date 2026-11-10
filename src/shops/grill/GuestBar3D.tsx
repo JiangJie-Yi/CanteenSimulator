@@ -2,6 +2,7 @@ import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes } from '@/game/skewers'
 import { rattleSound } from './skewerSound'
 import { getClock } from '@/ui/clockStore'
+import { NO_RAY } from '@/scene/pickable'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
@@ -775,7 +776,7 @@ function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream
         {/* (the long lantern's middle: its cord, then half its height under it) */}
         <group position-y={-0.5}>
           <primitive object={model} />
-          <sprite ref={halo} scale={[0.9, 1.25, 1]}>
+          <sprite ref={halo} scale={[0.9, 1.25, 1]} raycast={NO_RAY}>
             <spriteMaterial map={CHOCHIN_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.5} />
           </sprite>
         </group>
@@ -1018,10 +1019,10 @@ function FishLantern() {
       </mesh>
       <group ref={hang} position-y={-FISH_LANTERN_CORD}>
         <primitive object={model} />
-        <sprite ref={fishGlow} position-y={-0.16} scale={[0.62, 0.55, 1]}>
+        <sprite ref={fishGlow} position-y={-0.16} scale={[0.62, 0.55, 1]} raycast={NO_RAY}>
           <spriteMaterial map={FISH_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
         </sprite>
-        <sprite position-y={-0.68} scale={[0.5, 0.95, 1]}>
+        <sprite position-y={-0.68} scale={[0.5, 0.95, 1]} raycast={NO_RAY}>
           <spriteMaterial map={FISH_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.35} color="#bcd0ff" />
         </sprite>
       </group>

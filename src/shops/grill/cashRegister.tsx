@@ -493,6 +493,7 @@ export function RegisterKeys({ lang }: { lang: Lang }) {
     let busy = !!hovered.current
     if (!busy) for (const at of REGISTER.pressed.values()) if (now - at < 300) { busy = true; break }
     keys.visible = busy
+    keys.userData.drawnElsewhere = !busy
     keysAll.visible = !busy
     // the keys: down fast, held a moment, back up
     keys.children.forEach((key) => {

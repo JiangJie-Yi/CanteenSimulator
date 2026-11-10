@@ -1,4 +1,5 @@
 import { personName } from '@/data/people'
+import { solidHit } from '@/scene/pickable'
 import { setTip } from '@/scene/hoverTip'
 import { normalizeRenderer } from '@/scene/materialNormalize'
 import { useLowPower } from '@/scene/power'
@@ -895,7 +896,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
     const alt = (e: KeyboardEvent | PointerEvent) => { c.enabled = e.altKey }
     const down = (e: PointerEvent) => {
       c.mouseButtons.RIGHT = e.altKey ? THREE.MOUSE.DOLLY : THREE.MOUSE.PAN
-      const onSomething = getThree().internal.hovered.size > 0
+      // (only something solid, or a handle: a lamp's glow over the wall isn't something)
+      const onSomething = [...getThree().internal.hovered.values()].some((h) => h.object.userData.gizmo || solidHit(h.object))
       c.enabled = e.altKey || e.button === 1 || e.button === 2 || (e.button === 0 && !onSomething)
     }
     const up = () => { c.enabled = false }
