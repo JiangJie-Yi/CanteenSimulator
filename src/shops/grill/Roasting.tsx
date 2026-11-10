@@ -299,6 +299,8 @@ const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
  * footprint. At a bucket's own size (on the table it was once drawn three times as big, nearly a metre across) */
 const BUCKET_SCALE = 0.55
 const BIN_R = 0.27 * BUCKET_SCALE
+/** (scratch: a piece's size in the world, for its rod) */
+const ROD_WS = new THREE.Vector3()
 /** the trash bin for bare sticks, burnt scraps and the like (the water bucket is only for water), on the floor by the cook's right foot */
 const TRASH_R = 0.15
 const TRASH_H = 0.3
@@ -1457,23 +1459,27 @@ function HearthGuard() {
  * same white as the table's faces round them, the bay looked to be no recess at all, the top cut and the body under it flat). The walls are the
  * body's faces, set 0.06 back from the cuts (COOK_TABLE_PARTS' insets); the wash 2 mm off them, from the kick's top to the body's
  */
-const RECESS_TEX = (() => {
+const recessTex = (k: number) => {
   const c = document.createElement('canvas')
   c.width = 4; c.height = 64
   const g = c.getContext('2d')!
   const grad = g.createLinearGradient(0, 0, 0, 64)
   // (deep enough to read as in under the top, not as a stain: at 0.5 at its top to 0.1 at its foot, the walls' middles came out a tenth darker
   // than the outer faces, and the bay still looked to be no recess)
-  grad.addColorStop(0, 'rgba(26,18,12,0.6)')
-  grad.addColorStop(0.35, 'rgba(26,18,12,0.38)')
-  grad.addColorStop(1, 'rgba(26,18,12,0.26)')
+  grad.addColorStop(0, `rgba(26,18,12,${0.6 * k})`)
+  grad.addColorStop(0.35, `rgba(26,18,12,${0.38 * k})`)
+  grad.addColorStop(1, `rgba(26,18,12,${0.26 * k})`)
   g.fillStyle = grad; g.fillRect(0, 0, 4, 64)
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   return tex
-})()
-const RECESS_MAT = new THREE.MeshBasicMaterial({ map: RECESS_TEX, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
-  polygonOffsetUnits: -1 })
+}
+const recessMat = (k: number) => new THREE.MeshBasicMaterial({ map: recessTex(k), transparent: true, depthWrite: false, polygonOffset: true,
+  polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
+const RECESS_MAT = recessMat(1)
+/** the recesses' side walls the deeper (the owner's, 2026-11-11: they face the room's light, and with the back wall's wash they still read as
+ * the table's white outer faces, as if not in under the top at all) */
+const RECESS_SIDE_MAT = recessMat(1.45)
 const RecessShade = memo(function RecessShade() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP + KICK_H, top = -0.08, h = top - floor
   const IN = 0.06, OFF = 0.002
@@ -1497,7 +1503,7 @@ const RecessShade = memo(function RecessShade() {
           : new THREE.Vector3().addScaledVector(ALONG, mid).addScaledVector(LAY, w.at)
         p.y = floor + h / 2
         const n = (w.across === 'along' ? ALONG : LAY).clone().multiplyScalar(w.face)
-        return <mesh key={i} position={p} rotation-y={Math.atan2(n.x, n.z)} material={RECESS_MAT} raycast={() => {}} renderOrder={1}>
+        return <mesh key={i} position={p} rotation-y={Math.atan2(n.x, n.z)} material={i % 3 ? RECESS_SIDE_MAT : RECESS_MAT} raycast={() => {}} renderOrder={1}>
           <planeGeometry args={[len, h]} />
         </mesh>
       })}
@@ -3986,8 +3992,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const bindMaterials = (p: Piece) => {
     if (p.mats.length) return
     const meshes: THREE.Mesh[] = []
+    // (not the one ink line round another portion's parts, copied with its node (inkOneLine makes this piece's own): it isn't toon, and a second
+    // portion of a whole fish was never bound, its rod never made the standard one nor pulled, drawn as large as the fish (the owner's, a week))
     p.node.traverse((o) => {
-      if (o instanceof THREE.Mesh && !o.name.endsWith('_outline')) meshes.push(o)
+      if (o instanceof THREE.Mesh && !o.name.endsWith('_outline') && !o.userData.oneInk) meshes.push(o)
     })
     if (!meshes.length || !meshes.every((m) => m.material instanceof THREE.MeshToonMaterial)) return
     const rand = seeded(p.key)
@@ -6958,13 +6966,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (here && p.skewerAt !== undefined && p.pullAt === undefined) inUse++
         // (the rod: in as it's pushed, out as it's pulled; none before or after)
         const grow = p.skewerAt === undefined ? 0 : p.pullAt !== undefined ? 1 - Math.min(1, (now - p.pullAt) / 450) : Math.min(1, (now - p.skewerAt) / 600)
-        // (every rod the one standard size (the owner's, 2026-11-11: some long and thick): its shape is made for the piece at its home size;
-        // the piece drawn larger than it's meant to be now (its size here, served or not (`shrink`), against its home size), the rod's taken
-        // back by as much: never larger than standard. Smaller (popping in, shrunk away) it goes with the piece, as it did)
+        // (every rod the one standard size (the owner's, 2026-11-11: some long and thick, a week of it): its shape is made for the piece at its
+        // home size; however much larger than that the piece is drawn in the world now (its own size, popping in or served, and everything it's
+        // in), the rod's taken back by as much: never larger than standard. Smaller (popping in, shrunk away) it goes with the piece, as it did.
+        // (it went by the piece's own size against what it was meant to be, and the whole fish, drawn 1.1 to 1.3 as they're served, kept rods
+        // to 2 m long))
         const hs = p.node.userData.home?.s as THREE.Vector3 | undefined
-        const k = menuIds.has(p.id) && hs && hs.x > 0 ? p.node.scale.x / hs.x : 1
-        const meant = menuIds.has(p.id) ? ((p.node.userData.shrink as number | undefined) ?? 1) : k
-        const keep = k > meant * 1.02 ? meant / k : 1
+        const wk = hs && hs.x > 0 ? p.node.getWorldScale(ROD_WS).x / hs.x : 1
+        const keep = wk > 1.0 ? 1 / wk : 1
         for (const m of p.sticks) {
           m.visible = grow > 0.001 && !p.stickOnly ? true : p.stickOnly && p.pullAt === undefined
           m.scale.setScalar((p.stickOnly ? 1 : Math.max(0.001, grow)) * keep)
