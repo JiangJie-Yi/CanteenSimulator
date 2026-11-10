@@ -1,7 +1,8 @@
 /**
  * The drinks behind the fridges: what's kept in the back (the crates by the fridges), bought by the case, and carried out to the fridges by
  * one of the staff a trip at a time. Pure: the fridges' shelves are rows of places, each holding a drink or nothing (null), each with the
- * drink it's meant for (`home`).
+ * drink it's meant for (`home`), and how many of it stand there one behind another (the owner's, 2026-11-10: a place was one drink, and the
+ * ones seen behind it went with it when it was taken; now each is a bottle of its own, taken from the front).
  */
 export type Back = Record<string, number>
 
@@ -28,55 +29,110 @@ export function buyCase(back: Back, id: string, cash: number) {
   return { ok: true, back: { ...back, [id]: (back[id] ?? 0) + (CASE_SIZE[id] ?? 24) }, cash: cash - cost }
 }
 
-/** one trip of restocking: the empty places filled with the drink each is meant for (or only `only`'s), from the back, as many as one can carry */
-export function restockRun<T extends string>(rows: (T | null)[][], home: T[][], back: Back, carry: number, only?: T) {
-  const out = rows.map((r) => [...r])
-  const left = { ...back }
-  let moved = 0
-  for (let r = 0; r < out.length && moved < carry; r++) {
-    for (let k = 0; k < out[r].length && moved < carry; k++) {
-      const want = home[r][k]
-      if (out[r][k] !== null || !want || (only && want !== only) || (left[want] ?? 0) <= 0) continue
-      out[r][k] = want
-      left[want]--
-      moved++
-    }
+/**
+ * How many of a drink stand in one place, one behind another, the front one and those behind it back to the fridge's back wall (as far as
+ * its own depth goes in it: the big bottles and the cans two, the little bottles, the coffee cans and the packs three); one for a drink this
+ * doesn't know
+ */
+export const PLACE_DEPTH: Record<string, number> = {
+  oolong: 2, greenTea: 2, sports: 2, cola: 2, yuzuSoda: 2, lacticSoda: 2, beer: 2, darkBeer: 2, beerCan: 2, highball: 2, chuhai: 2,
+  ramune: 3, milk: 3, coffee: 3, blackCoffee: 3, cafeAuLait: 3, appleJuice: 3, barleyTea: 3, vegJuice: 3, yakult: 3, yogurt: 3,
+  sake: 3, umeshu: 3, shochu: 3, grapeSoju: 3,
+}
+export const depthOf = (id: string | null | undefined) => (id ? PLACE_DEPTH[id] ?? 1 : 1)
+
+/** a fridge's places: each one's drink (or nothing), and how many of it stand there (0 when there's nothing) */
+export type Places<T extends string = string> = { rows: (T | null)[][]; counts: number[][] }
+const copyOf = <T extends string>(p: Places<T>): Places<T> => ({ rows: p.rows.map((r) => [...r]), counts: p.counts.map((r) => [...r]) })
+
+/** how many more of `id` a place has room for: none if another drink stands in it */
+export const roomFor = <T extends string>(p: Places<T>, r: number, k: number, id: T) =>
+  p.rows[r][k] === null || p.rows[r][k] === id ? Math.max(0, depthOf(id) - (p.rows[r][k] === null ? 0 : p.counts[r][k])) : 0
+
+/** one taken from a place, its front one (a customer's, the player's): the drink, or null if there was none; the place emptied with its last */
+export function takeFromPlace<T extends string>(p: Places<T>, r: number, k: number): T | null {
+  const id = p.rows[r][k]
+  if (!id || p.counts[r][k] <= 0) { p.rows[r][k] = null; p.counts[r][k] = 0; return null }
+  p.counts[r][k]--
+  if (p.counts[r][k] <= 0) { p.rows[r][k] = null; p.counts[r][k] = 0 }
+  return id
+}
+/** one put into a place (by hand): an empty one, or in front of the others of its own kind if there's room; whether it went in */
+export function putInPlace<T extends string>(p: Places<T>, r: number, k: number, id: T) {
+  if (roomFor(p, r, k, id) <= 0) return false
+  if (p.rows[r][k] === null) { p.rows[r][k] = id; p.counts[r][k] = 0 }
+  p.counts[r][k]++
+  return true
+}
+/** one carried by hand from one place to another: into an empty one or among its own kind there; a lone one swapped with a lone one of
+ * another kind; otherwise (another kind fills it) it goes back where it was. Whether anything moved */
+export function moveBetween<T extends string>(p: Places<T>, from: [number, number], to: [number, number]) {
+  const [fr, fk] = from, [tr, tk] = to
+  if (fr === tr && fk === tk) return false
+  const id = p.rows[fr][fk]
+  if (!id) return false
+  if (roomFor(p, tr, tk, id) > 0) { takeFromPlace(p, fr, fk); putInPlace(p, tr, tk, id); return true }
+  const there = p.rows[tr][tk]
+  if (there && there !== id && p.counts[fr][fk] === 1 && p.counts[tr][tk] === 1) {
+    p.rows[fr][fk] = there
+    p.rows[tr][tk] = id
+    return true
   }
-  return { rows: out, back: left, moved }
+  return false
 }
 
-/** how many places in the fridges are empty that the back could fill */
-export const emptyFillable = <T extends string>(rows: (T | null)[][], home: T[][], back: Back) =>
-  rows.reduce((n, r, ri) => n + r.filter((x, k) => x === null && (back[home[ri][k]] ?? 0) > 0).length, 0)
+/** one trip of restocking: the places filled with the drink each is meant for (or only `only`'s), each as far as it goes, from the back,
+ * as many as one can carry */
+export function restockRun<T extends string>(places: Places<T>, home: T[][], back: Back, carry: number, only?: T) {
+  const p = copyOf(places)
+  const left = { ...back }
+  let moved = 0
+  for (let r = 0; r < p.rows.length && moved < carry; r++) {
+    for (let k = 0; k < p.rows[r].length && moved < carry; k++) {
+      const want = home[r][k]
+      if (!want || (only && want !== only)) continue
+      while (moved < carry && (left[want] ?? 0) > 0 && putInPlace(p, r, k, want)) { left[want]--; moved++ }
+    }
+  }
+  return { rows: p.rows, counts: p.counts, back: left, moved }
+}
+
+/** how many drinks the fridges have room for that the back could fill (each kind's room, as far as the back has of it) */
+export function emptyFillable<T extends string>(p: Places<T>, home: T[][], back: Back) {
+  const room: Record<string, number> = {}
+  home.forEach((row, r) => row.forEach((id, k) => { if (id) room[id] = (room[id] ?? 0) + roomFor(p, r, k, id) }))
+  return Object.entries(room).reduce((n, [id, k]) => n + Math.min(k, back[id] ?? 0), 0)
+}
 
 /** a fridge with nothing in it: a new shop's (its drinks are put in from the back, by hand or by the stocker) */
-export const emptyFridge = <T extends string>(home: T[][]): (T | null)[][] => home.map((r) => r.map(() => null))
+export const emptyFridge = <T extends string>(home: T[][]): Places<T> => ({ rows: home.map((r) => r.map(() => null)), counts: home.map((r) => r.map(() => 0)) })
 
-/** the empty places filled from the back by hand, each with the drink it's meant for: all of them, or only `only`'s; as far as the back goes */
-export const fillFromBack = <T extends string>(rows: (T | null)[][], home: T[][], back: Back, only?: T) => restockRun(rows, home, back, Infinity, only)
+/** the places filled from the back by hand, each with the drink it's meant for: all of them, or only `only`'s; as far as the back goes */
+export const fillFromBack = <T extends string>(p: Places<T>, home: T[][], back: Back, only?: T) => restockRun(p, home, back, Infinity, only)
 
-/** each drink in a fridge: how many of its own places hold it (what's seen on its shelf), how many places are meant for it, and how many
- * of it stand in another drink's places (moved there by hand): those aren't on its shelf (the owner's, 2026-11-10: a coffee dragged into a
- * black coffee's empty place, and the coffee's shelf, a gap in it, still said 3/3) */
-export function drinkCounts<T extends string>(rows: (T | null)[][], home: T[][]) {
+/** each drink in a fridge: how many stand in its own places (what's seen on its shelf), how many its places hold, and how many of it stand
+ * in another drink's places (moved there by hand): those aren't on its shelf (the owner's, 2026-11-10: a coffee dragged into a black
+ * coffee's empty place, and the coffee's shelf, a gap in it, still said 3/3) */
+export function drinkCounts<T extends string>(p: Places<T>, home: T[][]) {
   const out: Record<string, { have: number; places: number; astray: number }> = {}
-  home.forEach((r) => r.forEach((id) => { (out[id] ??= { have: 0, places: 0, astray: 0 }).places++ }))
-  rows.forEach((r, i) => r.forEach((id, k) => {
+  home.forEach((r) => r.forEach((id) => { (out[id] ??= { have: 0, places: 0, astray: 0 }).places += depthOf(id) }))
+  p.rows.forEach((r, i) => r.forEach((id, k) => {
     if (!id) return
     const c = (out[id] ??= { have: 0, places: 0, astray: 0 })
-    if (home[i]?.[k] === id) c.have++
-    else c.astray++
+    if (home[i]?.[k] === id) c.have += p.counts[i][k]
+    else c.astray += p.counts[i][k]
   }))
   return out
 }
 
-/** the fridges' places (each fridge's rows) and the back, as kept in the browser */
-export type DrinkSave = { units: (string | null)[][][]; back: Back }
+/** the fridges' places (each fridge's rows, and how many stand in each) and the back, as kept in the browser */
+export type DrinkSave = { units: (string | null)[][][]; counts?: number[][][]; back: Back }
 export const writeDrinks = (d: DrinkSave) => JSON.stringify(d)
 /** the fridges and the back as they were kept, if they fit the fridges as they are now (`homes`: each fridge's places, the drink each is
- * meant for) and hold only drinks those know; else null (a new shop's are used) */
-export function readDrinks(text: string | null, homes: string[][][]): DrinkSave | null {
-  let raw: { units?: unknown; back?: unknown } | null
+ * meant for) and hold only drinks those know; else null (a new shop's are used). Kept before each place held more than one (no counts):
+ * every place holding a drink full, as its ranks were drawn behind it then */
+export function readDrinks(text: string | null, homes: string[][][]): (DrinkSave & { counts: number[][][] }) | null {
+  let raw: { units?: unknown; counts?: unknown; back?: unknown } | null
   try { raw = JSON.parse(text ?? 'null') } catch { return null }
   if (!raw || !Array.isArray(raw.units) || !raw.back || typeof raw.back !== 'object' || raw.units.length !== homes.length) return null
   const known = new Set(homes.flat(2))
@@ -88,7 +144,15 @@ export function readDrinks(text: string | null, homes: string[][][]): DrinkSave 
       if (!Array.isArray(row) || row.length !== homes[u][r].length || row.some((x) => x !== null && !known.has(x as string))) return null
     }
   }
+  // (how many stand in each: as kept, within what the place holds; a count that doesn't fit, or none kept at all, the place full)
+  const kept = Array.isArray(raw.counts) ? (raw.counts as unknown[][][]) : null
+  const counts = homes.map((rows, u) => rows.map((row, r) => row.map((_, k) => {
+    const id = units[u][r][k] as string | null
+    if (!id) return 0
+    const n = kept?.[u]?.[r]?.[k]
+    return typeof n === 'number' && Number.isFinite(n) && n >= 1 ? Math.min(depthOf(id), Math.floor(n)) : depthOf(id)
+  })))
   const back: Back = {}
   for (const [k, v] of Object.entries(raw.back as Record<string, unknown>)) if (typeof v === 'number' && v >= 0) back[k] = Math.floor(v)
-  return { units: units as (string | null)[][][], back }
+  return { units: units as (string | null)[][][], counts, back }
 }

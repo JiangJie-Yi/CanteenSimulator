@@ -19,8 +19,10 @@ function brighten(m: THREE.Material): THREE.Material {
   if ('emissive' in c) {
     // (lit materials: a warm emissive, and the colour itself a little lighter)
     mm.emissive = GLOW.clone()
-    // (more on a physically lit one: dark wood under the room's light hardly shows a little)
-    mm.emissiveIntensity = Math.max(mm.emissiveIntensity ?? 0, 0) + ((c as THREE.MeshStandardMaterial).isMeshStandardMaterial ? 0.5 : 0.32)
+    // (more on a physically lit one: dark wood under the room's light hardly shows a little). From a full emissive at least, whatever it
+    // was: one lit a little from within already (the fridge's bottles and their labels, at a tenth to a third) glowed far less than the rest
+    // of the room under the pointer (the owner's, 2026-11-10: a bottle's glow should be everything else's)
+    mm.emissiveIntensity = Math.max(mm.emissiveIntensity ?? 0, 1) + ((c as THREE.MeshStandardMaterial).isMeshStandardMaterial ? 0.5 : 0.32)
     if (mm.color) mm.color = mm.color.clone().multiplyScalar(1.04)
   } else if (mm.color) {
     // (unlit ones, which have no emissive: the colour lifted and warmed)

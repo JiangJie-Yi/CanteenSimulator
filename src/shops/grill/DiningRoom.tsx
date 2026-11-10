@@ -20,7 +20,7 @@ import { ColdMist } from '@/scene/ColdMist'
 import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK, BOSS_FX } from './Boss'
-import { CASE_SIZE } from '@/game/drinkStock'
+import { CASE_SIZE, depthOf } from '@/game/drinkStock'
 import { cartonMaterials } from './drinkCartons'
 import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
@@ -5368,7 +5368,7 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
  */
 export const FridgeStock = memo(FridgeStockImpl)
 /**
- * Every drink as it is in a hand, on a table or lifted on its shelf (DrinkBottle, lit and wet): none of them stand in the scene as it loads
+ * Every drink as it is in a hand or on a table (DrinkBottle, wet; one lifted on its shelf is the shelf's own, DrinkBottleLite): none of them stand in the scene as it loads
  * now that the shelves' are the plain ones (DrinkBottleLite), so their programs were made the first time a customer took one (a 317 ms
  * frame); made here unseen, once, and handed to the prewarm (warmLater) instead
  */
@@ -5377,15 +5377,12 @@ export const DrinkWarm = memo(function DrinkWarm() {
   useEffect(() => { if (g.current) warmLater(g.current) }, [])
   return (
     <group ref={g} visible={false}>
-      {DRINKS.map((d) => <group key={d.id}><DrinkBottle id={d.id} lit /><DrinkBottle id={d.id} wet /></group>)}
+      {DRINKS.map((d) => <group key={d.id}><DrinkBottle id={d.id} wet /></group>)}
       {/* (and the sake cup, its sake in it) */}
       <SakeCup />
     </group>
   )
 })
-/** where a drink's held, up from its foot (its middle: the pointer stays on it) */
-const GRAB = 0.11
-const HELD_MID = new THREE.Vector3(0, -GRAB, 0)
 function FridgeStockImpl({ n = 0 }: { n?: number }) {
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster, scene } = useThree()
@@ -5422,14 +5419,16 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       setVer((v) => v + 1)
       if (FRIDGE_STOCK.units[n].some((row, r) => row.some((id, k) => id !== null && id !== baked[r]?.[k]))) setBaked(bakedShelves(n))
     }
-    // (each place's bottles shown or hidden in the batch as the stock is now; the one being carried, its front bottle hidden)
+    // (each place's bottles shown or hidden in the batch as the stock is now: as many as stand in it, from its back wall forward, the front
+    // one taken first and the ones behind it left where they stand (the owner's, 2026-11-10: taking one took the ones behind it too); the
+    // front one of those hidden while it's pointed at or carried, drawn on its own then)
     const api = batch.current
     const now = `${FRIDGE_STOCK.ver}|${lifted}|${raised}`
     if (api && (shown.current.now !== now || shown.current.api !== api)) {
       shown.current = { now, api }
       FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {
-        api.show(`f${r}-${k}`, id !== null && lifted !== `${r}-${k}` && raised !== `${r}-${k}`)
-        api.show(`b${r}-${k}`, id !== null)
+        const deep = depthOf(baked[r]?.[k]), first = deep - (id ? FRIDGE_STOCK.counts[n][r][k] : 0), key = `${r}-${k}`
+        for (let j = 0; j < deep; j++) api.show(`p${r}-${k}-${j}`, j >= first && !(j === first && (lifted === key || raised === key)))
       }))
     }
     // (what's out: on the floor before the fridge, or set down on a table, upright, where it was put)
@@ -5547,7 +5546,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     const hit = rc.intersectObjects(near, false).find((h) => h.face && h.face.normal.clone().transformDirection(h.object.matrixWorld).y > 0.7)
     return hit && Math.abs(hit.point.y - p.y) < 0.25 ? hit.point.y : p.y
   }
-  const begin = (from: From, ev: { stopPropagation: () => void }) => {
+  const begin = (from: From, ev: { stopPropagation: () => void; ray?: THREE.Ray }) => {
     // (edit mode is for the scene alone)
     if (getEdit().on) return
     // (a drink in the fridge only with its door open: the glass is in the way otherwise)
@@ -5557,6 +5556,10 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // (lifted from its place among the others: its clink against them)
     const lifting = from.kind === 'slot' ? FRIDGE_STOCK.units[n][from.r]?.[from.k] : null
     if (lifting) bottleClink(isCan(lifting), FRIDGE_AT[n])
+    // (held by its own middle, however tall it is (the owner's, 2026-11-10: it was held 11 cm up whatever it was, a can hung under the pointer
+    // and jumped as it was taken hold of))
+    const held = lifting ?? (from.kind === 'out' ? FRIDGE_STOCK.out[from.i]?.id : null)
+    const mid = held ? shelfTall(held) / 2 : 0.11
     const key = from.kind === 'slot' ? `${from.r}-${from.k}` : `o${from.i}`
     const grp = objs.current.get(key)
     const host = root.current
@@ -5570,10 +5573,30 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // (carried on a level through where it was picked up (the owner's: on the fridge's upright front alone it lagged and swung off from the
     // pointer, seen from above, and stopped dead at the fridge's sides): wherever the pointer's ray meets that level, it's right there, a
     // little up; in front of the fridge's own outline it's on the fridge's front, to go into a place on another shelf)
-    // (held by its middle, GRAB up from its foot: the pointer stays on the bottle's middle, not its foot)
+    // (held by its middle, `mid` up from its foot: the pointer stays on the bottle's middle, not its foot)
     host.updateWorldMatrix(true, false)
     // (the level a little above where it was, so what it's carried over isn't run into; it stays on the pointer)
-    const level = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(grp.localToWorld(new THREE.Vector3(0, GRAB, 0)).y + 0.05))
+    const level = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(grp.localToWorld(new THREE.Vector3(0, mid, 0)).y + 0.05))
+    const heldMid = new THREE.Vector3(0, -mid, 0)
+    // (on the fridge's front, held where it was taken hold of: it stays just where it was under the pointer, moved from there (it jumped to
+    // have its middle on the pointer, before); once out past the fridge's outline, by its middle, as it is on the level)
+    const frontPlane = () => {
+      const nrm = new THREE.Vector3(0, 0, 1).transformDirection(host.matrixWorld)
+      return new THREE.Plane().setFromNormalAndCoplanarPoint(nrm, host.localToWorld(new THREE.Vector3(0, 0.7, 0.2)))
+    }
+    // (`grip`: the point it was taken hold of, on its own upright through its middle (where it stands in its place, those in front of it
+    // taken), from its foot: that point kept on the pointer's ray as it's carried, on the fridge's front)
+    let grip: THREE.Vector2 | null = null
+    if (from.kind === 'slot' && ev.ray && lifting) {
+      const nrm = new THREE.Vector3(0, 0, 1).transformDirection(host.matrixWorld)
+      const own = new THREE.Plane().setFromNormalAndCoplanarPoint(nrm, host.localToWorld(new THREE.Vector3(0, 0.7, grp.position.z - backOf(from.r, from.k, lifting))))
+      const at = ev.ray.intersectPlane(own, new THREE.Vector3())
+      if (at) { const q = host.worldToLocal(at); grip = new THREE.Vector2(q.x - grp.position.x, q.y - grp.position.y) }
+      // (brought out to the front at once, along its own place (those in front of it are gone), that point still on the pointer: on the
+      // screen it only comes a little nearer, it doesn't jump)
+      const front = grip && ev.ray.intersectPlane(frontPlane(), new THREE.Vector3())
+      if (grip && front) { const q = host.worldToLocal(front); grp.position.set(q.x - grip.x, q.y - grip.y, 0.2) }
+    }
     // (lit while it's carried, as everything picked up is: one off the floor now; one out of a place once the bottle carried is drawn in it
     // (the effect on `lifted`))
     if (from.kind === 'out') glowOn(grp)
@@ -5581,8 +5604,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       const rect = gl.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera)
       host.updateWorldMatrix(true, false)
-      const nrm = new THREE.Vector3(0, 0, 1).transformDirection(host.matrixWorld)
-      plane.setFromNormalAndCoplanarPoint(nrm, host.localToWorld(new THREE.Vector3(0, 0.7, 0.2)))
+      plane.copy(frontPlane())
       const front = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
       const onFront = front ? host.worldToLocal(front.clone()) : null
       const inFridge = !!onFront && Math.abs(onFront.x) < 0.45 && onFront.y > 0.02 && onFront.y < 1.62
@@ -5607,9 +5629,10 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
         return
       }
       grp.quaternion.identity()
-      if (inFridge && onFront) { grp.position.set(onFront.x, onFront.y - GRAB, 0.2); return }
+      if (inFridge && onFront) { grp.position.set(onFront.x - (grip?.x ?? 0), onFront.y - (grip?.y ?? mid), 0.2); return }
       if (!flat) return
-      grp.position.copy(host.worldToLocal(flat)).add(HELD_MID)
+      grip = null
+      grp.position.copy(host.worldToLocal(flat)).add(heldMid)
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
@@ -5678,7 +5701,8 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           o.vy = 0
           o.fell = py
           o.hit = false
-          grp.position.set(o.x, py, o.z)
+          // (what's out moved there; a place's own stays at its place, its others still in it)
+          if (from.kind === 'out') grp.position.set(o.x, py, o.z)
         }
       }
     }
@@ -5689,21 +5713,21 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
   const bakedKey = baked.map((row) => row.join(',')).join('|')
   // (made once for what it was baked with, so the stock changing doesn't redraw the hundred and sixty bottles under the batch)
   const ranks = useMemo(() => baked.map((row, r) => row.map((id, k) => {
-    const sh = FRIDGE_UNITS[n].shelves
-    // (the ranks behind it straight back, square, each its own depth and 5 mm apart (the owner's: neat rows; they were set a hair askew)
-    const sp = new THREE.Vector3(shelfLayout(n, r).xs[k], sh[r].y, 0.16), step = shelfSize(id)[1] + 0.005
-    const deep = Math.max(1, Math.floor(RANK_DEPTH / step))
-    return [
-      <group key={`f${r}-${k}`} position={sp.toArray()} userData={{ batchPart: `f${r}-${k}` }}><DrinkBottleLite id={id} /></group>,
-      <group key={`b${r}-${k}`} userData={{ batchPart: `b${r}-${k}` }}>
-        {Array.from({ length: deep }, (_, j) => (
-          <group key={j} position={[sp.x, sp.y, sp.z - step * (j + 1)]}>
-            <DrinkBottleLite id={id} />
-          </group>
-        ))}
-      </group>,
-    ]
+    // (as many as the place holds (game/drinkStock's depthOf), front to back, straight back, square, each its own depth and 5 mm apart (the
+    // owner's: neat rows; they were set a hair askew)), each a part of the batch of its own: shown while it's there)
+    const sp = new THREE.Vector3(shelfLayout(n, r).xs[k], FRIDGE_UNITS[n].shelves[r].y, 0.16), step = rankStep(id)
+    // (laid in from the back wall forward: the glass and the drinks in it are see-through, drawn in the order they're merged, so the ones
+    // behind first and those in front over them (the owner's, 2026-11-10: the front ones first, the ones behind showed over them, their
+    // shoulders out of place through the front ones'))
+    const deep = depthOf(id)
+    return Array.from({ length: deep }, (_, i) => deep - 1 - i).map((j) => (
+      <group key={`p${r}-${k}-${j}`} position={[sp.x, sp.y, sp.z - step * j]} userData={{ batchPart: `p${r}-${k}-${j}` }}>
+        <DrinkBottleLite id={id} />
+      </group>
+    ))
   })), [baked, n])
+  /** how far back in its place its front one stands now (those in front of it taken) */
+  const backOf = (r: number, k: number, id: DrinkId) => rankStep(id) * Math.max(0, depthOf(id) - FRIDGE_STOCK.counts[n][r][k])
   return (
     <group ref={root}>
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
@@ -5712,10 +5736,17 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'pointer'; setHover(`${r}-${k}`); setRaised(`${r}-${k}`) } aimTip(ev); setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
           onPointerOut={() => { document.body.style.cursor = ''; setHover((h) => (h === `${r}-${k}` ? null : h)); setTip(null) }}>
           {/* (what the pointer finds: the bottle's size, unseen) */}
-          <mesh position-y={0.11} visible={false}><boxGeometry args={[shelfSize(shelves[r].ids[k])[0] + shelfLayout(n, r).gap * 0.9, 0.22, 0.06]} /></mesh>
-          {lifted === `${r}-${k}` ? <DrinkBottle id={id} lit /> : raised === `${r}-${k}` && (
-            <HoverLit active={hover === `${r}-${k}`} onDone={() => setRaised((x) => (x === `${r}-${k}` ? null : x))}><DrinkBottle id={id} lit /></HoverLit>
-          )}
+          <mesh position-y={shelfTall(id) / 2} visible={false}><boxGeometry args={[shelfSize(shelves[r].ids[k])[0] + shelfLayout(n, r).gap * 0.9, shelfTall(id) + 0.02, 0.06]} /></mesh>
+          {/* (pointed at, or carried: the very bottle on the shelf (the shelf's own, not a finer one: the owner's, 2026-11-10: it changed under
+              the pointer), lit as anything pointed at is, where it stands in its place) */}
+          {/* (drawn after the shelves' batch (its group's order): see-through as it is, the bottles behind it under it, not over it) */}
+          <group renderOrder={1}>
+            {lifted === `${r}-${k}` ? <DrinkBottleLite id={id} /> : raised === `${r}-${k}` && (
+              <HoverLit active={hover === `${r}-${k}`} onDone={() => setRaised((x) => (x === `${r}-${k}` ? null : x))}>
+                <group position-z={-backOf(r, k, id)}><DrinkBottleLite id={id} /></group>
+              </HoverLit>
+            )}
+          </group>
         </group>
       )))}
       {/* (the front bottles and the ranks behind each, packed shoulder to shoulder back to the fridge's back wall, as a shop's shelves are:
@@ -5732,9 +5763,18 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     </group>
   )
 }
-/** how far back behind the front rank the shelves are filled: one rank more behind each, enough for the shelf to read full through the
- * glass (all the way back it was six hundred bottles a fridge) */
-const RANK_DEPTH = 0.12
+/** how far apart a place's drinks stand, front to back: each its own depth and 5 mm (game/drinkStock's PLACE_DEPTH, how many, fills the
+ * twelve centimetres behind the front one: enough for the shelf to read full through the glass; all the way back it was six hundred bottles
+ * a fridge) */
+const rankStep = (id: DrinkId) => shelfSize(id)[1] + 0.005
+/** how tall a drink stands on its shelf (its shelf bottle, DrinkBottleLite, at its size in the shop): where it's held (its middle) and how
+ * tall what finds the pointer is */
+function shelfTall(id: DrinkId) {
+  const kind = KIND_OF[id], shaped = shapeOf(id)
+  const top = kind === 'pack' ? PACK.h + 0.0034 : kind === 'can' && id !== 'cola' && id !== 'greenTea' ? 0.0935 : kind === 'small' ? 0.076
+    : shaped ? LITE_GEO[shaped].capY + 0.005 * LITE_GEO[shaped].capR : 0.2
+  return top * DRINK_SCALE[id]
+}
 /** a fridge's places as its shelves' batch is made with them: each its drink, or (empty) the drink that's its own */
 const bakedShelves = (n: number) => FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => (id ?? FRIDGE_UNITS[n].shelves[r].ids[k]) as DrinkId))
 /** how wide across a shelf a drink stands and how deep (its shape as the shelves draw it, DrinkBottleLite, turned a quarter round as it's
@@ -5920,6 +5960,11 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
           {shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
           <mesh geometry={shadedLabel(LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
           <mesh geometry={shaded(LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
+          {/* (the beer's gold foil round its neck, the sake's paper collar under its cap (the plum wine's red), as the full bottles have them) */}
+          {LITE_GEO[shaped].collar && !soju(id) && (
+            <mesh geometry={shaded(LITE_GEO[shaped].collar!.geo, f === 'beer' ? '#d4b04a' : id === 'umeshu' ? '#b8261c' : '#f4efe2')}
+              position-y={LITE_GEO[shaped].collar!.y} material={SHELF_PARTS} />
+          )}
         </>}
       </group>
     </group>
@@ -5927,14 +5972,14 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
 })
 /** (`level`: how much is left in it, 1 full: drunk down sip by sip at the customer's place, and left there empty, or nearly, when they've
  * gone (the owner's, 2026-11-10: it vanished at the last moment and a glass from nowhere stood there); what's inside shown that high) */
-function DrinkBottleImpl({ id, lit = false, wet = false, level = 1 }: { id: DrinkId; lit?: boolean; wet?: boolean; level?: number }) {
-  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} lit={lit} wet={wet} level={level} /></group>
+function DrinkBottleImpl({ id, wet = false, level = 1 }: { id: DrinkId; wet?: boolean; level?: number }) {
+  return <group scale={DRINK_SCALE[id]}><DrinkBottleRaw id={id} wet={wet} level={level} /></group>
 }
-function DrinkBottleRaw({ id, lit = false, wet = false, level = 1 }: { id: DrinkId; lit?: boolean; wet?: boolean; level?: number }) {
+function DrinkBottleRaw({ id, wet = false, level = 1 }: { id: DrinkId; wet?: boolean; level?: number }) {
   const d = DRINKS.find((x) => x.id === id)!
   const kind = KIND_OF[id]
-  const label = lit ? LABEL_LIT : LABEL_MAT
-  const glassMat = kind === 'can' ? (lit ? CAN_LIT : CAN) : (lit ? GLASS_LIT : GLASS)
+  const label = LABEL_MAT
+  const glassMat = kind === 'can' ? CAN : GLASS
   // (the glass itself: the beer's brown, the ramune's pale aqua, the rest clear; the PET clear and thinner; its tint and clearness in its vertices)
   const glass = (g: THREE.BufferGeometry) => kind === 'can' ? g
     : tinted(g, formOf(id) === 'beer' ? (id === 'darkBeer' ? '#2a1808' : '#5a3010') : id === 'ramune' ? '#a8dcea' : soju(id) ? '#3f8a4a' : kind === 'pet' ? '#f2f6f8' : '#eef4f2',
@@ -6069,21 +6114,33 @@ const BOTTLE_DRINK = {
   sake: liquidOf([[0, 0], [0.022, 0], [0.0245, 0.004], [0.0245, 0.12], [0.0225, 0.15], [0.014, 0.178], [0.0105, 0.2], [0, 0.206]], 0.8),
   pet: liquidOf([[0, 0], [0.026, 0], [0.032, 0.008], [0.032, 0.17], [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0, 0.246]], 0.88),
 }
-/** the shelf's plain bottles (DrinkBottleLite): each body a few rings (its foot, its shoulder, its neck), 8 round; a label band; a cap */
+/** the shelf's plain bottles (DrinkBottleLite): each body a few rings (its foot, its shoulder rounded by a ring more, its neck and its lip),
+ * 8 round, open under its foot and under its cap (no fan of triangles to a point); a label band; a cap; the beer's gold foil round its
+ * neck, the sake's paper collar (`collar`, its radius at its foot and its top, how tall, where) */
 const liteBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 8)
+const LITE_PTS: Record<'beer' | 'sake' | 'pet500' | 'pet' | 'milk' | 'ramune', [number, number][]> = {
+  beer: [[0.012, 0], [0.0275, 0.003], [0.0275, 0.12], [0.0235, 0.145], [0.0145, 0.17], [0.0125, 0.2], [0.0135, 0.206], [0.004, 0.207]],
+  sake: [[0.012, 0], [0.0245, 0.003], [0.0245, 0.12], [0.0225, 0.15], [0.014, 0.178], [0.0105, 0.2], [0.0115, 0.206], [0.004, 0.207]],
+  pet500: [[0.012, 0], [0.0235, 0.004], [0.0235, 0.1], [0.021, 0.125], [0.0135, 0.145], [0.0105, 0.152], [0.0105, 0.158], [0.004, 0.159]],
+  pet: [[0.014, 0], [0.032, 0.006], [0.032, 0.17], [0.028, 0.2], [0.017, 0.225], [0.0135, 0.236], [0.0135, 0.246], [0.004, 0.247]],
+  milk: [[0.012, 0], [0.0225, 0.004], [0.0225, 0.085], [0.02, 0.098], [0.0175, 0.106], [0.0175, 0.118], [0.004, 0.119]],
+  ramune: [[0.012, 0], [0.025, 0.006], [0.025, 0.085], [0.0115, 0.122], [0.0152, 0.146], [0.0098, 0.16], [0.0122, 0.178], [0.004, 0.179]],
+}
+/** a collar round a shelf bottle's neck: a band open at both ends, `rb` round at its foot, `rt` at its top, `h` tall */
+const liteCollar = (rb: number, rt: number, h: number) => new THREE.CylinderGeometry(rt, rb, h, 8, 1, true)
 const LITE_GEO = {
-  beer: { body: liteBody([[0.012, 0], [0.0275, 0.003], [0.0275, 0.12], [0.0145, 0.17], [0.0125, 0.21], [0.004, 0.211]]),
-    label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 8, 1, true), labelY: 0.065, capY: 0.212, capR: 1.1 },
-  sake: { body: liteBody([[0.012, 0], [0.0245, 0.003], [0.0245, 0.12], [0.014, 0.178], [0.0105, 0.206], [0.004, 0.207]]),
-    label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 8, 1, true), labelY: 0.07, capY: 0.208, capR: 0.95 },
-  pet500: { body: liteBody([[0.012, 0], [0.0235, 0.004], [0.0235, 0.1], [0.0135, 0.145], [0.0105, 0.158], [0.004, 0.159]]),
-    label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 8, 1, true), labelY: 0.07, capY: 0.162, capR: 0.9 },
-  pet: { body: liteBody([[0.014, 0], [0.032, 0.006], [0.032, 0.17], [0.017, 0.225], [0.0135, 0.246], [0.004, 0.247]]),
-    label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 8, 1, true), labelY: 0.1, capY: 0.25, capR: 1.1 },
-  milk: { body: liteBody([[0.012, 0], [0.0225, 0.004], [0.0225, 0.085], [0.0175, 0.106], [0.0175, 0.118], [0.004, 0.119]]),
-    label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 8, 1, true), labelY: 0.05, capY: 0.12, capR: 1.5 },
-  ramune: { body: liteBody([[0.012, 0], [0.025, 0.006], [0.025, 0.085], [0.0115, 0.122], [0.0152, 0.146], [0.0098, 0.16], [0.0122, 0.178], [0.004, 0.179]]),
-    label: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 8, 1, true), labelY: 0.055, capY: 0.181, capR: 1.0 },
+  beer: { body: liteBody(LITE_PTS.beer), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 8, 1, true), labelY: 0.065, capY: 0.21, capR: 1.1,
+    collar: { geo: liteCollar(0.0152, 0.0136, 0.028), y: 0.186 } as { geo: THREE.BufferGeometry; y: number } | null },
+  sake: { body: liteBody(LITE_PTS.sake), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 8, 1, true), labelY: 0.07, capY: 0.208, capR: 0.95,
+    collar: { geo: liteCollar(0.0129, 0.0116, 0.012), y: 0.196 } as { geo: THREE.BufferGeometry; y: number } | null },
+  pet500: { body: liteBody(LITE_PTS.pet500), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 8, 1, true), labelY: 0.07, capY: 0.162, capR: 0.9,
+    collar: null as { geo: THREE.BufferGeometry; y: number } | null },
+  pet: { body: liteBody(LITE_PTS.pet), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 8, 1, true), labelY: 0.1, capY: 0.25, capR: 1.1,
+    collar: null as { geo: THREE.BufferGeometry; y: number } | null },
+  milk: { body: liteBody(LITE_PTS.milk), label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 8, 1, true), labelY: 0.05, capY: 0.12, capR: 1.5,
+    collar: null as { geo: THREE.BufferGeometry; y: number } | null },
+  ramune: { body: liteBody(LITE_PTS.ramune), label: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 8, 1, true), labelY: 0.055, capY: 0.181, capR: 1.0,
+    collar: null as { geo: THREE.BufferGeometry; y: number } | null },
   cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 8),
   marble: new THREE.IcosahedronGeometry(0.0108, 0),
   canLabel: new THREE.CylinderGeometry(0.0212, 0.0212, 0.088, 8, 1, true),
@@ -6500,7 +6557,9 @@ const LABEL_ATLAS = (() => {
       g.drawImage(cv, x0, y0 + 7 + LABEL_H, CELL_W, 1, x0, y0 + 8 + LABEL_H, CELL_W, 8)
     }
   })
-  if (t) t.anisotropy = 4
+  // (its fine print kept: every label in a picture 2112 wide was brought down to the cap's 1024, each label a quarter of itself, blurred
+  // (the owner's, 2026-11-10: the packaging looked cheap); allowed twice the cap, about as drawn)
+  if (t) { t.anisotropy = 4; t.userData.capScale = 2 }
   return t
 })()
 const LABEL_FINISH = (() => {
@@ -6558,12 +6617,8 @@ const LABEL_LIT = LABEL_MAT.clone()
 LABEL_LIT.emissive = new THREE.Color('#ffffff'); LABEL_LIT.emissiveMap = LABEL_ATLAS; LABEL_LIT.emissiveIntensity = 0.3
 const GLASS = new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.06, clearcoat: 0.95, clearcoatRoughness: 0.04, transparent: true,
   depthWrite: false, specularIntensity: 1 })
-const GLASS_LIT = glowByVertex(GLASS.clone(), 'bottle-glass-lit')
-GLASS_LIT.emissive = new THREE.Color('#ffffff'); GLASS_LIT.emissiveIntensity = 0.32
 const CAN = new THREE.MeshStandardMaterial({ color: '#d4d8dc', metalness: 0.88, roughness: 0.28 })
-const CAN_LIT = CAN.clone()
-CAN_LIT.emissive = new THREE.Color('#d4d8dc'); CAN_LIT.emissiveIntensity = 0.32
-reflectStudio(GLASS, GLASS_LIT, CAN, CAN_LIT, LABEL_MAT, LABEL_LIT)
+reflectStudio(GLASS, CAN, LABEL_MAT, LABEL_LIT)
 /** the drink in each bottle: its colour and how clear in its vertices, lit a touch from within so it glows in the fridge; smooth, the room's
  * light caught on its top (the owner's: a gleam on the drink's surface inside) */
 const FILL = glowByVertex(new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.06, transparent: true, depthWrite: false,
@@ -6638,10 +6693,35 @@ function shadedGlass(g: THREE.BufferGeometry, hex: string, alpha: number) {
 }
 /** how see-through a shelf bottle's glass is: the beer's brown and the soju's green deep, the plastic thinnest */
 const glassAlpha = (id: DrinkId) => (formOf(id) === 'beer' ? 0.84 : soju(id) ? 0.58 : KIND_OF[id] === 'pet' ? 0.12 : id === 'ramune' ? 0.3 : 0.2)
-/** a shelf bottle's drink, inside its glass to as full as it's filled (the full bottle's own shapes), its colour and how clear in its vertices */
+/** how full each shelf bottle is (of its height), as the full bottles' drinks are */
+const LITE_FULL = { beer: 0.8, sake: 0.8, pet500: 0.9, pet: 0.88, milk: 0.86, ramune: 0.62 }
+/**
+ * What's in a shelf bottle: its own glass's shape (LITE_PTS) drawn in a millimetre and a half all round, filled to how full it is, a flat top
+ * there; its eight sides at the glass's own angles, so each of its faces lies under one of the glass's (the owner's, 2026-11-10: the full
+ * bottle's drink, another shape, its shoulder rounder than the plain glass's, showed out through it at the shoulder)
+ */
+const LITE_DRINK = new Map<string, THREE.BufferGeometry>()
+function liteFill(shaped: keyof typeof LITE_PTS) {
+  const hit = LITE_DRINK.get(shaped)
+  if (hit) return hit
+  const pts = LITE_PTS[shaped], top = pts[pts.length - 1][1] * LITE_FULL[shaped], out: [number, number][] = []
+  const IN = 0.0015
+  for (let i = 0; i < pts.length; i++) {
+    const [r, y] = pts[i]
+    if (y <= top) { out.push([Math.max(0.002, r - IN), Math.max(IN, y)]); continue }
+    const [r0, y0] = pts[i - 1]
+    out.push([Math.max(0.002, r0 + ((top - y0) / (y - y0)) * (r - r0) - IN), top])
+    break
+  }
+  out.push([0.0005, top])
+  const g = liteBody(out)
+  LITE_DRINK.set(shaped, g)
+  return g
+}
+/** a shelf bottle's drink, inside its glass to as full as it's filled, its colour and how clear in its vertices */
 function liteDrink(shaped: 'beer' | 'sake' | 'pet' | 'pet500' | 'milk' | 'ramune', id: DrinkId) {
   const d = DRINKS.find((x) => x.id === id)!
-  const g = shaped === 'ramune' ? BOTTLE_GEO.ramuneDrink : BOTTLE_DRINK[shaped]
+  const g = liteFill(shaped)
   // (a clear drink all but clear: the glass's colour and the light through it are what's seen; a milk or a tea solid)
   return tinted(g, id === 'ramune' ? '#c6ecf6' : id === 'sake' ? '#f2ecd4' : d.color,
     id === 'milk' ? 1 : id === 'ramune' || id === 'sake' || soju(id) || id === 'sports' ? 0.16 : 0.88)

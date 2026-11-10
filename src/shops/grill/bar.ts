@@ -14,7 +14,7 @@ import { RACK_FULL, type Dryer } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyBasin } from '@/game/basin'
-import { emptyFridge, readDrinks, startBack, writeDrinks, type Back } from '@/game/drinkStock'
+import { emptyFridge, moveBetween, putInPlace, readDrinks, startBack, takeFromPlace, writeDrinks, type Back, type Places } from '@/game/drinkStock'
 import { replaces } from '@/scene/hot'
 import { ROLL_SLIPS } from '@/game/receipts'
 
@@ -389,10 +389,11 @@ export const FRIDGE_UNITS: { sign: [string, string]; shelves: { y: number; ids: 
 /** which fridge a drink lives in */
 export const fridgeUnitOf = (id: DrinkId) => Math.max(0, FRIDGE_UNITS.findIndex((u) => u.shelves.some((sh) => sh.ids.includes(id))))
 /**
- * What stands in the fridges: each place holds a drink or nothing (taken); drinks the player's taken out stand on the floor
- * before their fridge. A customer who takes a drink empties a place (the last of that kind in its fridge); the shop puts
- * one back after a while; and the player can drag any drink to another place in the same fridge (an empty one, or
- * swapping), or out onto the floor, and back in again. `ver` goes up with every change, for the drawing to follow.
+ * What stands in the fridges: each place holds a drink or nothing, and how many of it stand there one behind another (`counts`,
+ * game/drinkStock's depthOf at most); drinks the player's taken out stand on the floor before their fridge. A customer who takes a drink
+ * takes the front one of a place (the last of that kind in its fridge); the shop puts them back from the back; and the player can drag any
+ * drink to another place in the same fridge (an empty one, among its own kind, or swapping a lone one), or out onto the floor, and back in
+ * again. `ver` goes up with every change, for the drawing to follow.
  */
 /** the drinks in the fridges and in the back, kept in the browser: a new shop's fridges are empty (stocked from the back by hand, in the drinks'
  * panel, or by a hired stocker), its back two cases of each */
@@ -404,8 +405,11 @@ export const DRINK_BACK: { back: Back; ver: number } = { back: keptDrinks?.back 
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __drinkBack?: typeof DRINK_BACK }).__drinkBack = DRINK_BACK
 /** the shop's cash, for buying from the room itself (App fills it in): how much there is, and paying out (a purchase in the ledger) */
 export const SHOP_PURSE = { cash: () => Infinity as number, spend: (n: number) => { void n } }
+const NEW_FRIDGES = FRIDGE_UNITS.map((u) => emptyFridge<DrinkId>(u.shelves.map((sh) => sh.ids)))
 export const FRIDGE_STOCK = {
-  units: (keptDrinks?.units as (DrinkId | null)[][][] | undefined) ?? FRIDGE_UNITS.map((u) => emptyFridge<DrinkId>(u.shelves.map((sh) => sh.ids))),
+  units: (keptDrinks?.units as (DrinkId | null)[][][] | undefined) ?? NEW_FRIDGES.map((f) => f.rows),
+  /** how many stand in each place, one behind another (0 where there's nothing) */
+  counts: keptDrinks?.counts ?? NEW_FRIDGES.map((f) => f.counts),
   /** (x, z: out on the floor before the fridge, in its own frame; w: set down on a table, anywhere, in the scene's) */
   // (`lift`: how far a fallen one lying still is raised to rest on the floor, measured once it's come to rest (DiningRoom); `hit`: it's
   // landed from this fall (what landing does to it, game/spills, done once, not at every bounce); `base`: the boards' real top there, in the
@@ -414,6 +418,8 @@ export const FRIDGE_STOCK = {
     base?: number }[],
   ver: 0,
 }
+/** a fridge's places as game/drinkStock takes them (its own rows and counts, changed in place) */
+export const placesOf = (unit: number): Places<DrinkId> => ({ rows: FRIDGE_STOCK.units[unit], counts: FRIDGE_STOCK.counts[unit] })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
 // (kept again whenever the fridges or the back change: looked at every second and a half)
 if (typeof window !== 'undefined') {
@@ -422,7 +428,7 @@ if (typeof window !== 'undefined') {
     const v = `${FRIDGE_STOCK.ver}|${DRINK_BACK.ver}`
     if (v === seen) return
     seen = v
-    try { localStorage.setItem(DRINKS_KEY, writeDrinks({ units: FRIDGE_STOCK.units, back: DRINK_BACK.back })) } catch { /* (not kept) */ }
+    try { localStorage.setItem(DRINKS_KEY, writeDrinks({ units: FRIDGE_STOCK.units, counts: FRIDGE_STOCK.counts, back: DRINK_BACK.back })) } catch { /* (not kept) */ }
   }, 1500)
   // (stopped when a hot update swaps this module for a new copy: one more of them with every edit, before)
   replaces(import.meta.hot, () => window.clearInterval(id))
@@ -453,7 +459,7 @@ export const onPantryAsk = (f: PantryAsk) => { pantryAsks.add(f); return () => {
 const pantryShuts = new Set<() => void>()
 export function shutPantry() { pantryShuts.forEach((f) => f()) }
 export const onPantryShut = (f: () => void) => { pantryShuts.add(f); return () => { pantryShuts.delete(f) } }
-/** a customer takes a drink: the last place holding one of that kind is emptied (any kind at all if it's run out); the fridge it was in, or -1 */
+/** a customer takes a drink: the front one of the last place holding that kind (any kind at all if it's run out); the fridge it was in, or -1 */
 export function takeDrink(id: DrinkId): number {
   const home = fridgeUnitOf(id)
   for (const u of [home, ...FRIDGE_STOCK.units.map((_, i) => i).filter((i) => i !== home)]) {
@@ -462,7 +468,7 @@ export function takeDrink(id: DrinkId): number {
       for (let r = rows.length - 1; r >= 0; r--) {
         for (let k = rows[r].length - 1; k >= 0; k--) {
           if (want ? rows[r][k] === want : rows[r][k]) {
-            rows[r][k] = null
+            takeFromPlace(placesOf(u), r, k)
             FRIDGE_STOCK.ver++
             return u
           }
@@ -473,32 +479,27 @@ export function takeDrink(id: DrinkId): number {
   }
   return -1
 }
-/** the shop puts back one drink in a fridge where one's been taken (the first empty place, its own kind) */
+/** the shop puts back one drink in a fridge where one's been taken (the first place with room, its own kind) */
 export function restockDrink(unit: number) {
-  const rows = FRIDGE_STOCK.units[unit]
-  for (let r = 0; r < rows.length; r++) {
-    const k = rows[r].findIndex((x) => x === null)
-    if (k >= 0) {
-      rows[r][k] = FRIDGE_UNITS[unit].shelves[r].ids[k]
-      FRIDGE_STOCK.ver++
-      return true
+  const p = placesOf(unit)
+  for (let r = 0; r < p.rows.length; r++) {
+    for (let k = 0; k < p.rows[r].length; k++) {
+      if (putInPlace(p, r, k, FRIDGE_UNITS[unit].shelves[r].ids[k])) { FRIDGE_STOCK.ver++; return true }
     }
   }
   return false
 }
-/** the player moves a drink from one place to another in a fridge (swapping with what's there, if anything) */
+/** the player moves a drink from one place to another in a fridge (into an empty one or among its own kind, or a lone one swapped with a
+ * lone one): whether it moved */
 export function moveDrink(unit: number, from: [number, number], to: [number, number]) {
-  const rows = FRIDGE_STOCK.units[unit]
-  const a = rows[from[0]][from[1]]
-  rows[from[0]][from[1]] = rows[to[0]][to[1]]
-  rows[to[0]][to[1]] = a
-  FRIDGE_STOCK.ver++
+  const ok = moveBetween(placesOf(unit), from, to)
+  if (ok) FRIDGE_STOCK.ver++
+  return ok
 }
-/** the player takes a drink out of a fridge and stands it on the floor before it (x across, z out from it) */
+/** the player takes a drink out of a fridge, the front one of its place, and stands it on the floor before it (x across, z out from it) */
 export function pullOut(unit: number, from: [number, number], x: number, z: number, w?: [number, number, number]) {
-  const id = FRIDGE_STOCK.units[unit][from[0]][from[1]]
+  const id = takeFromPlace(placesOf(unit), from[0], from[1])
   if (!id) return
-  FRIDGE_STOCK.units[unit][from[0]][from[1]] = null
   FRIDGE_STOCK.out.push({ id, unit, x, z, w })
   FRIDGE_STOCK.ver++
 }
@@ -543,11 +544,10 @@ export function tableHit(ray: THREE.Ray): THREE.Vector3 | null {
   best.sort((a, b) => a.t - b.t)
   return best[0]?.p ?? null
 }
-/** and puts one back, into an empty place */
+/** and puts one back, into an empty place or among its own kind with room */
 export function putBack(index: number, unit: number, to: [number, number]) {
   const o = FRIDGE_STOCK.out[index]
-  if (!o || FRIDGE_STOCK.units[unit][to[0]][to[1]]) return false
-  FRIDGE_STOCK.units[unit][to[0]][to[1]] = o.id
+  if (!o || !putInPlace(placesOf(unit), to[0], to[1], o.id)) return false
   FRIDGE_STOCK.out.splice(index, 1)
   FRIDGE_STOCK.ver++
   return true

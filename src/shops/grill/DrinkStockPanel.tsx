@@ -3,7 +3,7 @@ import { tl, type Lang } from '@/data/i18n'
 import { buyCase, caseCost, CASE_SIZE, drinkCounts, fillFromBack } from '@/game/drinkStock'
 import { FitLine } from '@/ui/FitLine'
 import { setTip } from '@/scene/hoverTip'
-import { DRINK_BACK, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, SHOP_PURSE, type DrinkId } from './bar'
+import { DRINK_BACK, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, placesOf, SHOP_PURSE, type DrinkId } from './bar'
 
 type Drink = (typeof DRINKS)[number]
 const HOMES = FRIDGE_UNITS.map((u) => u.shelves.map((sh) => sh.ids))
@@ -85,14 +85,15 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
     changed()
   }
   const fill = (only?: DrinkId) => {
-    FRIDGE_STOCK.units.forEach((rows, u) => {
-      const r = fillFromBack(rows, HOMES[u], DRINK_BACK.back, only)
+    FRIDGE_STOCK.units.forEach((_, u) => {
+      const r = fillFromBack(placesOf(u), HOMES[u], DRINK_BACK.back, only)
       FRIDGE_STOCK.units[u] = r.rows
+      FRIDGE_STOCK.counts[u] = r.counts
       DRINK_BACK.back = r.back
     })
     changed()
   }
-  const counts = FRIDGE_STOCK.units.map((rows, u) => drinkCounts(rows, HOMES[u]))
+  const counts = FRIDGE_STOCK.units.map((_, u) => drinkCounts(placesOf(u), HOMES[u]))
   /** a drink's count over the fridges, and its places */
   const total = (id: DrinkId) => counts.reduce((t, c) => ({ have: t.have + (c[id]?.have ?? 0), places: t.places + (c[id]?.places ?? 0) }), { have: 0, places: 0 })
   useEffect(() => () => setTip(null), [])
