@@ -524,11 +524,16 @@ export function WcOtohime({ who }: { who: Who }) {
   )
 }
 
-/** the paper holder on the wall (z=0, facing +z): the roll thins with each visit; a click puts a new one on, its end folded to a point */
+/** the paper holder on the wall (z=0, facing +z): the roll thins with each visit; a click puts a new one on, its end folded to a point.
+ * (the owner's, 2026-11-10: the sheet hanging off it hung in the air a little below and in front of the roll, the roll's yellow core stood
+ * out of its ends, and a click on the sheet did nothing): the sheet off the roll's very front, touching it, curved a little and its
+ * perforation showing; the roll's ends its layers round a cardboard core and the hole the bar runs through; the whole of it, sheet and all,
+ * one thing to click (an unseen box round it) */
 export function WcPaper({ who }: { who: Who }) {
   const b = useBits()
   const roll = useRef<THREE.Group>(null)
   const tail = useRef<THREE.Mesh>(null)
+  const ends = useRef<(THREE.Mesh | null)[]>([])
   const flakes = useRef<THREE.Group>(null)
   const st = useRef({ spun: -1e9 })
   useFrame(() => {
@@ -541,17 +546,20 @@ export function WcPaper({ who }: { who: Who }) {
     const spin = u >= 0 && u < 0.3 ? (u / 0.3) * (u / 0.3) * (3 - 2 * (u / 0.3)) : 0
     if (roll.current) {
       b.roll.scale.set(PAPER_LONG, r, r)
-      b.core.scale.x = PAPER_LONG
+      // (the core a hair inside the roll's ends (it stood out of them, a yellow disc at each): its end drawn on them, below)
+      b.core.scale.x = PAPER_LONG * 0.97
       b.roll.visible = p > 0.001
       b.fold.visible = false
-      // (turned once forward as a sheet's pulled)
-      roll.current.rotation.x = spin * Math.PI * 2
+      for (const e of ends.current) if (e) { e.scale.set(r, r, 1); e.visible = p > 0.001 }
+      // (turned a little forward as a sheet's pulled, as it is in the hand (the owner's: 15 to 30 degrees, not a whole turn))
+      roll.current.rotation.x = spin * ROLL_PULL
     }
     if (tail.current) {
-      // (a flat strip hanging down off its front, flicking as it turns)
+      // (the sheet hanging straight down off the roll's front, from where it leaves it (its top at the roll's frontmost line, on it), flicking
+      // as it's pulled)
       tail.current.visible = p > 0.001
-      tail.current.position.set(0, -r * 0.2 - 0.03, r + 0.001)
-      tail.current.rotation.x = u >= 0 && u < 0.6 ? Math.sin(u * 22) * 0.5 * (1 - u / 0.6) : 0
+      tail.current.position.set(0, 0, r + 0.0008)
+      tail.current.rotation.x = u >= 0 && u < 0.6 ? Math.sin(u * 22) * 0.35 * (1 - u / 0.6) : 0
     }
     const f = flakes.current
     if (f) {
@@ -585,9 +593,19 @@ export function WcPaper({ who }: { who: Who }) {
         <primitive object={b.roll} />
         <primitive object={b.core} />
         <primitive object={b.fold} />
+        {/* (each end: the paper's layers round to its edge, scaled with what's left; the cardboard core's ring and the hole in it, the bar through) */}
+        {[-1, 1].map((sd, i) => (
+          <group key={sd} position={[sd * (ROLL_HALF + 0.0004), 0, 0]} rotation-y={sd * Math.PI / 2}>
+            <mesh ref={(o) => { ends.current[i] = o }} raycast={() => {}} geometry={ROLL_END} material={ROLL_END_MAT} />
+            <mesh position-z={0.0004} raycast={() => {}} geometry={CORE_END} material={CORE_END_MAT} />
+            <mesh position-z={0.0004} raycast={() => {}} geometry={CORE_HOLE} material={CORE_HOLE_MAT} />
+          </group>
+        ))}
       </group>
+      {/* (what's clicked: all of it, the holder, the roll and the sheet hanging off it, as one box (the sheet itself was let through)) */}
+      <mesh position={[0, -0.018, 0.062]} visible={false}><boxGeometry args={[0.18, 0.2, 0.13]} /></mesh>
       <group position={[0, 0, 0.065]}>
-        <mesh ref={tail} raycast={() => {}} geometry={PAPER_TAIL} material={PAPER_MAT} />
+        <mesh ref={tail} raycast={() => {}} geometry={PAPER_TAIL} material={TAIL_MAT} />
         <group ref={flakes} visible={false}>
           {[0, 1].map((k) => <mesh key={k} raycast={() => {}}><planeGeometry args={[0.012, 0.01]} /><meshBasicMaterial color="#fbfaf6" transparent side={THREE.DoubleSide} /></mesh>)}
         </group>
@@ -595,9 +613,72 @@ export function WcPaper({ who }: { who: Who }) {
     </group>
   )
 }
-/** the roll's length against the model's (the holder's arms 0.02-0.03 clear either side), and its tail: a flat strip down off its front */
+/** the roll's length against the model's (the holder's arms 0.02-0.03 clear either side), half of it (the model's roll is 0.105 long) */
 const PAPER_LONG = 0.86
-const PAPER_TAIL = new THREE.PlaneGeometry(0.1, 0.06).translate(0, -0.03, 0)
+const ROLL_HALF = (0.105 * PAPER_LONG) / 2
+/** how far the roll turns as a sheet's pulled */
+const ROLL_PULL = THREE.MathUtils.degToRad(25)
+/**
+ * The sheet off the roll's front: as wide as the roll, 7 cm down from where it leaves it (its top edge at the origin), bowed out a few
+ * millimetres along it as paper hangs, its foot a little back in; on it, near its foot, the next perforation (dashed)
+ */
+const PAPER_TAIL = (() => {
+  const W = ROLL_HALF * 2, L = 0.07, rows = 6
+  const pos: number[] = [], uv: number[] = [], idx: number[] = []
+  for (let j = 0; j <= rows; j++) {
+    const t = j / rows
+    const z = 0.0035 * Math.sin(Math.PI * t * 0.85)
+    for (const s of [-1, 1]) { pos.push((s * W) / 2, -L * t, z); uv.push(s < 0 ? 0 : 1, 1 - t) }
+    if (j < rows) { const a = j * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3) }
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  g.setIndex(idx)
+  g.computeVertexNormals()
+  return g
+})()
+/** the sheet's paper: soft white, a faint emboss, and its perforation dashed across near the foot */
+const TAIL_MAT = (() => {
+  const c = document.createElement('canvas')
+  c.width = 128; c.height = 128
+  const g = c.getContext('2d')!
+  g.fillStyle = '#fbfaf6'; g.fillRect(0, 0, 128, 128)
+  // (the emboss: a fine quilting of dots)
+  g.fillStyle = 'rgba(200,196,186,0.35)'
+  for (let y = 4; y < 128; y += 8) for (let x = (y / 8) % 2 ? 4 : 8; x < 128; x += 8) g.fillRect(x, y, 1.4, 1.4)
+  // (the perforation)
+  g.fillStyle = 'rgba(150,146,138,0.85)'
+  for (let x = 2; x < 128; x += 7) g.fillRect(x, 104, 4, 1.6)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return new THREE.MeshToonMaterial({ color: '#ffffff', map: tex, side: THREE.DoubleSide })
+})()
+/** a roll's end: its paper's layers in faint rings out to the edge (scaled with the roll), and the core's: a cardboard ring and its hole */
+const ROLL_END = new THREE.CircleGeometry(1, 32)
+const ROLL_END_MAT = (() => {
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 256
+  const g = c.getContext('2d')!
+  g.fillStyle = '#f7f5ef'; g.fillRect(0, 0, 256, 256)
+  // (the layers: rings a little irregular in their shade, closer toward the edge as a roll's are)
+  for (let k = 0; k < 26; k++) {
+    const rr = 128 * Math.sqrt(0.12 + (0.88 * k) / 26)
+    g.strokeStyle = `rgba(190,184,172,${0.25 + 0.25 * ((k * 7) % 3) / 2})`
+    g.lineWidth = 1.2
+    g.beginPath(); g.arc(128, 128, rr, 0, Math.PI * 2); g.stroke()
+  }
+  // (the outer edge, a touch darker)
+  g.strokeStyle = 'rgba(170,164,152,0.8)'; g.lineWidth = 3
+  g.beginPath(); g.arc(128, 128, 126, 0, Math.PI * 2); g.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return new THREE.MeshToonMaterial({ color: '#ffffff', map: tex })
+})()
+const CORE_END = new THREE.RingGeometry(0.0155, 0.021, 24)
+const CORE_END_MAT = new THREE.MeshToonMaterial({ color: '#b98d4e' })
+const CORE_HOLE = new THREE.CircleGeometry(0.0155, 24)
+const CORE_HOLE_MAT = new THREE.MeshBasicMaterial({ color: '#2a2622' })
 
 /** the brush in its pot on the floor at `at`; scrubbing, it goes over into the bowl (at `bowl`, in the room) and round, and back */
 export function WcBrush({ who, at, bowl }: { who: Who; at: [number, number, number]; bowl: [number, number, number] }) {
