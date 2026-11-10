@@ -2654,14 +2654,17 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       </StaticBatch></Movable>}
       {/* (no towel on a rod: a paper towel dispenser by the washstand and a hand dryer past it toward the door (the owner's: swapped), on the wall beside it,
           where hands are held out after washing (GuestBar3D steps them over to it, its marker wc-dryer-<who>)) */}
+      {/* (the dryer a Jet Towel flush on the wall under the wainscot's rail (its top, the slot the hands go into, at 0.88: the rail's foot at
+          0.8825; the owner's: 0.85 to 0.95); the towel box higher, clear over the rail (it sat on it)) */}
       <Movable id={`wc2-${who}-dryer`} label={`烘手機（${name}）`}>
-        <group position={[D - 0.56, 1.02, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
+        {/* (3 cm further toward the door: down to its foot now, it ran a centimetre into the washstand's counter (clips.mjs)) */}
+        <group position={[D - 0.59, 0.88, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}>
           <WcDryer who={who} />
-          <group name={`wc-dryer-${who}`} position={[0, -1.02, 0.4]} />
+          <group name={`wc-dryer-${who}`} position={[0, -0.88, 0.4]} />
         </group>
       </Movable>
       <Movable id={`wc2-${who}-towelbox`} label={`擦手紙盒（${name}）`}>
-        <group position={[D - 0.26, 1.14, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}><WcTowelBox /></group>
+        <group position={[D - 0.26, 1.25, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}><WcTowelBox /></group>
       </Movable>
       {/* (no お手洗い plaque on the wall: the owner's, the wall kept clean) */}
       <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch plain>

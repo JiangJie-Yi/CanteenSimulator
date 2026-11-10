@@ -5,7 +5,9 @@
   on the hinge, made closed, for the game to lift); the water (node "WcWater", to swirl); the cistern behind with the hand basin on its
   lid (手洗い付き), its spout curving over, the lever at its side.
 - wcbits.glb, node "WcBits": the room's small fittings, each its own node, made with its back to a wall at z=0 facing +z: the wall
-  remote "WcRemote" (screen, stop, wash and bidet keys), the flush keys "WcFlushKey", the Otohime "WcOtohime" (sakura on its face) and
+  remote "WcRemote" (screen, stop, wash and bidet keys), the flush keys "WcFlushKey", the hand dryer "WcJetTowel" (a Jet Towel: its
+  hands' slot open at the top and both ends; its origin on the wall at its top), the paper towel dispenser "WcTowelBox" (brushed steel;
+  its origin on the wall at its middle), the Otohime "WcOtohime" (sakura on its face) and
   its lit ring "WcOtoLed", the walnut paper holder "WcHolder" with the roll "WcRoll" (unit radius, scaled by what's left), its core
   "WcCore" and the folded point "WcFold"; on the floor the brush pot "WcBrushPot" and brush "WcBrush", and the sanitary bin "WcBin"; the
   women's sanitary pads "WcPads" (a hinoki wall shelf, a rattan basket of them in pastel wrappers).
@@ -133,8 +135,11 @@ def toilet():
                                  (0.186, 0.38), (0.188, 0.391), (0.18, 0.397), (0.164, 0.395), (0.146, 0.372), (0.112, 0.33), (0.07, 0.298),
                                  (0.03, 0.288), (0.0, 0.286)], SX, 1.0, 40, BX, 0)
     fin(body, "WcBowl", M["china"], parts)
-    # (its back running on into the cistern's foot, all one glaze: a rounded block under the seat's hinge)
-    fin(rbox("WcNeck", (0.24, 0.34, 0.27), (0.215, 0.17, 0), 0.06, 3), "WcNeck", M["china"], parts)
+    # (its back running on into the cistern's foot, all one glaze: a turned oval skirt behind the bowl, waisted a little and drawn in at its
+    # top under the washlet, as a TOTO's is (the owner's, 2026-11-10: it was a rounded block, and with the tank's another over it the toilet
+    # read as two boxes stacked); its top ring's ladder hidden under the washlet)
+    fin(lathe_oval("WcNeck", [(0.118, 0.0), (0.125, 0.008), (0.126, 0.04), (0.118, 0.16), (0.12, 0.26), (0.124, 0.32), (0.112, 0.365),
+                               (0.0, 0.372)], 0.95, 1.0, 24, 0.2, 0), "WcNeck", M["china"], parts)
     # (the water in the well: its own node, to swirl when it's flushed)
     # (a thin disc, its two faces ladders across it: no point in its middle for the swirl to gather into)
     w = lathe_oval("WcWater", [(0.068, 0.0), (0.068, 0.0001)], 1.22, 1.0, 20, 0, 0)
@@ -144,8 +149,11 @@ def toilet():
     fin(rbox("WcWashlet", (0.17, 0.1, 0.4), (0.225, 0.447, 0), 0.04, 3), "WcWashlet", M["ivory"], parts)
     fin(rbox("WcWashletSeam", (0.172, 0.008, 0.402), (0.225, 0.425, 0), 0.003, 2), "WcWashletSeam", M["seam"], parts)
     fin(rbox("WcNozzle", (0.03, 0.012, 0.05), (0.15, 0.405, 0), 0.005, 2), "WcNozzle", M["nozzle"], parts)
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.006, location=P(0.2, 0.465, 0.201))
+    # (its lamps on its side: power and eco, two little green dots (the owner's))
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.006, location=P(0.2, 0.465, 0.201))
     fin(active(), "WcPowerLamp", M["lamp"], parts)
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=0.005, location=P(0.235, 0.465, 0.2005))
+    fin(active(), "WcEcoLamp", M["lamp"], parts)
     # (the washlet's own control arm along the seat's right side: a long rounded panel, its keys on top (おしり blue, ビデ pink, the big
     # orange 止, the dryer and the deodoriser grey, a little lit screen), so it reads at a glance as a 免治便座)
     fin(rbox("WcArm", (0.3, 0.06, 0.08), (0.06, 0.45, 0.235), 0.022, 3), "WcArm", M["ivory"], parts)
@@ -219,7 +227,15 @@ def bits():
          "rattan": pbr("BitRattan", lin("#b98a52"), rough=0.6),
          "padPink": pbr("BitPadPink", lin("#f4b8ca"), rough=0.45, coat=0.3),
          "padWhite": pbr("BitPadWhite", lin("#f8f4f1"), rough=0.45, coat=0.3),
-         "padLilac": pbr("BitPadLilac", lin("#cbb8e6"), rough=0.45, coat=0.3)}
+         "padLilac": pbr("BitPadLilac", lin("#cbb8e6"), rough=0.45, coat=0.3),
+         "pearl": pbr("JetPearl", lin("#f4f3ef"), rough=0.3, metal=0.4),
+         "vent": pbr("JetVent", lin("#2a2d33"), rough=0.5),
+         "acrylic": pbr("JetAcrylic", lin("#1b1e23"), rough=0.1, coat=0.8),
+         "jetlamp": pbr("JetLamp", lin("#3a4048"), rough=0.3),
+         "steel": pbr("JetSteel", lin("#c4c8cd"), rough=0.35, metal=0.85),
+         "towel": pbr("TowelSteel", lin("#c9ccd1"), rough=0.38, metal=0.85),
+         "towelgap": pbr("TowelGap", lin("#202226"), rough=0.6),
+         "towelwin": pbr("TowelWin", lin("#dfe7ea"), rough=0.3)}
     groups = {}
 
     def node(name):
@@ -265,6 +281,89 @@ def bits():
     node("WcFlushKey")
     add("WcFlushKey", rbox("FlushPlate", (0.058, 0.084, 0.016), (0.0, 0.0, 0.008), 0.0, 1), "FlushPlate", M["ivory"], smooth=False)
     quad("FlushFace", 0.054, 0.08, (0.0, 0.0, 0.017), M["flushart"], "WcFlushKey")
+    # ---- the hand dryer (the owner's, 2026-11-10: a Jet Towel, not the rounded white box on a rounded hood that read as two boxes stacked,
+    # nor sat on the wainscot's rail): an upright slim unit 30 wide, 56 tall, 17 deep, flush on the wall under the rail, its top at the
+    # origin; seen from its end a U: its back half up to the top, the slot the hands go down into (3 cm across, 27 down, open at the top and
+    # both ends), its front half lower so the hands go in easily, the back's lip chamfered down into the slot, a row of jets along the inside
+    # of each lip; on its front a dark acrylic strip with the lamp in it (lit by the game as it blows) and down by its foot a steel grille
+    # where the air goes out. One piece of pearl white (a little metal in it), its edges eased
+    node("WcJetTowel")
+    JW = 0.30
+    prof = [(0.0, 0.0), (0.055, 0.0), (0.09, -0.035), (0.09, -0.27), (0.12, -0.27), (0.12, -0.10), (0.135, -0.085), (0.17, -0.10),
+            (0.17, -0.53), (0.15, -0.56), (0.0, -0.56)]
+    bm = bmesh.new()
+    ends = [[bm.verts.new(P(sx * JW / 2, y, z)) for (z, y) in prof] for sx in (-1, 1)]
+    n = len(prof)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((ends[0][i], ends[0][j], ends[1][j], ends[1][i]))
+    bm.faces.new(ends[0])
+    bm.faces.new(list(reversed(ends[1])))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    # (the edges eased (2 steps, 6 mm), the back's against the wall left square)
+    eased = [e for e in bm.edges if not all(abs(v.co.y) < 1e-6 for v in e.verts)]
+    bmesh.ops.bevel(bm, geom=eased, offset=0.006, offset_type="OFFSET", segments=2, profile=0.5, affect="EDGES", clamp_overlap=True)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+    me = bpy.data.meshes.new("JetBody")
+    bm.to_mesh(me)
+    bm.free()
+    jb = bpy.data.objects.new("JetBody", me)
+    bpy.context.collection.objects.link(jb)
+    add("WcJetTowel", jb, "JetBody", M["pearl"], smooth=True)
+    # (smooth only where the bevels round the edges: its flat faces flat)
+    for pg in jb.data.polygons:
+        pg.use_smooth = max(abs(c) for c in pg.normal) < 0.999
+
+    def plate(name, w, h, at, mat, normal="front", g="WcJetTowel"):
+        # (a flat quad laid on a face: "front" facing +z at z, "back" facing -z (the slot's front wall, seen from the slot), "slant" on the back
+        # lip's chamfer, facing up and out into the slot)
+        bm = bmesh.new()
+        uvl = bm.loops.layers.uv.new()
+        x, y, z = at
+        if normal == "slant":
+            dz, dy = 0.7071, -0.7071
+            hz, hy = h / 2 * 0.7071, h / 2 * 0.7071
+            pts = [(x - w / 2, y - hy, z + hz), (x + w / 2, y - hy, z + hz), (x + w / 2, y + hy, z - hz), (x - w / 2, y + hy, z - hz)]
+        else:
+            pts = [(x - w / 2, y - h / 2, z), (x + w / 2, y - h / 2, z), (x + w / 2, y + h / 2, z), (x - w / 2, y + h / 2, z)]
+        vs = [bm.verts.new(P(*q)) for q in pts]
+        f = bm.faces.new(vs if normal != "back" else list(reversed(vs)))
+        for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+            lp[uvl].uv = uv
+        me = bpy.data.meshes.new(name)
+        bm.to_mesh(me)
+        bm.free()
+        o = bpy.data.objects.new(name, me)
+        bpy.context.collection.objects.link(o)
+        add(g, o, name, mat, smooth=False)
+        return o
+    # (the jets: a dark row along the back lip's chamfer and one along the inside of the front lip's top, a hair off them)
+    plate("JetVentBack", 0.25, 0.012, (0.0, -0.0175 + 0.0007, 0.0725 + 0.0007), M["vent"], "slant")
+    plate("JetVentFront", 0.25, 0.012, (0.0, -0.115, 0.1192), M["vent"], "back")
+    # (the strip on its front: dark acrylic, the lamp in its middle; the grille by its foot, its slits)
+    plate("JetAcrylic", 0.2, 0.024, (0.0, -0.15, 0.1712), M["acrylic"])
+    plate("JetLamp", 0.07, 0.007, (0.0, -0.15, 0.1716), M["jetlamp"])
+    plate("JetGrille", 0.19, 0.075, (0.0, -0.47, 0.1712), M["steel"])
+    for k in range(6):
+        plate(f"JetSlit{k}", 0.17, 0.005, (0.0, -0.4425 - k * 0.011, 0.1716), M["vent"])
+    # ---- the paper towel dispenser (brushed stainless): smaller and higher than it was (the owner's: it sat bulky on the wainscot's rail):
+    # 22 wide, 27 tall, 8.5 deep, its origin at its middle on the wall; its lid's seam across its front, a little window onto the stack, the
+    # slot under its front edge the sheets come out of (the game draws a sheet's edge hanging from it, and one drawn out)
+    node("WcTowelBox")
+    add("WcTowelBox", rbox("TowelBody", (0.22, 0.27, 0.085), (0.0, 0.0, 0.0425), 0.018, 3), "TowelBody", M["towel"])
+    plate("TowelSeam", 0.2, 0.003, (0.0, 0.085, 0.0852), M["towelgap"], g="WcTowelBox")
+    # (the window onto the stack: pale, the white paper behind it showing through)
+    plate("TowelWindow", 0.085, 0.045, (0.0, 0.03, 0.0852), M["towelwin"], g="WcTowelBox")
+    # (the slot: a dark strip on its underside near the front, facing down)
+    bm = bmesh.new()
+    vs = [bm.verts.new(P(*q)) for q in ((-0.08, -0.1352, 0.045), (0.08, -0.1352, 0.045), (0.08, -0.1352, 0.062), (-0.08, -0.1352, 0.062))]
+    bm.faces.new(vs)
+    me = bpy.data.meshes.new("TowelSlot")
+    bm.to_mesh(me)
+    bm.free()
+    so = bpy.data.objects.new("TowelSlot", me)
+    bpy.context.collection.objects.link(so)
+    add("WcTowelBox", so, "TowelSlot", M["towelgap"], False)
     # ---- the Otohime (音姫): a little white box, a sakura flower on its face, a speaker grille, a round sensor with a blue ring that lights
     node("WcOtohime")
     add("WcOtohime", rbox("OtoBody", (0.095, 0.13, 0.035), (0, 0, 0.0175), 0.012, 4), "OtoBody", M["oto"])

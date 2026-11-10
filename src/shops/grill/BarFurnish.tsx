@@ -13,16 +13,23 @@ const TILLSTOOL_URL = import.meta.env.BASE_URL + 'models/tillstool.glb'
 const BAMBOO_URL = import.meta.env.BASE_URL + 'models/bamboopot.glb'
 const TOILET_URL = import.meta.env.BASE_URL + 'models/toilet.glb'
 const WASH_URL = import.meta.env.BASE_URL + 'models/washstand.glb'
-const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashBowl', 'WashSoap', 'WashFrame', 'BitWalnut'])
+const GLOSSY = new Set(['StoolBrass', 'PotGlaze', 'WcChina', 'WcIvory', 'WcChrome', 'WcWater', 'WashBrass', 'WashMirror', 'WashBowl', 'WashSoap', 'WashFrame', 'BitWalnut',
+  'JetPearl', 'JetSteel', 'JetAcrylic', 'TowelSteel'])
 /** a few made as asked (the owner's): the toilet's china a warm ivory, glazed (clear coat, a little rough); its chrome bright metal; the
  * paper holder's walnut with a soft sheen */
 const FINISH: Record<string, { color?: string; roughness: number; metalness: number; clearcoat: number }> = {
   WcChina: { color: '#f4f4f0', roughness: 0.15, metalness: 0.05, clearcoat: 0.8 },
   WcChrome: { roughness: 0.2, metalness: 0.9, clearcoat: 0.3 },
   BitWalnut: { roughness: 0.45, metalness: 0, clearcoat: 0.35 },
+  // (the hand dryer's pearl white shell, a little metal in it, its acrylic strip glossy black, its grille and the towel box brushed steel
+  // (the owner's, 2026-11-10))
+  JetPearl: { color: '#f4f3ef', roughness: 0.3, metalness: 0.4, clearcoat: 0.2 },
+  JetAcrylic: { color: '#1b1e23', roughness: 0.1, metalness: 0, clearcoat: 0.8 },
+  JetSteel: { roughness: 0.35, metalness: 0.85, clearcoat: 0 },
+  TowelSteel: { color: '#c9ccd1', roughness: 0.38, metalness: 0.85, clearcoat: 0 },
 }
 /** parts too thin or small for an ink line */
-const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d)/
+const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d|Vent|Lamp|Acrylic|Slit|Seam|Window|Slot|Grille)/
 
 const made = new Map<string, THREE.Object3D>()
 function toonOf(url: string, scene: THREE.Group) {
@@ -48,7 +55,7 @@ function toonOf(url: string, scene: THREE.Group) {
     }
     // (chrome real metal, the studio in it: with nothing to reflect it drew black (the cistern's spout, the owner saw))
     // (and the washroom's brass and mirror the same)
-    if (/Chrome|^Wash(Brass|Mirror)$/.test(src.name) && (t as THREE.MeshStandardMaterial).metalness > 0.5) reflectStudio(t as THREE.MeshStandardMaterial)
+    if (/Chrome|^Wash(Brass|Mirror)$|^Jet(Pearl|Steel)$|^TowelSteel$/.test(src.name) && (t as THREE.MeshStandardMaterial).metalness > 0.3) reflectStudio(t as THREE.MeshStandardMaterial)
     m.material = t
     m.castShadow = !UNINKED.test(m.name)
     m.receiveShadow = true
