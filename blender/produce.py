@@ -246,11 +246,12 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
     rnd = __import__("random").Random(salt * 7919 + 13)
     ph = [rnd.uniform(0, 6.3) for _ in range(10)]
     # (what's inside pressing out: lumps a tuber across, here and there, more of them toward the top)
-    lumps = [(rnd.uniform(0, 2 * math.pi), rnd.uniform(0.08, 0.95) ** 0.8, r * rnd.uniform(0.02, 0.042)) for _ in range(15)]
+    # (2026-11-11, the owner's: more like an old burlap sack: the tubers pressing the cloth out harder, more of them)
+    lumps = [(rnd.uniform(0, 2 * math.pi), rnd.uniform(0.08, 0.95) ** 0.8, r * rnd.uniform(0.03, 0.06)) for _ in range(20)]
     TIE_T = 0.62
 
     def prof(t):
-        f = 1 + 0.11 * math.exp(-((t - 0.17) / 0.14) ** 2) - 0.03 * math.exp(-((t - 0.52) / 0.13) ** 2) + 0.01 * math.exp(-((t - 0.86) / 0.1) ** 2)
+        f = 1 + 0.13 * math.exp(-((t - 0.19) / 0.16) ** 2) - 0.045 * math.exp(-((t - 0.55) / 0.13) ** 2) + 0.01 * math.exp(-((t - 0.86) / 0.1) ** 2)
         if t < 0.04:
             f *= 0.9 + 0.1 * (t / 0.04) ** 0.5            # (rounded under where it slumps on the floor)
         if tie:
@@ -278,8 +279,9 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
         y = h * t
         rows.append(([bm.verts.new(at(radius(t, 2 * math.pi * j / seg), 2 * math.pi * j / seg, y)) for j in range(seg)], [t * 0.9] * seg))
     # ---- the cuff: up from the mouth's edge, over, out and down, its edge tucked back under against the body
-    rc = [0.02 * (1 + 0.15 * math.sin(3 * a + ph[3]) + 0.06 * math.sin(7 * a + ph[4])) for a in (2 * math.pi * j / seg for j in range(seg))]
-    lip = [0.006 * math.sin(2 * a + ph[5]) + 0.004 * math.sin(5 * a + ph[6]) for a in (2 * math.pi * j / seg for j in range(seg))]
+    # (rolled down unevenly, as a worn sack's mouth is: thick in one place, thin in another, its edge higher here and lower there)
+    rc = [0.02 * (1 + 0.35 * math.sin(3 * a + ph[3]) + 0.15 * math.sin(7 * a + ph[4])) for a in (2 * math.pi * j / seg for j in range(seg))]
+    lip = [0.012 * math.sin(2 * a + ph[5]) + 0.007 * math.sin(5 * a + ph[6]) for a in (2 * math.pi * j / seg for j in range(seg))]
     top = [radius(1.0, 2 * math.pi * j / seg) for j in range(seg)]
     PHI = [math.pi * k for k in (0.75, 0.5, 0.25, 0.0, -0.25, -0.5, -0.72, -0.92)]
     rim = []
@@ -588,9 +590,10 @@ def board(name, cx, cy, cz, w, h, d):
 
 # ---- the three sacks, standing close together, a little apart at their cuffs; the middle one a step back ----
 SACKS = [  # (x, z, height, radius, material, lean, what's in it)
-    (-0.43, 0.02, 0.46, 0.154, "sackP", (-0.015, -0.012), "potato"),
-    (0.0, -0.04, 0.5, 0.162, "sackS", (0.0, -0.012), "sweet"),
-    (0.425, 0.03, 0.42, 0.149, "sackO", (0.015, -0.012), "onion"),
+    # (squatter than they were, as full sacks of potatoes sag (the owner's, 2026-11-11: not like vases))
+    (-0.43, 0.02, 0.41, 0.154, "sackP", (-0.02, -0.014), "potato"),
+    (0.0, -0.04, 0.45, 0.162, "sackS", (0.006, -0.016), "sweet"),
+    (0.425, 0.03, 0.38, 0.149, "sackO", (0.02, -0.012), "onion"),
 ]
 
 

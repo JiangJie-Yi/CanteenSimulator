@@ -24,10 +24,11 @@ const BAKED = /^ProduceTuber/
 /** the produce sacks' cloth: its cross-weave pressed in (a normal map, blender/produce.py's WEAVE_N), kept as the tubers' are */
 const WOVEN = /^ProduceSack(Potato|Sweet|Onion)$/
 /** how much brighter each sack's burlap is drawn than it's woven */
-const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18 }
-/** the produce sacks' cloth dyed another colour (the owner's): the potatoes' and sweet potatoes' a clean bleached cotton-hemp, the onions' an
- * unbleached linen a shade duller (they've no woven bands now: the owner's, too stiff, like a barrel's hoops) */
-const BURLAP_DYE: Record<string, string> = { ProduceSackPotato: '#f4f1ea', ProduceSackSweet: '#f4f1ea', ProduceSackOnion: '#d5cebf' }
+// (the produce sacks' a little too, to an old sack's light tan (the owner's, 2026-11-11))
+const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18, ProduceSackPotato: 1.15, ProduceSackSweet: 1.15, ProduceSackOnion: 1.22 }
+/** the produce sacks' cloth dyed another colour: none now (the owner's, 2026-11-11: the white was too white, an old burlap sack's tan as it's
+ * woven, grime and all; they'd been dyed a bleached cotton-hemp, 2026-11-09); kept for a sack that wants one */
+const BURLAP_DYE: Record<string, string> = {}
 
 /** a burlap picture in another colour: each point that colour by how light it was against the cloth's own mean (the weave's light and dark
  * kept, a little softened); what's woven in another colour (a red or green band: far from the cloth's brown) left as it was */
