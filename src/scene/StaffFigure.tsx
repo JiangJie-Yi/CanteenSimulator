@@ -115,8 +115,10 @@ const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.3
 export const WIPE_HAND = { y: 0.83, z: 0.44 }
 /** a handheld game (the owner's: what one of the staff slacking has out, their thumbs at it): a dark body with its screen lit, a red grip on its
  * left and a blue one on its right, made once (its colours in its points, one draw), in the figure's frame where it's held up before the
- * chest, tipped toward the face */
-const HANDHELD_AT = new THREE.Vector3(0, 0.43, 0.33)
+ * chest, its screen tipped up toward the face (the owner's, 2026-11-10: it was held down at the belly, its screen to the ceiling, and they
+ * looked straight ahead over it); `HANDHELD_TIP` how far its top's tipped back from upright */
+const HANDHELD_AT = new THREE.Vector3(0, 0.58, 0.31)
+const HANDHELD_TIP = -0.6
 const HANDHELD_GEO = (() => {
   const box = (w: number, h: number, d: number, x: number, colour: string, z = 0) => {
     const g = new THREE.BoxGeometry(w, h, d).toNonIndexed()
@@ -182,6 +184,10 @@ function heldPieces(): { geo: THREE.BufferGeometry; part: Part }[] {
     { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.024, 0.02, 0.05, 8), '#e8dcc0', at.clone().multiply(new THREE.Matrix4().makeTranslation(0.03, 0.03, 0))) },
     { part: 'clip', geo: piece(new THREE.BoxGeometry(0.12, 0.008, 0.16), '#c9a66b', clip) },
     { part: 'clip', geo: piece(new THREE.PlaneGeometry(0.1, 0.12), '#f7f3ea', clip.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.005, 0.01)).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2))) },
+    // (its steel clip across the top, holding the list's top edge; the list's lines, written in pencil)
+    { part: 'clip', geo: piece(new THREE.BoxGeometry(0.056, 0.01, 0.022), '#5b6168', clip.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.0105, 0.066))) },
+    ...[[0.035, 0.07], [0.017, 0.058], [-0.001, 0.07], [-0.019, 0.05], [-0.037, 0.064]].map(([z, len]) => ({ part: 'clip' as Part,
+      geo: piece(new THREE.PlaneGeometry(len, 0.0035), '#8a96a3', clip.clone().multiply(new THREE.Matrix4().makeTranslation(0.006 - (0.07 - len) / 2, 0.0058, z)).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2))) })),
   ]
 }
 
@@ -216,9 +222,14 @@ function build(scene: THREE.Group, v: Variant): Built {
     pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: BONES.indexOf(part),
       inked: !UNINKED.test(m.name), flat: !!m.userData.flat, shadowless: HEAD.test(m.name), decal: m.name === 'BossFace', tint: m.userData.tint })
   })
+  // (what's held is plain colours: its UVs on the atlas's white patch (they ran over the whole atlas, a little picture of it on the clipboard's
+  // list: the owner's, 2026-11-10, a strange pattern on it))
+  const [wu, wv] = (mat.userData.whiteUv as [number, number] | undefined) ?? [0, 0]
   for (const h of heldPieces()) {
-    if (holds.includes(h.part)) pieces.push({ geo: h.geo, bone: BONES.indexOf(h.part) })
-    else h.geo.dispose()
+    if (!holds.includes(h.part)) { h.geo.dispose(); continue }
+    const uv = h.geo.attributes.uv as THREE.BufferAttribute | undefined
+    if (uv) { for (let i = 0; i < uv.count; i++) uv.setXY(i, wu, wv); uv.needsUpdate = true }
+    pieces.push({ geo: h.geo, bone: BONES.indexOf(h.part) })
   }
   // (the parts' groups, each at the place it's moved about: a hand at where it hangs, the eyes at their middle (to close), the rest at the
   // figure's)
@@ -332,7 +343,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   const handheld = useMemo(() => {
     const m = new THREE.Mesh(HANDHELD_GEO, HANDHELD_MAT)
     m.position.copy(HANDHELD_AT)
-    m.rotation.x = -0.9
+    m.rotation.x = HANDHELD_TIP
     m.visible = false
     m.castShadow = false
     m.raycast = () => {}
@@ -403,9 +414,12 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
     // wait (RUSH); talking while a word of theirs is up (STAFF_TALK); a blink every few seconds; the viewer's face over all of it
     const now = performance.now()
+    // (slacking, a good while with nothing to do (data/staff's activityOf): their handheld game out before their chest, head down over it,
+    // thumbs going, the face of one deep in a game; not as they walk)
+    const slack = !id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' && job?.sweep === undefined && !job?.broom
     const word = STAFF_TALK.find((w) => w.id === id)
     const tapping = seated && (t + seed) % 7 < 2.2
-    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined || job?.sweep !== undefined ? 'focused'
+    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined || job?.sweep !== undefined || slack ? 'focused'
       : job?.carry || job?.stretch || (job?.nod ?? 0) > 0.2 ? 'happy' : 'idle')
     if (!faceAsked && word && Math.sin(t * 17) + Math.sin(t * 7.3) * 0.6 > 0.2) face = 'talk'
     if ((t + seed * 0.9) % 3.4 < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
@@ -424,9 +438,6 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const [jw, jh] = jelly(t - fw.at)
     fig.body.scale.set(jw, (1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008) * jh, jw)
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
-    // (slacking, a good while with nothing to do (data/staff's activityOf): their handheld game out before their chest, head down over it,
-    // thumbs going; not as they walk)
-    const slack = !id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' && job?.sweep === undefined && !job?.broom
     handheld.visible = slack
     if (slack) handheld.position.y = HANDHELD_AT.y + Math.sin(t * 2.2 + seed) * 0.004
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
@@ -441,7 +452,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       if (slack) {
         const thumb = Math.max(0, Math.sin(t * (sd > 0 ? 13 : 11) + seed + (sd > 0 ? 1.7 : 0))) * 0.012
         hand.position.set(sd * 0.085, HANDHELD_AT.y + thumb, HANDHELD_AT.z - 0.01)
-        hand.rotation.set(-0.9, 0, 0)
+        hand.rotation.set(HANDHELD_TIP, 0, 0)
         continue
       }
       if (seated) {

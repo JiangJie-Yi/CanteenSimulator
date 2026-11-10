@@ -67,6 +67,8 @@ export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolea
   atlas.flipY = false
   atlas.anisotropy = 4
   const mat = make(atlas)
+  // (where the white patch is, for what's added to the figure after (a clipboard, a tray): plain colours, their UVs on it)
+  mat.userData.whiteUv = [white.x / W, white.y / H]
   for (const m of meshes) {
     const src = m.material as THREE.MeshStandardMaterial
     const pic = picOf(src)
