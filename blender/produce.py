@@ -645,7 +645,7 @@ for i, (x, z, h, r, mat, lean, kind) in enumerate(SACKS):
 # ---- a few rolled out in front ----
 tuber("ProduceLoose0", -0.22, 0.045, 0.29, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 # (a potato and an onion: the owner's)
-onion("ProduceLooseOnion", 0.24, 0.038, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
+onion("ProduceLooseOnion", 0.24, 0.044, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
 # ---- the crate of carrots and burdock, beside the onions' sack ----
 CX, CW, CD, CH = 0.81, 0.38, 0.26, 0.18
 board("ProduceCrateBottom", CX, 0.012, 0.0, CW, 0.024, CD)
@@ -656,8 +656,9 @@ for sd in (-1, 1):
 # (the carrots lying across it, front to back, in two layers, their leaves to the back; the burdock leaning in its far end)
 for k in range(7):
     layer = k // 4
-    carrot(f"ProduceCarrot{k}", CX - 0.14 + (k % 4) * 0.045 + layer * 0.02, 0.13 + layer * 0.035, 0.0, 0.18,
-           rot=(math.pi / 2 + 0.08 * (k % 3 - 1), 0.0, 0.12 * (k % 2) - 0.06))
+    # (their leaves to the back, all of them inside the crate: the leaves had stood out through its front slats)
+    carrot(f"ProduceCarrot{k}", CX - 0.14 + (k % 4) * 0.045 + layer * 0.02, 0.13 + layer * 0.035, 0.03, 0.18,
+           rot=(-math.pi / 2 + 0.08 * (k % 3 - 1), 0.0, 0.12 * (k % 2) - 0.06))
 for k in range(4):
     gobo(f"ProduceGobo{k}", CX + 0.09 + 0.012 * k, 0.17, -0.06 + 0.04 * k, 0.36, rot=(0.08 * (k - 1.5), 0.55, 0.0))
 sack_parts = list(parts)
@@ -712,12 +713,16 @@ charcoal_parts = [o for o in parts if o not in sack_parts]
 # ---- under their roots ----
 root = bpy.data.objects.new("ProduceSacks", None)
 bpy.context.collection.objects.link(root)
+# (only what isn't hung from another part already: an onion's root tuft and a carrot's leaves stay with it (taken off them, the tufts lay
+# in a heap under the floor and the leaves inside the sweet potatoes' sack, the onions bare))
 for o in sack_parts:
-    o.parent = root
+    if o.parent is None:
+        o.parent = root
 croot = bpy.data.objects.new("CharcoalSack", None)
 bpy.context.collection.objects.link(croot)
 for o in charcoal_parts:
-    o.parent = croot
+    if o.parent is None:
+        o.parent = croot
 croot.location = P(1.2, 0, 0)
 top = bpy.data.objects.new("Produce", None)
 bpy.context.collection.objects.link(top)
