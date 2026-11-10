@@ -221,6 +221,84 @@ export function tapRunning(id: string, level: number) {
   run.gain.gain.setTargetAtTime(0.16 * l, a.currentTime, 0.12)
 }
 
+/** water pouring into the washroom's bowl as it stands in it (its stopper down, filling): a deeper plunge under the tap's splash, its ring
+ * rising in pitch as the bowl fills (the air over the water shorter, as a jug filling), one loop for both rooms as loud as the nearer.
+ * Each bowl says each frame how near it's heard (0: nothing pouring into standing water) and how full it is */
+const pours = new Map<string, { level: number; full: number }>()
+let pour: { gain: GainNode; band: BiquadFilterNode } | null = null
+export function basinPour(id: string, level: number, full: number) {
+  const prev = pours.get(id)
+  if (prev && Math.abs(prev.level - level) < 0.02 && Math.abs(prev.full - full) < 0.02 && !(level === 0 && prev.level !== 0)) return
+  pours.set(id, { level, full })
+  const a = ctx()
+  if (!a) return
+  let top = { level: 0, full: 0 }
+  for (const v of pours.values()) if (v.level > top.level) top = v
+  if (!pour) {
+    if (top.level <= 0) return
+    // (a stream into a pool: rough noise, bubbling in and out, through a band that rings)
+    const n = Math.floor(a.sampleRate * 3)
+    const b = a.createBuffer(1, n, a.sampleRate)
+    const d = b.getChannelData(0)
+    let last = 0
+    for (let i = 0; i < n; i++) { last = last * 0.55 + (Math.random() * 2 - 1) * 0.45; d[i] = last * (0.7 + 0.3 * Math.sin((i / n) * Math.PI * 2 * 41) * Math.sin((i / n) * Math.PI * 2 * 7)) }
+    const src = a.createBufferSource()
+    src.buffer = b
+    src.loop = true
+    const band = a.createBiquadFilter(); band.type = 'bandpass'; band.Q.value = 3.2; band.frequency.value = 420
+    const gain = a.createGain()
+    gain.gain.value = 0
+    src.connect(band).connect(gain).connect(a.destination)
+    src.start()
+    pour = { gain, band }
+  }
+  pour.band.frequency.setTargetAtTime(380 + 640 * top.full, a.currentTime, 0.2)
+  pour.gain.gain.setTargetAtTime(0.22 * top.level, a.currentTime, 0.15)
+}
+
+/** the bowl's pop-up stopper pressed: the spring latch catching with a small dry click, and the brass cap tinking down onto the strainer
+ * (pressed shut) or knocking up off it (popped open, a touch higher) */
+export function plugSound(down: boolean, near = 1) {
+  const a = ctx()
+  if (!a || near < 0.02) return
+  const t = a.currentTime
+  const ck = noise(a, 0.012, (x) => (1 - x) ** 2, 0.2)
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400
+  ck.connect(hp).connect(out(a, 0.1 * near))
+  ck.start(t)
+  ping(a, t + 0.018, down ? 1850 : 2350, 0.035 * near, 0.18, out(a, 1))
+  ping(a, t + 0.018, down ? 3100 : 3900, 0.014 * near, 0.12, out(a, 1))
+}
+
+/** the bowl let go (its stopper up with water in it): glugs as the water goes down the drain, coming quicker and lower as the bowl empties,
+ * and a last slurp of air as it's gone (`seconds`: how long it'll take, as full as it was) */
+export function drainGurgle(near: number, seconds: number) {
+  const a = ctx()
+  if (!a || near < 0.02 || seconds < 0.2) return
+  const t0 = a.currentTime
+  const to = out(a, 1)
+  let k = t0 + 0.12
+  while (k < t0 + seconds) {
+    const x = (k - t0) / seconds
+    const glug = noise(a, 0.07, (y) => Math.sin(Math.PI * y) ** 2, 0.35)
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 6
+    const f = 520 - 220 * x + Math.random() * 90
+    bp.frequency.setValueAtTime(f * 1.3, k); bp.frequency.exponentialRampToValueAtTime(f * 0.75, k + 0.07)
+    const g = a.createGain(); g.gain.value = (0.16 + 0.1 * x) * near
+    glug.connect(bp).connect(g).connect(to)
+    glug.start(k)
+    k += 0.16 - 0.07 * x + Math.random() * 0.08
+  }
+  // (the last of it sucked down: a falling hiss)
+  const end = t0 + seconds
+  const sl = noise(a, 0.35, (y) => Math.sin(Math.PI * Math.min(1, y * 1.6)) * (1 - y), 0.3)
+  const lp = a.createBiquadFilter(); lp.type = 'bandpass'; lp.Q.value = 2
+  lp.frequency.setValueAtTime(900, end); lp.frequency.exponentialRampToValueAtTime(240, end + 0.35)
+  const sg = a.createGain(); sg.gain.value = 0.2 * near
+  sl.connect(lp).connect(sg).connect(to)
+  sl.start(end)
+}
+
 /** a tap's cross handle given its quarter turn (the owner's: turning it should be heard; light, not heavy or watery): the stem turning in its
  * packing, a short faint stick-slip squeak rising as it opens (falling as it shuts), a little ring of brass on brass at the end of the turn,
  * and, shutting, the washer seating with a small dull knock */
