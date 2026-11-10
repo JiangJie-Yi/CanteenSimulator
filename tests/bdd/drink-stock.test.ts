@@ -95,7 +95,18 @@ feature('飲料櫃一開始是空的，自己從後場補', () => {
       w.rows = [['cola', null, null], ['oolong', 'oolong']]
     })
     when('數一數', (w) => { w.c = drinkCounts(w.rows, w.home) })
-    then('可樂 1/3、烏龍茶 2/2', (w) => { expect(w.c.cola).toEqual({ have: 1, places: 3 }); expect(w.c.oolong).toEqual({ have: 2, places: 2 }) })
+    then('可樂 1/3、烏龍茶 2/2', (w) => { expect(w.c.cola).toEqual({ have: 1, places: 3, astray: 0 }); expect(w.c.oolong).toEqual({ have: 2, places: 2, astray: 0 }) })
+  })
+
+  scenario('放到別的飲料格子裡的，不算在它自己架上（看得到幾瓶就是幾瓶）', ({ given, when, then, and }) => {
+    given('咖啡 3 格放了 2 瓶，第 3 瓶被拖到黑咖啡的空格', (w) => {
+      w.home = [['coffee', 'coffee', 'coffee', 'blackCoffee', 'blackCoffee']]
+      w.rows = [['coffee', null, 'coffee', 'coffee', null]]
+    })
+    when('數一數', (w) => { w.c = drinkCounts(w.rows, w.home) })
+    then('咖啡架上 2/3', (w) => { expect(w.c.coffee.have).toBe(2); expect(w.c.coffee.places).toBe(3) })
+    and('另有 1 瓶在別格', (w) => { expect(w.c.coffee.astray).toBe(1) })
+    and('黑咖啡自己的格子一瓶都沒有', (w) => { expect(w.c.blackCoffee.have).toBe(0) })
   })
 
   scenario('櫃子與後場存起來再讀回來一樣；讀不懂的就用一開始的樣子', ({ given, when, then, and }) => {

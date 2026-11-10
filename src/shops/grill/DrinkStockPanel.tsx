@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { tl, type Lang } from '@/data/i18n'
 import { buyCase, caseCost, CASE_SIZE, drinkCounts, fillFromBack } from '@/game/drinkStock'
 import { FitLine } from '@/ui/FitLine'
+import { setTip } from '@/scene/hoverTip'
 import { DRINK_BACK, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, SHOP_PURSE, type DrinkId } from './bar'
 
 type Drink = (typeof DRINKS)[number]
@@ -80,6 +81,7 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
   const counts = FRIDGE_STOCK.units.map((rows, u) => drinkCounts(rows, HOMES[u]))
   /** a drink's count over the fridges, and its places */
   const total = (id: DrinkId) => counts.reduce((t, c) => ({ have: t.have + (c[id]?.have ?? 0), places: t.places + (c[id]?.places ?? 0) }), { have: 0, places: 0 })
+  useEffect(() => () => setTip(null), [])
   /** the drinks the back can't fill their empty places from: a case of each of those is what the foot's button orders */
   const short = UNIT_DRINKS.flat().filter((id) => { const t = total(id); return (DRINK_BACK.back[id] ?? 0) < t.places - t.have })
   const shortCost = short.reduce((n, id) => n + caseCost(id), 0)
@@ -92,7 +94,7 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
             <h3 className="chiller-zone-head"><span>{tl(lang, unit.sign[0], unit.sign[1], u ? 'Alcohol' : 'Drinks')}</span><i aria-hidden="true">4°C</i></h3>
             <div className="chiller-bins">
               {UNIT_DRINKS[u].map((id) => {
-                const d = drinkOf(id), c = counts[u][id] ?? { have: 0, places: 0 }, back = DRINK_BACK.back[id] ?? 0
+                const d = drinkOf(id), c = counts[u][id] ?? { have: 0, places: 0, astray: 0 }, back = DRINK_BACK.back[id] ?? 0
                 const name = tl(lang, d.zh, d.ja, d.en)
                 const out = c.have <= 0
                 const cost = caseCost(id)
@@ -105,7 +107,14 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
                       <i style={{ width: `${c.places ? Math.min(100, (c.have / c.places) * 100) : 0}%` }} />
                     </span>
                     <span className="chiller-bin-info" aria-hidden="true">
-                      <b className={out ? 'is-zero' : ''}>{tl(lang, '櫃中', '庫内', 'Fridge')} <em>{c.have}/{c.places}</em></b>
+                      <b className={out ? 'is-zero' : ''}>{tl(lang, '櫃中', '庫内', 'Fridge')} <em>{c.have}/{c.places}</em>
+                        {/* (and any of it put in another drink's places: not on its own shelf, said apart) */}
+                        {c.astray > 0 && (
+                          <i className="drink-astray" onPointerEnter={() => setTip({ title: tl(lang, `另有 ${c.astray} 瓶在別的格子`, `ほかの棚に ${c.astray} 本`, `${c.astray} more in other places`),
+                            hint: tl(lang, '被拖到別種飲料的位置，不在自己的架上', '別の飲み物の場所に移されていて、自分の棚にはない', 'Moved into another drink’s places, not on its own shelf') })}
+                          onPointerLeave={() => setTip(null)}>+{c.astray}</i>
+                        )}
+                      </b>
                       <small>{tl(lang, '後場', 'バック', 'Back')} <em>{back}</em></small>
                     </span>
                     <span className="chiller-buy drink-bin-buy">

@@ -6200,6 +6200,20 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   color: #c0392b;
 }
 
+/* (a drink's bottles put in another drink's places: beside its count, apart from it) */
+.chiller-bin-info .drink-astray {
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: rgb(192 57 43 / 0.12);
+  color: #a33a2a;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+
 .chiller-bin-info em {
   font-style: normal;
   font-size: 15px;

@@ -54,11 +54,18 @@ export const emptyFridge = <T extends string>(home: T[][]): (T | null)[][] => ho
 /** the empty places filled from the back by hand, each with the drink it's meant for: all of them, or only `only`'s; as far as the back goes */
 export const fillFromBack = <T extends string>(rows: (T | null)[][], home: T[][], back: Back, only?: T) => restockRun(rows, home, back, Infinity, only)
 
-/** each drink's count in a fridge (whatever place it stands in), and how many places are meant for it */
+/** each drink in a fridge: how many of its own places hold it (what's seen on its shelf), how many places are meant for it, and how many
+ * of it stand in another drink's places (moved there by hand): those aren't on its shelf (the owner's, 2026-11-10: a coffee dragged into a
+ * black coffee's empty place, and the coffee's shelf, a gap in it, still said 3/3) */
 export function drinkCounts<T extends string>(rows: (T | null)[][], home: T[][]) {
-  const out: Record<string, { have: number; places: number }> = {}
-  home.forEach((r) => r.forEach((id) => { (out[id] ??= { have: 0, places: 0 }).places++ }))
-  rows.forEach((r) => r.forEach((id) => { if (id) (out[id] ??= { have: 0, places: 0 }).have++ }))
+  const out: Record<string, { have: number; places: number; astray: number }> = {}
+  home.forEach((r) => r.forEach((id) => { (out[id] ??= { have: 0, places: 0, astray: 0 }).places++ }))
+  rows.forEach((r, i) => r.forEach((id, k) => {
+    if (!id) return
+    const c = (out[id] ??= { have: 0, places: 0, astray: 0 })
+    if (home[i]?.[k] === id) c.have++
+    else c.astray++
+  }))
   return out
 }
 
