@@ -143,16 +143,30 @@ OA, OB, OH = 0.19, 0.13, 0.4     # (the open sack's half-width, half-depth, heig
 SEG = 24
 
 
-def ring(sx, y, inset=0.0):
-    """a rounded-square ring round y (a superellipse: a full sack's corners), `sx` its size against the sack's own"""
+def wob(k, y):
+    """how far out the cloth stands at point k round it, at height y, against the plain shape (the owner's, 2026-11-11, after Sketchfab's
+    "Burlap Bags", looked at only: a burlap sack, not a bucket): a touch out of round all the way up; the rice inside pressing it out in a
+    couple of soft bulges low down; and the cloth bunched into folds up under the rolled mouth, deeper toward it"""
+    a, t = 2 * math.pi * k / SEG, min(1.0, max(0.0, y / OH))
+    out = 1 + 0.025 * math.sin(2 * a + 0.7) + 0.02 * math.sin(3 * a + 1.9)
+    out += 0.022 * math.exp(-((t - 0.32) / 0.22) ** 2) * math.sin(4 * a + 2.2)
+    rise = max(0.0, min(1.0, (t - 0.5) / 0.5))
+    out += 0.032 * rise * rise * math.sin(7 * a + 1.3) * (0.65 + 0.35 * math.sin(3 * a + 0.4))
+    return out
+
+
+def ring(sx, y, inset=0.0, at=None):
+    """a rounded-square ring round y (a superellipse: a full sack's corners), `sx` its size against the sack's own (a number, or one for
+    each point round it), its cloth's own unevenness (wob) as at height `at` (y's own if not given)"""
     pts = []
     for k in range(SEG):
         t = 2 * math.pi * k / SEG
         c, s = math.cos(t), math.sin(t)
         e = 2 / 3.0
-        x = math.copysign(abs(c) ** e, c) * (OA * sx - inset)
-        z = math.copysign(abs(s) ** e, s) * (OB * sx - inset)
-        pts.append((x, y, z))
+        sk = (sx[k] if isinstance(sx, list) else sx) * wob(k, y if at is None else at)
+        x = math.copysign(abs(c) ** e, c) * (OA * sk - inset)
+        z = math.copysign(abs(s) ** e, s) * (OB * sk - inset)
+        pts.append((x, y[k] if isinstance(y, list) else y, z))
     return pts
 
 
@@ -182,17 +196,24 @@ def tube(name, rings, mat, uvmap):
 
 # (its body: the foot spread a little where it sits, full in the middle, drawing in a touch to the rim; up its height u, round its front v:
 # the front half's v 0..1 one way, the back half's back again, so the print stands on its front and its back)
-body = [(0.94, 0.0), (1.02, 0.025), (1.06, 0.1), (1.07, 0.2), (1.04, 0.3), (1.0, OH)]
+# (the mouth's edge up here and down there round it: the body's top, the cuff and the inside all meet along it)
+lip = [0.008 * math.sin(2 * 2 * math.pi * k / SEG + 0.5) + 0.005 * math.sin(5 * 2 * math.pi * k / SEG + 2.6) for k in range(SEG)]
+# (sagging at its foot under the rice's weight, drawn in a little under the rolled mouth)
+body = [(0.95, 0.0), (1.04, 0.02), (1.1, 0.07), (1.11, 0.14), (1.08, 0.22), (1.03, 0.3), (0.99, 0.36), (1.0, OH)]
 across = lambda k: 1 - abs(((k / SEG) % 1.0) * 2 - 1)  # noqa: E731
-tube("RiceSackOpen", [ring(s, y) for s, y in body], "sack", lambda k, i: (across(k), 1 - body[i][1] / OH))
+tube("RiceSackOpen", [ring(s_, [OH + lip[k] for k in range(SEG)] if y == OH else y, at=y) for s_, y in body], "sack", lambda k, i: (across(k), 1 - body[i][1] / OH))
 # (the mouth rolled down outward: over the rim and down in a cuff; under it and the inside of the cloth plain burlap, down to the rice)
-cuff = [(1.0, OH), (1.05, OH + 0.022), (1.11, OH + 0.012), (1.13, OH - 0.03), (1.1, OH - 0.05), (1.06, OH - 0.04)]
-tube("RiceSackCuff", [ring(s, y) for s, y in cuff], "inside", lambda k, i: (k / SEG * 3, i / 5))
+# (rolled unevenly, as a worn sack's is: thick in one place and thin in another, its edge up here and down there, hanging lower at the side)
+CUFF = [(1.0, 0.0), (1.05, 0.022), (1.11, 0.012), (1.13, -0.03), (1.1, -0.05), (1.06, -0.04)]
+thick = [1 + 0.5 * math.sin(3 * 2 * math.pi * k / SEG + 0.4) + 0.25 * math.sin(5 * 2 * math.pi * k / SEG + 2.0) for k in range(SEG)]
+droop = [0.6 + 0.8 * (0.5 + 0.5 * math.sin(2 * 2 * math.pi * k / SEG + 1.1)) for k in range(SEG)]
+cuff = [([1 + (s_ - 1) * thick[k] for k in range(SEG)], [OH + lip[k] + dy * (droop[k] if dy < 0 else 1) for k in range(SEG)]) for s_, dy in CUFF]
+tube("RiceSackCuff", [ring(s_, y, at=OH) for s_, y in cuff], "inside", lambda k, i: (k / SEG * 3, i / 5))
 RICE_Y = OH - 0.05
-inner = [(1.0, OH), (0.97, OH - 0.02), (0.96, RICE_Y - 0.02)]
-tube("RiceSackIn", [ring(s, y) for s, y in inner], "inside", lambda k, i: (k / SEG * 3, i / 2))
+inner = [(1.0, [OH + lip[k] for k in range(SEG)]), (0.97, OH - 0.02), (0.96, RICE_Y - 0.02)]
+tube("RiceSackIn", [ring(s_, y, at=OH) for s_, y in inner], "inside", lambda k, i: (k / SEG * 3, i / 2))
 # (the rice: heaped a little to the middle, its rim tucked under the cloth; closed across in a ladder, no fan to its middle)
-rice_rings = [ring(0.965, RICE_Y - 0.01), ring(0.75, RICE_Y + 0.012), ring(0.45, RICE_Y + 0.024)]
+rice_rings = [ring(0.965, RICE_Y - 0.01, at=OH), ring(0.75, RICE_Y + 0.012, at=OH), ring(0.45, RICE_Y + 0.024, at=OH)]
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
 vs = [[bm.verts.new(P(*p)) for p in r] for r in rice_rings]
