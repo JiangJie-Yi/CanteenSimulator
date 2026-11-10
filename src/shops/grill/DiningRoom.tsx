@@ -165,9 +165,11 @@ const seal = (g: CanvasRenderingContext2D, x: number, y: number, s: number) => {
  * its rings' widths and places a hair different) and softened at its edges as dye bleeds; the dye mottled, a cotton weave and a few resist
  * specks over it all. A tile is 0.6 wide by the band's 0.2, joining with the next along the wall.
  */
-const SEIGAIHA_TILE = 0.6
-const SEIGAIHA = canvasTex(1536, 512, (g) => {
-  const W = 1536, H = 512, R = 384, COLS = W / (2 * R)
+// (the owner's, 2026-11-10 evening: still a little dense; the waves a third bigger again (two to 0.8 instead of 0.6, two rows in the
+// band), four rings to each instead of five, finer, with more of the ground between them)
+const SEIGAIHA_TILE = 0.8
+const SEIGAIHA = canvasTex(2048, 512, (g) => {
+  const W = 2048, H = 512, R = 512, COLS = W / (2 * R)
   const GROUND = '#ece2c9'
   const INDIGO = ['#1d3253', '#223a5f', '#283f66', '#1a2d4a', '#243d63']
   let seed = 1
@@ -185,23 +187,23 @@ const SEIGAIHA = canvasTex(1536, 512, (g) => {
       const half = new Path2D(); half.moveTo(cx - R, cy); half.arc(cx, cy, R, Math.PI, 0); half.closePath()
       g.fillStyle = GROUND; g.fill(half)
       const wash = g.createRadialGradient(cx, cy, R * 0.12, cx, cy, R)
-      wash.addColorStop(0, 'rgba(34,58,95,0.22)'); wash.addColorStop(0.65, 'rgba(34,58,95,0.07)'); wash.addColorStop(1, 'rgba(34,58,95,0)')
+      wash.addColorStop(0, 'rgba(34,58,95,0.16)'); wash.addColorStop(0.65, 'rgba(34,58,95,0.05)'); wash.addColorStop(1, 'rgba(34,58,95,0)')
       g.fillStyle = wash; g.fill(half)
       // (its rings, each drawn twice: a faint wide one where the dye's bled, then its line)
-      for (const [f, w] of [[0.94, 22], [0.78, 15], [0.62, 14], [0.46, 13], [0.3, 12]] as const) {
+      for (const [f, w] of [[0.93, 20], [0.72, 13], [0.52, 12], [0.33, 11]] as const) {
         const r = R * f + (rnd() - 0.5) * 5, lw = w + (rnd() - 0.5) * 3
         g.beginPath(); g.arc(cx, cy, r, Math.PI, 0)
-        g.strokeStyle = 'rgba(34,58,95,0.16)'; g.lineWidth = lw + 9; g.stroke()
+        g.strokeStyle = 'rgba(34,58,95,0.12)'; g.lineWidth = lw + 8; g.stroke()
         g.strokeStyle = ink; g.lineWidth = lw; g.stroke()
       }
-      g.beginPath(); g.moveTo(cx - R * 0.14, cy); g.arc(cx, cy, R * 0.14, Math.PI, 0); g.closePath()
+      g.beginPath(); g.moveTo(cx - R * 0.12, cy); g.arc(cx, cy, R * 0.12, Math.PI, 0); g.closePath()
       g.fillStyle = ink; g.fill()
     }
   }
   // (over it all, wrapped round the tile's ends: the dye's mottle, broad and faint; the cotton's weave; pale resist specks and a few darker)
   seed = 4242
   const wrap = (x: number, draw: (x: number) => void) => { draw(x); if (x < 80) draw(x + W); if (x > W - 80) draw(x - W) }
-  for (let k = 0; k < 21; k++) {
+  for (let k = 0; k < 28; k++) {
     const x = rnd() * W, y = rnd() * H, r = 60 + rnd() * 90, dark = rnd() < 0.5
     wrap(x, (xx) => {
       const m = g.createRadialGradient(xx, y, 0, xx, y, r)
@@ -211,7 +213,7 @@ const SEIGAIHA = canvasTex(1536, 512, (g) => {
   }
   for (let y = 0; y < H; y += 3) { g.fillStyle = 'rgba(96,80,56,0.035)'; g.fillRect(0, y, W, 1) }
   for (let x = 0; x < W; x += 3) { g.fillStyle = 'rgba(255,250,236,0.03)'; g.fillRect(x, 0, 1, H) }
-  for (let k = 0; k < 3900; k++) {
+  for (let k = 0; k < 5200; k++) {
     const x = rnd() * W, y = rnd() * H, w = 1 + rnd() * 2.5, pale = rnd() < 0.7
     g.fillStyle = pale ? `rgba(246,240,224,${0.12 + rnd() * 0.18})` : `rgba(40,34,26,${0.05 + rnd() * 0.07})`
     wrap(x, (xx) => g.fillRect(xx, y, w, 1))
