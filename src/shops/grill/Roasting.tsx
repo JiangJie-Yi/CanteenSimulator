@@ -6953,9 +6953,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (here && p.skewerAt !== undefined && p.pullAt === undefined) inUse++
         // (the rod: in as it's pushed, out as it's pulled; none before or after)
         const grow = p.skewerAt === undefined ? 0 : p.pullAt !== undefined ? 1 - Math.min(1, (now - p.pullAt) / 450) : Math.min(1, (now - p.skewerAt) / 600)
+        // (every rod the one standard size (the owner's, 2026-11-11: some long and thick): its shape is made for the piece at its home size;
+        // the piece drawn larger than it's meant to be now (its size here, served or not (`shrink`), against its home size), the rod's taken
+        // back by as much: never larger than standard. Smaller (popping in, shrunk away) it goes with the piece, as it did)
+        const hs = p.node.userData.home?.s as THREE.Vector3 | undefined
+        const k = menuIds.has(p.id) && hs && hs.x > 0 ? p.node.scale.x / hs.x : 1
+        const meant = menuIds.has(p.id) ? ((p.node.userData.shrink as number | undefined) ?? 1) : k
+        const keep = k > meant * 1.02 ? meant / k : 1
         for (const m of p.sticks) {
           m.visible = grow > 0.001 && !p.stickOnly ? true : p.stickOnly && p.pullAt === undefined
-          m.scale.setScalar(p.stickOnly ? 1 : Math.max(0.001, grow))
+          m.scale.setScalar((p.stickOnly ? 1 : Math.max(0.001, grow)) * keep)
         }
       }
       SKEWERS.inUse = inUse
