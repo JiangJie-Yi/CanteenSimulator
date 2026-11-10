@@ -5407,7 +5407,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     return () => glowOff(g)
   }, [lifted])
   const shelves = FRIDGE_UNITS[n].shelves
-  const slotAt = (r: number, k: number) => new THREE.Vector3((k - (shelves[r].ids.length - 1) / 2) * shelves[r].pitch, shelves[r].y, 0.16)
+  const slotAt = (r: number, k: number) => new THREE.Vector3(shelfLayout(n, r).xs[k], shelves[r].y, 0.16)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   // (what the shelves' batch was made with: each place's drink, an empty one as the drink that's its own (its home), so a place emptied and
   // filled again (a customer's drink taken, the stocker's carried out) is only hidden and shown in the batch; only a place holding another
@@ -5690,13 +5690,14 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
   // (made once for what it was baked with, so the stock changing doesn't redraw the hundred and sixty bottles under the batch)
   const ranks = useMemo(() => baked.map((row, r) => row.map((id, k) => {
     const sh = FRIDGE_UNITS[n].shelves
-    const sp = new THREE.Vector3((k - (sh[r].ids.length - 1) / 2) * sh[r].pitch, sh[r].y, 0.16), step = sh[r].pitch * 1.02
+    // (the ranks behind it straight back, square, each its own depth and 5 mm apart (the owner's: neat rows; they were set a hair askew)
+    const sp = new THREE.Vector3(shelfLayout(n, r).xs[k], sh[r].y, 0.16), step = shelfSize(id)[1] + 0.005
     const deep = Math.max(1, Math.floor(RANK_DEPTH / step))
     return [
       <group key={`f${r}-${k}`} position={sp.toArray()} userData={{ batchPart: `f${r}-${k}` }}><DrinkBottleLite id={id} /></group>,
       <group key={`b${r}-${k}`} userData={{ batchPart: `b${r}-${k}` }}>
         {Array.from({ length: deep }, (_, j) => (
-          <group key={j} position={[sp.x + (((k * 7 + j * 3) % 5) - 2) * 0.003, sp.y, sp.z - step * (j + 1)]} rotation-y={((k + j) % 3 - 1) * 0.25}>
+          <group key={j} position={[sp.x, sp.y, sp.z - step * (j + 1)]}>
             <DrinkBottleLite id={id} />
           </group>
         ))}
@@ -5711,9 +5712,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           onPointerOver={(ev) => { ev.stopPropagation(); if (doorOpen()) { document.body.style.cursor = 'pointer'; setHover(`${r}-${k}`); setRaised(`${r}-${k}`) } aimTip(ev); setTip({ title: drinkName(id), hint: doorOpen() ? '拖出來，放到桌上或客人面前' : '先點櫃門打開' }) }}
           onPointerOut={() => { document.body.style.cursor = ''; setHover((h) => (h === `${r}-${k}` ? null : h)); setTip(null) }}>
           {/* (what the pointer finds: the bottle's size, unseen) */}
-          <mesh position-y={0.11} visible={false}><boxGeometry args={[shelves[r].pitch * 0.9, 0.22, 0.06]} /></mesh>
+          <mesh position-y={0.11} visible={false}><boxGeometry args={[shelfSize(shelves[r].ids[k])[0] + shelfLayout(n, r).gap * 0.9, 0.22, 0.06]} /></mesh>
           {lifted === `${r}-${k}` ? <DrinkBottle id={id} lit /> : raised === `${r}-${k}` && (
-            <HoverLift active={hover === `${r}-${k}`} onDone={() => setRaised((x) => (x === `${r}-${k}` ? null : x))}><DrinkBottle id={id} lit /></HoverLift>
+            <HoverLit active={hover === `${r}-${k}`} onDone={() => setRaised((x) => (x === `${r}-${k}` ? null : x))}><DrinkBottle id={id} lit /></HoverLit>
           )}
         </group>
       )))}
@@ -5736,30 +5737,63 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
 const RANK_DEPTH = 0.12
 /** a fridge's places as its shelves' batch is made with them: each its drink, or (empty) the drink that's its own */
 const bakedShelves = (n: number) => FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => (id ?? FRIDGE_UNITS[n].shelves[r].ids[k]) as DrinkId))
+/** how wide across a shelf a drink stands and how deep (its shape as the shelves draw it, DrinkBottleLite, turned a quarter round as it's
+ * stood there, at its size in the shop), measured once each */
+const SHELF_SIZES = new Map<DrinkId, [number, number]>()
+function shelfSize(id: DrinkId): [number, number] {
+  const hit = SHELF_SIZES.get(id)
+  if (hit) return hit
+  const kind = KIND_OF[id], shaped = shapeOf(id)
+  const g = kind === 'pack' ? PACK.body : kind === 'can' && id !== 'cola' && id !== 'greenTea' ? LITE_GEO.canLabel : kind === 'small' ? BOTTLE_GEO.small
+    : shaped ? LITE_GEO[shaped].body : null
+  let v: [number, number] = [0.06, 0.06]
+  if (g) {
+    if (!g.boundingBox) g.computeBoundingBox()
+    const b = g.boundingBox!, sc = DRINK_SCALE[id]
+    // (turned a quarter round (DrinkBottleLite): its own z across the shelf, its x deep)
+    v = [(b.max.z - b.min.z) * sc, (b.max.x - b.min.x) * sc]
+  }
+  SHELF_SIZES.set(id, v)
+  return v
+}
+/** how much of a shelf's width the drinks stand along (blender/drinkfridge.py: its walls 0.395 either side of the middle, the cove lights'
+ * baffles 2 cm in from them; a little room left inside those) */
+const SHELF_SPAN = 0.72
 /**
- * A bottle the pointer's on, as everything else pointed at answers (the owner's): lifted 2 cm and made 3% larger, evenly, eased in; eased
- * back to its place when the pointer leaves, and only then handed back to the shelf's batch (`onDone`). It was a glowing tube drawn round
- * it, 25 cm tall whatever the drink: a can looked drawn out to twice its height, and washed white.
+ * Where each of a shelf's places stands across it (the owner's, 2026-11-10: the rows were laid at a fixed pitch from the middle, small
+ * bottles with wide gaps between them, cans and packs packed shoulder to shoulder, room left at an end): each place as wide as its own
+ * drink (the shelf's own, so nothing moves as drinks are taken or swapped), the gaps between them and at both ends all alike, the row filling
+ * the shelf; and that gap.
  */
-function HoverLift({ active, onDone, children }: { active: boolean; onDone: () => void; children: React.ReactNode }) {
+const SHELF_LAYOUTS = new Map<string, { xs: number[]; gap: number }>()
+function shelfLayout(n: number, r: number) {
+  const key = `${n}-${r}`, hit = SHELF_LAYOUTS.get(key)
+  if (hit) return hit
+  const ws = FRIDGE_UNITS[n].shelves[r].ids.map((id) => shelfSize(id)[0])
+  const gap = Math.max(0.003, (SHELF_SPAN - ws.reduce((a, w) => a + w, 0)) / (ws.length + 1))
+  const xs: number[] = []
+  let x = -(ws.reduce((a, w) => a + w, 0) + gap * (ws.length - 1)) / 2
+  for (const w of ws) { xs.push(x + w / 2); x += w + gap }
+  const v = { xs, gap }
+  SHELF_LAYOUTS.set(key, v)
+  return v
+}
+/**
+ * A bottle the pointer's on, as everything else pointed at answers (the owner's): drawn on its own, lit in its place, as anything that can
+ * be picked up is (scene/hoverGlow); put out as the pointer leaves, and then handed back to the shelf's batch (`onDone`). It was lifted 2 cm
+ * and made 3% larger as well (the owner's, 2026-11-10: no rising, only the glow), and before that a glowing tube 25 cm tall round it.
+ */
+function HoverLit({ active, onDone, children }: { active: boolean; onDone: () => void; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
-  const k = useRef(0)
   const done = useRef(onDone)
   done.current = onDone
-  // (and lit while it's pointed at, as everything that can be picked up is (the owner's, 2026-11-10: the drinks in the fridges only rose,
-  // they didn't light up): the glow round its outline (scene/hoverGlow), put out as the pointer leaves it)
   useEffect(() => {
     const o = g.current
-    if (!active || !o) return
+    if (!active) { done.current(); return }
+    if (!o) return
     glowOnly(o)
     return () => glowLeave(o)
   }, [active])
-  useFrame((_, dt) => {
-    k.current += ((active ? 1 : 0) - k.current) * Math.min(1, dt * 14)
-    const o = g.current
-    if (o) { o.position.y = 0.02 * k.current; o.scale.setScalar(1 + 0.03 * k.current) }
-    if (!active && k.current < 0.01) done.current()
-  })
   return <group ref={g}>{children}</group>
 }
 /** a drink's name, for its tag */
@@ -5781,6 +5815,12 @@ const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.
 const FORM: Partial<Record<DrinkId, DrinkId>> = { darkBeer: 'beer', shochu: 'sake', umeshu: 'sake', blackCoffee: 'coffee', cafeAuLait: 'coffee', yuzuSoda: 'chuhai',
   grapeSoju: 'sake', lacticSoda: 'chuhai' }
 const formOf = (id: DrinkId): DrinkId => FORM[id] ?? id
+/** which of the shelves' simple bottles a drink's drawn as (LITE_GEO), or none (a can, a pack, a little bottle) */
+const shapeOf = (id: DrinkId) => {
+  const f = formOf(id)
+  return f === 'beer' ? 'beer' : f === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'cola' || id === 'greenTea' || id === 'sports' ? 'pet500'
+    : id === 'milk' ? 'milk' : id === 'ramune' ? 'ramune' : null
+}
 /**
  * The floor's real top under a point (the fridge's own floor, its frame's y = 0, is a centimetre under the boards' top: what was laid there
  * flat, a spilt drink and its shards, was under the boards): a short ray straight down, against only what's near it (its originals too, if
@@ -5854,8 +5894,7 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
   const d = DRINKS.find((x) => x.id === id)!
   const kind = KIND_OF[id]
   const f = formOf(id)
-  const shaped = f === 'beer' ? 'beer' : f === 'sake' ? 'sake' : id === 'oolong' ? 'pet' : id === 'cola' || id === 'greenTea' || id === 'sports' ? 'pet500'
-    : id === 'milk' ? 'milk' : id === 'ramune' ? 'ramune' : null
+  const shaped = shapeOf(id)
   // (its body's colour: the beer's brown glass, the ramune's aqua, the milk white; a clear bottle the colour of what's in it, paled by the glass)
   const body = id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#86d0e2' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : soju(id) ? '#3f8a4a' : f === 'sake' ? '#e4ece6'
     : `#${new THREE.Color(d.color).lerp(new THREE.Color('#ffffff'), 0.25).getHexString()}`

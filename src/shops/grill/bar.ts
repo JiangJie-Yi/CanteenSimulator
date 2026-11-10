@@ -369,20 +369,21 @@ export type DrinkId = (typeof DRINKS)[number]['id']
  * alcohol (sake and beer in bottles, beer, highballs and chuhai in cans) in the second. Each shelf, bottom up, is a row
  * of places, the big bottles low; the unit a drink lives in is where a customer goes for it.
  */
-export const FRIDGE_UNITS: { sign: [string, string]; shelves: { y: number; pitch: number; ids: DrinkId[] }[] }[] = [
+// (each shelf's drinks laid evenly across it by DiningRoom's shelfLayout, as wide as each stands: no pitch of its own)
+export const FRIDGE_UNITS: { sign: [string, string]; shelves: { y: number; ids: DrinkId[] }[] }[] = [
   { sign: ['飲料', 'ドリンク'], shelves: [
-    { y: 0.27, pitch: 0.082, ids: ['oolong', 'oolong', 'oolong', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
-    { y: 0.72, pitch: 0.08, ids: ['cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'yuzuSoda', 'yuzuSoda', 'yuzuSoda'] },
-    // (the paper packs with the milk and the coffees (the owner's, 2026-11-10): twelve to the shelf, a little closer)
-    { y: 1.19, pitch: 0.055, ids: ['milk', 'milk', 'coffee', 'coffee', 'blackCoffee', 'cafeAuLait', 'appleJuice', 'appleJuice', 'barleyTea', 'barleyTea', 'vegJuice', 'vegJuice'] },
-    { y: 1.63, pitch: 0.07, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yogurt', 'yogurt', 'yogurt', 'lacticSoda', 'lacticSoda', 'lacticSoda'] },
+    { y: 0.27, ids: ['oolong', 'oolong', 'oolong', 'greenTea', 'greenTea', 'greenTea', 'sports', 'sports', 'sports'] },
+    { y: 0.72, ids: ['cola', 'cola', 'cola', 'ramune', 'ramune', 'ramune', 'yuzuSoda', 'yuzuSoda', 'yuzuSoda'] },
+    // (the paper packs with the milk and the coffees (the owner's, 2026-11-10): twelve to the shelf)
+    { y: 1.19, ids: ['milk', 'milk', 'coffee', 'coffee', 'blackCoffee', 'cafeAuLait', 'appleJuice', 'appleJuice', 'barleyTea', 'barleyTea', 'vegJuice', 'vegJuice'] },
+    { y: 1.63, ids: ['yakult', 'yakult', 'yakult', 'yakult', 'yogurt', 'yogurt', 'yogurt', 'lacticSoda', 'lacticSoda', 'lacticSoda'] },
   ] },
   // (each kind on one shelf only (the owner's, 2026-11-10: the cans were on three), its plaque naming what's on it)
   { sign: ['酒類', 'お酒'], shelves: [
-    { y: 0.27, pitch: 0.082, ids: ['beer', 'beer', 'beer', 'beer', 'beer', 'darkBeer', 'darkBeer', 'darkBeer', 'darkBeer'] },
-    { y: 0.72, pitch: 0.082, ids: ['sake', 'sake', 'sake', 'sake', 'sake', 'umeshu', 'umeshu', 'umeshu', 'umeshu'] },
-    { y: 1.19, pitch: 0.082, ids: ['shochu', 'shochu', 'shochu', 'shochu', 'shochu', 'grapeSoju', 'grapeSoju', 'grapeSoju', 'grapeSoju'] },
-    { y: 1.63, pitch: 0.07, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'chuhai', 'chuhai', 'chuhai'] },
+    { y: 0.27, ids: ['beer', 'beer', 'beer', 'beer', 'beer', 'darkBeer', 'darkBeer', 'darkBeer', 'darkBeer'] },
+    { y: 0.72, ids: ['sake', 'sake', 'sake', 'sake', 'sake', 'umeshu', 'umeshu', 'umeshu', 'umeshu'] },
+    { y: 1.19, ids: ['shochu', 'shochu', 'shochu', 'shochu', 'shochu', 'grapeSoju', 'grapeSoju', 'grapeSoju', 'grapeSoju'] },
+    { y: 1.63, ids: ['beerCan', 'beerCan', 'beerCan', 'beerCan', 'highball', 'highball', 'highball', 'chuhai', 'chuhai', 'chuhai'] },
   ] },
 ]
 /** which fridge a drink lives in */
