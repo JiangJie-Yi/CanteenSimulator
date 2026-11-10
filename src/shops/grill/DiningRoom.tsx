@@ -2,7 +2,7 @@ import { blessingChime, pourSake, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
-import { bottleClink, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
+import { bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { landingOf } from '@/game/spills'
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -4997,7 +4997,7 @@ const FRIDGE_LED = (() => {
 /** each shelf's lip (the owner's: no price tags, a convenience store's): brushed steel, and in its middle a small black plaque edged in gold
  * naming what the shelf keeps (a quarter of the picture to a shelf, the lowest at the top) */
 // (as bar.ts's FRIDGE_UNITS fills each shelf, the lowest first)
-const SHELF_NAMES = [['お茶・スポーツ', '炭酸', '牛乳・珈琲', '乳酸菌飲料'], ['瓶ビール・黒ビール', '日本酒・梅酒', '韓国焼酎', '缶ビール・ハイボール・酎ハイ']]
+const SHELF_NAMES = [['お茶・スポーツ', '炭酸', '牛乳・珈琲・紙パック', '乳酸菌飲料'], ['瓶ビール・黒ビール', '日本酒・梅酒', '韓国焼酎', '缶ビール・ハイボール・酎ハイ']]
 const fridgeTagTex = (n: number) => {
   const t = canvasTex(1024, 256, (g) => {
     for (let k = 0; k < 4; k++) {
@@ -5445,6 +5445,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           g.position.copy(host.worldToLocal(new THREE.Vector3(o.w[0], o.w[1], o.w[2])))
           g.quaternion.copy(host.getWorldQuaternion(new THREE.Quaternion()).invert())
         } else {
+          // (down on the boards' real top (floorAt), not the fridge's own floor a centimetre under it (the owner's: nothing laid on the floor
+          // sinks into it)): found once where it's put down, however it got there
+          if (o.base === undefined) { const w = host.localToWorld(new THREE.Vector3(o.x, 0, o.z)); o.base = host.worldToLocal(w.setY(floorAt(scene, w))).y }
           // (let go in mid-air, it falls: gravity, and a small bounce on the floor)
           if (o.fy !== undefined) {
             o.fell = Math.max(o.fell ?? 0, o.fy)
@@ -5461,6 +5464,11 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
                 const land = landingOf(KIND_OF[o.id], o.fell ?? 0)
                 if (land === 'shatter') { broken.push(i); breakBottle(o.id, at.setY(floorAt(scene, at)), host.getWorldScale(LIFT_AT).y); return }
                 if (land === 'roll' && !o.tipped) { o.tipped = true; o.tip = 0; o.roll = 0; canClatter(at) }
+                // (a paper pack: onto its side with a dull thud of board (a box doesn't roll); a little drop, a softer one)
+                if (KIND_OF[o.id] === 'pack') {
+                  if (land === 'topple' && !o.tipped) { o.tipped = true; o.tip = 0; o.roll = 0 }
+                  boxThud(at, land === 'topple' ? 1 : 0.5)
+                }
               }
               // (landing: a hard fall from high enough can't keep it upright, a tall bottle least of all: it tips over, and rolls)
               if (!o.tipped && o.vy < -2.2 && Math.random() < Math.min(0.95, (o.fell ?? 0) * 0.9 + 0.15)) { o.tipped = true; o.tip = 0; o.roll = 0 }
@@ -5472,23 +5480,24 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
             // (over on its side in about half a second, rolling a hand's width while it goes, slowing)
             const tip = Math.min(Math.PI / 2, (o.tip ?? 0) + dt * 4)
             o.tip = tip
-            const roll = Math.min(0.22, (o.roll ?? 0) + dt * 0.5 * (1 - tip / (Math.PI / 2) + 0.15))
+            const box = KIND_OF[o.id] === 'pack'
+            const roll = box ? 0 : Math.min(0.22, (o.roll ?? 0) + dt * 0.5 * (1 - tip / (Math.PI / 2) + 0.15))
             o.roll = roll
-            g.position.set(o.x + roll, o.fy ?? 0, o.z)
+            g.position.set(o.x + roll, (o.fy ?? 0) + (o.base ?? 0), o.z)
             // (over toward the room, then rolling sideways along the floor, turning about its own length as it goes: the roll was turned about
             // the same axis as the fall, tipping it on past lying flat, its neck down into the floor)
             g.quaternion.copy(TIP_Q.setFromAxisAngle(TIP_AXIS, tip)).multiply(SPIN_Q.setFromAxisAngle(SPIN_AXIS, -roll / ROLL_R))
             // (its lowest point on the floor, whatever its girth and however it's turned (the owner's, 2026-11-10: a ramune lying down sank half
             // into the boards: it was raised a fixed 2.6 cm, a slim bottle's half width): measured each frame while it goes over and rolls,
             // kept once it lies still)
-            const still = tip >= Math.PI / 2 && roll >= 0.22 && o.fy === undefined
+            const still = tip >= Math.PI / 2 && (box || roll >= 0.22) && o.fy === undefined
             if (!still || o.lift === undefined) {
-              const lift = restLift(g, host, o.fy ?? 0)
+              const lift = restLift(g, host, (o.fy ?? 0) + (o.base ?? 0))
               if (still) o.lift = lift
               g.position.y += lift
             } else g.position.y += o.lift
           } else {
-            g.position.set(o.x, o.fy ?? 0, o.z)
+            g.position.set(o.x, (o.fy ?? 0) + (o.base ?? 0), o.z)
             g.quaternion.identity()
           }
         }
@@ -5661,8 +5670,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           FRIDGE_STOCK.out[from.i].x = x
           FRIDGE_STOCK.ver++
         }
-        // (let go above the floor, it drops from there)
+        // (let go above the floor, it drops from there; where it's to come down, found again (`base`: the frame below))
         const o = FRIDGE_STOCK.out[idx]
+        if (o) o.base = undefined
         if (o && py > 0.03) {
           o.fy = py
           o.vy = 0
@@ -5765,7 +5775,7 @@ const drinkName = (id: string) => {
 // the 65 ml cultured milk 9 cm, a 200 ml milk bottle 13 cm)
 const DRINK_SCALE: Record<DrinkId, number> = { beer: 1.2, sake: 1.12, oolong: 1.26, ramune: 1.06, beerCan: 1.36, highball: 1.36, coffee: 1.2, greenTea: 1.3,
   cola: 1.3, yakult: 1.12, sports: 1.3, milk: 1.1, chuhai: 1.36, blackCoffee: 1.2, cafeAuLait: 1.2, yuzuSoda: 1.36, darkBeer: 1.2, shochu: 1.08, umeshu: 1.06,
-  grapeSoju: 1.08, yogurt: 1.5, lacticSoda: 1.36 }
+  grapeSoju: 1.08, yogurt: 1.5, lacticSoda: 1.36, appleJuice: 1.25, barleyTea: 1.25, vegJuice: 1.25 }
 /** what each drink's shaped as (its bottle or can): the newer ones as one of the first (a dark beer the beer's bottle, shochu and umeshu the
  * sake's) */
 const FORM: Partial<Record<DrinkId, DrinkId>> = { darkBeer: 'beer', shochu: 'sake', umeshu: 'sake', blackCoffee: 'coffee', cafeAuLait: 'coffee', yuzuSoda: 'chuhai',
@@ -5852,7 +5862,12 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
   return (
     <group scale={DRINK_SCALE[id]}>
       <group rotation-y={-Math.PI / 2}>
-        {kind === 'can' && id !== 'cola' && id !== 'greenTea' ? <>
+        {kind === 'pack' ? <>
+          {/* (a paper pack: its printed body, the seam sealed across its top, the silver of its straw hole) */}
+          <mesh geometry={shadedLabel(PACK.body, id, true)} material={SHELF_LABEL} />
+          <mesh geometry={shaded(PACK.seam, d.label[0], true)} position-y={PACK.h} material={SHELF_PARTS} />
+          <mesh geometry={PACK.hole} position={PACK.holeAt} material={SHELF_METAL} />
+        </> : kind === 'can' && id !== 'cola' && id !== 'greenTea' ? <>
           <mesh geometry={shadedLabel(LITE_GEO.canLabel, id)} position-y={0.045} material={SHELF_LABEL} />
           <mesh geometry={LITE_CAN_LID} material={SHELF_METAL} />
         </> : kind === 'small' ? <>
@@ -5898,6 +5913,19 @@ function DrinkBottleRaw({ id, lit = false, wet = false, level = 1 }: { id: Drink
       {/* (its top: the lid pressed down inside its rolled rim, the ring pull lying on it, all aluminium) */}
       <mesh geometry={CAN_LID} material={glassMat} />
       <mesh geometry={CAN_TAB} position={[0, 0.0915, 0.0035]} material={glassMat} />
+    </group>
+  )
+  if (kind === 'pack') return (
+    // a paper pack: its printed body, its seam, its straw hole's silver foil; on its back, a straw in its clear wrapper stuck on aslant
+    <group rotation-y={-Math.PI / 2}>
+      <mesh geometry={labelGeo(PACK.body, id)} material={label} />
+      <mesh geometry={tinted(PACK.seam, d.label[0])} position-y={PACK.h} material={PARTS} />
+      <mesh geometry={PACK.hole} position={PACK.holeAt} material={CAN} />
+      <group position={PACK.strawAt} rotation-x={PACK.strawTilt}>
+        <mesh geometry={tinted(PACK.straw, '#f4f1ea')} material={PARTS} />
+        <mesh geometry={tinted(PACK.wrap, '#ffffff', 0.32)} material={GLASS} />
+      </group>
+      {wet && <mesh geometry={PACK.body} material={DEW} scale={[1.02, 1, 1.02]} />}
     </group>
   )
   if (d.shape === 'small') return (
@@ -6067,6 +6095,38 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
     return gr
   }
   const JP = '"Zen Antique", serif'
+  /**
+   * A paper pack's print (PACK's body; the owner's, 2026-11-10): its ground, a band of colour at its foot; its wide front at a quarter
+   * round, its narrow sides at a half and at the seam (both ends, a half each), its back at three quarters (what's in it, the 200 ml and
+   * the paper pack mark); each panel drawn a seventh wider than it's drawn tall (the print runs 14 cm round on 512 dots, 8 cm up on 256);
+   * a strip of the ground at the very top for its top and foot
+   */
+  const pack = (ground: string, band: string, front: (cx: number) => void, side: (cx: number) => void) => {
+    g.fillStyle = ground; g.fillRect(0, 0, W, H)
+    g.fillStyle = band; g.fillRect(0, H * 0.87, W, H * 0.13)
+    const panel = (x: number, draw: (cx: number) => void) => { g.save(); g.translate(x, 0); g.scale(1.144, 1); draw(0); g.restore() }
+    panel(W * 0.25, (cx) => {
+      front(cx)
+      htext('200ml', cx + 34, H * 0.935, 14, '#ffffff', '"Arial Black", sans-serif')
+      paperMark(cx - 44, H * 0.935, 18, '#ffffff')
+    })
+    for (const x of [0, W * 0.5, W]) panel(x, side)
+    panel(W * 0.75, (cx) => {
+      g.fillStyle = 'rgba(255,255,255,0.85)'; g.fillRect(cx - 52, H * 0.18, 104, H * 0.6)
+      g.strokeStyle = band; g.lineWidth = 1.5; g.strokeRect(cx - 52, H * 0.18, 104, H * 0.6)
+      g.fillStyle = 'rgba(60,50,40,0.45)'
+      for (let k = 0; k < 9; k++) g.fillRect(cx - 44, H * 0.25 + k * 15, k % 3 === 2 ? 52 : 88, 3)
+      paperMark(cx - 36, H * 0.935, 18, '#ffffff')
+      htext('200ml', cx + 30, H * 0.935, 14, '#ffffff', '"Arial Black", sans-serif')
+    })
+    g.fillStyle = ground; g.fillRect(0, 0, W, 6)
+  }
+  /** the paper pack mark (紙パック): a little rounded square, 紙 in it */
+  const paperMark = (x: number, y: number, s: number, ink: string) => {
+    g.strokeStyle = ink; g.lineWidth = 1.6
+    g.beginPath(); g.roundRect(x - s / 2, y - s / 2, s, s, 3); g.stroke()
+    htext('紙', x, y + 1, s * 0.62, ink, '"Noto Sans TC", sans-serif', 700)
+  }
   // (soju's Hangul: the system's own Korean face (Malgun Gothic on Windows, Apple SD Gothic Neo on a Mac))
   const HANGUL = '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Nanum Gothic", sans-serif'
   switch (id) {
@@ -6305,6 +6365,57 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
       })
       break
     }
+    case 'appleJuice': {
+      pack('#fbf6ea', '#c8302a', (cx) => {
+        htext('りんご', cx, H * 0.14, 30, '#c8302a', JP)
+        // (a red apple, its shine, its stem and a leaf)
+        const ay = H * 0.47
+        g.fillStyle = '#d8352a'; g.beginPath(); g.ellipse(cx - 13, ay, 30, 34, 0, 0, Math.PI * 2); g.ellipse(cx + 13, ay, 30, 34, 0, 0, Math.PI * 2); g.fill()
+        g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.ellipse(cx - 20, ay - 14, 7, 11, -0.5, 0, Math.PI * 2); g.fill()
+        g.strokeStyle = '#6a3a14'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, ay - 30); g.quadraticCurveTo(cx + 2, ay - 42, cx + 6, ay - 48); g.stroke()
+        g.fillStyle = '#4a8a3a'; g.beginPath(); g.ellipse(cx + 18, ay - 42, 13, 6, -0.5, 0, Math.PI * 2); g.fill()
+        htext('果汁100%', cx, H * 0.77, 16, '#5a1a10', '"Noto Sans TC", sans-serif', 700)
+      }, (cx) => {
+        for (let k = 0; k < 3; k++) { g.fillStyle = '#d8352a'; g.beginPath(); g.arc(cx, H * (0.22 + k * 0.2), 10, 0, Math.PI * 2); g.fill(); g.fillStyle = '#4a8a3a'; g.beginPath(); g.ellipse(cx + 6, H * (0.22 + k * 0.2) - 12, 5, 2.5, -0.5, 0, Math.PI * 2); g.fill() }
+      })
+      break
+    }
+    case 'barleyTea': {
+      pack('#efe2bf', '#6a3a14', (cx) => {
+        vtext('麦茶', cx - 24, H * 0.42, 48, '#4a2a10')
+        // (an ear of barley, its awns up)
+        g.strokeStyle = '#8a6a2a'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx + 26, H * 0.78); g.quadraticCurveTo(cx + 30, H * 0.5, cx + 24, H * 0.2); g.stroke()
+        for (let k = 0; k < 7; k++) {
+          const y = H * (0.24 + k * 0.06), sd = k % 2 ? 1 : -1
+          g.fillStyle = '#c89a3a'; g.beginPath(); g.ellipse(cx + 26 + sd * 7, y, 6, 9, sd * 0.5, 0, Math.PI * 2); g.fill()
+          g.strokeStyle = '#b08a3a'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx + 26 + sd * 9, y - 6); g.lineTo(cx + 26 + sd * 20, y - 26); g.stroke()
+        }
+        htext('香ばしい', cx, H * 0.79, 15, '#6a3a14', '"Noto Sans TC", sans-serif', 700)
+      }, (cx) => {
+        vtext('麦茶', cx, H * 0.42, 30, '#6a3a14')
+      })
+      break
+    }
+    case 'vegJuice': {
+      pack('#f8f2e2', '#2e7d3a', (cx) => {
+        htext('野菜', cx, H * 0.14, 32, '#2e7d3a', JP)
+        // (a carrot and a tomato, their leaves)
+        g.fillStyle = '#e8701a'; g.beginPath(); g.moveTo(cx - 34, H * 0.36); g.lineTo(cx - 6, H * 0.36); g.lineTo(cx - 20, H * 0.7); g.closePath(); g.fill()
+        g.strokeStyle = '#c85a12'; g.lineWidth = 1.5
+        for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(cx - 30 + k * 2, H * (0.36 + k * 0.08)); g.lineTo(cx - 22 + k, H * (0.36 + k * 0.08)); g.stroke() }
+        g.fillStyle = '#4a8a3a'
+        for (const a of [-0.5, 0, 0.5]) { g.beginPath(); g.ellipse(cx - 20 + a * 10, H * 0.31, 4, 11, a, 0, Math.PI * 2); g.fill() }
+        g.fillStyle = '#d8352a'; g.beginPath(); g.arc(cx + 20, H * 0.55, 22, 0, Math.PI * 2); g.fill()
+        g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.ellipse(cx + 13, H * 0.5, 5, 8, -0.5, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#3a7a2a'
+        for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; g.beginPath(); g.ellipse(cx + 20 + Math.cos(a) * 6, H * 0.47 + Math.sin(a) * 3, 6, 2.5, a, 0, Math.PI * 2); g.fill() }
+        htext('ジュース', cx, H * 0.8, 15, '#2e5a2a', '"Noto Sans TC", sans-serif', 700)
+      }, (cx) => {
+        g.fillStyle = '#e8701a'; g.beginPath(); g.moveTo(cx - 8, H * 0.2); g.lineTo(cx + 8, H * 0.2); g.lineTo(cx, H * 0.4); g.closePath(); g.fill()
+        g.fillStyle = '#d8352a'; g.beginPath(); g.arc(cx, H * 0.6, 12, 0, Math.PI * 2); g.fill()
+      })
+      break
+    }
     case 'yakult': {
       g.fillStyle = '#f8f2e4'; g.fillRect(0, 0, W, H)
       g.fillStyle = '#d42a24'; g.fillRect(0, H * 0.3, W, H * 0.4)
@@ -6319,10 +6430,10 @@ function drawLabel(g: CanvasRenderingContext2D, id: DrinkId, lbl: readonly strin
 }
 /** the soju (green glass) */
 const soju = (id: string) => id === 'shochu' || id === 'grapeSoju'
-/** what each drink's made of: aluminium cans, glass bottles, PET bottles, the little cultured milk bottle */
-const KIND_OF: Record<DrinkId, 'can' | 'glass' | 'pet' | 'small'> = { beer: 'glass', sake: 'glass', oolong: 'pet', ramune: 'glass', beerCan: 'can', highball: 'can',
+/** what each drink's made of: aluminium cans, glass bottles, PET bottles, the little cultured milk bottle, paper packs */
+const KIND_OF: Record<DrinkId, 'can' | 'glass' | 'pet' | 'small' | 'pack'> = { beer: 'glass', sake: 'glass', oolong: 'pet', ramune: 'glass', beerCan: 'can', highball: 'can',
   coffee: 'can', greenTea: 'pet', cola: 'pet', yakult: 'small', sports: 'pet', milk: 'glass', chuhai: 'can', blackCoffee: 'can', cafeAuLait: 'can', yuzuSoda: 'can',
-  darkBeer: 'glass', shochu: 'glass', umeshu: 'glass', grapeSoju: 'glass', yogurt: 'small', lacticSoda: 'can' }
+  darkBeer: 'glass', shochu: 'glass', umeshu: 'glass', grapeSoju: 'glass', yogurt: 'small', lacticSoda: 'can', appleJuice: 'pack', barleyTea: 'pack', vegJuice: 'pack' }
 /**
  * The drinks' looks, shared by them all, so a fridge's eighty bottles are a handful of draws (each drink's own glass, label, drink and cap
  * had been a material each: some fifty draws for the two fridges). Every label in one picture (LABEL_ATLAS, a cell each, a margin of itself
@@ -6359,7 +6470,8 @@ const LABEL_FINISH = (() => {
     const { c, r } = cellOf(d.id), kind = KIND_OF[d.id]
     // (red: its clear coat; green: how rough; blue: how metallic, as three's maps read them)
     // (the owner's, 2026-11-10: a can's print is on aluminium (metal 0.85, roughness 0.28); a bottle's label a little matt (0.4))
-    const [coat, rough, metal] = kind === 'can' ? [0.3, 0.28, 0.85] : [0.25, 0.4, 0]
+    // (a paper pack's printed board half matt, a touch of its foil's sheen (roughness 0.5, metal 0.05))
+    const [coat, rough, metal] = kind === 'can' ? [0.3, 0.28, 0.85] : kind === 'pack' ? [0, 0.5, 0.05] : [0.25, 0.4, 0]
     data.set([coat * 255, rough * 255, metal * 255, 255], ((ATLAS_ROWS - 1 - r) * ATLAS_COLS + c) * 4)
   }
   const t = new THREE.DataTexture(data, ATLAS_COLS, ATLAS_ROWS)
@@ -6450,14 +6562,15 @@ function roundLight(x: number, z: number): [number, number] {
 }
 const SHADED = new Map<string, THREE.BufferGeometry>()
 /** a geometry's colour, shaded round it (roundLight) */
-function shaded(g: THREE.BufferGeometry, hex: string) {
-  const key = `${g.uuid}|${hex}`
+function shaded(g: THREE.BufferGeometry, hex: string, flat = false) {
+  const key = `${g.uuid}|${hex}|${flat}`
   let out = SHADED.get(key)
   if (!out) {
     out = g.clone()
-    const c = new THREE.Color(hex), pos = out.attributes.position, a = new Float32Array(pos.count * 3)
+    // (`flat`: a box's (the paper pack's), each side lit by the way it faces, all of it alike, not round it point by point)
+    const c = new THREE.Color(hex), pos = out.attributes.position, a = new Float32Array(pos.count * 3), src = flat ? out.attributes.normal : pos
     for (let i = 0; i < pos.count; i++) {
-      const [k, w] = roundLight(pos.getX(i), pos.getZ(i))
+      const [k, w] = roundLight(src.getX(i), src.getZ(i))
       a[i * 3] = Math.min(1, c.r * k + w); a[i * 3 + 1] = Math.min(1, c.g * k + w); a[i * 3 + 2] = Math.min(1, c.b * k + w)
     }
     out.setAttribute('color', new THREE.BufferAttribute(a, 3))
@@ -6520,9 +6633,53 @@ const CAN_TAB = (() => {
   g.rotateX(-Math.PI / 2)
   return g
 })()
+/**
+ * A paper pack's body (the owner's, 2026-11-10: a Japanese brick pack, 4 x 3 x 8 cm made, drawn a quarter bigger): a brick, its upright
+ * edges chamfered; its print round it as a can's label is round a can (u from the middle of a narrow side, round to its wide front at a
+ * quarter, where a label's front is), its top and its foot the print's plain ground (a strip at the very top of its picture); its front +x
+ * (turned to the room with the rest), `w` wide, `d` deep, `h` tall. Its top and foot ladders of triangles across it (no fan to a point)
+ */
+function packBody(w: number, d: number, h: number, c: number) {
+  const P: [number, number][] = [[0, w / 2], [d / 2 - c, w / 2], [d / 2, w / 2 - c], [d / 2, -(w / 2 - c)], [d / 2 - c, -w / 2], [-(d / 2 - c), -w / 2],
+    [-d / 2, -(w / 2 - c)], [-d / 2, w / 2 - c], [-(d / 2 - c), w / 2], [0, w / 2]]
+  const L = [0]
+  for (let i = 1; i < P.length; i++) L.push(L[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]))
+  const tot = L[L.length - 1]
+  const pos: number[] = [], nrm: number[] = [], uv: number[] = []
+  const vert = (x: number, y: number, z: number, n: [number, number, number], u: number, v: number) => { pos.push(x, y, z); nrm.push(...n); uv.push(u, v) }
+  for (let i = 0; i < P.length - 1; i++) {
+    const [x0, z0] = P[i], [x1, z1] = P[i + 1]
+    const len = Math.hypot(x1 - x0, z1 - z0) || 1
+    const n: [number, number, number] = [-(z1 - z0) / len, 0, (x1 - x0) / len]
+    const u0 = L[i] / tot, u1 = L[i + 1] / tot
+    vert(x0, 0, z0, n, u0, 0); vert(x1, 0, z1, n, u1, 0); vert(x1, h, z1, n, u1, 1)
+    vert(x0, 0, z0, n, u0, 0); vert(x1, h, z1, n, u1, 1); vert(x0, h, z0, n, u0, 1)
+  }
+  // (the top and the foot: across it in rungs, the ground's colour)
+  const RUNGS = [[8, 1, 2], [8, 2, 7], [7, 2, 3], [7, 3, 6], [6, 3, 4], [6, 4, 5]]
+  for (const [a, b, e] of RUNGS) for (const k of [a, b, e]) vert(P[k][0], h, P[k][1], [0, 1, 0], 0.5, 0.99)
+  for (const [a, b, e] of RUNGS) for (const k of [a, e, b]) vert(P[k][0], 0, P[k][1], [0, -1, 0], 0.5, 0.99)
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  return g
+}
+/** a paper pack: its body, the sealed seam across its top (a fin along its width), the silver foil disc of its straw hole near a corner of
+ * its top, and the straw in its clear wrapper stuck to its back, aslant (17 degrees) */
+const PACK = (() => {
+  const w = 0.04, d = 0.03, h = 0.08
+  return {
+    h, body: packBody(w, d, h, 0.0022),
+    seam: new THREE.BoxGeometry(0.0013, 0.0034, w - 0.002).translate(0, 0.0017, 0),
+    hole: new THREE.CylinderGeometry(0.0034, 0.0034, 0.0006, 10), holeAt: [d / 4, h + 0.0003, w / 4] as [number, number, number],
+    straw: new THREE.CylinderGeometry(0.0013, 0.0013, 0.064, 6), wrap: new THREE.BoxGeometry(0.0028, 0.07, 0.0062),
+    strawAt: [-d / 2 - 0.0017, h * 0.47, 0] as [number, number, number], strawTilt: 0.3,
+  }
+})()
 /** a label's band shaded round it the same way (white shaded: it multiplies the label's picture; the gleam lifts it a little) */
-function shadedLabel(g: THREE.BufferGeometry, id: DrinkId) {
-  return shaded(labelGeo(g, id), '#ffffff')
+function shadedLabel(g: THREE.BufferGeometry, id: DrinkId, flat = false) {
+  return shaded(labelGeo(g, id), '#ffffff', flat)
 }
 /** the ramune's marble: clear glass catching the light */
 const MARBLE = new THREE.MeshPhysicalMaterial({ color: '#e8f6fa', roughness: 0.02, clearcoat: 1, transparent: true, opacity: 0.55, specularIntensity: 1 })

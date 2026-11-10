@@ -17,6 +17,11 @@ feature('飲料摔到地上', () => {
     and('養樂多那種小瓶也不會破', () => { expect(landingOf('small', 1.2)).toBe('bounce') })
   })
 
+  scenario('鋁箔包（紙盒）摔不破：從高處掉下是悶的一聲、側躺在地上', ({ then, and }) => {
+    then('從 1.2 公尺掉下去是倒下側躺，不是破掉，也不滾', () => { expect(landingOf('pack', 1.2)).toBe('topple') })
+    and('從低處掉下去只是彈一下', () => { expect(landingOf('pack', 0.3)).toBe('bounce') })
+  })
+
   scenario('破掉的瓶子留下 6 到 10 片碎片', ({ then }) => {
     then('每一種落點都在 6 到 10 片之間，同一個落點片數一樣', () => {
       for (let s = 0; s < 40; s++) { const n = shardsOf(s * 7.3); expect(n).toBeGreaterThanOrEqual(6); expect(n).toBeLessThanOrEqual(10); expect(shardsOf(s * 7.3)).toBe(n) }

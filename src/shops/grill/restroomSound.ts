@@ -429,6 +429,29 @@ export function canClatter(at: THREE.Vector3) {
   roll.connect(rb).connect(rg).connect(o); roll.start(t + 0.22)
 }
 
+/**
+ * A paper pack dropped on the floor (game/spills), heard at `at`: a dull thud of board and the drink in it, no ring (`k` how hard: a small
+ * drop half as loud), and, a hard one, a second softer as it settles on its side
+ */
+export function boxThud(at: THREE.Vector3, k = 1) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('thud', 120)) return
+  const t = a.currentTime, o = out(a, 0.3 * near * k, pan)
+  for (const [dt, gk] of (k >= 1 ? [[0, 1], [0.13, 0.4]] : [[0, 1]]) as [number, number][]) {
+    const n = noise(a, 0.09, (x) => (1 - x) ** 3, 0.55)
+    const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520; lp.Q.value = 0.9
+    const ng = a.createGain(); ng.gain.value = gk
+    n.connect(lp).connect(ng).connect(o); n.start(t + dt)
+    ping(a, t + dt, 150 + Math.random() * 20, 0.5 * gk, 0.08, o)
+  }
+  // (the drink in it, a little slosh)
+  const s = noise(a, 0.16, (x) => Math.min(1, x * 20) * (1 - x) ** 2, 0.3)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 1.2
+  const sg = a.createGain(); sg.gain.value = 0.25 * k
+  s.connect(bp).connect(sg).connect(o); s.start(t + 0.02)
+}
+
 /** a toilet's door latched behind someone, heard at `at`: a little brass bolt slid home, a click and its small ring, a softer click after */
 export function latchSound(at: THREE.Vector3) {
   const a = ctx()

@@ -26,6 +26,20 @@ export function DrinkIcon({ d }: { d: Drink }) {
       </svg>
     )
   }
+  if (d.shape === 'pack') {
+    return (
+      <svg className="drink-icon" viewBox="0 0 24 32" aria-hidden="true">
+        {/* (a paper pack: a brick, its sealed top folded down at its ends, its print's band, its straw stuck aslant to its side) */}
+        <path d="M6.5 9.5h11v19h-11z" fill={bg} stroke={ink} strokeWidth="1" strokeLinejoin="round" />
+        <path d="M6.5 9.5l1.8-2.4h7.4l1.8 2.4" fill={bg} stroke={ink} strokeWidth="0.9" strokeLinejoin="round" />
+        <rect x="7" y="24.5" width="10" height="3.5" fill={fg} />
+        <rect x="8" y="14" width="8" height="7" rx="1.2" fill={fg} opacity="0.85" />
+        <circle cx="14.2" cy="8.3" r="0.9" fill="#c8ccd2" stroke={ink} strokeWidth="0.5" />
+        <path d="M19 26.5l1.4-12.5" stroke={ink} strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M19 26.5l1.4-12.5" stroke="#f4f1ea" strokeWidth="0.8" strokeLinecap="round" />
+      </svg>
+    )
+  }
   if (d.shape === 'small') {
     return (
       <svg className="drink-icon" viewBox="0 0 24 32" aria-hidden="true">
