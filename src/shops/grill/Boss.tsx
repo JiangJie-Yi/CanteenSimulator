@@ -82,6 +82,21 @@ const GLOW_LINE = new THREE.Color('#ffd24a')
 /** the drink in his hand: its foot a little under his fist, a touch forward of it (the body's frame); and a scratch vector for the hand */
 const DRINK_IN_PALM = new THREE.Vector3(0, -0.05, 0.015)
 const HAND_AT = new THREE.Vector3()
+const PALM_A = new THREE.Vector3()
+/** where to put a hand's bone, up and down in its own parent's frame, for its palm (drawn some way off it: drawnCentre) to come to `wy` in
+ * the world, the rest of where it's put (x, z) as given: worked out from where the palm comes with the bone at 0 and at 1 */
+function palmTo(bone: THREE.Object3D, palm: THREE.Vector3, at: THREE.Vector3, wy: number) {
+  const was = bone.position.clone()
+  bone.position.set(at.x, 0, at.z)
+  bone.updateWorldMatrix(true, false)
+  const y0 = bone.localToWorld(PALM_A.copy(palm)).y
+  bone.position.y = 1
+  bone.updateWorldMatrix(false, false)
+  const k = bone.localToWorld(PALM_A.copy(palm)).y - y0
+  bone.position.copy(was)
+  bone.updateWorldMatrix(false, false)
+  return Math.abs(k) > 1e-6 ? (wy - y0) / k : at.y
+}
 export const BOSS_DRINK = { at: null as THREE.Vector3 | null, id: null as DrinkId | null, item: null as unknown, arrived: false, since: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossDrink?: typeof BOSS_DRINK }).__bossDrink = BOSS_DRINK
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossFx?: typeof BOSS_FX }).__bossFx = BOSS_FX
@@ -269,6 +284,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
    * skinned mesh, his parts' vertices hung from their bones some way off), so what he holds hangs from this */
   const palm = useRef<THREE.Vector3 | null>(null)
   const palmL = useRef<THREE.Vector3 | null>(null)
+  /** his palms' heights in the world as they're eased to where they're wanted at the fire (NaN: not at it) */
+  const palmY = useRef({ r: NaN, l: NaN })
   const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1, probeX: 0, probeZ: 0, probeEdit: false })
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
@@ -536,6 +553,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
 
     // ---- the hands
     const R = new THREE.Vector3(), L = new THREE.Vector3()
+    // (at the fire, how high their palms are is so far over the cook table's top (OWNER_GRILL.top) in the world, not from his own middle:
+    // he stands on the kitchen's floor, the table's top at his chest (he stood up on it before (the owner saw), and these were his own);
+    // worked out below (palmTo), NaN: the pose's own)
+    let wantR = NaN, wantL = NaN
+    const at = (over: number) => OWNER_GRILL.top + over
     if (moving) {
       // (swinging, opposite each other, forward and back with each step, a little up as they come forward)
       const sw = Math.sin(step * Math.PI) * (run ? 0.13 : 0.08)
@@ -544,22 +566,25 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     } else if (act === 'tongs') {
       // (both hands out in front, the tongs in the right; every so often a quick turn of whatever's on the fire)
       const flip = Math.max(0, Math.sin(s.t * 2.2)) ** 6
-      R.set(-0.08, 0.12 + flip * 0.06, 0.3 + flip * 0.04)
-      L.set(0.1, 0.1, 0.28)
+      R.set(-0.08, 0, 0.3 + flip * 0.04); wantR = at(0.22) + flip * 0.1
+      L.set(0.1, 0, 0.28); wantL = at(0.18)
     } else if (act === 'hold') {
-      // (both hands out before him: low and forward reaching for it, up at his chest holding it)
-      if (OWNER_GRILL.hold) { R.set(-0.07, 0.16, 0.3); L.set(0.07, 0.16, 0.3) } else { R.set(-0.05, 0.08, 0.34); L.set(0.06, 0.08, 0.3) }
+      // (both hands out before him: low and forward reaching for it, up holding it over the table, down with it to its place: as high in the
+      // world as Roasting has them (OWNER_GRILL.handY))
+      wantR = wantL = Number.isFinite(OWNER_GRILL.handY) ? OWNER_GRILL.handY : at(OWNER_GRILL.hold ? 0.2 : 0.1)
+      if (OWNER_GRILL.hold) { R.set(-0.07, 0, 0.3); L.set(0.07, 0, 0.3) } else { R.set(-0.05, 0, 0.34); L.set(0.06, 0, 0.3) }
     } else if (act === 'dab') {
       // (the right hand out over the fire: the fingers rubbing salt off in quick little flicks, a brush drawn to and fro, a spoon tapped;
       // the left held at his chest)
       const k = OWNER_GRILL.dab
-      if (k === 'pinch') R.set(-0.05, 0.2 + Math.max(0, Math.sin(T * 22)) * 0.018, 0.34)
-      else if (k === 'brush') R.set(-0.05 + Math.sin(T * 9) * 0.06, 0.12, 0.36)
-      else R.set(-0.05, 0.17 + Math.abs(Math.sin(T * 12)) * 0.025, 0.34)
-      L.set(0.08, 0.12, 0.16)
+      // (up at what's on the skewers, near his own head's height (they stand near as tall as he does): salt from up over it)
+      if (k === 'pinch') { R.set(-0.05, 0, 0.34); wantR = at(0.55) + Math.max(0, Math.sin(T * 22)) * 0.03 }
+      else if (k === 'brush') { R.set(-0.05 + Math.sin(T * 9) * 0.06, 0, 0.36); wantR = at(0.45) }
+      else { R.set(-0.05, 0, 0.34); wantR = at(0.5) + Math.abs(Math.sin(T * 12)) * 0.04 }
+      L.set(0.08, 0, 0.16); wantL = at(0.15)
     } else if (act === 'fan') {
-      R.set(-0.06, 0.18, 0.3)
-      L.set(0.08, 0.06 + Math.sin(T * 1.6) * 0.01, 0.2)
+      R.set(-0.06, 0, 0.3); wantR = at(0.25)
+      L.set(0.08, 0, 0.2); wantL = at(0.12) + Math.sin(T * 1.6) * 0.016
     } else if (act === 'taste') {
       // (a piece held up to his mouth in the right hand, bitten and chewed, the left on his belly)
       const chew = Math.max(0, Math.sin((T - BOSS_TASTE.since) * 7))
@@ -579,8 +604,15 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       R.set(0, 0.012 * Math.sin(T * 1.6), 0)
       L.set(0, 0.012 * Math.sin(T * 1.6 + 1), 0)
     }
-    if (parts.handR) parts.handR.position.lerp(R, Math.min(1, dt * 12))
-    if (parts.handL) parts.handL.position.lerp(L, Math.min(1, dt * 12))
+    // (the palms to their heights at the fire: eased there in the world, and held there whatever his lean (leaning in, his body tips his
+    // hands down with it, and eased in his own frame they lagged, dipping into the table's edge as he reached))
+    const sm = palmY.current
+    sm.r = Number.isFinite(wantR) ? (Number.isFinite(sm.r) ? sm.r + (wantR - sm.r) * Math.min(1, dt * 14) : OWNER_GRILL.hand.y) : NaN
+    sm.l = Number.isFinite(wantL) ? (Number.isFinite(sm.l) ? sm.l + (wantL - sm.l) * Math.min(1, dt * 14) : OWNER_GRILL.hand.y) : NaN
+    const holdR = Number.isFinite(sm.r) && parts.handR && palm.current ? palmTo(parts.handR, palm.current, R, sm.r) : NaN
+    const holdL = Number.isFinite(sm.l) && parts.handL && palmL.current ? palmTo(parts.handL, palmL.current, L, sm.l) : NaN
+    if (parts.handR) { parts.handR.position.lerp(R, Math.min(1, dt * 12)); if (Number.isFinite(holdR)) parts.handR.position.y = holdR }
+    if (parts.handL) { parts.handL.position.lerp(L, Math.min(1, dt * 12)); if (Number.isFinite(holdL)) parts.handL.position.y = holdL }
     // (where his hands are, for what he carries: between his two palms as they're drawn (the hands' bones aren't on them: drawnCentre))
     if (grill && parts.handR && parts.handL) {
       parts.handR.updateWorldMatrix(true, false); parts.handL.updateWorldMatrix(true, false)

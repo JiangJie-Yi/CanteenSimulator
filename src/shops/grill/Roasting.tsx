@@ -877,6 +877,8 @@ export const CHEF_CARRY = {
   key: null as string | null, kind: 'toFire' as 'toFire' | 'toPlate', phase: 'idle' as 'idle' | 'reach' | 'carry' | 'place' | 'back', t: 0,
   from: new THREE.Vector3(), fromQ: new THREE.Quaternion(), heldQ: new THREE.Quaternion(),
   stand: new THREE.Vector3(), face: new THREE.Vector3(), lean: 0, hold: false,
+  /** what he holds it by, in the piece's own frame: its foot (footOf) */
+  foot: new THREE.Vector3(),
 }
 /** each step's seconds: reaching, carrying (a turn and a step or two), setting it down, back */
 const CARRY_S = { reach: 0.3, carry: 0.5, place: 0.35, back: 0.3, idle: 0 }
@@ -896,6 +898,26 @@ const TONGS_MAT = new THREE.MeshToonMaterial({ color: '#8d9299' })
 /** further than this (the world's units) from his hand, he uses them */
 const ARM_REACH = 0.6
 const TONGS_Z = new THREE.Vector3(0, 0, 1)
+const FOOT_BOX = new THREE.Box3(), FOOT_V = new THREE.Vector3(), GRIP = new THREE.Vector3()
+/**
+ * What the head chef holds a piece by: its foot as it stands on the fire (the end of its skewer that goes into the ash, or the bottom of
+ * what sits on the net), in the piece's own frame; from what of it's drawn (its skewer and its food, not its ink). He stands on the
+ * kitchen's floor, the table's top at his chest, and a skewer stands near as tall as he is: held by its middle, he carried it over his
+ * head; by its foot, his hands stay at his chest, it upright over them, and its foot goes into the ash from them
+ */
+function footOf(p: Piece, out: THREE.Vector3) {
+  const n = p.node
+  const q0 = n.quaternion.clone(), p0 = n.position.clone()
+  n.quaternion.copy(p.homeQ); n.position.copy(p.homeP)
+  n.updateWorldMatrix(true, true)
+  FOOT_BOX.makeEmpty()
+  n.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.visible && !m.name.endsWith('_outline')) FOOT_BOX.expandByObject(m) })
+  const at = n.getWorldPosition(FOOT_V)
+  if (FOOT_BOX.isEmpty()) out.set(0, 0, 0)
+  else out.copy(n.worldToLocal(new THREE.Vector3(at.x, FOOT_BOX.min.y, at.z)))
+  n.quaternion.copy(q0); n.position.copy(p0); n.updateWorldMatrix(true, true)
+  return out
+}
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __chefCarry?: typeof CHEF_CARRY }).__chefCarry = CHEF_CARRY
 /** the Movable each store is, to find where it's been put (the cubby has none: it's the cook table's) */
 const STORE_PIECE: Record<Exclude<Store, 'cubby'>, string> = { freezer: 'freezer', ricetub: 'ricetub', sacks: 'produce' }
@@ -1174,12 +1196,18 @@ function crewPlaces(crew: CrewMember[]) {
     return spot ? [{ m, ...spot, way: crewWayOut(m.role, spot.at), seat }] : []
   })
 }
+/** the kitchen's floor's top in this frame, as CookTable lays it (the customers' floor, GRILL_OFFSET's height; the kitchen's dais up off
+ * it; its boards a hair over that): what everyone in the kitchen stands on */
+const KITCHEN_FLOOR_Y = GRILL_OFFSET.y - KITCHEN_DROP + 0.004 * GRILL_SCALE
 /** where the cook stands (on the floor, in the notch: in up to the hearth, as the owner drew; he stood out past the table's edge), and the
  * way he faces: in at the fire. In the middle of the notch, along: it's only a little wider than he is (1.3 to his 1.0), and set to one side
  * (it was 0.36 nearer its left-hand side) he stood into the table beside it, by the left-hand cubby (the owner saw it) */
 // (and 2.2 out, not 2.0: up on the notch's step his chest and sleeves were level with the seasonings' ledge, its pots in them (clips.mjs
 // found it; at 2.12 his sleeves still brushed the peanut bowl and the miso))
+// (on the kitchen's floor (KITCHEN_FLOOR_Y): his frame's floor is his, his step on it; it was this frame's 0, the cook table's top, and he
+// stood up there on his step, a table's height over the floor, the table's top at his feet, and his step with him (the owner saw it))
 const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+  .setY(KITCHEN_FLOOR_Y)
 /** how high the step is in the owner's notch and the third cook's bay (a low wooden step, a duckboard's height: the owner's, 2026-11-10; at
  * 0.2 the owner stood up out of his notch, the table's top at his hips, and the third cook's bay had none, the floor showing in it) */
 const STEP_H = 0.045
@@ -1187,7 +1215,7 @@ const STEP_H = 0.045
  * of his feet), in the middle of it across, facing in at the fire (KITCHEN_YAW), on his step; he stood out past the table's end, the crate
  * out of reach */
 const SOUS_AT = new THREE.Vector3().addScaledVector(ALONG, (SOUS_NOTCH.along[0] + SOUS_NOTCH.along[1]) / 2 + 0.03 - FIRE_SHIFT.dot(ALONG))
-  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(GRILL_OFFSET.y - KITCHEN_DROP + STEP_H)
+  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(KITCHEN_FLOOR_Y + STEP_H)
 /** the aisle in front of the cook table, where he stands while the shop's open */
 const AISLE_LAY = 2.62
 /** and the line he walks along it, a little further out (clear of his cook's back, at the fire), and how far along it either way (the
@@ -1215,18 +1243,20 @@ const bossAisle = (home: THREE.Vector3) => {
   return { mouth: bossFrame(LAY.clone().multiplyScalar(WALK_LAY - home.dot(LAY))), dir: bossFrame(ALONG, true),
     range: [(WALK_ALONG[0] - h) / BOSS_SCALE, (WALK_ALONG[1] - h) / BOSS_SCALE] as [number, number] }
 }
-/** the low wooden step on the notch's floor that he and his cook stand on at the fire (the owner's; blender/notchstep.py): its height, its
- * depth, and where it stands (its back to the notch's back, its front, the step up, a little out past the table's edge), turned with the
- * table */
-const NOTCH_STEP = { h: STEP_H, d: 1.05 }
-// (its back 0.09 out from the notch's back, so its front's as far past the table's edge as he's stood back)
-const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALONG)).addScaledVector(LAY, COOK_NOTCH.lay[0] + 0.09 + NOTCH_STEP.d / 2)
-  .setY(CHEF_AT.y)
+/** the low wooden step on the notch's floor that he stands on at the fire (the owner's; blender/notchstep.py's NotchStep): its height, its
+ * size, and where it stands: on the kitchen's floor, from wall to wall across the notch (its walls at the floor, the table's dark kick, are
+ * STEP_FIT out from COOK_NOTCH's cut, and it 3 mm short of them), from the notch's back wall out a little past the table's edge, under his
+ * feet; turned with the table */
+const STEP_FIT = 0.047
+const NOTCH_STEP = { h: STEP_H, d: 2.4 - (COOK_NOTCH.lay[0] - STEP_FIT) }
+const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALONG)).addScaledVector(LAY, COOK_NOTCH.lay[0] - STEP_FIT + NOTCH_STEP.d / 2)
+  .setY(KITCHEN_FLOOR_Y)
 const NOTCH_STEP_YAW = Math.atan2(-ALONG.z, ALONG.x)
-/** the third cook's: the same step, in his bay, its back 0.09 out from the bay's back as the owner's is, its front past the table's end; turned
- * so it goes into the bay the way his notch's goes into his (along the table, not across it), level with the owner's */
-const SOUS_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, SOUS_NOTCH.along[0] + 0.09 + NOTCH_STEP.d / 2 - FIRE_SHIFT.dot(ALONG))
-  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(NOTCH_STEP_AT.y)
+/** the third cook's (SousStep): his bay's floor filled with the same step (the owner's, 2026-11-10: it stood out over the table's end, a
+ * board in the air), from wall to wall across it and from its back wall to the table's end, level with the owner's; turned so its depth
+ * runs into the bay, along the table */
+const SOUS_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, (SOUS_NOTCH.along[0] - STEP_FIT + COOK_TABLE.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(KITCHEN_FLOOR_Y)
 const SOUS_STEP_YAW = Math.atan2(ALONG.x, ALONG.z)
 const BOSS_AISLE = { ...bossAisle(CHEF_AT),
   step: { to: (NOTCH_STEP_AT.dot(LAY) + NOTCH_STEP.d / 2 - CHEF_AT.dot(LAY)) / BOSS_SCALE, h: NOTCH_STEP.h / BOSS_SCALE } }
@@ -1288,6 +1318,10 @@ const HEARTH_ZONES: HearthZones = {
   bay: { along: [SOUS_NOTCH.along[0], SOUS_NOTCH.along[1]], lay: [SOUS_NOTCH.lay[0], SOUS_NOTCH.lay[1]] },
 }
 const GUARD_AT = new THREE.Vector3(), GUARD_LOCAL = new THREE.Vector3(), GUARD_INV = new THREE.Matrix4()
+/** how high over the cook table's top he carries a piece (his hands' middle, what he holds hanging from it), and a spare for the top's
+ * height in the world */
+const CARRY_LIFT = 0.2
+const TOP_AT = new THREE.Vector3()
 /** (in development: who was put out of the table or the hearth, from where to where, the last few hundred) */
 const GUARD_LOG: { who: string; role: string; from: [number, number]; to: [number, number] }[] = []
 if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __hearthPushes: GUARD_LOG })
@@ -1337,7 +1371,7 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
   // right-hand end where the other cooks stand)
   const W = KITCHEN_FLOOR.along[1] - KITCHEN_FLOOR.along[0], D = KITCHEN_FLOOR.lay[1] - KITCHEN_FLOOR.lay[0]
   const mid = new THREE.Vector3().addScaledVector(ALONG, (KITCHEN_FLOOR.along[0] + KITCHEN_FLOOR.along[1]) / 2)
-    .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(GRILL_OFFSET.y - KITCHEN_DROP + 0.004 * GRILL_SCALE)
+    .addScaledVector(LAY, (KITCHEN_FLOOR.lay[0] + KITCHEN_FLOOR.lay[1]) / 2).setY(KITCHEN_FLOOR_Y)
   return (
     <>
       {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
@@ -2739,11 +2773,11 @@ const STEP_URL = import.meta.env.BASE_URL + 'models/notchstep.glb'
 useGLTF.preload(STEP_URL)
 /** a notch's wooden step (blender/notchstep.py, the owner's 木台階: one block): its top in the table's keyaki, its sides the bar's standing
  * boards; inked, merged, standing still. The owner's in his notch, and the same in the third cook's bay */
-const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階', at = NOTCH_STEP_AT, yaw = NOTCH_STEP_YAW }: { id?: string; label?: string
-  at?: THREE.Vector3; yaw?: number }) {
+const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階', node = 'NotchStep', at = NOTCH_STEP_AT, yaw = NOTCH_STEP_YAW }: { id?: string
+  label?: string; node?: 'NotchStep' | 'SousStep'; at?: THREE.Vector3; yaw?: number }) {
   const gltf = useGLTF(STEP_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
-    const r = gltf.scene.getObjectByName('NotchStep')!.clone(true)
+    const r = gltf.scene.getObjectByName(node)!.clone(true)
     r.position.set(0, 0, 0)
     const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: COOK_TABLE_WOOD })
     const skirt = new THREE.MeshToonMaterial({ color: '#e0c8a8', map: BAR_BASE_WOOD })
@@ -2757,7 +2791,7 @@ const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階
     })
     inkModel(r, () => false, { width: 0.004, weld: true })
     return r
-  }, [gltf])
+  }, [gltf, node])
   return (
     <Movable id={id} label={label}><StaticBatch plain>
       <group position={at} rotation-y={yaw}><primitive object={obj} /></group>
@@ -4911,6 +4945,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const C = CHEF_CARRY
       C.key = p.key; C.kind = kind; C.phase = 'reach'; C.t = 0
       C.from.copy(p.node.position); C.fromQ.copy(p.node.quaternion)
+      footOf(p, C.foot)
     }
     // (not while he's off plating or at the charcoal: the orders wait till he's back at the board)
     if (T.phase === 'idle' && chefLive && PLATER_OUT.id !== FETCHER.id) {
@@ -6971,6 +7006,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
                 const C = CHEF_CARRY
                 C.key = p.key; C.kind = 'toPlate'; C.phase = 'reach'; C.t = 0
                 C.from.copy(p.node.position); C.fromQ.copy(p.node.quaternion)
+                footOf(p, C.foot)
               }
             }
           } else if (!SERVICE.claimed.has(p.key) && PLATING.slots[p.readyAt]?.seat !== p.seat) {
@@ -7192,6 +7228,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         const hand = p.node.parent ? p.node.parent.worldToLocal(OWNER_GRILL.hand.clone()) : OWNER_GRILL.hand.clone()
         const k = Math.min(1, C.t / CARRY_S[C.phase]), e = k * k * (3 - 2 * k)
+        // (held by its foot (C.foot): from its origin to its foot, turned as it's turned, in its parent's frame)
+        const grip = (q: THREE.Quaternion) => GRIP.copy(C.foot).multiply(p.node.scale).applyQuaternion(q)
+        // (his hands' height, in the world: down to its foot where it is, up over the table's top as it's carried, down with it to where its
+        // foot goes; never under the table's top, nor over his chin)
+        const up = (v: THREE.Vector3) => (p.node.parent ? p.node.parent.localToWorld(v.clone()) : v.clone()).y
+        // (his palms' middle: a mitten's half its height, 0.1, over the top at the least, or it went into it reaching to the board)
+        const reachY = (v: THREE.Vector3) => THREE.MathUtils.clamp(up(v) + 0.04, OWNER_GRILL.top + 0.1, OWNER_GRILL.top + 0.4)
+        const lifted = OWNER_GRILL.top + CARRY_LIFT
+        if (C.phase === 'reach') OWNER_GRILL.handY = reachY(C.from.clone().add(grip(C.fromQ)))
+        else if (C.phase === 'carry') OWNER_GRILL.handY = lifted
+        else if (C.phase === 'place') OWNER_GRILL.handY = THREE.MathUtils.lerp(lifted, reachY(dest.clone().add(grip(destQ))), e)
+        else OWNER_GRILL.handY = NaN
         if (C.phase === 'reach') {
           // (his hands to it where it is: on the board, or standing in the fire)
           p.node.position.copy(C.from); p.node.quaternion.copy(C.fromQ)
@@ -7200,13 +7248,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           C.stand.copy(toward(C.from)); C.face.copy(C.from); C.lean = CARRY_LEAN * (0.6 + 0.8 * far) * Math.sin(Math.PI * k); C.hold = false
           C.heldQ.copy(p.homeQ)
         } else if (C.phase === 'carry') {
-          // (in his hands, upright on its stick, as he turns and steps to where it's going)
-          p.node.position.lerpVectors(C.from, hand, Math.min(1, e * 2.2))
+          // (in his hands by its foot, standing up on its stick over them, as he turns and steps to where it's going)
           p.node.quaternion.slerpQuaternions(C.fromQ, C.heldQ, e)
+          p.node.position.lerpVectors(C.from, hand.clone().sub(grip(p.node.quaternion)), Math.min(1, e * 2.2))
           C.stand.copy(toward(dest)); C.face.copy(dest); C.lean = 0; C.hold = true
         } else if (C.phase === 'place') {
           // (leaning in, the skewer pushed into the ash at its place, or the fish laid on the plate)
-          p.node.position.lerpVectors(hand, dest, e)
+          p.node.position.lerpVectors(hand.clone().sub(grip(C.heldQ)), dest, e)
           p.node.quaternion.slerpQuaternions(C.heldQ, destQ, e)
           C.lean = CARRY_LEAN * Math.sin(Math.PI * Math.min(1, k * 1.2)); C.hold = true
         } else {
@@ -7230,7 +7278,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (the long chopsticks from his hand to it, while it's further than his arm reaches: out to it as he reaches, holding it as it comes in)
         const tg = tongs.current
         if (tg?.parent) {
-          const tip = p.node.getWorldPosition(new THREE.Vector3())
+          // (to what he holds it by)
+          const tip = p.node.localToWorld(C.foot.clone())
           const from = OWNER_GRILL.hand.clone()
           const far = tip.distanceTo(from)
           const on = (C.phase === 'reach' || C.phase === 'carry' || C.phase === 'place') && far > ARM_REACH
@@ -7247,7 +7296,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (the owner stands to it at the fire: where, in the world, and how, for Boss.tsx)
       const fr = tongs.current?.parent
       OWNER_GRILL.on = C.phase !== 'idle' && !!fr
-      if (fr) { fr.localToWorld(OWNER_GRILL.stand.copy(C.stand)); fr.localToWorld(OWNER_GRILL.face.copy(C.face)) }
+      if (fr) { fr.localToWorld(OWNER_GRILL.stand.copy(C.stand)); fr.localToWorld(OWNER_GRILL.face.copy(C.face)); OWNER_GRILL.top = fr.localToWorld(TOP_AT.set(0, 0, 0)).y }
+      if (C.phase === 'idle') OWNER_GRILL.handY = NaN
       OWNER_GRILL.lean = C.lean
       OWNER_GRILL.hold = C.hold
     }
@@ -7396,7 +7446,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <BossSpot open={space === 'open'} lang={lang} />
         {/* (and the notch's wooden step he and his cook stand on) */}
         <NotchStep />
-        <NotchStep id="soustep" label="三廚木台階" at={SOUS_STEP_AT} yaw={SOUS_STEP_YAW} />
+        <NotchStep id="soustep" label="三廚木台階" node="SousStep" at={SOUS_STEP_AT} yaw={SOUS_STEP_YAW} />
         {/* (the chef's long chopsticks, out while he reaches across the hearth) */}
         <mesh ref={tongs} name="chef-tongs" geometry={TONGS_GEO} material={TONGS_MAT} visible={false} raycast={() => {}} />
         {/* (the staff's outfits drawn a moment under the notch's floor as the shop loads: their programs made then, not as they first walk in) */}
