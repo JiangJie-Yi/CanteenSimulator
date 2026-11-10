@@ -877,7 +877,9 @@ export const CHEF_TRIP = {
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __chefTrip?: typeof CHEF_TRIP }).__chefTrip = CHEF_TRIP
 /** how long what he's brought is prepared on the board: a rice ball shaped in his hands (game/rice's SHAPE_S), else salted, scored, skewered */
-const prepOf = (store: Store) => (store === 'ricetub' ? SHAPE_S : PREP_S)
+// (the rice balls are shaped at the rice-ball counter, by the cooker, as the rice is taken (TAKE_S + SHAPE_S there): a moment at the board)
+const prepOf = (store: Store) => (store === 'ricetub' ? 0.3 : PREP_S)
+const takeOf = (store: Store) => (store === 'ricetub' ? TAKE_S + SHAPE_S : TAKE_S)
 /**
  * What the head chef has in his hands (the owner's: nothing flies across the kitchen by itself): a piece taken off the board to the fire,
  * or off the fire to the plating place. Its steps: reaching for it where it is, carrying it in his hands as he turns and steps to where
@@ -952,7 +954,10 @@ function footOf(p: Piece, out: THREE.Vector3) {
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __chefCarry?: typeof CHEF_CARRY }).__chefCarry = CHEF_CARRY
 /** the Movable each store is, to find where it's been put (the cubby has none: it's the cook table's) */
-const STORE_PIECE: Record<Exclude<Store, 'cubby'>, string> = { freezer: 'freezer', ricetub: 'ricetub', sacks: 'produce' }
+// (the rice balls' rice: the electric cooker, on the rice-ball counter (the rice tub's out of use))
+const STORE_PIECE: Record<Exclude<Store, 'cubby'>, string> = { freezer: 'freezer', ricetub: 'denkinabe', sacks: 'produce' }
+/** the counter a store stands on, if any (he stands before its front) */
+const STORE_COUNTER: Partial<Record<Store, string>> = { ricetub: 'prepcounter' }
 /**
  * Where the chef stands to take something out of a store (Roasting's frame): before the fridge under the cook table on the left, its
  * doors' swing clear; else just off the side of the store (as it stands, wherever it's been moved) nearest his place, facing it.
@@ -972,9 +977,9 @@ function storeSpot(store: Store, scene: THREE.Object3D, frame: THREE.Object3D, h
   const inv = frame.matrixWorld.clone().invert(), lb = new THREE.Box3()
   for (let i = 0; i < 8; i++) lb.expandByPoint(new THREE.Vector3(i & 1 ? wb.max.x : wb.min.x, i & 2 ? wb.max.y : wb.min.y, i & 4 ? wb.max.z : wb.min.z).applyMatrix4(inv))
   const face = lb.getCenter(new THREE.Vector3()), half = lb.getSize(new THREE.Vector3()).multiplyScalar(0.5)
-  // (up on the warming counter (Decor's Warmer: the rice tub): before the counter's front, the kitchen's side, across from it; off its own
-  // side, toward his place, he stood in the counter)
-  const counter = store === 'ricetub' ? warmerFront(scene, piece, frame) : null
+  // (up on a counter (Decor's PrepCounter: the cooker): before the counter's front, the kitchen's side, across from it; off its own side,
+  // toward his place, he stood in the counter)
+  const counter = STORE_COUNTER[store] ? warmerFront(scene, piece, frame, STORE_COUNTER[store]!) : null
   if (counter) return { spot: counter.setY(floorAt(counter)), face }
   const d = home.clone().sub(face).setY(0)
   if (d.lengthSq() < 1e-6) d.set(1, 0, 0)
@@ -985,9 +990,9 @@ function storeSpot(store: Store, scene: THREE.Object3D, frame: THREE.Object3D, h
 }
 /** the warming counter's front (Decor's Warmer: its own +z the kitchen's side) across from a piece on it, a step out (the chef's frame); null
  * if it's not on it */
-function warmerFront(scene: THREE.Object3D, piece: THREE.Object3D, frame: THREE.Object3D) {
+function warmerFront(scene: THREE.Object3D, piece: THREE.Object3D, frame: THREE.Object3D, id: string) {
   let w: THREE.Object3D | undefined
-  scene.traverse((o) => { if (!w && o.userData.editId === 'warmer') w = o })
+  scene.traverse((o) => { if (!w && o.userData.editId === id) w = o })
   // (the counter's own frame: the turned group in it)
   let f: THREE.Object3D | undefined
   w?.traverse((o) => { if (!f && o !== w && Math.abs(o.rotation.y) > 1e-3) f = o })
@@ -1035,7 +1040,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     o.userData.fetcher = true
     o.userData.lean = 0
     o.userData.carry = T.phase === 'toBoard' || (T.phase === 'taking' && T.t > TAKE_S * 0.5)
-    o.userData.prep = T.phase === 'prepping'
+    // (and shaping the rice balls at the counter as he takes the rice)
+    o.userData.prep = T.phase === 'prepping' || (T.phase === 'taking' && T.store === 'ricetub' && T.t > TAKE_S)
     const pierced = performance.now() - T.pierceAt
     o.userData.pierce = T.phase === 'prepping' && pierced < 600 ? pierced / 600 : undefined
     o.userData.fanNow = false
@@ -1075,9 +1081,9 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       o.position.copy(T.spot)
       o.rotation.y = turnToward(o.rotation.y, Math.atan2(T.face.x - T.spot.x, T.face.z - T.spot.z), dt)
       T.t += dt * paceOfStaff(id)
-      if (T.t >= TAKE_S) {
-        // (a rice ball's rice out of the tub, for each one he's bringing (game/rice))
-        if (T.store === 'ricetub') for (let i = 0; i < T.keys.length; i++) RICE.tub = takeRice(RICE.tub)
+      if (T.t >= takeOf(T.store)) {
+        // (a rice ball's rice out of the cooker, for each one he's making (game/rice))
+        if (T.store === 'ricetub') for (let i = 0; i < T.keys.length; i++) { const r = takeRice(RICE.rice, RICE.kama); RICE.rice = r.rice; RICE.kama = r.kama }
         T.phase = afterPhase(T.phase); T.t = 0
       }
       hand()

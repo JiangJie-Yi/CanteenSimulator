@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
-import { TUB_FULL, emptyKama, type Kama } from '@/game/rice'
+import { RICE_FULL, warmKama, type Kama } from '@/game/rice'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -781,7 +781,7 @@ export const SEAT_BONES = new Map<number, number>()
  * whether someone's washing the next pot's rice at the sink just now (GuestBar3D's plater does it all; Decor draws the pot; Roasting
  * takes a portion for each rice ball)
  */
-export const RICE: { tub: number; kama: Kama; washing: boolean } = { tub: TUB_FULL, kama: emptyKama(), washing: false }
+export const RICE: { rice: number; kama: Kama; washing: boolean } = { rice: RICE_FULL, kama: warmKama(), washing: false }
 /**
  * The fire kept by the third cook (三廚, the plater: the owner's, a robata's kitchen split three ways): the grill (Roasting) asks for charcoal
  * when the fire's low or for water when it's run too hot (`want`); the third cook, walking (GuestBar3D's platerRun), takes it from the crate

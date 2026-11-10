@@ -144,6 +144,9 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-3', ['till-cat']],
   // (the shoe cupboard and the waiting bench, laid out afresh about the genkan (2026-11-11))
   ['jgs-edit-relaid-4', ['shoecab', 'bench']],
+  // (the warming counter moved up by the till, the rice-ball counter and the cooker where it stood, the tub and the old rice pot put by
+  // (2026-11-11))
+  ['jgs-edit-relaid-5', ['warmer', 'misopot', 'denkinabe', 'ricetub', 'hagama']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
