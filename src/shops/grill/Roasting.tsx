@@ -1233,7 +1233,7 @@ const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(AL
   .setY(KITCHEN_FLOOR_Y)
 /** how high the step is in the owner's notch and the third cook's bay (a low wooden step, a duckboard's height: the owner's, 2026-11-10; at
  * 0.2 the owner stood up out of his notch, the table's top at his hips, and the third cook's bay had none, the floor showing in it) */
-const STEP_H = 0.045
+const STEP_H = 0.05
 /** where the third cook stands: in his bay at the table's far end (SOUS_NOTCH), a little out from its back wall (his front's some 0.3 ahead
  * of his feet), in the middle of it across, facing in at the fire (KITCHEN_YAW), on his step; he stood out past the table's end, the crate
  * out of reach */
@@ -1301,6 +1301,47 @@ const COOK_TABLE_WOOD = woodTex('keyaki_top.jpg', 1.6, 1.6)
 const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
 /** the bar's base: boards standing side by side, straight grain and flat-sawn in turn, their grain clear (the owner: it didn't show) */
 const BAR_BASE_WOOD = woodTex('bar_base.jpg', 1, 1)
+/**
+ * A duckboard's top (すのこ): dark oiled cedar slats across it, each its own shade and grain, a dark gap between each and the next; one tile
+ * 0.4 of a unit square, five slats to it (its UVs are in units: the notch steps')
+ */
+const SUNOKO_TOP = (() => {
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 256
+  const g = c.getContext('2d')!
+  let seed = 11
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  g.fillStyle = '#140c07'; g.fillRect(0, 0, 256, 256)
+  const n = 5, pitch = 256 / n, gap = 6
+  for (let k = 0; k < n; k++) {
+    const y0 = k * pitch + gap / 2, h = pitch - gap
+    const base = [58 + rnd() * 14, 39 + rnd() * 9, 29 + rnd() * 7]
+    const grad = g.createLinearGradient(0, y0, 0, y0 + h)
+    grad.addColorStop(0, `rgb(${base[0] + 14},${base[1] + 10},${base[2] + 7})`)
+    grad.addColorStop(1, `rgb(${base[0] - 8},${base[1] - 6},${base[2] - 4})`)
+    g.fillStyle = grad; g.fillRect(0, y0, 256, h)
+    // (its grain: long fine streaks along it, a few darker, wandering a little)
+    for (let q = 0; q < 16; q++) {
+      const yy = y0 + 2 + rnd() * (h - 4), dark = rnd() < 0.35
+      g.strokeStyle = dark ? 'rgba(20,12,7,0.45)' : 'rgba(120,88,64,0.28)'
+      g.lineWidth = 0.8 + rnd() * 1.2
+      g.beginPath(); g.moveTo(0, yy)
+      for (let x = 0; x <= 256; x += 32) g.lineTo(x, yy + Math.sin(x / 40 + q) * 1.2)
+      g.stroke()
+    }
+    // (the slat's edges eased: a lighter lip along its top edge, a shade under its foot)
+    g.fillStyle = 'rgba(150,112,82,0.35)'; g.fillRect(0, y0, 256, 2)
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, y0 + h - 2, 256, 2)
+  }
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(1 / 0.4, 1 / 0.4)
+  tex.anisotropy = 4
+  return tex
+})()
+/** the cook table's dark kick round its foot: as high as the notch steps, so none shows over their backs */
+const KICK_H = 0.05
 /** below its top: honed white marble with soft grey veining (blender/marbletex.py), a tile 1.2 across (the owner had it dark a while, and
  * wanted it white again) */
 const COOK_MARBLE = woodTex('marble_panel.jpg', 1, 1)
@@ -1389,6 +1430,59 @@ function HearthGuard() {
   return <group ref={mark} />
 }
 
+/**
+ * The two recesses in the cook table's body (the owner's notch at its front, the third cook's bay at its end) shaded inside, under the top's
+ * overhang, as they are: a soft dark wash down their back and side walls, deepest up under the top (the owner's, 2026-11-10: their walls the
+ * same white as the table's faces round them, the bay looked to be no recess at all, the top cut and the body under it flat). The walls are the
+ * body's faces, set 0.06 back from the cuts (COOK_TABLE_PARTS' insets); the wash 2 mm off them, from the kick's top to the body's
+ */
+const RECESS_TEX = (() => {
+  const c = document.createElement('canvas')
+  c.width = 4; c.height = 64
+  const g = c.getContext('2d')!
+  const grad = g.createLinearGradient(0, 0, 0, 64)
+  // (deep enough to read as in under the top, not as a stain: at 0.5 at its top to 0.1 at its foot, the walls' middles came out a tenth darker
+  // than the outer faces, and the bay still looked to be no recess)
+  grad.addColorStop(0, 'rgba(26,18,12,0.6)')
+  grad.addColorStop(0.35, 'rgba(26,18,12,0.38)')
+  grad.addColorStop(1, 'rgba(26,18,12,0.26)')
+  g.fillStyle = grad; g.fillRect(0, 0, 4, 64)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+})()
+const RECESS_MAT = new THREE.MeshBasicMaterial({ map: RECESS_TEX, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+  polygonOffsetUnits: -1 })
+const RecessShade = memo(function RecessShade() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP + KICK_H, top = -0.08, h = top - floor
+  const IN = 0.06, OFF = 0.002
+  // (each wall: where along it runs (from, to: the table's frame, along or lay), where it stands across it, the way it faces)
+  const walls: { a: [number, number]; at: number; across: 'along' | 'lay'; face: 1 | -1 }[] = [
+    // (the bay: its back wall, its two sides out to the table's end)
+    { a: [SOUS_NOTCH.lay[0] - IN, SOUS_NOTCH.lay[1] + IN], at: SOUS_NOTCH.along[0] - IN + OFF, across: 'along', face: 1 },
+    { a: [SOUS_NOTCH.along[0] - IN, COOK_TABLE.along[1] - IN], at: SOUS_NOTCH.lay[0] - IN + OFF, across: 'lay', face: 1 },
+    { a: [SOUS_NOTCH.along[0] - IN, COOK_TABLE.along[1] - IN], at: SOUS_NOTCH.lay[1] + IN - OFF, across: 'lay', face: -1 },
+    // (the notch: its back wall, its two sides out to the table's front)
+    { a: [COOK_NOTCH.along[0] - IN, COOK_NOTCH.along[1] + IN], at: COOK_NOTCH.lay[0] - IN + OFF, across: 'lay', face: 1 },
+    { a: [COOK_NOTCH.lay[0] - IN, COOK_TABLE.lay[1] - IN], at: COOK_NOTCH.along[0] - IN + OFF, across: 'along', face: 1 },
+    { a: [COOK_NOTCH.lay[0] - IN, COOK_TABLE.lay[1] - IN], at: COOK_NOTCH.along[1] + IN - OFF, across: 'along', face: -1 },
+  ]
+  return (
+    <group>
+      {walls.map((w, i) => {
+        const len = w.a[1] - w.a[0], mid = (w.a[0] + w.a[1]) / 2
+        // (the wall's plane: its middle in the table's frame, and turned to face out of the wall into the recess)
+        const p = w.across === 'along' ? new THREE.Vector3().addScaledVector(ALONG, w.at).addScaledVector(LAY, mid)
+          : new THREE.Vector3().addScaledVector(ALONG, mid).addScaledVector(LAY, w.at)
+        p.y = floor + h / 2
+        const n = (w.across === 'along' ? ALONG : LAY).clone().multiplyScalar(w.face)
+        return <mesh key={i} position={p} rotation-y={Math.atan2(n.x, n.z)} material={RECESS_MAT} raycast={() => {}} renderOrder={1}>
+          <planeGeometry args={[len, h]} />
+        </mesh>
+      })}
+    </group>
+  )
+})
 function CookTableImpl({ floor = true }: { floor?: boolean }) {
   // (and under it all the kitchen's floor, from the bar's cook's edges to the front, and on past the table's
   // right-hand end where the other cooks stand)
@@ -1399,6 +1493,7 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
     <>
       {/* (set back under the top on their outer faces only: where they meet, they run into each other, no gap) */}
       {COOK_TABLE_PARTS.map((p, i) => <CookTableBox key={i} lay={[p[0], p[1]]} along={[p[2], p[3]]} inset={p[4]} />)}
+      <RecessShade />
       <CubbyFrame />
       {/* (the third cook's fire irons, leant by his bay at its right-hand side, against the crate) */}
       <SousIrons />
@@ -1805,8 +1900,10 @@ function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [num
       <mesh position-y={(floor - 0.08) / 2} geometry={useMemo(() => panelBox(W - 0.12, -floor - 0.08, D - 0.12, 1.2), [W, D, floor])}>
         <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
       </mesh>
-      <mesh position-y={floor + 0.05}>
-        <boxGeometry args={[W - 0.1, 0.1, D - 0.1]} />
+      {/* (as high as the steps in the recesses (STEP_H), so none of it shows over their backs: at 0.1 a band of it stood over them, a dark
+          step round their back corners (the owner saw)) */}
+      <mesh position-y={floor + KICK_H / 2}>
+        <boxGeometry args={[W - 0.1, KICK_H, D - 0.1]} />
         <meshToonMaterial color="#1e140d" />
       </mesh>
     </group>
@@ -2802,8 +2899,10 @@ const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階
   const obj = useMemo(() => {
     const r = gltf.scene.getObjectByName(node)!.clone(true)
     r.position.set(0, 0, 0)
-    const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: COOK_TABLE_WOOD })
-    const skirt = new THREE.MeshToonMaterial({ color: '#e0c8a8', map: BAR_BASE_WOOD })
+    // (a duckboard's (すのこ): dark cedar slats across it, its sides the same dark wood; the owner's, 2026-11-10: it was the table's own light
+    // keyaki, a piece of the top laid on the floor)
+    const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: SUNOKO_TOP })
+    const skirt = new THREE.MeshToonMaterial({ color: '#6b4c38', map: BAR_BASE_WOOD })
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return

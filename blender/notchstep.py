@@ -41,8 +41,8 @@ def P(x, y, z):
 # the top, its dark kick at its foot), the steps 0.047 out, so 3 mm off them; the owner's from his notch's back wall to 2.40 out (under his
 # feet, at 2.3, and the step up a little in front of them), the third cook's from his bay's back wall to the table's end (3.1))
 STEPS = {"NotchStep": (1.3 + 2 * 0.047, 2.4 - (1.26 - 0.047)), "SousStep": (1.3 + 2 * 0.047, 3.1 - (2.33 - 0.047))}
-H = 0.045                           # tall: a duckboard's height (the owner's, 2026-11-10: at 0.2, then 0.14 before that, he stood up out of
-                                    # the notch, the table's top at his hips)
+H = 0.05                            # tall: a duckboard's height (the owner's, 2026-11-10: at 0.2, then 0.14 before that, he stood up out of
+                                    # the notch, the table's top at his hips), the table's dark kick behind it no higher
 EASE = 0.012                        # the edges' bevel
 M = {
     "top": pbr("StepTop", (0.86, 0.66, 0.42), rough=0.55),
