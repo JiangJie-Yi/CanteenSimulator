@@ -732,6 +732,16 @@ export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_
  */
 export const TAKEOUT = { orders: [] as TakeoutOrder[] }
 /**
+ * The takeaway stand behind the cashier's chair (the owner's, 2026-11-11): with a cashier at the till, a server sets the bagged takeaway down on
+ * it (`bags`, the orders' ids), and the cashier turns round in their chair, takes it up and hands it over the till to its customer (`handing`:
+ * whose, how far on in seconds; `turn`, how far they're turned round to it, 0..1; `carry`, their hands out holding it); with no one at the till
+ * the server takes it out to the customer as before. `cashierAt`: the moment the cashier was last seen sat at the till (Roasting).
+ */
+export const TAKEOUT_STAND = { bags: [] as number[], handing: null as { id: number; t: number } | null, turn: 0, carry: false, cashierAt: -1e9 }
+export const cashierIn = () => performance.now() - TAKEOUT_STAND.cashierAt < 800
+/** where the stand is, in the bar's frame: right behind the cashier's chair, its front to it */
+export const STAND_AT = { x: 1.72, z: -2.14, yaw: Math.atan2(-0.59, -0.81) }
+/**
  * The waiting bench by the genkan (the owner's, 2026-11-09): with every stool taken, up to BENCH_SEATS come in and sit there in their shoes to
  * wait their turn (Roasting puts them on it, `ids` in the order they came, `since` when), are called to the first stool to come free (`up`:
  * GuestBar3D walks them from the bench to it) and give up after BENCH_WAIT (`gone`: out of the door again)
@@ -744,7 +754,7 @@ export const BENCH_PLACE = { x: -1.18, z: -3.978, y: 0.169, yaw: 0.6297, pitch: 
 export const BENCH_WAIT = 90
 export const BENCH = { ids: [] as number[], since: new Map<number, number>(), up: new Set<number>(), gone: new Set<number>() }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bench: BENCH, __seatsTaken: SEATS_TAKEN })
-if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __takeout: TAKEOUT })
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __takeout: TAKEOUT, __takeoutStand: TAKEOUT_STAND })
 /** the takeaway box's place on the table, in the scene's frame (ALONG, LAY) */
 // (beside the ready plate along the table, toward the fire, clear of it: a plate's half-width and the box's, and a little between)
 export const TAKEOUT_SPOT = { along: PLATING_SPOT.along - 0.46, lay: PLATING_SPOT.lay }

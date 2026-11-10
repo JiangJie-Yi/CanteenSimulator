@@ -55,7 +55,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, BENCH, BENCH_SEATS, BENCH_WAIT } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -1183,6 +1183,12 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
           o.position.setFromMatrixPosition(m.matrixWorld).applyMatrix4(inv)
           const dir = new THREE.Vector3(0, 0, -1).transformDirection(m.matrixWorld).transformDirection(inv)
           o.rotation.y = Math.atan2(dir.x, dir.z)
+          // (the cashier at the till: turned round in the chair to the takeaway stand behind them, hands out with a bag (bar.ts's TAKEOUT_STAND))
+          if (seat === 'cashier-seat') {
+            TAKEOUT_STAND.cashierAt = performance.now()
+            o.rotation.y += TAKEOUT_STAND.turn * Math.PI * 0.8
+            o.userData.carry = TAKEOUT_STAND.carry
+          }
           return
         }
       }

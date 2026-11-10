@@ -119,6 +119,8 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   '老式的炊飯爐灶（已不用，現在用電鍋煮飯）': ['昔ながらのかまど（使っていない、今は電気釜で炊く）', 'An old rice stove (out of use: the rice is cooked in the electric cooker now)'],
   '已不用（白飯從電鍋取）': ['使っていない（ご飯は電気釜から）', 'Out of use (the rice comes from the cooker)'],
   飯糰料理台: ['おにぎりの作業台', 'Rice ball counter'],
+  外帶檯: ['持ち帰り台', 'Takeaway stand'],
+  '外帶的牛皮紙袋放這裡，收銀員轉身拿給客人': ['持ち帰りのクラフト紙袋を置く台：レジ係が振り向いて取り、お客に渡す', 'The takeaway bags wait here: the cashier turns, takes one and hands it over'],
   '包飯糰的地方：白飯從電鍋取，在這裡捏': ['おにぎりを握る台：ご飯は電気釜から取ってここで握る', 'Where the rice balls are made: rice from the cooker, shaped here'],
   '空了，等著洗米煮飯': ['空っぽ、米を研いで炊くのを待つ', 'Empty: waiting for rice to be washed and cooked'],
   '般若心經，供在神前': ['般若心経、神前に供える', 'The Heart Sutra, offered at the shrine'],
