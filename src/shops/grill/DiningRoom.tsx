@@ -2349,19 +2349,6 @@ const WC_CEDAR = canvasTex(64, 128, (g) => {
     }
   }
 }, true)
-const WC_GEO = {
-  bowl: new THREE.SphereGeometry(0.12, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-  foot: new THREE.CylinderGeometry(0.07, 0.09, 0.28, 16),
-  seat: new THREE.TorusGeometry(0.1, 0.022, 8, 20),
-  tank: new THREE.BoxGeometry(0.12, 0.3, 0.32),
-  basin: new THREE.CylinderGeometry(0.09, 0.065, 0.06, 18),
-  pot: new THREE.CylinderGeometry(0.03, 0.026, 0.1, 10),
-  leaf: new THREE.ConeGeometry(0.02, 0.12, 4),
-  lamp: new THREE.SphereGeometry(0.06, 12, 8),
-  /** the wall lantern's paper: a box a little inside its frame */
-  lantern: new THREE.BoxGeometry(0.11, 0.17, 0.05),
-}
-/** the room's paper lamp, on its sensor */
 /**
  * A toilet in the dark (its switch by the door off: the owner's): its rooms' insides dimmed, as the lamp's paper is, by a see-through black
  * box filling each (its faces toward the eye only, so whatever's in it is darkened once, seen from above or through the door); fading in
@@ -2397,16 +2384,6 @@ function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number
       {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={mat} position={[x, sy / 2, z]} scale={[sx, sy, sz]} renderOrder={4} />)}
     </group>
   )
-}
-function WcLamp({ who, at, geo = WC_GEO.lamp }: { who: 'm' | 'f'; at: [number, number, number]; geo?: THREE.BufferGeometry }) {
-  const m = useRef<THREE.MeshBasicMaterial>(null)
-  const k = useRef(0.4)
-  useFrame(() => {
-    // (on its own switch by the door (the owner's): lit while it's on, dark paper while it's off; it used to light only with someone there)
-    k.current += ((getLights().wc[who] ? 1 : 0.12) - k.current) * 0.08
-    m.current?.color.set('#fff1cc').multiplyScalar(k.current)
-  })
-  return <mesh geometry={geo} position={at}><meshBasicMaterial ref={m} color="#fff1cc" toneMapped={false} /></mesh>
 }
 /** a wall of the toilet's rooms, facing into them: charred cedar to the waist with a rail along it, cream plaster over; `len` along it, its
  * middle at `at`, turned `yaw` (unturned, it faces +z); the cedar's boards their own width whatever its length. `cut`: the wall that's cut
@@ -2482,24 +2459,88 @@ function WcSlats({ x, z, y }: { x: [number, number]; z: [number, number]; y: num
     </>
   )
 }
-/** a paper lamp on a wall, on a little wooden arm (the rooms have no ceiling: they're seen from above, cut open): its globe in its ring `out`
- * from the wall, at `at` on it, the wall facing `yaw` (unturned, +z) */
-function WcSconce({ who, at, yaw }: { who: 'm' | 'f'; at: [number, number, number]; yaw: number }) {
-  // (a small Japanese wall lantern (the owner's: not a globe on a bent black arm): a dark wooden frame on a backboard against the wall, its
-  // washi lit from inside, a kumiko of thin bars over its front; low on triangles, its glow its own, no light of its own)
-  const out = 0.045
-  const D = '#3a2416'
+/** the washrooms' finer things (blender/wcdecor.py; the owner's, 2026-11-11: the plants finer, the lamp less plain and brighter): the hanging
+ * wall lantern, the moss ball on its dish, the camellia in its bamboo vase; in the room's toon light, the leaves and petals seen from both sides,
+ * inked and folded together by material, made once each and copied (sharing their shapes) */
+const WCDECOR_URL = import.meta.env.BASE_URL + 'models/wcdecor.glb'
+useGLTF.preload(WCDECOR_URL)
+const WCDECOR_MADE = new Map<string, THREE.Object3D>()
+const THIN = /Leaf|Petal|Fern|LanternPaper/
+function useWcDecor(name: 'WcLantern' | 'Kokedama' | 'Camellia') {
+  const gltf = useGLTF(WCDECOR_URL) as unknown as { scene: THREE.Group }
+  return useMemo(() => {
+    let base = WCDECOR_MADE.get(name)
+    if (!base) {
+      const r = gltf.scene.getObjectByName(name)!.clone(true)
+      r.position.set(0, 0, 0)
+      const mats = new Map<THREE.Material, THREE.Material>()
+      r.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        const src = m.material as THREE.MeshStandardMaterial
+        let t = mats.get(src)
+        if (!t) {
+          t = src.name === 'WcdBronze' ? new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.7, roughness: 0.35 })
+            : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, side: THIN.test(src.name) ? THREE.DoubleSide : THREE.FrontSide })
+          t.name = src.name
+          mats.set(src, t)
+        }
+        m.material = t
+        m.receiveShadow = true
+      })
+      inkModel(r, (m) => THIN.test(((m as THREE.Mesh).material as THREE.Material | undefined)?.name ?? '') || /Paper/.test(m.name), { width: 0.0012, weld: true })
+      // (the lantern's paper left on its own: the game lights it)
+      if (name !== 'WcLantern') { plainColours(r); base = mergeByMaterial(r) } else base = r
+      WCDECOR_MADE.set(name, base)
+    }
+    return base.clone(true)
+  }, [gltf, name])
+}
+/** a washroom's plant on its counter (blender/wcdecor.py) */
+function WcPlant({ name }: { name: 'Kokedama' | 'Camellia' }) {
+  const obj = useWcDecor(name)
+  return <primitive object={obj} />
+}
+/** the soft glow round a lit lamp on a wall (no light of its own: the owner's rule, no lights added or switched), brighter round the one by
+ * the washroom's door; it fades with the switch */
+const WC_HALO = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas'); c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64)
+  gr.addColorStop(0, 'rgba(255,226,170,0.85)'); gr.addColorStop(0.35, 'rgba(255,214,150,0.35)'); gr.addColorStop(1, 'rgba(255,214,150,0)')
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+const WC_HALO_GEO = new THREE.PlaneGeometry(1, 1)
+function WcHalo({ who, size, strength }: { who: 'm' | 'f'; size: number; strength: number }) {
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({ map: WC_HALO, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, toneMapped: false }), [])
+  useEffect(() => () => mat.dispose(), [mat])
+  useFrame(() => { mat.opacity += ((getLights().wc[who] ? strength : 0) - mat.opacity) * 0.08 })
+  return <mesh geometry={WC_HALO_GEO} material={mat} scale={size} renderOrder={5} raycast={() => null} />
+}
+/** a hanging wall lantern (掛け行灯, blender/wcdecor.py) on a wall: its backboard on the wall at `at`, the wall facing `yaw` (unturned, +z); its
+ * washi lit on the switch by the door (WcLamp's way), a soft glow round it on the wall; `bright`, the one by the washroom's door, its glow
+ * the stronger and wider */
+function WcSconce({ who, at, yaw, bright = false }: { who: 'm' | 'f'; at: [number, number, number]; yaw: number; bright?: boolean }) {
+  const obj = useWcDecor('WcLantern')
+  const paper = useRef<THREE.MeshBasicMaterial | null>(null)
+  const k = useRef(0.4)
+  useMemo(() => {
+    const m = new THREE.MeshBasicMaterial({ color: '#fff1cc', toneMapped: false })
+    obj.traverse((o) => { if ((o as THREE.Mesh).isMesh && /Paper/.test(o.name)) (o as THREE.Mesh).material = m })
+    paper.current = m
+  }, [obj])
+  useEffect(() => () => paper.current?.dispose(), [])
+  useFrame(() => {
+    k.current += ((getLights().wc[who] ? 1 : 0.12) - k.current) * 0.08
+    paper.current?.color.set('#fff1cc').multiplyScalar(k.current)
+  })
   return (
-    <group position={[at[0], at[1] - 0.06, at[2]]} rotation-y={yaw}>
-      <WcLamp who={who} at={[0, 0, out]} geo={WC_GEO.lantern} />
-      <StaticBatch plain>
-        <mesh position={[0, 0, 0.006]}><boxGeometry args={[0.15, 0.26, 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
-        {[-1, 1].map((sd) => <mesh key={`p${sd}`} position={[sd * 0.06, 0, out]}><boxGeometry args={[0.012, 0.2, 0.064]} /><meshToonMaterial color={D} /></mesh>)}
-        {[-1, 1].map((sd) => <mesh key={`c${sd}`} position={[0, sd * 0.098, out]}><boxGeometry args={[0.14, 0.014, 0.07]} /><meshToonMaterial color={D} /></mesh>)}
-        {/* (its kumiko: one bar up the middle, three across) */}
-        <mesh position={[0, 0, out + 0.0262]}><boxGeometry args={[0.005, 0.18, 0.004]} /><meshToonMaterial color={D} /></mesh>
-        {[-0.045, 0, 0.045].map((y) => <mesh key={`h${y}`} position={[0, y, out + 0.0262]}><boxGeometry args={[0.11, 0.005, 0.004]} /><meshToonMaterial color={D} /></mesh>)}
-      </StaticBatch>
+    <group position={[at[0], at[1] - 0.08, at[2]]} rotation-y={yaw}>
+      <primitive object={obj} />
+      <group position={[0, 0, 0.004]}><WcHalo who={who} size={bright ? 0.75 : 0.5} strength={bright ? 0.9 : 0.6} /></group>
     </group>
   )
 }
@@ -2623,37 +2664,15 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       {/* (the men's: a moss ball (苔玉) on a dark, near-black stoneware dish and a stub of bamboo by it (the owner's: the men's and women's
           set apart); the women's its bamboo vase of camellia) */}
       {who === 'm' && (
-        <Movable id="wc2-m-moss" label="苔玉（男廁）"><StaticBatch plain>
-          <group position={[D - 0.14, 0.764, 0.19]}>
-            <mesh position-y={0.008}><cylinderGeometry args={[0.05, 0.04, 0.016, 12]} /><meshToonMaterial color="#2c2a28" /></mesh>
-            <mesh position-y={0.048} scale={[1, 0.9, 1]}><icosahedronGeometry args={[0.04, 1]} /><meshToonMaterial color="#4c6e34" /></mesh>
-            {[0, 2.1, 4.2].map((a) => (
-              <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.012, 0.1, Math.sin(a) * 0.012]} rotation={[Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35]}>
-                <meshToonMaterial color="#5f8f45" />
-              </mesh>
-            ))}
-            <mesh position={[0.06, 0.05, 0.03]}><cylinderGeometry args={[0.009, 0.01, 0.1, 6]} /><meshToonMaterial color="#7a9a4a" /></mesh>
-          </group>
-        </StaticBatch></Movable>
+        <Movable id="wc2-m-moss" label="苔玉（男廁）">
+          <group position={[D - 0.14, 0.764, 0.19]}><WcPlant name="Kokedama" /></group>
+        </Movable>
       )}
-      {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}><StaticBatch plain>
-      {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl) */}
-      {/* (clear of the counter's back rail: it stood 2 mm into it (clips.mjs)); in the women's on the bowl's left, its soap on the right; the
-          men's the other way round, its moss ball on the right (the owner's, 2026-11-06) */}
-      <group position={[D - 0.14, 0.764, -0.19]}>
-        <mesh geometry={WC_GEO.pot} position-y={0.05}><meshToonMaterial color="#b8a060" /></mesh>
-        {/* (its nodes: each ring lying round the tube (they stood upright, cutting through it in a jagged dark seam down its side), a little
-            its inside just clear of it where it is (it tapers, 0.026 at its foot to 0.03 at its top)) */}
-        {[0.02, 0.05, 0.08].map((y) => <mesh key={y} position-y={y} rotation-x={Math.PI / 2}><torusGeometry args={[0.026 + 0.004 * (y / 0.1) + 0.0023, 0.002, 4, 10]} /><meshToonMaterial color="#8a7a3a" /></mesh>)}
-        <mesh position={[0.01, 0.17, 0.005]} rotation-z={0.15}><cylinderGeometry args={[0.0022, 0.0022, 0.14, 5]} /><meshToonMaterial color="#3a2a1a" /></mesh>
-        <mesh position={[0.02, 0.24, 0.005]}><sphereGeometry args={[0.024, 8, 6]} /><meshToonMaterial color="#d8445a" /></mesh>
-        {[0, 1.6, 3.2, 4.7].map((a) => (
-          <mesh key={a} geometry={WC_GEO.leaf} position={[Math.cos(a) * 0.02, 0.15, Math.sin(a) * 0.02]} rotation={[Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5]}>
-            <meshToonMaterial color="#3f7a3a" />
-          </mesh>
-        ))}
-      </group>
-      </StaticBatch></Movable>}
+      {/* (a bamboo vase of camellia on the washstand's counter, beside the bowl, clear of the counter's back rail; in the women's on the bowl's
+          left, its soap on the right; the men's the other way round, its moss ball on the right (the owner's, 2026-11-06)) */}
+      {who === 'f' && <Movable id={`wc2-${who}-vase`} label={`竹花瓶（${name}）`}>
+        <group position={[D - 0.14, 0.764, -0.19]}><WcPlant name="Camellia" /></group>
+      </Movable>}
       {/* (no towel on a rod: a paper towel dispenser by the washstand and a hand dryer past it toward the door (the owner's: swapped), on the wall beside it,
           where hands are held out after washing (GuestBar3D steps them over to it, its marker wc-dryer-<who>)) */}
       {/* (the dryer on the wall, blowing down (the owner's, 2026-11-10: a light one, not the Jet Towel's upright body), over the wainscot's
@@ -2691,7 +2710,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
       <Movable id={`wc2-${who}-lamp`} label={`紙燈（${name}）`}>
       {/* a paper lamp on the wall toward the other toilet, on its arm: on a motion sensor, bright while someone's in or the door's open, dim
           otherwise */}
-      <WcSconce who={who} at={[D * 0.62, h - 0.02, -s * w / 2]} yaw={s > 0 ? 0 : Math.PI} />
+      <WcSconce who={who} at={[D * 0.62, h - 0.02, -s * w / 2]} yaw={s > 0 ? 0 : Math.PI} bright />
       </Movable>
       {/* ---- the toilet's room, in its own frame: x from the way in (0) to its far end (E), z across it */}
       <group position={[SX, 0, s * w / 2]} rotation-y={-s * Math.PI / 2}>
