@@ -2714,6 +2714,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   type WaiterPhase = 'idle' | 'fetch' | 'pickup' | 'go' | 'set' | 'back' | 'clearGo' | 'clearTake' | 'clearBack' | 'drop'
     | 'washGo' | 'wash' | 'unloadGo' | 'unloadTake' | 'unloadCarry' | 'unloadPut' | 'handGo' | 'handwash' | 'basketGo' | 'basketTake'
     | 'toBox' | 'boxTake' | 'toTill' | 'hand' | 'toStand' | 'standPut'
+    | 'skTrayGo' | 'skTake' | 'skSinkGo' | 'skWash' | 'skHolderGo' | 'skPut'
     | 'sweepGo' | 'sweep'
   const waiters = useRef<{ phase: WaiterPhase
     t: number; seat: number; keys: string[]; run: number | null
@@ -2776,6 +2777,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const platerBowl = useRef<THREE.Group>(null)
   /** the bundle of iron skewers the plater carries to the sink and back to the holder */
   const platerSkewers = useRef<THREE.Group>(null)
+  /** the same in a server's hands (one at a time washes them) */
+  const serverSkewers = useRef<THREE.Group>(null)
   /** the fire kept by the plater (bar.ts's FIRE_TEND): a handful of charcoal from the crate, a dipper of water from the bucket (and the
    * dipper stirring the miso soup) */
   const platerCoal = useRef<THREE.Group>(null)
@@ -2971,6 +2974,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** (every second) the plates out at seats looked over for any left where nobody sits */
   const sweep = useRef(0)
   const sinkFront = () => inBar('SinkFront', endOf(1)).setY(0)
+  /** where one stands on the kitchen's floor to reach something on (or by) the cook table: the nearest spot clear of it */
+  const reachClear = (v: THREE.Vector3) => {
+    const blocks = kitchenBlocks()
+    if (!blocks.length) return v.clone().setY(0)
+    const [a, l] = standClear(flat(v), blocks)
+    const c0 = counters[0]
+    return c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
+  }
+  /** where one stands at the skewer buckets on the cook table's front (the used ones', the clean ones'), measured afresh */
+  const skewerSpot = (name: 'skewer-tray' | 'skewer-holder', or: THREE.Vector3) => { marks.current.delete(name); return reachClear(inBar(name, or)) }
+  /** the skewers being washed: by a server (a floor one with nothing else to do), or by the plater when there's no server */
+  const SK_PHASES = new Set<string>(['skTrayGo', 'skTake', 'skSinkGo', 'skWash', 'skHolderGo', 'skPut'])
   /** where the k-th plate stands in the dish dryer (along its rack, from its first slot to its last), and the way its plates face */
   const dryerAt = (k: number) => inBar('SinkDryerRack0', endOf(1)).lerp(inBar('SinkDryerRack1', endOf(1)), DRYER_CAP > 1 ? k / (DRYER_CAP - 1) : 0)
   /** where the k-th plate stands in the draining basket: along its slots (blender/sink.py's SinkRackSlot0, 1, 6 cm apart as it's made), from
@@ -3728,8 +3743,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       /** where they stand at the two skewer holders on the cook table's front (the used ones' right of the notch, the clean ones' left of it):
        * the nearest spot on the floor clear of the table (right under one, they stood half in the table's face) */
-      const skTraySpot = () => { marks.current.delete('skewer-tray'); return reachOf(inBar('skewer-tray', home())) }
-      const skHolderSpot = () => { marks.current.delete('skewer-holder'); return reachOf(inBar('skewer-holder', home())) }
+      const skTraySpot = () => skewerSpot('skewer-tray', home())
+      const skHolderSpot = () => skewerSpot('skewer-holder', home())
       const faceTo = (v: THREE.Vector3) => { pl.yaw = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
       /** where they stand on the kitchen's floor to reach something on (or by) the cook table: the nearest spot clear of it */
       const reachOf = (v: THREE.Vector3) => {
@@ -3800,8 +3815,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
               else setOff(reachOf(coalSackAt()), 'toCoalSack')
             } else { const near = dipFrom(); if (near) stepTo(near, 'toBucket'); else setOff(reachOf(bucketAt()), 'toBucket') }
-          } else if (open && !SHOP.leaving && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n))) {
-            // (the used skewers piling up, or the holder nearly empty: to the used tray by the plating place for all of them)
+          } else if (open && !SHOP.leaving && !waiters.current.length && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n))) {
+            // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server to wash them (theirs, the owner's): to the used
+            // bucket by the plating place for all of them)
             pl.pos.copy(home())
             setOff(skTraySpot(), 'toSkTray')
             away(true)
@@ -4398,10 +4414,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const dirtyNow = runs.current.filter((r) => r.phase === 'dirty' && !spoken.has(r.key))
           // (the sink and the dryer one server's at a time)
           const atSink = waiters.current.some((x) => x !== w && (x.phase === 'washGo' || x.phase === 'wash' || x.phase === 'unloadGo' || x.phase === 'unloadTake'
-            || x.phase === 'handGo' || x.phase === 'handwash' || x.phase === 'basketGo' || x.phase === 'basketTake'))
+            || x.phase === 'handGo' || x.phase === 'handwash' || x.phase === 'basketGo' || x.phase === 'basketTake' || x.phase === 'skSinkGo' || x.phase === 'skWash'))
+          // (the used skewers due a wash and no one on it already)
+          const skewersDue = washGoes(SKEWERS.s) && !atSink && !waiters.current.some((x) => SK_PHASES.has(x.phase)) && !['toSkTray', 'takeSk', 'toSkSink', 'washSk', 'toHolder', 'putSk'].includes(platerRun.current.phase)
           // (the shop shut and going home: nothing new taken on; what's left is put away overnight with the closing)
           const chore = SHOP.leaving ? null : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : dirty.current, rack: PLATE_RACK.n,
-            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink ? { n: 0, left: null } : DRAIN })
+            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink ? { n: 0, left: null } : DRAIN, skewers: skewersDue })
           if (chore === 'serve') {
             // (across the kitchen to the chef for it)
             w.slot = slot
@@ -4420,9 +4438,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             // (across the kitchen to the sink: to wash what's in it into the washer under it (or by hand into the draining basket while the washer's
             // busy: the owner's, 2026-11-10), or to take the washer's clean plates, or the basket's dry ones, back to the racks)
             go(kitchenRoute(home.at, sinkFront()), chore === 'wash' ? 'washGo' : chore === 'unload' ? 'unloadGo' : chore === 'handwash' ? 'handGo' : 'basketGo')
+          } else if (chore === 'skewers') {
+            // (across the kitchen to the used skewers' bucket on the cook table's front, all of them out of it, to the sink with them)
+            go(kitchenRoute(home.at, skewerSpot('skewer-tray', home.at)), 'skTrayGo')
           }
         }
       } else if (w.phase === 'fetch') walk(() => { w.phase = 'pickup'; face(plating.at) })
+      // ---- the iron skewers (game/skewers): the used bucket emptied into their hands, washed at the sink, put back in the clean ones' bucket
+      else if (w.phase === 'skTrayGo') walk(() => { w.phase = 'skTake'; face(inBar('skewer-tray', w.pos)) })
+      else if (w.phase === 'skTake' && w.t > 0.6) { SKEWERS.s = pickUpDirty(SKEWERS.s); go(kitchenRoute(w.pos, sinkFront()), 'skSinkGo') }
+      else if (w.phase === 'skSinkGo') walk(() => {
+        w.phase = 'skWash'
+        face(inBar('SinkBasinFloor', endOf(1)))
+        const id = ownerServes ? 'owner' : servers[wi]?.id
+        if (id) STAFF_TALK.push({ key: performance.now() + 0.7 + wi, id, text: LINES[lang].skewerWash, until: performance.now() + 2400 })
+      })
+      else if (w.phase === 'skWash' && w.t > SKEWER_WASH_S) { meterWater('dish'); go(kitchenRoute(w.pos, skewerSpot('skewer-holder', w.pos)), 'skHolderGo') }
+      else if (w.phase === 'skHolderGo') walk(() => { w.phase = 'skPut'; face(inBar('skewer-holder', w.pos)) })
+      else if (w.phase === 'skPut' && w.t > 0.5) { SKEWERS.s = putBackClean(SKEWERS.s); rattleSound(); go(kitchenRoute(w.pos, home.at), 'back') }
       else if (w.phase === 'sweepGo') walk(() => {
         // (at the broken glass: facing it, broom down, a word to the room)
         w.phase = 'sweep'
@@ -4637,6 +4670,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // what's on the tray goes where the tray goes (and, being set down, from the tray to the bar)
       const tray = trayAt()
+      // (the bundle of skewers in their hands, from the used bucket to the clean one; scrubbed to and fro at the sink)
+      const sb = serverSkewers.current
+      if (sb && (SK_PHASES.has(w.phase) || sb.userData.by === wi)) {
+        const has = w.phase === 'skSinkGo' || w.phase === 'skWash' || w.phase === 'skHolderGo' || w.phase === 'skPut' || (w.phase === 'skTake' && w.t > 0.3)
+        sb.visible = has
+        sb.userData.by = has ? wi : undefined
+        if (has) { sb.position.copy(tray).add(new THREE.Vector3(w.phase === 'skWash' ? Math.sin(w.t * 12) * 0.03 : 0, 0.01, 0)); sb.rotation.set(0, w.look ?? w.yaw, 0) }
+      }
       if (w.carry?.length) {
         let i = 0
         for (const key of w.carry) {
@@ -4785,7 +4826,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     SINK.dirty = dirty.current
     DRYER.open = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'unloadTake') ? 1 : 0
-    SINK.washing = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'handwash') || wash.current !== null || RICE.washing
+    SINK.washing = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'handwash' || x.phase === 'skWash') || wash.current !== null || RICE.washing
     // (every plate told over: the racks', the sink's, the washer's, the basket's, and the rest out (at the plating place, on their way, at the
     // seats))
     PLATE_COUNT.rack = PLATE_RACK.n
@@ -4971,8 +5012,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <mesh position={[0, 0.02, 0.04]} rotation-x={Math.PI / 2 - 0.25} geometry={DIPPER_HANDLE_GEO} material={DIPPER_MAT} />
         </group>
       )}
-      {given && (
-        <group ref={platerSkewers} visible={false}>
+      {given && [platerSkewers, serverSkewers].map((ref, k) => (
+        <group key={k} ref={ref} visible={false}>
           {/* (a bundle of iron skewers held across the hands) */}
           {Array.from({ length: 7 }, (_, i) => (
             <mesh key={i} position={[(i - 3) * 0.008, (i % 2) * 0.006, 0]} rotation={[Math.PI / 2, 0, (i - 3) * 0.03]}>
@@ -4980,7 +5021,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             </mesh>
           ))}
         </group>
-      )}
+      ))}
       {given && (
         <group ref={platerBowl} name="plater-bowl" visible={false}>
           {/* (a wooden rice-washing bowl, the rice in it) */}

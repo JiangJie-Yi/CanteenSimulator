@@ -49,6 +49,15 @@ feature('外場分工：一個端菜收盤，另一個洗碗、烘碗、搬回�
       expect(nextChore({ ...base, duty: 'dish', rack: 0, sink: 3, dryer: { n: 6, left: 0 } })).toBe('unload')
     })
   })
+  scenario('用過的鐵籤桶滿了：由閒著的外場拿去洗，廚師不洗', ({ then, but, and }) => {
+    then('管外場的沒事：去洗鐵籤', () => { expect(nextChore({ ...base, duty: 'floor', skewers: true })).toBe('skewers') })
+    and('一個人時也是他', () => { expect(nextChore({ ...base, duty: 'all', skewers: true })).toBe('skewers') })
+    but('有菜要端、有盤子要收：先端、先收', () => {
+      expect(nextChore({ ...base, duty: 'floor', skewers: true, serve: true })).toBe('serve')
+      expect(nextChore({ ...base, duty: 'floor', skewers: true, dirty: 1 })).toBe('clear')
+    })
+    and('管洗碗的不去洗鐵籤', () => { expect(nextChore({ ...base, duty: 'dish', skewers: true })).toBeNull() })
+  })
   scenario('一個人時：端菜、洗碗、收盤、搬盤都做', ({ then, and }) => {
     then('有髒盤子：收', () => { expect(nextChore({ ...base, duty: 'all', dirty: 1 })).toBe('clear') })
     and('流理台夠一批：洗', () => { expect(nextChore({ ...base, duty: 'all', sink: WASH_AT })).toBe('wash') })

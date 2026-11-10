@@ -55,7 +55,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -6946,6 +6946,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.pullAt = now
           SKEWERS.s = usedSkewer(SKEWERS.s)
           clinkSound()
+          // (pulled out by the chef, the food left on the plate, the rod dropped in the used bucket (SkewerStore flies it there))
+          const rod = p.sticks[0]
+          if (rod && PULLED.length < 8) PULLED.push({ from: rod.getWorldPosition(new THREE.Vector3()), at: now })
         }
         if (here && p.skewerAt !== undefined && p.pullAt === undefined) inUse++
         // (the rod: in as it's pushed, out as it's pulled; none before or after)

@@ -90,15 +90,17 @@ export const shutStarts = (d: Dryer) => d.left === null && d.n > 0
 /** a server's part of the work (the owner's: one clears, the other washes; a lone server does it all) */
 export type Duty = 'floor' | 'dish' | 'all'
 /** what a free server does next */
-export type Chore = 'serve' | 'clear' | 'wash' | 'handwash' | 'unload' | 'unbasket' | null
+export type Chore = 'serve' | 'clear' | 'wash' | 'handwash' | 'unload' | 'unbasket' | 'skewers' | null
 /**
  * What a free server does next, by their duty. Food plated at the chef's plating place for a seated customer goes to them first, whoever carries it; then the
  * floor's server clears the plates left dirty at the seats to the sink, and the dishes' server takes the washer's clean plates (or the basket's
  * drained ones) back to the racks (first of all, when the racks are bare), washes what's in the sink into the washer, or, while it's busy,
- * by hand into the draining basket. `dirty`: plates left at the seats; `sink`: in the sink, waiting to be washed.
+ * by hand into the draining basket. `dirty`: plates left at the seats; `sink`: in the sink, waiting to be washed. With nothing else to do, the
+ * floor's server takes the used skewers' bucket to the sink, washes them and puts them back in the clean ones' (`skewers`: they're due, game/
+ * skewers' washGoes; the owner's, 2026-11-11: an idle server's job, not the cooks').
  */
-export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DRAIN }: { duty: Duty; serve: boolean; dirty: number; sink: number; rack: number; dryer: Dryer
-  drain?: Drain }): Chore {
+export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DRAIN, skewers = false }: { duty: Duty; serve: boolean; dirty: number; sink: number; rack: number; dryer: Dryer
+  drain?: Drain; skewers?: boolean }): Chore {
   if (serve) return 'serve'
   const dish = duty !== 'floor', floor = duty !== 'dish'
   const dried = dryer.left === 0 && dryer.n > 0, drained = drain.left === 0 && drain.n > 0
@@ -109,6 +111,7 @@ export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DR
   if (floor && dirty > 0) return 'clear'
   if (dish && dried) return 'unload'
   if (dish && drained) return 'unbasket'
+  if (floor && skewers) return 'skewers'
   return null
 }
 /** each server's duty: two or more, the first on the floor and the second at the dishes (any more on the floor); one alone does both */

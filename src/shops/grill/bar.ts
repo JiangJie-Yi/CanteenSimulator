@@ -171,6 +171,9 @@ export const SEAT_MOVE: { ask: { guest: number; from: number; to: number } | nul
 /** the shop's fifty iron skewers (game/skewers): clean in the holder, dirty in the used tray, carried to the sink; `inUse`, those on food now
  * (Roasting counts them each frame) */
 export const SKEWERS: { s: Skewers; inUse: number } = { s: startSkewers(), inUse: 0 }
+/** the skewers just pulled out of the food as it's plated (the owner's, 2026-11-11: the chef pulls them and drops them in the used bucket):
+ * where each was (the world) and when (performance.now()); SkewerStore flies each into the used bucket and lets it go */
+export const PULLED: { from: THREE.Vector3; at: number }[] = []
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __skewers?: typeof SKEWERS }).__skewers = SKEWERS
 /** the owner out on the floor serving (no server hired: he carries the plates, clears them and takes the washed ones back himself, the
  * owner's: nothing flies): GuestBar3D walks a figure of him; Roasting's, at his place in the kitchen, is hidden meanwhile */
