@@ -154,12 +154,9 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
               {STORY[lang].body.map((t) => <p key={t}>{t}</p>)}
               <p className="rep-story-end">{STORY[lang].end}</p>
             </article>
-            {/* (the game, who makes it, and where its source is) */}
+            {/* (who makes it, where its source is, which build, what with: the rows alone (the owner's, 2026-11-10: the game's name and a line
+                on what it is taken off the top), spaced out a little) */}
             <div className="rep-about">
-              <strong>{pick('聞野・日式烤魚', '聞野・炭火焼の魚', 'Kikuno · Japanese Grill')}</strong>
-              <p>{pick('在瀏覽器裡玩的日式烤魚店經營遊戲：試做、開店、雇人，看客人吃得開不開心。',
-                'ブラウザで遊ぶ炭火焼の店の経営ゲーム。試作し、店を開き、人を雇い、お客さんの顔を見る。',
-                'A Japanese charcoal grill to run in the browser: try dishes out, open up, hire staff, and watch how the customers like it.')}</p>
               <dl>
                 <dt>{pick('開發者', '開発', 'Developer')}</dt><dd><a href={DEVELOPER_URL} target="_blank" rel="noopener noreferrer">{DEVELOPER}</a></dd>
                 {/* (each on one line, set smaller if it must be (the owner's: nothing on two lines): the addresses without their https://

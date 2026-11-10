@@ -16,38 +16,36 @@ export type Story = {
   end: string
 }
 
+// (the owner's, 2026-11-10: pared down, each line short and hard; a line break within a paragraph is its own line, as he set them)
 export const STORY: Record<Lang, Story> = {
   zh: {
     title: '一個人，一爐火',
-    sub: '聞野開店記',
-    open: '他拖著一只磨損的行李箱，隻身從台灣來到大阪天滿的窄巷深處。咬牙拿出所有的壓箱積蓄，付完店租與爐具，帳本上用熟悉的新台幣寫著僅剩的退路：',
-    ledger: ['孤注一擲的積蓄', '押金、爐台與裝潢', '開門首日營運週轉金'],
+    sub: '聞野 開店記',
+    open: '帶著一隻舊行李箱，隻身落腳大阪天滿的深巷。\n押上手頭最後的積蓄，只求一座燒得通紅的圍炉裏。',
+    ledger: ['孤注一擲的積蓄', '押金、爐台與裝潢', '開門首日營運金'],
     body: [
-      '八張木吧台椅、一座燒得通紅的圍爐裏，門口那盞「聞野」白燈籠是他親手掛上的。他希望巷子裡匆忙的人們，遠遠就能聞到炭火的香氣。',
-      '在異國開門，每一秒都是生存。備長炭一截截燒成灰，冷凍櫃裡的鮮魚一天天倒數著保鮮期；水錶、電錶與工讀生的時薪，從掀開暖簾那一刻就不曾停過。客人一口烤魚後的一句「うまい」，能撐起一整天的心力；而一張皺眉的臭臉，就足以讓這個月的帳本見紅。',
+      '八張吧台椅，一盞手掛的「聞野」白燈籠。\n掀開暖簾那一刻，炭火、水電、時薪與鮮魚的保鮮期，每分每秒都在倒數。',
     ],
-    end: '這從來不是一間悠閒的小居酒屋，而是一場真真切切的生存戰。顧好火候，算好銀兩，將每條魚烤出焦香——直到整座城市的夜歸人，都記住聞野的滋味。',
+    end: '這不是悠閒的小酒館，而是一場真切的生存戰。\n顧好火候，算好銀兩——直到整座城市的夜歸人，都記住這縷焦香。',
   },
   ja: {
     title: 'ひとり、ひとつの炉',
     sub: '聞野 開店記',
-    open: 'スーツケースひとつで、彼は台湾からひとり大阪へやって来た。半生かけた蓄えは、開業費を払うとこれだけになった。帳簿だけは、今も台湾ドルでつけている。',
-    ledger: ['半生の蓄え', '開業費', '開店の日、手元に'],
+    open: '古いスーツケースひとつで、大阪・天満の路地の奥に流れ着いた。\n手元の蓄えを残らず賭けて、真っ赤に燃える囲炉裏をひとつ。',
+    ledger: ['すべてを賭けた蓄え', '保証金、炉と内装', '開店初日の運転資金'],
     body: [
-      '店は天満の細い路地の突き当たり。カウンター八席に囲炉裏がひとつ、入口の提灯は自分の手で掛けた。名は「聞野」。路地の向こうまで、炭の香りが届くように。',
-      '大阪では、毎日がお金との勝負だ。備長炭は一本ずつ灰になり、冷凍庫の魚は日ごとに鮮度を落とす。人の時給も、水道と電気のメーターも、暖簾を掛けたその瞬間から回り出す。「うまい」の一言が明日を支え、しかめっ面ひとつで今月の帳簿は赤く染まる。',
+      'カウンター八席、自分で掛けた「聞野」の白い提灯。\n暖簾を掛けたその瞬間から、炭も、水道と電気も、時給も、魚の鮮度も、刻一刻と減っていく。',
     ],
-    end: 'ここは、のんびりした小さな店ではない。生き残りをかけた勝負だ。火を守り、帳簿を合わせ、一尾一尾をちょうどよく焼き上げる――この路地の誰もが、聞野の味を覚えるその日まで。',
+    end: 'のんびりした小さな店ではない。本物の生き残りをかけた勝負だ。\n火を守り、銭を合わせる――この街の夜帰りの誰もが、この焦げた香りを覚えるまで。',
   },
   en: {
     title: 'One Man, One Fire',
     sub: 'How Kikuno opened',
-    open: 'He came from Taiwan to Osaka alone, with a single suitcase. Half a lifetime’s savings came to this once the opening costs were paid; he still keeps his books in Taiwan dollars.',
-    ledger: ['Saved over half a lifetime', 'Opening costs', 'In hand on opening day'],
+    open: 'One old suitcase, and he came to rest alone in a back alley of Tenma, Osaka.\nHe staked the last of his savings on one irori hearth, burning red.',
+    ledger: ['Savings, all staked', 'Deposit, hearth and fit-out', 'Running money for day one'],
     body: [
-      'The shop sits at the end of a narrow alley in Tenma: eight seats at the counter, one irori hearth, and lanterns at the door he hung himself. He named it Kikuno, so the smell of charcoal would carry down the alley.',
-      'In Osaka, every day burns money. The binchotan turns to ash one stick at a time, the fish in the freezer lose their freshness day by day, and the wages, the water meter and the power meter start running the moment the noren goes up. One “delicious” carries him to tomorrow; one sour face can turn the month’s books red.',
+      'Eight stools at the counter, one white Kikuno lantern hung by his own hand.\nThe moment the noren goes up, the charcoal, the water and power, the wages and the fish all start counting down.',
     ],
-    end: 'This is no easygoing little shop: it’s a fight to survive. Keep the fire, balance the books, grill every fish just right, until everyone in the alley knows the taste of Kikuno.',
+    end: 'This is no easygoing little bar: it’s a real fight to survive.\nMind the fire, mind the money, until every late walker in the city knows this smell of charcoal.',
   },
 }
