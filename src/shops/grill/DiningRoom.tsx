@@ -491,29 +491,47 @@ const ART = {
     const robe = new Path2D()
     robe.moveTo(80, 176)
     robe.bezierCurveTo(62, 182, 54, 200, 52, 224)
-    robe.bezierCurveTo(50, 272, 60, 320, 54, 380)
+    robe.bezierCurveTo(45, 270, 41, 322, 52, 380)
     robe.bezierCurveTo(50, 420, 38, 452, 26, 476)
     robe.lineTo(182, 476)
     robe.bezierCurveTo(168, 440, 152, 402, 148, 352)
     robe.bezierCurveTo(146, 300, 152, 240, 148, 208)
     robe.bezierCurveTo(144, 190, 132, 180, 120, 176)
     robe.closePath()
-    // (the hanging sleeve of her left arm, its lining red at its foot)
+    // (her right arm's sleeve, on our left (she faces us; the owner's, 2026-11-10: the plectrum was in her left hand, the shamisen's body on
+    // her left, her right arm nowhere): the upper arm out to the elbow, the forearm bent back in over the shamisen's body at her right hip, the
+    // hand out of the sleeve's mouth with the plectrum; the long sleeve hanging from the forearm, its lining red at its foot)
     const sleeve = new Path2D()
-    sleeve.moveTo(56, 204)
-    sleeve.bezierCurveTo(40, 222, 26, 262, 22, 302)
-    sleeve.bezierCurveTo(20, 334, 26, 356, 42, 364)
-    sleeve.bezierCurveTo(58, 370, 72, 362, 76, 342)
-    sleeve.lineTo(80, 240)
+    sleeve.moveTo(80, 188)
+    sleeve.bezierCurveTo(58, 192, 38, 214, 28, 244)
+    sleeve.bezierCurveTo(20, 274, 14, 312, 16, 342)
+    sleeve.bezierCurveTo(18, 370, 28, 386, 46, 386)
+    sleeve.bezierCurveTo(54, 386, 60, 380, 59, 368)
+    sleeve.bezierCurveTo(58, 342, 54, 312, 48, 296)
+    sleeve.lineTo(36.4, 288.8)
+    sleeve.lineTo(51.6, 279.2)
+    sleeve.bezierCurveTo(56, 262, 66, 236, 78, 214)
     sleeve.closePath()
-    // (her right sleeve hanging from her arm, bent to the shamisen's plectrum)
+    // (her left arm's, on our right, raised to the shamisen's neck: the upper arm out to the elbow, the forearm back up across her to the hand
+    // round the neck, the sleeve hanging from it)
     const rsleeve = new Path2D()
-    rsleeve.moveTo(146, 204)
-    rsleeve.bezierCurveTo(166, 226, 176, 270, 176, 318)
-    rsleeve.bezierCurveTo(176, 340, 164, 350, 150, 344)
-    rsleeve.bezierCurveTo(138, 338, 132, 316, 130, 296)
-    rsleeve.lineTo(126, 262)
+    rsleeve.moveTo(120, 188)
+    rsleeve.bezierCurveTo(142, 192, 162, 214, 170, 246)
+    rsleeve.bezierCurveTo(178, 282, 184, 320, 182, 346)
+    rsleeve.bezierCurveTo(180, 372, 166, 384, 150, 382)
+    rsleeve.bezierCurveTo(138, 380, 132, 370, 132, 354)
+    rsleeve.bezierCurveTo(132, 316, 131, 276, 131.4, 247.7)
+    rsleeve.lineTo(140.6, 232.3)
+    rsleeve.bezierCurveTo(146, 231, 150, 229, 152, 226)
+    rsleeve.bezierCurveTo(144, 218, 132, 212, 124, 210)
     rsleeve.closePath()
+    // (the folds where each arm bends: from the crook of the elbow down into the hanging sleeve, and one round the elbow's outside)
+    const folds = (lines: number[][]) => {
+      line(0.9, 'rgba(8,16,40,0.7)')
+      for (const [a, b, c, d, e, f, h, k] of lines) { g.beginPath(); g.moveTo(a, b); g.bezierCurveTo(c, d, e, f, h, k); g.stroke() }
+      line(0.6, 'rgba(176,206,236,0.35)')
+      for (const [a, b, c, d, e, f, h, k] of lines) { g.beginPath(); g.moveTo(a + 1, b + 0.6); g.bezierCurveTo(c + 1, d + 0.6, e + 1, f + 0.6, h + 1, k + 0.6); g.stroke() }
+    }
     const NAVY = '#203a6c'
     const kimono = (path: Path2D) => {
       g.fillStyle = NAVY; g.fill(path)
@@ -536,9 +554,6 @@ const ART = {
       g.fillStyle = 'rgba(250,236,220,0.85)'
       for (let y = y0 + 3, r = 0; y < y1; y += 5, r++) for (let x = x0 + (r % 2) * 2.5; x < x1; x += 5) { g.beginPath(); g.arc(x, y, 0.9, 0, Math.PI * 2); g.fill() }
     }
-    kimono(sleeve)
-    g.save(); g.clip(sleeve); kanoko(0, 346, 100, 380); g.restore()
-    line(); g.stroke(sleeve)
     kimono(robe)
     g.save(); g.clip(robe)
     kanoko(0, 452, 200, 476)
@@ -562,13 +577,16 @@ const ART = {
     line(); g.stroke(robe)
     // (the obi's bow behind her, its loops out past her right side)
     const bow = new Path2D()
-    bow.moveTo(146, 266); bow.bezierCurveTo(164, 246, 182, 252, 178, 276); bow.bezierCurveTo(176, 296, 160, 302, 146, 296); bow.closePath()
+    bow.moveTo(140, 266); bow.bezierCurveTo(152, 250, 166, 254, 164, 274); bow.bezierCurveTo(162, 292, 152, 298, 140, 294); bow.closePath()
     g.fillStyle = '#d9ac48'; g.fill(bow); line(); g.stroke(bow)
-    line(0.8, 'rgba(120,70,20,0.6)'); g.beginPath(); g.moveTo(152, 272); g.quadraticCurveTo(166, 266, 172, 278); g.stroke()
-    // ---- her right sleeve over the robe, its red lining at its foot
+    line(0.8, 'rgba(120,70,20,0.6)'); g.beginPath(); g.moveTo(146, 272); g.quadraticCurveTo(156, 266, 160, 278); g.stroke()
+    // ---- her left sleeve over the robe, its red lining at its foot
     kimono(rsleeve)
-    g.save(); g.clip(rsleeve); kanoko(100, 330, 200, 360); g.restore()
+    g.save(); g.clip(rsleeve); kanoko(100, 354, 200, 390); g.restore()
     line(); g.stroke(rsleeve)
+    g.save(); g.clip(rsleeve)
+    folds([[154, 232, 160, 250, 162, 270, 158, 290], [148, 236, 150, 248, 148, 260, 145, 272], [170, 250, 174, 262, 176, 274, 176, 288]])
+    g.restore()
     // ---- her neck, the collars crossed over it (left over right): red, white, then the robe's own navy
     g.fillStyle = '#faf4ea'
     g.beginPath(); g.moveTo(90, 148); g.lineTo(114, 148); g.lineTo(118, 196); g.lineTo(86, 196); g.closePath(); g.fill()
@@ -657,8 +675,17 @@ const ART = {
     // its slender neck (棹) lacquered near black, a warm gleam down one edge, tapering up past her sleeve to the ivory top nut and the pegbox
     // (天神) curling back, three ivory pegs (糸巻) through it, two to one side, one to the other; the three strings from the cord over the
     // bridge and guard up to the pegs
-    const ang = Math.atan2(160 - 300, 186 - 124), NECK = 124
-    g.save(); g.translate(124, 300); g.rotate(ang + Math.PI / 2)
+    // ---- her right sleeve hanging over the robe's side, the forearm in it bent over to the shamisen; its red lining at its foot
+    kimono(sleeve)
+    g.save(); g.clip(sleeve); kanoko(0, 352, 100, 390); g.restore()
+    line(); g.stroke(sleeve)
+    g.save(); g.clip(sleeve)
+    folds([[52, 266, 46, 284, 40, 304, 36, 330], [46, 262, 40, 270, 34, 280, 30, 296], [28, 250, 23, 264, 21, 280, 21, 298]])
+    g.restore()
+    // (its body against her right hip, on our left; its neck up across her to over her left shoulder, the pegbox a little higher than it)
+    const DX = 72, DY = 318
+    const ang = Math.atan2(152 - DY, 153.4 - DX), NECK = 120
+    g.save(); g.translate(DX, DY); g.rotate(ang + Math.PI / 2)
     // (in here: up the neck is -y, across the body x)
     line(1.6, '#7a3462'); g.beginPath(); g.moveTo(-4, 21); g.bezierCurveTo(-7.5, 33, 5.5, 35, 3, 22); g.stroke()
     line(0.5, 'rgba(255,214,236,0.6)'); g.beginPath(); g.moveTo(-3.8, 22.4); g.bezierCurveTo(-6.6, 32, 4.6, 33.4, 2.8, 23); g.stroke()
@@ -713,39 +740,83 @@ const ART = {
     line(0.4, 'rgba(252,246,230,0.95)')
     for (const o of [-1.2, 0, 1.2]) { g.beginPath(); g.moveTo(o * 1.3, 20); g.lineTo(o, 10); g.lineTo(o * 0.75, -22); g.lineTo(o * 0.55, -20 - NECK); g.stroke() }
     g.restore()
-    // (her hand out of her sleeve with the plectrum (撥): its ivory handle in her palm, its blade fanning out over the guard; the back of her
-    // hand to us, four slim fingers curled round under the handle, her thumb along its top toward the blade; at her wrist the sleeve's mouth,
-    // its red lining showing)
-    g.save(); g.translate(145, 280.5); g.rotate(Math.atan2(290.5 - 280.5, 128.9 - 145)); g.scale(1.35, -1.35)
-    // (in here: +x down the plectrum toward its blade, +y to the side her fingers curl round)
-    const bachi = new Path2D()
-    bachi.moveTo(-9, -1.4); bachi.lineTo(4, -1.7); bachi.quadraticCurveTo(10, -3, 19, -8.5); bachi.lineTo(19.5, 8.5); bachi.quadraticCurveTo(10, 3, 4, 1.7); bachi.lineTo(-9, 1.4); bachi.closePath()
-    const ivory = g.createLinearGradient(0, -8, 0, 8)
-    ivory.addColorStop(0, '#f8f0da'); ivory.addColorStop(0.5, '#ece0be'); ivory.addColorStop(1, '#d6c498')
-    g.fillStyle = ivory; g.fill(bachi); line(0.45, 'rgba(110,84,48,0.95)'); g.stroke(bachi)
-    line(0.35, 'rgba(255,255,255,0.75)'); g.beginPath(); g.moveTo(6, 1.6); g.quadraticCurveTo(11, 3, 18, 7); g.stroke()
-    const SKIN = '#faf3e8'
-    const piece = (p: Path2D) => { g.fillStyle = SKIN; g.fill(p); line(0.42); g.stroke(p) }
-    const wrist = new Path2D(); wrist.moveTo(-18, -3.3); wrist.lineTo(-8, -3.7); wrist.lineTo(-8, 3.9); wrist.lineTo(-18, 3.5); wrist.closePath()
-    piece(wrist)
-    const back = new Path2D(); back.moveTo(-10.4, -3.9); back.bezierCurveTo(-5, -5.8, 1.2, -5.2, 2.8, -1.8); back.bezierCurveTo(3.2, 1.5, 1.6, 4.6, -1, 5)
-    back.lineTo(-9.4, 4.7); back.bezierCurveTo(-11.4, 3.9, -11.8, -2.6, -10.4, -3.9); back.closePath()
-    piece(back)
-    for (let k = 0; k < 4; k++) {
-      const f = new Path2D(); f.roundRect(-8.8 + k * 2.75, 1.4, 2.6, 5.6 - Math.abs(k - 1.4) * 0.55, 1.3)
-      piece(f)
+    // (her left hand round the neck, two thirds of the way up it, out of her left sleeve's mouth: the wrist up from it, the back of the hand
+    // to us, four fingers arched over the neck's face to the strings, the first a little apart, pressing one; the thumb behind, unseen)
+    {
+      const nx = Math.cos(ang), ny = Math.sin(ang)
+      const at = 22 + NECK * 0.62, hx = DX + nx * at, hy = DY + ny * at
+      // (across the neck, toward the hand's side: square to it)
+      const sx = ny < 0 ? -ny : ny, sy = ny < 0 ? nx : -nx
+      g.save(); g.translate(hx, hy); g.rotate(Math.atan2(sy, sx)); g.scale(1.2, 1.2)
+      // (in here: +x out from the neck's middle toward her wrist, +y down the neck)
+      const SKIN = '#faf3e8'
+      const piece = (p: Path2D) => { g.fillStyle = SKIN; g.fill(p); line(0.4); g.stroke(p) }
+      const wrist = new Path2D(); wrist.moveTo(8.5, -3.2); wrist.lineTo(19, -3.6); wrist.lineTo(19, 3.9); wrist.lineTo(8.5, 4.1); wrist.closePath()
+      piece(wrist)
+      const back = new Path2D(); back.moveTo(10, -4.4); back.bezierCurveTo(6, -6, 2.6, -5.4, 1.4, -3.2)
+      back.bezierCurveTo(0.8, 0, 1.2, 3.6, 2.8, 5); back.bezierCurveTo(5.6, 5.9, 8.6, 5.5, 10, 4.2); back.closePath()
+      piece(back)
+      // (the fingers over the neck's face, from the knuckles on its near side to their tips on the strings by its far edge, the little one
+      // shortest; the first lifted off the rest, its tip down on a string)
+      for (let k = 0; k < 4; k++) {
+        const y = -4.1 + k * 2.7 + (k === 0 ? -0.9 : 0), len = 6.4 - Math.abs(k - 1.1) * 0.55
+        const f = new Path2D(); f.roundRect(2.6 - len, y - 1.2, len, 2.4, 1.2)
+        piece(f)
+        // (the knuckle's crease and the nail's edge at the tip)
+        line(0.3, 'rgba(160,110,90,0.65)'); g.beginPath(); g.moveTo(1.4 - len * 0.45, y - 1); g.lineTo(1.4 - len * 0.45, y + 1); g.stroke()
+        line(0.3, 'rgba(210,150,140,0.8)'); g.beginPath(); g.moveTo(3.3 - len, y - 0.7); g.quadraticCurveTo(2.6 - len, y, 3.3 - len, y + 0.7); g.stroke()
+      }
+      // (her sleeve's mouth at the wrist, its red lining)
+      const cuff = new Path2D(); cuff.moveTo(15.5, -7); cuff.quadraticCurveTo(13.2, 0, 15.5, 7.4); cuff.lineTo(24, 8.2); cuff.lineTo(24, -7.6); cuff.closePath()
+      g.fillStyle = NAVY; g.fill(cuff)
+      line(1.3, '#b8261c'); g.beginPath(); g.moveTo(16.1, -6.4); g.quadraticCurveTo(13.8, 0, 16.1, 6.8); g.stroke()
+      line(0.55); g.stroke(cuff)
+      g.restore()
     }
-    line(0.3, 'rgba(160,110,90,0.65)')
-    for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(-8.4 + k * 2.75, 4.6); g.lineTo(-6.6 + k * 2.75, 4.6); g.stroke() }
-    const thumb = new Path2D(); thumb.moveTo(-3.5, -3.7); thumb.bezierCurveTo(0, -4.5, 4.6, -3.7, 6.2, -2.3); thumb.bezierCurveTo(6.8, -1.4, 5.8, -0.6, 4.7, -1)
-    thumb.bezierCurveTo(2, -1.6, -1, -1.6, -3.3, -1.2); thumb.closePath()
-    piece(thumb)
-    line(0.3, 'rgba(160,110,90,0.7)'); g.beginPath(); g.moveTo(4.3, -2.9); g.quadraticCurveTo(5.5, -2.7, 5.8, -1.9); g.stroke()
-    const cuff = new Path2D(); cuff.moveTo(-15.5, -7); cuff.quadraticCurveTo(-13, 0, -15.5, 7.4); cuff.lineTo(-25, 8.4); cuff.lineTo(-25, -7.6); cuff.closePath()
-    g.fillStyle = NAVY; g.fill(cuff)
-    line(1.3, '#b8261c'); g.beginPath(); g.moveTo(-16.1, -6.4); g.quadraticCurveTo(-13.7, 0, -16.1, 6.8); g.stroke()
-    line(0.55); g.stroke(cuff)
-    g.restore()
+    // (her right hand out of her right sleeve, the forearm laid over the shamisen's body, with the plectrum (撥): its ivory handle in her fist,
+    // its blade fanning out and down onto the strings over the guard, about to strike: standing off the skin on its edge, its shadow cast on
+    // the skin under it, the light along its thin edge; the back of her hand to us and a little up, four slim fingers curled round under the
+    // handle, her thumb along its top toward the blade; at her wrist the sleeve's mouth, its red lining showing)
+    {
+      const HX = 57, HY = 295, TX = 78, TY = 306.5
+      g.save(); g.translate(HX, HY); g.rotate(Math.atan2(TY - HY, TX - HX)); g.scale(1.5, 1.5)
+      // (in here: +x down the plectrum toward its blade, +y to the side her fingers curl round)
+      const bachi = new Path2D()
+      bachi.moveTo(-10, -1.25); bachi.lineTo(4, -1.5)
+      bachi.bezierCurveTo(8, -1.8, 10.5, -4.8, 13.2, -7.6)
+      bachi.lineTo(14.6, 6.4)
+      bachi.bezierCurveTo(11, 4.2, 8, 1.8, 4, 1.5)
+      bachi.lineTo(-10, 1.25); bachi.closePath()
+      g.save(); g.translate(1.8, 2.6); g.fillStyle = 'rgba(80,46,18,0.3)'; g.fill(bachi); g.restore()
+      const ivory = g.createLinearGradient(0, -7.6, 0, 6.4)
+      ivory.addColorStop(0, '#fbf5e4'); ivory.addColorStop(0.5, '#ede1c0'); ivory.addColorStop(1, '#c9b385')
+      g.fillStyle = ivory; g.fill(bachi); line(0.45, 'rgba(110,84,48,0.95)'); g.stroke(bachi)
+      line(0.55, 'rgba(255,255,255,0.9)'); g.beginPath(); g.moveTo(13.3, -7); g.lineTo(14.5, 5.8); g.stroke()
+      line(0.5, 'rgba(150,118,70,0.75)'); g.beginPath(); g.moveTo(4.4, 1.4); g.bezierCurveTo(8.2, 1.9, 11.2, 4, 14.3, 6.1); g.stroke()
+      const SKIN = '#faf3e8'
+      const piece = (p: Path2D) => { g.fillStyle = SKIN; g.fill(p); line(0.4); g.stroke(p) }
+      const wrist = new Path2D(); wrist.moveTo(-18, -3.3); wrist.lineTo(-8, -3.7); wrist.lineTo(-8, 3.9); wrist.lineTo(-18, 3.5); wrist.closePath()
+      piece(wrist)
+      const back = new Path2D(); back.moveTo(-10.4, -3.9); back.bezierCurveTo(-5, -5.8, 1.2, -5.2, 2.8, -1.8); back.bezierCurveTo(3.2, 1.5, 1.6, 4.6, -1, 5)
+      back.lineTo(-9.4, 4.7); back.bezierCurveTo(-11.4, 3.9, -11.8, -2.6, -10.4, -3.9); back.closePath()
+      piece(back)
+      // (the fingers curled round under the handle, slim, each overlapping the next a little)
+      for (let k = 0; k < 4; k++) {
+        const f = new Path2D(); f.roundRect(-8.7 + k * 2.6, 1.2, 2.5, 5.2 - Math.abs(k - 1.4) * 0.5, 1.25)
+        piece(f)
+      }
+      line(0.3, 'rgba(160,110,90,0.65)')
+      for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(-8.3 + k * 2.6, 4.3); g.lineTo(-6.6 + k * 2.6, 4.3); g.stroke() }
+      const thumb = new Path2D(); thumb.moveTo(-3.5, -3.7); thumb.bezierCurveTo(0, -4.5, 4.6, -3.7, 6.2, -2.3); thumb.bezierCurveTo(6.8, -1.4, 5.8, -0.6, 4.7, -1)
+      thumb.bezierCurveTo(2, -1.6, -1, -1.6, -3.3, -1.2); thumb.closePath()
+      piece(thumb)
+      line(0.3, 'rgba(160,110,90,0.7)'); g.beginPath(); g.moveTo(4.3, -2.9); g.quadraticCurveTo(5.5, -2.7, 5.8, -1.9); g.stroke()
+      const cuff = new Path2D(); cuff.moveTo(-15.5, -7); cuff.quadraticCurveTo(-13, 0, -15.5, 7.4); cuff.lineTo(-25, 8.4); cuff.lineTo(-25, -7.6); cuff.closePath()
+      g.fillStyle = NAVY; g.fill(cuff)
+      line(1.3, '#b8261c'); g.beginPath(); g.moveTo(-16.1, -6.4); g.quadraticCurveTo(-13.7, 0, -16.1, 6.8); g.stroke()
+      line(0.55); g.stroke(cuff)
+      g.restore()
+    }
     // ---- the title in its cartouche, top right, and a seal at the foot
     g.fillStyle = '#efe2c2'; g.fillRect(162, 12, 28, 96)
     line(1); g.strokeRect(162, 12, 28, 96); g.strokeRect(164.5, 14.5, 23, 91)
