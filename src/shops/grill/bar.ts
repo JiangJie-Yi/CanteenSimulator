@@ -665,14 +665,15 @@ export const LIP_H = 0.15
  * behind it (`stackLay`), where a server stands in front of it to take it up (`serverLay`) and where the plater sets down what they bring
  * (`platerAlong`): to the right of the tasting bowl, clear of it and of the bin behind (measured from above, 2026-11-04)
  */
-export const PLATING_SPOT = { along: 2.86, lay: 1.8, stackLay: 1.3, serverLay: 2.6, platerAlong: 3.15 }
+export const PLATING_SPOT = { along: 2.86, lay: 1.8, stackLay: 0.75, serverLay: 2.6, platerAlong: 3.4 }
 /** a place in the scene's frame (ALONG, LAY, height) into the bar's (what toGrillScene undoes) */
 const sceneToBar = (along: number, lay: number, y = 0) => new THREE.Vector3().addScaledVector(ALONG, along).addScaledVector(LAY, lay).setY(y)
   .sub(GRILL_OFFSET).divideScalar(GRILL_SCALE)
-/** how many plates can stand ready at the plating place at once (one seat's each); and where along it (from the ready place, toward the
- * chef's side: LAY) each stands, its stack of clean plates behind them */
-export const READY_SLOTS = 1
-export const readyAlong = (k: number) => -0.24 * k
+/** how many plates can stand ready at the plating place at once (one seat's each: the owner's, 2026-11-10, three places, A B C, and no
+ * more: what's done for a fourth waits by the fire); and where each stands (from the ready place back across the table, the bar's units:
+ * a row down the table's end, the plates and what's on them clear of each other), their stack of clean plates behind them */
+export const READY_SLOTS = 3
+export const readyAlong = (k: number) => -0.16 * k
 export const PLATE_STACK_ALONG = (PLATING_SPOT.stackLay - PLATING_SPOT.lay) / 2 // (the bar's sizes: GRILL_SCALE, 2, is set further down)
 /**
  * The plating place, in the bar's frame (the frame GuestBar3D walks its servers in): the ready plate's place on the table (`at`, its `top`
@@ -684,8 +685,9 @@ export function platingOf() {
   const top = sceneToBar(0, 0, 0).y
   const at = sceneToBar(PLATING_SPOT.along, PLATING_SPOT.lay).setY(top)
   const dir = LAY.clone().normalize(), across = ALONG.clone().normalize()
+  // (the plater sets the clean ones down standing at the table's end beside their stack, now it's behind the three places)
   return { at, top, dir, across, out: sceneToBar(PLATING_SPOT.along, PLATING_SPOT.serverLay).setY(0),
-    in: sceneToBar(PLATING_SPOT.platerAlong, PLATING_SPOT.serverLay).setY(0) }
+    in: sceneToBar(PLATING_SPOT.platerAlong, PLATING_SPOT.stackLay).setY(0) }
 }
 /** what's ready at the plating place just now: one of its slots, the seat it's for, whether a plate's laid there (the seat's plate isn't out
  * yet), and how many of its pieces are flying to it and are down on it (Roasting counts them every frame) */

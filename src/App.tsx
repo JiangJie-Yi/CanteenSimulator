@@ -113,12 +113,13 @@ import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
 import { GameClock } from '@/ui/GameClock'
 import { ageFresh } from '@/game/freshness'
 import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, type Lot } from '@/game/lots'
+import { RING_SLOTS } from '@/game/fireSlots'
 import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
 
 // distance between dishes on the carousel
 const SPACING = 6
-/** most items that fit around the charcoal at once */
-const FIRE_CAPACITY = 16
+/** most items that fit around the charcoal at once: its places (game/fireSlots) */
+const FIRE_CAPACITY = RING_SLOTS
 const SAVE_KEY = 'canteen-save'
 /** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
 const RESUME_KEY = 'jgs-resume-1'

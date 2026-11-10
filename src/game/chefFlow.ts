@@ -28,11 +28,12 @@ export type Waiting = { key: string; id: string; at: number }
  * The next trip, if any: to wherever the first order waiting (by when it was ordered) is kept, bringing that one and the next few waiting
  * that are kept in the same place, in the order they came, up to CARRY_MAX.
  */
-export function nextTrip(queue: readonly Waiting[]): { store: Store; keys: string[] } | null {
-  if (!queue.length) return null
+export function nextTrip(queue: readonly Waiting[], room = CARRY_MAX): { store: Store; keys: string[] } | null {
+  // (none while the board's full (fireSlots' BOARD_SLOTS): he waits by it with what he's brought; no more than it has room for)
+  if (!queue.length || room <= 0) return null
   const byTime = [...queue].sort((a, b) => a.at - b.at)
   const store = storeOf(byTime[0].id)
-  return { store, keys: byTime.filter((w) => storeOf(w.id) === store).slice(0, CARRY_MAX).map((w) => w.key) }
+  return { store, keys: byTime.filter((w) => storeOf(w.id) === store).slice(0, Math.min(CARRY_MAX, room)).map((w) => w.key) }
 }
 
 /** the step after this one once it's finished (the walks end on arriving; taking it out and the prep by their own times) */

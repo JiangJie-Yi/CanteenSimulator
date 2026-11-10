@@ -37,6 +37,7 @@ import { commuteOf, delayOf, paceOf } from '@/game/commute'
 import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { fireCall, HOT_AT } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
+import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { SHAPE_S, takeRice } from '@/game/rice'
 import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
@@ -468,10 +469,11 @@ const FoodWasteBin = memo(function FoodWasteBin({ position, container }: { posit
 })
 useGLTF.preload(FOOD_WASTE_URL)
 
-/** the tray for raw food waiting to go on the fire: a row of sticks across it, a few more laid in the gaps on top; loose food in a row along
- * its back. It holds no more than that: the rest wait in the fridge until there's room, brought out as the tray's cleared */
-const TRAY_ROWS = 5
-const TRAY_CAP = TRAY_ROWS * 2 - 1
+/** the tray for raw food waiting to go on the fire: a row of sticks across it, side by side, BOARD_SLOTS of them (the owner's, 2026-11-10:
+ * nine, five and four laid on top in the gaps, heaped up in a rush); loose food in a row along its back. It holds no more than that: the
+ * rest wait in the fridge until there's room, brought out as the tray's cleared, and the second cook brings no more than there's room for */
+const TRAY_ROWS = BOARD_SLOTS
+const TRAY_CAP = TRAY_ROWS
 const LOOSE_CAP = 7
 const TRAY_W = 1.6
 const TRAY_D = 0.9
@@ -905,6 +907,27 @@ const FOOT_BOX = new THREE.Box3(), FOOT_V = new THREE.Vector3(), GRIP = new THRE
  * kitchen's floor, the table's top at his chest, and a skewer stands near as tall as he is: held by its middle, he carried it over his
  * head; by its foot, his hands stay at his chest, it upright over them, and its foot goes into the ash from them
  */
+const RING_TURN = new THREE.Quaternion()
+/** how far out the squared ring the skewers stand round is at a bearing (blender/grilledfish.py's ring_at: a superellipse, |x|^4 + |z|^4 the
+ * same all round), against its round's */
+const ringOut = (a: number) => 1 / (Math.abs(Math.cos(a)) ** 4 + Math.abs(Math.sin(a)) ** 4) ** 0.25
+/**
+ * A skewer's place on the fire turned round the fire's middle to ring place `k` (game/fireSlots' RING_AZ, the dish's own frame), kept on the
+ * squared ring (out or in as the ring is there): its home, its turn and where Dish shows it
+ */
+function toRingPlace(p: Piece, k: number) {
+  const phi = Math.atan2(p.homeP.z, p.homeP.x)
+  const theta = THREE.MathUtils.degToRad(RING_AZ[k])
+  // (turning about +y by an angle moves the bearing back by it)
+  RING_TURN.setFromAxisAngle(UP, phi - theta)
+  const out = ringOut(theta) / ringOut(phi)
+  const move = (v: THREE.Vector3) => { v.applyQuaternion(RING_TURN); v.x *= out; v.z *= out }
+  move(p.homeP)
+  p.homeQ.premultiply(RING_TURN)
+  p.homeQ0.premultiply(RING_TURN)
+  const h = p.node.userData.home as { p: THREE.Vector3; q: THREE.Quaternion } | undefined
+  if (h) { move(h.p); h.q.premultiply(RING_TURN) }
+}
 function footOf(p: Piece, out: THREE.Vector3) {
   const n = p.node
   const q0 = n.quaternion.clone(), p0 = n.position.clone()
@@ -2912,9 +2935,6 @@ const DAB = 0.35
 /** label over a seasoning when pointed at */
 const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk: '煉乳', peanut: '花生粉', miso: '味噌', wasabi: '山葵',
   shichimi: '七味粉', yuzu: '柚子胡椒', lemon: '檸檬', water: '水' }
-/** most skewers over the coals at once */
-const FIRE_SKEWERS = 16
-
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
 const STICK_FOOT_R = 0.76
 const STICK_TOP_R = 0.42
@@ -3467,6 +3487,8 @@ type Piece = {
   pullAt?: number
   /** where its rod's middle is (its own frame): laid on the board centred on it */
   stickMid?: THREE.Vector3
+  /** its place round the fire (game/fireSlots' RING_AZ), while it stands there or is on its way to it; given up as it leaves */
+  ringSlot?: number
   /** (on a plate) where it was last sat down on its face (its container and place there): measured again only when it's moved */
   sitAt?: string
   id: string
@@ -4586,12 +4608,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.node.userData.onPlate = true
       return false
     }
-    const skewer = !p.loose
-    const onFire = pieces.current.filter((q) => present(q) && !q.loose && !q.collected && !q.staged && !q.eaten).length
-    if (skewer && onFire >= FIRE_SKEWERS) {
-      onNotice?.('fireFull')
-      p.node.userData.onPlate = true
-      return false
+    // (a skewer into a place of its own round the fire (game/fireSlots), the first free one, it turned round to it; with none free it waits
+    // on the board, the second cook waiting with what he's brought (the owner's, 2026-11-10: in a rush they stood all round it, crowded))
+    if (!p.loose) {
+      const taken = new Set(pieces.current.filter((q) => q !== p && q.ringSlot !== undefined).map((q) => q.ringSlot!))
+      const k = p.ringSlot !== undefined && !taken.has(p.ringSlot) ? p.ringSlot : freeRingSlot(taken)
+      if (k === null) {
+        onNotice?.('fireFull')
+        p.node.userData.onPlate = true
+        return false
+      }
+      if (k !== p.ringSlot) toRingPlace(p, k)
+      p.ringSlot = k
     }
     p.staged = false
     p.homeFlight = instant ? 1 : 0
@@ -4745,6 +4773,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.steps = []
     p.progress = 0
     p.netSpot = null
+    p.ringSlot = undefined
     p.container = null
     p.carried = false
     p.trash = -1
@@ -4949,7 +4978,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // (not while he's off plating or at the charcoal: the orders wait till he's back at the board)
     if (T.phase === 'idle' && chefLive && PLATER_OUT.id !== FETCHER.id) {
-      const trip = nextTrip(pieces.current.filter((p) => p.fetching && present(p)).map((p) => ({ key: p.key, id: p.id, at: p.stagedAt })))
+      // (no more than the board has room for (game/fireSlots): its raw skewers waiting there counted; full, he waits by it)
+      const onBoard = pieces.current.filter((p) => p.staged && !p.fetching && !p.loose && present(p) && !p.eaten && !roast.rawDish?.items.includes(p.id)).length
+      const trip = nextTrip(pieces.current.filter((p) => p.fetching && present(p)).map((p) => ({ key: p.key, id: p.id, at: p.stagedAt })), boardRoom(onBoard))
       // (busy from now: not sent off for plates in this same frame (GuestBar3D))
       if (trip) { T.store = trip.store; T.keys = trip.keys; T.t = 0; T.phase = 'toStore'; FETCHER.busy = true }
     }
@@ -6754,6 +6785,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const boardSticks = onBoard.filter((q) => !q.loose), boardLoose = onBoard.filter((q) => q.loose)
     const inFridge = new Set([...boardSticks.slice(TRAY_CAP), ...boardLoose.slice(LOOSE_CAP)])
 
+    // ---- the places round the fire (game/fireSlots): each given up as what holds it leaves it, in his hands to the plating place, flying off
+    // by itself, done with, or back on the board; every piece, a fish's rod its own or not (held by those without one, a rush's fire was
+    // taken up whole by what had long been eaten, and nothing more went on)
+    for (const p of pieces.current) {
+      if (p.ringSlot === undefined) continue
+      if (!present(p) || p.trash >= 0 || p.eaten || p.staged || p.fetching ||
+        (p.collected && (CHEF_CARRY.key === p.key ? CHEF_CARRY.phase !== 'reach' : p.flight > 0))) p.ringSlot = undefined
+    }
     // ---- the iron skewers (the owner's: fifty of them, game/skewers): a piece's pushed onto one from the holder in the last of its preparing on
     // the board (none clean: it waits there, said once); pulled out as it lands on its plate (the shop open) into the used tray; its rod drawn
     // growing in as it's pushed through, shrinking out as it's pulled. And how many are on food, for the count; the pool kept whole
@@ -6780,7 +6819,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         // (researching too: what's tasted is in the bowl without its skewer (the owner's: no skewer in a bowl or on a plate; one was left
         // lying in the bowl when the food was eaten off it, a taste shown for it))
-        if (here && p.skewerAt !== undefined && p.pullAt === undefined && p.collected && p.flight >= 1) {
+        // (pulled as it's down where it's going, whatever it's done with: a takeaway's in its box had kept its rod when it wasn't counted here
+        // (the owner saw rods on the box))
+        if (p.skewerAt !== undefined && p.pullAt === undefined && p.collected && p.flight >= 1 && p.trash < 0 && !p.eaten) {
           p.pullAt = now
           SKEWERS.s = usedSkewer(SKEWERS.s)
           clinkSound()
@@ -6841,6 +6882,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.steps = []
         p.progress = 0
         p.netSpot = null
+        p.ringSlot = undefined
         p.container = null
         p.carried = false
         p.trash = -1

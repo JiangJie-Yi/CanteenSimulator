@@ -3,6 +3,7 @@
 // off, eaten by you (shop shut) or served to the customers (shop open), the AI chef and the customers working the same
 // way — drawn as a fire pit seen from above in SVG, with the customers' bar (GuestCounter) over it.
 import { canCookByHand, modeOf } from '@/game/mode'
+import { RING_SLOTS } from '@/game/fireSlots'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { LINES } from '@/data/lines'
@@ -20,7 +21,7 @@ import { tl } from '@/data/i18n'
 const EAT_SECONDS = 3
 const PATIENCE = 150
 const BAR_SEATS = GRILL_SEATS.length
-const FIRE_SKEWERS = 16
+const FIRE_SKEWERS = RING_SLOTS
 const NET_SPOTS = 3
 const SIPS = 3
 const SOUP_TASTE = 78
