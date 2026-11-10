@@ -256,18 +256,81 @@ export function basinPour(id: string, level: number, full: number) {
   pour.gain.gain.setTargetAtTime(0.22 * top.level, a.currentTime, 0.15)
 }
 
-/** the bowl's pop-up stopper pressed: the spring latch catching with a small dry click, and the brass cap tinking down onto the strainer
- * (pressed shut) or knocking up off it (popped open, a touch higher) */
+/** the bowl's pop-up stopper (the owner's: a crisp mechanical feel). Pressed home (`down`): the cap's rim meeting its ring, then the spring
+ * latch catching a hair later, sharp and dry, and the brass seated with a small tink. Let go (popped up): the latch freeing with a softer
+ * click, and the cap thrown up on its spring, a bright metallic twang falling a little in pitch as it settles, a lighter ring over it */
 export function plugSound(down: boolean, near = 1) {
   const a = ctx()
   if (!a || near < 0.02) return
   const t = a.currentTime
-  const ck = noise(a, 0.012, (x) => (1 - x) ** 2, 0.2)
-  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400
-  ck.connect(hp).connect(out(a, 0.1 * near))
-  ck.start(t)
-  ping(a, t + 0.018, down ? 1850 : 2350, 0.035 * near, 0.18, out(a, 1))
-  ping(a, t + 0.018, down ? 3100 : 3900, 0.014 * near, 0.12, out(a, 1))
+  const click = (at: number, ms: number, hp: number, gain: number) => {
+    const ck = noise(a, ms / 1000, (x) => (1 - x) ** 2, 0.15)
+    const f = a.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp
+    ck.connect(f).connect(out(a, gain * near))
+    ck.start(at)
+  }
+  if (down) {
+    click(t, 9, 2800, 0.09)
+    click(t + 0.045, 6, 4600, 0.14)
+    ping(a, t + 0.047, 3200, 0.018 * near, 0.06, out(a, 1))
+    ping(a, t + 0.05, 1650, 0.03 * near, 0.14, out(a, 1))
+    return
+  }
+  click(t, 7, 3400, 0.08)
+  // (the spring's twang: a bright tone dropping as it rings down, wobbling with the cap)
+  const o = a.createOscillator(), g = a.createGain(), wob = a.createOscillator(), wd = a.createGain()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(2550, t + 0.05)
+  o.frequency.exponentialRampToValueAtTime(1900, t + 0.34)
+  wob.frequency.value = 26; wd.gain.value = 60
+  wob.connect(wd).connect(o.frequency)
+  g.gain.setValueAtTime(0.0001, t + 0.05)
+  g.gain.exponentialRampToValueAtTime(0.03 * near, t + 0.056)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.36)
+  o.connect(g).connect(out(a, 1))
+  o.start(t + 0.05); wob.start(t + 0.05)
+  o.stop(t + 0.4); wob.stop(t + 0.4)
+  ping(a, t + 0.052, 4100, 0.012 * near, 0.09, out(a, 1))
+}
+
+/** water running away into the bowl's overflow as it stands full (the owner's): a thin, bubbling trickle, one loop for both rooms as loud as
+ * the nearer; each bowl says each frame how near it's heard (0: nothing running into its overflow) */
+const overs = new Map<string, number>()
+let overRun: { gain: GainNode } | null = null
+export function overflowTrickle(id: string, level: number) {
+  const prev = overs.get(id) ?? 0
+  if (Math.abs(prev - level) < 0.02 && !(level === 0 && prev !== 0)) return
+  overs.set(id, level)
+  const a = ctx()
+  if (!a) return
+  const l = Math.max(0, ...overs.values())
+  if (!overRun) {
+    if (l <= 0) return
+    // (a trickle into a narrow opening: smoother noise in quick little bursts, through a band high and narrow, wobbling)
+    const n = Math.floor(a.sampleRate * 2)
+    const b = a.createBuffer(1, n, a.sampleRate)
+    const d = b.getChannelData(0)
+    let last = 0
+    for (let i = 0; i < n; i++) {
+      last = last * 0.5 + (Math.random() * 2 - 1) * 0.5
+      const x = i / n
+      d[i] = last * (0.55 + 0.45 * Math.abs(Math.sin(x * Math.PI * 2 * 37) * Math.sin(x * Math.PI * 2 * 11)))
+    }
+    const src = a.createBufferSource()
+    src.buffer = b
+    src.loop = true
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2300; f.Q.value = 1.4
+    const lfo = a.createOscillator(); lfo.frequency.value = 6.5
+    const depth = a.createGain(); depth.gain.value = 450
+    lfo.connect(depth).connect(f.frequency)
+    const gain = a.createGain()
+    gain.gain.value = 0
+    src.connect(f).connect(gain).connect(a.destination)
+    src.start()
+    lfo.start()
+    overRun = { gain }
+  }
+  overRun.gain.gain.setTargetAtTime(0.07 * l, a.currentTime, 0.2)
 }
 
 /** the bowl let go (its stopper up with water in it): glugs as the water goes down the drain, coming quicker and lower as the bowl empties,

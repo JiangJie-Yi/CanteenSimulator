@@ -563,7 +563,8 @@ def washstand():
          "mirror": pbr("WashMirror", lin("#d8e2e6"), rough=0.02, metal=1.0),
          "frame": pbr("WashFrame", lin("#1c1410"), rough=0.3, coat=0.6),
          "celadon": pbr("WashSoap", lin("#a9c7b4"), rough=0.2, coat=0.7),
-         "outlet": pbr("WashOutlet", lin("#2a2620"), rough=0.6)}
+         "outlet": pbr("WashOutlet", lin("#2a2620"), rough=0.6),
+         "hole": pbr("WashOverflowHole", lin("#0d0a08"), rough=0.9)}
     parts = []
     W, DP, TH, PL = 0.56, 0.42, 0.05, 0.09
     CD = DP - 0.03
@@ -628,6 +629,65 @@ def washstand():
         a = k * math.pi / 3
         bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.0035, depth=0.002, location=P(-0.21 + 0.014 * math.cos(a), T + 0.0372, 0.014 * math.sin(a)))
         fin(active(), f"WashDrainHole{k}", M["outlet"], parts)
+    # ---- the overflow (the owner's, 2026-11-10: high water should run away somewhere): an oblong opening in the bowl's wall under the tap
+    # (its far side, toward the wall), its middle 2.5 cm under the rim's inner lip, in a brass frame. Laid on the wall as it's turned (its
+    # 32 flat faces: a point's radius there is its facet's, not the circle's): the frame's face 3.5 mm out from the clay and its foot 1 mm
+    # into it, the dark opening a face 2 mm out inside it (never on the clay itself: two faces that close shimmer at a distance). The water
+    # stands at the opening's lower edge (the game's WATER_TOP, 0.0672 over the drain's top)
+    OV_Y = T + 0.108
+    (oa, ob), (ia, ib) = (0.0125, 0.0068), (0.0095, 0.0042)  # (the frame's half width round the wall and half height up it; the opening's)
+    (ra, ya), (rb, yb) = (0.135, T + 0.084), (0.151, T + 0.115)  # (the stretch of the inner profile it's on)
+    sl = math.hypot(rb - ra, yb - ya)
+    tr, ty = (rb - ra) / sl, (yb - ya) / sl  # (up the wall)
+    nr, ny = -ty, tr  # (out of it, into the bowl)
+    rc = ra + (rb - ra) * (OV_Y - ya) / (yb - ya)
+    seg = 2 * math.pi / 32
+
+    def on_wall(sa, d, lift):
+        r = rc + tr * d
+        phi = sa / r
+        rf = r * math.cos(seg / 2) / math.cos(abs(phi) - seg / 2) + nr * lift
+        return P(-0.21 + rf * math.cos(phi), OV_Y + ty * d + ny * lift, rf * math.sin(phi))
+
+    def oval(bm, a, b, lift, n=20):
+        return [bm.verts.new(on_wall(a * math.cos(2 * math.pi * k / n), b * math.sin(2 * math.pi * k / n), lift)) for k in range(n)]
+
+    mid, n_in = Vector(on_wall(0, 0, 0)), Vector((nr, 0, ny))
+    bm = bmesh.new()
+    bm.loops.layers.uv.new()
+    o_top, o_foot, i_top, i_face = oval(bm, oa, ob, 0.0035), oval(bm, oa, ob, -0.001), oval(bm, ia, ib, 0.0035), oval(bm, ia, ib, 0.002)
+    made = []
+    for k in range(len(o_top)):
+        k2 = (k + 1) % len(o_top)
+        made += [("top", bm.faces.new((o_top[k], o_top[k2], i_top[k2], i_top[k]))),
+                 ("out", bm.faces.new((o_foot[k], o_foot[k2], o_top[k2], o_top[k]))),
+                 ("in", bm.faces.new((i_top[k], i_top[k2], i_face[k2], i_face[k])))]
+    bm.normal_update()
+    for kind, f in made:
+        c = f.calc_center_median() - mid
+        c -= n_in * c.dot(n_in)
+        want = n_in if kind == "top" else c if kind == "out" else -c
+        if f.normal.dot(want) < 0:
+            f.normal_flip()
+    me = bpy.data.meshes.new("WashOverflowRing")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("WashOverflowRing", me)
+    bpy.context.collection.objects.link(o)
+    fin(o, "WashOverflowRing", M["brass"], parts, smooth=False)
+    bm = bmesh.new()
+    bm.loops.layers.uv.new()
+    hole = ladder_fill(bm, oval(bm, ia, ib, 0.002))
+    bm.normal_update()
+    if hole[0].normal.dot(n_in) < 0:
+        for f in hole:
+            f.normal_flip()
+    me = bpy.data.meshes.new("WashOverflowHole")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("WashOverflowHole", me)
+    bpy.context.collection.objects.link(o)
+    fin(o, "WashOverflowHole", M["hole"], parts, smooth=False)
     # ---- the tap: its rose on the wall, its body out of it, the bonnet on top, the spout running on and turning down over the drain
     HY = T + 0.33
     bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.026, depth=0.01, location=P(-0.005, HY, 0), rotation=(0, math.pi / 2, 0))

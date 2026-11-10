@@ -12,8 +12,8 @@ import { handOver, TOILETS, meterWater } from './bar'
 import { getEdit } from './edit'
 import { roundMirror } from './mirror'
 import { shrineDoor } from './shrineSound'
-import { basinPour, drainGurgle, dryerSound, flushSound, knockSound, otohimeNear, otohimeSound, plugSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
-import { basinStep, draining, DRAIN_S, FILM } from '@/game/basin'
+import { basinPour, drainGurgle, dryerSound, flushSound, knockSound, otohimeNear, otohimeSound, overflowTrickle, plugSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
+import { basinStep, draining, overflowing, DRAIN_S, FILM } from '@/game/basin'
 import { reflectStudio } from '@/scene/studio'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
@@ -731,10 +731,11 @@ export function WcPads() {
 /** how long a guest's hand wash runs the tap (ms) */
 export const HAND_MS = 1500
 /** the bowl's inside (blender/wc.py's washstand, its turned profile from the drain out to the rim: radius, height over the drain's top), for
- * how wide the water stands at a height; how high it stands full (3 cm under the rim's inside: the owner's safe line, an overflow keeping it
- * there) and the least that shows (a hair over the drain) */
+ * how wide the water stands at a height and how deep over its floor; how high it stands full (the lower edge of the overflow in its wall
+ * under the tap, blender/wc.py's OV_*: 2.5 cm under the rim's inner lip; whatever more runs in goes away down it) and the least that shows
+ * (a hair over the drain) */
 const BOWL_IN: [number, number][] = [[0.036, -0.002], [0.076, 0.005], [0.11, 0.021], [0.135, 0.047], [0.151, 0.078], [0.157, 0.096]]
-const WATER_TOP = 0.066, WATER_LOW = 0.0015
+const WATER_TOP = 0.0672, WATER_LOW = 0.0015
 const waterY = (level: number) => WATER_LOW + level * (WATER_TOP - WATER_LOW)
 /** the bowl's inside radius at a height over the drain: its 32 flat faces' insides, a little in from the turned profile */
 function bowlR(y: number) {
@@ -743,6 +744,15 @@ function bowlR(y: number) {
     if (y <= y1) return (r0 + (r1 - r0) * Math.max(0, (y - y0) / (y1 - y0))) * 0.985
   }
   return BOWL_IN[BOWL_IN.length - 1][0] * 0.985
+}
+/** the bowl's floor's height over the drain at a radius out from its middle (its profile, BOWL_IN): how deep the water stands there */
+function floorAt(rad: number) {
+  if (rad <= BOWL_IN[0][0]) return 0
+  for (let i = 1; i < BOWL_IN.length; i++) {
+    const [r0, y0] = BOWL_IN[i - 1], [r1, y1] = BOWL_IN[i]
+    if (rad <= r1) return Math.max(0, y0 + ((y1 - y0) * (rad - r0)) / (r1 - r0))
+  }
+  return BOWL_IN[BOWL_IN.length - 1][1]
 }
 /** a flat round of radius 1 lying in xz, facing up, filled in rungs straight across it (no fan of triangles to its middle: the owner's
  * low-poly rule), its uv flat over it */
@@ -767,18 +777,27 @@ function rungDisc(n: number) {
   g.setIndex(idx)
   return g
 }
-/** the water's face: a small tile of gentle ripples, its slopes worked out round it (it tiles), slid across as the water shimmers */
+/** the water's face (the owner's: the old tile's long ridges caught the light as scattered white dashes): a 256 tile of soft ripples running
+ * every way (a dozen waves, each a direction whose counts round the tile are whole, so it tiles; the finer the quieter), its slopes worked
+ * out round it; two layers of it slid across each other in the water's shader */
 const RIPPLE = (() => {
   if (typeof document === 'undefined') return null
-  const N = 128, P = (Math.PI * 2) / N
-  const h = (x: number, y: number) => Math.sin(x * P * 3 + Math.sin(y * P * 2) * 0.8) * 0.35 + Math.sin(y * P * 4 + x * P) * 0.25
-    + Math.sin((x + y) * P * 5) * 0.15 + Math.cos(x * P * 7 - y * P * 3) * 0.1
+  const N = 256, P = (Math.PI * 2) / N
+  const waves: [number, number, number, number][] = []
+  let seed = 7
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  for (let k = 0; k < 14; k++) {
+    const a = rnd() * Math.PI * 2, m = 3 + Math.floor(rnd() * 7)
+    const i = Math.round(Math.cos(a) * m), j = Math.round(Math.sin(a) * m)
+    if (i || j) waves.push([i, j, 1 / Math.hypot(i, j), rnd() * Math.PI * 2])
+  }
+  const h = (x: number, y: number) => { let v = 0; for (const [i, j, amp, ph] of waves) v += Math.sin((i * x + j * y) * P + ph) * amp; return v }
   const c = document.createElement('canvas')
   c.width = c.height = N
   const g = c.getContext('2d')!, img = g.createImageData(N, N)
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
-      const dx = (h(x + 1, y) - h(x - 1, y)) * 2.4, dy = (h(x, y + 1) - h(x, y - 1)) * 2.4, l = Math.hypot(dx, dy, 1), i = (y * N + x) * 4
+      const dx = h(x + 1, y) - h(x - 1, y), dy = h(x, y + 1) - h(x, y - 1), l = Math.hypot(dx, dy, 1), i = (y * N + x) * 4
       img.data[i] = (-dx / l * 0.5 + 0.5) * 255
       img.data[i + 1] = (dy / l * 0.5 + 0.5) * 255
       img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255
@@ -788,33 +807,117 @@ const RIPPLE = (() => {
   g.putImageData(img, 0, 0)
   const t = new THREE.CanvasTexture(c)
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(2.5, 2.5)
+  t.repeat.set(4, 4)
   return t
 })()
+/** the meniscus: a thin ring round the water's edge where it climbs the bowl, nothing at its inside, brightest near the wall (its uv x is
+ * across it, 0 in to 1 out; the picture's a gradient along it) */
+const MENISCUS_GEO = (() => {
+  const n = 32, IN = 0.955
+  const pos: number[] = [], nor: number[] = [], uv: number[] = [], idx: number[] = []
+  for (let k = 0; k <= n; k++) {
+    const a = (k / n) * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a)
+    pos.push(c * IN, 0, sn * IN, c, 0, sn)
+    nor.push(0, 1, 0, 0, 1, 0)
+    uv.push(0, k / n, 1, k / n)
+  }
+  for (let k = 0; k < n; k++) { const a = 2 * k; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3) }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  g.setIndex(idx)
+  return g
+})()
+const MENISCUS_TEX = tex(64, 4, (g) => {
+  const gr = g.createLinearGradient(0, 0, 64, 0)
+  gr.addColorStop(0, 'rgba(255,255,255,0)')
+  gr.addColorStop(0.4, 'rgba(255,255,255,0)')
+  gr.addColorStop(0.82, 'rgba(255,255,255,0.55)')
+  gr.addColorStop(1, 'rgba(255,255,255,0.38)')
+  g.fillStyle = gr
+  g.fillRect(0, 0, 64, 4)
+})
 const WATER_GEO = rungDisc(32)
 const BOWL_HIT_GEO = rungDisc(16)
 /** a ripple: a thin ring (its outer edge RING_OUT), spread out by scaling it */
 const RING_OUT = 0.0085
 const RING_GEO = new THREE.RingGeometry(RING_OUT * 0.9, RING_OUT, 28).rotateX(-Math.PI / 2)
-/** the pop-up stopper over the drain's strainer: a shallow brass cap on a short stem, its top filled in rungs */
+/** the pop-up drain (the owner's, 2026-11-10: the stopper showed no travel, no feel): a brass ring set on the drain's strainer, its throat
+ * dark inside it, and the cap riding in it on its stem (a flat top eased round its edge, a short skirt), its origin where its skirt's foot
+ * sits seated on the strainer, lifted OPEN_LIFT when it's popped up (the dark gap under it then plain round its stem). Each lathe's profile
+ * runs so its faces look out (three's LatheGeometry faces the way its points run) */
+const OPEN_LIFT = 0.008
+const lathe = (pts: [number, number][], n: number) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), n)
 const STOPPER_GEO = mergeGeometries([
-  rungDisc(20).scale(0.021, 1, 0.021).translate(0, 0.004, 0),
-  new THREE.CylinderGeometry(0.021, 0.0215, 0.003, 20, 1, true).translate(0, 0.0025, 0),
-  new THREE.CylinderGeometry(0.0035, 0.0035, 0.008, 8, 1, true).translate(0, -0.003, 0),
+  rungDisc(20).scale(0.0204, 1, 0.0204).translate(0, 0.004, 0),
+  lathe([[0.0215, 0.0002], [0.0215, 0.003], [0.0212, 0.0037], [0.0204, 0.004]], 20),
+  new THREE.CylinderGeometry(0.0035, 0.0035, 0.008, 8, 1, true).translate(0, -0.0038, 0),
 ])!
+const DRAIN_RING_GEO = lathe([[0.0262, -0.0004], [0.0262, 0.0032], [0.0258, 0.0036], [0.0222, 0.0036], [0.0218, 0.0032], [0.0218, -0.0004]], 24)
+const THROAT_GEO = rungDisc(20).scale(0.0218, 1, 0.0218).translate(0, 0.0004, 0)
 const STOPPER_MAT = new THREE.MeshStandardMaterial({ color: '#c9a04a', metalness: 0.85, roughness: 0.28 })
 reflectStudio(STOPPER_MAT)
-/** each room's bowl's water, its ripples and its swirl (the toilet's flush's streaks, pale; their own materials, each as see-through as its
- * room's water is just then): no
- * transmission (the owner's rule: it draws the whole room again each frame), a pale clear face that catches the studio's light, its ripples
- * in its normals */
+const THROAT_MAT = new THREE.MeshBasicMaterial({ color: '#0f0c09', polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
+/** the cap's lift a moment (`e` s) after it's pressed home, from where it was: down into its ring in 0.12 s, quicker as it goes, a hair past
+ * its seat and eased back onto it */
+function sealAt(e: number, from: number) {
+  if (e < 0.12) { const x = e / 0.12; return from + (-0.0006 - from) * x * x }
+  if (e < 0.2) { const x = (e - 0.12) / 0.08; return -0.0006 * (1 - x * x * (3 - 2 * x)) }
+  return 0
+}
+/** the cap's lift a moment after it's let go: a little dip as its latch frees (0.05 s), then up on its spring (damped: some 1.5 mm over its
+ * 8 mm at 0.12 s, settled by 0.35 s) */
+function popAt(e: number, from: number) {
+  const DIP = 0.05
+  if (e < DIP) return from - 0.0012 * Math.sin((Math.PI * e) / DIP)
+  const t = e - DIP, z = 0.47, w = 30, wd = w * Math.sqrt(1 - z * z)
+  if (t > 0.6) return OPEN_LIFT
+  return from + (OPEN_LIFT - from) * (1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + ((z * w) / wd) * Math.sin(wd * t)))
+}
+/** each room's bowl's water: its face, the pale line where it meets the bowl, its ripples (the stream's, spreading; the overflow's, drawn in
+ * to it), its swirl, each its own materials (each as see-through as its room's water is just then). No transmission (the owner's rule: it
+ * draws the whole room again each frame; the owner's, 2026-11-10: it looked a flat sheet of frosted green plastic): a clear face whose
+ * colour and see-through are worked out in its shader from how deep it stands over the bowl at each point (uDepth, out from its middle to
+ * its edge: the shallows all but clear, the deep a little blue-green), more of a mirror the lower it's seen across (Fresnel), two layers of
+ * fine ripples drifting different ways in its normals (the lamps' own glints a third as strong: spread by the ripples they read as a milky
+ * film); its program its own, made as the page loads (the water's in the scene from the
+ * start, hidden) */
 const basinLooks = () => {
-  const water = new THREE.MeshStandardMaterial({ color: '#2f6f7c', transparent: true, opacity: 0.3, roughness: 0.04, metalness: 0, envMapIntensity: 1.3,
-    depthWrite: false, normalMap: RIPPLE, normalScale: new THREE.Vector2(0.5, 0.5) })
+  const u = { uTime: { value: 0 }, uDepth: { value: new Array<number>(8).fill(0) } }
+  const water = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, roughness: 0.05, metalness: 0, envMapIntensity: 0.6,
+    depthWrite: false, normalMap: RIPPLE, normalScale: new THREE.Vector2(0.12, 0.12) })
+  water.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = u.uTime
+    sh.uniforms.uDepth = u.uDepth
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vDisk;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvDisk = position.xz;')
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vDisk;\nuniform float uTime;\nuniform float uDepth[8];')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+float wRho = clamp( length( vDisk ), 0.0, 1.0 ) * 7.0;
+int wI = int( floor( wRho ) );
+float wDep = mix( uDepth[ min( wI, 7 ) ], uDepth[ min( wI + 1, 7 ) ], wRho - float( wI ) );
+float wTint = 1.0 - exp( - wDep / 0.035 );
+diffuseColor.rgb = mix( vec3( 0.86, 0.95, 0.96 ), vec3( 0.16, 0.46, 0.48 ), wTint );
+diffuseColor.a *= mix( 0.04, 0.34, wTint );`)
+      .replace('vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;', `vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
+vec3 mapN2 = texture2D( normalMap, vNormalMapUv * 1.73 + vec2( - uTime * 0.017, uTime * 0.011 ) ).xyz * 2.0 - 1.0;
+mapN = normalize( vec3( mapN.xy + mapN2.xy, mapN.z * mapN2.z ) );`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+reflectedLight.directSpecular *= 0.35;`)
+      .replace('#include <opaque_fragment>', `float wFres = 0.02 + 0.98 * pow( 1.0 - saturate( dot( normal, normalize( vViewPosition ) ) ), 5.0 );
+diffuseColor.a = mix( diffuseColor.a, 0.9 * opacity, wFres );
+#include <opaque_fragment>`)
+  }
+  water.customProgramCacheKey = () => 'basin-water'
   reflectStudio(water)
+  const rim = new THREE.MeshBasicMaterial({ map: MENISCUS_TEX, color: '#eef8fa', transparent: true, depthWrite: false })
   const rings = [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ color: '#eef9fd', transparent: true, opacity: 0, depthWrite: false, toneMapped: false }))
+  const over = [0, 1].map(() => new THREE.MeshBasicMaterial({ color: '#eef9fd', transparent: true, opacity: 0, depthWrite: false, toneMapped: false }))
   const swirl = new THREE.MeshBasicMaterial({ map: SWIRL, color: '#d4f1f7', transparent: true, opacity: 0, depthWrite: false, toneMapped: false })
-  return { water, rings, swirl }
+  return { water, u, rim, rings, over, swirl }
 }
 const BASIN_LOOK = { m: basinLooks(), f: basinLooks() }
 const WASH_STREAM = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.62, depthWrite: false, toneMapped: false })
@@ -887,8 +990,14 @@ export function WashstandLive({ who }: { who: Who }) {
   const rings = useRef<(THREE.Mesh | null)[]>([])
   const swirl = useRef<THREE.Mesh>(null)
   const stopper = useRef<THREE.Mesh>(null)
-  /** how far the swirl's shown (0..1), how far up the stopper is (0 down .. 1 popped up), which way it was last heard going */
-  const bfx = useRef({ swirl: 0, stop: TOILETS[who].basin.plugged ? 0 : 1, plugged: TOILETS[who].basin.plugged })
+  const rim = useRef<THREE.Mesh>(null)
+  const overRings = useRef<(THREE.Mesh | null)[]>([])
+  /** how far the swirl's shown (0..1), how far the overflow's ripples are (0..1), which way the stopper was last heard going, its lift now
+   * (0 seated .. OPEN_LIFT popped up), where it was and when as it last went */
+  const bfx = useRef((() => {
+    const plugged = TOILETS[who].basin.plugged, lift = plugged ? 0 : OPEN_LIFT
+    return { swirl: 0, over: 0, plugged, lift, from: lift, t0: -10 }
+  })())
   const len = parts.tip.y - parts.floor.y
   useFrame(({ clock, camera, scene }, dt) => {
     // (the mirror showing the room while the eye's near it; the plain glass (the studio's blur in it) when not)
@@ -914,10 +1023,18 @@ export function WashstandLive({ who }: { who: Who }) {
       water.current.visible = wet
       water.current.position.set(parts.floor.x, surf, parts.floor.z)
       water.current.scale.set(r, 1, r)
-      // (deeper, a little more of its blue-green over the glaze)
-      look.water.opacity = 0.16 + 0.22 * B.level
     }
-    RIPPLE?.offset.set(k * 0.035, k * 0.02)
+    if (rim.current) {
+      rim.current.visible = wet
+      rim.current.position.set(parts.floor.x, surf + 0.0003, parts.floor.z)
+      rim.current.scale.set(r, 1, r)
+    }
+    // (how deep it stands out from its middle to its edge, for its shader's colour and see-through; its ripples drifting (the owner's
+    // numbers), the second layer finer and the other way in the shader)
+    const R = r / 0.985, dep = look.u.uDepth.value
+    for (let i = 0; i < 8; i++) dep[i] = Math.max(0, y - floorAt((R * i) / 7))
+    look.u.uTime.value = k
+    RIPPLE?.offset.set((k * 0.02) % 1, (k * 0.015) % 1)
     // (the stream from the spout down to the water standing in the bowl, or to the drain)
     const bottom = wet ? surf : parts.floor.y
     if (stream.current) {
@@ -946,14 +1063,31 @@ export function WashstandLive({ who }: { who: Who }) {
       swirl.current.scale.set(sr, 1, sr)
       look.swirl.opacity = 0.3 * f.swirl
     }
-    // (the stopper: pressed down flush on the strainer, or popped up on its stem; heard as it goes, and the water gurgling away down it)
-    f.stop += ((B.plugged ? 0 : 1) - f.stop) * Math.min(1, Math.min(dt, 0.1) * 16)
-    stopper.current?.position.set(parts.floor.x, parts.floor.y - 0.0005 + f.stop * 0.0075, parts.floor.z)
+    // (full, its stopper down and the tap running: what more runs in goes away into the overflow in the wall under the tap, little ripples
+    // drawn in to it at the water's edge there, a thin trickle heard)
+    const ov = overflowing(B, on)
+    f.over += ((ov ? 1 : 0) - f.over) * Math.min(1, Math.min(dt, 0.1) * 4)
+    overRings.current.forEach((m, i) => {
+      if (!m) return
+      m.visible = wet && f.over > 0.02
+      if (!m.visible) return
+      const p = (k * 1.1 + i / 2) % 1, sc = (0.0035 + 0.015 * (1 - p)) / RING_OUT
+      m.position.set(parts.floor.x + r * 0.99, surf + 0.0009, parts.floor.z)
+      m.scale.set(sc, sc, sc)
+      look.over[i].opacity = 0.32 * Math.sin(Math.PI * p) * f.over
+    })
+    overflowTrickle(`wc-${who}`, ov ? near : 0)
+    // (the stopper (the owner's: it showed no travel): pressed home into its ring in 0.12 s, a hair past and back; let go, a little dip as its
+    // latch frees and up on its spring 8 mm, some 1.5 mm over and settling; heard as it goes, and the water gurgling away down it)
     if (B.plugged !== f.plugged) {
       f.plugged = B.plugged
+      f.from = f.lift
+      f.t0 = k
       plugSound(B.plugged, near)
       if (!B.plugged && B.level > FILM + 0.02) drainGurgle(near, DRAIN_S * B.level)
     }
+    f.lift = (B.plugged ? sealAt : popAt)(k - f.t0, f.from)
+    stopper.current?.position.set(parts.floor.x, parts.floor.y + f.lift, parts.floor.z)
     // (the tap heard splashing on the bare bowl, quieter as it pours into water standing in it; that heard as it fills)
     tapRunning(`wc-${who}`, on ? near * (1 - 0.45 * Math.min(1, B.level * 3)) : 0)
     basinPour(`wc-${who}`, on && B.level > 0.03 ? near : 0, B.level)
@@ -994,15 +1128,21 @@ export function WashstandLive({ who }: { who: Who }) {
       </mesh>
       {/* (the water standing in the bowl, the ripples spreading from where the stream lands, the swirl over the drain as it's let go) */}
       <mesh ref={water} name={`basin-water-${who}`} geometry={WATER_GEO} material={BASIN_LOOK[who].water} visible={false} renderOrder={1} raycast={() => {}} />
+      <mesh ref={rim} geometry={MENISCUS_GEO} material={BASIN_LOOK[who].rim} visible={false} renderOrder={2} raycast={() => {}} />
       {BASIN_LOOK[who].rings.map((m, i) => (
         <mesh key={i} ref={(o) => { rings.current[i] = o }} geometry={RING_GEO} material={m} visible={false} renderOrder={2} raycast={() => {}} />
+      ))}
+      {BASIN_LOOK[who].over.map((m, i) => (
+        <mesh key={`o${i}`} ref={(o) => { overRings.current[i] = o }} geometry={RING_GEO} material={m} visible={false} renderOrder={2} raycast={() => {}} />
       ))}
       <mesh ref={swirl} geometry={WATER_GEO} material={BASIN_LOOK[who].swirl} visible={false} renderOrder={2} raycast={() => {}} />
       {/* (the bowl and its stopper: pointed at, the stopper lights and says which way a click takes it; clicked, it's pressed down to hold the
           water in, or popped up to let it go (the owner's)) */}
       <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const B = TOILETS[who].basin; B.plugged = !B.plugged; setTip({ title: '洗手盆', hint: plugSays() }) }}
         {...hover('洗手盆', plugSays)}>
-        <mesh ref={stopper} name={`basin-stopper-${who}`} geometry={STOPPER_GEO} material={STOPPER_MAT} position={[parts.floor.x, parts.floor.y + 0.007, parts.floor.z]} />
+        <mesh geometry={DRAIN_RING_GEO} material={STOPPER_MAT} position={[parts.floor.x, parts.floor.y, parts.floor.z]} />
+        <mesh geometry={THROAT_GEO} material={THROAT_MAT} position={[parts.floor.x, parts.floor.y, parts.floor.z]} />
+        <mesh ref={stopper} name={`basin-stopper-${who}`} geometry={STOPPER_GEO} material={STOPPER_MAT} position={[parts.floor.x, parts.floor.y, parts.floor.z]} />
         <mesh geometry={BOWL_HIT_GEO} position={[parts.floor.x, parts.floor.y + 0.075, parts.floor.z]} scale={[0.148, 1, 0.148]} visible={false} />
       </group>
     </group>

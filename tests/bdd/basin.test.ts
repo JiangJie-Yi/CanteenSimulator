@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { basinStep, draining, emptyBasin, DRAIN_S, FILL_S, FILM, type Basin } from '@/game/basin'
+import { basinStep, draining, emptyBasin, overflowing, DRAIN_S, FILL_S, FILM, type Basin } from '@/game/basin'
 
 /** the level after `secs` of the tap `running`, stepped a frame at a time */
 const after = (b: Basin, running: boolean, secs: number) => {
@@ -41,6 +41,30 @@ feature('洗手盆蓄水與排水', () => {
     then('盆底一層薄水，不會積高', () => { expect(w.b.level).toBe(FILM) })
     and('不算在排水（沒有漩渦）', () => { expect(draining(w.b, true)).toBe(false) })
     and('關水後薄水也流光', () => { after(w.b, false, 1); expect(w.b.level).toBe(0) })
+  })
+
+  scenario('塞住開著水，水到溢水孔的下緣就停住，多的水從溢水孔流走、不會溢出檯面', ({ given, when, then, and }) => {
+    const w = { b: emptyBasin() }
+    given('空的洗手盆，塞子壓下去塞住', () => { w.b.plugged = true })
+    when('開水開到蓄滿', () => { after(w.b, true, FILL_S + 0.1) })
+    then('水位停在溢水孔的下緣（滿）', () => { expect(w.b.level).toBe(1) })
+    and('水正從溢水孔流走', () => { expect(overflowing(w.b, true)).toBe(true) })
+    and('再開十秒，水位還是停在那裡', () => { after(w.b, true, 10); expect(w.b.level).toBe(1); expect(overflowing(w.b, true)).toBe(true) })
+  })
+
+  scenario('關了水，溢水孔就不再有水流進去，水位不變', ({ given, when, then, and }) => {
+    const w = { b: { level: 1, plugged: true } as Basin }
+    given('滿到溢水孔的水、塞子塞著', () => { expect(w.b.level).toBe(1) })
+    when('關水', () => { after(w.b, false, 3) })
+    then('不再溢流', () => { expect(overflowing(w.b, false)).toBe(false) })
+    and('水位不變', () => { expect(w.b.level).toBe(1) })
+  })
+
+  scenario('還沒滿、或塞子拔起來時，溢水孔沒有水流進去', ({ given, then, and }) => {
+    const w = { b: { level: 0.6, plugged: true } as Basin }
+    given('六分滿、塞子塞著、開著水', () => { expect(w.b.level).toBe(0.6) })
+    then('水還沒到溢水孔', () => { expect(overflowing(w.b, true)).toBe(false) })
+    and('滿了但塞子拔起來，水從排水口走，不從溢水孔', () => { expect(overflowing({ level: 1, plugged: false }, true)).toBe(false) })
   })
 
   scenario('滿盆的水開著水拔塞子，也會放到只剩薄水', ({ given, when, then }) => {

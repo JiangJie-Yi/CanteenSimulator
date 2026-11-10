@@ -1,6 +1,7 @@
 // The washroom basin's water (the owner's, 2026-11-10: the bowl stood empty under the running tap, the water straight down its drain): how
-// full it is (0 empty .. 1 full to its safe line, 3 cm under the rim) and its pop-up stopper, down (plugged) or up (draining). Pure: the
-// washstand steps it each frame with whether its tap is running.
+// full it is (0 empty .. 1 full: up to the lower edge of the overflow, an oblong opening in the bowl's wall under the tap some 2.5 cm under
+// its rim, which takes whatever more runs in) and its pop-up stopper, down (plugged) or up (draining). Pure: the washstand steps it each
+// frame with whether its tap is running.
 
 /** seconds to fill from empty with the tap on and the stopper down; to drain from full with the stopper up */
 export const FILL_S = 3.5
@@ -22,6 +23,10 @@ export function basinStep(b: Basin, running: boolean, dt: number): number {
   if (b.level > film) return Math.max(film, b.level - dt / DRAIN_S)
   return Math.min(film, b.level + dt / FILL_S)
 }
+
+/** whether water's running away into the overflow (the owner's: high water should go somewhere): the stopper down, the tap running and the
+ * bowl full to the opening's lower edge, as much going out of it as comes in (its little ripples drawn into it, its trickle) */
+export const overflowing = (b: Basin, running: boolean) => b.plugged && running && b.level >= 1
 
 /** whether it's draining away (the stopper up and more in it than the film it keeps): a swirl over the drain, a gurgle */
 export const draining = (b: Basin, running: boolean) => !b.plugged && b.level > (running ? FILM : 0) + 0.01
