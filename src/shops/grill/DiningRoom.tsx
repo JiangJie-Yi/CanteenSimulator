@@ -1628,6 +1628,8 @@ function RoundShoji() {
           .replace('void main() {', `void main() {\n  if (vWin.y * vWin.y + vWin.z * vWin.z > ${(R * R).toFixed(5)}${lowerOnly ? ' || vWin.y > 0.0' : ''}) discard;`)
       }
       m.customProgramCacheKey = () => (lowerOnly ? 'round-cut-low' : 'round-cut')
+      // (no halo round it when pointed at: a hull of it wouldn't be cut to the round, and would show the halves slid into the wall)
+      m.userData.noGlowHull = true
       return m
     }
     return {
@@ -5287,6 +5289,15 @@ function flyerGeo(n: 0 | 1) {
   return g
 }
 const FLYER_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: FLYER_TEX })
+/** a fallen drink's turn over onto its side (toward the room), its turning about its own length as it rolls (a bottle's girth, about), and what
+ * its lying is measured with (made once) */
+const TIP_AXIS = new THREE.Vector3(1, 0, 0)
+const SPIN_AXIS = new THREE.Vector3(0, 1, 0)
+const TIP_Q = new THREE.Quaternion()
+const SPIN_Q = new THREE.Quaternion()
+const ROLL_R = 0.035
+const LIFT_BOX = new THREE.Box3()
+const LIFT_AT = new THREE.Vector3()
 function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
   const { body } = useFreezer(n)
   const flyers = useMemo(() => flyerGeo(n as 0 | 1), [n])
@@ -5447,8 +5458,19 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
             o.tip = tip
             const roll = Math.min(0.22, (o.roll ?? 0) + dt * 0.5 * (1 - tip / (Math.PI / 2) + 0.15))
             o.roll = roll
-            g.position.set(o.x + roll, (o.fy ?? 0) + (0.026 * Math.sin(tip)), o.z)
-            g.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, -1), tip + roll * 2)
+            g.position.set(o.x + roll, o.fy ?? 0, o.z)
+            // (over toward the room, then rolling sideways along the floor, turning about its own length as it goes: the roll was turned about
+            // the same axis as the fall, tipping it on past lying flat, its neck down into the floor)
+            g.quaternion.copy(TIP_Q.setFromAxisAngle(TIP_AXIS, tip)).multiply(SPIN_Q.setFromAxisAngle(SPIN_AXIS, -roll / ROLL_R))
+            // (its lowest point on the floor, whatever its girth and however it's turned (the owner's, 2026-11-10: a ramune lying down sank half
+            // into the boards: it was raised a fixed 2.6 cm, a slim bottle's half width): measured each frame while it goes over and rolls,
+            // kept once it lies still)
+            const still = tip >= Math.PI / 2 && roll >= 0.22 && o.fy === undefined
+            if (!still || o.lift === undefined) {
+              const lift = restLift(g, host, o.fy ?? 0)
+              if (still) o.lift = lift
+              g.position.y += lift
+            } else g.position.y += o.lift
           } else {
             g.position.set(o.x, o.fy ?? 0, o.z)
             g.quaternion.identity()
@@ -5459,6 +5481,19 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // (what's been taken is put back by the stocker, carried out from the back (GuestBar3D's stocker), not by itself)
   })
   type From = { kind: 'slot'; r: number; k: number } | { kind: 'out'; i: number }
+  /**
+   * How far a drink lying on the floor (in front of the fridge: its own frame's y `floor`) is to be raised so its lowest point is on it: its
+   * box measured round its own vertices as it's turned now (a bottle on its side touches the floor with its body, a can with its rim),
+   * in the fridge's frame; 0 if it's not down in it
+   */
+  const restLift = (g: THREE.Object3D, host: THREE.Object3D, floor: number) => {
+    g.updateMatrixWorld(true)
+    LIFT_BOX.setFromObject(g, true)
+    if (LIFT_BOX.isEmpty()) return 0
+    const floorWorld = host.localToWorld(LIFT_AT.set(0, floor, 0)).y
+    const below = floorWorld - LIFT_BOX.min.y
+    return below > 0 ? below / host.getWorldScale(LIFT_AT).y : 0
+  }
   /**
    * The real top of whatever's under a point set down on a table (tableHit has each table at one height; where a top stands a little higher
    * or lower than that, a drink set down there hung in the air (the owner's)): a short ray straight down there, against only what's near it
@@ -5489,7 +5524,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // (a drink in the fridge only with its door open: the glass is in the way otherwise)
     if (from.kind === 'slot' && !doorOpen()) return
     ev.stopPropagation()
-    if (from.kind === 'out') { const o = FRIDGE_STOCK.out[from.i]; if (o) { o.tipped = false; o.tip = 0; o.roll = 0 } }
+    if (from.kind === 'out') { const o = FRIDGE_STOCK.out[from.i]; if (o) { o.tipped = false; o.tip = 0; o.roll = 0; o.lift = undefined } }
     // (lifted from its place among the others: its clink against them)
     const lifting = from.kind === 'slot' ? FRIDGE_STOCK.units[n][from.r]?.[from.k] : null
     if (lifting) bottleClink(isCan(lifting), FRIDGE_AT[n])

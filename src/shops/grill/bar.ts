@@ -400,7 +400,8 @@ export const SHOP_PURSE = { cash: () => Infinity as number, spend: (n: number) =
 export const FRIDGE_STOCK = {
   units: (keptDrinks?.units as (DrinkId | null)[][][] | undefined) ?? FRIDGE_UNITS.map((u) => emptyFridge<DrinkId>(u.shelves.map((sh) => sh.ids))),
   /** (x, z: out on the floor before the fridge, in its own frame; w: set down on a table, anywhere, in the scene's) */
-  out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number]; fy?: number; vy?: number; fell?: number; tip?: number; roll?: number; tipped?: boolean }[],
+  // (`lift`: how far a fallen one lying still is raised to rest on the floor, measured once it's come to rest (DiningRoom))
+  out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number]; fy?: number; vy?: number; fell?: number; tip?: number; roll?: number; tipped?: boolean; lift?: number }[],
   ver: 0,
 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
