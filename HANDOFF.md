@@ -2,7 +2,7 @@
 
 最後更新：2026-11-10 晚上。`main` 在 `0689e3f`，跟 GitHub 同步，沒有未提交的程式修改。
 
-新的 session：先讀本檔，再讀 `CLAUDE.md`（最上面是工作守則與固定規則，下面是開發守則、檔案分層、BDD、效能守則）。
+新的 session：先讀本檔，再讀 `CLAUDE.md`（工作守則、固定規則、檔案分層、指令、BDD、模型與效能守則）。每件擺設、每個流程的細節在 `docs/DETAILS.md`（不會自動載入，需要時搜尋那一段）。
 
 本檔的路徑簡寫：`grill/` = `src/shops/grill/`、`game/` = `src/game/`、`scene/` = `src/scene/`、`ui/` = `src/ui/`、`data/` = `src/data/`、`App.tsx` = `src/App.tsx`、`bdd/` = `tests/bdd/`、`models/` = `public/models/`。`blender/*.py` 產生的 `.blend` 不另外列。
 
@@ -286,13 +286,13 @@
 | `data/tipText.ts` | 新提示文字的日文、英文 | 不碰 |
 | 新檔 `grill/basinWater.ts` | 不碰 | 建議（要店主同意）：新的水材質寫在這裡，`Restroom.tsx` 只改引用的幾行 |
 | `HANDOFF.md` | 只寫 5-3 | 只寫 5-4 |
-| `CLAUDE.md` | 不碰 | 不碰 |
+| `CLAUDE.md`、`docs/DETAILS.md` | 不碰 | 不碰 |
 
 **重疊的地方**
 
 1. `grill/Restroom.tsx` 的 `WashstandLive`（第 829–1009 行）：兩組都改同一個 `useFrame`。組 A 在第 910–911 行（水位、高度）與第 950–956 行（塞子），組 B 在第 916–920 行（透明度、波紋），只隔幾行，git 合併時很可能衝突。
 2. 組 B 的細白邊要放在水面高度、照盆的半徑（`waterY`、`bowlR`，第 736–746 行），而組 A 會改滿水的高度與盆的模型。
-3. `CLAUDE.md` 裡洗手盆那一段是一整行很長的文字（搜尋「**洗手盆會蓄水、放水**」），兩組各自改一定衝突。
+3. `docs/DETAILS.md` 裡洗手盆那一段是一整行很長的文字（搜尋「**洗手盆會蓄水、放水**」），兩組各自改一定衝突。
 4. `HANDOFF.md` 兩組都要寫進度。
 5. 看起來不重疊、但要注意：`models/washstand.glb` 只有組 A 重出，組 B 在自己的分支上看到的是沒有孔的舊盆，合併後要重拍確認；`tests/e2e/_basin.mjs` 在 git 外，各自一份，不會衝突。
 
@@ -302,16 +302,14 @@
 2. **worktree 放在專案資料夾外面**（例如 `C:\Users\augus\Projects\JGS-basin-a`、`JGS-basin-b`）。專案沒有 vitest 設定檔，`npm test` 會掃整個資料夾，worktree 放在裡面（例如 `.claude/worktrees/`）的話，主資料夾跑測試會連那一份一起跑。
 3. **先合併組 A，再合併組 B。** 組 A 改的是結構（模型、滿水高度、邏輯），組 B 是材質。組 B 合併前先在自己的資料夾 `git rebase main`（這時 `main` 已經有組 A），在新的滿水高度與有孔的盆上重新驗收。
 4. 組 B 的新程式盡量寫在新檔，`Restroom.tsx` 只改幾行，衝突最少。
-5. **兩組都不改 `CLAUDE.md`**，進度與跟規格不同的地方只寫在本檔自己那一節（5-3、5-4）。兩組都合併後，由主視窗統一更新 `CLAUDE.md` 洗手盆那一段。
+5. **兩組都不改 `CLAUDE.md`、`docs/DETAILS.md`**，進度與跟規格不同的地方只寫在本檔自己那一節（5-3、5-4）。兩組都合併後，由主視窗統一更新 `docs/DETAILS.md` 洗手盆那一段。
 6. **兩組都不推 `main`、不合併**，只提交到自己的分支；合併與推送由店主決定。
 7. **5-5 排在後面的單**裡，「烘手機與擦手紙盒」「廁所植物、皂液、擦手紙、燈」兩張也會動 `grill/Restroom.tsx`、`blender/wc.py`、`models/washstand.glb`、`models/wcbits.glb`、`grill/restroomSound.ts`，等組 A、組 B 合併後才做；「飲料外箱」「店家評價」跟洗手盆不重疊。
 
 **建立 worktree 的指令**（在主資料夾的 PowerShell）
 
 ```powershell
-# 先把新的 HANDOFF.md、CLAUDE.md 提交，worktree 才會帶著它們
-git add HANDOFF.md CLAUDE.md
-git commit -m "docs: handoff rewritten, working rules and fixed rules at the top of CLAUDE.md"
+# 新的 HANDOFF.md、CLAUDE.md、docs/DETAILS.md 已經提交（2026-11-10），worktree 會帶著它們
 git worktree add ..\JGS-basin-a -b basin-a
 git worktree add ..\JGS-basin-b -b basin-b
 # 每個 worktree 裡：
