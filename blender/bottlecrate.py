@@ -86,9 +86,27 @@ def over(sd, half, by):
     # (the lip over the whole of the wall's thickness, out past it)
     a, b = sd * (half - T), sd * (half + by)
     return min(a, b), max(a, b)
+def ring(name, xo, zo, xi, zi, y0, y1):
+    """a rectangular ring in one piece (the owner's: the rim was four boxes, their ends showing as seams at the corners): out to xo, zo, in
+    to xi, zi, from y0 to y1; its top, bottom, outer and inner sides each four quads round it"""
+    bm = bmesh.new()
+    rect = lambda hx, hz, y: [bm.verts.new(P(sx * hx, y, sz * hz)) for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    ot, it, ob, ib = rect(xo, zo, y1), rect(xi, zi, y1), rect(xo, zo, y0), rect(xi, zi, y0)
+    for k in range(4):
+        n = (k + 1) % 4
+        bm.faces.new((ot[k], ot[n], it[n], it[k]))
+        bm.faces.new((ob[k], ib[k], ib[n], ob[n]))
+        bm.faces.new((ob[k], ob[n], ot[n], ot[k]))
+        bm.faces.new((ib[k], it[k], it[n], ib[n]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return o
+rim.append(ring("lip", W / 2 + LIP, D / 2 + LIP, W / 2 - T, D / 2 - T, H - LIP_H, H))
 for sd in (-1, 1):
-    rim.append(box(f"lipL{sd}", -W / 2 - LIP, W / 2 + LIP, H - LIP_H, H, *over(sd, D / 2, LIP)))
-    rim.append(box(f"lipE{sd}", *over(sd, W / 2, LIP), H - LIP_H, H, -D / 2 + T, D / 2 - T))
     rim.append(box(f"footL{sd}", -W / 2 - LIP * 0.6, W / 2 + LIP * 0.6, 0.0, 0.008, *out_of(sd, D / 2, LIP * 0.6)))
     rim.append(box(f"footE{sd}", *out_of(sd, W / 2, LIP * 0.6), 0.0, 0.008, -D / 2 + IN, D / 2 - IN))
 # ---- a few ribs along the walls' lower band, evenly spaced and the same on every side (the long sides' panels above them left smooth for
@@ -101,13 +119,15 @@ for sd in (-1, 1):
     for k in range(3):
         z = -D / 2 + 0.05 + (D - 0.1) * k / 2
         rim.append(box(f"ribE{sd}{k}", *out_of(sd, W / 2, RIB_OUT), 0.008, SLOT_Y - SLOT_H / 2 - 0.012, z - RIB / 2, z + RIB / 2))
-# ---- the cells' walls inside
+# ---- the cells' walls inside: up to a little under the hand-holds (the owner's: they ran up past the holds' bottom, showing through them
+# across the opening)
+CELL_TOP = SLOT_Y - SLOT_H / 2 - 0.008
 for c in range(1, COLS):
     x = -W / 2 + T + (W - 2 * T) * c / COLS
-    rim.append(box(f"cellC{c}", x - 0.0025, x + 0.0025, FLOOR, H * 0.88, -D / 2 + T, D / 2 - T))
+    rim.append(box(f"cellC{c}", x - 0.0025, x + 0.0025, FLOOR, CELL_TOP, -D / 2 + T, D / 2 - T))
 for r in range(1, ROWS):
     z = -D / 2 + T + (D - 2 * T) * r / ROWS
-    rim.append(box(f"cellR{r}", -W / 2 + T, W / 2 - T, FLOOR, H * 0.88, z - 0.0025, z + 0.0025))
+    rim.append(box(f"cellR{r}", -W / 2 + T, W / 2 - T, FLOOR, CELL_TOP, z - 0.0025, z + 0.0025))
 tray = rim[0]
 bpy.ops.object.select_all(action="DESELECT")
 for o in rim:
