@@ -35,7 +35,8 @@ def P(x, y, z):
     return Vector((x, -z, y))
 
 
-W, D, H = 1.22, 1.05, 0.2          # across, deep, tall (higher, the owner's: it was 0.14; and deeper, to stand him back off the seasoning ledge)
+W, D, H = 1.22, 1.05, 0.045        # across, deep, tall (deeper, to stand him back off the seasoning ledge; low, a duckboard's height, the owner's
+                                    # (2026-11-10): at 0.2, then 0.14 before that, he stood up out of the notch, the table's top at his hips)
 EASE = 0.012                        # the edges' bevel
 M = {
     "top": pbr("StepTop", (0.86, 0.66, 0.42), rough=0.55),

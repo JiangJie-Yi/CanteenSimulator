@@ -1180,11 +1180,14 @@ function crewPlaces(crew: CrewMember[]) {
 // (and 2.2 out, not 2.0: up on the notch's step his chest and sleeves were level with the seasonings' ledge, its pots in them (clips.mjs
 // found it; at 2.12 his sleeves still brushed the peanut bowl and the miso))
 const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(ALONG, (COOK_NOTCH.along[0] + COOK_NOTCH.along[1]) / 2 - FIRE_SHIFT.dot(ALONG))
+/** how high the step is in the owner's notch and the third cook's bay (a low wooden step, a duckboard's height: the owner's, 2026-11-10; at
+ * 0.2 the owner stood up out of his notch, the table's top at his hips, and the third cook's bay had none, the floor showing in it) */
+const STEP_H = 0.045
 /** where the third cook stands: in his bay at the table's far end (SOUS_NOTCH), a little out from its back wall (his front's some 0.3 ahead
- * of his feet), in the middle of it across, facing in at the fire (KITCHEN_YAW); he stood out past the table's end, the crate out of reach */
+ * of his feet), in the middle of it across, facing in at the fire (KITCHEN_YAW), on his step; he stood out past the table's end, the crate
+ * out of reach */
 const SOUS_AT = new THREE.Vector3().addScaledVector(ALONG, (SOUS_NOTCH.along[0] + SOUS_NOTCH.along[1]) / 2 + 0.03 - FIRE_SHIFT.dot(ALONG))
-  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(GRILL_OFFSET.y - KITCHEN_DROP)
-  .setY(GRILL_OFFSET.y - KITCHEN_DROP)
+  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(GRILL_OFFSET.y - KITCHEN_DROP + STEP_H)
 /** the aisle in front of the cook table, where he stands while the shop's open */
 const AISLE_LAY = 2.62
 /** and the line he walks along it, a little further out (clear of his cook's back, at the fire), and how far along it either way (the
@@ -1215,11 +1218,16 @@ const bossAisle = (home: THREE.Vector3) => {
 /** the low wooden step on the notch's floor that he and his cook stand on at the fire (the owner's; blender/notchstep.py): its height, its
  * depth, and where it stands (its back to the notch's back, its front, the step up, a little out past the table's edge), turned with the
  * table */
-const NOTCH_STEP = { h: 0.2, d: 1.05 }
+const NOTCH_STEP = { h: STEP_H, d: 1.05 }
 // (its back 0.09 out from the notch's back, so its front's as far past the table's edge as he's stood back)
 const NOTCH_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, CHEF_AT.dot(ALONG)).addScaledVector(LAY, COOK_NOTCH.lay[0] + 0.09 + NOTCH_STEP.d / 2)
   .setY(CHEF_AT.y)
 const NOTCH_STEP_YAW = Math.atan2(-ALONG.z, ALONG.x)
+/** the third cook's: the same step, in his bay, its back 0.09 out from the bay's back as the owner's is, its front past the table's end; turned
+ * so it goes into the bay the way his notch's goes into his (along the table, not across it), level with the owner's */
+const SOUS_STEP_AT = new THREE.Vector3().addScaledVector(ALONG, SOUS_NOTCH.along[0] + 0.09 + NOTCH_STEP.d / 2 - FIRE_SHIFT.dot(ALONG))
+  .addScaledVector(LAY, (SOUS_NOTCH.lay[0] + SOUS_NOTCH.lay[1]) / 2 - FIRE_SHIFT.dot(LAY)).setY(NOTCH_STEP_AT.y)
+const SOUS_STEP_YAW = Math.atan2(ALONG.x, ALONG.z)
 const BOSS_AISLE = { ...bossAisle(CHEF_AT),
   step: { to: (NOTCH_STEP_AT.dot(LAY) + NOTCH_STEP.d / 2 - CHEF_AT.dot(LAY)) / BOSS_SCALE, h: NOTCH_STEP.h / BOSS_SCALE } }
 // (his walk on his round: out of the notch (straight back) and along the aisle)
@@ -2729,9 +2737,10 @@ function EditProxyImpl({ id, label, at, size, yaw }: { id: string; label: string
 
 const STEP_URL = import.meta.env.BASE_URL + 'models/notchstep.glb'
 useGLTF.preload(STEP_URL)
-/** the notch's wooden step (blender/notchstep.py, the owner's 木台階: one block): its top in the table's keyaki, its sides the bar's standing
- * boards; inked, merged, standing still */
-const NotchStep = memo(function NotchStep() {
+/** a notch's wooden step (blender/notchstep.py, the owner's 木台階: one block): its top in the table's keyaki, its sides the bar's standing
+ * boards; inked, merged, standing still. The owner's in his notch, and the same in the third cook's bay */
+const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階', at = NOTCH_STEP_AT, yaw = NOTCH_STEP_YAW }: { id?: string; label?: string
+  at?: THREE.Vector3; yaw?: number }) {
   const gltf = useGLTF(STEP_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
     const r = gltf.scene.getObjectByName('NotchStep')!.clone(true)
@@ -2750,8 +2759,8 @@ const NotchStep = memo(function NotchStep() {
     return r
   }, [gltf])
   return (
-    <Movable id="notchstep" label="木台階"><StaticBatch plain>
-      <group position={NOTCH_STEP_AT} rotation-y={NOTCH_STEP_YAW}><primitive object={obj} /></group>
+    <Movable id={id} label={label}><StaticBatch plain>
+      <group position={at} rotation-y={yaw}><primitive object={obj} /></group>
     </StaticBatch></Movable>
   )
 })
@@ -3336,8 +3345,8 @@ const RODS = new WeakMap<THREE.BufferGeometry, Map<string, { geo: THREE.BufferGe
 /** `scale`: its piece's own (each piece is authored at its own size in the dish's model, some not even alike every way: the rod drawn that
  * much the other way, so it doesn't grow and shrink with the food); `turn`: the rod's own frame in its piece's, where the scale is; `out`: the
  * way out from the fire, in the rod's own frame */
-function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: THREE.Quaternion, out: THREE.Vector3) {
-  const key = [...scale.toArray(), ...turn.toArray(), ...out.toArray()].map((x) => x.toFixed(3)).join()
+function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: THREE.Quaternion, out: THREE.Vector3, upIn: THREE.Vector3) {
+  const key = [...scale.toArray(), ...turn.toArray(), ...out.toArray(), ...upIn.toArray()].map((x) => x.toFixed(3)).join()
   const mine = RODS.get(src) ?? new Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3 }>()
   RODS.set(src, mine)
   const had = mine.get(key)
@@ -3355,8 +3364,14 @@ function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: TH
     return { c, spread: Math.max(...near.map((p) => p.distanceTo(c))) }
   }
   const ea = end(a, -1), eb = end(b, 1)
-  const foot = ea.spread > eb.spread ? ea.c : eb.c
-  const tip = ea.spread > eb.spread ? b : a
+  // (the iron's point goes in where the rod stands in the hearth: its lower end, standing on the fire (`upIn`, the way up in the rod's own
+  // frame). The model's own point told it before (the end whose last few millimetres close in on one spot), and a rod whose two ends were
+  // alike was a coin toss: some stood ring first in the sand, the point up in the air (the owner saw). One lying (a rod across the net) by
+  // its point still)
+  const rise = eb.c.clone().sub(ea.c).dot(upIn), len = ea.c.distanceTo(eb.c)
+  const aLow = Math.abs(rise) > 0.3 * len ? rise > 0 : ea.spread > eb.spread
+  const foot = aLow ? ea.c : eb.c
+  const tip = aLow ? b : a
   const up = tip.clone().sub(foot).normalize()
   // (its flat's face out from the fire: across it, the bar's width and the loop's plane)
   const face = out.clone().addScaledVector(up, -out.dot(up))
@@ -3833,7 +3848,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const phi = Math.atan2(p.homeP.z, p.homeP.x)
         const outward = new THREE.Vector3(Math.cos(phi), 0, Math.sin(phi)).applyQuaternion(p.homeQ0.clone().invert()).divide(sc)
           .applyQuaternion(m.quaternion.clone().invert()).normalize()
-        const rod = standardStick(m.geometry, sc, m.quaternion, outward)
+        // (and the way up, there: which of its ends is down in the hearth)
+        const upIn = new THREE.Vector3(0, 1, 0).applyQuaternion(p.homeQ0.clone().invert()).divide(sc).applyQuaternion(m.quaternion.clone().invert()).normalize()
+        const rod = standardStick(m.geometry, sc, m.quaternion, outward, upIn)
         m.geometry = rod.geo
         for (const c of m.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) c.geometry = rod.geo
         p.stickMid = rod.mid.clone().applyQuaternion(m.quaternion).add(m.position)
@@ -6777,6 +6794,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.wasPresent = false
         p.staged = false
         p.fetching = false
+        // (and off its skewer: kept, it came back on its next order raw from the freezer with last time's rod through it (the owner saw rods
+        // on what was being fetched), and wasn't skewered again at the board)
+        p.skewerAt = undefined
+        p.pullAt = undefined
         p.homeFlight = 1
         p.unwrapped = false
         p.unwrapT = 0
@@ -7375,6 +7396,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         <BossSpot open={space === 'open'} lang={lang} />
         {/* (and the notch's wooden step he and his cook stand on) */}
         <NotchStep />
+        <NotchStep id="soustep" label="三廚木台階" at={SOUS_STEP_AT} yaw={SOUS_STEP_YAW} />
         {/* (the chef's long chopsticks, out while he reaches across the hearth) */}
         <mesh ref={tongs} name="chef-tongs" geometry={TONGS_GEO} material={TONGS_MAT} visible={false} raycast={() => {}} />
         {/* (the staff's outfits drawn a moment under the notch's floor as the shop loads: their programs made then, not as they first walk in) */}

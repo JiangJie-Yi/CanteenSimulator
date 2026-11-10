@@ -58,8 +58,6 @@ const ROUND: Phase[] = [
 // (and a run back to it, after a taste or a drink taken down the aisle: at once past it when he's there)
 const ROUND_OPEN: Phase[] = [{ act: 'tongs', len: 6 }, { act: 'idle', len: 2.5 }, { act: 'run', len: 0 }]
 const WALK_SPEED = 0.9
-/** how near the camera he may come, anywhere in the picture, before he fades (while it's looking past him at something else) */
-const BOSS_CLOSE = 3.4
 const RUN_SPEED = 2.4
 
 /** `to`: the far end of his walk, in the frame he stands in (x, z), from his place at its origin, facing +z */
@@ -298,16 +296,14 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     hits.sort((a, b) => a.distance - b.distance)
     return hits.length ? frame.worldToLocal(hits[0].point.clone()).y : 0
   }
-  // ---- out of the way of the camera: standing between it and what it's on (the grill, from camera 1 right behind him), he fades to a ghost
-  // of himself, as a game's characters do; his own materials, so nothing else fades with him
-  const ghost = useRef(1)
+  // ---- his own materials (so nothing else glows with him) and his ink line, for the glow over him when a drink's held to him
   const { mats, inks } = useMemo(() => {
     const set = new Set<THREE.Material>()
     const ink: THREE.Object3D[] = []
     root.traverse((o) => {
       const m = (o as THREE.Mesh).material
       if (!m) return
-      // (the ink line round him is drawn on its own back faces: it goes while he's faded, or it would hang there as a dark ring)
+      // (the ink line round him is drawn on its own back faces: it turns gold round him as he glows)
       if (/outline/i.test(o.name) || (!Array.isArray(m) && m.side === THREE.BackSide)) {
         ink.push(o)
         // (his own copy of the line's material (it's shared by width with everyone's), so it can turn gold round him alone as he glows)
@@ -323,8 +319,6 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     for (const x of set) if (!x.transparent) { x.alphaHash = true; x.needsUpdate = true }
     return { mats: [...set], inks: ink }
   }, [root])
-  const controls = useThree((s) => s.controls) as unknown as { target?: THREE.Vector3 } | null
-  const fadeClock = useRef(0)
   const glowWas = useRef(0)
   const glowBase = useMemo(() => new Map<THREE.Material, { c: THREE.Color; i: number }>(), [])
   // (what floats up over his head: his gulps while he drinks, his coins and hearts at the till's money)
@@ -336,7 +330,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
    * words hung on at his empty place; hidden with him */
   const floats = useRef(new Set<HTMLElement>())
   const floatEl = useCallback((el: HTMLElement | null) => { if (el) floats.current.add(el) }, [])
-  useFrame(({ camera: cam, clock }) => {
+  useFrame(({ clock }) => {
     const m = mover.current
     if (!m) return
     // (out on the floor serving, drawn there by GuestBar3D: not here at his place meanwhile)
@@ -346,41 +340,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       const vis = m.visible ? '' : 'hidden'
       if (el.style.visibility !== vis) el.style.visibility = vis
     }
-    // (the step from the clock itself, as for his walk: the frame's delta runs short while the frames are paced)
-    const dt = Math.min(Math.max(0, clock.elapsedTime - fadeClock.current), 0.1)
-    fadeClock.current = clock.elapsedTime
-    // (his head: what shows first at the foot of the picture)
-    const at = m.localToWorld(new THREE.Vector3(0, 0.8, 0))
-    const fwd = cam.getWorldDirection(new THREE.Vector3())
-    const along = at.clone().sub(cam.position).dot(fwd)
-    // (what the camera's on: its controls' target, or where its line of sight meets the floor; he fades only standing well in front of it,
-    // between it and the camera, never when it's him that's looked at)
-    const tgt = controls?.target
-    const lookD = tgt ? tgt.clone().sub(cam.position).dot(fwd) : fwd.y < -0.05 ? cam.position.y / -fwd.y : 6
-    const ndc = at.clone().project(cam)
-    const inView = Math.abs(ndc.x) < 1.1 && ndc.y > -1.3 && ndc.y < 1.05 && ndc.z < 1
-    const lookedAt = tgt ? tgt.distanceTo(m.getWorldPosition(new THREE.Vector3())) < 1.6 : false
-    // (and only when he's actually over it in the picture: near where the camera's looking on screen, not merely somewhere in front of it,
-    // standing off to one side, which is no reason to turn him to a ghost)
-    const over = tgt ? Math.hypot(...(() => { const a = tgt.clone().project(cam); const b = m.localToWorld(new THREE.Vector3(0, 0.45, 0)).project(cam); return [a.x - b.x, a.y - b.y] })()) < 0.45 : true
-    // (and only from close by, the grill's own views: from a view of the whole room (far back) he's just one of the things in it)
-    const near = lookD < 9
-    // (or right by the camera anywhere in the picture, while it looks past him at something else: the back room's view had his face filling
-    // a third of it as he went by)
-    // (near by his size on the screen too, not his distance alone: through a long lens (the grill's, the back room's) he was a head filling
-    // the foot of the picture from 4.7 away, past BOSS_CLOSE, and solid)
-    // (his head's size in the picture: a quarter of its height or more across is a head in the way, from above or level)
-    const fov = (cam as THREE.PerspectiveCamera).fov ?? 40
-    const headR = 0.3 * m.getWorldScale(new THREE.Vector3()).y / Math.max(0.01, along * Math.tan((fov * Math.PI) / 360))
-    const big = headR > 0.25
-    const close = inView && along > 0 && (along < BOSS_CLOSE || big)
-    const want = !getEdit().on && !lookedAt && ((near && inView && over && along > 0 && along < lookD - 1.2) || close) ? 0.35 : 1
-    ghost.current += (want - ghost.current) * Math.min(1, Math.min(dt, 0.1) * 6)
-    const k = ghost.current
-    for (const o of inks) o.visible = k > 0.95
-    // (faded by hashing, not blending: each pixel of him drawn or not by a fine dither as faint as he is, his nearest surface still hiding his
-    // far side, so he's one see-through figure whatever's drawn first; blended, he went to a jumble or to black)
-    for (const x of mats) x.opacity = k
+    // (always solid (the owner's, 2026-11-10): he faded to a dithered ghost of himself whenever he stood between the camera and what it was
+    // on, and at the fire, the grill's own view, that was a snow of dots over half the hearth)
     // (the glow: steady and breathing while a drink's held over him, a flash fading over a second when one's set down for him)
     const since = (performance.now() - BOSS_FX.glowAt) / 1000
     const flash = since < 0 ? 0 : since < 0.15 ? since / 0.15 * 0.8 : Math.max(0, 0.8 * (1 - (since - 0.15) / 0.85))
