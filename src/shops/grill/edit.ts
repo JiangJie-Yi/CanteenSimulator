@@ -98,6 +98,17 @@ const loadGroups = (): Record<string, Group> => {
     if (g[id] && d && !made.has(id)) g[id] = { ...g[id], t: [0, 1, 2].map((k) => g[id].t[k] + d[k]) as V3 }
     try { localStorage.setItem(key, '1'); localStorage.setItem(KEY_G, JSON.stringify(g)) } catch { /* storage blocked */ }
   }
+  // (a kept cat stand from before the coin and the helmet were set on it: they join it, out of whatever else held them, so they go where it goes
+  // (the owner's, 2026-11-11: left behind when the stand moved for the bench))
+  const cats = g['grp-doorcats']
+  if (cats && !dropped().includes('grp-doorcats')) {
+    const join = ['koban', 'kabuto'].filter((m) => !cats.members.includes(m))
+    if (join.length) {
+      for (const [k, x] of Object.entries(g)) if (x.members.some((m) => join.includes(m))) g[k] = { ...x, members: x.members.filter((m) => !join.includes(m)) }
+      g['grp-doorcats'] = { ...g['grp-doorcats'], members: [...g['grp-doorcats'].members, ...join] }
+      try { localStorage.setItem(KEY_G, JSON.stringify(g)) } catch { /* storage blocked */ }
+    }
+  }
   return g
 }
 const made = new Set<string>()
