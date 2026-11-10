@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { comesIn, exitSignLit, LIGHTS_DEFAULT, lampGlow, lightOn, patienceIn, readLights, roomDim, roomMood, keyLightFrom, shadowDepth, shadowSoft, studioLight, switchLights, unlitShade, writeLights } from '@/game/roomLights'
+import { comesIn, exitSignLit, LIGHTS_DEFAULT, lampGlow, lanternsLit, lightOn, patienceIn, readLights, roomDim, roomMood, keyLightFrom, shadowDepth, shadowSoft, studioLight, switchLights, unlitShade, writeLights } from '@/game/roomLights'
 
 feature('牆上的電燈開關', () => {
   scenario('一開店燈是開著的', ({ given, then }) => {
@@ -153,6 +153,12 @@ feature('牆上的電燈開關', () => {
       expect(keyLightFrom('dawn', null)).toEqual([0, 1, 0])
       expect(keyLightFrom('dusk', null)).toEqual([0, 1, 0])
     })
+  })
+
+  scenario('門口燈籠開店時點亮，開始收店（最後點餐）就熄滅，還沒開店時不亮', ({ then, and }) => {
+    then('營業中亮著', () => { expect(lanternsLit(true, false)).toBe(true) })
+    and('按了閉店、開始收店（最後點餐）就熄掉', () => { expect(lanternsLit(true, true)).toBe(false) })
+    and('打烊之後、還沒開店時不亮', () => { expect(lanternsLit(false, false)).toBe(false) })
   })
 
   scenario('關了的燈是灰白的紙與玻璃，不再是點亮時的黃', ({ given, then, and }) => {

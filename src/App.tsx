@@ -43,8 +43,8 @@ import { Reputation } from '@/ui/Reputation'
 import { CharacterViewer } from '@/shops/grill/CharacterViewer'
 import { BOSS_FX } from '@/shops/grill/Boss'
 import { StockPanel, type StockTab } from '@/shops/grill/StockPanel'
-import { getLights, useLights } from '@/scene/lightsStore'
-import { keyLightFrom, lampGlow, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
+import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
+import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
 import { dutyDay, idleTick, LAST_CALL, LATE, RATING_FLOW, SHOP, STAFF_IDLE, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
@@ -1309,6 +1309,9 @@ export default function App() {
   useEffect(() => { if (closing) closingAt.current = gameMinutes(); else SHOP.hurry = false }, [closing])
   const [leaving, setLeaving] = useState(false)
   useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
+  // (the door's lanterns lit as the shop opens and put out at its last order (the owner's: shut, or the room's lights off for the night,
+  // they still shone on): their switch by the way in thrown by the shop itself; pressed by hand, it still puts them out or lights them between)
+  useEffect(() => { setLightSwitch('door', lanternsLit(ai, closing)) }, [ai, closing])
   // (shut: the day's counted done, the next shift's on duty from now (game/shifts' dutyDay))
   useEffect(() => { if (!ai) SHOP.counted = false }, [ai])
   /** the last half hour begun: said in the kitchen's log (the current language and shop: the clock's timer is made once) */

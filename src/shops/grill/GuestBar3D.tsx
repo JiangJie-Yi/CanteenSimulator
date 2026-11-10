@@ -713,8 +713,9 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
       ? { fill: '#160a06', shadow: 'rgba(255,200,120,0.3)' }
       : { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
 })
-/** a door lantern's paper with its flame out (its own switch by the way in): as the daylight finds it by day, dim by night */
-const unlitPaper = () => (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 0.3 : 0.78)
+/** a door lantern's paper with its flame out (its own switch by the way in; the shop shut): as the daylight finds it by day, by night as dark
+ * as the noren beside it (its colour's a linear light: at 0.3 the paper still read as half lit in the dark, the owner saw them shine on) */
+const unlitPaper = () => (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 0.12 : 0.78)
 /** how far apart the two lanterns by the doorway hang, the red and the grill's beside it (middle to middle) */
 const CHOCHIN_PAIR = 0.32  // (0.3: their paper just touched, clips.mjs)
 const CHOCHIN_GLOW = (() => {
@@ -742,34 +743,38 @@ useGLTF.preload(NOREN_URL)
 function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream' }) {
   const tex = useMemo(() => chochinTexture(mark, style), [mark, style])
   const hang = useRef<THREE.Group>(null)
-  const skin = useRef<THREE.MeshBasicMaterial>(null)
-  // (blender/genkan.py's lantern: its paper lit from within and painted with the name, its caps lacquer, its bands and bail gold)
+  // (blender/genkan.py's lantern: its paper lit from within and painted with the name, its caps lacquer, its bands and bail gold; its paper's
+  // material handed back with it, the one that's drawn (kept aside in a ref while it was made, it was a copy made and thrown away by React's
+  // second run in development: the lit or unlit paper was set on that, and the lanterns shone on with their switch off: the owner saw it))
   const gltf = useGLTF(CHOCHIN_URL) as unknown as { scene: THREE.Group }
-  const model = useMemo(() => {
+  const { model, skin } = useMemo(() => {
     const r = gltf.scene.clone(true)
+    let paper: THREE.MeshBasicMaterial | null = null
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       if (src.name === 'ChochinPaper') {
-        const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })
-        skin.current = mat
-        m.material = mat
+        paper = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })
+        m.material = paper
       } else m.material = src.name === 'ChochinGold' ? new THREE.MeshStandardMaterial({ color: '#d6a84a', metalness: 1, roughness: 0.3 })
         : new THREE.MeshToonMaterial({ color: src.color.clone() })
     })
     inkModel(r, (m) => /Band|Bail|Tassel/.test(m.name), { width: 0.0015, weld: true })
-    return r
+    return { model: r, skin: paper as THREE.MeshBasicMaterial | null }
   }, [gltf, tex])
   const halo = useRef<THREE.Sprite>(null)
-  useFrame(({ clock }) => {
+  /** how lit it is (0 out .. 1 lit), going to its switch's way over some 0.4 s, as a flame's lit or put out */
+  const lit = useRef(getLights().door ? 1 : 0)
+  useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
-    // (lit, its glow breathing like the flame; out (the door lanterns' switch by the way in), the paper as daylight or the dark finds it)
-    const on = getLights().door
-    const f = on ? 0.9 + 0.06 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 7.3 + 1.1) : unlitPaper()
+    // (lit, its glow breathing like the flame; out (the door lanterns' switch by the way in: thrown by the shop at its opening and its last
+    // order, App), the paper as daylight or the dark finds it)
+    lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
+    const k = lit.current, flame = 0.9 + 0.06 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 7.3 + 1.1)
     if (hang.current) hang.current.rotation.z = Math.sin(t * 0.9) * 0.04
-    if (skin.current) skin.current.color.setScalar(f)
-    if (halo.current) halo.current.material.opacity = on ? 0.5 + (f - 0.9) * 2 : 0
+    skin?.color.setScalar(unlitPaper() + (flame - unlitPaper()) * k)
+    if (halo.current) halo.current.material.opacity = k * (0.5 + (flame - 0.9) * 2)
   })
   return (
     <group>
@@ -967,6 +972,10 @@ function FishLantern() {
   const gltf = useGLTF(FISH_LANTERN_URL) as unknown as { scene: THREE.Group }
   const hang = useRef<THREE.Group>(null)
   const fishGlow = useRef<THREE.Sprite>(null)
+  /** the pale glow under the fish (it was lit whatever the switch: the owner saw the fish shine on with the lanterns out) */
+  const fishUnder = useRef<THREE.Sprite>(null)
+  /** how lit it is (0 out .. 1 lit), going to its switch's way over some 0.4 s */
+  const lit = useRef(getLights().door ? 1 : 0)
   const { model, fish, papers } = useMemo(() => {
     const r = gltf.scene.clone(true)
     const papers: THREE.MeshBasicMaterial[] = []
@@ -1002,12 +1011,13 @@ function FishLantern() {
     return { model: r, fish, papers }
   }, [gltf])
   useEffect(() => () => { for (const m of papers) m.dispose() }, [papers])
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
-    const on = getLights().door
-    const flame = on ? 0.92 + 0.05 * Math.sin(t * 2.3) + 0.03 * Math.sin(t * 6.1 + 0.7) : unlitPaper()
-    for (const m of papers) m.color.setScalar(flame)
-    if (fishGlow.current) fishGlow.current.material.opacity = on ? 0.55 : 0
+    lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
+    const k = lit.current, flame = 0.92 + 0.05 * Math.sin(t * 2.3) + 0.03 * Math.sin(t * 6.1 + 0.7)
+    for (const m of papers) m.color.setScalar(unlitPaper() + (flame - unlitPaper()) * k)
+    if (fishGlow.current) fishGlow.current.material.opacity = 0.55 * k
+    if (fishUnder.current) fishUnder.current.material.opacity = 0.35 * k
     if (hang.current) { hang.current.rotation.z = Math.sin(t * 0.8) * 0.025; hang.current.rotation.x = Math.sin(t * 0.55 + 1) * 0.015 }
     fish.rotation.z = Math.sin(t * 0.8 - 0.7) * 0.045
   })
@@ -1028,7 +1038,7 @@ function FishLantern() {
         <sprite ref={fishGlow} position-y={-0.16} scale={[0.62, 0.55, 1]} raycast={NO_RAY}>
           <spriteMaterial map={FISH_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.55} />
         </sprite>
-        <sprite position-y={-0.68} scale={[0.5, 0.95, 1]} raycast={NO_RAY}>
+        <sprite ref={fishUnder} position-y={-0.68} scale={[0.5, 0.95, 1]} raycast={NO_RAY}>
           <spriteMaterial map={FISH_GLOW} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} opacity={0.35} color="#bcd0ff" />
         </sprite>
       </group>

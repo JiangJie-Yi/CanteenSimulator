@@ -22,6 +22,11 @@ export function switchLights(s: RoomLights, c: Circuit = 'room'): RoomLights {
   return { ...s, wc: { ...s.wc, [k]: !s.wc[k] } }
 }
 
+/** whether the door's lanterns are lit by the shop's own doing (the owner's: shut, or the room's lights off for the night, they still shone
+ * on): from its opening till its last order, as a shop lights its lanterns to open and takes them in to close; their switch by the way in
+ * puts them out or lights them in between */
+export const lanternsLit = (open: boolean, closing: boolean) => open && !closing
+
 /** the exit sign: the emergency light, lit whatever the switches are */
 export const exitSignLit = (_s: RoomLights) => true
 
