@@ -7,7 +7,8 @@ import { sweeps, SWEEP_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
-import { drinksToOrder, stockerChore, type StockChore } from '@/game/stocker'
+import { drinksToOrder, ROLL_LOW, stockerChore, type StockChore } from '@/game/stocker'
+import { ROLL, SOAP, SOAP_FULL, SOAP_REFILL_AT, takeOne, takesTowel, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT } from '@/game/washroom'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -231,6 +232,13 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
  */
 const STOCK_CARRY = 8
 // (he walks by his own frame loop: drawn again only if he or the room changes, not with every redraw of the bar)
+/** a washroom's paper towels or soap down to where they're topped up, with a spare in stock for it: the stock keeper goes round to it */
+const wcLow = (w: 'm' | 'f') => {
+  const t = TOILETS[w]
+  return (t.towels < TOWEL_REFILL_AT && SUPPLIES.has(TOWEL) > 0) || (t.soap < SOAP_REFILL_AT && SUPPLIES.has(SOAP) > 0)
+}
+/** whether it's a roll he's going to change there (else he's topping up the towels or the soap) */
+const rolling = (w: 'm' | 'f') => TOILETS[w].room.paper < ROLL_LOW && SUPPLIES.has(ROLL) > 0
 const Stocker = memo(StockerImpl, (a, b) => a.counters === b.counters && a.fridges === b.fridges && a.who.id === b.who.id && a.who.look === b.who.look)
 /**
  * The stock keeper (倉儲; the owner's: they order in and restock, and walk to do it), by game/stocker's chores: a toilet's roll running out,
@@ -347,6 +355,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           rolls: { m: TOILETS.m.room.paper, f: TOILETS.f.room.paper }, wcBusy: { m: busy('m'), f: busy('f') },
           fridgeShort: fridges.map((f) => emptyFillable(placesOf(f.n), FRIDGE_UNITS[f.n].shelves.map((sh) => sh.ids), DRINK_BACK.back)),
           boxes: seats.map((_, i) => tissuesAt(i)), seatTaken: (n) => SEATS_TAKEN.has(n), spares: Math.max(0, SUPPLIES.has(TISSUE)),
+          // (a roll changed only with a spare in stock; and the washrooms' paper towels and soap topped up from theirs, on the same round)
+          rollSpares: Math.max(0, SUPPLIES.has(ROLL)), wcLow: { m: wcLow('m'), f: wcLow('f') },
         })
         if (next && !(next.kind === 'roll' && !wcs)) {
           s.chore = next
@@ -394,12 +404,17 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           s.phase = 'back'
         }
       } else if (c.kind === 'roll') {
-        // (in, the door shut behind him: the old roll off the holder, a new one on)
+        // (in, the door shut behind him: the old roll off the holder, a new one on, from the spares in stock; and the towel box and the soap
+        // topped up from theirs while he's there)
         if (s.t > 2.4 && !s.done) {
           s.done = true
           const t = TOILETS[c.who]
-          t.room = newRoll(t.room)
-          t.rollAt = performance.now()
+          if (t.room.paper < ROLL_LOW && SUPPLIES.take(ROLL, 1)) {
+            t.room = newRoll(t.room)
+            t.rollAt = performance.now()
+          }
+          if (topUp(t.towels, TOWEL_FULL, TOWEL_REFILL_AT, 1).level !== t.towels && SUPPLIES.take(TOWEL, 1)) t.towels = TOWEL_FULL
+          if (topUp(t.soap, SOAP_FULL, SOAP_REFILL_AT, 1).level !== t.soap && SUPPLIES.take(SOAP, 1)) t.soap = SOAP_FULL
         }
         if (s.t > 2.8) s.phase = 'back'
       } else {
@@ -457,12 +472,13 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         : s.phase === 'take' ? tl3('取貨中', '荷出し中', 'Picking up a case')
         : s.phase === 'back' ? tl3('返回待命', '戻り中', 'Heading back')
         : c?.kind === 'drinks' ? (s.phase === 'work' ? tl3('補貨中', '補充中', 'Restocking') + pct(s.t / 1.6) : tl3('搬運飲料中', '飲み物運搬中', 'Carrying drinks'))
-        : c?.kind === 'roll' ? tl3('更換衛生紙', 'トイレ紙交換', 'Changing the toilet roll') + (s.phase === 'work' ? pct(s.t / 2.8) : '')
+        : c?.kind === 'roll' ? (rolling(c.who) ? tl3('更換衛生紙', 'トイレ紙交換', 'Changing the toilet roll') : tl3('補充洗手間用品', 'トイレ用品の補充', 'Restocking the washroom'))
+          + (s.phase === 'work' ? pct(s.t / 2.8) : '')
         : tl3('補充面紙', 'ティッシュ補充', 'Refilling tissues') + (s.phase === 'work' ? pct(s.t / 2.0) : '')
       if (el.textContent !== text) el.textContent = text
       el.style.visibility = slacking || g.current?.visible === false || (g.current?.userData.fade ?? 1) < 0.5 ? 'hidden' : ''
     }
-    if (h.roll) h.roll.visible = out && c?.kind === 'roll' && !s.done
+    if (h.roll) h.roll.visible = out && c?.kind === 'roll' && !s.done && rolling(c.who)
     if (h.box) h.box.visible = out && c?.kind === 'tissue' && !s.done
   })
   // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
@@ -3277,7 +3293,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (s.t > HAND_S) {
           // (then a step to the hand dryer on the wall beside, turned to it, hands under it while it blows)
           const who = s.wc!.who as 'm' | 'f'
-          if (s.t - dt <= HAND_S) TOILETS[who].dryAt = performance.now()
+          if (s.t - dt <= HAND_S) {
+            const t = TOILETS[who]
+            t.dryAt = performance.now()
+            // (one in two takes a paper towel too, while there's one (game/washroom))
+            if (takesTowel(s.id)) { const took = takeOne(t.towels); t.towels = took.left; if (took.got) t.towelAt = t.dryAt }
+          }
           const dry = inBar(`wc-dryer-${who}`, w.basin)
           const k = Math.min(1, (s.t - HAND_S) / 0.3)
           const to = w.basin.clone().lerp(dry.clone().setY(w.basin.y), 0.55)

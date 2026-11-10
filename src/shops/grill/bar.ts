@@ -14,6 +14,7 @@ import { RACK_FULL, type Dryer } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyBasin } from '@/game/basin'
+import { SOAP_FULL, TOWEL_FULL } from '@/game/washroom'
 import { emptyFridge, moveBetween, putInPlace, readDrinks, startBack, takeFromPlace, writeDrinks, type Back, type Places } from '@/game/drinkStock'
 import { replaces } from '@/scene/hot'
 import { ROLL_SLIPS } from '@/game/receipts'
@@ -570,8 +571,10 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
  * minute, App), and the water in its bowl and the bowl's stopper (game/basin); and when it last flushed, was scrubbed, played its Otohime,
  * was knocked at, or a guest last washed their hands at its washstand, or dried them at its hand dryer (performance.now() ms, for the room's
  * animations and sounds) */
+// (`towels`: sheets left in the washroom's paper towel box, `soap`: presses left in its hand soap (game/washroom); `towelAt`, `pumpAt`: when a
+// sheet was last pulled, the pump last pressed, by a guest or a click)
 const wcOf = () => ({ passing: 0, inside: 0, open: false, room: freshRoom(), tap: false, basin: emptyBasin(), flushAt: -1e9, scrubAt: -1e9, otoAt: -1e9,
-  knockAt: -1e9, rollAt: -1e9, washAt: -1e9, handAt: -1e9, dryAt: -1e9 })
+  knockAt: -1e9, rollAt: -1e9, washAt: -1e9, handAt: -1e9, dryAt: -1e9, towels: TOWEL_FULL, soap: SOAP_FULL, towelAt: -1e9, pumpAt: -1e9 })
 export const TOILETS = { m: wcOf(), f: wcOf() }
 /** points off the taste of what each guest eats, for what they found in the toilet (Roasting reads it) */
 export const WC_GRUMBLE = new Map<number, number>()

@@ -71,6 +71,7 @@ import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
 import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, type Visit } from '@/game/reputation'
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
+import { SOAP, SOAP_FULL, SOAP_REFILL_AT, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT, washroomOrder } from '@/game/washroom'
 import { RECEIPT, receiptOrder } from '@/game/receipts'
 import { LINES } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
@@ -1946,6 +1947,13 @@ export default function App() {
     book('bought', o.cost)
     shiftStock({ [TISSUE]: o.boxes })
   }
+  /** packs of the washrooms' spares bought (game/washroom: toilet rolls, paper towels, hand soap refills), paid as stock bought */
+  const buyWashroom = (id: string, packs: number) => {
+    const o = washroomOrder(id, packs)
+    if (!o.n || o.cost > cash) return
+    book('bought', o.cost)
+    shiftStock({ [id]: o.n })
+  }
   /** packs of receipt paper bought (game/receipts), paid as stock bought */
   const buyReceipts = (packs: number) => {
     const o = receiptOrder(packs)
@@ -2419,6 +2427,14 @@ export default function App() {
     const t = refillBoxes(boxes, spares)
     t.boxes.forEach((n, i) => { if (n !== boxes[i]) setTissues(i, n) })
     if (t.spares !== spares) shiftStockRef.current({ [TISSUE]: t.spares - spares })
+    // (and each washroom's paper towels and hand soap topped up from the spares, as the rooms are cleaned before opening (game/washroom))
+    const had = { towel: stockRef.current[TOWEL] ?? 0, soap: stockRef.current[SOAP] ?? 0 }
+    let towels = had.towel, soaps = had.soap
+    for (const w of [TOILETS.m, TOILETS.f]) {
+      const tw = topUp(w.towels, TOWEL_FULL, TOWEL_REFILL_AT, towels); w.towels = tw.level; towels = tw.spares
+      const sp = topUp(w.soap, SOAP_FULL, SOAP_REFILL_AT, soaps); w.soap = sp.level; soaps = sp.spares
+    }
+    if (towels !== had.towel || soaps !== had.soap) shiftStockRef.current({ [TOWEL]: towels - had.towel, [SOAP]: soaps - had.soap })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ai])
 
@@ -3180,7 +3196,7 @@ export default function App() {
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
           onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}
           restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
-          onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onBuyReceipts={buyReceipts} onClose={() => setFridgeOpen(false)} />
+          onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onBuyReceipts={buyReceipts} onBuyWashroom={buyWashroom} onClose={() => setFridgeOpen(false)} />
       )}
       {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
       {ai && (

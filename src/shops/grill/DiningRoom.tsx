@@ -2664,7 +2664,7 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         </group>
       </Movable>
       <Movable id={`wc2-${who}-towelbox`} label={`擦手紙盒（${name}）`}>
-        <group position={[D - 0.26, 1.25, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}><WcTowelBox /></group>
+        <group position={[D - 0.26, 1.25, -s * (w / 2 - 0.004)]} rotation-y={s > 0 ? 0 : Math.PI}><WcTowelBox who={who} /></group>
       </Movable>
       {/* (no お手洗い plaque on the wall: the owner's, the wall kept clean) */}
       <Movable id={`wc2-${who}-duck`} label={`簀之子踏板（${name}）`}><StaticBatch plain>

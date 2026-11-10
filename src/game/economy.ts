@@ -1,6 +1,7 @@
 // Money and stock: what things cost, what a dish on the menu takes out of stock, and whether it can be served.
 // Pure functions over the data in src/data, so App (and the tests) all reckon the same way.
 import { TISSUE, TISSUE_LOW, tissueOrder } from './tissues'
+import { ROLL, SOAP, TOWEL, WASHROOM_LOW, washroomOrder } from './washroom'
 import { RECEIPT, RECEIPT_LOW, receiptOrder } from './receipts'
 import { DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
@@ -172,6 +173,13 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     const t = tissueOrder(1)
     const c = Math.round(t.cost * off)
     if (cost + c <= cash) { buy[TISSUE] = t.boxes; cost += c }
+  }
+  // (and the washrooms' spares, a pack of each once it's low: toilet rolls, paper towels, hand soap)
+  if (menu.length) for (const id of [ROLL, TOWEL, SOAP]) {
+    if ((stock[id] ?? 0) >= WASHROOM_LOW[id]) continue
+    const o = washroomOrder(id, 1)
+    const c = Math.round(o.cost * off)
+    if (cost + c <= cash) { buy[id] = o.n; cost += c }
   }
   // (and a pack of receipt paper once the spare rolls are low)
   if (menu.length && (stock[RECEIPT] ?? 0) < RECEIPT_LOW) {

@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { BOX_LOW, BOX_SHEETS, TISSUE, TISSUE_PACK } from '@/game/tissues'
+import { ROLL, SOAP, SOAP_FULL, SOAP_REFILL_AT, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT, WASHROOM_PACKS } from '@/game/washroom'
+import { ROLL_LOW } from '@/game/stocker'
 import { RECEIPT, RECEIPT_PACK, ROLL_SLIPS } from '@/game/receipts'
 import { LOADS, USES, POWER_TIERS, WATER_TIERS, WATER_BASE, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
 import { createPortal } from 'react-dom'
@@ -16,7 +18,7 @@ import { Glyph } from '@/ui/GameIcons'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
-import { GRILL_SEATS, onPrinter, PRINTER, tissuesAt } from './bar'
+import { GRILL_SEATS, onPrinter, PRINTER, tissuesAt, TOILETS } from './bar'
 import { DrinkStockBody } from './DrinkStockPanel'
 import { frostSound, usePanelSound } from '@/ui/uiSound'
 
@@ -103,6 +105,8 @@ type Props = {
   onBuyTissues: (packs: number) => void
   /** packs of receipt paper bought (game/receipts) */
   onBuyReceipts: (packs: number) => void
+  /** packs of the washrooms' spares bought (game/washroom: toilet rolls, paper towels, hand soap refills) */
+  onBuyWashroom: (id: string, packs: number) => void
   onClose: () => void
 }
 
@@ -138,6 +142,7 @@ export function StockPanel(p: Props) {
   /** how many in a tab are out (or spoiled): a red mark on the tab */
   const warn = (t: StockTab) => {
     if (t === 'supplies') return ((p.stock[CHARCOAL] ?? 0) + CRATE.left <= 0 ? 1 : 0) + ((p.stock[RECEIPT] ?? 0) <= 0 && PRINTER.slips < ROLL_SLIPS / 5 ? 1 : 0)
+      + WASHROOM_CARDS.filter((c) => (p.stock[c.id] ?? 0) <= 0 && c.low()).length
     if (t === 'drinks') return 0
     const zone = foods.filter((x) => storageOf(x.id) === t).filter((x) => (p.stock[x.id] ?? 0) <= 0 || freshGrade(p.fresh[x.id] ?? 100) === 'spoiled').length
     const seas = SEASONINGS.filter((k) => storageOf(seasonId(k)) === t && (p.stock[seasonId(k)] ?? 0) <= 0).length
@@ -510,11 +515,49 @@ function TissueZone(p: Props) {
               title={tl(lang, `訂兩組（NT$${2 * TISSUE_PACK.cost}）`, '2組注文', 'Order two packs')}>{tl(lang, '兩組', '2組', '+2')}</span>
           </span>
         </div>
+        {WASHROOM_CARDS.map((c) => <WashroomCard key={c.id} {...p} card={c} />)}
       </div>
-      <p className="stock-note">{tl(lang, '每個座位的抽屜一盒；客人吃完會抽幾張，盒子空了客人會不滿（影響店家評價）。開店前空的（或快空的）會用備品換新盒。',
-        '各席の引き出しに1箱。食べ終わると数枚使う。空だとお客さんの評価が下がる。開店前に空（残り少ない）箱を予備と交換。',
-        'A box in each place’s drawer; customers take a few as they finish, and an empty one costs the shop its rating. Before opening, empty (or nearly empty) boxes are swapped from the spares.')}</p>
+      <p className="stock-note">{tl(lang, '每個座位的抽屜一盒；客人吃完會抽幾張，盒子空了客人會不滿（影響店家評價）。開店前空的（或快空的）會用備品換新盒。洗手間的捲筒衛生紙、擦手紙（一盒 150 張）與洗手乳，倉儲巡到時用備品補，開店前快沒的擦手紙與洗手乳也會補滿。',
+        '各席の引き出しに1箱。食べ終わると数枚使う。空だとお客さんの評価が下がる。開店前に空（残り少ない）箱を予備と交換。トイレのロール、ペーパータオル（1箱150枚）、ハンドソープは倉庫係が見回りで予備から補充し、開店前にも少ないタオルとソープを補充。',
+        'A box in each place’s drawer; customers take a few as they finish, and an empty one costs the shop its rating. Before opening, empty (or nearly empty) boxes are swapped from the spares. The washrooms’ toilet rolls, paper towels (150 to a box) and hand soap are refilled from the spares by the stock keeper on his round, and low towels and soap topped up before opening.')}</p>
     </section>
+  )
+}
+
+/** the washrooms' spares in the household zone (game/washroom; the owner's, 2026-11-10: with their counts, to be ordered): each its glyph,
+ * how it's sold, how much is in use in the two washrooms (the men's and the women's) and how much that is of full, and whether it's running
+ * out there */
+const WASHROOM_CARDS = [
+  { id: ROLL, glyph: 'tissue' as const, level: () => (TOILETS.m.room.paper + TOILETS.f.room.paper) / 2, low: () => TOILETS.m.room.paper < ROLL_LOW || TOILETS.f.room.paper < ROLL_LOW,
+    sub: (lang: Lang) => tl(lang, `${WASHROOM_PACKS[ROLL].n} 捲一串・NT$${WASHROOM_PACKS[ROLL].cost}`, `${WASHROOM_PACKS[ROLL].n}ロール・NT$${WASHROOM_PACKS[ROLL].cost}`, `${WASHROOM_PACKS[ROLL].n} rolls, NT$${WASHROOM_PACKS[ROLL].cost}`),
+    inUse: (lang: Lang) => tl(lang, `男廁 ${pctOf(TOILETS.m.room.paper)}・女廁 ${pctOf(TOILETS.f.room.paper)}`, `男 ${pctOf(TOILETS.m.room.paper)}・女 ${pctOf(TOILETS.f.room.paper)}`, `Men’s ${pctOf(TOILETS.m.room.paper)}, women’s ${pctOf(TOILETS.f.room.paper)}`) },
+  { id: TOWEL, glyph: 'towel' as const, level: () => (TOILETS.m.towels + TOILETS.f.towels) / (2 * TOWEL_FULL), low: () => Math.min(TOILETS.m.towels, TOILETS.f.towels) < TOWEL_REFILL_AT,
+    sub: (lang: Lang) => tl(lang, `${TOWEL_FULL}張 × ${WASHROOM_PACKS[TOWEL].n}包・NT$${WASHROOM_PACKS[TOWEL].cost}`, `${TOWEL_FULL}枚 × ${WASHROOM_PACKS[TOWEL].n}パック・NT$${WASHROOM_PACKS[TOWEL].cost}`, `${TOWEL_FULL} × ${WASHROOM_PACKS[TOWEL].n} packs, NT$${WASHROOM_PACKS[TOWEL].cost}`),
+    inUse: (lang: Lang) => tl(lang, `盒內 男 ${TOILETS.m.towels}・女 ${TOILETS.f.towels}`, `箱内 男 ${TOILETS.m.towels}・女 ${TOILETS.f.towels}`, `In the boxes: ${TOILETS.m.towels} / ${TOILETS.f.towels}`) },
+  { id: SOAP, glyph: 'soap' as const, level: () => (TOILETS.m.soap + TOILETS.f.soap) / (2 * SOAP_FULL), low: () => Math.min(TOILETS.m.soap, TOILETS.f.soap) < SOAP_REFILL_AT,
+    sub: (lang: Lang) => tl(lang, `${WASHROOM_PACKS[SOAP].n} 包・NT$${WASHROOM_PACKS[SOAP].cost}`, `${WASHROOM_PACKS[SOAP].n}袋・NT$${WASHROOM_PACKS[SOAP].cost}`, `${WASHROOM_PACKS[SOAP].n} refills, NT$${WASHROOM_PACKS[SOAP].cost}`),
+    inUse: (lang: Lang) => tl(lang, `瓶內 男 ${pctOf(TOILETS.m.soap / SOAP_FULL)}・女 ${pctOf(TOILETS.f.soap / SOAP_FULL)}`, `ボトル 男 ${pctOf(TOILETS.m.soap / SOAP_FULL)}・女 ${pctOf(TOILETS.f.soap / SOAP_FULL)}`, `Bottles: ${pctOf(TOILETS.m.soap / SOAP_FULL)} / ${pctOf(TOILETS.f.soap / SOAP_FULL)}`) },
+]
+const pctOf = (k: number) => `${Math.round(Math.max(0, Math.min(1, k)) * 100)}%`
+function WashroomCard(p: Props & { card: (typeof WASHROOM_CARDS)[number] }) {
+  const { lang, stock, cash, card } = p
+  const spares = stock[card.id] ?? 0, pack = WASHROOM_PACKS[card.id], low = card.low()
+  return (
+    <div className={`chiller-bin season-bin supply-bin is-still${spares <= 0 && low ? ' is-out' : ''}`}>
+      <span className="chiller-bin-head"><Glyph id={card.glyph} size={18} className="tissue-icon" /><FitLine className="chiller-bin-name">{supplyName(card.id, lang)}</FitLine></span>
+      <FitLine className="drink-bin-sub" min={9}>{card.sub(lang)}</FitLine>
+      <span className={`chiller-level${card.level() <= 0 ? ' is-zero' : low ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, card.level() * 100)}%` }} /></span>
+      <span className="chiller-bin-info" aria-hidden="true">
+        <b className={spares <= 0 ? 'is-zero' : ''}>{tl(lang, '備品', '予備', 'Spare')} <em>{spares}</em></b>
+        <small>{card.inUse(lang)}</small>
+      </span>
+      <span className="chiller-buy season-buy">
+        <span role="button" tabIndex={0} className={`chiller-btn${cash >= pack.cost ? '' : ' is-off'}`} onClick={() => cash >= pack.cost && p.onBuyWashroom(card.id, 1)}
+          title={tl(lang, `訂一組（NT$${pack.cost}）`, '1組注文', 'Order a pack')}>{tl(lang, '訂一組', '1組', '+1 pack')}</span>
+        <span role="button" tabIndex={0} className={`chiller-btn chiller-fill${cash >= 2 * pack.cost ? '' : ' is-off'}`} onClick={() => cash >= 2 * pack.cost && p.onBuyWashroom(card.id, 2)}
+          title={tl(lang, `訂兩組（NT$${2 * pack.cost}）`, '2組注文', 'Order two packs')}>{tl(lang, '兩組', '2組', '+2')}</span>
+      </span>
+    </div>
   )
 }
 

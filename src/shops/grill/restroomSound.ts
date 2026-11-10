@@ -187,6 +187,27 @@ export function rollSound(near: number) {
   o.stop(t + 0.5)
 }
 
+/** the hand soap's pump pressed (the owner's, 2026-11-10: it can be pressed, and it's used up): its head's plastic click as it goes down and
+ * a soft wet squelch of soap coming out; pressed empty, only the click and a little puff of air */
+export function pumpSound(near: number, empty = false) {
+  const a = ctx()
+  if (!a || near < 0.02) return
+  const t = a.currentTime
+  // (the click: a short bright tick, the spring's little ring after it)
+  const c = noise(a, 0.03, (x) => (1 - x) * (1 - x), 0.02)
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3200
+  c.connect(hp).connect(out(a, 0.2 * near))
+  c.start(t)
+  ping(a, t + 0.004, 2600, 0.025 * near, 0.04, a.destination, 'triangle')
+  const s2 = noise(a, empty ? 0.12 : 0.16, (x) => Math.sin(Math.PI * Math.min(1, x * 1.6)) * (1 - x), 0.25)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = empty ? 0.6 : 2.2
+  // (the soap's squelch low and wet, sliding down as it's pushed out; an empty one's breath of air higher and thin)
+  bp.frequency.setValueAtTime(empty ? 2400 : 1100, t + 0.03)
+  bp.frequency.exponentialRampToValueAtTime(empty ? 1600 : 420, t + 0.18)
+  s2.connect(bp).connect(out(a, (empty ? 0.06 : 0.16) * near))
+  s2.start(t + 0.03)
+}
+
 /** taps left running or washing (the sink's, the toilets' washstands'): one splashing loop for them all, as loud as the nearest running one;
  * each tap says how near it's running each frame (0: shut) */
 const taps = new Map<string, number>()

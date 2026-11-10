@@ -2,6 +2,7 @@
 // dry powders at room temperature), and the binchotan for the fire, kept in a sack on the floor by the table and taken from it into the
 // crate on the table's top as the crate runs out. Each is bought in, held in stock and used up (the owner's: they aren't free).
 import { TISSUE, TISSUE_START } from './tissues'
+import { ROLL, SOAP, TOWEL, WASHROOM_START } from './washroom'
 import { RECEIPT, RECEIPT_START } from './receipts'
 import { SEASONINGS, SEASON_COST, SEASON_NAME, type Seasoning } from '@/data/recipes'
 import type { Lang } from '@/data/i18n'
@@ -48,6 +49,10 @@ export const startingSupplies = (): Stock => ({
   [TISSUE]: TISSUE_START,
   // (and spare rolls of receipt paper for the register's printer: game/receipts)
   [RECEIPT]: RECEIPT_START,
+  // (and the washrooms' spares: toilet rolls, paper towel packs, hand soap refills: game/washroom)
+  [ROLL]: WASHROOM_START[ROLL],
+  [TOWEL]: WASHROOM_START[TOWEL],
+  [SOAP]: WASHROOM_START[SOAP],
 })
 
 /** a dab of a seasoning taken from stock (null when there's none left: it can't go on) */
@@ -79,5 +84,8 @@ export function supplyName(id: string, lang: Lang): string | null {
   if (id === NORI) return lang === 'ja' ? '焼き海苔' : lang === 'en' ? 'nori' : '海苔'
   if (id === TISSUE) return lang === 'ja' ? 'ティッシュ（箱）' : lang === 'en' ? 'tissues (boxes)' : '衛生紙（盒）'
   if (id === RECEIPT) return lang === 'ja' ? 'レシート用紙（巻）' : lang === 'en' ? 'receipt paper (rolls)' : '發票紙（捲）'
+  if (id === ROLL) return lang === 'ja' ? 'トイレットペーパー' : lang === 'en' ? 'toilet rolls' : '捲筒衛生紙'
+  if (id === TOWEL) return lang === 'ja' ? 'ペーパータオル' : lang === 'en' ? 'paper towels' : '擦手紙'
+  if (id === SOAP) return lang === 'ja' ? 'ハンドソープ（詰め替え）' : lang === 'en' ? 'hand soap refills' : '洗手乳補充包'
   return id === CHARCOAL ? (lang === 'ja' ? '備長炭' : lang === 'en' ? 'binchotan' : '備長炭') : null
 }

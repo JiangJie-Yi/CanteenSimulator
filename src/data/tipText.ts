@@ -172,6 +172,22 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   點擊關上: ['クリックで閉める', 'Click to shut'],
   點擊關閉: ['クリックで閉じる', 'Click to close'],
   '點螢幕操作：點單、分類、結帳': ['画面をタップ：注文・分類・会計', 'Tap the screen: orders, categories, bill'],
+  // (the washrooms' fittings and their supplies (game/washroom))
+  免治馬桶遙控器: ['温水洗浄便座のリモコン', 'Washlet remote'],
+  沖水鈕: ['洗浄ボタン', 'Flush button'],
+  音姬: ['音姫', 'Otohime'],
+  點一下播放流水聲: ['クリックで流水音', 'Click for the sound of water'],
+  烘手機: ['ハンドドライヤー', 'Hand dryer'],
+  '點一下吹風；客人洗完手會自己來烘乾': ['クリックで送風・手を洗ったお客さんは自分で乾かしに来る', 'Click to blow; guests dry their hands here after washing'],
+  擦手紙盒: ['ペーパータオル', 'Paper towels'],
+  點一下抽一張擦手紙: ['クリックでペーパータオルを1枚', 'Click to take a paper towel'],
+  '空了，沒有擦手紙的備品：到庫存的耗材訂': ['空・予備なし：在庫の消耗品で注文', 'Empty, no spares: order them under the stock’s supplies'],
+  洗手乳: ['ハンドソープ', 'Hand soap'],
+  按一下擠一下: ['押すと1回分出る', 'Press for a pump'],
+  '空了，沒有洗手乳補充包：到庫存的耗材訂': ['空・詰め替えなし：在庫の消耗品で注文', 'Empty, no refills: order them under the stock’s supplies'],
+  衛生紙架: ['トイレットペーパー', 'Toilet roll'],
+  '抽取衛生紙 / 轉動紙捲': ['紙を引く / ロールを回す', 'Pull a sheet / turn the roll'],
+  '用完了，沒有備用的捲筒衛生紙：到庫存的耗材訂': ['使い切った・予備のロールなし：在庫の消耗品で注文', 'Used up, no spare rolls: order them under the stock’s supplies'],
 }
 
 /** what's put together with a number in it: its shape, and the same said in Japanese and in English */
@@ -197,6 +213,12 @@ const SHAPES: [RegExp, (m: string[]) => string, (m: string[]) => string][] = [
   [/^點一下打掃$/, () => 'クリックで掃除', () => 'Click to clean'],
   [/^衛生紙備品 (\d+) 盒$/, (m) => `ティッシュ予備 ${m[1]} 箱`, (m) => `${m[1]} spare tissue boxes`],
   [/^點一下看耗材$/, () => 'クリックで消耗品を見る', () => 'Click for supplies'],
+  [/^還有 (\d+) 張$/, (m) => `残り ${m[1]} 枚`, (m) => `${m[1]} left`],
+  [/^還有 (\d+) 下$/, (m) => `残り ${m[1]} 回`, (m) => `${m[1]} pumps left`],
+  [/^還夠 (\d+) 位客人用$/, (m) => `あと ${m[1]} 人分`, (m) => `Enough for ${m[1]} more`],
+  [/^空了！點一下補一包（備品 (\d+) 包）$/, (m) => `空！クリックで1パック補充（予備 ${m[1]}）`, (m) => `Empty! Click to put a pack in (${m[1]} spare)`],
+  [/^空了！點一下換上補充包（備品 (\d+) 包）$/, (m) => `空！クリックで詰め替え（予備 ${m[1]}）`, (m) => `Empty! Click to put a refill in (${m[1]} spare)`],
+  [/^用完了！點一下換新捲（備品 (\d+) 捲）$/, (m) => `使い切った！クリックで新しいロール（予備 ${m[1]}）`, (m) => `Used up! Click for a new roll (${m[1]} spare)`],
   [/^左鍵調冷、右鍵調暖，(-?\d+)～(-?\d+)℃$/, (m) => `左クリックで冷たく、右クリックで暖かく、${m[1]}～${m[2]}℃`, (m) => `Left-click colder, right-click warmer, ${m[1]} to ${m[2]}℃`],
 ]
 

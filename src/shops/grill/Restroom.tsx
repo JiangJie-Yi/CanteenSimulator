@@ -8,11 +8,12 @@ import { setTip } from '@/scene/hoverTip'
 import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, pullSheet, ROLL_USES } from '@/game/restroom'
 import { mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
-import { handOver, TOILETS, meterWater } from './bar'
+import { handOver, TOILETS, meterWater, SUPPLIES } from './bar'
+import { ROLL, SOAP, SOAP_FULL, takeOne, TOWEL, TOWEL_FULL } from '@/game/washroom'
 import { getEdit } from './edit'
 import { roundMirror } from './mirror'
 import { shrineDoor } from './shrineSound'
-import { basinPour, drainGurgle, dryerSound, flushSound, knockSound, otohimeNear, otohimeSound, overflowTrickle, plugSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
+import { basinPour, drainGurgle, dryerSound, flushSound, knockSound, otohimeNear, otohimeSound, overflowTrickle, plugSound, pumpSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
 import { basinStep, draining, overflowing, DRAIN_S, FILM } from '@/game/basin'
 import { reflectStudio } from '@/scene/studio'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -387,7 +388,8 @@ function useBits() {
     if (lampMesh) lampMesh.material = jetLamp
     // (the towel box's window: smoked acrylic, the stack of white sheets behind it, glossy)
     const win = r.towel.getObjectByName('TowelWindow') as THREE.Mesh | undefined
-    if (win && TOWEL_WINDOW) win.material = new THREE.MeshStandardMaterial({ map: TOWEL_WINDOW, roughness: 0.2, metalness: 0 })
+    const towelWin = towelWindow()
+    if (win && towelWin) win.material = new THREE.MeshStandardMaterial({ map: towelWin.tex, roughness: 0.2, metalness: 0 })
     const lcd = r.remote.getObjectByName('RemLcd') as THREE.Mesh | undefined
     lit(lcd, '#7fe2ee')
     // (the faces' keys, frame and words: painted, not modelled (the owner's: the pair 30 triangles))
@@ -401,10 +403,28 @@ function useBits() {
     for (const o of [r.remote, r.oto, r.holder, r.pot, r.bin, r.pads, r.towel]) { plainColours(o); mergeByMaterial(o) }
     plainColours(r.dryer)
     mergeByMaterial(r.dryer, (o) => o.name === 'DryerLamp')
-    return { ...r, ledMat, jetLamp }
+    return { ...r, ledMat, jetLamp, towelWin }
   }, [gltf])
 }
 
+/** what the washroom's paper, towels and soap say pointed at: how much is left, and when they're out, whether there's a spare in stock to
+ * put in (game/washroom) */
+const spareOf = (id: string) => Math.max(0, SUPPLIES.has(id))
+function rollSays(who: Who) {
+  const p = TOILETS[who].room.paper
+  if (p > 0.001) return `抽取衛生紙 / 轉動紙捲・還夠 ${Math.round(p * ROLL_USES)} 位客人用`
+  return spareOf(ROLL) > 0 ? `用完了！點一下換新捲（備品 ${spareOf(ROLL)} 捲）` : '用完了，沒有備用的捲筒衛生紙：到庫存的耗材訂'
+}
+function towelSays(who: Who) {
+  const n = TOILETS[who].towels
+  if (n > 0) return `點一下抽一張擦手紙・還有 ${n} 張`
+  return spareOf(TOWEL) > 0 ? `空了！點一下補一包（備品 ${spareOf(TOWEL)} 包）` : '空了，沒有擦手紙的備品：到庫存的耗材訂'
+}
+function soapSays(who: Who) {
+  const n = TOILETS[who].soap
+  if (n > 0) return `按一下擠一下・還有 ${n} 下`
+  return spareOf(SOAP) > 0 ? `空了！點一下換上補充包（備品 ${spareOf(SOAP)} 包）` : '空了，沒有洗手乳補充包：到庫存的耗材訂'
+}
 const hover = (title: string, hint: () => string) => ({
   onPointerOver: (e: Parameters<typeof handOver.onPointerOver>[0]) => { handOver.onPointerOver(e); setTip({ title, hint: hint() }) },
   onPointerOut: (e: Parameters<typeof handOver.onPointerOut>[0]) => { handOver.onPointerOut(e); setTip(null) },
@@ -448,34 +468,49 @@ const TOWEL_SHEET = new THREE.PlaneGeometry(0.12, 0.12).translate(0, -0.06, 0)
 const PAPER_MAT = new THREE.MeshToonMaterial({ color: '#fbfaf6' })
 /** where the dispenser's lip is (wc.py: a curved slot under its front, 13.65 cm below its middle, its middle some 4.6 cm out from the wall) */
 const SLOT_Y = -0.1345, SLOT_Z = 0.046
-/** the window's picture: smoked brown acrylic, the stack of sheets behind it (their edges in fine lines, as high as the box is full), a
- * gloss across it */
-const TOWEL_WINDOW = (() => {
+/** the window's picture: smoked brown acrylic, the stack of sheets behind it (their edges in fine lines, as high as the box is full: drawn
+ * again as it's used, `draw(level)`, the box full at 1), a gloss across it; each box its own */
+function towelWindow() {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas'); c.width = 32; c.height = 160
   const g = c.getContext('2d')!
-  g.fillStyle = '#2c2119'; g.fillRect(0, 0, 32, 160)
-  const top = 160 * 0.22
-  for (let y = top; y < 160; y += 2) { g.fillStyle = y % 4 < 2 ? '#8f7a62' : '#7b6754'; g.fillRect(0, y, 32, 2) }
-  g.fillStyle = 'rgba(30,18,10,0.35)'; g.fillRect(0, top, 32, 3)
-  const gl = g.createLinearGradient(0, 0, 32, 160)
-  gl.addColorStop(0.35, 'rgba(255,255,255,0)'); gl.addColorStop(0.45, 'rgba(255,255,255,0.22)'); gl.addColorStop(0.55, 'rgba(255,255,255,0)')
-  g.fillStyle = gl; g.fillRect(0, 0, 32, 160)
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.flipY = false
-  return t
-})()
+  const draw = (level: number) => {
+    g.fillStyle = '#2c2119'; g.fillRect(0, 0, 32, 160)
+    // (a full box's stack up to a fifth from the window's top, as it was drawn; down to nothing as it's used)
+    const top = 160 * (1 - 0.78 * Math.max(0, Math.min(1, level)))
+    for (let y = top; y < 160; y += 2) { g.fillStyle = y % 4 < 2 ? '#8f7a62' : '#7b6754'; g.fillRect(0, y, 32, 2) }
+    if (top < 158) { g.fillStyle = 'rgba(30,18,10,0.35)'; g.fillRect(0, top, 32, 3) }
+    const gl = g.createLinearGradient(0, 0, 32, 160)
+    gl.addColorStop(0.35, 'rgba(255,255,255,0)'); gl.addColorStop(0.45, 'rgba(255,255,255,0.22)'); gl.addColorStop(0.55, 'rgba(255,255,255,0)')
+    g.fillStyle = gl; g.fillRect(0, 0, 32, 160)
+    t.needsUpdate = true
+  }
+  draw(1)
+  return { tex: t, draw }
+}
 /**
  * The paper towel dispenser: matt warm-white plastic, its lid's seam across the front, a smoked window onto the stack, a lock on its top,
  * a curved lip under it with a sheet's end hanging out. Pointed at it lights; clicked, a sheet's drawn down out of the lip and away (a
- * paper sound)
+ * paper sound). A box holds 150 sheets (the owner's, 2026-11-10; TOILETS' towels, game/washroom): one taken at each click and by one guest
+ * in two drying their hands, the stack in its window going down with them; empty, a click puts a pack in from the spares in stock (the stock
+ * keeper does it on his round, and they're topped up before each day's opening)
  */
-export function WcTowelBox() {
+export function WcTowelBox({ who }: { who: Who }) {
   const b = useBits()
   const g = useRef<THREE.Group>(null)
   const sheet = useRef<THREE.Mesh>(null)
-  const pulled = useRef(-1e9)
-  useFrame(() => {
-    const u = (now() - pulled.current) / 1000
+  const edge = useRef<THREE.Mesh>(null)
+  const st = useRef({ shown: -1, heard: TOILETS[who].towelAt })
+  useFrame(({ camera }) => {
+    const t = TOILETS[who], s = st.current
+    // (the stack seen through the window as high as the box is full: drawn again a twentieth at a time)
+    const lv = Math.ceil((t.towels / TOWEL_FULL) * 20)
+    if (lv !== s.shown) { s.shown = lv; b.towelWin?.draw(lv / 20) }
+    if (edge.current) edge.current.visible = t.towels > 0
+    // (a guest's sheet heard as a click's is, if the room's near)
+    if (t.towelAt !== s.heard) { s.heard = t.towelAt; if (nearOf(g.current, camera) > 0.3) tissuePull() }
+    const u = (now() - t.towelAt) / 1000
     const m = sheet.current
     if (!m) return
     m.visible = u >= 0 && u < 0.7
@@ -488,10 +523,16 @@ export function WcTowelBox() {
     ;(m.material as THREE.MeshToonMaterial).opacity = 1 - away
   })
   return (
-    <group ref={g} onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; pulled.current = now(); tissuePull() }}
-      {...hover('擦手紙盒', () => '點一下抽一張擦手紙')}>
+    <group ref={g} onClick={(e) => {
+      e.stopPropagation()
+      if (getEdit().on) return
+      const t = TOILETS[who]
+      if (t.towels > 0) { const k = takeOne(t.towels); t.towels = k.left; t.towelAt = now() }
+      else if (SUPPLIES.take(TOWEL, 1)) { t.towels = TOWEL_FULL; rollSound(nearOf(g.current, e.camera)) }
+      setTip({ title: '擦手紙盒', hint: towelSays(who) })
+    }} {...hover('擦手紙盒', () => towelSays(who))}>
       <primitive object={b.towel} />
-      <mesh geometry={TOWEL_EDGE} position={[0, SLOT_Y + 0.002, SLOT_Z]} rotation-x={-0.14} material={PAPER_MAT} />
+      <mesh ref={edge} geometry={TOWEL_EDGE} position={[0, SLOT_Y + 0.002, SLOT_Z]} rotation-x={-0.14} material={PAPER_MAT} />
       <mesh ref={sheet} geometry={TOWEL_SHEET} visible={false} raycast={() => {}}>
         <meshToonMaterial color="#fbfaf6" side={THREE.DoubleSide} transparent />
       </mesh>
@@ -618,7 +659,8 @@ export function WcPaper({ who }: { who: Who }) {
       if (getEdit().on) return
       const t = TOILETS[who]
       if (t.room.paper <= 0.001) {
-        // (used up: a new roll)
+        // (used up: a new roll, a spare from stock (game/washroom), if there's one)
+        if (!SUPPLIES.take(ROLL, 1)) { setTip({ title: '衛生紙架', hint: rollSays(who) }); return }
         t.room = newRoll(t.room)
         t.rollAt = now()
         rollSound(nearOf(roll.current, e.camera))
@@ -628,11 +670,7 @@ export function WcPaper({ who }: { who: Who }) {
       t.room = pullSheet(t.room)
       st.current.spun = now()
       tissuePull()
-    }} {...hover('衛生紙架', () => {
-      const p = TOILETS[who].room.paper
-      const left = Math.round(p * ROLL_USES)
-      return p <= 0.001 ? '用完了！點一下換新捲' : `抽取衛生紙 / 轉動紙捲・還夠 ${left} 位客人用`
-    })}>
+    }} {...hover('衛生紙架', () => rollSays(who))}>
       <primitive object={b.holder} />
       <group ref={roll} position={[0, 0, 0.065]}>
         <primitive object={b.roll} />
@@ -1015,10 +1053,21 @@ export function WashstandLive({ who }: { who: Who }) {
     const soapBits: THREE.Object3D[] = []
     root.traverse((o) => { if (/^Wash(SoapBottle|Pump)/.test(o.name) && (o as THREE.Mesh).isMesh) soapBits.push(o) })
     for (const o of soapBits) soap.attach(o)
+    // (its pump's head and nozzle a piece of their own, pressed down as it's used (the owner's, 2026-11-10: it can be pressed, and it's used
+    // up): by a click, or by a guest as they wash their hands)
+    const pump = new THREE.Group()
+    pump.name = 'WashPumpPress'
+    soap.add(pump)
+    for (const o of soapBits) if (/^WashPump(Head|Nozzle)/.test(o.name)) pump.attach(o)
     if (who === 'f') soap.scale.z = -1
     plainColours(root)
     mergeByMaterial(root, (o) => doors.includes(o as THREE.Group) || o === soap)
-    mergeByMaterial(soap)
+    mergeByMaterial(soap, (o) => o === pump)
+    mergeByMaterial(pump)
+    // (where the bottle stands, in the stand's own frame: what takes the pointer for it, a little bigger)
+    root.updateMatrixWorld(true)
+    const soapBox = new THREE.Box3().setFromObject(soap)
+    const soapAt = soapBox.getCenter(new THREE.Vector3()), soapSize = soapBox.getSize(new THREE.Vector3()).addScalar(0.012)
     for (const d of doors) mergeByMaterial(d)
     mergeByMaterial(handle)
     let plain: THREE.Object3D | null = null
@@ -1026,12 +1075,12 @@ export function WashstandLive({ who }: { who: Who }) {
     const mirror = roundMirror((box.max.y - box.min.y) / 2)
     mirror.glass.position.copy(face).add(new THREE.Vector3(-0.0006, 0, 0))
     mirror.glass.rotation.y = -Math.PI / 2
-    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null, doors }
+    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null, doors, pump, soapAt, soapSize }
   }, [gltf, who])
   const cab = useRef({ open: false, k: 0 })
   useEffect(() => () => { parts.mirror.glass.getRenderTarget().dispose(); (parts.mirror.glass.material as THREE.Material).dispose() }, [parts])
   const frame = useRef(0)
-  const st = useRef({ turn: 0, lastHand: -1e9, was: false })
+  const st = useRef({ turn: 0, lastHand: -1e9, was: false, pumped: TOILETS[who].pumpAt })
   const stream = useRef<THREE.Mesh>(null)
   const water = useRef<THREE.Mesh>(null)
   const rings = useRef<(THREE.Mesh | null)[]>([])
@@ -1058,7 +1107,18 @@ export function WashstandLive({ who }: { who: Who }) {
     s.turn += ((on ? 1 : 0) - s.turn) * Math.min(1, Math.min(dt, 0.1) * 8)
     parts.handle.rotation.y = s.turn * (Math.PI / 2)
     // (a guest's hand wash, metered once)
-    if (t.handAt > s.lastHand) { s.lastHand = t.handAt; meterWater('handwash') }
+    if (t.handAt > s.lastHand) {
+      s.lastHand = t.handAt
+      meterWater('handwash')
+      // (and a press of the soap first, while there's any (game/washroom))
+      const k = takeOne(t.soap)
+      t.soap = k.left
+      if (k.got) t.pumpAt = now()
+    }
+    // (the pump's head pressed down 5 mm and back, heard as it's pressed)
+    if (t.pumpAt !== s.pumped) { s.pumped = t.pumpAt; pumpSound(nearOf(parts.root, camera)) }
+    const pu = (now() - t.pumpAt) / 1000
+    parts.pump.position.y = pu >= 0 && pu < 0.32 ? -0.005 * Math.sin(Math.PI * Math.min(1, pu / 0.32)) : 0
     const k = clock.elapsedTime
     // (the bowl's water (the owner's: it was always empty, the stream straight down the drain): risen or let go a moment on (game/basin),
     // as wide as the bowl is at its height, shimmering)
@@ -1149,6 +1209,14 @@ export function WashstandLive({ who }: { who: Who }) {
   const cabSays = () => (cab.current.open ? '點擊關上' : '點擊打開・備用的衛生紙、擦手紙與洗手乳補充包')
   const says = () => (TOILETS[who].tap ? '點一下關水' : '點一下開水（開著會一直計水費）')
   const plugSays = () => (TOILETS[who].basin.plugged ? '點一下拔起塞子（放水）' : '點一下壓下塞子（蓄水）')
+  /** the soap pressed at a click: a press, if there's any; empty, a refill put in from the spares in stock, if there's one; else only its
+   * pump's dry click */
+  const press = (camera: THREE.Camera) => {
+    const t = TOILETS[who]
+    if (t.soap > 0) { const k = takeOne(t.soap); t.soap = k.left; t.pumpAt = now(); return }
+    if (SUPPLIES.take(SOAP, 1)) { t.soap = SOAP_FULL; rollSound(nearOf(parts.root, camera)); return }
+    pumpSound(nearOf(parts.root, camera), true)
+  }
   return (
     <group>
       {/* (the cabinet's doors pointed at through the stand's own model: only they answer) */}
@@ -1165,6 +1233,11 @@ export function WashstandLive({ who }: { who: Who }) {
         <primitive object={parts.root} />
       </group>
       <primitive object={parts.mirror.glass} />
+      {/* (the hand soap: pointed at it lights and says how much is left; clicked, a press (an empty one, a refill put in)) */}
+      <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; press(e.camera); setTip({ title: '洗手乳', hint: soapSays(who) }) }}
+        {...hover('洗手乳', () => soapSays(who))}>
+        <mesh position={parts.soapAt.toArray()} visible={false}><boxGeometry args={parts.soapSize.toArray()} /></mesh>
+      </group>
       {/* (the tap's handle: pointed at it lights and says so; clicked, the water's turned on, or off) */}
       <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; TOILETS[who].tap = !TOILETS[who].tap; setTip({ title: '洗手台水龍頭', hint: says() }) }}
         {...hover('洗手台水龍頭', says)}>

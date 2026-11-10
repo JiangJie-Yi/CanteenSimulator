@@ -8,7 +8,7 @@ export type GlyphPart = { d: string; stroke?: number; cut?: boolean; o?: number 
 export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
-  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb'
+  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb' | 'towel' | 'soap'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -43,6 +43,12 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
   // (a roll of tissue stood on end, its core showing, a sheet hanging off its side)
   tissue: [{ d: 'M2.4 5v7.2a4.3 1.8 0 0 0 8.6 0V5Z' }, { d: 'M6.7 3.2a4.3 1.8 0 1 1 0 3.6a4.3 1.8 0 1 1 0-3.6Z', stroke: 0.9, cut: true },
     { d: 'M6.7 4.5a1.3.55 0 1 1 0 1.1a1.3.55 0 1 1 0-1.1Z', cut: true }, { d: 'M11.6 6.6h2.4v7.8l-.8-.5-.8.5-.8-.5Z' }],
+  // (paper towels: a stack of folded sheets, the top one drawn up out of it, its fold showing)
+  towel: [{ d: 'M2.2 9.4h11.6v4.8H2.2Z' }, { d: 'M2.2 11.8h11.6', stroke: 0.9, cut: true }, { d: 'M4.4 2.2h7.2l1.4 6.2H3Z' },
+    { d: 'M4.2 5.4h7.6', stroke: 0.8, cut: true }],
+  // (hand soap: a pump bottle, its head and spout on its neck, a label across it)
+  soap: [{ d: 'M4.6 6.8h6.8a1.3 1.3 0 0 1 1.3 1.3v5.6a1.3 1.3 0 0 1-1.3 1.3H4.6a1.3 1.3 0 0 1-1.3-1.3V8.1a1.3 1.3 0 0 1 1.3-1.3Z' },
+    { d: 'M6.9 4.2h2.2v2.6H6.9Z' }, { d: 'M5.4 2.4h5.6v1.8H5.4ZM11 2.4h2.4v1.1H11Z' }, { d: 'M5.2 9.6h5.6v2.6H5.2Z', cut: true }],
   // (world space: a globe, its meridian and parallels; object space: a box seen from a corner)
   globe: [{ d: 'M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2Z', stroke: 1.3 }, { d: 'M8 2c-2.2 2-2.2 10 0 12M8 2c2.2 2 2.2 10 0 12M2.3 6h11.4M2.3 10h11.4', stroke: 1 }],
   box: [{ d: 'M8 1.8 13.6 4.6v6.8L8 14.2 2.4 11.4V4.6ZM2.4 4.6 8 7.4l5.6-2.8M8 7.4v6.8', stroke: 1.3 }],
