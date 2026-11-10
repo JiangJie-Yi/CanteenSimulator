@@ -8,7 +8,7 @@ export type GlyphPart = { d: string; stroke?: number; cut?: boolean; o?: number 
 export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
-  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad'
+  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -61,6 +61,8 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
     { d: 'M4.6 6.4v3M3.1 7.9h3', stroke: 1.1, cut: true }, { d: 'M10.6 7.3a.75.75 0 1 1 0 1.5a.75.75 0 1 1 0-1.5ZM12.4 8.6a.75.75 0 1 1 0 1.5a.75.75 0 1 1 0-1.5Z', cut: true }],
   // (an eye: the view's, as on the views button)
   eye: [{ d: 'M1.4 8S3.8 3.6 8 3.6 14.6 8 14.6 8 12.2 12.4 8 12.4 1.4 8 1.4 8Z', stroke: 1.3 }, { d: 'M8 5.9a2.1 2.1 0 1 1 0 4.2A2.1 2.1 0 1 1 8 5.9Z' }],
+  // (a review found useful: a thumb up, its cuff beside it)
+  thumb: [{ d: 'M1.6 7.2h2.8v6.6H1.6Z' }, { d: 'M5.4 7.2 8.2 2.3c.5-.9 2-.6 2 .6v3.3h3.1c.9 0 1.6.8 1.4 1.7l-1.1 5.1c-.2.7-.8 1.2-1.5 1.2H5.4Z' }],
 }
 
 /** the icon as SVG markup, for the DOM the developer panel builds by hand */

@@ -5,8 +5,9 @@
 
 export type Gripe = 'wait' | 'tissue' | 'toilet' | 'dark' | 'sick' | 'nothing' | 'receipt'
 /** one customer's visit, as they leave: what they thought of what they ate (0..100, none if they ate nothing), how long they waited for
- * their first piece (seconds), whether they walked out, and what put them out */
-export type Visit = { id: number; taste: number | null; waited: number; walkedOut: boolean; gripes: Gripe[] }
+ * their first piece (seconds), whether they walked out, and what put them out; the game's day it was, and whether it's a review bought
+ * (no customer behind it) */
+export type Visit = { id: number; taste: number | null; waited: number; walkedOut: boolean; gripes: Gripe[]; day?: number; bought?: boolean }
 /** how much each kind of upset takes off a visit's satisfaction */
 export const GRIPE_COST: Record<Gripe, number> = { wait: 12, tissue: 8, toilet: 10, dark: 18, sick: 35, nothing: 25, receipt: 6 }
 /** how long a wait for the first piece is taken in good part (seconds); after that, a point off every six seconds, up to twenty */
@@ -95,3 +96,47 @@ export function remarkOf(v: Visit): Remark {
 /** how many visits are kept (the rating needs only the latest; a few more for the list) */
 export const KEEP_VISITS = 120
 export const keepVisits = (vs: Visit[]) => (vs.length > KEEP_VISITS ? vs.slice(-KEEP_VISITS) : vs)
+
+/** a visit's three sides as a map app's review of a restaurant shows them (料理 5/5, サービス 4/5, 雰囲気 5/5): whole stars, 1 to 5; nothing
+ * eaten, none for the food */
+export function visitSides(v: Visit): { food: number | null; service: number; place: number } {
+  const whole = (s: number) => Math.max(1, Math.min(5, Math.round(starsOf(s))))
+  const f = foodScore(v)
+  return { food: f === null ? null : whole(f), service: v.walkedOut ? 1 : whole(serviceScore(v)), place: whole(placeScore(v)) }
+}
+/** how many of the visits rate it 5, 4, 3, 2 and 1 star (each its own stars, rounded), for the bars beside the score */
+export function starCounts(visits: Visit[]): [number, number, number, number, number] {
+  const c: [number, number, number, number, number] = [0, 0, 0, 0, 0]
+  for (const v of visits) c[5 - Math.max(1, Math.min(5, Math.round(visitStars(v))))]++
+  return c
+}
+/** the reviews in an order (the owner's: as a map app sorts them): most relevant (newest first, but those with something to say ahead of the
+ * bare praise bought in), newest, highest, lowest */
+export type ReviewOrder = 'relevant' | 'newest' | 'highest' | 'lowest'
+export function sortReviews(visits: Visit[], by: ReviewOrder): Visit[] {
+  const at = new Map(visits.map((v, i) => [v, i]))
+  const newest = (a: Visit, b: Visit) => at.get(b)! - at.get(a)!
+  const vs = [...visits]
+  if (by === 'newest') return vs.sort(newest)
+  if (by === 'highest') return vs.sort((a, b) => visitStars(b) - visitStars(a) || newest(a, b))
+  if (by === 'lowest') return vs.sort((a, b) => visitStars(a) - visitStars(b) || newest(a, b))
+  return vs.sort((a, b) => Number(!!a.bought) - Number(!!b.bought) || newest(a, b))
+}
+/** how long ago a visit was, in the game's days: today, so many days, weeks, months */
+export function agoOf(day: number | undefined, today: number): { n: number; unit: 'today' | 'day' | 'week' | 'month' } {
+  const d = Math.max(0, today - (day ?? today))
+  if (d === 0) return { n: 0, unit: 'today' }
+  if (d < 7) return { n: d, unit: 'day' }
+  if (d < 30) return { n: Math.floor(d / 7), unit: 'week' }
+  return { n: Math.floor(d / 30), unit: 'month' }
+}
+/** reviews to be bought (the owner's: a shop can pay for its stars), so many at so much (NT$) */
+export const REVIEW_PACKS = [{ n: 5, cost: 2500 }, { n: 10, cost: 4500 }, { n: 30, cost: 12000 }] as const
+/** the reviews a pack brings: four and five stars, nothing to complain of, dated `day`, numbered down from `first` (bought ones are numbered
+ * below every customer's, who count up from one) */
+export function boughtVisits(n: number, first: number, day: number): Visit[] {
+  return Array.from({ length: n }, (_, i) => {
+    const id = first - i, h = (Math.imul(id, 2654435761) >>> 0) % 1000 / 1000
+    return { id, taste: 78 + Math.round(h * 21), waited: 20 + Math.round(h * 40), walkedOut: false, gripes: [], day, bought: true }
+  })
+}

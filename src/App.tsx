@@ -69,7 +69,7 @@ import { SAY_EACH, sayChunks } from '@/game/say'
 import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
 import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
-import { flowOf, keepVisits, rateShop, type Visit } from '@/game/reputation'
+import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, type Visit } from '@/game/reputation'
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
 import { RECEIPT, receiptOrder } from '@/game/receipts'
 import { LINES } from '@/data/lines'
@@ -125,7 +125,7 @@ const FIRE_CAPACITY = RING_SLOTS
 const SAVE_KEY = 'canteen-save'
 /** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
 const RESUME_KEY = 'jgs-resume-1'
-type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number; promo?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, Rota>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
   /** each food's lots, as bought (game/lots) */
@@ -153,7 +153,8 @@ const SAVED: Saved | null = (() => {
     // storage blocked
   }
   // (a fresh game (not one brought back): the last game's days gone from the books)
-  if (!back) try { localStorage.removeItem('jgs-days-1') } catch { /* (storage blocked) */ }
+  // (and its reviews: a new shop starts with none, nought stars (the owner's, 2026-11-10: the last game's were still there))
+  if (!back) try { localStorage.removeItem('jgs-days-1'); localStorage.removeItem('jgs-reputation-1') } catch { /* (storage blocked) */ }
   // (the same applicants as before, so the staff taken on are still among them)
   if (back?.candidates) for (const [shop, ws] of Object.entries(back.candidates)) CANDIDATES[shop] = ws
   // (and the clock as it was: the same day, the same time of day)
@@ -1482,7 +1483,7 @@ export default function App() {
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0, utility: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
   // the water and power: the month so far on the meter (game/utilities), kept in the browser; shown in the stock panel every few seconds
   const meterRef = useRef<Meter>((() => {
     try { const v = JSON.parse(localStorage.getItem(METER_KEY) ?? 'null'); if (v && typeof v.kwh === 'number' && typeof v.day === 'number') return v as Meter } catch { /* (none kept) */ }
@@ -1495,7 +1496,8 @@ export default function App() {
     return []
   })
   const addVisit = useCallback((v: Visit) => setShopVisits((vs) => {
-    const next = keepVisits([...vs, v])
+    // (dated by the game's day, for the review's "so long ago")
+    const next = keepVisits([...vs, { ...v, day: v.day ?? getClock().day }])
     try { localStorage.setItem(VISITS_KEY, JSON.stringify(next)) } catch { /* (not kept) */ }
     return next
   }), [])
@@ -1521,9 +1523,29 @@ export default function App() {
   }, [])
   const [showRating, setShowRating] = useState(false)
   const closeRating = useCallback(() => setShowRating(false), [])
+  // (reviews bought (the owner's, 2026-11-10): a pack's worth of four and five stars, numbered below every real customer's, dated today, paid
+  // as promotion; the drawer's handler the same every render (its memo), calling the latest)
+  const buyReviews = (pack: number) => {
+    const pk = REVIEW_PACKS[pack]
+    if (!pk) return
+    if (cash < pk.cost) {
+      say(tl(lang, `現金不足：買 ${pk.n} 則評價需要 NT$${pk.cost.toLocaleString('en-US')}`, `お金が足りません：クチコミ ${pk.n} 件は NT$${pk.cost.toLocaleString('en-US')}`, `Not enough cash: ${pk.n} reviews cost NT$${pk.cost.toLocaleString('en-US')}`))
+      return
+    }
+    book('promo', pk.cost)
+    setShopVisits((vs) => {
+      const next = keepVisits([...vs, ...boughtVisits(pk.n, Math.min(0, ...vs.map((v) => v.id)) - 1, getClock().day)])
+      try { localStorage.setItem(VISITS_KEY, JSON.stringify(next)) } catch { /* (not kept) */ }
+      return next
+    })
+    say(tl(lang, `買了 ${pk.n} 則好評（NT$${pk.cost.toLocaleString('en-US')}）`, `高評価を ${pk.n} 件買った（NT$${pk.cost.toLocaleString('en-US')}）`, `Bought ${pk.n} good reviews (NT$${pk.cost.toLocaleString('en-US')})`))
+  }
+  const buyRef = useRef(buyReviews)
+  buyRef.current = buyReviews
+  const onBuyReviews = useCallback((pack: number) => buyRef.current(pack), [])
   const meterTick = useRef(0)
   // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
-  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.utility ?? 0) - (ledger.setup ?? 0) - (ledger.offering ?? 0) + (ledger.till ?? 0)
+  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.utility ?? 0) - (ledger.setup ?? 0) - (ledger.offering ?? 0) - (ledger.promo ?? 0) + (ledger.till ?? 0)
   // (the room's own purchases (a case of drinks from the crates) paid from the same cash, into what's bought)
   const cashNow = useRef(cash)
   cashNow.current = cash
@@ -2878,7 +2900,7 @@ export default function App() {
           onClick={editOn ? undefined : () => setShowRating((v) => !v)} />
         {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars; a drawer out from the left, kept
             drawn so it slides back in as it slid out) */}
-        {!editOn && <Reputation open={showRating} lang={lang} rating={shopRating} visits={shopVisits} onClose={closeRating} />}
+        {!editOn && <Reputation open={showRating} lang={lang} rating={shopRating} visits={shopVisits} today={clockDay} cash={cash} onBuy={onBuyReviews} onClose={closeRating} />}
         {/* (the fire is the grill's own (research, at the grill's view); how full is the owner's own, on his view: the rest of the time they're
             out of the way, and the buttons under them move up into the room left) */}
         {showFire && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
@@ -2923,6 +2945,7 @@ export default function App() {
                 <p><span>{tl(lang, '採買支出', '仕入れ', 'Purchasing')}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '收銀機取款', 'レジから取り出し', 'Taken from till')}</span><b className="money">+{Math.round(ledger.till ?? 0).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
+                <p><span>{tl(lang, '宣傳費（買評價）', '宣伝費（クチコミ）', 'Promotion (reviews)')}</span><b className="money">−{Math.round(ledger.promo ?? 0).toLocaleString()}</b></p>
                 {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['utility', -(ledger.utility ?? 0)], ['wage', -ledger.wage]] as const)
                   .map(([k, v]) => (
                     <p key={k}><span>{UI[lang][k]}</span><b className="money">{v < 0 ? '−' : ''}{Math.abs(v).toFixed(k === 'revenue' || k === 'foodCost' ? 0 : k === 'utility' ? 2 : 1)}</b></p>
@@ -2987,7 +3010,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, till: 0, utility: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}

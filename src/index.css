@@ -7481,7 +7481,7 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 :root[data-theme='dark'] :is(.rep-empty, .rep-sum, .rep-recent li, .rep-about, .rep-credits li) { background: rgb(255 255 255 / 0.05); border-color: rgb(246 236 216 / 0.12); }
 .rep-empty { margin: 0 0 10px; padding: 16px 14px; }
 /* (the shop's stars, big, and beside them the food, the service and the place) */
-.rep-sum { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; padding: 12px 14px; }
+.rep-sum { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 16px; padding: 12px 14px; }
 .rep-score { display: grid; justify-items: start; gap: 3px; }
 .rep-score strong { font-size: 40px; line-height: 1; color: #c4442f; font-variant-numeric: tabular-nums; }
 :root[data-theme='dark'] .rep-score strong { color: #ff9a80; }
@@ -7569,7 +7569,7 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .rep-stars-base { color: rgb(59 42 32 / 0.18); }
 :root[data-theme='dark'] .rep-stars-base { color: rgb(246 236 216 / 0.2); }
 .rep-stars-fill { position: absolute; left: 0; top: 0; overflow: hidden; white-space: nowrap; color: #f0a020; }
-.rep-parts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content auto 1fr; gap: 4px 8px; }
+.rep-parts { grid-column: 1 / -1; list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px dashed rgb(59 42 32 / 0.18); display: grid; grid-template-columns: max-content auto 1fr; gap: 4px 8px; }
 /* (each row on the list's own columns, the names' as wide as the longest of them, nothing broken onto a second line (the owner's: サービ/ス,
    The/place, in a column 3.6em wide)) */
 .rep-parts li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; white-space: nowrap; }
@@ -7589,13 +7589,43 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 :root[data-theme='dark'] .rep-drawer h4 { color: #f6ecd8; border-color: rgb(246 236 216 / 0.25); }
 :root[data-theme='dark'] .rep-drawer h4 small { background: rgb(246 236 216 / 0.1); }
 .rep-recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.rep-recent li { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; padding: 9px 12px; }
+/* (a review as a map app's: the picture and the name with the reviewer's line under it, then across the card the stars and how long ago, what
+   they said, the food, service and atmosphere out of five, and the useful button) */
+.rep-recent li { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; padding: 10px 12px; }
 .rep-recent .rev-avatar { grid-row: 1 / 3; width: 38px; height: 38px; align-self: center; filter: drop-shadow(0 2px 3px rgb(59 42 32 / 0.18)); }
 .rep-who { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; white-space: nowrap; }
 /* (what kind of customer they were: a small pill beside the name they review under) */
 .rep-kind { padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 400; opacity: 0.75; background: rgb(127 127 127 / 0.16); }
 .rep-said { font-size: 13.5px; }
 .rep-note { margin: 0; padding: 10px 2px 12px; font-size: 11.5px; }
+/* (how many gave five stars down to one: a bar each, the most of them full) */
+.rep-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.rep-bars li { display: grid; grid-template-columns: 0.8em minmax(0, 1fr); align-items: center; gap: 6px; font-size: 11.5px; line-height: 1; color: #7a6250; }
+.rep-bars i { display: block; height: 7px; border-radius: 999px; background: rgb(59 42 32 / 0.1); overflow: hidden; }
+.rep-bars b { display: block; height: 100%; border-radius: 999px; background: #f0a020; }
+:root[data-theme='dark'] .rep-bars i { background: rgb(246 236 216 / 0.12); }
+/* (reviews to be bought: a pill that opens the three packs, each its price and its button) */
+.rep-buy { display: grid; gap: 8px; margin-top: 10px; }
+.rep-buy-open { justify-self: start; padding: 5px 14px; border: none; border-radius: 999px; background: #8e2f22; color: #fff3e2; font: inherit; font-size: 13px; letter-spacing: 0.06em; white-space: nowrap; cursor: pointer; box-shadow: 0 2px 6px -2px rgb(0 0 0 / 0.4); }
+.rep-buy-open:hover { background: #a8382a; }
+.rep-packs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rep-packs li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 10px; background: rgb(255 255 255 / 0.3); border: 1px solid rgb(59 42 32 / 0.12); white-space: nowrap; }
+:root[data-theme='dark'] .rep-packs li { background: rgb(255 255 255 / 0.05); border-color: rgb(246 236 216 / 0.12); }
+.rep-packs button { padding: 3px 12px; border: none; border-radius: 999px; background: var(--wood-bar); color: #f6e8cc; font: inherit; font-size: 12.5px; cursor: pointer; }
+.rep-packs button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* (the orders the reviews can be read in, as chips) */
+.rep-sort { display: flex; gap: 6px; margin: 0 0 10px; overflow-x: auto; scrollbar-width: none; }
+.rep-sort button { flex: none; padding: 4px 11px; border: 1px solid rgb(59 42 32 / 0.25); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.rep-sort button[aria-pressed='true'] { background: #5a3d28; border-color: #5a3d28; color: #f6e8cc; }
+:root[data-theme='dark'] .rep-sort button { border-color: rgb(246 236 216 / 0.25); }
+:root[data-theme='dark'] .rep-sort button[aria-pressed='true'] { background: #e8b04a; border-color: #e8b04a; color: #2a1d12; }
+.rep-meta { font-size: 11.5px; color: #7a6250; white-space: nowrap; }
+.rep-when, .rep-said, .rep-sides, .rep-like { grid-column: 1 / -1; }
+.rep-when { display: flex; align-items: center; gap: 8px; }
+.rep-when small, .rep-sides { font-size: 11.5px; color: #7a6250; }
+.rep-like { justify-self: start; display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: 1px solid rgb(59 42 32 / 0.2); border-radius: 999px; background: transparent; color: #7a6250; font: inherit; font-size: 11.5px; white-space: nowrap; cursor: pointer; }
+.rep-like[aria-pressed='true'] { color: #2f6f9f; border-color: rgb(47 111 159 / 0.5); background: rgb(47 111 159 / 0.08); }
+:root[data-theme='dark'] :is(.rep-meta, .rep-when small, .rep-sides, .rep-like, .rep-bars li) { color: #c9bfae; }
 .tissue-icon { flex: none; width: 18px; height: 18px; color: #8a6a4a; }
 
 /* ---- the stock panel in the office's finish (the owner's: frosted glass as the office's staff tab has it, not the fridge's blues): the wood
