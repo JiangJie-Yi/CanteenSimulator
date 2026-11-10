@@ -71,7 +71,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -461,7 +461,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
   useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear(); for (const f of FRIDGE_STATE) f.stocker = false }, [])
   return (
-    <group ref={g} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
+    <group ref={(o) => { g.current = o; if (o) FIGURES.set(o, 'other') }} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
       <BlobShadow r={0.17} />
       <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
       <Html position={[0, 1.95, 0]} center zIndexRange={[19, 9]} style={{ pointerEvents: 'none' }}>
@@ -2103,6 +2103,16 @@ function Counter({ length }: { length: number }) {
 /** a stool pulled out and pushed in (the bar's frame): where its customer stops behind it, how far it's pulled out, how far they push it back
  * getting up; how long pulling it out, stepping onto it, sliding in (or home) take, and how long after they're off before it's pushed home */
 const STOOL_STAND = 0.42, STOOL_OUT = 0.25, STOOL_LEAVE = 0.22
+/**
+ * Where each stool's seat and each place on the waiting bench are as they've been moved by hand (edit mode): a marker hung in each, where it
+ * was laid out (the owner's, 2026-11-10: a seat goes with its chair; moved, its customer sat where it had been). A customer near their own
+ * stool is moved by as much as it has been (all of it within 0.4 of it, none from 1.2: the way to it bends to it); one on the bench sits
+ * where the bench is
+ */
+const SEAT_MARKS = new Map<number, THREE.Object3D>()
+const BENCH_MARKS = new Map<number, THREE.Object3D>()
+const SEAT_SHIFT = new THREE.Vector3()
+const BENCH_AT = [new THREE.Vector3(), new THREE.Vector3()]
 const STOOL_PULL_S = 0.25, STOOL_STEP_S = 0.3, STOOL_SLIDE_S = 0.4, STOOL_HOME_WAIT = 0.3
 /** the way back from a place's stool toward the aisle (level) */
 const backOf = (st: { stool: THREE.Vector3; aisle: THREE.Vector3 }) => st.aisle.clone().sub(st.stool).setY(0).normalize()
@@ -3293,6 +3303,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (and if they've somehow not got out in all the time it can take, they're gone all the same)
         if ((d >= lp.len && s.fade <= 0) || raw > lp.len + (PAY_S + SHOES_S + 8) * v) done.push(s.id)
       }
+      // (their stool where it's been moved to by hand: sat on it there, and stepped up to it and away from it there)
+      const mk = SEAT_MARKS.get(s.seat), fr = frame.current
+      if (g && mk && fr) {
+        fr.worldToLocal(mk.getWorldPosition(SEAT_SHIFT)).sub(st.stool)
+        if (SEAT_SHIFT.lengthSq() > 1e-8) {
+          const w = THREE.MathUtils.clamp((1.2 - Math.hypot(g.position.x - st.stool.x, g.position.z - st.stool.z)) / 0.8, 0, 1)
+          g.position.addScaledVector(SEAT_SHIFT, w * w * (3 - 2 * w))
+        }
+      }
       // (the name tag goes with the body: gone a little before they are, so none is left hanging in the doorway)
       const tag = labels.current.get(s.id)
       const hidden = s.phase === 'wcIn' && s.wc?.who !== 'drink' && (s.fade ?? 0) <= 0
@@ -4032,7 +4051,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       for (const v of sitters.current.values()) {
         v.t += step
         const sp = SPEED * walkSpeedOf(kindOf(v.id).kind)
-        const at = way?.benchSpots[v.spot]
+        // (its place on the bench where the bench is now, moved by hand or not)
+        const laid = way?.benchSpots[v.spot], bm = BENCH_MARKS.get(v.spot), fb = frame.current
+        const at = laid && bm && fb ? fb.worldToLocal(bm.getWorldPosition(BENCH_AT[v.spot])) : laid
         if (!way || !at) { sitters.current.delete(v.id); benchChanged = true; continue }
         if (BENCH.up.has(v.id)) {
           // (called: up off the bench and on in to their stool from here (setShown's way in starts where they sat))
@@ -4633,9 +4654,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && !ownerServes && (
         <group ref={(o) => {
           const was = platerObj.current
-          if (was && was !== o) KITCHEN_FOLK.delete(was)
+          if (was && was !== o) { KITCHEN_FOLK.delete(was); FIGURES.delete(was) }
           platerObj.current = o
-          if (o) KITCHEN_FOLK.add(o)
+          // (out from his place and back to it: the third cook's is his bay, the second cook's his board; none, the owner)
+          if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, !plater ? 'owner' : plater.role === 'sous' ? 'sous' : 'other') }
         }} name="plater-walker" scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.17} />
           {plater ? <StaffFigure id={plater.id} role={plater.role} look={plater.look} moving={platerMoving} /> : <OwnerWalker moving={platerMoving} />}
@@ -4715,9 +4737,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {ownerServes && (
         <group ref={(o) => {
           const was = waiterObjs.current[0]
-          if (was && was !== o) KITCHEN_FOLK.delete(was)
+          if (was && was !== o) { KITCHEN_FOLK.delete(was); FIGURES.delete(was) }
           waiterObjs.current[0] = o
-          if (o) KITCHEN_FOLK.add(o)
+          if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, 'owner') }
         }} position={ownerAt()} rotation-y={OWNER_YAW} scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.2} />
           <OwnerWalker moving={!!moving[0]} />
@@ -4726,9 +4748,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {!ownerServes && servers.slice(0, homes.length).map((w, i) => (
         <group key={w.id} ref={(o) => {
           const was = waiterObjs.current[i]
-          if (was && was !== o) KITCHEN_FOLK.delete(was)
+          if (was && was !== o) { KITCHEN_FOLK.delete(was); FIGURES.delete(was) }
           waiterObjs.current[i] = o
-          if (o) KITCHEN_FOLK.add(o)
+          if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, 'other') }
         }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE} userData={{ staffId: w.id }}>
           <BlobShadow r={0.17} />
           <StaffFigure id={w.id} role="server" look={w.look} moving={!!moving[i]} />
@@ -4738,7 +4760,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const g = guests.find((x) => x.id === s.id)
         const walking = s.phase !== 'sit'
         return (
-          <group key={s.id} ref={(o) => { if (o) groups.current.set(s.id, o); else groups.current.delete(s.id) }}>
+          <group key={s.id} userData={{ guest: s.id }} ref={(o) => { if (o) { groups.current.set(s.id, o); FIGURES.set(o, 'other') } else groups.current.delete(s.id) }}>
             {/* (a soft shadow under them, sat or walking) */}
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
@@ -4762,12 +4784,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             {/* (drawn at the customers' size, as the stools are: its seat a stool's height under them) */}
             <group scale={[0.48 * PEOPLE_SCALE, PEOPLE_SCALE, 0.8 * PEOPLE_SCALE]}><WaitingBench /></group>
           </group>
+          {/* (its two places, where those waiting sit: they go with it, moved by hand) */}
+          {takeoutWay.benchSpots.map((p, k) => (
+            <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
+          ))}
         </Movable>
       )}
       {/* (gone from the bench's list, faded out: drawn so until React takes them away, never back at full (it was ?? 1: a blink of them whole in the
           doorway as they went, the last frame)) */}
       {people && sitterList.map((v) => (
-        <group key={`bench${v.id}`} name={`bench-sitter-${v.id}`} ref={(o) => { if (o) sitterObjs.current.set(v.id, o); else sitterObjs.current.delete(v.id) }}>
+        <group key={`bench${v.id}`} name={`bench-sitter-${v.id}`} ref={(o) => { if (o) { sitterObjs.current.set(v.id, o); FIGURES.set(o, 'other') } else sitterObjs.current.delete(v.id) }}>
           <BlobShadow r={0.17 * PEOPLE_SCALE} />
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
@@ -4778,7 +4804,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ))}
       {/* takeaway customers and riders waiting in the genkan, and the boxes the servers carry out to them */}
       {people && visitorList.map((v) => (
-        <group key={`takeout${v.id}`} ref={(o) => { if (o) visitorObjs.current.set(v.id, o); else visitorObjs.current.delete(v.id) }}>
+        <group key={`takeout${v.id}`} ref={(o) => { if (o) { visitorObjs.current.set(v.id, o); FIGURES.set(o, 'other') } else visitorObjs.current.delete(v.id) }}>
           <BlobShadow r={0.17 * PEOPLE_SCALE} />
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
@@ -4908,8 +4934,8 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
   })
   return (
     <>
-      {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut: only the stool's look; where its guest
-          sits and the way to it stay as they are, so no one is put out of a seat) */}
+      {/* (each stool its own Movable, so each can be moved, turned and made larger or smaller by hand when the shop's shut; its customer sits on it
+          where it's been moved to (SEAT_MARKS)) */}
       {seats.map((st, n) => (
         <Movable key={`${seats.length}-${n}`} id={`stool${n}`} label={`座位 ${n + 1}`}>
           <group ref={(o) => { pulls.current[n] = o }}>
@@ -4917,6 +4943,7 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
             <group position={st.stool} rotation-y={st.yaw} scale={PEOPLE_SCALE}><StoolModel red={n % 2 === 1} /></group>
           </StaticBatch>
           </group>
+          <group name={`stool-seat-${n}`} position={st.stool} userData={{ marker: true }} ref={(o) => { if (o) SEAT_MARKS.set(n, o); else SEAT_MARKS.delete(n) }} />
         </Movable>
       ))}
     </>

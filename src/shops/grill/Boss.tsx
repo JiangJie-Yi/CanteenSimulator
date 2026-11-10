@@ -11,7 +11,7 @@ import type { Lang } from '@/data/i18n'
 import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
-import { FRIDGE_STOCK, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
+import { FIGURES, FRIDGE_STOCK, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
 import { footDust, newSteps } from '@/scene/DustPuffs'
 const FEET = new THREE.Vector3()
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
@@ -250,7 +250,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const m = mover.current
     if (!m) return
     KITCHEN_FOLK.add(m)
-    return () => { KITCHEN_FOLK.delete(m) }
+    FIGURES.set(m, 'owner')
+    return () => { KITCHEN_FOLK.delete(m); FIGURES.delete(m) }
   }, [])
   const body = useRef<THREE.Group>(null)
   const parts = useMemo(() => ({

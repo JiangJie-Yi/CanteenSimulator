@@ -9,7 +9,7 @@ import { RENDER_DEFAULT, type RenderPref } from '@/game/renderPrefs'
 import { EDIT_TEXT, pieceName } from '@/data/editText'
 import type { Lang } from '@/data/i18n'
 import { VIEW_SPOTS } from '@/data/views'
-import { areasOf, chainOf, isStill, leavesOf, parentOf, undoGroup, within, type ViewCam } from '@/game/editGroups'
+import { applyGroup, areasOf, chainOf, isStill, leavesOf, parentOf, undoGroup, within, type ViewCam } from '@/game/editGroups'
 import { glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { GRILL_SEATS } from './bar'
@@ -262,6 +262,58 @@ export const positionOf = (id: string): V3 => {
 }
 /** where a piece's pivot is moved to from its middle (its own frame) */
 export const pivotOf = (id: string): V3 => state.pivots[id] ?? [0, 0, 0]
+/**
+ * What hangs or is fixed to a wall, whose pivot stays at its middle: the lamps and lanterns, the noren, the switches and signs and pictures, the
+ * speaker, the shrine's shelf on its brackets, the knives on the table's front, what's on the toilets' walls, the views' cameras. Everything
+ * else stands on something (the floor, a table, a shelf) and has its pivot at the middle of its foot (the owner's, 2026-11-10: the handles
+ * sat half way up each piece; a chair's, a counter's, a fridge's, a vase's, a sack's at the middle of its base, as Maya's are set): turned
+ * about it, it turns where it stands; sized about it, it grows up from where it stands and doesn't sink into it. A new piece that hangs goes on here.
+ */
+export const HANGS = /^(barlamp|sidelamp|chochin|fishlantern|noren$|speaker$|exitsign$|lightswitch|wcswitch$|art-|knives$|altar$|viewcam-)|^wc2-[mf]-(lamp|noren|dryer|towelbox|remote|paper|oto|pads)/
+// (each piece and each group whose pivot has been brought down to its foot, once: what was saved for it made up for then, so nothing moved)
+const KEY_FOOT = 'jgs-edit-foot-1'
+const KEY_GFOOT = 'jgs-edit-group-foot-1'
+const footSets = (key: string) => { try { return new Set<string>(JSON.parse(localStorage.getItem(key) ?? '[]')) } catch { return new Set<string>() } }
+const footDone = footSets(KEY_FOOT), groupFootDone = footSets(KEY_GFOOT)
+const keepFeet = () => { try { localStorage.setItem(KEY_FOOT, JSON.stringify([...footDone])); localStorage.setItem(KEY_GFOOT, JSON.stringify([...groupFootDone])) } catch { /* storage blocked */ } }
+export const footSettled = (id: string) => footDone.has(id)
+/**
+ * A standing piece's pivot brought down from its middle to its foot (by `d`, in its own frame), once: a pivot moved by hand (D) kept where it
+ * was put (counted from the foot now); and `shift` added to its place, what was saved for it turned or sized about its middle made up for
+ * (Movable works it out), so nothing moves
+ */
+export function settleFoot(id: string, d: V3, shift: V3) {
+  if (footDone.has(id)) return
+  footDone.add(id)
+  const pv = state.pivots[id]
+  if (pv) state.pivots = { ...state.pivots, [id]: [pv[0] - d[0], pv[1] - d[1], pv[2] - d[2]] }
+  if (shift.some((v) => Math.abs(v) > 1e-7)) {
+    const o = state.offsets[id] ?? [0, 0, 0]
+    state.offsets = { ...state.offsets, [id]: [o[0] + shift[0], o[1] + shift[1], o[2] + shift[2]] }
+  }
+  keepFeet()
+  if (pv || shift.some((v) => Math.abs(v) > 1e-7)) { save(); emit() }
+}
+/**
+ * Each group's pivot brought down to its pieces' feet as a piece's is (its lowest foot's height, its middle across as it was), once for each,
+ * its own move made up for, so nothing moves; a group with a piece not yet measured waits for the next time
+ */
+export function settleGroupFeet() {
+  let changed = false
+  for (const [gid, g] of Object.entries(state.groups)) {
+    if (groupFootDone.has(gid) || unsettled.has(gid)) continue
+    const feet = leavesOf(state.groups, gid).map((m) => registry.get(m)?.foot?.() ?? null)
+    if (!feet.length || feet.some((v) => !v)) continue
+    const y = Math.min(...feet.map((v) => intoGroup(gid, v as V3)[1]))
+    const d: V3 = [0, y - g.pivot[1], 0]
+    // (turned and sized about the old pivot, now about the new: the difference made up for in its move)
+    const ad = applyGroup({ ...g, pivot: [0, 0, 0], t: [0, 0, 0] }, d)
+    state.groups = { ...state.groups, [gid]: { ...g, pivot: [g.pivot[0], y, g.pivot[2]], t: [g.t[0] + ad[0] - d[0], g.t[1] + ad[1] - d[1], g.t[2] + ad[2] - d[2]] } }
+    groupFootDone.add(gid)
+    changed = true
+  }
+  if (changed) { keepFeet(); save(); emit() }
+}
 /** the pivot moved to v, and the piece's place moved by `shift` with it (so the piece itself stays where it is, turned or sized as it is) */
 export function setPivot(id: string, v: V3, shift: V3 = [0, 0, 0]) {
   state.pivots = { ...state.pivots, [id]: v }
@@ -370,7 +422,7 @@ export function resetAll() {
   clearAllRenderPrefs()
   save(); emit()
 }
-export const select = (id: string | null) => { state.selected = id; emit() }
+export const select = (id: string | null) => { state.selected = id; if (id && state.groups[id]) settleGroupFeet(); emit() }
 /** which handles the selected piece shows: arrows to move it, rings to turn it, boxes to scale it */
 export function setTool(t: Tool) {
   if (!state.on || state.tool === t) return
@@ -424,7 +476,7 @@ export function setScaleAxis(a: 0 | 1 | 2 | null) {
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
 // (kept on the window, so a live code update in development (which loads this module afresh) doesn't lose the pieces that weren't remounted: the
 // panel would list only some of them)
-type Entry = { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null }
+type Entry = { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null; foot?: () => V3 | null }
 const registry: Map<string, Entry> = typeof window !== 'undefined'
   ? ((window as unknown as { __editRegistry?: Map<string, Entry> }).__editRegistry ??= new Map())
   : new Map()
@@ -437,8 +489,8 @@ export function frameSelected() {
   const target = leavesOf(state.groups, id).find((m) => registry.has(m)) ?? id
   registry.get(target)?.focus()
 }
-export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null) {
-  registry.set(id, { label, focus, center, parent })
+export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null, foot?: () => V3 | null) {
+  registry.set(id, { label, focus, center, parent, foot })
   panel()
   return () => { registry.delete(id); panel() }
 }
@@ -476,6 +528,9 @@ export function makeGroup() {
   }
   state.picked = []
   state.selected = id
+  // (its pivot at its pieces' feet, as every group's (a name used before may have been a group's settled then))
+  groupFootDone.delete(id)
+  settleGroupFeet()
   save(); emit()
   toast(T().grouped(ids.length, state.groups[id].name), 'edit')
 }
@@ -549,6 +604,8 @@ export function groupByViews() {
     const all = [...(g?.members ?? []), ...ids]
     const pivot = middleOf(all.flatMap((m) => leavesOf(state.groups, m))) ?? [0, 0, 0]
     state.groups = { ...state.groups, [gid]: g ? { ...g, members: all, pivot } : { name: areaName(view), members: all, pivot, t: [0, 0, 0], yaw: 0, s: 1 } }
+    // (its pivot at its pieces' middle again: brought down to their feet once more)
+    groupFootDone.delete(gid)
     made = true
   }
   for (const id of registry.keys()) knownNow.add(id)
@@ -600,6 +657,7 @@ export function toggleEdit() {
   if (state.locked) toast(T().paused)
   settleGroups()
   groupByViews()
+  settleGroupFeet()
   state.wire = false
   baseline = take()
   state.on = true

@@ -6,6 +6,7 @@ import { TUB_FULL, emptyKama, type Kama } from '@/game/rice'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
+import type { HearthRole } from '@/game/hearthGuard'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { openingFloat, startingRolls, type DrawerCash, type Rolls } from '@/game/till'
@@ -90,6 +91,14 @@ export const SICK = new Set<number>()
  * goes: the cook's table's cupboard doors don't swing into anyone stood or passing in front of them (read from their world matrices).
  */
 export const KITCHEN_FOLK = new Set<THREE.Object3D>()
+/**
+ * Everyone drawn (the owner, the cooks, the servers, the cashier, the stock keeper, the customers, those waiting or come for a takeaway),
+ * each figure's own group (the one its way moves), put in by its own as it's drawn, and who they are to the cook table (game/hearthGuard):
+ * the owner may stand in his notch, the third cook in his bay, no one else on the table, no one at all in the hearth (Roasting's
+ * HearthGuard puts them out of it the last thing before each frame's drawn, after all that moves them). One no longer in the scene is let go.
+ */
+export const FIGURES = new Map<THREE.Object3D, HearthRole>()
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __figures: FIGURES })
 
 /**
  * Serving through the pass, when there's a server on the floor: what's grilled is put out at the pass (the end of the

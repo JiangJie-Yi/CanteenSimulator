@@ -9,7 +9,7 @@ import * as THREE from 'three'
 import { ALONG } from './bar'
 import { holdVeil } from '@/scene/Later'
 import { warmLater } from '@/scene/Prewarm'
-import { beginChange, clickPick, groupFrame, commitOffsets, FIXED_SIZE, getEdit, GIZMO, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
+import { beginChange, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -570,10 +570,23 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   /** the group the turn and scale act about (the pivot): its matrix, with what's inside it, is what moving the pivot must make up for */
   const pg = useRef<THREE.Group>(null)
   const [box, setBox] = useState<{ c: V3; s: V3; yaw: number; theta: number } | null>(null)
-  // (the piece's middle, in the frame of its own group as it stands untouched: what it turns and scales about; measured once it has been drawn)
+  // (the point it turns and scales about, in the frame of its own group as it stands untouched (its pivot, before any moved by hand); measured
+  // once it has been drawn)
   const [mid, setMid] = useState<V3>([0, 0, 0])
-  /** the point it's turned and sized about: its middle, or (standing on the floor) the middle of its foot */
-  const footOf = (m: { c: V3; s: V3 }): V3 => (ground !== undefined ? [m.c[0], ground, m.c[2]] : m.c)
+  /** it hangs or is fixed to a wall (edit's HANGS): turned and sized about its middle; anything else stands on something, about its foot */
+  const hangs = HANGS.test(id)
+  /** its pivot brought down to its foot by its measure (not given a floor's height of its own, `ground`, and not hanging) */
+  const footed = !hangs && ground === undefined
+  /**
+   * The point it's turned and sized about: the middle of its foot (the owner's, 2026-11-10: the handles at the middle of a piece's base, not
+   * half way up it), at the floor's height it's given (`ground`) or where its lowest point is; a hanging one's middle
+   */
+  const footOf = (m: { c: V3; s: V3; y0: number }): V3 => (ground !== undefined ? [m.c[0], ground, m.c[2]] : hangs ? m.c : [m.c[0], m.y0, m.c[2]])
+  /**
+   * What its own turn and size as made (baseTurn, baseScale) were laid out about (its middle, before its pivot came down to its foot) made up
+   * for: added to its place, always, so it stands where it was laid out (the charcoal crate, made 1.75 times as big about its middle)
+   */
+  const [madeShift, setMadeShift] = useState<V3>([0, 0, 0])
   const inner = useRef<THREE.Group>(null)
   // (the turn from the room's frame into the parent's, about the vertical; found once the piece is in place)
   const [thetaRoom, setTheta] = useState(0)
@@ -593,7 +606,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   const theta = space === 'local' ? ownYaw : thetaW
   useEffect(() => { setFrame(id, thetaW, ownYaw) }, [id, thetaW, ownYaw])
   void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
-  const o = positionOf(id)
+  const o0 = positionOf(id)
+  const o: V3 = [o0[0] + madeShift[0], o0[1] + madeShift[1], o0[2] + madeShift[2]]
   const rot = rotationOf(id), sc = scaleOf(id)
   // (the pivot: the piece's middle, moved by hand if it has been (D))
   const pvo = pivotOf(id)
@@ -637,7 +651,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
         yMin = Math.min(yMin, v.y); yMax = Math.max(yMax, v.y)
       }
     })
-    if (!pts.length) return { c: [0, 0.3, 0] as V3, s: [0.5, 0.6, 0.5] as V3, yaw: 0, theta: 0 }
+    if (!pts.length) return { c: [0, 0.3, 0] as V3, s: [0.5, 0.6, 0.5] as V3, yaw: 0, theta: 0, y0: 0, empty: true }
     // (the box is squared to the room, like the gates' and the cats' stand: turned about the vertical to the bar's own direction, whatever
     // way the piece's parent is turned, so none of them comes out a diamond)
     const fit = (a: number) => {
@@ -660,7 +674,48 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const co = Math.cos(best.a), si = Math.sin(best.a)
     // (the middle back out of the turned frame)
     const c = [cx * co + cz * si, (yMin + yMax) / 2, -cx * si + cz * co] as V3
-    return { c, s: [Math.max(best.x1 - best.x0, 0.06) + 0.02, Math.max(yMax - yMin, 0.06) + 0.02, Math.max(best.z1 - best.z0, 0.06) + 0.02] as V3, yaw: best.a, theta }
+    return { c, s: [Math.max(best.x1 - best.x0, 0.06) + 0.02, Math.max(yMax - yMin, 0.06) + 0.02, Math.max(best.z1 - best.z0, 0.06) + 0.02] as V3, yaw: best.a, theta,
+      y0: yMin, empty: false }
+  }
+  /**
+   * The turn and size it's given about its pivot, as one matrix (its pivot group down to its contents' group: the room's turn, its own, its
+   * size along its own axes): as drawn now, or (`made`) with only what it's made with (baseTurn, baseScale), none given by hand
+   */
+  const turnAndSize = (made = false) => {
+    const p = pg.current
+    const chain: THREE.Object3D[] = []
+    for (let n: THREE.Object3D | undefined = p ?? undefined; n && n !== inner.current; n = n.children[0]) chain.push(n)
+    if (!p || chain.length !== 6) return null
+    const a = new THREE.Matrix4()
+    chain.forEach((n, k) => {
+      n.updateMatrix()
+      if (made && k === 1) a.multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(baseTurn[0] * DEG, baseTurn[1] * DEG, baseTurn[2] * DEG)))
+      else if (made && k === 3) a.multiply(new THREE.Matrix4().makeScale(baseScale, baseScale, baseScale))
+      else a.multiply(n.matrix)
+    })
+    return a.setPosition(0, 0, 0)
+  }
+  /**
+   * Its pivot set from its measure (`m`, in its own frame), and, a standing piece's having come down from its middle to its foot by d: what
+   * it's made with made up for (madeShift, every time), and, the first time, what's been saved for it (settleFoot: its turn and size by hand,
+   * or a pivot moved by hand), so it stands just where it did
+   */
+  const poseFrom = (m: { c: V3; s: V3; y0: number; empty: boolean }) => {
+    const foot = footOf(m)
+    setMid((was) => (was[0] === foot[0] && was[1] === foot[1] && was[2] === foot[2] ? was : foot))
+    if (!footed || m.empty) return
+    const d = new THREE.Vector3(0, foot[1] - m.c[1], 0)
+    const now = turnAndSize(), made = turnAndSize(true)
+    if (!now || !made) return
+    const madeD = d.clone().applyMatrix4(made).sub(d)
+    setMadeShift((was) => (Math.abs(was[0] - madeD.x) + Math.abs(was[1] - madeD.y) + Math.abs(was[2] - madeD.z) < 1e-7 ? was : [madeD.x, madeD.y, madeD.z]))
+    if (footSettled(id)) return
+    const nowD = d.clone().applyMatrix4(now).sub(d)
+    const moved = pivotOf(id).some((v) => Math.abs(v) > 1e-9)
+    // (with a pivot moved by hand, that pivot stays where it is (counted from the foot now): nothing to make up for but madeShift's; else
+    // all of the difference, less madeShift's)
+    const shift: V3 = moved ? [-madeD.x, -madeD.y, -madeD.z] : [nowD.x - madeD.x, nowD.y - madeD.y, nowD.z - madeD.z]
+    settleFoot(id, [0, d.y, 0], shift)
   }
 
   /** the turn about the vertical its contents carry: down the chain of single groups inside it to where it branches or a mesh is */
@@ -670,7 +725,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     let n: THREE.Object3D = inn
     // (the editor's own wire box hung in it is not part of what's seen; nor what a batch merged its parts into: its originals, under the
     // batch's other group, are where the turn is (a piece turned inside its batch had the world's axes for its own, the willow, the till))
-    const kids = (o: THREE.Object3D) => o.children.filter((c) => !(c as THREE.LineSegments).isLineSegments && !c.userData.batchMade)
+    // (nor a marker hung in it for something to find it by (a stool's seat): nothing to see)
+    const kids = (o: THREE.Object3D) => o.children.filter((c) => !(c as THREE.LineSegments).isLineSegments && !c.userData.batchMade && !c.userData.marker)
     while (kids(n).length === 1 && !(kids(n)[0] as THREE.Mesh).isMesh) n = kids(n)[0]
     inn.updateWorldMatrix(true, true)
     const yaw = (o: THREE.Object3D) => new THREE.Euler().setFromQuaternion(o.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
@@ -770,7 +826,11 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   }, () => {
     const m = measure('whole')
     return m && g.current ? (g.current.localToWorld(new THREE.Vector3(...m.c)).toArray() as V3) : null
-  }, parentPiece), [id, label, camera, controls, parentPiece])
+  }, parentPiece, () => {
+    // (the middle of its foot in the world: where a group of it has its pivot)
+    const m = measure('whole')
+    return m && !m.empty && g.current ? (g.current.localToWorld(new THREE.Vector3(m.c[0], m.y0, m.c[2])).toArray() as V3) : null
+  }), [id, label, camera, controls, parentPiece])
 
   // (the groups this piece is in, if any has been moved, turned or sized: their moves, turns and sizes laid over the piece as one, each about its
   // own middle, in the world; one in a view's area that's as it was made changes nothing, and costs nothing a frame)
@@ -793,11 +853,18 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
 
   // (its middle, once it has been drawn (a frame later, for a batch that merges after mount), and its box when editing begins)
   // (tried every tenth of a second until there's something to measure: a model may still be loading)
+  // (shown as soon as it can be measured at all; measured on till something's drawn in it, its pivot set again then: measured empty, a model
+  // still loading, it was turned and sized about the empty box's middle till edit mode came round to measure it again)
   useEffect(() => {
-    let tries = 0
+    let tries = 0, shown = false
     const t = window.setInterval(() => {
       const m = measure()
-      if (m || ++tries > 80) { if (m) setMid(footOf(m)); setInYaw(facing()); setReady(true); window.clearInterval(t) }
+      if (m) poseFrom(m)
+      if (m && !shown) { setInYaw(facing()); setReady(true); shown = true }
+      if ((m && !m.empty) || ++tries > 80) {
+        if (!shown) { setInYaw(facing()); setReady(true) }
+        window.clearInterval(t)
+      }
     }, 100)
     return () => window.clearInterval(t)
   }, [])
@@ -825,7 +892,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     }
     countIt()
     setBox(first)
-    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta, ownYaw); setTheta(m.theta) } if (n) setMid(footOf(n)); countIt() }, 300)
+    const t = window.setTimeout(() => { const m = measure('whole'), n = measure(); if (m) { setBox(m); setFrame(id, m.theta, ownYaw); setTheta(m.theta) } if (n) poseFrom(n); countIt() }, 300)
     return () => window.clearTimeout(t)
   }, [on])
 

@@ -11,6 +11,7 @@ import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
+import { keepOut, type HearthZones } from '@/game/hearthGuard'
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
@@ -72,7 +73,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
-import { FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
+import { FIGURES, FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -1045,8 +1046,9 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     const o = g.current
     if (!o) return
     KITCHEN_FOLK.add(o)
-    return () => { KITCHEN_FOLK.delete(o); SHOP.walking.delete(id); COMMUTERS.delete(id) }
-  }, [id])
+    FIGURES.set(o, role === 'sous' ? 'sous' : 'other')
+    return () => { KITCHEN_FOLK.delete(o); FIGURES.delete(o); SHOP.walking.delete(id); COMMUTERS.delete(id) }
+  }, [id, role])
   /**
    * Their way out from a place (this frame, on the floor), through the door and a step past it: a cook across the kitchen round all that
    * stands on its floor (GuestBar3D's route) to the gate, the cashier along behind the till; home through the front door; a cook who lives
@@ -1267,6 +1269,61 @@ const KITCHEN_FLOOR = (() => {
   const lay1 = c1 ? toGrillScene(c1.at.clone().addScaledVector(c1.along, -c1.length / 2 - 0.35)).dot(LAY) : COOK_TABLE.lay[1] + 0.9
   return { lay: [lay0, lay1], along: [along0, along1] }
 })()
+/**
+ * The cook table and its hearth on the floor plan, in the table's own frame (its corners' markers' frame: along it, across it, the hearth's
+ * middle at FIRE_SHIFT): what no one may stand in (game/hearthGuard)
+ */
+const HEARTH_ZONES: HearthZones = {
+  table: { along: [COOK_TABLE.along[0], COOK_TABLE.along[1]], lay: [COOK_TABLE.lay[0], COOK_TABLE.lay[1]] },
+  pit: { along: [FIRE_SHIFT.dot(ALONG) - HEARTH_HALF * HEARTH_LONG, FIRE_SHIFT.dot(ALONG) + HEARTH_HALF * HEARTH_LONG], lay: [-HEARTH_HALF, HEARTH_HALF] },
+  notch: { along: [COOK_NOTCH.along[0], COOK_NOTCH.along[1]], lay: [COOK_NOTCH.lay[0], COOK_NOTCH.lay[1]] },
+  bay: { along: [SOUS_NOTCH.along[0], SOUS_NOTCH.along[1]], lay: [SOUS_NOTCH.lay[0], SOUS_NOTCH.lay[1]] },
+}
+const GUARD_AT = new THREE.Vector3(), GUARD_LOCAL = new THREE.Vector3(), GUARD_INV = new THREE.Matrix4()
+/** (in development: who was put out of the table or the hearth, from where to where, the last few hundred) */
+const GUARD_LOG: { who: string; role: string; from: [number, number]; to: [number, number] }[] = []
+if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __hearthPushes: GUARD_LOG })
+/**
+ * No one stood in the cook table or its hearth (the owner's, 2026-11-10: a member of the staff in the 囲炉裏's salt bed, only his head
+ * showing; fixing ways and spots one by one hadn't kept them all out). Every figure drawn (bar's FIGURES) is put out of them the last thing
+ * before the frame's drawn (the scene's onBeforeRender: after every useFrame, its ways, its spots, its giving way to others, and before the
+ * shadows and the picture are made), the nearest way, the owner into his notch and the third cook into his bay if those are nearer
+ * (game/hearthGuard's keepOut). Hung in the table's own frame, beside its corners' markers.
+ */
+function HearthGuard() {
+  const mark = useRef<THREE.Group>(null)
+  const scene = useThree((st) => st.scene)
+  useEffect(() => {
+    const was = scene.onBeforeRender
+    scene.onBeforeRender = function (...args) {
+      was.apply(this, args)
+      const frame = mark.current?.parent
+      if (!frame) return
+      frame.updateWorldMatrix(true, false)
+      GUARD_INV.copy(frame.matrixWorld).invert()
+      for (const [o, role] of FIGURES) {
+        if (!o.parent) { FIGURES.delete(o); continue }
+        o.getWorldPosition(GUARD_AT)
+        GUARD_LOCAL.copy(GUARD_AT).applyMatrix4(GUARD_INV)
+        const al = GUARD_LOCAL.dot(ALONG), la = GUARD_LOCAL.dot(LAY)
+        const [a2, l2] = keepOut(al, la, role, HEARTH_ZONES)
+        if (a2 === al && l2 === la) continue
+        if (import.meta.env.DEV) {
+          GUARD_LOG.push({ who: o.name || String(o.userData.staffId ?? o.userData.guest ?? '?'), role, from: [al, la], to: [a2, l2] })
+          if (GUARD_LOG.length > 400) GUARD_LOG.splice(0, 100)
+        }
+        // (moved along the table's own axes only, in its frame; back into the world, and into its own parent's frame)
+        GUARD_LOCAL.addScaledVector(ALONG, a2 - al).addScaledVector(LAY, l2 - la).applyMatrix4(frame.matrixWorld)
+        o.parent.worldToLocal(GUARD_LOCAL)
+        o.position.copy(GUARD_LOCAL)
+        o.updateMatrixWorld(true)
+      }
+    }
+    return () => { scene.onBeforeRender = was }
+  }, [scene])
+  return <group ref={mark} />
+}
+
 function CookTableImpl({ floor = true }: { floor?: boolean }) {
   // (and under it all the kitchen's floor, from the bar's cook's edges to the front, and on past the table's
   // right-hand end where the other cooks stand)
@@ -1282,6 +1339,8 @@ function CookTableImpl({ floor = true }: { floor?: boolean }) {
       <SousIrons />
       {/* (its far corners, marked for the servers' way round it to the dish racks: GuestBar3D) */}
       <group name="cook-table-c0" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[0]).addScaledVector(LAY, COOK_TABLE.lay[0])} />
+      {/* (no one stood in the table or its hearth: put out of them the last thing before each frame's drawn) */}
+      <HearthGuard />
       <group name="cook-table-c1" position={new THREE.Vector3().addScaledVector(ALONG, COOK_TABLE.along[1]).addScaledVector(LAY, COOK_TABLE.lay[1])} />
       {/* (the cubbies either side a pair of doors each, opening out to the left and the right; under the hearth, at the back of the notch,
           no cupboard: the table's own face, the cook's knives hung upright on their rack on it (Decor's KnifeSet) */}
