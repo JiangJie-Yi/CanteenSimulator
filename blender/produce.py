@@ -1,8 +1,10 @@
 """The raw potatoes and sweet potatoes in their sacks (produce.glb, node "ProduceSacks"), after the photoscanned sack of potatoes the owner
-pointed to (looked at, nothing taken from it): three burlap sacks standing upright against the kitchen side of the bar, full to the brim, what's
-in them heaped up out of their mouths, the cloth's edge folded in over it, a seam with its flap down the front, soft creases round the upper
-part where it's been gathered and let go, a slumped foot, the weave coarse and grimy (two of potatoes, one of sweet potatoes with a red band
-woven round it); a few have rolled out onto the floor in front.
+pointed to (looked at, nothing taken from it): three burlap sacks standing upright against the kitchen side of the bar, full to the brim,
+open (the owner's, 2026-11-10: they looked like barrels, or paper tubes wrapped in white cloth): heavy at the foot, slumped and bulging out,
+drawn in a little at the waist, lumpy all over where what's inside presses the cloth out; their mouths rolled down outward into a thick soft
+cuff, what's in them heaped up out of it, a few leaning on the cuff; a seam with its flap down the front; no woven bands (the sweet potatoes'
+tied round instead with a rough jute twine, its ends hanging); the weave coarse, pressed in (a normal map), and grimy toward the foot (one of
+potatoes, one of sweet potatoes, one of onions); a few have rolled out onto the floor in front.
 
 And the sack of binchotan (node "CharcoalSack") that stands on the floor by the cook table, its crate on the table filled from it: the same
 sack in a darker cloth, a band of black stripes and a red stamp printed on it, the sticks standing up out of its mouth ("CharcoalStick0".."13":
@@ -47,20 +49,31 @@ def lin(hexs):
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
-def burlap(name, band=None, base=("#7a6648", "#c8b38a"), stripes=False):
-    """burlap's coarse plain weave: thick threads over and under, uneven, flecked, a little hairy; grimier toward the foot and in the creases
-    round its upper part (where v is 0.55, 0.7, 0.83 up it); `band` a colour woven round it near the top; `stripes` three black bands
-    printed round it and a red stamp (the charcoal's)"""
-    S = 1024
+def weave_of(S=1024, f=150):
+    """burlap's coarse plain weave: thick threads over and under, uneven; each thread's own shade along it; and its relief, the threads on
+    top at each crossing standing proud, the gaps between sunk (made once: every sack's burlap is woven the same, its colour its own)"""
     u, v = grid01(S)
-    f = 150
     wob = (fbm(S, 4, 4) - 0.5) * 0.35
     wx, wy = np.abs(np.sin(np.pi * (u * f + wob))), np.abs(np.sin(np.pi * (v * f + wob * 0.7)))
     over = (np.floor(u * f + wob) + np.floor(v * f + wob * 0.7)) % 2
-    thread = np.where(over > 0, 0.3 + 0.7 * wx, 0.3 + 0.7 * wy)
-    # (each thread's own shade: some darker, some paler, along their length)
     tone = np.where(over > 0, vnoise(S, 3, f), vnoise(S, f, 3))
     gaps = smooth(0.02, 0.32, np.minimum(wx, wy))
+    relief = np.where(over > 0, 0.45 + 0.55 * wx, 0.45 + 0.55 * wy) * (0.55 + 0.45 * gaps)
+    return {"S": S, "u": u, "v": v, "f": f, "wx": wx, "wy": wy, "over": over, "tone": tone, "gaps": gaps, "relief": relief}
+
+
+WEAVE = weave_of()
+# (the cross-weave pressed in: the produce sacks' normal map, one for the three, their weave the same)
+WEAVE_N = image("produce_weave_n", to_normal(WEAVE["relief"], 1.4), data=True)
+
+
+def burlap(name, band=None, base=("#7a6648", "#c8b38a"), stripes=False, creases=True, nrm=None):
+    """burlap: the weave (WEAVE) flecked, a little hairy; grimier toward the foot, and (`creases`) in the creases round its upper part (where
+    v is 0.55, 0.7, 0.83 up it); `band` a colour woven round it near the top; `stripes` three black bands printed round it and a red stamp
+    (the charcoal's); `nrm` its relief"""
+    S, u, v, f = WEAVE["S"], WEAVE["u"], WEAVE["v"], WEAVE["f"]
+    wx, wy, over, tone, gaps = WEAVE["wx"], WEAVE["wy"], WEAVE["over"], WEAVE["tone"], WEAVE["gaps"]
+    thread = np.where(over > 0, 0.3 + 0.7 * wx, 0.3 + 0.7 * wy)
     n = fbm(S, 6, 6)
     fleck = smooth(0.62, 0.8, fbm(S, 24, 24))
     col = mix(lin(base[0]), lin(base[1]), np.clip(thread * 0.55 + n * 0.35 + (tone - 0.5) * 0.3, 0, 1))
@@ -69,7 +82,7 @@ def burlap(name, band=None, base=("#7a6648", "#c8b38a"), stripes=False):
     # (grime: up from the foot, and settled in the creases; blotches here and there)
     blot = fbm(S, 3, 3)
     grime = smooth(0.2, 0.0, v) * 0.4 + smooth(0.62, 0.9, blot) * 0.16
-    for c in (0.55, 0.7, 0.83):
+    for c in ((0.55, 0.7, 0.83) if creases else ()):
         # (only here and there along each crease, as a fold traps it)
         grime = grime + smooth(0.025, 0.0, np.abs(v - c - (fbm(S, 6, 2) - 0.5) * 0.05)) * 0.22 * smooth(0.35, 0.7, fbm(S, 7, 3))
     col *= (1 - np.clip(grime, 0, 0.7))[..., None]
@@ -85,19 +98,21 @@ def burlap(name, band=None, base=("#7a6648", "#c8b38a"), stripes=False):
         ring = smooth(0.05, 0.0, np.abs(np.sqrt(sx * sx + sy * sy) - 0.32)) + smooth(0.32, 0.26, np.sqrt(sx * sx + sy * sy)) * smooth(0.06, 0.0, np.abs(sx))
         col = mix(col, lin("#141210"), np.clip(ink, 0, 1) * (0.55 + 0.45 * thread) * 0.9)
         col = mix(col, lin("#b3261e"), np.clip(ring, 0, 1) * (0.5 + 0.5 * thread) * 0.85)
-    return pbr(name, (1, 1, 1), tex=image(name, col), rough=0.95)
+    return pbr(name, (1, 1, 1), tex=image(name, col), nrm=nrm, rough=0.95)
 
 
 # (the potatoes' and sweet potatoes' own skins, as dug: blender/tubers.py)
 POTATO_SKIN, SWEET_SKIN = potato_skin(512), sweet_potato_skin(512)
 M = {
-    "sackP": burlap("ProduceSackPotato"),
-    "sackS": burlap("ProduceSackSweet", band="#b8322a"),
-    # (the onions' sack: the same burlap with a green band woven round it)
-    "sackO": burlap("ProduceSackOnion", band="#3f7a3a"),
+    # (no bands woven round them (the owner's: stiff and too regular, like a barrel's hoops), no creases' grime round them; the weave pressed
+    # in, the cloth rough (0.95))
+    "sackP": burlap("ProduceSackPotato", creases=False, nrm=WEAVE_N),
+    "sackS": burlap("ProduceSackSweet", creases=False, nrm=WEAVE_N),
+    "sackO": burlap("ProduceSackOnion", creases=False, nrm=WEAVE_N),
     "potato": pbr("ProducePotato", (1, 1, 1), tex=image("produce_potato", POTATO_SKIN[0]), nrm=image("produce_potato_n", POTATO_SKIN[1], data=True), rough=0.85),
     "sweet": pbr("ProduceSweetPotato", (1, 1, 1), tex=image("produce_sweet", SWEET_SKIN[0]), nrm=image("produce_sweet_n", SWEET_SKIN[1], data=True), rough=0.55),
-    "tie": pbr("ProduceTwine", tuple(lin("#a88a5a")), rough=0.9),
+    # (a rough jute twine, earthy yellow)
+    "tie": pbr("ProduceTwine", tuple(lin("#b58f52")), rough=0.95),
     "sackC": burlap("CharcoalSackCloth", base=("#4a3c2a", "#9a8460"), stripes=True),
     "inside": pbr("ProduceSackInside", tuple(lin("#2e2416")), rough=1.0),
     # (binchotan has a dull metallic sheen, near black)
@@ -219,6 +234,157 @@ def seam_of(name, cx, cz, h, r, mat, lean, front, ts, radius, ph, o):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     mesh_object(name + "Seam", bm, mat)
     return o
+
+
+def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 2, salt=0, tie=False):
+    """a sack standing full and open (the owner's, 2026-11-10: not a barrel, not a tube): heavy at its foot (its bottom third bulging out some
+    12 per cent, slumped and rounded under on the floor), drawn in a little at its waist, a touch out of round, lumpy all over where what's
+    inside presses the cloth out (more toward the top); its mouth rolled down outward into a thick soft cuff, uneven round it, its edge tucked
+    back against the body under it; a dark floor just inside, under what's heaped there; a seam down the front; `tie`: a rough twine round its
+    upper middle, drawing the cloth in a little, knotted, its two ends hanging. Returns it, its cuff's top all round (`rim`: the radius and
+    height at each of its angles) and its mouth's own radius there"""
+    rnd = __import__("random").Random(salt * 7919 + 13)
+    ph = [rnd.uniform(0, 6.3) for _ in range(10)]
+    # (what's inside pressing out: lumps a tuber across, here and there, more of them toward the top)
+    lumps = [(rnd.uniform(0, 2 * math.pi), rnd.uniform(0.08, 0.95) ** 0.8, r * rnd.uniform(0.02, 0.042)) for _ in range(15)]
+    TIE_T = 0.62
+
+    def prof(t):
+        f = 1 + 0.11 * math.exp(-((t - 0.17) / 0.14) ** 2) - 0.03 * math.exp(-((t - 0.52) / 0.13) ** 2) + 0.01 * math.exp(-((t - 0.86) / 0.1) ** 2)
+        if t < 0.04:
+            f *= 0.9 + 0.1 * (t / 0.04) ** 0.5            # (rounded under where it slumps on the floor)
+        if tie:
+            f *= 1 - 0.03 * math.exp(-((t - TIE_T) / 0.03) ** 2)
+        return f
+
+    def radius(t, a):
+        base = r * prof(t) * (1 + 0.035 * math.cos(2 * a + ph[0]))
+        for (la, lt, amp) in lumps:
+            da = math.atan2(math.sin(a - la), math.cos(a - la))
+            base += amp * math.exp(-(da / 0.33) ** 2 - ((t - lt) / 0.11) ** 2) * (0.35 + 0.65 * t)
+        base += r * 0.008 * math.sin(5 * a + 7 * t + ph[1]) * math.cos(3 * a - 5 * t + ph[2])
+        return base
+    ts = [0.0, 0.025, 0.07, 0.14, 0.22, 0.31, 0.41, 0.51] + ([TIE_T - 0.02, TIE_T, TIE_T + 0.02] if tie else [0.6]) + [0.69, 0.78, 0.86, 0.93, 1.0]
+    dx, dz = lean
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new()
+    rows = []
+
+    def at(rr, a, y):
+        return P(cx + rr * math.cos(a) + dx * y, y, cz + rr * math.sin(a) + dz * y)
+    # (the weave about as tall as it's wide round it, once up the body, so the picture's grimy foot is only at the sack's foot (at 1.4 times
+    # up it the foot's grime came round again, a dark band three quarters up); the cuff back down the picture's clean part)
+    for t in ts:
+        y = h * t
+        rows.append(([bm.verts.new(at(radius(t, 2 * math.pi * j / seg), 2 * math.pi * j / seg, y)) for j in range(seg)], [t * 0.9] * seg))
+    # ---- the cuff: up from the mouth's edge, over, out and down, its edge tucked back under against the body
+    rc = [0.02 * (1 + 0.15 * math.sin(3 * a + ph[3]) + 0.06 * math.sin(7 * a + ph[4])) for a in (2 * math.pi * j / seg for j in range(seg))]
+    lip = [0.006 * math.sin(2 * a + ph[5]) + 0.004 * math.sin(5 * a + ph[6]) for a in (2 * math.pi * j / seg for j in range(seg))]
+    top = [radius(1.0, 2 * math.pi * j / seg) for j in range(seg)]
+    PHI = [math.pi * k for k in (0.75, 0.5, 0.25, 0.0, -0.25, -0.5, -0.72, -0.92)]
+    rim = []
+    for k, phi in enumerate(PHI):
+        row, vs = [], []
+        for j in range(seg):
+            a = 2 * math.pi * j / seg
+            c = rc[j]
+            rr = top[j] + c + 1.1 * c * math.cos(phi)
+            y = h + lip[j] + 0.95 * c * math.sin(phi)
+            row.append(bm.verts.new(at(rr, a, y)))
+            vs.append(0.9 - (k + 1) * 0.04)
+            if k == 1:
+                rim.append((rr, y, a))
+        rows.append((row, vs))
+    for k in range(len(rows) - 1):
+        (r0, v0), (r1, v1) = rows[k], rows[k + 1]
+        for j in range(seg):
+            j2 = (j + 1) % seg
+            f = bm.faces.new((r0[j], r1[j], r1[j2], r0[j2]))
+            for loop, (jj, vv) in zip(f.loops, ((j, v0[j]), (j, v1[j]), (j + 1, v1[j2]), (j + 1, v0[j2]))):
+                loop[uv].uv = (jj / seg * 2, vv)
+    ladder_fill(bm, rows[0][0])
+    o = mesh_object(name, bm, mat)
+    # ---- the dark floor just inside the mouth, under what's heaped there
+    bm = bmesh.new()
+    ring = [bm.verts.new(at(top[j] * 0.93, 2 * math.pi * j / seg, h - 0.006)) for j in range(seg)]
+    bm.faces.new(ring)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for fc in bm.faces:
+        if fc.normal.z < 0:
+            fc.normal_flip()
+    mesh_object(name + "Inside", bm, "inside")
+    # ---- the seam, below the cuff
+    seam_of(name, cx, cz, h, r, mat, lean, front, [t for t in ts if t <= 0.92], radius, ph, o)
+    # ---- the twine: round the waist, knotted at the front's side, its ends hanging
+    if tie:
+        y = h * TIE_T
+        n = 16
+        loop = [Vector((cx + (radius(TIE_T, a) + 0.007) * math.cos(a) + dx * y, y, cz + (radius(TIE_T, a) + 0.007) * math.sin(a) + dz * y))
+                for a in (2 * math.pi * k / n for k in range(n))]
+        tube_obj(name + "Twine", loop, 0.0055, "tie", cyclic=True)
+        ka = front + 0.55
+        kr = radius(TIE_T, ka) + 0.012
+        knot = Vector((cx + kr * math.cos(ka) + dx * y, y, cz + kr * math.sin(ka) + dz * y))
+        bm = bmesh.new()
+        bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.012)
+        for v_ in bm.verts:
+            v_.co = Vector((v_.co.x * 1.25, v_.co.y * 0.9, v_.co.z * 0.8)) + Vector(P(*knot))
+        mesh_object(name + "Knot", bm, "tie")
+        out_ = Vector((math.cos(ka), 0.0, math.sin(ka)))
+        side = Vector((-math.sin(ka), 0.0, math.cos(ka)))
+        for s_, (hang, swing) in enumerate(((0.085, 0.012), (0.06, -0.016))):
+            tail = [knot + side * swing * u + out_ * (0.006 + 0.01 * u) - Vector((0.0, hang * u, 0.0)) for u in (0.0, 0.35, 0.7, 1.0)]
+            tube_obj(f"{name}TwineEnd{s_}", tail, 0.0045, "tie")
+    return o, rim, top
+
+
+def tube_obj(name, pts, rad, mat, cyclic=False):
+    """a four-sided tube through points (the game's frame), its ends closed"""
+    cd = bpy.data.curves.new(name, "CURVE")
+    cd.dimensions = "3D"
+    cd.bevel_depth = rad
+    cd.bevel_resolution = 0
+    cd.use_fill_caps = not cyclic
+    sp = cd.splines.new("POLY")
+    sp.points.add(len(pts) - 1)
+    sp.use_cyclic_u = cyclic
+    for spt, q in zip(sp.points, pts):
+        spt.co = (*P(*q), 1)
+    ob = bpy.data.objects.new(name, cd)
+    bpy.context.collection.objects.link(ob)
+    bpy.ops.object.select_all(action="DESELECT")
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.convert(target="MESH")
+    ob = bpy.context.view_layer.objects.active
+    ob.data.materials.clear()
+    ob.data.materials.append(M[mat])
+    for pg in ob.data.polygons:
+        pg.use_smooth = True
+    parts.append(ob)
+    return ob
+
+
+def world_bvh(objs):
+    """the objects (and what hangs from them) as one tree, where they are now"""
+    bpy.context.view_layer.update()
+    verts, polys = [], []
+    for o in objs:
+        for ob in [o] + list(o.children_recursive):
+            m = ob.matrix_world
+            base = len(verts)
+            verts += [m @ v.co for v in ob.data.vertices]
+            polys += [[base + i for i in pg.vertices] for pg in ob.data.polygons]
+    return BVHTree.FromPolygons(verts, polys)
+
+
+def settle(o, cloth, step=0.003, most=0.08):
+    """lifted until it's clear of the sack's cloth: resting on the cuff, or in the mouth, not through it; how far it went"""
+    up = 0.0
+    while cloth.overlap(world_bvh([o])) and up < most:
+        o.location.z += step
+        up += step
+    return up
 
 
 # ---- the tubers, as the Ebisu and the lucky cats are made (the owner's): a clean, coarse grid of quads with what a detailed one looks like baked
@@ -420,42 +586,68 @@ def board(name, cx, cy, cz, w, h, d):
     return o
 
 
-# ---- the three sacks, standing close together, leaning on each other a little ----
+# ---- the three sacks, standing close together, a little apart at their cuffs; the middle one a step back ----
 SACKS = [  # (x, z, height, radius, material, lean, what's in it)
-    (-0.38, 0.0, 0.46, 0.17, "sackP", (0.03, 0.0), "potato"),
-    (0.0, -0.03, 0.5, 0.18, "sackS", (0.0, 0.01), "sweet"),
-    (0.37, 0.01, 0.42, 0.165, "sackO", (-0.04, 0.0), "onion"),
+    (-0.43, 0.02, 0.46, 0.154, "sackP", (-0.015, -0.012), "potato"),
+    (0.0, -0.04, 0.5, 0.162, "sackS", (0.0, -0.012), "sweet"),
+    (0.425, 0.03, 0.42, 0.149, "sackO", (0.015, -0.012), "onion"),
 ]
+
+
+def lean_out(a, tilt):
+    """turned to lie along the way out of the sack at bearing `a` (the game's: from +x toward +z), tipped `tilt` down at its outer end (a
+    tuber lies along its own x)"""
+    return (0.0, tilt, -a)
+
+
 for i, (x, z, h, r, mat, lean, kind) in enumerate(SACKS):
-    sack(f"ProduceSack{i}", x, z, h, r, mat, lean, front=math.pi / 2 + (i - 1) * 0.35, salt=i)
-    # (what's in it, heaped up out of its mouth: a ring round the edge and more on top, as full as a sack can be)
+    front = math.pi / 2 + (i - 1) * 0.35
+    body, rim, top = open_sack(f"ProduceSack{i}", x, z, h, r, mat, lean, front=front, salt=i, tie=(kind == "sweet"))
+    cloth = world_bvh([o for o in parts if o.name.startswith(f"ProduceSack{i}") and "Inside" not in o.name])
+    mouth = sum(top) / len(top)
     tx, tz = x + lean[0] * h, z + lean[1] * h
+    heap = []
+    # (what's in it, heaped up out of the cuff: a ring round inside the mouth at heights each its own, more on top, as full as a sack can
+    # be; a couple at the front leaning out on the cuff)
     if kind == "potato":
-        ring_n = 6
-        for k in range(ring_n):
-            a = 2 * math.pi * k / ring_n + i
-            rr = r * 0.52
-            tuber(f"ProducePotato{i}{k}", tx + rr * math.cos(a), h + 0.012 + 0.006 * (k % 2), tz + rr * math.sin(a), 0.058, "potato",
-                  rot=(k * 0.7, k * 1.3 + a, k * 0.4))
-        for k, (dx_, dz_) in enumerate([(-0.035, -0.02), (0.04, -0.015), (0.0, 0.04)]):
-            tuber(f"ProducePotatoTop{i}{k}", tx + dx_, h + 0.06, tz + dz_, 0.056, "potato", rot=(k * 1.1, k * 0.7, k * 0.9))
+        for k in range(7):
+            a = 2 * math.pi * k / 7 + 0.3
+            heap.append(tuber(f"ProducePotato{i}{k}", tx + mouth * 0.55 * math.cos(a), h + 0.012 + 0.01 * ((k * 3) % 4) / 3, tz + mouth * 0.55 * math.sin(a),
+                              0.057, "potato", rot=(k * 0.7, k * 1.3 + a, k * 0.4)))
+        for k, da in enumerate((-0.7, 0.75)):
+            a = front + da
+            heap.append(tuber(f"ProducePotatoEdge{i}{k}", tx + mouth * 0.84 * math.cos(a), h + 0.022, tz + mouth * 0.84 * math.sin(a), 0.056, "potato",
+                              rot=lean_out(a, 0.35)))
+        for k, (dx_, dz_, dy) in enumerate([(-0.035, -0.02, 0.0), (0.04, -0.015, 0.012), (0.0, 0.04, 0.006)]):
+            heap.append(tuber(f"ProducePotatoTop{i}{k}", tx + dx_, h + 0.062 + dy, tz + dz_, 0.056, "potato", rot=(k * 1.1, k * 0.7, k * 0.9)))
     elif kind == "onion":
         for k in range(6):
             a = 2 * math.pi * k / 6 + i
-            onion(f"ProduceOnion{i}{k}", tx + r * 0.52 * math.cos(a), h + 0.02 + 0.006 * (k % 2), tz + r * 0.52 * math.sin(a), 0.045,
-                  rot=(0.3 * math.cos(a), 0.3 * math.sin(a), k))
-        for k, (dx_, dz_) in enumerate([(-0.03, -0.02), (0.035, 0.0), (0.0, 0.04)]):
-            onion(f"ProduceOnionTop{i}{k}", tx + dx_, h + 0.07, tz + dz_, 0.044, rot=(0.2 * k, -0.15 * k, k))
+            heap.append(onion(f"ProduceOnion{i}{k}", tx + mouth * 0.55 * math.cos(a), h + 0.018 + 0.008 * (k % 3) / 2, tz + mouth * 0.55 * math.sin(a), 0.045,
+                              rot=(0.3 * math.cos(a), 0.3 * math.sin(a), k)))
+        for k, da in enumerate((-0.75, 0.7)):
+            a = front + da
+            heap.append(onion(f"ProduceOnionEdge{i}{k}", tx + mouth * 0.86 * math.cos(a), h + 0.03, tz + mouth * 0.86 * math.sin(a), 0.043,
+                              rot=(0.5 * math.sin(a), -0.5 * math.cos(a), k * 1.7)))
+        for k, (dx_, dz_, dy) in enumerate([(-0.03, -0.02, 0.0), (0.035, 0.0, 0.008), (0.0, 0.04, 0.004)]):
+            heap.append(onion(f"ProduceOnionTop{i}{k}", tx + dx_, h + 0.068 + dy, tz + dz_, 0.044, rot=(0.2 * k, -0.15 * k, k)))
     else:
-        for k, (dx_, dz_, dy, a) in enumerate([(-0.06, -0.05, 0.0, 0.4), (0.07, 0.0, 0.012, -0.6), (-0.02, 0.08, 0.004, 1.2), (0.03, -0.02, 0.05, 0.1),
-                                            (-0.07, 0.04, 0.03, 2.0)]):
-            tuber(f"ProduceSweet{i}{k}", tx + dx_, h + 0.012 + dy, tz + dz_, 0.05, "sweet", rot=(0.0, 0.15 * k, a))
+        for k, (dx_, dz_, dy, a) in enumerate([(-0.06, -0.05, 0.0, 0.4), (0.07, 0.0, 0.012, -0.6), (-0.02, 0.07, 0.004, 1.2), (0.03, -0.02, 0.05, 0.1)]):
+            heap.append(tuber(f"ProduceSweet{i}{k}", tx + dx_, h + 0.014 + dy, tz + dz_, 0.05, "sweet", rot=(0.0, 0.15 * k, a)))
+        # (two at the front's sides: one laid out over the cuff, one stood up out of the heap against it)
+        for k, (da, rr_, dy, tilt) in enumerate(((-0.6, 0.74, 0.03, 0.32), (0.85, 0.66, 0.05, -0.55))):
+            a = front + da
+            heap.append(tuber(f"ProduceSweetEdge{i}{k}", tx + mouth * rr_ * math.cos(a), h + dy, tz + mouth * rr_ * math.sin(a), 0.05, "sweet",
+                              rot=lean_out(a, tilt)))
+    # (each lifted till it's clear of the cloth: on the cuff, not through it)
+    lifts = {o.name: round(settle(o, cloth), 3) for o in heap}
+    print("SETTLED", i, {k_: v for k_, v in lifts.items() if v})
 # ---- a few rolled out in front ----
-tuber("ProduceLoose0", -0.2, 0.045, 0.27, 0.055, "potato", rot=(0.3, 0.2, 0.9))
+tuber("ProduceLoose0", -0.22, 0.045, 0.29, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 # (a potato and an onion: the owner's)
-onion("ProduceLooseOnion", 0.25, 0.038, 0.3, 0.044, rot=(1.4, 0.3, 0.6))
+onion("ProduceLooseOnion", 0.24, 0.038, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
 # ---- the crate of carrots and burdock, beside the onions' sack ----
-CX, CW, CD, CH = 0.78, 0.38, 0.26, 0.18
+CX, CW, CD, CH = 0.81, 0.38, 0.26, 0.18
 board("ProduceCrateBottom", CX, 0.012, 0.0, CW, 0.024, CD)
 for sd in (-1, 1):
     board(f"ProduceCrateSide{sd}", CX + sd * (CW / 2 - 0.01), CH / 2, 0.0, 0.02, CH, CD)

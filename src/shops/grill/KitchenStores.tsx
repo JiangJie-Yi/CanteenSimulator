@@ -21,10 +21,12 @@ const OPEN = /^(ProduceSack|CharcoalSack)/
 /** what's baked (the tubers: blender/produce.py bakes a detailed twin onto each coarse one), its normal map kept, so the room's light shades
  * it as if it were round */
 const BAKED = /^ProduceTuber/
+/** the produce sacks' cloth: its cross-weave pressed in (a normal map, blender/produce.py's WEAVE_N), kept as the tubers' are */
+const WOVEN = /^ProduceSack(Potato|Sweet|Onion)$/
 /** how much brighter each sack's burlap is drawn than it's woven */
 const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18 }
 /** the produce sacks' cloth dyed another colour (the owner's): the potatoes' and sweet potatoes' a clean bleached cotton-hemp, the onions' an
- * unbleached linen a shade duller; their woven bands kept as they are */
+ * unbleached linen a shade duller (they've no woven bands now: the owner's, too stiff, like a barrel's hoops) */
 const BURLAP_DYE: Record<string, string> = { ProduceSackPotato: '#f4f1ea', ProduceSackSweet: '#f4f1ea', ProduceSackOnion: '#d5cebf' }
 
 /** a burlap picture in another colour: each point that colour by how light it was against the cloth's own mean (the weave's light and dark
@@ -92,7 +94,7 @@ function partOf(scene: THREE.Group, node: string, width: number, keep?: (o: THRE
           const dye = BURLAP_DYE[sm.name]
           if (dye && sm.map?.image) toon.map = dyeBurlap(sm.map, dye)
           t = toon
-          if (BAKED.test(sm.name) && sm.normalMap) Object.assign(t, { normalMap: sm.normalMap, normalScale: sm.normalScale.clone() })
+          if ((BAKED.test(sm.name) || WOVEN.test(sm.name)) && sm.normalMap) Object.assign(t, { normalMap: sm.normalMap, normalScale: sm.normalScale.clone() })
         }
         t.name = sm.name
         mats.set(s, t)
