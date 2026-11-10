@@ -30,14 +30,16 @@ export function buyCase(back: Back, id: string, cash: number) {
 }
 
 /**
- * How many of a drink stand in one place, one behind another, the front one and those behind it back to the fridge's back wall (as far as
- * its own depth goes in it: the big bottles and the cans two, the little bottles, the coffee cans and the packs three); one for a drink this
- * doesn't know
+ * How many of a drink stand in one place, one behind another, the front one and those behind it all the way back to the fridge's back wall
+ * (the owner's, 2026-11-11: full to the back, each by its own size, the same gap between them): from the front row's middle (0.16 in the
+ * fridge's frame, blender/drinkfridge.py) back to a centimetre off the liner's back (-0.336), each its own depth and 5 mm apart
+ * (DiningRoom's rankStep and shelfSize, measured with tests/e2e/_rankfit.mjs); one for a drink this doesn't know
  */
 export const PLACE_DEPTH: Record<string, number> = {
-  oolong: 2, greenTea: 2, sports: 2, cola: 2, yuzuSoda: 2, lacticSoda: 2, beer: 2, darkBeer: 2, beerCan: 2, highball: 2, chuhai: 2,
-  ramune: 3, milk: 3, coffee: 3, blackCoffee: 3, cafeAuLait: 3, appleJuice: 3, barleyTea: 3, vegJuice: 3, yakult: 3, yogurt: 3,
-  sake: 3, umeshu: 3, shochu: 3, grapeSoju: 3,
+  oolong: 6, greenTea: 7, sports: 7, cola: 7, beer: 7, darkBeer: 7,
+  yuzuSoda: 8, lacticSoda: 8, beerCan: 8, highball: 8, chuhai: 8, ramune: 8, sake: 8, shochu: 8, grapeSoju: 8,
+  milk: 9, coffee: 9, blackCoffee: 9, cafeAuLait: 9, yogurt: 9, umeshu: 9,
+  appleJuice: 11, barleyTea: 11, vegJuice: 11, yakult: 11,
 }
 export const depthOf = (id: string | null | undefined) => (id ? PLACE_DEPTH[id] ?? 1 : 1)
 

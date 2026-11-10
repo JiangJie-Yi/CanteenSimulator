@@ -5798,6 +5798,7 @@ function shelfSize(id: DrinkId): [number, number] {
   SHELF_SIZES.set(id, v)
   return v
 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __shelfSize: shelfSize })
 /** how much of a shelf's width the drinks stand along (blender/drinkfridge.py: its walls 0.395 either side of the middle, the cove lights'
  * baffles 2 cm in from them; a little room left inside those) */
 const SHELF_SPAN = 0.72
