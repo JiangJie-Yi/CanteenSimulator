@@ -7,7 +7,12 @@ plain boxes and planes, about 400 triangles.
 - "FridgeSign": the light box over the door, one quad (its picture, the washi sign, painted by the game: FridgeSign).
 - "FridgeShelves": the four wire shelves, each a quad whose picture is the wire grid (its gaps see-through: FridgeWire), a white front
   lip (FridgeLiner) and on it a strip of price tags (FridgeTag: the shelf's own quarter of the picture, painted by the game).
-- The back of the liner is its own face (FridgeBackLight: the game paints the LED's cool white wash on it, brightest under each shelf).
+- The back of the liner is its own face (FridgeBackLight: the game paints the LED's cool white wash on it, brightest under each shelf), and
+  so are its sides (FridgeSideLight: the cove light's wash, brightest at the front): each side's light is a cove (the owner's, 2026-11-10:
+  the sides were two glaring white bars by the frame): a black baffle standing in from the wall just behind the gasket, and behind it a
+  narrow strip of milky acrylic (FridgeCove, lit) slanting back to the wall, seen only from an angle, its light on the wall behind.
+- Nothing lies in another's plane (the owner saw black stripes torn across the white at the foot: the plinth's top and front shared the
+  floor's): the plinth under the floor, the liner's faces 4 mm off the walls, the shelves' tags 3 mm off their lips.
 - "FridgeDoorL", "FridgeDoorR": the pair of glass doors (the owner's: two black-framed doors a fridge, a black mullion where they meet): each
   its frame, its pane (FridgeGlass, see-through) and a long silver handle by the middle; the game swings each on its outer edge.
 - The foot: six louvre slats and a small silver maker's plate (FridgeMetal).
@@ -67,6 +72,8 @@ M = {
     "wire": pbr("FridgeWire", (1, 1, 1), tex=image("fridge_wire", wire_rgb, alpha=wires.astype(np.float32)), rough=0.4, blend=False),
     "glass": pbr("FridgeGlass", lin("#cfe2ea"), rough=0.05, blend=True),
     "backlight": pbr("FridgeBackLight", (1, 1, 1), rough=0.6),
+    "sideglow": pbr("FridgeSideLight", (1, 1, 1), rough=0.6),
+    "cove": pbr("FridgeCove", lin("#f0fdf4"), rough=0.5),
     "tag": pbr("FridgeTag", (1, 1, 1), rough=0.6),
 }
 parts = []
@@ -122,21 +129,44 @@ body = [
     box("back", x0 + T, x1 - T, 0, H, zb, zb + T, "shell"),
     box("top", x0 + T, x1 - T, H - T, H, zb + T, zf, "shell"),
     box("head", x0 + T, x1 - T, open_y1, H - T, zf - 0.06, zf, "shell"),
-    box("plinth", x0 + T, x1 - T, 0.0, PLINTH, zf - 0.08, zf - 0.02, "louver"),
+    # (under the floor, not up into it: its top and its front lay in the floor's planes and fought them)
+    box("plinth", x0 + T, x1 - T, 0.0, PLINTH - 0.02, zf - 0.08, zf - 0.02, "louver"),
     box("floor", x0 + T, x1 - T, PLINTH - 0.02, PLINTH, zb + T, zf - 0.02, "liner"),
     box("strip", x0 + T, x1 - T, PLINTH - 0.025, PLINTH, zf - 0.02, zf, "metal"),
 ]
 # (the louvre: six slats across the foot, standing proud of it, and a little silver maker's plate in their middle)
 for k in range(6):
-    y = 0.012 + k * 0.019
+    # (all under the steel strip over them (its foot 0.115 up): the top one ran a millimetre into it)
+    y = 0.01 + k * 0.0185
     body.append(box(f"slat{k}", x0 + T + 0.03, x1 - T - 0.03, y, y + 0.009, zf - 0.02, zf - 0.006, "gasket"))
 body.append(box("badge", -0.055, 0.055, 0.056, 0.082, zf - 0.006, zf - 0.002, "metal"))
 # (the liner: the back and sides inside, white; the ceiling under the header)
 ix0, ix1, iz0, iz1 = x0 + T, x1 - T, zb + T, zf - 0.06
-body.append(quad("liner-back", [(ix0, open_y0, iz0 + 0.001), (ix1, open_y0, iz0 + 0.001), (ix1, open_y1, iz0 + 0.001), (ix0, open_y1, iz0 + 0.001)], "backlight"))
-body.append(quad("liner-l", [(ix0 + 0.001, open_y0, iz1), (ix0 + 0.001, open_y0, iz0), (ix0 + 0.001, open_y1, iz0), (ix0 + 0.001, open_y1, iz1)], "liner"))
-body.append(quad("liner-r", [(ix1 - 0.001, open_y0, iz0), (ix1 - 0.001, open_y0, iz1), (ix1 - 0.001, open_y1, iz1), (ix1 - 0.001, open_y1, iz0)], "liner"))
-body.append(quad("liner-top", [(ix0, open_y1 - 0.001, iz1), (ix1, open_y1 - 0.001, iz1), (ix1, open_y1 - 0.001, iz0), (ix0, open_y1 - 0.001, iz0)], "liner"))
+# (4 mm off the cabinet's walls, not 1: at 1 they flickered with them from across the room)
+LO = 0.004
+body.append(quad("liner-back", [(ix0, open_y0, iz0 + LO), (ix1, open_y0, iz0 + LO), (ix1, open_y1, iz0 + LO), (ix0, open_y1, iz0 + LO)], "backlight"))
+# (the sides' pictures from the front (u 0) to the back (u 1), up their height)
+body.append(quad("liner-l", [(ix0 + LO, open_y0, iz1), (ix0 + LO, open_y0, iz0), (ix0 + LO, open_y1, iz0), (ix0 + LO, open_y1, iz1)], "sideglow",
+                 uv=((0, 0), (1, 0), (1, 1), (0, 1))))
+body.append(quad("liner-r", [(ix1 - LO, open_y0, iz0), (ix1 - LO, open_y0, iz1), (ix1 - LO, open_y1, iz1), (ix1 - LO, open_y1, iz0)], "sideglow",
+                 uv=((1, 0), (0, 0), (0, 1), (1, 1))))
+body.append(quad("liner-top", [(ix0, open_y1 - LO, iz1), (ix1, open_y1 - LO, iz1), (ix1, open_y1 - LO, iz0), (ix0, open_y1 - LO, iz0)], "liner"))
+# (the cove lights: either side a black baffle standing 2 cm in from the wall just behind the gasket, the full height of the opening, and
+# behind it, against the wall, a narrow strip of milky acrylic, lit; from the front only the baffle shows and the light washed on the wall
+# behind it. Clear of the shelves' wire (which starts 1 cm behind the liner's front edge))
+BW = 0.02
+for sd, xw in ((-1, ix0), (1, ix1)):
+    inner = xw - sd * BW
+    xa, xb = (xw, inner) if sd < 0 else (inner, xw)
+    # (matte black, as the gasket: in the cabinet's glossy black it caught the studio and stood out as a pale bar)
+    body.append(box(f"baffle{'lr'[sd > 0]}", xa, xb, open_y0, open_y1, iz1 + 0.003, iz1 + 0.025, "gasket"))
+    # (tucked close to the wall, deep in the baffle's shadow: at its full width (to the baffle's inner edge) it showed from the front at any
+    # slant, a bare bright line up the side; now only from well round to the side, the light itself seen as the wash on the wall)
+    near, wall = xw - sd * 0.012, xw - sd * 0.004
+    a, b = (near, iz1 + 0.002), (wall, iz1 - 0.004)
+    # (counter-clockwise seen from inside the cabinet: its face toward the middle)
+    pts = [(a[0], open_y0, a[1]), (b[0], open_y0, b[1]), (b[0], open_y1, b[1]), (a[0], open_y1, a[1])]
+    body.append(quad(f"cove{'lr'[sd > 0]}", pts if sd < 0 else pts[::-1], "cove"))
 # (the gasket: a dark frame round the opening, just inside the door)
 g = 0.012
 body += [box("gasket-t", ix0, ix1, open_y1 - g, open_y1, zf - 0.03, zf - 0.02, "gasket"),
@@ -153,11 +183,14 @@ shelves = []
 for k, y in enumerate(SHELVES):
     sy = y - 0.004
     shelves.append(quad(f"shelf{k}", [(ix0 + 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy, iz0 + 0.02), (ix0 + 0.01, sy, iz0 + 0.02)], "wire"))
-    shelves.append(box(f"lip{k}", ix0 + 0.01, ix1 - 0.01, sy - 0.025, sy + 0.012, iz1 - 0.022, iz1 - 0.01, "liner"))
-    # (the price tags along the lip's face, 1.5 mm proud of it: this shelf's quarter of the picture)
+    # (its lip, and the strip naming the shelf on it, inside the baffles either side, their ends 2.2 cm in from the walls (the owner's: they
+    # ran out to the walls and showed past the doors' stiles, white stubs through the posts))
+    LI = BW + 0.002
+    shelves.append(box(f"lip{k}", ix0 + LI, ix1 - LI, sy - 0.025, sy + 0.012, iz1 - 0.022, iz1 - 0.01, "liner"))
+    # (the tags along the lip's face, 3 mm proud of it: this shelf's quarter of the picture)
     v0, v1 = 1 - (k + 1) / len(SHELVES), 1 - k / len(SHELVES)
-    shelves.append(quad(f"tags{k}", [(ix0 + 0.012, sy - 0.023, iz1 - 0.0085), (ix1 - 0.012, sy - 0.023, iz1 - 0.0085), (ix1 - 0.012, sy + 0.01, iz1 - 0.0085),
-                                     (ix0 + 0.012, sy + 0.01, iz1 - 0.0085)], "tag", uv=((0, v0), (1, v0), (1, v1), (0, v1))))
+    shelves.append(quad(f"tags{k}", [(ix0 + LI + 0.002, sy - 0.023, iz1 - 0.007), (ix1 - LI - 0.002, sy - 0.023, iz1 - 0.007), (ix1 - LI - 0.002, sy + 0.01, iz1 - 0.007),
+                                     (ix0 + LI + 0.002, sy + 0.01, iz1 - 0.007)], "tag", uv=((0, v0), (1, v0), (1, v1), (0, v1))))
 fridge_shelves = join(shelves, "FridgeShelves")
 
 # ---- the doors: a pair, each its frame, its pane, its handle by the middle (where the two frames meet, a black mullion)

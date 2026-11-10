@@ -38,7 +38,9 @@ export function capTexture(t: THREE.Texture | null | undefined) {
   if (!isPicture(full)) return
   done.add(src)
   const [w, h] = sizeOf(full)
-  const cap = texCap()
+  // (a picture of fine lettering may ask for up to twice the cap (`userData.capScale`): the drinks fridges' light boxes (the owner's: drawn at
+  // 2048 so their brush lettering and leaf stay sharp), a few megabytes against the hundreds the cap saves)
+  const cap = texCap() * Math.min(2, Math.max(1, (t.userData as { capScale?: number }).capScale ?? 1))
   if (w <= cap && h <= cap) return
   const k = cap / Math.max(w, h)
   const small = document.createElement('canvas')
