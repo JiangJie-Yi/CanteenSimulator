@@ -19,6 +19,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE } from '@/game/drinkStock'
+import { cartonMaterials } from './drinkCartons'
 import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, type Counter, type DrinkId } from './bar'
 import { Movable } from './Movable'
 import { getEdit } from './edit'
@@ -6423,61 +6424,24 @@ const drinkLabel = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? id
 const lowestBack = () => [...new Set(FRIDGE_UNITS.flatMap((u) => u.shelves.flatMap((sh) => sh.ids)))]
   .sort((a, b) => (DRINK_BACK.back[a] ?? 0) / (CASE_SIZE[a] ?? 24) - (DRINK_BACK.back[b] ?? 0) / (CASE_SIZE[b] ?? 24))
 const CARTONS_URL = import.meta.env.BASE_URL + 'models/drinkcartons.glb'
-/** what each case in the stack holds (blender/drinkcartons.py's CartonPrint0..4): the canned drinks come by the carton, the bottles by the crate */
-const CARTON_DRINKS: DrinkId[] = ['beerCan', 'greenTea', 'cola', 'highball', 'chuhai']
-/** a carton's print: the kraft board, a band of the drink's own colour across it with its name big, a row of its cans and how many are in */
-const cartonPrint = (id: DrinkId) => canvasTex(512, 256, (g) => {
-  const d = DRINKS.find((x) => x.id === id)!
-  const [bg, fg, text] = d.label
-  g.fillStyle = '#b98a5c'; g.fillRect(0, 0, 512, 256)
-  g.fillStyle = 'rgba(90,60,30,0.08)'
-  for (let x = 0; x < 512; x += 9) g.fillRect(x, 0, 3, 256)
-  // (the band, and a thinner one of the drink's second colour under it)
-  g.fillStyle = bg; g.fillRect(0, 46, 512, 128)
-  g.fillStyle = fg; g.fillRect(0, 174, 512, 10)
-  g.fillStyle = fg
-  g.font = '900 70px "Zen Antique", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText(text, 300, 112)
-  // (a little can at the band's left, in the drink's colours)
-  g.fillStyle = '#c8ccd2'; g.beginPath(); g.roundRect(46, 66, 64, 92, 10); g.fill()
-  g.fillStyle = bg; g.fillRect(48, 88, 60, 46)
-  g.fillStyle = fg; g.fillRect(58, 104, 40, 12)
-  g.strokeStyle = '#3b2a20'; g.lineWidth = 3; g.beginPath(); g.roundRect(46, 66, 64, 92, 10); g.stroke()
-  // (what's in it, printed small on the board under the band)
-  g.fillStyle = '#3b2a20'
-  g.font = '700 26px "Arial Black", sans-serif'
-  g.fillText(`350ml × ${CASE_SIZE[id] ?? 24}`, 256, 220)
-  g.font = '700 18px sans-serif'; g.textAlign = 'left'
-  drawGlyph(g, 'arrowU', 16, 15, 18, '#3b2a20')
-  g.fillText('天地無用', 38, 24)
-})
-/** the cartons of canned drinks stacked by the crates (blender/drinkcartons.py), each printed for its drink, in the room's toon light */
+/** the cartons of canned drinks stacked by the crates (blender/drinkcartons.py): each printed for its drink on one print at one scale
+ * (drinkCartons.ts), matte kraft with its flutes and handholes, taped shut with a translucent brown tape */
 function DrinkCartons() {
   const gltf = useGLTF(CARTONS_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
     const root = gltf.scene.clone(true)
-    const mats = new Map<THREE.Material, THREE.Material>()
+    const { board, tape } = cartonMaterials()
     root.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      let t = mats.get(src)
-      if (!t) {
-        const k = /^CartonPrint(\d)/.exec(src.name)
-        // (a glTF model's pictures are read top row first: the print's canvas too)
-        const print = k ? cartonPrint(CARTON_DRINKS[+k[1]]) : null
-        if (print) { print.flipY = false; print.needsUpdate = true }
-        // (the tape clear, as packing tape is (the owner's: it was an opaque brown strip))
-        t = /Tape/.test(src.name) ? clearTape() : new THREE.MeshToonMaterial({ color: k ? '#ffffff' : src.color.clone(), map: print ?? src.map })
-        mats.set(src, t)
-      }
-      m.material = t
-      m.castShadow = true
+      const tapeOf = /Tape/.test((m.material as THREE.Material).name ?? '')
+      m.material = tapeOf ? tape : board
+      // (the tape lies on the board: no shadow of its own)
+      m.castShadow = !tapeOf
       m.receiveShadow = true
     })
     inkModel(root, (m) => /Tape/.test((m.material as THREE.Material).name ?? ''), { width: 0.0012, weld: true })
-    // (nine cases now, each its board, its print and three strips of tape: folded together by material, a handful of draws for the stack)
-    plainColours(root)
+    // (nine cases, each its board and its tape: one material each, folded together: two draws for the stack, and their ink line)
     mergeByMaterial(root)
     return root
   }, [gltf])

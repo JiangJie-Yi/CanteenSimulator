@@ -1,11 +1,14 @@
 """Cardboard cases of drinks (段ボール), stacked by the crates at the back of the drinks: drinkcartons.glb, node "DrinkCartons".
 
 Nine cases (the owner: bigger cases, more of them, stacked up high): two side by side to a layer, four layers each a little askew on the
-last, one on top turned across, about 1.1 tall. Each a plain box of kraft board (one quad to a face, no bottom), its
-top flaps shut under a strip of tape running over and down the ends (one strip of three quads); its long sides and one end printed (material
-"CartonPrint<k>", the picture laid once over each printed face: the game draws each its own drink's print on it), the rest plain board
-("CartonKraft"). The game's frame: y up, the stack standing on y = 0, its middle at the origin; each case 0.40 long, 0.21 tall, 0.28 deep
-(a case of 24 cans; they were 0.30 x 0.14 x 0.20). The five prints shared round the nine (CartonPrint0..4).
+last, one on top turned across, about 1.1 tall. The game's frame: y up, the stack standing on y = 0, its middle at the origin; each case 0.40
+long, 0.21 tall, 0.28 deep (a case of 24 cans). Each a box of board with its upright and top edges bevelled 5 mm (no bottom: it stands on
+the floor or the case under it; 30 triangles), its top flaps shut under a strip of tape along the seam, over the bevels and down both ends.
+
+Its faces all one material ("CartonPrint"), laid out on the game's print (1024 x 1024, 930 px to the metre, the same for every face: the
+owner's, 2026-11-10: the print was one 2:1 picture laid over each face whatever its shape, the ends' squashed, and the +x end's mirrored) as
+a dieline: each drink's row, its long side (front and back, W x H) and its end (D x H) beside it; one top for all (W x D) at the right. Every
+face's picture right reading seen from outside it (CartonLayout below, which the game's painter follows: shops/grill/drinkCartons.ts).
 
 Run:
     blender -b --factory-startup --python blender/drinkcartons.py -- <project path> [preview.png]
@@ -39,7 +42,7 @@ def lin(hexs):
 
 
 def kraft():
-    """corrugated kraft board: warm brown, faint flutes showing through, a few scuffs"""
+    """corrugated kraft board: warm brown, faint flutes showing through, a few scuffs (the preview's: the game paints the print)"""
     seed(4)
     N = 256
     u, v = grid01(N)
@@ -50,73 +53,93 @@ def kraft():
     return mix(col, (0.8, 0.66, 0.48), scuff * 0.35)
 
 
-M = {"kraft": pbr("CartonKraft", (1, 1, 1), tex=image("cartonkraft", kraft()), rough=0.85),
-     "tape": pbr("CartonTape", lin("#a8784a"), rough=0.5)}
-PRINTS = [pbr(f"CartonPrint{k}", (1, 1, 1), tex=image(f"cartonprint{k}", kraft()), rough=0.8) for k in range(5)]
+M = {"print": pbr("CartonPrint", (1, 1, 1), tex=image("cartonprint", kraft()), rough=0.88),
+     "tape": pbr("CartonTape", lin("#c9a26a"), rough=0.35)}
 parts = []
+
+# (the print's layout, in its pixels from its top left (the game's drinkCartons.ts follows it): one scale for every face)
+PX, TW, TH = 930.0, 1024.0, 1024.0
+SIDE_X, END_X, ROW0, ROW = 4.0, 384.0, 4.0, 202.0
+TOP_X, TOP_Y = 650.0, 4.0
+BEVEL = 0.005
 
 
 def carton(idx, k, at, turn):
-    """one case (the idx-th), its print material k, standing at `at` (its foot's middle, the game's frame), turned `turn` about the upright"""
+    """one case (the idx-th), its print row k, standing at `at` (its foot's middle, the game's frame), turned `turn` about the upright"""
+    hw, hd = L / 2, D / 2
+    W, Hh, Dd = L * PX, H * PX, D * PX
+    row_y = ROW0 + k * ROW
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    # (each face one quad, flat (the owner's: each face was 4 x 4 to bulge a hair, 192 triangles a case, and the bottom one's underside
-    # sagged into a jagged edge); no bottom (it stands on the floor or the case under it): 10 triangles a case)
-    n = 1
-    faces = []
-    # (each face: its axis, side, and the two in-face axes; printed: the long sides (z) and one end (+x))
-    for ax, side, printed in ((0, 1, True), (0, -1, False), (1, 1, False), (2, 1, True), (2, -1, True)):
-        others = [a for a in range(3) if a != ax]
-        half = (L / 2, H / 2, D / 2)
-        grid = []
-        for i in range(n + 1):
-            row = []
-            for j in range(n + 1):
-                p = [0.0, 0.0, 0.0]
-                p[ax] = side * half[ax]
-                p[others[0]] = -half[others[0]] + 2 * half[others[0]] * i / n
-                p[others[1]] = -half[others[1]] + 2 * half[others[1]] * j / n
-                row.append((bm.verts.new(P(p[0], p[1] + H / 2, p[2])), (i / n, j / n)))
-            grid.append(row)
-        for i in range(n):
-            for j in range(n):
-                q = [grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]]
-                if side < 0:
-                    q.reverse()
-                f = bm.faces.new([vv for vv, _ in q])
-                f.material_index = 1 if printed else 0
-                for lp, (_, uv) in zip(f.loops, q):
-                    # (printed faces: the print laid once over the face, upright; plain ones: the board's flutes along)
-                    uu, vv = uv
-                    if ax == 0:
-                        lp[uvl].uv = (vv if side > 0 else 1 - vv, uu)
-                    elif ax == 2:
-                        lp[uvl].uv = (uu if side > 0 else 1 - uu, vv)
-                    else:
-                        lp[uvl].uv = (uu, vv)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    v = {}
+    for sx in (-1, 1):
+        for y in (0.0, H):
+            for sz in (-1, 1):
+                v[(sx, y, sz)] = bm.verts.new(P(sx * hw, y, sz * hd))
+    # (its four sides and its top; no bottom)
+    for q in (((-1, 0.0, 1), (1, 0.0, 1), (1, H, 1), (-1, H, 1)), ((1, 0.0, -1), (-1, 0.0, -1), (-1, H, -1), (1, H, -1)),
+              ((1, 0.0, 1), (1, 0.0, -1), (1, H, -1), (1, H, 1)), ((-1, 0.0, -1), (-1, 0.0, 1), (-1, H, 1), (-1, H, -1)),
+              ((-1, H, 1), (1, H, 1), (1, H, -1), (-1, H, -1))):
+        bm.faces.new([v[c] for c in q])
+    bm.normal_update()
+    # (each face turned out of the box)
+    mid = Vector(P(0, H / 2, 0))
+    for f in bm.faces:
+        if f.normal.dot(f.calc_center_median() - mid) < 0:
+            f.normal_flip()
+    # (its upright edges and its top's bevelled: the board's edges eased, not cut sharp (the owner's); the foot's edges left, standing flat)
+    edges = [e for e in bm.edges if not all(abs(vv.co.z) < 1e-6 for vv in e.verts)]
+    bmesh.ops.bevel(bm, geom=edges, offset=BEVEL, offset_type="OFFSET", segments=1, profile=0.5, affect="EDGES", clamp_overlap=True)
+    bm.normal_update()
+    for f in bm.faces:
+        if f.normal.dot(f.calc_center_median() - mid) < 0:
+            f.normal_flip()
+    bm.normal_update()
+    # (each face's picture: by which way it faces, the bevels' taking the edge of the face they lean to (a side's or an end's before the
+    # top's), each seen from outside right reading: x, y, z the game's)
+    for f in bm.faces:
+        n = f.normal
+        g = (n.x, n.z, -n.y)
+        ax = max(range(3), key=lambda a_: abs(g[a_]) - (0.02 if a_ == 1 else 0.0))
+        for lp in f.loops:
+            co = lp.vert.co
+            x, y, z = co.x, min(H, max(0.0, co.z)), -co.y
+            if ax == 2:
+                u = (x + hw) / L if g[2] > 0 else (hw - x) / L
+                px, py = SIDE_X + u * W, row_y + (H - y) / H * Hh
+            elif ax == 0:
+                u = (hd - z) / D if g[0] > 0 else (z + hd) / D
+                px, py = END_X + u * Dd, row_y + (H - y) / H * Hh
+            else:
+                px, py = TOP_X + (x + hw) / L * W, TOP_Y + (z + hd) / D * Dd
+            lp[uvl].uv = (px / TW, 1 - py / TH)
     me = bpy.data.meshes.new(f"Carton{idx}")
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(f"Carton{idx}", me)
     bpy.context.collection.objects.link(o)
-    o.data.materials.append(M["kraft"])
-    o.data.materials.append(PRINTS[k])
-    # (crisp, as board is: its faces flat, only the faintest swell)
+    o.data.materials.append(M["print"])
     for f in o.data.polygons:
         f.use_smooth = False
-    # (the tape: one strip over the flaps' seam along the top and down both ends, three quads lying a hair off the board)
-    tw, drop, off = 0.045, 0.06, 0.0015
+    # (the tape: one strip along the top's seam, over the bevels and down both ends 3 cm (the owner's), lying 2.5 mm off the board, out past
+    # the ink line round the box (inside it, the line drawn over it at the edges, the tape looked cut there: the owner saw it break))
+    tw, drop, off = 0.048, 0.03, 0.0025
+    c = off * math.tan(math.pi / 8)
+    prof = [(-hw - off, H - drop), (-hw - off, H - BEVEL + c), (-hw + BEVEL - c, H + off),
+            (hw - BEVEL + c, H + off), (hw + off, H - BEVEL + c), (hw + off, H - drop)]
     bm = bmesh.new()
-    pts = [(-L / 2 - off, H - drop), (-L / 2 - off, H + off), (L / 2 + off, H + off), (L / 2 + off, H - drop)]
-    rows = [[bm.verts.new(P(x, y, z)) for (x, y) in pts] for z in (-tw / 2, tw / 2)]
-    for k in range(3):
-        bm.faces.new((rows[0][k], rows[0][k + 1], rows[1][k + 1], rows[1][k]))
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    uvt = bm.loops.layers.uv.new()
+    rows = [[bm.verts.new(P(x, y, zz)) for (x, y) in prof] for zz in (-tw / 2, tw / 2)]
+    run = [0.0]
+    for i in range(1, len(prof)):
+        run.append(run[-1] + math.dist(prof[i], prof[i - 1]))
+    for i in range(len(prof) - 1):
+        f = bm.faces.new((rows[0][i], rows[0][i + 1], rows[1][i + 1], rows[1][i]))
+        for lp, (ss, ii) in zip(f.loops, ((0, i), (0, i + 1), (1, i + 1), (1, i))):
+            lp[uvt].uv = (ss, run[ii] / run[-1])
+    bm.normal_update()
     for f in bm.faces:
-        c = f.calc_center_median()
-        if f.normal.dot(Vector((c.x, c.y, c.z - H / 2 - 0.0))) < 0:
+        if f.normal.dot(f.calc_center_median() - mid) < 0:
             f.normal_flip()
     me = bpy.data.meshes.new(f"CartonTape{idx}")
     bm.to_mesh(me)
@@ -124,12 +147,10 @@ def carton(idx, k, at, turn):
     t = bpy.data.objects.new(f"CartonTape{idx}", me)
     bpy.context.collection.objects.link(t)
     t.data.materials.append(M["tape"])
-    tape = [t]
-    for t in tape:
-        t.parent = o
+    t.parent = o
     o.matrix_world = Matrix.Translation(P(*at)) @ Matrix.Rotation(turn, 4, "Z")
     parts.append(o)
-    parts.extend(tape)
+    parts.append(t)
     return o
 
 
@@ -140,8 +161,9 @@ LAYOUT = [(-0.205, 0.0, 0.0, 0.02), (0.205, 0.0, 0.01, -0.03),
           (-0.19, 3, 0.006, 0.04), (0.205, 3, -0.006, -0.05),
           (0.0, 4, 0.0, math.pi / 2 + 0.08)]
 PRINT_OF = [0, 1, 2, 3, 4, 2, 0, 3, 1]
+# (each layer sitting on the tape of the one under it: they stood 1.2 cm apart, each case floating over the last)
 for i, (x, layer, z, turn) in enumerate(LAYOUT):
-    carton(i, PRINT_OF[i], (x, layer * (H + 0.012), z), turn)
+    carton(i, PRINT_OF[i], (x, layer * (H + 0.003), z), turn)
 root = bpy.data.objects.new("DrinkCartons", None)
 bpy.context.collection.objects.link(root)
 bpy.context.view_layer.update()
