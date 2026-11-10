@@ -188,6 +188,11 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   衛生紙架: ['トイレットペーパー', 'Toilet roll'],
   '抽取衛生紙 / 轉動紙捲': ['紙を引く / ロールを回す', 'Pull a sheet / turn the roll'],
   '用完了，沒有備用的捲筒衛生紙：到庫存的耗材訂': ['使い切った・予備のロールなし：在庫の消耗品で注文', 'Used up, no spare rolls: order them under the stock’s supplies'],
+  // (the plates, every one counted: the racks, the draining basket)
+  碗盤架: ['食器棚', 'Plate rack'],
+  瀝水籃: ['水切りかご', 'Drainer'],
+  空的: ['空', 'Empty'],
+  '乾了，等著搬回碗盤架': ['乾いた・食器棚に戻すのを待つ', 'Dry, waiting to go back to the rack'],
 }
 
 /** what's put together with a number in it: its shape, and the same said in Japanese and in English */
@@ -213,6 +218,12 @@ const SHAPES: [RegExp, (m: string[]) => string, (m: string[]) => string][] = [
   [/^點一下打掃$/, () => 'クリックで掃除', () => 'Click to clean'],
   [/^衛生紙備品 (\d+) 盒$/, (m) => `ティッシュ予備 ${m[1]} 箱`, (m) => `${m[1]} spare tissue boxes`],
   [/^點一下看耗材$/, () => 'クリックで消耗品を見る', () => 'Click for supplies'],
+  [/^這一組 (\d+)\/(\d+)$/, (m) => `この棚 ${m[1]}/${m[2]}`, (m) => `This rack ${m[1]}/${m[2]}`],
+  [/^全店 (\d+)\/(\d+)$/, (m) => `店全体 ${m[1]}/${m[2]}`, (m) => `All racks ${m[1]}/${m[2]}`],
+  [/^(使用中|水槽|洗碗機|瀝水籃) (\d+)$/, (m) => `${{ 使用中: '使用中', 水槽: 'シンク', 洗碗機: '食洗機', 瀝水籃: '水切りかご' }[m[1]]} ${m[2]}`,
+    (m) => `${{ 使用中: 'In use', 水槽: 'Sink', 洗碗機: 'Washer', 瀝水籃: 'Drainer' }[m[1]]} ${m[2]}`],
+  [/^(\d+)\/(\d+) 個盤子$/, (m) => `皿 ${m[1]}/${m[2]}`, (m) => `${m[1]}/${m[2]} plates`],
+  [/^還要 (\d+) 秒瀝乾$/, (m) => `あと ${m[1]} 秒で乾く`, (m) => `Dry in ${m[1]} s`],
   [/^還有 (\d+) 張$/, (m) => `残り ${m[1]} 枚`, (m) => `${m[1]} left`],
   [/^還有 (\d+) 下$/, (m) => `残り ${m[1]} 回`, (m) => `${m[1]} pumps left`],
   [/^還夠 (\d+) 位客人用$/, (m) => `あと ${m[1]} 人分`, (m) => `Enough for ${m[1]} more`],

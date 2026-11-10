@@ -6,7 +6,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { PLATE_RACK } from './bar'
+import { PLATE_COUNT, PLATE_RACK } from './bar'
+import { RACK_FULL } from '@/game/plates'
+import { aimTip, setTip } from '@/scene/hoverTip'
+import { HOVER } from '@/scene/hoverGlow'
 import { wareGeometry } from './ware'
 import { StaticBatch } from '@/scene/StaticBatch'
 import { DESIGN_COUNT, wareDesign } from './wareDesigns'
@@ -147,6 +150,11 @@ const woodsOf = () => (woods ??= { light: grain(WOOD, '#6a4426'), dark: grain(WO
  * the shop's (game/plates): the first rack shows the first 25 of what's there, the second the rest (so the second empties first; on each
  * the piles on top go before the standing ones). A server comes to the front of it for a plate before each customer's first dish
  * (`rack-front-<part>`, where they stand; `rack-top-<part>`, where the plate's taken from), and the washed ones come back onto it from the sink */
+/** what a rack says pointed at (the owner's, 2026-11-10: every plate counted): how many it holds, and where all the shop's are */
+function rackSays(part: number) {
+  const mine = Math.max(0, Math.min(PER_RACK, PLATE_COUNT.rack - part * PER_RACK))
+  return `這一組 ${mine}/${PER_RACK}・全店 ${PLATE_COUNT.rack}/${RACK_FULL}｜使用中 ${PLATE_COUNT.out}・水槽 ${PLATE_COUNT.sink}・洗碗機 ${PLATE_COUNT.washer}・瀝水籃 ${PLATE_COUNT.basket}`
+}
 export function PlateRack({ part = 0 }: { part?: number }) {
   const all = useMemo(() => platesOf(part), [part])
   const [count, setCount] = useState(PLATE_RACK.n)
@@ -171,7 +179,11 @@ export function PlateRack({ part = 0 }: { part?: number }) {
   return (
     <group>
       {/* (what the editor's pointer finds: the whole rack and its cupboard, unseen; its wood is merged, a few draws, and takes no pointing) */}
-      <mesh position={[0, (H + CAB) / 2, 0.02]} visible={false}><boxGeometry args={[W + 0.06, H + CAB, D + 0.08]} /></mesh>
+      <mesh position={[0, (H + CAB) / 2, 0.02]} visible={false}
+        onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '碗盤架', hint: rackSays(part) }) }}
+        onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
+        <boxGeometry args={[W + 0.06, H + CAB, D + 0.08]} />
+      </mesh>
       {/* (where a server stands for a plate, and where it's lifted off) */}
       <group name={`rack-front-${part}`} position={[0, 0, D / 2 + 0.5]} />
       <group name={`rack-top-${part}`} position={[0, CAB + SHELVES[1] + 0.12, 0.04]} />

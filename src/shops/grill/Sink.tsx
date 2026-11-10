@@ -13,9 +13,10 @@ import { inkModel } from '@/scene/inkHull'
 import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { Steam } from '@/scene/Steam'
-import { canOpen, DRY_S, DRYER_CAP, dryerPhase, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
-import { DRYER, SINK, tipOver } from './bar'
-import { setTip } from '@/scene/hoverTip'
+import { canOpen, DRAIN_CAP, DRY_S, DRYER_CAP, dryerPhase, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
+import { DRAIN, DRYER, SINK, tipOver } from './bar'
+import { aimTip, setTip } from '@/scene/hoverTip'
+import { HOVER } from '@/scene/hoverGlow'
 import { getEdit } from './edit'
 import { coolerDoorSound, tapRunning, tapTurnSound, washerBeep, washerChime } from './restroomSound'
 
@@ -32,7 +33,6 @@ export const SINK_SETS = [
   { node: 'SinkBasketSet', id: 'sink-basket', label: '瀝水籃' },
   { node: 'SinkScrubSet', id: 'sink-scrub', label: '棕櫚刷' },
   { node: 'SinkSoapSet', id: 'sink-soap', label: '肥皂' },
-  { node: 'SinkPailSet', id: 'sink-pail', label: '檜木手桶' },
   { node: 'SinkTowelSet', id: 'sink-towel', label: '布巾' },
   { node: 'SinkBinSet', id: 'sink-bin', label: '竹籤垃圾桶' },
   // (behind the tap to its left (the owner's): the dish soap's pump bottle and the sponge scourer)
@@ -132,6 +132,8 @@ export function SinkModel() {
     const r = gltf.scene.clone(true)
     // (what stands on it taken off: each placed as a piece of its own)
     for (const set of SINK_SETS) r.getObjectByName(set.node)?.removeFromParent()
+    // (and the hinoki hand pail, no longer kept on it (the owner's, 2026-11-10: crossed out); still in the model, not drawn)
+    r.getObjectByName('SinkPailSet')?.removeFromParent()
     // (and the tap's handle, turned as the water's turned on and off: in a group of its own, to take the pointer; and the washer's door,
     // turned down about its hinge as it's loaded and emptied, and its basket, slid out with it (the plates' marks in it go with it))
     const handle = r.getObjectByName('SinkTapHandle')!
@@ -290,11 +292,29 @@ export function SinkPart({ node }: { node: string }) {
     const src = gltf.scene.getObjectByName(node)
     if (!src) return new THREE.Group()
     const r = src.clone(true)
+    // (the draining basket's three plates as it's made taken out: the plates washed by hand stand in it as many as there are (GuestBar3D))
+    if (node === 'SinkBasketSet') {
+      const made: THREE.Object3D[] = []
+      r.traverse((o) => { if (/^SinkRackPlate/.test(o.name)) made.push(o) })
+      for (const o of made) o.removeFromParent()
+    }
     dressSink(r)
     plainColours(r)
     mergeByMaterial(r)
     return r
   }, [gltf, node])
+  // (the draining basket says how many plates stand in it and whether they're dry (the owner's: every plate counted))
+  if (node === 'SinkBasketSet') return (
+    <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '瀝水籃', hint: basketSays() }) }}
+      onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
+      <primitive object={obj} />
+    </group>
+  )
   return <primitive object={obj} />
+}
+/** what the draining basket says pointed at */
+function basketSays() {
+  if (DRAIN.n <= 0) return `0/${DRAIN_CAP} 個盤子・空的`
+  return `${DRAIN.n}/${DRAIN_CAP} 個盤子・` + (DRAIN.left !== null && DRAIN.left > 0 ? `還要 ${Math.ceil(DRAIN.left)} 秒瀝乾` : '乾了，等著搬回碗盤架')
 }
 useGLTF.preload(URL)

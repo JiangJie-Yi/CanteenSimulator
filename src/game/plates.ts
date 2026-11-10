@@ -21,6 +21,17 @@ export const DRY_S = 8
 
 /** the dish dryer: how many plates are in it, and its time left drying (null: not running, empty or being loaded; 0: done, the plates dry) */
 export type Dryer = { n: number; left: number | null }
+/**
+ * The draining basket on the sink's counter (the owner's, 2026-11-10: the washer first; while it's washing, or full, the sink's plates are
+ * washed by hand and stood in the basket beside it to drain, then taken to the racks): how many it holds, how long they take to drain dry
+ * (seconds, from the last put in), and how long a plate takes to wash by hand (the washer's are rinsed in half a second)
+ */
+export const DRAIN_CAP = 6
+export const DRAIN_S = 20
+export const HAND_EACH = 1.2
+/** the draining basket: how many plates stand in it, and how long till they're dry (null: empty; 0: dry, to be taken to the racks) */
+export type Drain = { n: number; left: number | null }
+const NO_DRAIN: Drain = { n: 0, left: null }
 
 /** whether the kitchen goes for plates now: the plating place's stack (with what's on its way to it) running low, and the racks not bare */
 export const platerGoes = (stock: number, coming: number, rack: number) => stock + coming < STACK_LOW && rack > 0
@@ -34,6 +45,23 @@ export const putBack = (rack: number, n: number, full = RACK_FULL) => Math.min(f
  * has dried plates in it still (they come out first), nor with it full */
 export const washNow = (dirty: number, rack: number, dryer: Dryer) =>
   dirty > 0 && dryer.left === null && dryer.n < DRYER_CAP && (dirty >= WASH_AT || rack === 0)
+/** the washer busy: washing, or full and not yet started (its clean plates waiting to be taken out aren't busy: they're taken out, and it's free) */
+export const washerBusy = (d: Dryer) => (d.left !== null && d.left > 0) || (d.left === null && d.n >= DRYER_CAP)
+/** whether the sink's dirty plates are washed by hand now (the washer first: only while it's busy): a batch of them (or any, the racks bare),
+ * with room in the basket */
+export const handNow = (dirty: number, rack: number, dryer: Dryer, drain: Drain) =>
+  dirty > 0 && washerBusy(dryer) && drain.n < DRAIN_CAP && (dirty >= WASH_AT || rack === 0)
+/** a plate washed by hand: out of the sink, stood in the basket to drain (all of them draining from then) */
+export const handOne = (dirty: number, drain: Drain): { dirty: number; drain: Drain } =>
+  dirty > 0 && drain.n < DRAIN_CAP ? { dirty: dirty - 1, drain: { n: drain.n + 1, left: DRAIN_S } } : { dirty, drain }
+/** the basket, a moment on: draining, dry at 0 */
+export const drainTick = (d: Drain, dt: number): Drain => (d.left !== null && d.left > 0 ? { n: d.n, left: Math.max(0, d.left - dt) } : d)
+/** a trip's worth of the drained plates out of the basket, to the racks (none while they're wet) */
+export const unbasket = (d: Drain) => {
+  const take = d.left === 0 ? Math.min(CARRY, d.n) : 0
+  const n = d.n - take
+  return { take, drain: { n, left: n > 0 ? d.left : null } as Drain }
+}
 /** a plate washed: out of the sink into the dryer (not while it's full) */
 export const washOne = (dirty: number, dryer: Dryer): { dirty: number; dryer: Dryer } =>
   dirty > 0 && dryer.n < DRYER_CAP && dryer.left === null ? { dirty: dirty - 1, dryer: { n: dryer.n + 1, left: null } } : { dirty, dryer }
@@ -62,21 +90,25 @@ export const shutStarts = (d: Dryer) => d.left === null && d.n > 0
 /** a server's part of the work (the owner's: one clears, the other washes; a lone server does it all) */
 export type Duty = 'floor' | 'dish' | 'all'
 /** what a free server does next */
-export type Chore = 'serve' | 'clear' | 'wash' | 'unload' | null
+export type Chore = 'serve' | 'clear' | 'wash' | 'handwash' | 'unload' | 'unbasket' | null
 /**
  * What a free server does next, by their duty. Food plated at the chef's plating place for a seated customer goes to them first, whoever carries it; then the
- * floor's server clears the plates left dirty at the seats to the sink, and the dishes' server takes the dried plates out of the dryer back to
- * the racks (first of all, when the racks are bare), or washes what's in the sink into the dryer. `dirty`: plates left at the seats; `sink`:
- * in the sink, waiting to be washed.
+ * floor's server clears the plates left dirty at the seats to the sink, and the dishes' server takes the washer's clean plates (or the basket's
+ * drained ones) back to the racks (first of all, when the racks are bare), washes what's in the sink into the washer, or, while it's busy,
+ * by hand into the draining basket. `dirty`: plates left at the seats; `sink`: in the sink, waiting to be washed.
  */
-export function nextChore({ duty, serve, dirty, sink, rack, dryer }: { duty: Duty; serve: boolean; dirty: number; sink: number; rack: number; dryer: Dryer }): Chore {
+export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DRAIN }: { duty: Duty; serve: boolean; dirty: number; sink: number; rack: number; dryer: Dryer
+  drain?: Drain }): Chore {
   if (serve) return 'serve'
   const dish = duty !== 'floor', floor = duty !== 'dish'
-  const dried = dryer.left === 0 && dryer.n > 0
+  const dried = dryer.left === 0 && dryer.n > 0, drained = drain.left === 0 && drain.n > 0
   if (dish && dried && rack === 0) return 'unload'
+  if (dish && drained && rack === 0) return 'unbasket'
   if (dish && washNow(sink, rack, dryer)) return 'wash'
+  if (dish && handNow(sink, rack, dryer, drain)) return 'handwash'
   if (floor && dirty > 0) return 'clear'
   if (dish && dried) return 'unload'
+  if (dish && drained) return 'unbasket'
   return null
 }
 /** each server's duty: two or more, the first on the floor and the second at the dishes (any more on the floor); one alone does both */

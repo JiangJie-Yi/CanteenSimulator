@@ -10,7 +10,7 @@ import type { HearthRole } from '@/game/hearthGuard'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { openingFloat, startingRolls, type DrawerCash, type Rolls } from '@/game/till'
-import { RACK_FULL, type Dryer } from '@/game/plates'
+import { RACK_FULL, type Dryer, type Drain } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyBasin } from '@/game/basin'
@@ -759,6 +759,13 @@ export const PLATER_OUT: { id: string | null } = { id: null }
 /** the washer under the sink (game/plates): its plates and time left; `open`: a server's at it, its door down; `manual`: the player's let its
  * door down (Sink); `ask`: the player's asked for the sink's dirty plates to be put in it (GuestBar3D, which keeps the sink's, does it) */
 export const DRYER: Dryer & { open: number; manual: boolean; ask: number } = { n: 0, left: null, open: 0, manual: false, ask: 0 }
+/** the draining basket on the sink's counter (game/plates' Drain: the plates washed by hand while the washer's busy, and how long till
+ * they're dry); GuestBar3D runs it, draws its plates */
+export const DRAIN: Drain = { n: 0, left: null }
+/** where the shop's plates are just now, told over for the racks' and the basket's labels (the owner's: every plate counted): on the racks, in
+ * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
+export const PLATE_COUNT = { rack: 0, sink: 0, washer: 0, basket: 0, out: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __drain: DRAIN, __plateCount: PLATE_COUNT })
 /** the bin by the sink: how many used sticks are in it (cleared off the customers' plates with them; the owner's: thrown away there) */
 export const SINK_BIN = { sticks: 0 }
 /** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */

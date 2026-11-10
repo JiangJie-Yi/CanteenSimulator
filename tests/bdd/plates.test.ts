@@ -1,7 +1,8 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { CARRY, DRYER_CAP, DRY_S, STACK_CAP, STACK_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
-  putBack, unload, washNow, washOne, type Dryer, canOpen, dryerPhase, playerLoad, shutStarts } from '@/game/plates'
+  putBack, unload, washNow, washOne, type Dryer, canOpen, dryerPhase, playerLoad, shutStarts, DRAIN_CAP, DRAIN_S, drainTick, handNow, handOne,
+  unbasket, washerBusy } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 
 const idle: Dryer = { n: 0, left: null }
@@ -91,6 +92,34 @@ feature('洗碗、烘碗：洗好的放進烘碗機，烘好才搬回碗盤架',
     when('再搬一趟', (w) => { w.r = unload(w.r.dryer) })
     and('拿完了，烘碗機空出來', (w) => { expect(w.r.take).toBe(7 - CARRY); expect(w.r.dryer).toEqual(idle) })
     and('還在烘的拿不出來', () => { expect(unload({ n: 5, left: 9 }).take).toBe(0) })
+  })
+})
+
+feature('洗碗機優先；洗碗機在洗或滿了，就在水槽手洗、放進瀝水籃瀝乾，乾了搬回碗盤架', () => {
+  const base = { serve: false, dirty: 0, sink: 0, rack: 30, dryer: idle }
+  scenario('洗碗機空著：髒盤子放進洗碗機（不手洗）', ({ then, and }) => {
+    then('去洗碗機', () => { expect(nextChore({ ...base, duty: 'dish', sink: WASH_AT })).toBe('wash') })
+    and('不手洗', () => { expect(handNow(WASH_AT, 30, idle, { n: 0, left: null })).toBe(false) })
+  })
+  scenario('洗碗機正在洗：手洗、放進瀝水籃', ({ then, and, but }) => {
+    then('手洗', () => { expect(nextChore({ ...base, duty: 'dish', sink: WASH_AT, dryer: { n: DRYER_CAP, left: 5 } })).toBe('handwash') })
+    and('洗碗機在洗算忙', () => { expect(washerBusy({ n: 3, left: 5 })).toBe(true) })
+    but('洗好的還在裡面：先拿出來（不算忙），不手洗', () => {
+      expect(washerBusy({ n: 6, left: 0 })).toBe(false)
+      expect(nextChore({ ...base, duty: 'dish', sink: WASH_AT, dryer: { n: 6, left: 0 } })).toBe('unload')
+    })
+    and(`瀝水籃滿了（${DRAIN_CAP} 個）就不手洗`, () => { expect(handNow(WASH_AT, 30, { n: 4, left: 5 }, { n: DRAIN_CAP, left: DRAIN_S })).toBe(false) })
+  })
+  scenario('手洗一個：水槽少一個、瀝水籃多一個，從這時開始瀝乾', ({ then, and }) => {
+    then('水槽 3、瀝水籃 1', () => { expect(handOne(4, { n: 0, left: null })).toEqual({ dirty: 3, drain: { n: 1, left: DRAIN_S } }) })
+    and('再放一個，全部重新算瀝乾的時間', () => { expect(handOne(3, { n: 1, left: 4 })).toEqual({ dirty: 2, drain: { n: 2, left: DRAIN_S } }) })
+  })
+  scenario(`瀝 ${DRAIN_S} 秒乾了才搬回碗盤架，一趟最多 ${CARRY} 個`, ({ given, when, then, and }) => {
+    given(`瀝水籃 ${DRAIN_CAP} 個，剛放好`, (w) => { w.d = { n: DRAIN_CAP, left: DRAIN_S } })
+    then('還濕的搬不走', (w) => { expect(unbasket(w.d).take).toBe(0) })
+    when(`過了 ${DRAIN_S} 秒`, (w) => { w.d = drainTick(w.d, DRAIN_S) })
+    then('乾了：管洗碗的去搬', (w) => { expect(nextChore({ ...base, duty: 'dish', drain: w.d })).toBe('unbasket') })
+    and(`一趟拿 ${CARRY} 個，剩 ${DRAIN_CAP - CARRY} 個`, (w) => { const r = unbasket(w.d); expect(r.take).toBe(CARRY); expect(r.drain.n).toBe(DRAIN_CAP - CARRY) })
   })
 })
 

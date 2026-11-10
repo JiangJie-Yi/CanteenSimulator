@@ -30,6 +30,12 @@ feature('滑鼠指著東西時的標籤（日文、英文）', () => {
       expect(tipIn('抽取衛生紙 / 轉動紙捲・還夠 12 位客人用', 'en')).toBe('Pull a sheet / turn the roll · Enough for 12 more')
     })
   })
+  scenario('碗盤架與瀝水籃的盤子數量也照語言顯示', ({ then }) => {
+    then('碗盤架', () => {
+      expect(tipIn('這一組 20/25・全店 38/50｜使用中 6・水槽 3・洗碗機 0・瀝水籃 3', 'en')).toBe('This rack 20/25 · All racks 38/50｜In use 6 · Sink 3 · Washer 0 · Drainer 3')
+      expect(tipIn('3/6 個盤子・還要 12 秒瀝乾', 'ja')).toBe('皿 3/6・あと 12 秒で乾く')
+    })
+  })
   scenario('中文介面原樣顯示，對照表沒有的也原樣', ({ then }) => {
     then('不變', () => {
       expect(tipIn('飯桶', 'zh')).toBe('飯桶')
