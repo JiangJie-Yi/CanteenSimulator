@@ -502,7 +502,8 @@ cyl("SinkTapCap", tx, H + 0.155, H + 0.166, tz, 0.014, "faucet", seg=12, r1=0.00
 
 # ---------------------------------------------------------------------------------------------------- on the counter
 # (the draining basket: woven bamboo, a rim of split cane, standing on the draining part)
-bx0, bx1, bz0, bz1 = 0.04, 0.5, -0.34, 0.02
+# (twelve plates' worth long (the owner's, 2026-11-10: wider, twelve at least), out to the counter's end now the pail's gone)
+bx0, bx1, bz0, bz1 = 0.0, 0.74, -0.34, 0.02
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
 y0_, y1_ = H + 0.012, H + 0.13
@@ -536,7 +537,7 @@ for z_ in (bz0 + 0.04, bz1 - 0.04):
     tube(f"SinkBasketFoot{z_:+.2f}", [(bx0 + 0.02, H + 0.006, z_), (bx1 - 0.02, H + 0.006, z_)], 0.006, "rod", res=1, sides=8)
 # (three plates standing in it, edge on, and a bowl upside down beside them)
 for k in range(3):
-    px = 0.12 + k * 0.06
+    px = 0.085 + k * 0.06
     py, pz = H + 0.012 + 0.11, (bz0 + bz1) / 2 - 0.02
     bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.11, depth=0.012, location=P(px, py, pz), rotation=(0, math.pi / 2, 0))
     o = active()
@@ -547,7 +548,7 @@ for k in range(3):
     finish(active(), f"SinkRackPlateRim{k}", M["rim"])
     parts.append(active())
     empty(f"SinkRackSlot{k}", px, py, pz)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(0.42, H + 0.018, (bz0 + bz1) / 2 + 0.07))
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(0.65, H + 0.018, (bz0 + bz1) / 2 + 0.07))
 bowl = active()
 bowl.scale = (0.075, 0.075, 0.055)
 apply_scale(bowl)
@@ -607,13 +608,7 @@ tube("SinkDetergentSpout", [(DSX, H + 0.206, SPZ + 0.01), (DSX, H + 0.206, SPZ +
 SGX = -0.67
 box("SinkSpongeBase", SGX - 0.05, SGX + 0.05, H, H + 0.022, SPZ - 0.035, SPZ + 0.035, "sponge", bev=0.004, seg=2)
 box("SinkSpongeScour", SGX - 0.05, SGX + 0.05, H + 0.022, H + 0.032, SPZ - 0.035, SPZ + 0.035, "scour", bev=0.003, seg=1)
-# (the hinoki hand pail at the far end: staves, two copper hoops, its upright handle board)
-pxp, pzp = 0.64, 0.02
-cyl("SinkPail", pxp, H, H + 0.15, pzp, 0.085, "hinoki", seg=24, r1=0.095)
-cyl("SinkPailWater", pxp, H + 0.12, H + 0.121, pzp, 0.088, "basin", seg=24)
-for y_ in (H + 0.03, H + 0.12):
-    cyl(f"SinkPailHoop{y_:.2f}", pxp, y_, y_ + 0.012, pzp, 0.088 + (y_ - H) * 0.065 + 0.002, "copper", seg=24)
-box("SinkPailHandle", pxp - 0.012, pxp + 0.012, H + 0.1, H + 0.26, pzp - 0.095, pzp - 0.08, "hinoki", bev=0.003)
+# (no hinoki hand pail at the far end now: the owner's, 2026-11-10, crossed out; the draining basket runs on to there)
 
 # (where the washed plates are stacked, and where whoever brings or takes them stands)
 # (beside the cabinet's other end, toward its front: a stainless bin for the used sticks cleared off the customers' plates (the owner's: thrown
@@ -649,7 +644,6 @@ SETS = (("SinkBasketSet", ("SinkBasket", "SinkRackPlate", "SinkRackBowl", "SinkR
         ("SinkDetergentSet", ("SinkDetergent",)),
         ("SinkSpongeSet", ("SinkSponge",)),
         ("SinkDryerRack", ("SinkRackWire", "SinkDryerRack0", "SinkDryerRack1")),
-        ("SinkPailSet", ("SinkPail",)),
         ("SinkTowelSet", ("SinkTowel",)),
         ("SinkBinSet", ("SinkBin",)),
         ("SinkDryerDoor", ("SinkDryerDoorBar", "SinkDryerGlass", "SinkDryerHandle")),

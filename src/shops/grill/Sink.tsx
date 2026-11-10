@@ -132,8 +132,6 @@ export function SinkModel() {
     const r = gltf.scene.clone(true)
     // (what stands on it taken off: each placed as a piece of its own)
     for (const set of SINK_SETS) r.getObjectByName(set.node)?.removeFromParent()
-    // (and the hinoki hand pail, no longer kept on it (the owner's, 2026-11-10: crossed out); still in the model, not drawn)
-    r.getObjectByName('SinkPailSet')?.removeFromParent()
     // (and the tap's handle, turned as the water's turned on and off: in a group of its own, to take the pointer; and the washer's door,
     // turned down about its hinge as it's loaded and emptied, and its basket, slid out with it (the plates' marks in it go with it))
     const handle = r.getObjectByName('SinkTapHandle')!
