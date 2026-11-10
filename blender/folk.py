@@ -699,56 +699,175 @@ acc("schoolhat", [lathe("sch", [(C.y + 0.06, R + 0.05), (C.y + 0.085, R + 0.045)
                   lathe("schb", [(C.y + 0.06, R + 0.01), (C.y + 0.055, R + 0.06)], M["yellow"], seg=10, solid=0.008)])
 
 
-def surf_at(phi, y, out=0.0):
-    """the body's surface at bearing `phi` (0 its front, +z; pi/2 its side, +x; pi its back) and height y, `out` off it along its normal; and
-    that normal"""
-    r = rb(y)
-    dr = (rb(y + 0.004) - rb(y - 0.004)) / 0.008
+# (the body as it's made: the lathe leaves three of the outline's points out, and it's twelve flat sides round, not round: between their
+# corners its faces are in by up to 3.4 per cent of its radius (near a centimetre at its widest), and what was laid on the round it's
+# turned from stood off them by that much more there)
+BODY_RINGS = [q for k, q in enumerate(PROFILE) if k not in (0, 2, 5)]
+BODY_SIDES = 12
+
+
+def r_made(y):
+    """the radius of the body's rings at height y, as made (BODY_RINGS: the outline the lathe is given)"""
+    y = max(BODY_RINGS[0][0], min(BODY_RINGS[-1][0], y))
+    for (y0, r0), (y1, r1) in zip(BODY_RINGS, BODY_RINGS[1:]):
+        if y0 <= y <= y1:
+            return r0 + (r1 - r0) * (y - y0) / max(1e-6, y1 - y0)
+    return BODY_RINGS[-1][1]
+
+
+def on_shirt(phi, y, out):
+    """the point `out` off the body as it's made, at bearing `phi` (0 its front, +z; pi/2 its side, +x; pi its back) and height y: off its
+    flat faces, along the round's own normal there (its slope taken over a few centimetres, so what's laid along it doesn't kink at the
+    outline's corners); and that normal"""
+    half = math.pi / BODY_SIDES
+    d = (phi % (2 * half)) - half
+    r = r_made(y) * math.cos(half) / math.cos(d)
+    lo, hi = max(BODY_RINGS[0][0], y - 0.03), min(BODY_RINGS[-1][0], y + 0.03)
+    dr = (r_made(hi) - r_made(lo)) / max(1e-6, hi - lo)
     n = Vector((math.sin(phi), -dr, math.cos(phi))).normalized()
     return Vector((r * math.sin(phi), y, r * math.cos(phi))) + n * out, n
 
 
-def surf_x(x, y, back, out=0.0):
-    """the body's surface at height y, `x` across, on its back (`back`) or its front; `out` off it along its normal"""
-    r = rb(y)
-    return surf_at(math.copysign(math.asin(max(-1.0, min(1.0, x / r))), x) if not back else math.copysign(math.pi - math.asin(min(1.0, abs(x) / r)), x), y, out)
+def body_way(ctrl, out, tol=0.002):
+    """a smooth way over the body through `ctrl` [(bearing in degrees, height)...]: a centripetal Catmull-Rom spline through them, in the
+    body's own terms (round it, as a length at about its radius, and up it), so it turns only where they do and has no corner anywhere;
+    laid `out` off the body as it's made, as few points as follow it to within `tol`: one wherever it crosses one of the body's creases (the
+    lines down it between its flat sides, the rings round it where its outline turns), so the straight run between two lies on one flat
+    face, never cutting in across a crease; and as many more as its own bends want"""
+    K = 0.24
+    cp = [Vector((math.radians(a) * K, y)) for (a, y) in ctrl]
+    cp = [cp[0] * 2 - cp[1]] + cp + [cp[-1] * 2 - cp[-2]]
+    fine = []
+    for i in range(1, len(cp) - 2):
+        p0, p1, p2, p3 = cp[i - 1], cp[i], cp[i + 1], cp[i + 2]
+        t1 = (p1 - p0).length ** 0.5
+        t2 = t1 + (p2 - p1).length ** 0.5
+        t3 = t2 + (p3 - p2).length ** 0.5
+        for k in range(48):
+            t = t1 + (t2 - t1) * k / 48
+            a1 = p0 * ((t1 - t) / t1) + p1 * (t / t1)
+            a2 = p1 * ((t2 - t) / (t2 - t1)) + p2 * ((t - t1) / (t2 - t1))
+            a3 = p2 * ((t3 - t) / (t3 - t2)) + p3 * ((t - t2) / (t3 - t2))
+            b1 = a1 * ((t2 - t) / t2) + a2 * (t / t2)
+            b2 = a2 * ((t3 - t) / (t3 - t1)) + a3 * ((t - t1) / (t3 - t1))
+            fine.append(b1 * ((t2 - t) / (t2 - t1)) + b2 * ((t - t1) / (t2 - t1)))
+    fine.append(cp[-2])
+    # (the creases crossed, put in where they're crossed, each to be kept)
+    side = 2 * math.pi / BODY_SIDES
+    rings = [y for y, _ in BODY_RINGS]
+    pts, keep = [], []
+    for q0, q1 in zip(fine, fine[1:]):
+        pts.append(q0)
+        keep.append(False)
+        f0, f1 = q0.x / K, q1.x / K
+        cuts = []
+        for c in range(math.floor(min(f0, f1) / side) + 1, math.floor(max(f0, f1) / side) + 1):
+            cuts.append((c * side - f0) / (f1 - f0))
+        for y in rings:
+            if (q0.y - y) * (q1.y - y) < 0:
+                cuts.append((y - q0.y) / (q1.y - q0.y))
+        for u in sorted(cuts):
+            if 1e-4 < u < 1 - 1e-4:
+                pts.append(q0.lerp(q1, u))
+                keep.append(True)
+    pts.append(fine[-1])
+    keep.append(False)
+    keep[0] = keep[-1] = True
+    on = [on_shirt(q.x / K, q.y, out) for q in pts]
+    xyz = [p_ for p_, _ in on]
+
+    # (Douglas-Peucker between the points that are kept anyway)
+    def thin(i, j, kept):
+        a_, b_ = xyz[i], xyz[j]
+        ab = b_ - a_
+        far, at = -1.0, -1
+        for k in range(i + 1, j):
+            v = xyz[k] - a_
+            d = (v - ab * (v.dot(ab) / max(1e-12, ab.dot(ab)))).length
+            if d > far:
+                far, at = d, k
+        if far > tol:
+            kept.add(at)
+            thin(i, at, kept)
+            thin(at, j, kept)
+
+    kept = {k for k, f in enumerate(keep) if f}
+    marks = sorted(kept)
+    for i, j in zip(marks, marks[1:]):
+        thin(i, j, kept)
+    return [on[k] for k in sorted(kept)]
+
+
+def carry(n, t0, t1):
+    """`n`, square to the way `t0`, turned as the way turns to `t1` (a belt bending, not twisting)"""
+    v = n.copy()
+    v.rotate(t0.rotation_difference(t1))
+    return (v - t1 * v.dot(t1)).normalized()
 
 
 def band(name, pts, ups, w, t, mat):
-    """a flat belt through `pts` (three's frame), `w` wide and `t` thick, its broad face toward `ups` (the body's normals where it lies):
-    four-sided as a tube is, but flat; its ends closed"""
+    """a flat belt through `pts` (three's frame), `w` wide and `t` thick, its ends closed: its broad face toward `ups` where one's given (the
+    body's normals where it lies on it), and where not (None: where it leaves the body for the bag it's made fast to) as the belt would turn
+    there, carried on from the nearest given along it. Its face and its two edges; not its underside, 3 mm off the shirt all along and never
+    to be seen (the owner's rule on faces: a strap's no more than a hundred)"""
+    m = len(pts)
+    tans = [(pts[min(k + 1, m - 1)] - pts[max(k - 1, 0)]).normalized() for k in range(m)]
+    ns = [None if u is None else (u - tans[k] * u.dot(tans[k])).normalized() for k, u in enumerate(ups)]
+    first = next(k for k in range(m) if ns[k] is not None)
+    for k in range(first - 1, -1, -1):
+        ns[k] = carry(ns[k + 1], tans[k + 1], tans[k])
+    for k in range(first + 1, m):
+        if ns[k] is None:
+            ns[k] = carry(ns[k - 1], tans[k - 1], tans[k])
     bm = bmesh.new()
     rows = []
-    for k, (p, n) in enumerate(zip(pts, ups)):
-        tan = (pts[min(k + 1, len(pts) - 1)] - pts[max(k - 1, 0)]).normalized()
-        side = tan.cross(n).normalized()
-        nn = side.cross(tan).normalized()
-        rows.append([bm.verts.new(P(*(p + side * (sx * w / 2) + nn * (sy * t / 2)))) for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1))])
+    for p_, tan, nn in zip(pts, tans, ns):
+        side = tan.cross(nn).normalized()
+        rows.append([bm.verts.new(P(*(p_ + side * (sx * w / 2) + nn * (sy * t / 2)))) for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1))])
     for k in range(len(rows) - 1):
-        for i in range(4):
+        # (its face (sy +1), its two edges (sx -1, +1); not the underside, 2)
+        for i in (0, 1, 3):
             bm.faces.new((rows[k][i], rows[k][(i + 1) % 4], rows[k + 1][(i + 1) % 4], rows[k + 1][i]))
     bm.faces.new(rows[0])
     bm.faces.new(list(reversed(rows[-1])))
     return from_bm(name, bm, mat)
 
 
+# (a shoulder strap's way over the body between where it leaves the bag's top and where it goes back under the bag's foot, for the right
+# side (+x; the left's the same the other way round): [(bearing in degrees, height)], the owner's own points for it (2026-11-10): behind the
+# shoulder, over its top (just behind the side, beside the head: its inner edge 1.2 cm under the head), down the front of the chest half
+# way round from the middle to the side, then in one long easy curve round and back: under the arm at the side (its lower edge 3 cm over
+# the mitten's top, 0.32), across the back and down to the bag's foot. Side on, one smooth arc from the shoulder out over the chest and
+# back to the bag's foot: no straight runs along the side, no corner)
+BELT_WAY = [(137, 0.535), (108, 0.556), (82, 0.556), (58, 0.535), (38, 0.495), (30, 0.455), (31, 0.42), (40, 0.39), (56, 0.37), (78, 0.36), (104, 0.347), (130, 0.32), (150, 0.28)]
+# (how far its underside is off the shirt: two to five millimetres, the shirt's flat sides and all)
+BELT_GAP = 0.0035
+
+
 def straps(name, top, foot, mat, w=0.034, t=0.007):
-    """a bag's two shoulder straps, laid on the body as straps lie (the owner saw them come out through the chest: they ran straight from
-    the front of it to the bag's foot, through the body): from the bag's top up the back and over the shoulder, down the chest, out under the
-    arm and round the side to the bag's foot; each point off the body by half the strap and a little. `top(sd)`, `foot(sd)`: where each
-    side's is made fast to the bag, and which way it faces there"""
-    out = t / 2 + 0.004
+    """a bag's two shoulder straps, laid on the body as a randoseru's lie on a child (the owner's, 2026-11-10: they turned down the chest in a
+    hard fold and ran from it straight back through the air to the bag's foot, over the arm; before that, straight through the body): from
+    under the bag's top up the back and in an arch over the shoulder, straight down the chest, round in a wide U at the chest's foot above the
+    hand, round the side and the back and down to the bag's foot (BELT_WAY), smooth all the way; off the body as it's made by half the strap
+    and BELT_GAP. `top(sd)`, `foot(sd)`: where each side's is made fast to the bag (and the way the bag faces there: not used, the belt goes
+    to it as it bends): the belt starts and ends on the body under them, and goes on to them where they're further off it than its own
+    thickness and a little"""
+    out = t / 2 + BELT_GAP
     objs = []
     for sd in (-1, 1):
-        way = [top(sd)]
-        way += [surf_x(sd * 0.085, 0.5, True, out), surf_x(sd * 0.12, 0.545, True, out)]
-        # (over the shoulder: the body's top, under the head's edge)
-        way.append(surf_at(sd * math.pi / 2, 0.566, out))
-        way += [surf_x(sd * x, y, False, out) for (x, y) in ((0.125, 0.54), (0.14, 0.46), (0.18, 0.4))]
-        # (out under the arm and round the side, to the back)
-        way += [surf_at(sd * math.radians(a), y, out) for (a, y) in ((62, 0.37), (95, 0.35), (128, 0.32), (150, 0.285))]
-        way.append(foot(sd))
-        objs.append(band(f"{name}{sd}", [p for p, _ in way], [n for _, n in way], w, t, mat))
+        ends = [top(sd)[0], foot(sd)[0]]
+        under = [(math.degrees(math.atan2(e.x, e.z)), e.y) for e in ends]
+        way = body_way([under[0]] + [(sd * a, y) for (a, y) in BELT_WAY] + [under[1]], out)
+        pts, ups = [p_ for p_, _ in way], [n_ for _, n_ in way]
+        for k, e in enumerate(ends):
+            if (e - (pts[0] if k == 0 else pts[-1])).length > t + 0.012:
+                if k == 0:
+                    pts.insert(0, e)
+                    ups.insert(0, None)
+                else:
+                    pts.append(e)
+                    ups.append(None)
+        objs.append(band(f"{name}{sd}", pts, ups, w, t, mat))
     return objs
 
 
