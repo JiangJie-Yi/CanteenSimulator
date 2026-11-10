@@ -463,12 +463,12 @@ function end(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
   const m = 9, cx = x + D / 2
   g.save()
   g.beginPath(); g.rect(x, y, D, H); g.clip()
-  handhole(g, cx, y + H * 0.24, 0.095 * PX, 0.027 * PX)
   if (k.look === 'beer') {
-    const t = y + H * 0.42, b = y + H * 0.68, gr = g.createLinearGradient(0, t, 0, b)
+    // (its band at the side's height, the two meeting round the corner (the owner's: it sat lower, the corner a step))
+    const t = y + H * 0.3, b = y + H * 0.66, gr = g.createLinearGradient(0, t, 0, b)
     gr.addColorStop(0, '#d5d8da'); gr.addColorStop(0.55, '#aeb2b5'); gr.addColorStop(1, '#c5c8ca')
     g.fillStyle = gr; g.fillRect(x, t, D, b - t)
-    g.fillStyle = k.accent; g.fillRect(x, t - 4, D, 1.8); g.fillRect(x, b + 2.2, D, 1.8)
+    g.fillStyle = k.accent; g.fillRect(x, t - 6, D, 2.4); g.fillRect(x, b + 3.6, D, 2.4)
     fit(g, k.name, cx, b - (b - t) * 0.18, D * 0.74, 40, k.ink, { face: SIGN_FONT, weight: '400', spacing: 3, align: 'center' })
   } else if (k.look === 'tea') {
     fit(g, k.name, cx, y + H * 0.62, D * 0.5, 44, k.ink, { face: SIGN_FONT, weight: '400', spacing: 6, align: 'center' })
@@ -490,6 +490,8 @@ function end(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
     if (k.mark === 'barrel') barrel(g, x + D * 0.13, y + H * 0.56, 30, 38, k.ink, k.accent)
     else lemon(g, x + D * 0.13, y + H * 0.57, 15, k.ink, k.accent)
   }
+  // (the handhole cut through whatever's printed there)
+  handhole(g, cx, y + H * 0.24, 0.095 * PX, 0.027 * PX)
   fit(g, '350ml × 24缶', cx, y + H * 0.82, D * 0.5, 11, k.ink, { align: 'center' })
   // (best before and lot, inked on by the filler: a dot printer's grey, a little crooked)
   g.save()
