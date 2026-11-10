@@ -1,10 +1,13 @@
 // The drinks' cardboard cases' print (blender/drinkcartons.py lays each case's faces out on it): kraft board printed in one or two inks, as
-// the cases at the back of a Japanese bar are (the owner's, 2026-11-10: the print was one 2:1 picture laid over each face whatever its
-// shape, an end's squashed and the one end mirrored, a big flat block of colour across each; the tape broke off at the edges; the board had
-// no feel of board). Every face drawn at one scale (930 px to the metre), right reading from outside it: each drink's row its long side
-// (front and back) and its end beside it; the top one for all. On each side the drink's name big, its English, what's in it, two cans drawn,
-// this way up (天地無用), a JAN bar code and the recycling marks; on each end a die-cut handhole, the name, the best-before and lot inked on;
-// the top its flaps' seam and an inspection stamp. The board's flutes, its crushed edges, its creases and the handholes in a normal map.
+// the cases at the back of a Japanese bar are. Every face drawn at one scale (930 px to the metre), right reading from outside it: each
+// drink's row its long side (front and back) and its end beside it; the top one for all. No two kinds alike (the owner's, 2026-11-10: every
+// case was the same name, two cans and a big bar code, as if copied): a draft beer's silver band with its name big in brush strokes and its
+// strength and malt under it; a green tea's dark green straight on the board, its name upright beside 京都宇治, a pale teapot and a round
+// tea seal in a plain double frame; a cola's red rounded panel with its name knocked out in round heavy letters, kept-cool and handle-with-
+// care on either side; a sour's modern look, a strip of its colour, flat blocks for its flavour and a mark of its own (a whisky barrel, a
+// lemon). No cans drawn. The JAN code at its real size (some 3.5 by 1.6 cm), in a different corner, or on the end, case by case; this way
+// up (天地無用), the recycling marks; on each end a die-cut handhole, the name, the best-before and lot inked on; the top its flaps' seam and
+// an inspection stamp. The board's flutes, its crushed edges, its creases and the handholes in a normal map.
 import * as THREE from 'three'
 import { signTexture, SIGN_FONT } from '@/scene/signFont'
 import { normalFromHeight } from '@/scene/normalFromHeight'
@@ -18,10 +21,10 @@ const SIDE_X = 4, END_X = 384, ROW0 = 4, ROW = 202, TOP_X = 650, TOP_Y = 4
 const W = 0.4 * PX, H = 0.21 * PX, D = 0.28 * PX
 
 type Kind = {
-  /** the name, big, in the sign's face */
+  /** the name, big */
   name: string
   en: string
-  /** a line of what it is, small under the English */
+  /** a line of what it is, small */
   sub: string
   /** its two inks: the print's, and the second for its accents */
   ink: string
@@ -31,15 +34,27 @@ type Kind = {
   jan: string
   /** best before and lot, inked on its end */
   lot: string
+  /** its case's look (the owner's: no two alike) */
+  look: 'beer' | 'tea' | 'cola' | 'sour'
+  /** where its bar code's printed, small: on its side or its end, and which corner (or the right edge's middle) */
+  code: { on: 'side' | 'end'; at: 'tl' | 'tr' | 'bl' | 'br' | 'rm' }
+  /** a sour's mark: a whisky barrel, or a lemon slice; and its two flavour blocks */
+  mark?: 'barrel' | 'lemon'
+  blocks?: [string, string]
 }
 /** what each case holds, in the order of the model's rows (blender/drinkcartons.py's PRINT_OF): the canned drinks come by the case */
 export const CARTON_DRINKS: DrinkId[] = ['beerCan', 'greenTea', 'cola', 'highball', 'chuhai']
 const KINDS: Record<string, Kind> = {
-  beerCan: { name: '生ビール', en: 'DRAFT BEER', sub: '麦芽100%  アルコール分5%', ink: '#1b315a', accent: '#b4291f', alcohol: true, jan: '458221430001', lot: '2027.05 L3B' },
-  greenTea: { name: '緑茶', en: 'JAPANESE GREEN TEA', sub: '国産茶葉100%  無香料', ink: '#25603a', accent: '#8b6a24', alcohol: false, jan: '458221430102', lot: '2027.08 T1K' },
-  cola: { name: 'コーラ', en: 'COLA', sub: '炭酸飲料  よく冷やして', ink: '#a82a22', accent: '#1d1a18', alcohol: false, jan: '458221430209', lot: '2027.03 C2R' },
-  highball: { name: 'ハイボール', en: 'HIGHBALL  WHISKY & SODA', sub: 'アルコール分7%', ink: '#1a2846', accent: '#9a6a1c', alcohol: true, jan: '458221430306', lot: '2027.04 H5A' },
-  chuhai: { name: 'チューハイ', en: 'CHU-HI  LEMON', sub: 'レモン果汁3%  アルコール分5%', ink: '#a32c5c', accent: '#2f6a2a', alcohol: true, jan: '458221430403', lot: '2027.02 S4L' },
+  beerCan: { name: '生ビール', en: 'DRAFT BEER', sub: 'アルコール分5%・麦芽100%', ink: '#151515', accent: '#b4291f', alcohol: true, jan: '458221430001',
+    lot: '2027.05 L3B', look: 'beer', code: { on: 'side', at: 'br' } },
+  greenTea: { name: '緑茶', en: 'JAPANESE GREEN TEA', sub: '国産茶葉100%  無香料', ink: '#25603a', accent: '#b4291f', alcohol: false, jan: '458221430102',
+    lot: '2027.08 T1K', look: 'tea', code: { on: 'end', at: 'br' } },
+  cola: { name: 'コーラ', en: 'COLA', sub: '炭酸飲料', ink: '#b3261e', accent: '#1d1a18', alcohol: false, jan: '458221430209', lot: '2027.03 C2R',
+    look: 'cola', code: { on: 'side', at: 'bl' } },
+  highball: { name: 'ハイボール', en: 'WHISKY & SODA', sub: 'アルコール分7%  ウイスキー・ソーダ', ink: '#1a2846', accent: '#a8701c', alcohol: true,
+    jan: '458221430306', lot: '2027.04 H5A', look: 'sour', mark: 'barrel', blocks: ['7%', 'DRY'], code: { on: 'side', at: 'tr' } },
+  chuhai: { name: 'チューハイ', en: 'CHU-HI  LEMON', sub: 'レモン果汁3%  アルコール分5%', ink: '#1f4a2a', accent: '#d2a91a', alcohol: true,
+    jan: '458221430403', lot: '2027.02 S4L', look: 'sour', mark: 'lemon', blocks: ['レモン', '果汁3%'], code: { on: 'end', at: 'rm' } },
 }
 const RED = '#bf3326'
 const SANS = '"Yu Gothic", "YuGothic", "Hiragino Sans", "Meiryo", "Noto Sans JP", sans-serif'
@@ -142,32 +157,6 @@ function thisWayUp(g: CanvasRenderingContext2D, x: number, y: number, w: number,
   g.fillRect(x, y + h * 0.88, w, h * 0.12)
 }
 
-/** a can drawn in line, its band in the second ink: its top left x, y, w wide (its height the 350 ml can's, 1.85 times its width) */
-function can(g: CanvasRenderingContext2D, x: number, y: number, w: number, ink: string, accent: string, mark: string) {
-  const h = w * 1.85, lw = Math.max(1.2, w * 0.045)
-  g.save()
-  g.lineWidth = lw; g.strokeStyle = ink; g.lineJoin = 'round'
-  // (its body, the neck narrowing to the lid, the lid's rim an ellipse)
-  const neck = w * 0.1, rim = w * 0.11
-  g.fillStyle = '#d6b88a'
-  g.beginPath()
-  g.moveTo(x + neck, y + rim); g.lineTo(x, y + rim * 2.6); g.lineTo(x, y + h - rim)
-  g.quadraticCurveTo(x, y + h, x + w / 2, y + h); g.quadraticCurveTo(x + w, y + h, x + w, y + h - rim)
-  g.lineTo(x + w, y + rim * 2.6); g.lineTo(x + w - neck, y + rim); g.closePath()
-  g.fill(); g.stroke()
-  g.beginPath(); g.ellipse(x + w / 2, y + rim, w / 2 - neck, rim, 0, 0, Math.PI * 2); g.fillStyle = '#e4cba0'; g.fill(); g.stroke()
-  // (its band, and the name's first letter on it)
-  g.fillStyle = accent; g.fillRect(x + lw / 2, y + h * 0.36, w - lw, h * 0.3)
-  g.fillStyle = '#efe0c4'
-  g.font = `900 ${w * 0.5}px ${SIGN_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText(mark, x + w / 2, y + h * 0.515)
-  // (a highlight down it)
-  g.strokeStyle = 'rgba(255,248,232,0.5)'; g.lineWidth = lw * 0.9
-  g.beginPath(); g.moveTo(x + w * 0.22, y + rim * 3); g.lineTo(x + w * 0.22, y + h * 0.33); g.stroke()
-  g.beginPath(); g.moveTo(x + w * 0.22, y + h * 0.7); g.lineTo(x + w * 0.22, y + h - rim * 1.6); g.stroke()
-  g.restore()
-}
-
 /** the recycling marks: the corrugated board's (three arrows chasing round a triangle), the cans' aluminium (two round a circle) and the
  * plastic's (プラ, two round a rounded square), each s across, from x along a line at y */
 function marks(g: CanvasRenderingContext2D, x: number, y: number, s: number, ink: string) {
@@ -211,26 +200,36 @@ function marks(g: CanvasRenderingContext2D, x: number, y: number, s: number, ink
   g.restore()
 }
 
-/** a JAN bar code, `m` px a module, its top left (the quiet zone's) at x, y, its bars `h` tall, the digits under them */
-function barcode(g: CanvasRenderingContext2D, x: number, y: number, m: number, h: number, twelve: string) {
-  const { digits, bits } = ean13(twelve)
+/** a JAN bar code at its real size on a case (the owner's, 2026-11-10: it was three times that, filling a corner): CODE_M px a module (some
+ * 3.5 cm across, 1.6 cm tall with its digits), its top left (the quiet zone's) at x, y, the digits under its bars */
+const CODE_M = 0.31, CODE_H = 9.5
+const CODE_W = (95 + 18) * CODE_M, CODE_TALL = CODE_H + 14 * CODE_M
+function barcode(g: CanvasRenderingContext2D, x: number, y: number, twelve: string) {
+  const { digits, bits } = ean13(twelve), m = CODE_M
   g.save()
-  // (on a white patch, as they're printed so a scanner reads them off brown board)
-  const w = (95 + 18) * m
-  g.fillStyle = '#f3ead8'; g.fillRect(x, y - 3, w, h + 14)
+  // (on a pale patch, as they're printed so a scanner reads them off brown board)
+  g.fillStyle = '#f3ead8'; g.fillRect(x, y - 1, CODE_W, CODE_TALL + 1)
   g.fillStyle = '#141414'
   const x0 = x + 11 * m
   for (let i = 0; i < 95; i++) {
     if (bits[i] !== '1') continue
     // (the guard bars longer, down into the digits' line)
     const guard = i < 3 || (i >= 45 && i < 50) || i >= 92
-    g.fillRect(x0 + i * m, y, m, h + (guard ? 5 : 0))
+    g.fillRect(x0 + i * m, y, m, CODE_H + (guard ? 5 * m : 0))
   }
-  g.font = `600 ${8.5}px ${MONO}`; g.textBaseline = 'top'; g.textAlign = 'center'
-  g.fillText(digits[0], x + 5 * m, y + h + 1)
-  for (let i = 0; i < 6; i++) g.fillText(digits[1 + i], x0 + (3 + i * 7 + 3.5) * m, y + h + 1)
-  for (let i = 0; i < 6; i++) g.fillText(digits[7 + i], x0 + (50 + i * 7 + 3.5) * m, y + h + 1)
+  g.font = `600 ${8.5 * m}px ${MONO}`; g.textBaseline = 'top'; g.textAlign = 'center'
+  g.fillText(digits[0], x + 5 * m, y + CODE_H + m)
+  for (let i = 0; i < 6; i++) g.fillText(digits[1 + i], x0 + (3 + i * 7 + 3.5) * m, y + CODE_H + m)
+  for (let i = 0; i < 6; i++) g.fillText(digits[7 + i], x0 + (50 + i * 7 + 3.5) * m, y + CODE_H + m)
   g.restore()
+}
+/** where a kind's bar code goes on a face (x, y, w, h), if it goes on this one */
+function codeOn(g: CanvasRenderingContext2D, k: Kind, face: 'side' | 'end', x: number, y: number, w: number, h: number) {
+  if (k.code.on !== face) return
+  const e = 10
+  const [bx, by] = k.code.at === 'tl' ? [x + e, y + e] : k.code.at === 'tr' ? [x + w - e - CODE_W, y + e] : k.code.at === 'bl' ? [x + e, y + h - e - CODE_TALL]
+    : k.code.at === 'br' ? [x + w - e - CODE_W, y + h - e - CODE_TALL] : [x + w - e - CODE_W, y + h * 0.44]
+  barcode(g, bx, by, k.jan)
 }
 
 /** a die-cut handhole: a slot with round ends, w by h, its middle at x, y: dark through it, its cut edge's board showing light along the foot */
@@ -254,59 +253,254 @@ function handhole(g: CanvasRenderingContext2D, x: number, y: number, w: number, 
   g.restore()
 }
 
-/** a case's long side, its top left x, y */
-function side(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
-  const m = 9, ink = k.ink
+const MINCHO = '"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif JP", serif'
+/** the board's own colour, for letters knocked out of a printed panel */
+const KRAFT = '#d3a96f'
+
+/** a word set upright, one letter under the next, centred on cx from top; how tall it came out */
+function upright(g: CanvasRenderingContext2D, text: string, cx: number, top: number, size: number, ink: string, face = SANS, weight = '700') {
   g.save()
-  g.beginPath(); g.rect(x, y, W, H); g.clip()
-  // (業務用: a little tag stamped in the ink, the board showing through its letters)
-  g.fillStyle = ink; g.fillRect(x + m, y + m, 50, 17)
-  fit(g, '業務用', x + m + 25, y + m + 13, 44, 12, '#c9a46e', { align: 'center' })
-  fit(g, k.sub, x + m + 58, y + m + 13, W * 0.62 - 66, 9.5, ink, { weight: '600' })
-  // (the name, big, in the sign's face, on the left two thirds)
-  fit(g, k.name, x + m + 2, y + H * 0.56, W * 0.6, 66, ink, { face: SIGN_FONT, weight: '400', spacing: 3 })
-  // (a fine rule, the English letter spaced under it)
-  g.fillStyle = ink; g.fillRect(x + m + 2, y + H * 0.62, W * 0.6, 1.6)
-  fit(g, k.en, x + m + 2, y + H * 0.71, W * 0.6, 11, ink, { weight: '700', spacing: 2.4 })
-  // (what's in it, in a box; and the drinker's warning, or how to keep it, in fine print along the foot)
-  g.strokeStyle = ink; g.lineWidth = 1.6
-  g.beginPath(); g.roundRect(x + m + 2, y + H * 0.77, W * 0.34, H * 0.13, 4); g.stroke()
-  fit(g, '350ml × 24缶', x + m + 2 + W * 0.17, y + H * 0.77 + H * 0.098, W * 0.31, 14, ink, { align: 'center' })
-  if (k.alcohol) {
-    g.beginPath(); g.arc(x + m + W * 0.4, y + H * 0.835, H * 0.065, 0, Math.PI * 2); g.stroke()
-    fit(g, 'お酒', x + m + W * 0.4, y + H * 0.835 + 3.4, H * 0.1, 9, ink, { align: 'center' })
+  g.font = `${weight} ${size}px ${face}`; g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'top'
+  let y = top
+  for (const ch of text) { g.fillText(ch, cx, y); y += size * 1.04 }
+  g.restore()
+  return y - top
+}
+
+/** a box drawn round a line of words, w by h, its top left x, y, the words centred in it */
+function boxed(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, h: number, size: number, ink: string, r = 3) {
+  g.save()
+  g.strokeStyle = ink; g.lineWidth = 1.4
+  g.beginPath(); g.roundRect(x, y, w, h, r); g.stroke()
+  g.restore()
+  fit(g, text, x + w / 2, y + h / 2 + size * 0.36, w - 8, size, ink, { align: 'center' })
+}
+
+/** a pale teapot (急須, its handle out to one side) and two tea leaves, in the tea's ink washed thin, s across, its middle at cx, cy */
+function teapot(g: CanvasRenderingContext2D, cx: number, cy: number, s: number, ink: string) {
+  g.save()
+  g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 1.4; g.lineJoin = 'round'; g.lineCap = 'round'
+  const body = () => { g.beginPath(); g.ellipse(cx, cy, s * 0.3, s * 0.22, 0, 0, Math.PI * 2) }
+  const spout = () => {
+    g.beginPath(); g.moveTo(cx + s * 0.25, cy - s * 0.02); g.quadraticCurveTo(cx + s * 0.4, cy - s * 0.06, cx + s * 0.47, cy - s * 0.2)
+    g.lineTo(cx + s * 0.5, cy - s * 0.17); g.quadraticCurveTo(cx + s * 0.44, cy + s * 0.04, cx + s * 0.26, cy + s * 0.08); g.closePath()
   }
-  fit(g, k.alcohol ? 'お酒は20歳になってから。飲酒運転は法律で禁止されています。' : '直射日光・高温多湿を避けて保存してください。',
-    x + m + 2, y + H - 5, W * 0.6, 7.2, ink, { weight: '500' })
-  // (two cans drawn, the back one a little up and over)
-  const cx = x + W * 0.665, cy = y + 14
-  can(g, cx + 26, cy - 2, 36, ink, k.accent, k.name[0])
-  can(g, cx, cy + 8, 38, ink, k.accent, k.name[0])
-  // (this way up, in red, and 天地無用 under it)
-  thisWayUp(g, x + W - m - 34, y + m + 2, 34, RED)
-  fit(g, '天地無用', x + W - m - 17, y + m + 46, 40, 10.5, RED, { align: 'center' })
-  // (the bar code, and the recycling marks under it)
-  barcode(g, x + W - m - 113, y + H * 0.56, 1, 30, k.jan)
-  marks(g, x + W - m - 104, y + H * 0.8, 21, ink)
+  const handle = () => {
+    g.beginPath(); g.moveTo(cx - s * 0.26, cy - s * 0.08); g.lineTo(cx - s * 0.54, cy - s * 0.2); g.lineTo(cx - s * 0.56, cy - s * 0.13)
+    g.lineTo(cx - s * 0.27, cy + s * 0.01); g.closePath()
+  }
+  const lid = () => { g.beginPath(); g.ellipse(cx, cy - s * 0.21, s * 0.15, s * 0.04, 0, 0, Math.PI * 2); g.moveTo(cx + s * 0.035, cy - s * 0.27); g.arc(cx, cy - s * 0.27, s * 0.035, 0, Math.PI * 2) }
+  for (const shape of [body, spout, handle, lid]) { g.globalAlpha = 0.16; shape(); g.fill(); g.globalAlpha = 0.5; shape(); g.stroke() }
+  // (two leaves at its foot, their midribs)
+  for (const [lx, ly, a] of [[cx + s * 0.36, cy + s * 0.26, -0.5], [cx + s * 0.5, cy + s * 0.22, 0.35]] as [number, number, number][]) {
+    g.save(); g.translate(lx, ly); g.rotate(a)
+    g.globalAlpha = 0.22; g.beginPath(); g.ellipse(0, 0, s * 0.1, s * 0.04, 0, 0, Math.PI * 2); g.fill()
+    g.globalAlpha = 0.5; g.stroke(); g.beginPath(); g.moveTo(-s * 0.09, 0); g.lineTo(s * 0.09, 0); g.stroke()
+    g.restore()
+  }
   g.restore()
 }
 
-/** a case's end, its top left x, y */
+/** a round seal stamped a little crooked, a word in it in the sign's face, r round, its middle at cx, cy */
+function seal(g: CanvasRenderingContext2D, word: string, cx: number, cy: number, r: number, ink: string) {
+  g.save()
+  g.translate(cx, cy); g.rotate(-0.16)
+  g.strokeStyle = ink; g.globalAlpha = 0.85
+  g.lineWidth = 2; g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke()
+  g.lineWidth = 0.8; g.beginPath(); g.arc(0, 0, r * 0.8, 0, Math.PI * 2); g.stroke()
+  g.restore()
+  fit(g, word, cx, cy + r * 0.42, r * 1.3, r * 1.2, ink, { face: SIGN_FONT, weight: '400', align: 'center' })
+}
+
+/** a whisky barrel in line, its hoops in the second ink, w by h, its middle at cx, cy */
+function barrel(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, ink: string, hoop: string) {
+  g.save()
+  g.lineJoin = 'round'; g.lineCap = 'round'
+  const t = cy - h / 2, b = cy + h / 2, hw = (w / 2) * 0.84, bulge = (w / 2) * 1.04, cap = h * 0.08
+  // (its staves' outline, bulging at its waist, and the head's ellipse on top)
+  g.strokeStyle = ink; g.lineWidth = 2
+  g.beginPath(); g.moveTo(cx - hw, t); g.quadraticCurveTo(cx - bulge * 1.07, cy, cx - hw, b); g.stroke()
+  g.beginPath(); g.moveTo(cx + hw, t); g.quadraticCurveTo(cx + bulge * 1.07, cy, cx + hw, b); g.stroke()
+  g.beginPath(); g.ellipse(cx, t, hw, cap, 0, 0, Math.PI * 2); g.stroke()
+  g.beginPath(); g.ellipse(cx, b, hw, cap, 0, 0, Math.PI); g.stroke()
+  // (a few staves down it)
+  g.lineWidth = 0.9
+  for (const f of [-0.5, 0, 0.5]) { g.beginPath(); g.moveTo(cx + f * hw, t + cap * 0.9); g.quadraticCurveTo(cx + f * bulge * 1.07, cy, cx + f * hw, b + cap * 0.9); g.stroke() }
+  // (its two hoops)
+  g.strokeStyle = hoop; g.lineWidth = 3.2
+  for (const f of [0.2, 0.8]) {
+    const yy = t + h * f, ww = hw + (bulge * 1.07 - hw) * Math.sin(Math.PI * f) * 0.95
+    g.beginPath(); g.ellipse(cx, yy, ww, cap, 0, 0, Math.PI); g.stroke()
+  }
+  g.restore()
+}
+
+/** a lemon slice in line (its rind, its pith, eight segments), filled in the second ink, r round, its middle at cx, cy; a leaf by it */
+function lemon(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, ink: string, fill: string) {
+  g.save()
+  g.fillStyle = fill; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = ink; g.lineWidth = 2; g.stroke()
+  g.lineWidth = 1.1; g.beginPath(); g.arc(cx, cy, r * 0.82, 0, Math.PI * 2); g.stroke()
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * r * 0.1, cy + Math.sin(a) * r * 0.1); g.lineTo(cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8); g.stroke()
+  }
+  g.translate(cx + r * 0.78, cy - r * 0.86); g.rotate(-0.6)
+  g.fillStyle = ink; g.globalAlpha = 0.85; g.beginPath(); g.ellipse(0, 0, r * 0.42, r * 0.17, 0, 0, Math.PI * 2); g.fill()
+  g.restore()
+}
+
+/** the fine print along a face's foot: the drinker's warning, or how to keep it */
+function footnote(g: CanvasRenderingContext2D, k: Kind, x: number, y: number, w: number, ink: string) {
+  fit(g, k.alcohol ? 'お酒は20歳になってから。飲酒運転は法律で禁止されています。' : '直射日光・高温多湿を避けて保存してください。', x, y, w, 7, ink, { weight: '500' })
+}
+
+/** a draft beer's side: a silver band across its middle between two red lines, the name big on it in brush strokes, its strength and malt
+ * under it, 業務用 and its English over it */
+function beerSide(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
+  const t = y + H * 0.3, b = y + H * 0.66
+  const gr = g.createLinearGradient(0, t, 0, b)
+  gr.addColorStop(0, '#d5d8da'); gr.addColorStop(0.55, '#aeb2b5'); gr.addColorStop(1, '#c5c8ca')
+  g.fillStyle = gr; g.fillRect(x, t, W, b - t)
+  g.fillStyle = k.accent; g.fillRect(x, t - 6, W, 2.4); g.fillRect(x, b + 3.6, W, 2.4)
+  fit(g, k.name, x + W / 2, b - (b - t) * 0.17, W * 0.76, 60, k.ink, { face: SIGN_FONT, weight: '400', spacing: 6, align: 'center' })
+  g.fillStyle = k.ink; g.fillRect(x + 12, y + 12, 46, 15)
+  fit(g, '業務用', x + 35, y + 24, 40, 11, KRAFT, { align: 'center' })
+  fit(g, k.en, x + W / 2, y + H * 0.21, W * 0.4, 12, k.accent, { weight: '800', spacing: 4, align: 'center' })
+  fit(g, k.sub, x + W / 2, y + H * 0.79, W * 0.6, 13, k.ink, { weight: '800', align: 'center' })
+  boxed(g, '350ml × 24缶', x + 12, y + H * 0.83, W * 0.26, 17, 10, k.ink)
+  thisWayUp(g, x + W - 34, y + 9, 22, RED)
+  fit(g, '天地無用', x + W - 23, y + 40, 32, 8, RED, { align: 'center' })
+  marks(g, x + W * 0.36, y + H * 0.84, 12, k.ink)
+  footnote(g, k, x + 12, y + H - 4, W * 0.55, k.ink)
+}
+
+/** a green tea's side: dark green straight on the board in a plain double frame, its name upright and big by 京都宇治, a pale teapot and
+ * leaves, a round tea seal */
+function teaSide(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
+  g.save()
+  g.strokeStyle = k.ink
+  g.lineWidth = 1.6; g.strokeRect(x + 10, y + 10, W - 20, H - 20)
+  g.lineWidth = 0.8; g.strokeRect(x + 14.5, y + 14.5, W - 29, H - 29)
+  g.restore()
+  upright(g, k.name, x + W * 0.8, y + H * 0.13, 64, k.ink, SIGN_FONT, '400')
+  upright(g, '京都宇治', x + W * 0.65, y + H * 0.16, 15, k.ink, MINCHO, '600')
+  teapot(g, x + W * 0.29, y + H * 0.46, 132, k.ink)
+  seal(g, '茶', x + W * 0.5, y + H * 0.26, 15, k.accent)
+  fit(g, k.sub, x + 24, y + H * 0.8, W * 0.36, 9.5, k.ink, { weight: '700' })
+  boxed(g, '350ml × 24缶', x + 24, y + H * 0.83, W * 0.24, 16, 9.5, k.ink, 1)
+  thisWayUp(g, x + 22, y + 20, 18, RED)
+  fit(g, '天地無用', x + 31, y + 45, 26, 6.5, RED, { align: 'center' })
+  marks(g, x + W * 0.33, y + H * 0.82, 11, k.ink)
+  footnote(g, k, x + W * 0.57, y + H - 19, W * 0.38, k.ink)
+}
+
+/** a cola's side: a red rounded panel, its name knocked out of it in round heavy letters with what it is under them; kept cool on its
+ * left, handle with care on its right */
+function colaSide(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
+  const px = x + W * 0.13, py = y + H * 0.15, pw = W * 0.6, ph = H * 0.56
+  g.save()
+  g.fillStyle = k.ink; g.beginPath(); g.roundRect(px, py, pw, ph, 16); g.fill()
+  g.strokeStyle = KRAFT; g.lineWidth = 1.3; g.beginPath(); g.roundRect(px + 5, py + 5, pw - 10, ph - 10, 12); g.stroke()
+  // (the name: filled and stroked with round joins in the board's colour, round and heavy)
+  g.font = `900 52px ${SANS}`; g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+  const fw = g.measureText(k.name).width, sc = Math.min(1, (pw - 34) / fw)
+  g.translate(px + pw / 2, py + ph * 0.6); g.scale(sc, 1)
+  g.lineJoin = 'round'; g.lineWidth = 5; g.strokeStyle = KRAFT; g.fillStyle = KRAFT
+  g.strokeText(k.name, 0, 0); g.fillText(k.name, 0, 0)
+  g.restore()
+  fit(g, k.sub, px + pw / 2, py + ph * 0.86, pw * 0.5, 14, KRAFT, { weight: '800', spacing: 7, align: 'center' })
+  // (kept cool, upright on the left in a slim box; handle with care, boxed on the right)
+  g.save(); g.strokeStyle = k.ink; g.lineWidth = 1.2; g.strokeRect(x + 14, y + H * 0.17, 20, H * 0.5); g.restore()
+  upright(g, '冷暗所保管', x + 24, y + H * 0.19, 10.5, k.ink)
+  boxed(g, 'ガラス瓶・アルミ缶', x + W * 0.76, y + H * 0.3, W * 0.21, 18, 8, k.ink, 2)
+  fit(g, '取扱注意', x + W * 0.865, y + H * 0.56, W * 0.2, 15, k.ink, { weight: '900', align: 'center' })
+  fit(g, '350ml × 24缶', px + pw / 2, y + H * 0.82, pw * 0.5, 12, k.ink, { align: 'center' })
+  thisWayUp(g, x + W - 34, y + 9, 22, RED)
+  fit(g, '天地無用', x + W - 23, y + 40, 32, 8, RED, { align: 'center' })
+  marks(g, x + W * 0.72, y + H * 0.79, 12, k.ink)
+  footnote(g, k, x + W * 0.17, y + H - 4, W * 0.55, k.ink)
+}
+
+/** a sour's side, modern and fresh: a strip of its colour down the left, its name in heavy plain letters, two flat blocks for its flavour,
+ * its mark (a barrel, a lemon) to the right */
+function sourSide(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
+  g.fillStyle = k.accent; g.fillRect(x, y, 13, H)
+  g.save(); g.strokeStyle = k.ink; g.lineWidth = 1.2; g.strokeRect(x + 26, y + 13, 44, 15); g.restore()
+  fit(g, '業務用', x + 48, y + 25, 38, 10, k.ink, { align: 'center' })
+  fit(g, k.name, x + 26, y + H * 0.48, W * 0.56, 46, k.ink, { weight: '900', spacing: 1 })
+  fit(g, k.en, x + 27, y + H * 0.58, W * 0.5, 10, k.ink, { weight: '700', spacing: 3.4 })
+  const [b1, b2] = k.blocks ?? ['', '']
+  g.fillStyle = k.accent; g.fillRect(x + 27, y + H * 0.64, 54, 21)
+  fit(g, b1, x + 54, y + H * 0.64 + 15, 48, 12, '#fff6e2', { weight: '800', align: 'center' })
+  g.fillStyle = k.ink; g.fillRect(x + 85, y + H * 0.64, 54, 21)
+  fit(g, b2, x + 112, y + H * 0.64 + 15, 48, 12, '#fff6e2', { weight: '800', align: 'center' })
+  fit(g, k.sub, x + 27, y + H * 0.84, W * 0.42, 9, k.ink, { weight: '600' })
+  boxed(g, '350ml × 24缶', x + W * 0.52, y + H * 0.76, W * 0.2, 16, 9, k.ink)
+  if (k.mark === 'barrel') barrel(g, x + W * 0.8, y + H * 0.5, 78, 96, k.ink, k.accent)
+  else lemon(g, x + W * 0.79, y + H * 0.5, 38, k.ink, k.accent)
+  thisWayUp(g, x + W - 32, y + H - 44, 20, RED)
+  fit(g, '天地無用', x + W - 22, y + H - 14, 30, 7.5, RED, { align: 'center' })
+  marks(g, x + W * 0.5, y + H * 0.88, 10, k.ink)
+  footnote(g, k, x + 27, y + H - 4, W * 0.42, k.ink)
+}
+
+/** a case's long side, its top left x, y: its kind's own look, its bar code if it's printed here */
+function side(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
+  g.save()
+  g.beginPath(); g.rect(x, y, W, H); g.clip()
+  if (k.look === 'beer') beerSide(g, k, x, y)
+  else if (k.look === 'tea') teaSide(g, k, x, y)
+  else if (k.look === 'cola') colaSide(g, k, x, y)
+  else sourSide(g, k, x, y)
+  codeOn(g, k, 'side', x, y, W, H)
+  g.restore()
+}
+
+/** a case's end, its top left x, y: a die-cut handhole, the name in its kind's look under it, what's in it, the best-before and lot inked
+ * on, this way up; its bar code if it's printed here */
 function end(g: CanvasRenderingContext2D, k: Kind, x: number, y: number) {
-  const m = 9, ink = k.ink
+  const m = 9, cx = x + D / 2
   g.save()
   g.beginPath(); g.rect(x, y, D, H); g.clip()
-  handhole(g, x + D / 2, y + H * 0.24, 0.095 * PX, 0.027 * PX)
-  fit(g, k.name, x + D / 2, y + H * 0.6, D * 0.78, 42, ink, { face: SIGN_FONT, weight: '400', spacing: 2, align: 'center' })
-  fit(g, k.en, x + D / 2, y + H * 0.7, D * 0.8, 8.5, ink, { weight: '700', spacing: 1.6, align: 'center' })
-  fit(g, '350ml × 24缶', x + D / 2, y + H * 0.8, D * 0.6, 12, ink, { align: 'center' })
+  handhole(g, cx, y + H * 0.24, 0.095 * PX, 0.027 * PX)
+  if (k.look === 'beer') {
+    const t = y + H * 0.42, b = y + H * 0.68, gr = g.createLinearGradient(0, t, 0, b)
+    gr.addColorStop(0, '#d5d8da'); gr.addColorStop(0.55, '#aeb2b5'); gr.addColorStop(1, '#c5c8ca')
+    g.fillStyle = gr; g.fillRect(x, t, D, b - t)
+    g.fillStyle = k.accent; g.fillRect(x, t - 4, D, 1.8); g.fillRect(x, b + 2.2, D, 1.8)
+    fit(g, k.name, cx, b - (b - t) * 0.18, D * 0.74, 40, k.ink, { face: SIGN_FONT, weight: '400', spacing: 3, align: 'center' })
+  } else if (k.look === 'tea') {
+    fit(g, k.name, cx, y + H * 0.62, D * 0.5, 44, k.ink, { face: SIGN_FONT, weight: '400', spacing: 6, align: 'center' })
+    fit(g, '京都宇治', cx, y + H * 0.72, D * 0.4, 11, k.ink, { face: MINCHO, weight: '600', spacing: 3, align: 'center' })
+  } else if (k.look === 'cola') {
+    const pw = D * 0.6, ph = H * 0.27, px = cx - pw / 2, py = y + H * 0.41
+    g.save()
+    g.fillStyle = k.ink; g.beginPath(); g.roundRect(px, py, pw, ph, 11); g.fill()
+    g.font = `900 34px ${SANS}`; g.textAlign = 'center'
+    const sc = Math.min(1, (pw - 20) / g.measureText(k.name).width)
+    g.translate(cx, py + ph * 0.72); g.scale(sc, 1)
+    g.lineJoin = 'round'; g.lineWidth = 4; g.strokeStyle = KRAFT; g.fillStyle = KRAFT
+    g.strokeText(k.name, 0, 0); g.fillText(k.name, 0, 0)
+    g.restore()
+  } else {
+    g.fillStyle = k.accent; g.fillRect(x, y, 9, H)
+    fit(g, k.name, cx + D * 0.07, y + H * 0.6, D * 0.55, 28, k.ink, { weight: '900', align: 'center' })
+    fit(g, k.en, cx + D * 0.07, y + H * 0.68, D * 0.5, 7.5, k.ink, { weight: '700', spacing: 2, align: 'center' })
+    if (k.mark === 'barrel') barrel(g, x + D * 0.13, y + H * 0.56, 30, 38, k.ink, k.accent)
+    else lemon(g, x + D * 0.13, y + H * 0.57, 15, k.ink, k.accent)
+  }
+  fit(g, '350ml × 24缶', cx, y + H * 0.82, D * 0.5, 11, k.ink, { align: 'center' })
   // (best before and lot, inked on by the filler: a dot printer's grey, a little crooked)
   g.save()
-  g.translate(x + m, y + H - 9); g.rotate(-0.012)
-  fit(g, `賞味期限 ${k.lot}`, 0, 0, D * 0.6, 9, 'rgba(30,30,34,0.82)', { face: MONO, weight: '600', spacing: 0.6 })
+  g.translate(x + m + 6, y + H - 9); g.rotate(-0.012)
+  fit(g, `賞味期限 ${k.lot}`, 0, 0, D * 0.5, 8.5, 'rgba(30,30,34,0.82)', { face: MONO, weight: '600', spacing: 0.6 })
   g.restore()
-  thisWayUp(g, x + D - m - 26, y + H - 52, 26, RED)
-  fit(g, '天地無用', x + D - m - 13, y + H - 12, 34, 8.5, RED, { align: 'center' })
+  // (this way up: on the right, or the left where the bar code's taken the right)
+  const left = k.code.on === 'end'
+  thisWayUp(g, left ? x + m + 6 : x + D - m - 24, y + 12, 20, RED)
+  fit(g, '天地無用', left ? x + m + 16 : x + D - m - 14, y + 42, 30, 7.5, RED, { align: 'center' })
+  codeOn(g, k, 'end', x, y, D, H)
   g.restore()
 }
 
