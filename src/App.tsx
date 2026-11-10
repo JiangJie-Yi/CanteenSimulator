@@ -27,7 +27,7 @@ import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
-import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, coalCharge, STICKS_PER_PORTION, afterCharcoal, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
+import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -1872,15 +1872,18 @@ export default function App() {
     window.setTimeout(() => addTalk(d.id, 'chef', reply), 350 + Math.random() * 300)
   }
   /** buy in n of something (paid from the cash in hand) */
-  const buyIn = (d: DishInfo, id: string, n: number) => {
+  const buyIn = (d: DishInfo, id: string, want: number) => {
     const it = ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? GARNISH_GOODS.find((g) => g.id === id)
+    // (no more than there's room for (economy's STOCK_CAP): the rest isn't bought)
+    const n = Math.min(want, roomFor(id, stock[id] ?? 0))
+    if (n <= 0) return
     const cost = costOf(it ?? { price: 0 }) * n
     if (cost > cash) return
     book('bought', cost)
     setStock((st) => ({ ...st, [id]: (st[id] ?? 0) + n }))
   }
   /** the three ways to restock all at once: 補到平均 (whatever's under the average, up to it), 各補 5, 補滿 (everything up to PAR) */
-  const restockOf = (d: DishInfo, how: Restock) => (how === 'avg' ? averageOrder(d, stock) : how === 'each' ? eachOrder(d, 5) : topUpOrder(d, stock))
+  const restockOf = (d: DishInfo, how: Restock) => (how === 'avg' ? averageOrder(d, stock) : how === 'each' ? eachOrder(d, 5, stock) : topUpOrder(d, stock))
   /** everything out on the board to try put back: refunded (nothing was made) */
   const putAllBack = () => {
     for (const x of [...dish.bases, ...dish.items]) {

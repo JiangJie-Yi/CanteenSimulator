@@ -121,6 +121,21 @@ export const keepsDry = (id: string) => id === 'Onigiri' || id === NORI
 /** what buying n of every good of a shop costs (what comes in packs, whole packs) */
 export const buyAllCost = (d: Dish, n: number) => goodsOf(d).reduce((t, g) => t + costOf(g) * inPacks(g.id, n), 0)
 
+/**
+ * The most portions of any one food the shop has room to keep (its freezer, its fridges, its shelves: the owner's, 2026-11-10: there was no
+ * limit, and a fish's card read 691): an order's cut to the room left, what comes in packs to whole packs (the rice, ten to a bag). What
+ * isn't a food (a seasoning, the nori, the charcoal, the tissues, the receipt paper) keeps to its own usual stock instead
+ */
+export const STOCK_CAP = 100
+/** whether a good is kept within STOCK_CAP: a food */
+export const capped = (id: string) => !isSeasonId(id) && id !== NORI && id !== CHARCOAL && !id.startsWith('supply:')
+/** how many more of a good there's room for, in whole packs (no end to it for what isn't capped) */
+export const roomFor = (id: string, have: number) => {
+  if (!capped(id)) return Infinity
+  const room = Math.max(0, STOCK_CAP - have)
+  return Math.floor(room / packOf(id)) * packOf(id)
+}
+
 /** a stock keeper (倉儲) tops up whatever the menu uses once it's down to this many portions, back up to PAR */
 export const PAR = 10
 export const REORDER_AT = 3
@@ -145,7 +160,8 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     const kept = isSeasonId(id) ? SEASON_PAR : id === NORI ? NORI_PAR : 0
     const par = kept || PAR * q
     if (!g || have > (kept ? kept / 3 : REORDER_AT * q)) continue
-    const n = inPacks(id, par - have)
+    const n = Math.min(inPacks(id, par - have), roomFor(id, have))
+    if (n <= 0) continue
     const c = Math.round(costOf(g) * n * off)
     if (cost + c > cash) continue
     buy[id] = n
@@ -179,7 +195,8 @@ export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
   const buy: Stock = {}
   let cost = 0
   for (const g of goodsOf(d)) {
-    const n = inPacks(g.id, Math.max(par, packOf(g.id)) - (stock[g.id] ?? 0))
+    const have = stock[g.id] ?? 0
+    const n = Math.min(inPacks(g.id, Math.max(par, packOf(g.id)) - have), roomFor(g.id, have))
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n
@@ -200,7 +217,8 @@ export function averageOrder(d: Dish, stock: Stock) {
   const buy: Stock = {}
   let cost = 0
   for (const g of goods) {
-    const n = inPacks(g.id, avg - (stock[g.id] ?? 0))
+    const have = stock[g.id] ?? 0
+    const n = Math.min(inPacks(g.id, avg - have), roomFor(g.id, have))
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n
@@ -208,11 +226,16 @@ export function averageOrder(d: Dish, stock: Stock) {
   return { buy, cost, avg }
 }
 
-/** 各補 n: n more of every good */
-export function eachOrder(d: Dish, n: number) {
+/** 各補 n: n more of every good, as much of it as there's room for (none of what's full) */
+export function eachOrder(d: Dish, n: number, stock: Stock = {}) {
   const buy: Stock = {}
   let cost = 0
-  for (const g of goodsOf(d)) { buy[g.id] = inPacks(g.id, n); cost += costOf(g) * buy[g.id] }
+  for (const g of goodsOf(d)) {
+    const k = Math.min(inPacks(g.id, n), roomFor(g.id, stock[g.id] ?? 0))
+    if (k <= 0) continue
+    buy[g.id] = k
+    cost += costOf(g) * k
+  }
   return { buy, cost }
 }
 

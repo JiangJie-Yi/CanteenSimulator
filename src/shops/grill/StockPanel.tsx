@@ -7,7 +7,7 @@ import { nameIn, tl, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { SEASONINGS, SEASON_COST, type Seasoning } from '@/data/recipes'
 import { STORAGES, stockNameOf, storageName, storageOf, type Storage } from '@/data/storage'
-import { PAR, inPacks, keepsDry, packOf } from '@/game/economy'
+import { PAR, STOCK_CAP, inPacks, keepsDry, packOf, roomFor } from '@/game/economy'
 import { freshGrade } from '@/game/freshness'
 import { lotGrades, type Lot } from '@/game/lots'
 import { CHARCOAL, NORI, NORI_COST, NORI_PAR, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
@@ -211,7 +211,10 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
     const pack = packOf(x.id)
     const par = Math.max(PAR, pack)
     const need = inPacks(x.id, par - have)
-    const can = (k: number) => k > 0 && cash >= cost * k
+    // (no buying past the room there is (STOCK_CAP): a button's off once it's full; what's asked for past it isn't bought)
+    const room = roomFor(x.id, have)
+    const full = room <= 0
+    const can = (k: number) => k > 0 && room > 0 && cash >= cost * Math.min(k, room)
     const buy = (k: number) => (e: { stopPropagation: () => void; preventDefault: () => void }) => { e.stopPropagation(); e.preventDefault(); if (can(k)) p.onBuy(x.id, k) }
     const f = Math.round(p.fresh[x.id] ?? 100)
     const grade = freshGrade(f)
@@ -231,7 +234,15 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
         {/* (its English under it, for the Chinese and Japanese: in English it'd only say the name again, so its line's left blank, the card
             as tall as the others) */}
         {x.en && <span className="chiller-bin-en" lang="en" aria-hidden={lang === 'en' || undefined}>{lang === 'en' ? ' ' : stockNameOf(x.id, 'en') ?? x.en}</span>}
-        <span className={`chiller-level${out ? ' is-zero' : have < par ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / par) * 100)}%` }} /></span>
+        {/* (the bar is how full its room is, said over it (the owner's: a green bar with nothing to say what it was, taken for the freshness
+            under it): its stock against STOCK_CAP, 滿載 once it's full; orange while it's under the usual stock (PAR)) */}
+        <span className={`chiller-cap${full ? ' is-full' : ''}`} aria-hidden="true">
+          <span className="chiller-cap-row">
+            <span>{tl(lang, '庫存容量', '在庫容量', 'Room')}</span>
+            <em>{full && <b>{tl(lang, '滿載', '満杯', 'Full')}</b>}{have}/{STOCK_CAP}</em>
+          </span>
+          <span className={`chiller-level${out ? ' is-zero' : have < par ? ' is-low' : ''}`}><i style={{ width: `${Math.min(100, (have / STOCK_CAP) * 100)}%` }} /></span>
+        </span>
         <span className="chiller-bin-info" aria-hidden="true">
           <b className={out ? 'is-zero' : ''}>{tl(lang, '庫存', '在庫', 'Stock')} <em>{have}</em>{pack > 1 && tl(lang, '份', '人前', '')}</b>
           <small title={pack > 1 ? tl(lang, `一袋 ${pack} 份`, `1袋 ${pack}人前`, `${pack} a bag`) : undefined}>{tl(lang, '成本', '原価', 'Cost')} <em>{cost * pack}</em></small>
@@ -251,8 +262,11 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
             <span role="button" tabIndex={-1} className={`chiller-btn${can(pack) ? '' : ' is-off'}`} title={tl(lang, `叫 1 袋（${pack} 份）`, `1袋仕入れる（${pack}人前）`, `Order a bag (${pack})`)} onClick={buy(pack)}>{tl(lang, '+1袋', '+1袋', '+1 bag')}</span>
             <span role="button" tabIndex={-1} className={`chiller-btn${can(2 * pack) ? '' : ' is-off'}`} title={tl(lang, `叫 2 袋（${2 * pack} 份）`, `2袋仕入れる`, `Order 2 bags`)} onClick={buy(2 * pack)}>{tl(lang, '+2袋', '+2袋', '+2')}</span>
           </> : <>
-            <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`} title={tl(lang, '叫 1 份', '1つ仕入れる', 'Order 1')} onClick={buy(1)}>+1</span>
-            <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 份', '10個仕入れる', 'Order 10')} onClick={buy(10)}>+10</span>
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(1) ? '' : ' is-off'}`}
+              title={full ? tl(lang, `放滿了（最多 ${STOCK_CAP} 份）`, `満杯（最大 ${STOCK_CAP}）`, `Full (${STOCK_CAP} at most)`) : tl(lang, '叫 1 份', '1つ仕入れる', 'Order 1')} onClick={buy(1)}>+1</span>
+            <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`}
+              title={full ? tl(lang, `放滿了（最多 ${STOCK_CAP} 份）`, `満杯（最大 ${STOCK_CAP}）`, `Full (${STOCK_CAP} at most)`)
+                : room < 10 ? tl(lang, `只放得下 ${room} 份`, `あと ${room} しか入らない`, `Room for ${room} only`) : tl(lang, '叫 10 份', '10個仕入れる', 'Order 10')} onClick={buy(10)}>+10</span>
           </>}
           <span role="button" tabIndex={-1} className={`chiller-btn chiller-fill${can(need) ? '' : ' is-off'}`}
             title={need ? tl(lang, `補到 ${par} 份（${need} 份，NT$${cost * need}）`, `${par}まで補充（${need}）`, `Fill up to ${par} (${need}, NT$${cost * need})`) : tl(lang, '已經夠了', '十分あります', 'Enough already')}

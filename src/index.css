@@ -6531,6 +6531,41 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
   to { opacity: 1; translate: 0 0; }
 }
 
+/* each food's room in the stock (game/economy's STOCK_CAP): what the bar under it is, and how full it is; 滿載 in red once there's no room */
+/* (a grid, not a flex column: the bar's own align-self (centre, for the rows it sits in elsewhere) shrank it to nothing across a column) */
+.chiller-cap {
+  display: grid;
+  gap: 2px;
+}
+
+.chiller-cap-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 10px;
+  color: #7a6a58;
+  white-space: nowrap;
+}
+
+:root[data-theme='dark'] .chiller-cap-row {
+  color: #bba98f;
+}
+
+.chiller-cap-row em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.chiller-cap-row em b {
+  margin-right: 4px;
+  color: #c4442f;
+}
+
+:root[data-theme='dark'] .chiller-cap-row em b {
+  color: #ff8f78;
+}
+
 /* the stock bar on each chiller tag: how much there is against the par level */
 .chiller-level {
   display: block;
