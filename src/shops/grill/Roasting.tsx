@@ -4461,6 +4461,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (l1 < lMin + r * 0.5) at.addScaledVector(LAY, lMin + r * 0.5 - l1)
       if (l1 > lMax - r * 0.5) at.addScaledVector(LAY, lMax - r * 0.5 - l1)
     }
+    // (and never left on the hearth: pushed apart from the rest after it was cleared of it, a thing could be shoved back onto it (the
+    // owner saw the lantern standing in the fire with many plates out))
+    if (key === 'tray') clearOfHearth(at, 0.04, TRAY_W, TRAY_D)
+    else clearOfHearth(at, key === 'bowl-0' ? BOWL_R : r)
     return at
   }
   const [basketCount, setBasketCount] = useState(1)
@@ -4509,7 +4513,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (let pass = 0; pass < 3; pass++) {
       for (const key of containerKeys()) {
         // (a stack stays where it was put; what's kept in the cubby under the table stays there till it's taken out)
-        if (stackOn.current.has(key) || FIXED.has(key) || key === 'tray' || outsideTable(containerAt(key), footprint(key))) continue
+        // (nor the lantern: it's where it was set; what's set out keeps clear of it)
+        if (stackOn.current.has(key) || FIXED.has(key) || key === 'tray' || key === 'lantern' || outsideTable(containerAt(key), footprint(key))) continue
         const at = containerAt(key)
         const ok = settle(key, at.clone(), false, false)
         const shift = ok.sub(at)
