@@ -2330,6 +2330,10 @@ const DIPPER_WATER_GEO = new THREE.CircleGeometry(0.037, 12)
 const DIPPER_WATER_MAT = new THREE.MeshToonMaterial({ color: '#9ccbe0', transparent: true, opacity: 0.8 })
 /** how often (seconds) the plater goes to stir the miso soup when there's nothing else, and for how long */
 const SOUP_EVERY = 40, STIR_S = 3
+/** the water bucket up on the cook table by the third cook's bay (Roasting's TABLE_BIN): a plater whose place is nearer it than DIP_NEAR
+ * (the third cook, in his bay) steps toward it in his place till it's DIP_REACH off and dips it from there, his arm and the dipper the rest
+ * (the bar's units) */
+const DIP_NEAR = 0.7, DIP_REACH = 0.21
 const RICE_BOWL_GEO = new THREE.CylinderGeometry(0.1, 0.07, 0.07, 16, 1, true).translate(0, 0.035, 0)
 const RICE_IN_GEO = new THREE.CylinderGeometry(0.092, 0.08, 0.025, 16)
 /** how long a server wipes the bar down where a plate was cleared: two strokes along and back */
@@ -3674,6 +3678,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       const crateAt = () => middleOf('coal-crate')
       const bucketAt = () => middleOf('WaterBucket')
+      /** where the bucket's dipped from: a step toward it in his own place when it's by it (the third cook's bay), or null: from further off
+       * (the second cook plating from the board, the bucket moved in edit mode), the floor by it, as for anything on the table */
+      const dipFrom = () => {
+        const b = bucketAt(), h = home()
+        const d = Math.hypot(b.x - h.x, b.z - h.z)
+        return d < DIP_NEAR ? h.clone().lerp(b.setY(h.y), Math.max(0, d - DIP_REACH) / d) : null
+      }
+      /** a step or two straight to a spot in his own place: no way round the table to find (the kitchen's ways go round it, out of his bay) */
+      const stepTo = (to: THREE.Vector3, phase: typeof pl.phase) => { pl.path = [pl.pos.clone(), to.clone()]; pl.len = pathLength(pl.path); pl.phase = phase; pl.t = 0 }
       const soupPot = () => middleOf('miso-pot')
       const hearthAt = () => { marks.current.delete('FirePit'); return inBar('FirePit', home()) }
       /** where the water's thrown from: his own bay at the table's far end (Roasting's SOUS_AT), facing in over the hearth's near side */
@@ -3707,7 +3720,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (pl.t > 0.5 && platerFree(!!plater && FETCHER.id === plater.id, FETCHER.busy)) {
           pl.t = 0
           if (open && !SHOP.leaving && FIRE_TEND.want && !FIRE_TEND.done) {
-            // (the fire's asked for: charcoal from the crate, or water from the bucket on the floor, first of all)
+            // (the fire's asked for: charcoal from the crate, or water from the bucket on the table by his bay, first of all)
             pl.pos.copy(home())
             pl.fire = FIRE_TEND.want
             away(true)
@@ -3716,7 +3729,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               // owner's); with too little in it for a handful, first out to the sack on the floor for an armful to fill it)
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
               else setOff(reachOf(coalSackAt()), 'toCoalSack')
-            } else setOff(reachOf(bucketAt()), 'toBucket')
+            } else { const near = dipFrom(); if (near) stepTo(near, 'toBucket'); else setOff(reachOf(bucketAt()), 'toBucket') }
           } else if (open && !SHOP.leaving && RICE.kama.state === 'done') {
             // (the pot's cooked: to it, to scoop the rice out into the tub)
             pl.pos.copy(home())
@@ -3770,7 +3783,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       }
       else if (pl.phase === 'toBucket') walk(() => { pl.phase = 'scoopWater'; faceTo(bucketAt()) })
-      else if (pl.phase === 'scoopWater' && pl.t > 0.8) setOff(hearthSpot(), 'toHearth')
+      // (back from a step in his bay straight to where he stands; from the floor by the table, the way round to it)
+      else if (pl.phase === 'scoopWater' && pl.t > 0.8) { if (dipFrom()) stepTo(hearthSpot(), 'toHearth'); else setOff(hearthSpot(), 'toHearth') }
       else if (pl.phase === 'toHearth') walk(() => { pl.phase = pl.fire === 'water' ? 'sprinkle' : 'feedCoal'; faceTo(hearthAt()) })
       else if ((pl.phase === 'feedCoal' || pl.phase === 'sprinkle') && pl.t > 0.8) {
         // (the sticks in, or the water splashed on: the grill does the rest; he's in his bay already, turned back as he stands there. What
@@ -3881,11 +3895,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.position.copy(pl.pos)
         o.rotation.y = pl.yaw
         // (never the idle fanning of a cook at his place: his hands are full with the work here; bent forward to it: well down to the
-        // bucket on the floor, over the hearth to tip the coals in or splash the water, a little over the crate and the soup)
+        // sack on the floor, over the bucket on the table and the hearth to tip the coals in or splash the water, a little over the crate and
+        // the soup)
         o.userData.fetcher = true
         o.userData.fanNow = false
         const bend = (k: number) => Math.sin(Math.PI * Math.min(1, pl.t / k))
-        o.userData.lean = pl.phase === 'scoopWater' || pl.phase === 'liftSack' ? 0.5 * bend(0.8) : pl.phase === 'feedCoal' || pl.phase === 'sprinkle' ? 0.32 * bend(0.8)
+        o.userData.lean = pl.phase === 'liftSack' ? 0.5 * bend(0.8) : pl.phase === 'feedCoal' || pl.phase === 'sprinkle' || pl.phase === 'scoopWater' ? 0.32 * bend(0.8)
           : pl.phase === 'takeCoal' ? 0.18 * bend(0.6) : pl.phase === 'fillCrate' ? 0.22 * Math.sin(Math.PI * Math.max(0, Math.min(1, (pl.t - 0.2) / 0.7))) : pl.phase === 'stir' ? 0.14 : 0
         // (up on the kitchen's dais)
         // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)

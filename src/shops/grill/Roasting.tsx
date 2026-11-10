@@ -296,16 +296,20 @@ const SIZZLE_AT = new THREE.Vector3()
 /** the pinching hand is drawn a little above the pinch of salt it holds */
 const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
 /** the water bucket, drawn this much bigger than modelled (its water is for damping the fire down, not for the food: the owner's); and its
- * footprint. Down on the floor by the cook's left foot (the owner's), at a bucket's own size: on the table it was drawn three times as big,
- * nearly a metre across */
+ * footprint. At a bucket's own size (on the table it was once drawn three times as big, nearly a metre across) */
 const BUCKET_SCALE = 0.55
 const BIN_R = 0.27 * BUCKET_SCALE
 /** the trash bin for bare sticks, burnt scraps and the like (the water bucket is only for water), on the floor by the cook's right foot */
 const TRASH_R = 0.15
 const TRASH_H = 0.3
-/** where they stand: on the floor in front of the strips of table either side of the cook's notch, his step between them (the notch is only
- * as wide as the step; past the strips, the fridges' doors swing out). Along (the bar's, as COOK_NOTCH) and out (lay) */
-const FLOOR_BIN = { along: -0.19, lay: 2.27 }
+/** where the bucket stands: back on the table (the owner's, 2026-11-09 "水桶也沒放回桌上"; it had been put on the floor by the cook's left
+ * foot, 2026-11-07), on its top past the hearth's right-hand side, just in front of the third cook's bay: he dips it from there, a step
+ * toward it, the fire's water at hand; clear of the hearth's frame, the bay's edge (3 cm), the plating's stack of clean plates (3 cm) and
+ * the side dishes' place (DISH_TOP: nearer, they were pushed off it, and on along the table, the rice balls' dish out over its edge). Along
+ * (the bar's, as COOK_NOTCH) and out (lay) */
+const TABLE_BIN = { along: 2.55, lay: 0.5 }
+/** where the trash bin stands: on the floor in front of the strip of table right of the cook's notch (the notch is only as wide as his step;
+ * past the strip, the fridge's doors swing out). Along and out, as the bucket */
 const FLOOR_TRASH = { along: 1.43, lay: 2.26 }
 
 /** split bamboo in a 2-over-2 twill (網代編み), honey-coloured and a little smoked, wrapped round the basket */
@@ -488,8 +492,13 @@ const LEDGE_L = 1.62
 const FAN_PEG = { along: -LEDGE_L / 2 + 0.045, up: 0.365 - 0.19 }
 /** the fan hung on its peg: its paper's middle this far below the peg (its handle's length, 1.6 times its own, and the loop) */
 const FAN_DROP = -0.4
-/** the containers that stay where they're set, whatever's beside them: the ledge, fixed to the hearth */
+/** the containers that stay where they're set, whatever's beside them: the ledge, fixed to the hearth; the bucket and the trash bin (not
+ * taken up by hand: the bucket's dipper is) */
 const FIXED = new Set(['box', 'bin', 'trash'])
+/** and of those, what stands on the table's top, so what's put down there by hand is kept off it (the ledge is up over the cook's place, the
+ * trash bin down on the floor); not what's set out for itself as the table's laid (each has its own place clear of it: pushed off it there,
+ * the plate pushed the rice balls' dish along the table and it the side dish, out over its edge) */
+const FIXED_ON_TOP = new Set(['bin'])
 /** how many of the floating 美味 words can be up at once, and where an unused place waits */
 const POP_SLOTS = 8
 const POP_AWAY: [number, number, number] = [0, -50, 0]
@@ -1247,7 +1256,7 @@ const WALK_LAY = AISLE_LAY + 0.38
 const WALK_ALONG: [number, number] = [-1.24, 1.86]
 const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
 /** where the second cook stands while the shop's open (the owner's: the owner, 大廚, at the fire; the second, 二廚, fetching the orders and
- * skewering them): on the kitchen floor before the big chopping board, left of the notch and of the water bucket on the floor by it, facing
+ * skewering them): on the kitchen floor before the big chopping board, left of the notch and of where the water bucket stood on the floor by it, facing
  * in at the board (measured: the board along -2.33..-0.73, its front at lay 2.15; the bucket from along -1.05; he's 1.17 across with his
  * arms, which at -1.62 touched it, and the owner's reaching to the board's end)) */
 const BOARD_COOK_AT = new THREE.Vector3().addScaledVector(LAY, 2.55).addScaledVector(ALONG, -1.74).setY(GRILL_OFFSET.y - KITCHEN_DROP)
@@ -4378,12 +4387,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * Keep a moved container from passing through things: out of the stone ring, and clear of every other
    * plate, dish, basket, the box and the bin (round footprints, pushed apart until they just touch).
    */
-  const settle = (key: string, at: THREE.Vector3, stacking = false) => {
+  const settle = (key: string, at: THREE.Vector3, stacking = false, byHand = true) => {
     // (the ledge is fixed to the hearth: nothing pushes it, and it pushes nothing (it's up off the table, over the cook's place))
     if (FIXED.has(key)) return at
     const r = footprint(key)
     // (what it's stacked with doesn't push it away; nor, while an empty one is carried, other empty ones it could go on)
-    const others = containerKeys().filter((k) => k !== key && !FIXED.has(k) && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
+    const others = containerKeys().filter((k) => k !== key && (!FIXED.has(k) || (byHand && FIXED_ON_TOP.has(k))) && !sameStack(k, key) && !(stacking && STACKABLE(k) && !holds(k)))
       .flatMap((k) => circlesOf(k, containerAt(k)))
     // the crate (the fan hangs on its hook, up off the table)
     for (const d of [DECOR.crate, DECOR.rice]) others.push({ p: new THREE.Vector3(d.at[0], 0, d.at[1]), r: d.r })
@@ -4464,12 +4473,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // fire and of each other where it stands — at the start, and whenever another plate or basket is put out
   useLayoutEffect(() => {
     // (the seasoning box starts beside the cook, in the table's corner by where they stand, not out against the counter's edge)
-    // (the water bucket and the trash bin on the floor either side of the cook's step, whatever was kept from before (they stood on the table))
+    // (the water bucket on the table's top by the third cook's bay, the trash bin on the floor by the cook's step, whatever was kept from
+    // before (the bucket stood on the floor by his other foot, and before that on the table, drawn three times its size))
     const floorY = CHEF_AT.y
     if (carriers.bin) {
       const h = carriers.bin[0].home
-      const want = new THREE.Vector3().addScaledVector(ALONG, FLOOR_BIN.along - FIRE_SHIFT.dot(ALONG)).addScaledVector(LAY, FLOOR_BIN.lay)
-      moved.current.set('bin', new THREE.Vector3(want.x - h.x, floorY - h.y, want.z - h.z))
+      const want = new THREE.Vector3().addScaledVector(ALONG, TABLE_BIN.along - FIRE_SHIFT.dot(ALONG)).addScaledVector(LAY, TABLE_BIN.lay)
+      moved.current.set('bin', new THREE.Vector3(want.x - h.x, -h.y, want.z - h.z))
     }
     if (roast.trash) {
       const t = roast.trash
@@ -4489,7 +4499,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (a stack stays where it was put; what's kept in the cubby under the table stays there till it's taken out)
         if (stackOn.current.has(key) || FIXED.has(key) || key === 'tray' || outsideTable(containerAt(key), footprint(key))) continue
         const at = containerAt(key)
-        const ok = settle(key, at.clone())
+        const ok = settle(key, at.clone(), false, false)
         const shift = ok.sub(at)
         shift.y = 0
         if (shift.lengthSq() > 1e-6) moved.current.set(key, nudge(key).clone().add(shift))

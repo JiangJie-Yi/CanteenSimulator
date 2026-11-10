@@ -768,7 +768,7 @@ export const RICE: { tub: number; kama: Kama; washing: boolean } = { tub: TUB_FU
 /**
  * The fire kept by the third cook (三廚, the plater: the owner's, a robata's kitchen split three ways): the grill (Roasting) asks for charcoal
  * when the fire's low or for water when it's run too hot (`want`); the third cook, walking (GuestBar3D's platerRun), takes it from the crate
- * or the bucket on the floor to the hearth's far side, and says it's done (`done`), and only then does the grill drop the sticks in or damp
+ * or the bucket on the table by his bay to the hearth's far side, and says it's done (`done`), and only then does the grill drop the sticks in or damp
  * it down. `tender`: whether there's anyone to send (the plater's there); with none, the grill does it itself at once, as it used to.
  */
 /**
