@@ -464,3 +464,24 @@ export function stoolSound(at: THREE.Vector3) {
   r.connect(bp).connect(o); r.start(t)
   ping(a, t + 0.2, 140, 0.15, 0.06, o)
 }
+
+/** the dish washer done (the owner's: a clear chime as it finishes): two soft bell tones, the second a fourth up, each with a quiet octave over */
+export function washerChime(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('washer-chime', 600)) return
+  const t = a.currentTime, o = out(a, 0.2 * near, pan)
+  for (const [k, f] of [[0, 1046.5], [1, 1396.9]] as const) {
+    ping(a, t + k * 0.22, f, 0.4, 0.9, o)
+    ping(a, t + k * 0.22, f * 2, 0.08, 0.5, o)
+  }
+}
+/** its door tried while it's washing: a short low double beep, it won't open */
+export function washerBeep(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('washer-beep', 300)) return
+  const t = a.currentTime, o = out(a, 0.12 * near, pan)
+  ping(a, t, 520, 0.35, 0.09, o, 'square')
+  ping(a, t + 0.13, 520, 0.35, 0.09, o, 'square')
+}

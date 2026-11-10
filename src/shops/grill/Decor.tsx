@@ -1037,7 +1037,11 @@ function DenkiNabe() {
   }, [gltf])
   const steam = useRef<THREE.Group>(null)
   const was = useRef(RICE.kama.state)
+  const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? '飯煮好了（保溫中），等著盛進飯桶' : `空著（飯桶裡還有 ${RICE.tub} 份飯）`)
+  // (pointed at, its tag kept up to date as it counts down: it was set once, as the pointer came over it, and stood still)
+  const hov = useRef(false)
   useFrame(({ clock }) => {
+    if (hov.current) setTip({ title: '電鍋', hint: say() })
     const k = RICE.kama, t = clock.elapsedTime
     const cooking = k.state === 'cooking'
     model.lamp.color.copy(cooking ? LAMP_COOK : k.state === 'done' ? LAMP_WARM : LAMP_OFF)
@@ -1052,12 +1056,11 @@ function DenkiNabe() {
   })
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, DENKI_AT.along).addScaledVector(LAY, DENKI_AT.lay)
-  const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? '飯煮好了（保溫中），等著盛進飯桶' : `空著（飯桶裡還有 ${RICE.tub} 份飯）`)
   return (
     <group position={[p.x, 0, p.z]} rotation-y={WARMER_FACE}>
       <group position-y={DENKI_TOP} scale={DENKI_SCALE}
-        onPointerOver={(e) => { e.stopPropagation(); setTip({ title: '電鍋', hint: say() }) }}
-        onPointerOut={() => setTip(null)}>
+        onPointerOver={(e) => { e.stopPropagation(); hov.current = true; setTip({ title: '電鍋', hint: say() }) }}
+        onPointerOut={() => { hov.current = false; setTip(null) }}>
         <primitive object={model.root} />
         <group ref={steam} visible={false}>
           <Steam position={[0, 0.42, 0]} width={0.22} height={0.4} opacity={0.32} layers={2} />

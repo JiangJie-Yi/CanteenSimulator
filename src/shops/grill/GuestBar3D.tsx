@@ -59,7 +59,7 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
-import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring, putBack, RACK_FULL, unload, washOne } from '@/game/plates'
+import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { SCOOP_S, WASH_S, kamaTick, riceGoes, scoopIn, setOn } from '@/game/rice'
@@ -4364,7 +4364,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
         // (done: the sink washed empty or the dryer full; or nothing more could be washed)
         if (dryerStarts(dirty.current, DRYER) || r.dirty === before) {
-          if (DRYER.n > 0) DRYER.left = DRY_S
+          // (started: its door shut, whoever had let it down)
+          if (DRYER.n > 0) { DRYER.left = DRY_S; DRYER.manual = false }
           go(kitchenRoute(home.at, w.pos), 'back')
         }
       } else if (w.phase === 'unloadTake' && w.t > 0.6) {
@@ -4514,6 +4515,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     // the dryer drying (game/plates), its door down while someone's at it
     if (DRYER.left !== null && DRYER.left > 0) DRYER.left = dryerTick(DRYER, step).left
+    // (the player's put the sink's dirty plates in it, its door down (Sink): as many as there's room for, with a clink or two; the sink's count
+    // told for its label)
+    if (DRYER.ask) {
+      DRYER.ask = 0
+      const k = playerLoad(dirty.current, DRYER)
+      if (k > 0) {
+        dirty.current -= k
+        DRYER.n += k
+        const at = inBar('SinkDryerRack0', endOf(1))
+        const f = frame.current
+        if (f) { plateClink(f.localToWorld(SOUND_AT.copy(at))); window.setTimeout(() => plateClink(SOUND_AT), 140) }
+        redraw()
+      }
+    }
+    SINK.dirty = dirty.current
     DRYER.open = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'unloadTake') ? 1 : 0
     SINK.washing = waiters.current.some((x) => x.phase === 'wash') || wash.current !== null || RICE.washing
     // (the plating place's stack of clean plates, the plates in the dryer, and the sticks in the bin: as many drawn as there are)

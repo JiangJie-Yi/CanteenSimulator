@@ -9,7 +9,11 @@
 - A commercial stainless tap behind the basin, its gooseneck spout arching over it to an aerator, a single lever on top (it was a brass
   cross tap with a little bag of white cloth tied over its mouth).
 - On the counter: a draining basket of woven bamboo with three plates standing in it and a bowl upside down; a palm-fibre scrubber
-  (棕櫚たわし) and a bar of soap each on its little dish; a hinoki hand pail with copper hoops at the far end.
+  (棕櫚たわし) on its little dish; behind the basin, either side of the tap (the owner's, 2026-11-10): to its right the bar of soap on its dish
+  (it stood by the basin's right, in the basket's way), to its left a pump bottle of dish soap (green, a white pump) and a two-tone sponge
+  scourer; a hinoki hand pail with copper hoops at the far end.
+- The counter one slab (the owner's, 2026-11-10: four boxes round the basin, overlapping where they met, each inked: black lines along the
+  joins): the basin's opening cut through it with the basin's own round corners, its front edge rounded; the basin's walls on down from it.
 
 The game's frame, its own size in metres (the room's units): y up, 1.55 across (x), 0.85 deep (z: the owner's, deeper than it was), the
 counter's top 0.86 up; its front (the side the washer stands at) toward +z, the middle of its foot at the origin.
@@ -22,7 +26,9 @@ the cap) a set of its own, turned by the game as the water's turned on and off.
 The right of the cabinet is a dish dryer (烘碗機, the owner's: the washed plates are dried in it before they go back to the racks): a stainless
 bezel, a black control strip with three buttons and a lamp (SinkDryerLamp, its own material: the game lights it), a door hinged along its foot
 that drops open (SinkDryerDoor, a set of its own: the game turns it), a stainless frame round dark glass with a bar to pull it by; inside, a
-dark cavity with a wire rack for the plates to stand in. The cloth hangs on a bar on the cabinet's other end now (the dryer's door was behind
+stainless liner (the owner's: its dark cavity lay in the cabinet's planes and the wood showed through it) and a wire basket the plates stand
+in (SinkDryerRack, a set of its own: the game slides it out as the door drops; the marks SinkDryerRack0 and 1 go with it), and a mark
+SinkDryerRing where its progress ring is lit on the panel, SinkDryerSteam where the steam comes out. The cloth hangs on a bar on the cabinet's other end now (the dryer's door was behind
 it), and beside that end stands a bin for the used sticks cleared off the customers' plates (SinkBinSet, a piece of its own).
 
 Nodes the game finds: SinkSpoutTip (where the water comes out), SinkBasinFloor (the middle of the basin's floor: the dirty plates are set
@@ -143,6 +149,14 @@ M = {
     "lamp": pbr("SinkLamp", lin("#3a3a36"), rough=0.3),
     "glass": pbr("SinkGlass", lin("#3a4652"), rough=0.1),
     "cavity": pbr("SinkCavity", lin("#2e3134"), rough=0.6),
+    # (the dryer's liner: bright stainless (the owner's: #d1d5db, metal 0.85, rough 0.25))
+    "inner": pbr("SinkDryerLiner", lin("#d1d5db"), rough=0.25, metal=0.85),
+    # (the dish soap: its bottle a pale see-through green, the soap in it green, the pump white; the sponge's scourer dark green, its sponge yellow)
+    "soapbottle": pbr("SinkSoapBottle", lin("#cfe8cf"), rough=0.2),
+    "soapgreen": pbr("SinkSoapGreen", lin("#3f9a4a"), rough=0.3),
+    "pump": pbr("SinkPump", lin("#f2f2ee"), rough=0.4),
+    "scour": pbr("SinkScour", lin("#2f5a2a"), rough=0.9),
+    "sponge": pbr("SinkSponge", lin("#f2c84a"), rough=0.85),
     "liner": pbr("SinkBinLiner", lin("#1a1a1c"), rough=0.7),
 }
 parts = []
@@ -233,15 +247,49 @@ def empty(name, x, y, z):
 
 # ---------------------------------------------------------------------------------------------------- the counter and its basin
 x0, x1, zb, zf = BASIN
-# (the top round the basin's opening: behind it, in front of it, to its left, and the draining part to its right; the front edge rounded)
-box("SinkTopBack", -W / 2, W / 2, H - TT, H, -D / 2, zb, "terrazzo", bev=0.004)
-box("SinkTopFront", -W / 2, W / 2, H - TT, H, zf, D / 2, "terrazzo", bev=0.012, seg=3)
-box("SinkTopLeft", -W / 2, x0, H - TT, H, zb - 0.001, zf + 0.001, "terrazzo", bev=0.003)
-box("SinkTopRight", x1, W / 2, H - TT, H, zb - 0.001, zf + 0.001, "terrazzo", bev=0.003)
-# (the basin: its walls and floor, seen from inside, its upright corners rounded; a lip round its mouth)
-bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, (BASIN_FLOOR + H - 0.002) / 2, (zb + zf) / 2))
+# (the top: one slab of terrazzo, the basin's opening cut through it, its corners rounded as the basin's are (4 cm round, four steps); its
+# front edge rounded; the opening's walls the slab's own down through its thickness, the basin's on from there (one under the other, none in
+# another's plane))
+bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, H - TT / 2, 0))
+top = active()
+top.scale = (W, D, TT)
+apply_scale(top)
+bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, H - TT / 2, (zb + zf) / 2))
+cut = active()
+cut.scale = (x1 - x0, zf - zb, TT * 3)
+apply_scale(cut)
+bm = bmesh.new()
+bm.from_mesh(cut.data)
+bmesh.ops.bevel(bm, geom=[e for e in bm.edges if abs((e.verts[0].co - e.verts[1].co).normalized().z) > 0.9], offset=0.05, segments=4,
+                affect="EDGES", profile=0.5)
+bm.to_mesh(cut.data)
+bm.free()
+bo = top.modifiers.new("cut", "BOOLEAN")
+bo.operation = "DIFFERENCE"
+bo.object = cut
+bo.solver = "EXACT"
+bpy.context.view_layer.objects.active = top
+bpy.ops.object.modifier_apply(modifier=bo.name)
+bpy.data.objects.remove(cut, do_unlink=True)
+# (every face its one material: the boolean left the slab an empty slot, and the terrazzo, given after it, went unused)
+top.data.materials.clear()
+for p_ in top.data.polygons:
+    p_.material_index = 0
+# (its front edge rounded: the long edge along the front of its top)
+bm = bmesh.new()
+bm.from_mesh(top.data)
+front = [e for e in bm.edges if all(abs(v_.co.y + D / 2) < 1e-4 and abs(v_.co.z - H) < 1e-4 for v_ in e.verts)]
+bmesh.ops.bevel(bm, geom=front, offset=0.012, segments=3, affect="EDGES", profile=0.5)
+bm.to_mesh(top.data)
+bm.free()
+box_uv(top, 0.5)
+finish(top, "SinkTop", M["terrazzo"], smooth_shade=False)
+parts.append(top)
+# (the basin: its walls and floor, seen from inside, its upright corners rounded; its walls up to the slab's underside, where the slab's
+# own cut goes on)
+bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, (BASIN_FLOOR + H - TT) / 2, (zb + zf) / 2))
 bas = active()
-bas.scale = (x1 - x0, zf - zb, H - 0.002 - BASIN_FLOOR)
+bas.scale = (x1 - x0, zf - zb, H - TT - BASIN_FLOOR)
 apply_scale(bas)
 bm = bmesh.new()
 bm.from_mesh(bas.data)
@@ -273,8 +321,9 @@ DY0, DY1 = 0.12, H - TT - 0.045              # from over the foot rail to under 
 ZF = FRONT + 0.006                           # its face
 CAV = (DX0 + 0.025, DX1 - 0.025, DY0 + 0.02, BY - 0.006, ZF - 0.42, ZF - 0.012)   # its cavity: x, y and z from–to
 box("SinkBody", -W / 2 + 0.01, MID, 0.08, BY, BZ0, BZ1, "sugi", tile=0.6)
-box("SinkBodyR", MID, W / 2 - 0.01, 0.08, BY, BZ0, CAV[4], "sugi", tile=0.6)
-box("SinkBodyRFoot", MID, W / 2 - 0.01, 0.08, CAV[2], CAV[4], BZ1, "sugi", tile=0.6)
+# (behind the dryer's liner and under it, each 4 mm clear of it: they lay in the liner's planes and the wood showed through it)
+box("SinkBodyR", MID, W / 2 - 0.01, 0.08, BY, BZ0, CAV[4] - 0.004, "sugi", tile=0.6)
+box("SinkBodyRFoot", MID, W / 2 - 0.01, 0.08, CAV[2] - 0.004, CAV[4] - 0.004, BZ1, "sugi", tile=0.6)
 box("SinkBodyFront", -W / 2 + 0.01, W / 2 - 0.01, BY, H - TT, zf + 0.006, BZ1, "sugi", tile=0.6)
 box("SinkBodyBack", -W / 2 + 0.01, W / 2 - 0.01, BY, H - TT, BZ0, zb - 0.006, "sugi", tile=0.6)
 box("SinkBodyLeft", -W / 2 + 0.01, x0 - 0.006, BY, H - TT, zb - 0.006, zf + 0.006, "sugi", tile=0.6)
@@ -329,12 +378,33 @@ bm.to_mesh(me)
 bm.free()
 o = bpy.data.objects.new("SinkDryerCavity", me)
 bpy.context.collection.objects.link(o)
-o.data.materials.append(M["cavity"])
+o.data.materials.append(M["inner"])
+for p_ in o.data.polygons:
+    p_.use_smooth = False
 parts.append(o)
-# (its rack: two steel rails along the floor the plates stand on, and one at the back they lean against)
-for (ry, rz) in ((cy0 + 0.035, ZF - 0.29), (cy0 + 0.035, ZF - 0.13), (cy0 + 0.2, ZF - 0.36)):
-    tube(f"SinkDryerRail{ry:.2f}{rz:.2f}", [(cx0 + 0.01, ry, rz), (cx1 - 0.01, ry, rz)], 0.004, "steel", res=1, sides=6)
-# (where the first and the last plate stand: on the rails, upright, in a row along it)
+# (its basket, wire: a frame along its floor and one round its rim, uprights at its corners, two rows of tines the plates stand between; it
+# slides out as the door drops (its holder at its front foot). Each wire a thin six-sided rod)
+RX0, RX1, RZ0, RZ1 = cx0 + 0.015, cx1 - 0.015, cz0 + 0.03, cz1 - 0.03
+RY0, RY1 = cy0 + 0.012, cy0 + 0.1
+def wire(name, pts):
+    return tube(name, pts, 0.0028, "steel", res=1, sides=6)
+for k, y_ in enumerate((RY0, RY1)):
+    wire(f"SinkRackWireRing{k}", [(RX0, y_, RZ0), (RX1, y_, RZ0), (RX1, y_, RZ1), (RX0, y_, RZ1), (RX0, y_, RZ0)])
+for k, (xx, zz) in enumerate(((RX0, RZ0), (RX1, RZ0), (RX1, RZ1), (RX0, RZ1))):
+    wire(f"SinkRackWirePost{k}", [(xx, RY0, zz), (xx, RY1, zz)])
+# (the floor's cross wires, and the tines: two rows along it, a plate standing between each pair)
+for k in range(6):
+    xx = RX0 + (RX1 - RX0) * (k + 0.5) / 6
+    wire(f"SinkRackWireCross{k}", [(xx, RY0, RZ0), (xx, RY0, RZ1)])
+TINE_ROWS = (ZF - 0.29, ZF - 0.13)
+NT = 13
+for r_, zz in enumerate(TINE_ROWS):
+    wire(f"SinkRackWireRow{r_}", [(RX0, RY0, zz), (RX1, RY0, zz)])
+    for k in range(NT):
+        xx = RX0 + 0.02 + (RX1 - RX0 - 0.04) * k / (NT - 1)
+        wire(f"SinkRackWireTine{r_}_{k}", [(xx, RY0, zz), (xx, RY0 + 0.075, zz)])
+RACK_AT = ((cx0 + cx1) / 2, cy0, cz1)
+# (where the first and the last plate stand: in the basket, upright, in a row along it (they go with it as it slides))
 empty("SinkDryerRack0", cx0 + 0.09, cy0 + 0.035 + 0.16, ZF - 0.21)
 empty("SinkDryerRack1", cx1 - 0.09, cy0 + 0.035 + 0.16, ZF - 0.21)
 # (the bezel round it: stainless, the control strip across its top black, three buttons and the lamp)
@@ -353,6 +423,9 @@ bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.008, depth=0.006, loca
 o = active()
 finish(o, "SinkDryerLamp", M["lamp"])
 parts.append(o)
+# (where its progress ring is lit, on the panel between the buttons and the lamp; where the steam comes out, at the top of its opening)
+empty("SinkDryerRing", DX1 - 0.16, (PY0 + DY1) / 2, ZF + 0.0056)
+empty("SinkDryerSteam", (cx0 + cx1) / 2, cy1 - 0.02, ZF + 0.03)
 # (its door, hinged along its foot (the set's own place, SinkDryerDoor): a stainless frame round a pane of dark glass, a bar along its top
 # to pull it down by)
 GY0, GY1 = CAV[2] + 0.004, PY0 - 0.004
@@ -512,8 +585,28 @@ bm.free()
 cyl_uv(palm)
 finish(palm, "SinkPalm", M["palm"])
 parts.append(palm)
-cyl("SinkDish1", -0.02, H, H + 0.01, 0.07, 0.045, "dish", seg=20, r1=0.05)
-box("SinkSoap", -0.055, 0.015, H + 0.01, H + 0.035, 0.05, 0.095, "soap", bev=0.008, seg=3)
+# (the soap on its dish, behind the tap to its right, on the strip between the basin and the upstand (the owner's: by the basin's right it was
+# in the basket's way))
+SPZ = (zb + (-D / 2 + 0.04)) / 2
+cyl("SinkDish1", -0.25, H, H + 0.01, SPZ, 0.045, "dish", seg=20, r1=0.05)
+box("SinkSoap", -0.285, -0.215, H + 0.01, H + 0.035, SPZ - 0.0225, SPZ + 0.0225, "soap", bev=0.008, seg=3)
+# (behind the tap to its left: a pump bottle of dish soap, its body a pale see-through green and the soap in it green, a white pump on it,
+# its spout out over the counter; and beside it a sponge scourer, its green scouring side up on its yellow sponge)
+DSX = -0.55
+bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.031, depth=0.13, location=P(DSX, H + 0.068, SPZ))
+o = active()
+cyl_uv(o)
+finish(o, "SinkDetergentBottle", M["soapbottle"])
+parts.append(o)
+cyl("SinkDetergentShoulder", DSX, H + 0.133, H + 0.158, SPZ, 0.031, "soapbottle", seg=16, r1=0.014)
+cyl("SinkDetergentSoap", DSX, H + 0.004, H + 0.1, SPZ, 0.0285, "soapgreen", seg=16)
+cyl("SinkDetergentCollar", DSX, H + 0.158, H + 0.172, SPZ, 0.016, "pump", seg=12)
+cyl("SinkDetergentPump", DSX, H + 0.172, H + 0.2, SPZ, 0.006, "pump", seg=8)
+box("SinkDetergentHead", DSX - 0.016, DSX + 0.016, H + 0.2, H + 0.212, SPZ - 0.012, SPZ + 0.012, "pump", bev=0.003)
+tube("SinkDetergentSpout", [(DSX, H + 0.206, SPZ + 0.01), (DSX, H + 0.206, SPZ + 0.045)], 0.004, "pump", res=1, sides=6)
+SGX = -0.67
+box("SinkSpongeBase", SGX - 0.05, SGX + 0.05, H, H + 0.022, SPZ - 0.035, SPZ + 0.035, "sponge", bev=0.004, seg=2)
+box("SinkSpongeScour", SGX - 0.05, SGX + 0.05, H + 0.022, H + 0.032, SPZ - 0.035, SPZ + 0.035, "scour", bev=0.003, seg=1)
 # (the hinoki hand pail at the far end: staves, two copper hoops, its upright handle board)
 pxp, pzp = 0.64, 0.02
 cyl("SinkPail", pxp, H, H + 0.15, pzp, 0.085, "hinoki", seg=24, r1=0.095)
@@ -553,6 +646,9 @@ bpy.context.collection.objects.link(root)
 SETS = (("SinkBasketSet", ("SinkBasket", "SinkRackPlate", "SinkRackBowl", "SinkRackSlot")),
         ("SinkScrubSet", ("SinkDish0", "SinkPalm")),
         ("SinkSoapSet", ("SinkDish1", "SinkSoap")),
+        ("SinkDetergentSet", ("SinkDetergent",)),
+        ("SinkSpongeSet", ("SinkSponge",)),
+        ("SinkDryerRack", ("SinkRackWire", "SinkDryerRack0", "SinkDryerRack1")),
         ("SinkPailSet", ("SinkPail",)),
         ("SinkTowelSet", ("SinkTowel",)),
         ("SinkBinSet", ("SinkBin",)),
@@ -567,6 +663,7 @@ for set_name, prefixes in SETS:
 # (the handle turns about the tap's own upright; the dryer's door about its hinge along its foot)
 holder["SinkTapHandle"][0].location = P(tx, H + 0.158, tz)
 holder["SinkDryerDoor"][0].location = P(*DOOR_HINGE)
+holder["SinkDryerRack"][0].location = P(*RACK_AT)
 # (the holders' own places taken in before what's in them is hung on them, so nothing moves)
 bpy.context.view_layer.update()
 for o in parts:

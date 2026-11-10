@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { CARRY, DRYER_CAP, DRY_S, STACK_CAP, STACK_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
-  putBack, unload, washNow, washOne, type Dryer } from '@/game/plates'
+  putBack, unload, washNow, washOne, type Dryer, canOpen, dryerPhase, playerLoad, shutStarts } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 
 const idle: Dryer = { n: 0, left: null }
@@ -139,5 +139,28 @@ feature('服務生在廚房裡走去碗盤櫃，繞開擺設', () => {
   scenario('完全被擋住時沒有路', ({ when, then }) => {
     when('一道牆從房間這頭擋到那頭', (w) => { w.p = kitchenPath([0.5, 2], [5.5, 2], room, [{ x0: 2.8, z0: -1, x1: 3.2, z1: 5 }]) })
     then('沒有路', (w) => { expect(w.p).toBeNull() })
+  })
+})
+
+feature('洗碗機：玩家自己操作', () => {
+  scenario('開門把流理台的髒盤子放進去，最多放得下 8 個', ({ given, when, then, and }) => {
+    given('流理台有 12 個髒盤子，洗碗機空的', (w) => { w.d = { n: 0, left: null } as Dryer })
+    when('門打開、點洗碗籃', (w) => { w.k = playerLoad(12, w.d) })
+    then('放進去 8 個', (w) => { expect(w.k).toBe(DRYER_CAP); expect(DRYER_CAP).toBe(8) })
+    and('已經有 5 個時只放得下 3 個', () => { expect(playerLoad(12, { n: 5, left: null })).toBe(3) })
+  })
+
+  scenario('洗碗中不能開門、不能放；裡面是洗好的也不能放', ({ then, and }) => {
+    then('洗碗中', () => { expect(dryerPhase({ n: 6, left: 3 })).toBe('washing'); expect(canOpen({ n: 6, left: 3 })).toBe(false); expect(playerLoad(4, { n: 6, left: 3 })).toBe(0) })
+    and('洗好了：可以開門，但要先拿出來才放新的', () => { expect(dryerPhase({ n: 6, left: 0 })).toBe('clean'); expect(canOpen({ n: 6, left: 0 })).toBe(true); expect(playerLoad(4, { n: 6, left: 0 })).toBe(0) })
+  })
+
+  scenario('關上門就開始洗，約 8 秒洗好', ({ given, when, then, and }) => {
+    given('放了 6 個、還沒開始', (w) => { w.d = { n: 6, left: null } as Dryer })
+    when('關門', (w) => { if (shutStarts(w.d)) w.d = { ...w.d, left: DRY_S } })
+    then('開始洗', (w) => { expect(dryerPhase(w.d)).toBe('washing') })
+    when(`過了 ${DRY_S} 秒`, (w) => { w.d = dryerTick(w.d, DRY_S) })
+    then('洗好了', (w) => { expect(dryerPhase(w.d)).toBe('clean') })
+    and('空的關門不會開始', () => { expect(shutStarts({ n: 0, left: null })).toBe(false) })
   })
 })

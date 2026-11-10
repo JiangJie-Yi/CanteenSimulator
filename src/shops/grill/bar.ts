@@ -620,7 +620,9 @@ export const TILL_CASH: { drawer: DrawerCash; rolls: Rolls; onTake: ((amount: nu
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
 export const PLATE_RACK = { n: RACK_FULL }
 /** the sink (Sink.tsx): its plates being washed (the tap runs); and its tap turned on by hand (the owner's: its handle's to be turned) */
-export const SINK = { washing: false, tap: false }
+/** the sink: someone's washing at it, its tap's on, how many dirty plates are in it (GuestBar3D keeps them; told here for the washer's
+ * label) */
+export const SINK = { washing: false, tap: false, dirty: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */
@@ -730,7 +732,9 @@ export const PLATES_OUT = new Set<number>()
 export const PLATER_OUT: { id: string | null } = { id: null }
 /** the dish dryer in the sink's cabinet (game/plates' Dryer: what's in it, its time left); `open`, its door down (0..1) to load or unload it
  * (Sink.tsx draws it, GuestBar3D runs it) */
-export const DRYER: Dryer & { open: number } = { n: 0, left: null, open: 0 }
+/** the washer under the sink (game/plates): its plates and time left; `open`: a server's at it, its door down; `manual`: the player's let its
+ * door down (Sink); `ask`: the player's asked for the sink's dirty plates to be put in it (GuestBar3D, which keeps the sink's, does it) */
+export const DRYER: Dryer & { open: number; manual: boolean; ask: number } = { n: 0, left: null, open: 0, manual: false, ask: 0 }
 /** the bin by the sink: how many used sticks are in it (cleared off the customers' plates with them; the owner's: thrown away there) */
 export const SINK_BIN = { sticks: 0 }
 /** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */

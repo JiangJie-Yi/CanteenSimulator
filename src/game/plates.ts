@@ -1,8 +1,9 @@
 // The plates: all of them kept on the dish racks (碗盤櫃). The kitchen (the third cook; with none, the second; with neither, the owner) brings
 // a few at a time across to the chef's plating place on the cook table, beside him, and he plates what's grilled there; a server comes into
 // the kitchen to him for each plate ready and carries it to its customer (no pass on the bar between: the owner's), clears the plates
-// they've done with to the sink (the sticks left on them into the bin beside it), and wash them, put them in the dish dryer (烘碗機) and,
-// dried, take them back to the racks (the owner's: the kitchen plates, the floor only carries; one server clears, the other washes).
+// they've done with to the sink (the sticks left on them into the bin beside it), and rinse them, put them in the dish washer under it (洗碗機;
+// a dryer (烘碗機) until 2026-11-10, the owner's) and, washed, take them back to the racks (the owner's: the kitchen plates, the floor only
+// carries; one server clears, the other washes). The player can work the washer by hand too (Sink: its door, its basket).
 
 /** how many plates the racks hold when full (and how many the shop has) */
 export const RACK_FULL = 50
@@ -13,9 +14,10 @@ export const STACK_LOW = 2
 export const CARRY = 5
 /** the dirty plates at the sink are washed once there are this many (or straight away when the racks have run out) */
 export const WASH_AT = 5
-/** the dish dryer: how many plates it takes, and how long a load takes to dry (seconds) */
-export const DRYER_CAP = 10
-export const DRY_S = 30
+/** the dish washer-dryer under the sink: how many plates it takes (the owner's, 2026-11-10: six to eight), and how long a load takes to wash
+ * and dry (seconds: about eight, the owner's; it was a dryer, thirty) */
+export const DRYER_CAP = 8
+export const DRY_S = 8
 
 /** the dish dryer: how many plates are in it, and its time left drying (null: not running, empty or being loaded; 0: done, the plates dry) */
 export type Dryer = { n: number; left: number | null }
@@ -45,6 +47,17 @@ export const unload = (dryer: Dryer) => {
   const n = dryer.n - take
   return { take, dryer: { n, left: n > 0 ? dryer.left : null } as Dryer }
 }
+
+/** what the washer's doing, as it's seen: empty, plates in it waiting, washing, done (the plates clean in it) */
+export type DryerPhase = 'idle' | 'loaded' | 'washing' | 'clean'
+export const dryerPhase = (d: Dryer): DryerPhase => (d.left === null ? (d.n > 0 ? 'loaded' : 'idle') : d.left > 0 ? 'washing' : 'clean')
+/** its door: not to be opened while it washes */
+export const canOpen = (d: Dryer) => dryerPhase(d) !== 'washing'
+/** the player loading it, its door down (the owner's: click to put the sink's dirty plates in its basket): as many of the sink's as there's
+ * room for; none while it washes, nor while it's still got clean ones in it (they come out first) */
+export const playerLoad = (dirty: number, d: Dryer) => (d.left === null ? Math.max(0, Math.min(dirty, DRYER_CAP - d.n)) : 0)
+/** shut by the player with plates in it, not yet started: it starts */
+export const shutStarts = (d: Dryer) => d.left === null && d.n > 0
 
 /** a server's part of the work (the owner's: one clears, the other washes; a lone server does it all) */
 export type Duty = 'floor' | 'dish' | 'all'
