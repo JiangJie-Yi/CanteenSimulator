@@ -703,8 +703,11 @@ const sceneToBar = (along: number, lay: number, y = 0) => new THREE.Vector3().ad
  * more: what's done for a fourth waits by the fire); and where each stands (from the ready place back across the table, the bar's units:
  * a row down the table's end, the plates and what's on them clear of each other), their stack of clean plates behind them */
 export const READY_SLOTS = 3
-export const readyAlong = (k: number) => -0.16 * k
-export const PLATE_STACK_ALONG = (PLATING_SPOT.stackLay - PLATING_SPOT.lay) / 2 // (the bar's sizes: GRILL_SCALE, 2, is set further down)
+// (a plate's width and a little apart (the owner's, 2026-11-11: two plates stood in each other there, 0.32 apart and 0.46 across); the clean
+// stack beside the last of them, toward the chef (there's no room behind it for a fourth plate before the third cook's bay))
+export const readyAlong = (k: number) => -0.235 * k
+export const PLATE_STACK_ALONG = readyAlong(READY_SLOTS - 1)
+export const PLATE_STACK_ACROSS = -0.24
 /**
  * The plating place, in the bar's frame (the frame GuestBar3D walks its servers in): the ready plate's place on the table (`at`, its `top`
  * the table's top), the way its places run (`dir`, unit: back across the table from the front edge) and across it (`across`); where a
