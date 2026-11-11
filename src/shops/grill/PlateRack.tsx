@@ -6,7 +6,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { LOW_RACK, PLATE_COUNT, PLATE_RACK } from './bar'
+import { LOW_RACK, PLATE_COUNT, PLATE_RACK, tipOver } from './bar'
+import { PER_CABINET } from '@/game/tableware'
+import { getEdit } from './edit'
+import { coolerDoorSound } from './restroomSound'
 import { LOW_FULL, RACK_FULL } from '@/game/plates'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
@@ -22,10 +25,11 @@ const CAB = 0.56
  * (PILE_N) are put away in the cupboard under it */
 export const PER_RACK = 100
 const CABINET_URL = import.meta.env.BASE_URL + 'models/platecabinet.glb'
-/** the cupboard under the rack, in the room's toon light, its wood merged with the rack's */
-function CabinetBase() {
+/** the cupboard under the rack, in the room's toon light: its body (merged with the rack's wood), and its two sliding doors and two drawers
+ * taken out of it to be slid (the owner's, 2026-11-11: the bowls kept behind the doors, the chopsticks and spoons in the drawers) */
+function useCabinet() {
   const gltf = useGLTF(CABINET_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => {
+  return useMemo(() => {
     const root = gltf.scene.clone(true)
     const toon = new Map<THREE.Material, THREE.Material>()
     root.traverse((o) => {
@@ -38,9 +42,54 @@ function CabinetBase() {
       m.castShadow = true
       m.receiveShadow = true
     })
-    return root
+    const take = (n: string) => { const o = root.getObjectByName(n)!; o.removeFromParent(); mergeByMaterial(o); return o }
+    return { root, doors: [take('CabDoorSet0'), take('CabDoorSet1')], drawers: [take('CabDrawerSet0'), take('CabDrawerSet1')] }
   }, [gltf])
-  return <primitive object={obj} />
+}
+/** how far each door slides to open (over the other one's half) and each drawer pulls out */
+const DOOR_SLIDE = 0.43, DRAWER_OUT = 0.22
+/** what each door and drawer says pointed at: what's in it, how many, and what a click does */
+const CAB_SAYS = [
+  { title: '碗櫃（左）', what: `飯碗 ${PER_CABINET.riceBowls} 個（4 個一疊，3 疊）` },
+  { title: '碗櫃（右）', what: `湯碗 ${PER_CABINET.soupBowls} 個（4 個一疊，3 疊）` },
+  { title: '抽屜（左）', what: `筷子 ${PER_CABINET.chopsticks} 雙（10 雙一束，3 束）` },
+  { title: '抽屜（右）', what: `湯匙 ${PER_CABINET.spoons} 支（6 支一疊，2 疊）` },
+]
+/** the cupboard's doors and drawers: clicked, a door slides open over the other's half (the other shut: only one half opens at a time), a
+ * drawer pulls out; and again, shut */
+function CabinetFront({ cab, part }: { cab: ReturnType<typeof useCabinet>; part: number }) {
+  const want = useRef([0, 0, 0, 0])
+  const at = useRef([0, 0, 0, 0])
+  // (dev: opened from the console: __cabOpen[part][0..3] = 1)
+  if (import.meta.env.DEV) { const w = window as unknown as { __cabOpen?: number[][] }; (w.__cabOpen ??= [])[part] = want.current }
+  const says = (i: number) => `${CAB_SAYS[i].what}｜點一下${want.current[i] ? '關上' : '打開'}`
+  useFrame((_, dt) => {
+    const k = Math.min(1, Math.min(dt, 0.1) * 6)
+    for (let i = 0; i < 4; i++) at.current[i] += (want.current[i] - at.current[i]) * k
+    cab.doors[0].position.x = DOOR_SLIDE * at.current[0]
+    cab.doors[1].position.x = -DOOR_SLIDE * at.current[1]
+    cab.drawers[0].position.z = DRAWER_OUT * at.current[2]
+    cab.drawers[1].position.z = DRAWER_OUT * at.current[3]
+  })
+  const click = (i: number) => (e: Parameters<NonNullable<ReturnType<typeof tipOver>['onPointerOver']>>[0] & { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    if (getEdit().on) return
+    want.current[i] = want.current[i] ? 0 : 1
+    if (i < 2 && want.current[i]) want.current[1 - i] = 0
+    coolerDoorSound(!!want.current[i], 0.35)
+    tipOver(CAB_SAYS[i].title, says(i)).onPointerOver(e)
+  }
+  return (
+    <>
+      {[...cab.doors, ...cab.drawers].map((o, i) => (
+        <group key={i} onClick={click(i)}
+          onPointerOver={(e) => { if (getEdit().on) return; tipOver(CAB_SAYS[i].title, says(i)).onPointerOver(e) }}
+          onPointerOut={(e) => { if (getEdit().on) return; tipOver(CAB_SAYS[i].title, '').onPointerOut(e) }}>
+          <primitive object={o} />
+        </group>
+      ))}
+    </>
+  )
 }
 useGLTF.preload(CABINET_URL)
 const PLATE_R = 0.17
@@ -159,6 +208,7 @@ function rackSays(part: number) {
   return `這一組 ${mine}/${PER_RACK}・全店 ${PLATE_COUNT.rack}/${RACK_FULL}｜矮架 ${PLATE_COUNT.low}・使用中 ${PLATE_COUNT.out}・水槽 ${PLATE_COUNT.sink}・洗碗機 ${PLATE_COUNT.washer}・瀝水籃 ${PLATE_COUNT.basket}`
 }
 export function PlateRack({ part = 0 }: { part?: number }) {
+  const cab = useCabinet()
   const all = useMemo(() => platesOf(part), [part])
   const [count, setCount] = useState(PLATE_RACK.n)
   useFrame(() => { if (PLATE_RACK.n !== count) setCount(PLATE_RACK.n) })
@@ -181,17 +231,19 @@ export function PlateRack({ part = 0 }: { part?: number }) {
   )
   return (
     <group>
-      {/* (what the editor's pointer finds: the whole rack and its cupboard, unseen; its wood is merged, a few draws, and takes no pointing) */}
-      <mesh position={[0, (H + CAB) / 2, 0.02]} visible={false}
+      {/* (what the editor's pointer finds: the rack over the cupboard, unseen; its wood is merged, a few draws, and takes no pointing; the
+          cupboard's doors and drawers take their own) */}
+      <mesh position={[0, CAB + H / 2, 0.02]} visible={false}
         onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '碗盤架', hint: rackSays(part) }) }}
         onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
-        <boxGeometry args={[W + 0.06, H + CAB, D + 0.08]} />
+        <boxGeometry args={[W + 0.06, H, D + 0.08]} />
       </mesh>
       {/* (where a server stands for a plate, and where it's lifted off) */}
       <group name={`rack-front-${part}`} position={[0, 0, D / 2 + 0.5]} />
       <group name={`rack-top-${part}`} position={[0, CAB + SHELVES[1] + 0.12, 0.04]} />
+      <CabinetFront cab={cab} part={part} />
       <StaticBatch plain>
-      <CabinetBase />
+      <primitive object={cab.root} />
       {/* (the rack itself, up on the cupboard's top) */}
       <group position-y={CAB}>
       {post(-W / 2, -D / 2)}{post(W / 2, -D / 2)}{post(-W / 2, D / 2)}{post(W / 2, D / 2)}

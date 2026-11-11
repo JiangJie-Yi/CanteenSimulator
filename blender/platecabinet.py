@@ -62,6 +62,22 @@ M = {"carcass": pbr("CabCedar", (1, 1, 1), tex=image("cabcedar", wood((0.66, 0.4
      "brass": pbr("CabBrass", lin("#c49a48"), rough=0.35, metal=1.0),
      "lacquer": pbr("CabLacquer", lin("#141010"), rough=0.3),
      "shadow": pbr("CabShadow", lin("#2a1a10"), rough=0.9)}
+# (what's kept in it (the owner's, 2026-11-11): the bowls in the cupboard, white porcelain rice bowls with a blue line round under the rim and
+# lacquered soup bowls, black outside, vermilion in; the chopsticks and the renge spoons in the drawers; and the paper band round each
+# bundle of chopsticks)
+_cu, _cv = grid01(256)
+_k = np.floor(_cu * 20)
+_f = (_cu * 20) % 1
+# (twenty sticks across a bundle: each its own shade of lacquered brown, a dark line between them, rounded across)
+_chop = np.stack([0.42 + 0.06 * np.sin(_k * 2.3), 0.22 + 0.03 * np.sin(_k * 1.7), 0.12 + 0.02 * np.cos(_k * 3.1)], -1)
+_chop = _chop * (0.55 + 0.45 * np.sin(np.clip(_f, 0, 1) * math.pi) ** 0.5)[..., None]
+M.update({
+    "porcelain": pbr("CabPorcelain", lin("#f2efe8"), rough=0.25),
+    "blueline": pbr("CabBlueLine", lin("#2c4f8a"), rough=0.25),
+    "vermilion": pbr("CabVermilion", lin("#9e2a1e"), rough=0.3),
+    "chop": pbr("CabChopsticks", (1, 1, 1), tex=image("cabchop", np.clip(_chop, 0, 1).astype(np.float32)), rough=0.35),
+    "paper": pbr("CabPaper", lin("#f4f0e4"), rough=0.9),
+})
 parts = []
 
 
@@ -159,10 +175,159 @@ for y_ in (y_d0 - 0.008, y_d1 + 0.002):
     beam(f"CabTrack{int(y_ * 1000)}", (x0 + T, x1 - T), (y_, y_ + 0.008), (zf - 0.045, zf - 0.002), M["dark"], bev=0)
 # (and the dark of the inside, seen in the gap between the doors where they overlap)
 beam("CabInside", (x0 + T, x1 - T), (PL + T, y_dr0 - 0.022), (zb + 0.012, zb + 0.016), M["shadow"], bev=0)
+
+
+def lathe(name, prof, mats, seg, at, floor=False, sz=1.0):
+    """a turned surface through the profile's points ((r, y), in order, outside up over the rim and down inside), at `at` (x, y, z of its foot's
+    middle), stretched along z by sz; mats[i] the material of the band from point i to i + 1 (and of the floor, closing its last ring, if
+    floor: cut into a ladder on export). Faces out, away from its axis, on the outside"""
+    bm = bmesh.new()
+    angs = [k * 2 * math.pi / seg for k in range(seg)]
+    rings = [[bm.verts.new(P(at[0] + r * math.cos(a), at[1] + y, at[2] + r * math.sin(a) * sz)) for a in angs] for r, y in prof]
+    keys = []
+    for i in range(len(rings) - 1):
+        for j in range(seg):
+            f = bm.faces.new((rings[i][j], rings[i][(j + 1) % seg], rings[i + 1][(j + 1) % seg], rings[i + 1][j]))
+            f.material_index = mats[i]
+            keys.append(f)
+    fl = None
+    if floor:
+        fl = bm.faces.new(rings[-1])
+        fl.material_index = mats[-1]
+    for f in bm.faces:
+        f.normal_update()
+    # (the first band's outside faces away from the axis: if it doesn't, all of them turned)
+    f0 = keys[0]
+    c = f0.calc_center_median()
+    if f0.normal.dot(Vector((c.x - at[0], c.y + at[2], 0))) < 0:
+        for f in keys:
+            f.normal_flip()
+    if fl is not None:
+        if fl.normal.z < 0:
+            fl.normal_flip()
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    return o
+
+
+def kept(name, objs, mat_keys):
+    """the objects joined into one, their bands' materials (by index into mat_keys) given"""
+    for o in objs:
+        for k in mat_keys:
+            o.data.materials.append(M[k])
+        for f in o.data.polygons:
+            f.use_smooth = True
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    o = bpy.context.view_layer.objects.active
+    o.name = name
+    parts.append(o)
+    return o
+
+
+# (the cupboard's bowls: twelve rice bowls in three stacks of four behind the left door, twelve soup bowls the same behind the right, each
+# stack nested: the lowest whole outside, only the rim of each above it showing over the one below, the top one's inside)
+FLOOR_Y = PL + T
+RICE = {"foot": [(0.030, 0.0), (0.032, 0.008), (0.040, 0.010), (0.058, 0.030)], "band_from": (0.0611, 0.040),
+        "rim": [(0.066, 0.054), (0.068, 0.062), (0.064, 0.062)], "inside": [(0.054, 0.035), (0.035, 0.017)], "pitch": 0.022}
+SOUP = {"foot": [(0.032, 0.0), (0.033, 0.012), (0.042, 0.016), (0.057, 0.040)], "band_from": (0.0577, 0.044),
+        "rim": [(0.062, 0.070), (0.059, 0.070)], "inside": [(0.052, 0.042), (0.036, 0.022)], "pitch": 0.026}
+STACK, BOWL_SEG = 4, 12
+
+
+def stack(kind, x, z, outer, line, inner, tag):
+    objs = []
+    rim_m = [line, outer] if kind is RICE else [inner]
+    for k in range(STACK):
+        y0 = FLOOR_Y + k * kind["pitch"]
+        top = k == STACK - 1
+        if k == 0:
+            prof, mats = kind["foot"] + kind["rim"], [outer] * len(kind["foot"]) + rim_m
+        else:
+            prof, mats = [kind["band_from"]] + kind["rim"], [outer] + rim_m
+        if top:
+            prof, mats = prof + kind["inside"], mats + [inner] * len(kind["inside"]) + [inner]
+        objs.append(lathe(f"{tag}{k}", prof, mats, BOWL_SEG, (x, y0, z), floor=top))
+    return objs
+
+
+bowls = []
+for x_ in (-0.37, -0.225, -0.08):
+    bowls += stack(RICE, x_, -0.02, 0, 1, 0, f"CabRice{x_:.2f}_")
+for x_ in (0.08, 0.225, 0.37):
+    bowls += stack(SOUP, x_, -0.02, 2, 3, 3, f"CabSoup{x_:.2f}_")
+kept("CabBowls", bowls, ["porcelain", "blueline", "lacquer", "vermilion"])
+
+# (the drawers' boxes behind their fronts, to be pulled out: their sides, back and bottom of the lighter cedar; in the left one three bundles
+# of ten pairs of chopsticks, a paper band round each; in the right one twelve renge spoons in two stacks of six)
+DRAWERS = (((x0 + T + 0.004, -0.004)), ((0.004, x1 - T - 0.004)))
+DZ0, DZ1 = -0.21, zf - 0.0285
+DY0, DY1 = y_dr0 + 0.01, y_dr0 + 0.095
+drawer_parts = {0: [], 1: []}
+for k, (a, b) in enumerate(DRAWERS):
+    for nm, xx, yy, zz in ((f"CabDrawerSideA{k}", (a + 0.006, a + 0.016), (DY0, DY1), (DZ0, DZ1)),
+                           (f"CabDrawerSideB{k}", (b - 0.016, b - 0.006), (DY0, DY1), (DZ0, DZ1)),
+                           (f"CabDrawerBack{k}", (a + 0.016, b - 0.016), (DY0, DY1), (DZ0, DZ0 + 0.01)),
+                           (f"CabDrawerFloor{k}", (a + 0.016, b - 0.016), (DY0, DY0 + 0.008), (DZ0 + 0.01, DZ1))):
+        drawer_parts[k].append(beam(nm, xx, yy, zz, M["carcass"], bev=0.0015))
+IN_Y = DY0 + 0.008
+# (the chopsticks: each bundle a slab, its sticks drawn across it; its paper band round its middle, standing a little proud of it)
+a, b = DRAWERS[0]
+for i in range(3):
+    cx = a + 0.075 + i * 0.13
+    drawer_parts[0].append(beam(f"CabChops{i}", (cx - 0.03, cx + 0.03), (IN_Y, IN_Y + 0.009), (-0.12, 0.13), M["chop"], fit=True, bev=0))
+    drawer_parts[0].append(beam(f"CabChopBand{i}", (cx - 0.032, cx + 0.032), (IN_Y - 0.0005, IN_Y + 0.0105), (-0.012, 0.022), M["paper"], bev=0))
+# (the renge: a little oval bowl turned, stretched long, a flat handle rising from its back end; nested six to a stack, the lowest whole
+# outside, only the rim of each above it, the top one's inside)
+REN_FOOT = [(0.006, 0.0), (0.018, 0.003), (0.026, 0.010)]
+REN_RIM = [(0.027, 0.014), (0.024, 0.014)]
+REN_IN = [(0.017, 0.007), (0.007, 0.004)]
+a, b = DRAWERS[1]
+spoons = []
+for i in range(2):
+    cx = a + 0.13 + i * 0.2
+    for k in range(6):
+        y0 = IN_Y + k * 0.006
+        top = k == 5
+        prof = (REN_FOOT if k == 0 else [REN_FOOT[-1]]) + REN_RIM + (REN_IN if top else [])
+        spoons.append(lathe(f"CabRenge{i}_{k}", prof, [0] * len(prof), 10, (cx, y0, 0.02), floor=top, sz=1.45))
+        # (its handle: a flat tapering slab out from its back end, rising)
+        bm = bmesh.new()
+        pts = [(-0.008, 0.010, -0.034), (0.008, 0.010, -0.034), (-0.008, 0.015, -0.034), (0.008, 0.015, -0.034),
+               (-0.005, 0.027, -0.092), (0.005, 0.027, -0.092), (-0.005, 0.031, -0.092), (0.005, 0.031, -0.092)]
+        bmesh.ops.convex_hull(bm, input=[bm.verts.new(P(cx + px, y0 + py, 0.02 + pz)) for px, py, pz in pts])
+        me = bpy.data.meshes.new(f"CabRengeHandle{i}_{k}")
+        bm.to_mesh(me)
+        bm.free()
+        h = bpy.data.objects.new(me.name, me)
+        bpy.context.collection.objects.link(h)
+        spoons.append(h)
+drawer_parts[1].append(kept("CabRenge", spoons, ["porcelain"]))
 root = bpy.data.objects.new("PlateCabinet", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
     o.parent = root
+# (what moves, each a set of its own the game slides: each drawer with its box and what's in it; each door with its frame, panel and pull)
+for k in (0, 1):
+    e = bpy.data.objects.new(f"CabDrawerSet{k}", None)
+    bpy.context.collection.objects.link(e)
+    e.parent = root
+    for o in parts:
+        if o.name in (f"CabDrawer{k}", f"CabDrawerPull{k}") or o in drawer_parts[k]:
+            o.parent = e
+    e2 = bpy.data.objects.new(f"CabDoorSet{k}", None)
+    bpy.context.collection.objects.link(e2)
+    e2.parent = root
+    for o in parts:
+        if o.name.startswith(("CabDoorStile", "CabDoorRail", "CabDoorPanel", "CabPullRim", "CabPullWell")) and o.name.endswith(str(k)):
+            o.parent = e2
+    parts += [e, e2]
 
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
@@ -179,4 +344,4 @@ if PREVIEW:
         lt.rotation_euler = (P(0, 0.3, 0) - loc).to_track_quat("-Z", "Y").to_euler()
     w = bpy.data.worlds.new("W"); w.color = (0.35, 0.35, 0.37); bpy.context.scene.world = w
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "platecabinet.glb"), os.path.join(PROJECT, "blender", "platecabinet.blend"), PREVIEW)
-print("CABINET_DONE", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))
+print("CABINET_DONE", sum(len(p.vertices) - 2 for o in parts if o.type == "MESH" for p in o.data.polygons))
