@@ -182,6 +182,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-11', ['shrinecups', 'oranges', 'oranges2']],
   // (the cups' stand where the owner set it by hand, 5.5 cm along and 6.6 cm in (2026-11-11))
   ['jgs-edit-relaid-12', ['shrinecups']],
+  // (the speaker 5 cm along its width as the owner set it (2026-11-12))
+  ['jgs-edit-relaid-13', ['speaker']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -268,7 +270,8 @@ export const BASES: Record<string, V3> = {
   // (moved by the owner X -0.465, Z -0.367 (its object frame was the world's then), made so)
   willow: [0.2534 - 0.465, 0, 0.0272 - 0.367],
   // (the speaker set at X -0.285 Y 0.518 Z 0.169, in the room's frame: back in its corner (the owner's); the red lantern raised 0.25)
-  speaker: [0.3044, 0.518, 0.1309],
+  // (then on 0.05 along its own width, as the owner set it (2026-11-12): [0.0039, 0, -0.0247] in this parent's units)
+  speaker: [0.3083, 0.518, 0.1062],
   chochin: [0, 0.25, 0],
   chochin2: [0, 0.25, 0],
   sake: [0.084, 0, 0.118],
