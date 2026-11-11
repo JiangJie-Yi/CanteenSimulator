@@ -30,8 +30,9 @@ PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(_
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-STAND_W, STAND_D, STAND_H = 0.5, 0.32, 0.42
-TOP_R = 0.31
+# (lower, and a little wider round, the warming tub in its middle and the bags round its front (the owner's, 2026-11-11): 0.42 high, 0.31)
+STAND_W, STAND_D, STAND_H = 0.5, 0.32, 0.34
+TOP_R = 0.36
 BAG_W, BAG_D, BAG_H = 0.15, 0.09, 0.15
 
 
@@ -205,7 +206,7 @@ def leg(name, foot, head, w0, w1):
 
 s = [top_disc()]
 # (four legs under the apron's corners, splayed out a touch toward their feet, their caps)
-LA, LF = 0.17, 0.2      # (each leg's head in from the middle, its foot out)
+LA, LF = 0.2, 0.23      # (each leg's head in from the middle, its foot out)
 APR = h - TT - 0.06
 heads = []
 for k, (sx, sz) in enumerate(((-1, -1), (1, -1), (1, 1), (-1, 1))):
@@ -223,9 +224,9 @@ for k in range(4):
     else:
         s.append(box(f"apron{k}", cx - 0.009, cx + 0.009, APR, h - TT, min(a[2], b[2]) + 0.018, max(a[2], b[2]) - 0.018, "walnut", bev=0.002))
 # (two stretchers crossed low between opposite legs, halved where they cross)
-ys = 0.11
+ys = 0.09
 for k, (sx, sz) in enumerate(((1, 1), (1, -1))):
-    r_ = 0.19 * 0.7071
+    r_ = 0.22 * 0.7071
     s.append(tube(f"stretch{k}", [(-sx * r_, ys + k * 0.012, -sz * r_), (sx * r_, ys + k * 0.012, sz * r_)], 0.011, "walnut", sides=4))
 stand = join(s, "TakeoutStand")
 

@@ -5222,8 +5222,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <group position={[STAND_AT.x, 0, STAND_AT.z]} rotation-y={STAND_AT.yaw}>
             <TakeoutStandModel />
             <group ref={standTop} name="takeout-stand-top" position-y={STAND_TOP} userData={{ marker: true }} />
-            {STAND_SLOTS.map(([x, z], k) => (
-              <group key={k} ref={(o) => { standBags.current[k] = o }} position={[x, STAND_TOP, z]} visible={false}><KraftBag /></group>
+            {STAND_SLOTS.map(([x, z, a], k) => (
+              <group key={k} ref={(o) => { standBags.current[k] = o }} position={[x, STAND_TOP, z]} rotation-y={a} visible={false}><KraftBag /></group>
             ))}
             {/* (the old rice tub on its back half, as the warming tub (the owner's, 2026-11-11)) */}
             <group position={[0, STAND_TOP, WARM_TUB_Z]}><WarmTub /></group>
@@ -5369,13 +5369,15 @@ const TakeoutStandModel = memo(function TakeoutStandModel() {
   return <group {...nameOver('外帶桌', '外帶的牛皮紙袋放這裡，收銀員轉身拿給客人')}><primitive object={stand} /></group>
 })
 /** the stand's top's height (blender/takeout.py's STAND_H), and its bags' places along it */
-const STAND_TOP = 0.42
+const STAND_TOP = 0.34
 /** where the bags stand on the round table (its top's radius 0.31, blender/takeout.py's TOP_R): along its front half, side by side (x, z) */
-const STAND_SLOTS: [number, number][] = [[-0.155, 0.14], [0, 0.14], [0.155, 0.14]]
+// (round the warming tub's front, each turned to face out (the owner's, 2026-11-11: the tub in the table's middle): x, z, and its turn)
+const STAND_SLOTS: [number, number, number][] = [-0.75, 0, 0.75].map((a) => [Math.sin(a) * 0.29, Math.cos(a) * 0.29, a])
 /** the warming tub on its back half: its middle back from the table's, and how big it's drawn (the rice tub's model (blender/ricetub.py, 0.27
  * round its staves, 0.42 high) a little under half its size: some 25 across, beside the bags, on a table 62 across) */
 // (1.65 times what it was drawn (the owner's, 2026-11-11): some 39 across; forward a little to stay on the table, the bags clear of it)
-const WARM_TUB_Z = -0.11, WARM_TUB_SCALE = 0.44 * 1.65
+// (then 1.1 times again, in the table's middle (the owner's): some 43 across)
+const WARM_TUB_Z = 0, WARM_TUB_SCALE = 0.44 * 1.65 * 1.1
 /** the warming tub (保溫桶; the owner's, 2026-11-11: the old rice tub, put on the takeaway table): the sawara tub bound in copper, its lid on */
 // (opened by a click as the rice tub was: its lid lifted off and leant against its side, the rice kept warm in it seen; another, shut)
 const WarmTub = memo(function WarmTub() {
