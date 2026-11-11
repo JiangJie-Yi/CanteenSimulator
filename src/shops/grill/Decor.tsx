@@ -1145,7 +1145,7 @@ function Warmer() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, WARMER_AT.along).addScaledVector(LAY, WARMER_AT.lay)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '味噌湯放在加熱座上保溫（只有湯需要加熱）')}>
+    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '味噌湯在加熱座上保溫；白飯從電鍋取，在砧板上捏飯糰')}>
       <primitive object={model} />
     </group>
   )
@@ -1182,7 +1182,7 @@ function PrepCounter() {
       m.castShadow = /Sugi|Terrazzo|Kick/.test(src.name)
       m.receiveShadow = true
     })
-    inkModel(r, (m) => m.name !== 'PrepBody', { width: 0.0016, weld: true })
+    // (no ink: only the counter's body had it, and that's the warmer's model now)
     plainColours(r)
     mergeByMaterial(r)
     return r
@@ -1190,7 +1190,7 @@ function PrepCounter() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, PREP_AT.along).addScaledVector(LAY, PREP_AT.lay)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '包飯糰的地方：白飯從電鍋取，在這裡捏')}>
+    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '味噌湯在加熱座上保溫；白飯從電鍋取，在砧板上捏飯糰')}>
       <primitive object={model} />
     </group>
   )

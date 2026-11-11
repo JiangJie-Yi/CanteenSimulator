@@ -959,7 +959,8 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 // (the rice balls' rice: the electric cooker, on the rice-ball counter (the rice tub's out of use))
 const STORE_PIECE: Record<Exclude<Store, 'cubby'>, string> = { freezer: 'freezer', ricetub: 'denkinabe', sacks: 'produce' }
 /** the counter a store stands on, if any (he stands before its front) */
-const STORE_COUNTER: Partial<Record<Store, string>> = { ricetub: 'prepcounter' }
+// (the warmer's: the two counters are one, its body all the warmer's model (blender/warmer.py), the rice-ball counter's only what's on it)
+const STORE_COUNTER: Partial<Record<Store, string>> = { ricetub: 'warmer' }
 /**
  * Where the chef stands to take something out of a store (Roasting's frame): before the fridge under the cook table on the left, its
  * doors' swing clear; else just off the side of the store (as it stands, wherever it's been moved) nearest his place, facing it.

@@ -38,6 +38,10 @@ KICK = 0.1               # the black kick under the cabinet, set back
 # its well in its middle (kept where it stood, it came 2 cm from the counter's end: the owner's, moved off its place)
 WARMER_L, PREP_L = 1.4, 3.0
 WELL_X, WELL_R = 0.0, 0.4
+# (one counter, the two of them joined (the owner's, 2026-11-11: they're one): its body all in warmer.glb, from the warmer's left end to the
+# rice-ball counter's right, one top across both; the rice-ball counter's origin PREP_DX along it from the warmer's (Decor's PREP_AT), its
+# model only what stands on it)
+PREP_DX = WARMER_L / 2 + 0.02 + 0.002 + 0.02 + PREP_L / 2
 # (to the right: the cooker stands at its left end now, by the miso pot (the owner's, 2026-11-11))
 BOARD_X = 0.35
 
@@ -177,11 +181,11 @@ def join(objs, name):
     return o
 
 
-def counter(L, pre, doors):
+def counter(L, pre, doors, cx=0.0):
     """the counter's body: the black kick set back, the sugi cabinet with its doors' panels proud of it and a brass pull on each, the
     terrazzo top a little proud all round (no upstand along its back: the owner's, 2026-11-11, taken away)"""
     k = "" if pre == "Warmer" else "p_"
-    x0, x1, z0, z1 = -L / 2, L / 2, -D / 2, D / 2
+    x0, x1, z0, z1 = cx - L / 2, cx + L / 2, -D / 2, D / 2
     front = z1 - 0.04
     o = [
         box("kick", x0 + 0.04, x1 - 0.04, 0, KICK, z0 + 0.02, front - 0.06, k + "kick"),
@@ -230,7 +234,8 @@ def clear():
 
 
 # ---------------------------------------------------------------------------------------------------- the soup counter
-body = counter(WARMER_L, "Warmer", 2)
+JOINED_L = PREP_DX + PREP_L / 2 + WARMER_L / 2
+body = counter(JOINED_L, "Warmer", 6, cx=-WARMER_L / 2 + JOINED_L / 2)
 wells = [disc("well", WELL_X, H + 0.002, 0.02, WELL_R, 0.006, "well", segs=24),
          disc("glow", WELL_X, H + 0.005, 0.02, WELL_R * 0.8, 0.002, "glow", segs=24)]
 warmer_wells = join(wells, "WarmerWells")
@@ -259,7 +264,6 @@ export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "war
 for o in list(bpy.data.objects):
     bpy.data.objects.remove(o, do_unlink=True)
 parts = []
-body = counter(PREP_L, "Prep", 3)
 set_ = []
 # (the hinoki board, its rice balls on it: rounded triangles stood up, a band of nori round each one's foot)
 set_.append(box("board", BOARD_X - 0.36, BOARD_X + 0.36, H, H + 0.035, -0.2, 0.22, "hinoki", bev=0.008))
@@ -289,7 +293,7 @@ set_.append(box("noribox", BOARD_X + 0.5, BOARD_X + 0.78, H, H + 0.06, -0.22, 0.
 set_.append(box("norisheets", BOARD_X + 0.52, BOARD_X + 0.76, H + 0.06, H + 0.066, -0.2, -0.02, "nori"))
 set_.append(disc("salt", BOARD_X + 0.62, H + 0.04, 0.12, 0.045, 0.08, "salt", segs=12, r1=0.038))
 prep_set = join(set_, "PrepSet")
-root = root_of("PrepCounter", [body, prep_set])
+root = root_of("PrepCounter", [prep_set])
 if PREVIEW:
     preview_cam()
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "prepcounter.glb"), os.path.join(PROJECT, "blender", "prepcounter.blend"),
