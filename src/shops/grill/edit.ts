@@ -64,7 +64,8 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge'] },
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
   // (the rice sacks in the kitchen's corner, and the old rice tub and stove set aside by them)
-  'grp-ricecorner': { zh: '米袋與舊飯桶', ja: '米袋と飯桶', members: ['ricesacks', 'ricetub', 'hagama'] },
+  // (the old rice tub gone from it: it's the warming tub on the takeaway table now)
+  'grp-ricecorner': { zh: '米袋與舊飯桶', ja: '米袋と飯桶', members: ['ricesacks', 'hagama'] },
   'grp-wc-m': { zh: '男廁組', ja: '男子トイレ一式', members: ['wc2-m-noren', 'wc2-m-basin', 'wc2-m-moss', 'wc2-m-dryer', 'wc2-m-towelbox', 'wc2-m-duck', 'wc2-m-lamp', 'wc2-m-toilet', 'wc2-m-remote3', 'wc2-m-paper', 'wc2-m-brush', 'wc2-m-lamp2', 'wc-m-slippers'] },
   'grp-wc-f': { zh: '女廁組', ja: '女子トイレ一式', members: ['wc2-f-noren', 'wc2-f-basin', 'wc2-f-vase', 'wc2-f-dryer', 'wc2-f-towelbox', 'wc2-f-duck', 'wc2-f-lamp', 'wc2-f-toilet', 'wc2-f-remote3', 'wc2-f-oto', 'wc2-f-brush', 'wc2-f-paper', 'wc2-f-bin', 'wc2-f-pads', 'wc2-f-lamp2', 'wc-f-slippers'] },
 }
@@ -85,6 +86,20 @@ const loadGroups = (): Record<string, Group> => {
   let g: Record<string, Group> = {}
   try { g = JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { /* storage blocked */ }
   for (const [k, x] of Object.entries(g)) if (x.members.some(RETIRED)) g[k] = { ...x, members: x.members.filter((m) => !RETIRED(m)) }
+  // (the views' areas planned again from where everything is now, once (the owner's, 2026-11-12: after the pieces were moved about): the old
+  // areas broken up (their pieces and groups loose again, nothing else changed) and what they'd been made with forgotten, so the next time edit
+  // mode opens each view's area is made afresh (groupByViews))
+  try {
+    // (the keys by name: this runs as the module loads, before KEY_AK's line below)
+    if (!localStorage.getItem('jgs-edit-areas-replan-1')) {
+      for (const k of Object.keys(g)) if (k.startsWith('grp-view-')) delete g[k]
+      localStorage.removeItem('jgs-edit-area-known-1')
+      localStorage.setItem('jgs-edit-areas-replan-1', '1')
+      localStorage.setItem(KEY_G, JSON.stringify(g))
+    }
+  } catch { /* storage blocked */ }
+  // (the old rice tub's id left in a kept group: it's gone)
+  for (const [k, x] of Object.entries(g)) if (x.members.includes('ricetub')) g[k] = { ...x, members: x.members.filter((m) => m !== 'ricetub') }
   for (const [id, d] of Object.entries(DEFAULT_GROUPS)) {
     // (not when the owner has already put any of its pieces in a group of their own, or broken it up; a view's area holding them gives them up
     // to it, and holds it in their place)
@@ -636,7 +651,7 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
  * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
  * out of it, and nearer what the till's or the shrine's camera looks at */
 const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan',
-  koban: 'genkan', bench: 'genkan', takeoutstand: 'till', lowrack: 'back',
+  koban: 'genkan', bench: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', coalsack: 'back',
   // (the kitchen's back: the rice station between the cook table and the till was nearer the till's camera; the rice corner and the sake
   // barrel by it in no view's sight at all)
   'grp-ricestation': 'back', 'grp-sink': 'back', 'grp-racks': 'back', 'grp-ricecorner': 'back', sake: 'back', freezer: 'back',
