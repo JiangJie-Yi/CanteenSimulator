@@ -5017,8 +5017,6 @@ const FRIDGE_LED = (() => {
 })()
 /** each shelf's lip (the owner's: no price tags, a convenience store's): brushed steel, and in its middle a small black plaque edged in gold
  * naming what the shelf keeps (a quarter of the picture to a shelf, the lowest at the top) */
-// (as bar.ts's FRIDGE_UNITS fills each shelf, the lowest first)
-const SHELF_NAMES = [['お茶・スポーツ', '炭酸', '牛乳・珈琲・紙パック', '乳酸菌飲料'], ['瓶ビール・黒ビール', '日本酒・梅酒', '韓国焼酎', '缶ビール・ハイボール・酎ハイ']]
 const fridgeTagTex = (n: number) => {
   const t = canvasTex(1024, 256, (g) => {
     for (let k = 0; k < 4; k++) {
@@ -5028,16 +5026,25 @@ const fridgeTagTex = (n: number) => {
       g.fillStyle = st; g.fillRect(0, y0, 1024, 64)
       g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1
       for (let y = y0 + 3; y < y0 + 62; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(1024, y + 0.5); g.stroke() }
-      // (the plaque, before the left door (the doors meet in the middle, their handles over it): black lacquer, a gold line round it, the name in gold)
-      const name = SHELF_NAMES[n]?.[k] ?? ''
-      // (a long name set smaller, the plaque kept clear of the doors' stiles (缶ビール・ハイボール・酎ハイ ran on behind the middle one))
-      g.font = '700 32px "Noto Serif JP", "Yu Mincho", serif'
-      const size = Math.min(32, (32 * 330) / Math.max(1, g.measureText(name).width))
-      g.font = `700 ${size}px "Noto Serif JP", "Yu Mincho", serif`
-      const w = Math.max(120, g.measureText(name).width + 44), x0 = 256 - w / 2
-      g.fillStyle = '#151210'; g.fillRect(x0, y0 + 9, w, 46)
-      g.strokeStyle = '#c9a24a'; g.lineWidth = 1.5; g.strokeRect(x0 + 4, y0 + 13, w - 8, 38)
-      g.fillStyle = '#e2c06a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, 256, y0 + 33)
+      // (under each place, the name of what's kept there on a small white card, as clear as can be read through the glass (the owner's,
+      // 2026-11-11: the names marked clearly; no prices, the owner's before), a strip of the drink's own colour along its top; the shelf's
+      // name on a plaque in the middle before it is gone: the cards say it all). The strip's picture runs the lip's length, 0.742 (blender/
+      // drinkfridge.py: inside the baffles), its middle the shelf's
+      const shelf = FRIDGE_UNITS[n]?.shelves[k]
+      if (!shelf) continue
+      const lay = shelfLayout(n, k)
+      shelf.ids.forEach((id, j) => {
+        const d = DRINKS.find((x) => x.id === id)
+        const cx = (lay.xs[j] / 0.742 + 0.5) * 1024, w = Math.max(30, (shelfSize(id)[0] + lay.gap * 0.7) / 0.742 * 1024 - 4)
+        g.fillStyle = '#fbf8f0'; g.fillRect(cx - w / 2, y0 + 8, w, 48)
+        g.fillStyle = d?.label[0] ?? '#888'; g.fillRect(cx - w / 2, y0 + 8, w, 7)
+        g.strokeStyle = '#3a3530'; g.lineWidth = 1.2; g.strokeRect(cx - w / 2 + 0.5, y0 + 8.5, w - 1, 47)
+        const name = drinkName(id)
+        g.font = '700 26px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif'
+        const size = Math.max(12, Math.min(26, (26 * (w - 8)) / Math.max(1, g.measureText(name).width)))
+        g.font = `700 ${size}px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif`
+        g.fillStyle = '#1d1a16'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, cx, y0 + 36)
+      })
     }
   })
   if (t) t.flipY = false
@@ -5425,7 +5432,11 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     return () => glowOff(g)
   }, [lifted])
   const shelves = FRIDGE_UNITS[n].shelves
-  const slotAt = (r: number, k: number) => new THREE.Vector3(shelfLayout(n, r).xs[k], shelves[r].y, 0.16)
+  const slotAt = (r: number, k: number) => new THREE.Vector3(shelfLayout(n, r).xs[k], shelves[r].y + riseAt(0.16), 0.16)
+  // (each place's drinks sliding down into the place of the one taken from its front: how many fewer, since when; and how many it held)
+  const slides = useRef(new Map<string, { from: number; count: number }>())
+  const had = useRef(new Map<string, number>())
+  const [, setSliding] = useState(0)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   // (what the shelves' batch was made with: each place's drink, an empty one as the drink that's its own (its home), so a place emptied and
   // filled again (a customer's drink taken, the stocker's carried out) is only hidden and shown in the batch; only a place holding another
@@ -5440,16 +5451,22 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       setVer((v) => v + 1)
       if (FRIDGE_STOCK.units[n].some((row, r) => row.some((id, k) => id !== null && id !== baked[r]?.[k]))) setBaked(bakedShelves(n))
     }
-    // (each place's bottles shown or hidden in the batch as the stock is now: as many as stand in it, from its back wall forward, the front
-    // one taken first and the ones behind it left where they stand (the owner's, 2026-11-10: taking one took the ones behind it too); the
-    // front one of those hidden while it's pointed at or carried, drawn on its own then)
+    // (each place's bottles shown or hidden in the batch as the stock is now: as many as stand in it, from the front back, the shelf sloping
+    // down to the front (the owner's, 2026-11-11: as a convenience store's; before, they stood from the back wall forward and the front one
+    // taken left a gap); the front one hidden while it's pointed at or carried, drawn on its own then; and a place whose drinks are sliding
+    // down, all of it hidden, drawn on its own (SlideRun) till they're down)
+    FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {
+      const key = `${r}-${k}`, c = id ? FRIDGE_STOCK.counts[n][r][k] : 0, before = had.current.get(key)
+      had.current.set(key, c)
+      if (before !== undefined && c > 0 && c < before && id === baked[r]?.[k]) { slides.current.set(key, { from: before - c, count: c }); setSliding((v) => v + 1) }
+    }))
     const api = batch.current
-    const now = `${FRIDGE_STOCK.ver}|${lifted}|${raised}`
+    const now = `${FRIDGE_STOCK.ver}|${lifted}|${raised}|${[...slides.current.keys()].join(',')}`
     if (api && (shown.current.now !== now || shown.current.api !== api)) {
       shown.current = { now, api }
       FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {
-        const deep = depthOf(baked[r]?.[k]), first = deep - (id ? FRIDGE_STOCK.counts[n][r][k] : 0), key = `${r}-${k}`
-        for (let j = 0; j < deep; j++) api.show(`p${r}-${k}-${j}`, j >= first && !(j === first && (lifted === key || raised === key)))
+        const deep = depthOf(baked[r]?.[k]), count = id ? FRIDGE_STOCK.counts[n][r][k] : 0, key = `${r}-${k}`, sliding = slides.current.has(key)
+        for (let j = 0; j < deep; j++) api.show(`p${r}-${k}-${j}`, !sliding && j < count && !(j === 0 && (lifted === key || raised === key)))
       }))
     }
     // (what's out: on the floor before the fridge, or set down on a table, upright, where it was put)
@@ -5740,15 +5757,17 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // (laid in from the back wall forward: the glass and the drinks in it are see-through, drawn in the order they're merged, so the ones
     // behind first and those in front over them (the owner's, 2026-11-10: the front ones first, the ones behind showed over them, their
     // shoulders out of place through the front ones'))
+    // (each up the slope as far back as it stands, leaning back with the shelf; those behind the front one a little plainer: through the glass
+    // and the front one only their shoulders and labels show (the owner's: the ranks behind as light to draw as they can be))
     const deep = depthOf(id)
     return Array.from({ length: deep }, (_, i) => deep - 1 - i).map((j) => (
-      <group key={`p${r}-${k}-${j}`} position={[sp.x, sp.y, sp.z - step * j]} userData={{ batchPart: `p${r}-${k}-${j}` }}>
-        <DrinkBottleLite id={id} />
+      <group key={`p${r}-${k}-${j}`} position={[sp.x, shelves[r].y + riseAt(sp.z - step * j), sp.z - step * j]} rotation-x={SHELF_TILT} userData={{ batchPart: `p${r}-${k}-${j}` }}>
+        <DrinkBottleLite id={id} back={j > 0} />
       </group>
     ))
   })), [baked, n])
-  /** how far back in its place its front one stands now (those in front of it taken) */
-  const backOf = (r: number, k: number, id: DrinkId) => rankStep(id) * Math.max(0, depthOf(id) - FRIDGE_STOCK.counts[n][r][k])
+  /** how far back in its place its front one stands now: none, those behind slide down to the front (the shelf slopes) */
+  const backOf = (_r: number, _k: number, _id: DrinkId) => 0
   return (
     <group ref={root}>
       {FRIDGE_STOCK.units[n].map((row, r) => row.map((id, k) => id && (
@@ -5761,7 +5780,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           {/* (pointed at, or carried: the very bottle on the shelf (the shelf's own, not a finer one: the owner's, 2026-11-10: it changed under
               the pointer), lit as anything pointed at is, where it stands in its place) */}
           {/* (drawn after the shelves' batch (its group's order): see-through as it is, the bottles behind it under it, not over it) */}
-          <group renderOrder={1}>
+          <group renderOrder={1} rotation-x={SHELF_TILT}>
             {lifted === `${r}-${k}` ? <DrinkBottleLite id={id} /> : raised === `${r}-${k}` && (
               <HoverLit active={hover === `${r}-${k}`} onDone={() => setRaised((x) => (x === `${r}-${k}` ? null : x))}>
                 <group position-z={-backOf(r, k, id)}><DrinkBottleLite id={id} /></group>
@@ -5774,12 +5793,50 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           one batch, each place's front bottle and ranks a part of it, hidden while the place is empty (and the front one while it's carried);
           a hair of play in each so the rows aren't ruled) */}
       <StaticBatch key={`ranks${n}|${bakedKey}`} parts={batch}>{ranks}</StaticBatch>
+      {[...slides.current].map(([key, sl]) => {
+        const [r, k] = key.split('-').map(Number), id = baked[r]?.[k]
+        if (!id) return null
+        return <SlideRun key={`slide${key}`} id={id} count={sl.count} from={sl.from} x={shelfLayout(n, r).xs[k]} y={shelves[r].y} step={rankStep(id)}
+          onDone={() => { slides.current.delete(key); setSliding((v) => v + 1) }} />
+      })}
       {/* (what's been taken out, stood on the floor before the fridge) */}
       {FRIDGE_STOCK.out.map((o, i) => o.unit === n && (
         <group key={`o${i}-${o.id}`} ref={reg(`o${i}`)} name={`drink-out-${n}-${i}`} position={[o.x, 0, o.z]} onPointerDown={(ev) => begin({ kind: 'out', i }, ev)}
           onPointerOver={(ev) => { document.body.style.cursor = 'grab'; glowOnly(ev.eventObject); aimTip(ev); setTip({ title: drinkName(o.id), hint: '拖曳移動，放回櫃子或遞給客人' }) }} onPointerOut={(ev) => { document.body.style.cursor = ''; glowLeave(ev.eventObject); setTip(null) }}>
           <DrinkBottle id={o.id} wet />
         </group>
+      ))}
+    </group>
+  )
+}
+/**
+ * The shelves slope down to the front, as a convenience store's do (the owner's, 2026-11-11): what's taken from the front, those behind it
+ * slide down into its place (blender/drinkfridge.py: each shelf's wire 3.5 cm higher at the back, front to back 0.625, its front edge at
+ * z 0.305); a drink at z stands that much higher than the shelf's front, leaning back with it
+ */
+const SHELF_FRONT_Z = 0.305, SHELF_K = 0.035 / 0.625, SHELF_TILT = Math.atan(SHELF_K)
+const riseAt = (z: number) => (SHELF_FRONT_Z - z) * SHELF_K
+/** how long the drinks behind take to slide down into the place of the one taken */
+const SLIDE_S = 0.45
+/** a place's drinks sliding down the shelf (`count` of them, `from` places further back than they'll stand), drawn on their own while they do
+ * (the shelves' batch has them hidden), handed back once they're down (`onDone`) */
+function SlideRun({ id, count, from, x, y, step, onDone }: { id: DrinkId; count: number; from: number; x: number; y: number; step: number; onDone: () => void }) {
+  const g = useRef<THREE.Group>(null)
+  const t = useRef(0)
+  const done = useRef(false)
+  useFrame((_, dt) => {
+    t.current += Math.min(dt, 0.05)
+    const k = Math.min(1, t.current / SLIDE_S), e = k * k * (3 - 2 * k)
+    g.current?.children.forEach((c, j) => {
+      const z = 0.16 - step * (j + from * (1 - e))
+      c.position.set(x, y + riseAt(z), z)
+    })
+    if (k >= 1 && !done.current) { done.current = true; onDone() }
+  })
+  return (
+    <group ref={g}>
+      {Array.from({ length: count }, (_, j) => (
+        <group key={j} rotation-x={SHELF_TILT}><DrinkBottleLite id={id} back={j > 0} /></group>
       ))}
     </group>
   )
@@ -5952,7 +6009,7 @@ export const cupped = (id: string) => id === 'sake' || id === 'umeshu'
  * bottle or can in a few turned rings, opaque, its glass's and its drink's colour in its points; its label, and its cap. Two materials for
  * all of them (PARTS and the label's), so a fridge's whole stock is two draws; the one taken up, pointed at or carried is the full one.
  */
-const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
+const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false }: { id: DrinkId; back?: boolean }) {
   const d = DRINKS.find((x) => x.id === id)!
   const kind = KIND_OF[id]
   const f = formOf(id)
@@ -5977,13 +6034,14 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id }: { id: DrinkId }) {
         </> : shaped && <>
           {/* (the drink in it seen through its glass (the owner's: they were solid plastic colours), the neck above it only glass: the drink
               first, so the glass is laid over it; the ramune's marble in its neck) */}
-          <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />
-          <mesh geometry={shadedGlass(LITE_GEO[shaped].body, body, glassAlpha(id))} material={SHELF_GLASS} />
-          {shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
+          {/* (one behind another (`back`): its glass tinted the drink's colour, the drink in it not drawn, nor the ramune's marble or a collar) */}
+          {!back && <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />}
+          <mesh geometry={shadedGlass(LITE_GEO[shaped].body, body, back ? Math.min(1, glassAlpha(id) + 0.25) : glassAlpha(id))} material={SHELF_GLASS} />
+          {!back && shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
           <mesh geometry={shadedLabel(LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
           <mesh geometry={shaded(LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
           {/* (the beer's gold foil round its neck, the sake's paper collar under its cap (the plum wine's red), as the full bottles have them) */}
-          {LITE_GEO[shaped].collar && !soju(id) && (
+          {!back && LITE_GEO[shaped].collar && !soju(id) && (
             <mesh geometry={shaded(LITE_GEO[shaped].collar!.geo, f === 'beer' ? '#d4b04a' : id === 'umeshu' ? '#b8261c' : '#f4efe2')}
               position-y={LITE_GEO[shaped].collar!.y} material={SHELF_PARTS} />
           )}

@@ -44,6 +44,7 @@ T = 0.035                     # the walls' thickness
 PLINTH = 0.14                 # the louvred foot
 HEAD = 0.27                   # the header over the door, the sign in it
 SHELVES = (0.27, 0.72, 1.19, 1.63)
+SLOPE = 0.035                 # how much higher each shelf's wire is at the back than at the front
 
 
 def P(x, y, z):
@@ -182,7 +183,9 @@ sign = quad("FridgeSign", [(-sx, sy0, zf + 0.002), (sx, sy0, zf + 0.002), (sx, s
 shelves = []
 for k, y in enumerate(SHELVES):
     sy = y - 0.004
-    shelves.append(quad(f"shelf{k}", [(ix0 + 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy, iz0 + 0.02), (ix0 + 0.01, sy, iz0 + 0.02)], "wire"))
+    # (sloping down to the front, as a convenience store's shelves do, 3.5 cm higher at the back: what's taken from the front, those behind
+    # slide down into its place (the owner's, 2026-11-11; DiningRoom's SHELF_K))
+    shelves.append(quad(f"shelf{k}", [(ix0 + 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy, iz1 - 0.01), (ix1 - 0.01, sy + SLOPE, iz0 + 0.02), (ix0 + 0.01, sy + SLOPE, iz0 + 0.02)], "wire"))
     # (its lip, and the strip naming the shelf on it, inside the baffles either side, their ends 2.2 cm in from the walls (the owner's: they
     # ran out to the walls and showed past the doors' stiles, white stubs through the posts))
     LI = BW + 0.002
