@@ -66,7 +66,7 @@ import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTi
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
-import { MAKE_S, SOUP_BOWLS, emptyPot, potTick, setSoup, soupGoes } from '@/game/soup'
+import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes } from '@/game/soup'
 import { bottleClink, plateClink, stoolSound, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -3778,7 +3778,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         RICE.kama = r.kama
         if (r.cooked) { RICE.rice = RICE_FULL; onSay?.('chef', LINES[lang].riceDone) }
         // (the soup's pot heating up in its well, the same)
-        const s = potTick(SOUP.pot, step)
+        // (as fast as the well's heat has it: not at all with it off)
+        const s = potTick(SOUP.pot, step * heatRate(heatNow(SOUP.heat, SOUP.pot)))
         SOUP.pot = s.pot
         if (s.hot) { SOUP.left = SOUP_BOWLS; onSay?.('chef', LINES[lang].soupDone) }
       }

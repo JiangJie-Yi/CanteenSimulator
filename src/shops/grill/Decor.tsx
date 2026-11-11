@@ -19,7 +19,7 @@ import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
-import { HEAT_S } from '@/game/soup'
+import { HEAT_S, heatNow, nextHeat } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
 import { CharcoalSack, ProduceSacks } from './KitchenStores'
@@ -1161,8 +1161,8 @@ function Warmer() {
             metalness: 0.7, roughness: src.name === 'WarmerSteel' ? 0.25 : 0.35, envMapIntensity: 0.9 })
           reflectStudio(g)
           t = g
-        } else if (src.name === 'WarmerGlow') t = new THREE.MeshBasicMaterial({ color: '#8a3418' })
-        else if (src.name === 'WarmerLamp') t = new THREE.MeshBasicMaterial({ color: '#ff7a3a', toneMapped: false })
+        } else if (src.name === 'WarmerGlow') t = new THREE.MeshBasicMaterial({ color: GLOW_AT[0].clone() })
+        else if (src.name === 'WarmerLamp') t = new THREE.MeshBasicMaterial({ color: LAMP_AT[0].clone(), toneMapped: false })
         else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
         t.name = src.name
         made.set(src, t)
@@ -1174,16 +1174,37 @@ function Warmer() {
     inkModel(r, (m) => m.name !== 'WarmerBody', { width: 0.0016, weld: true })
     plainColours(r)
     mergeByMaterial(r)
-    return r
+    const mats = [...made.values()] as THREE.MeshBasicMaterial[]
+    return { root: r, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
   }, [gltf])
+  // (its glow and pilot lamp as its heat is (game/soup's heatNow): dark off, a dull red low, bright high; eased, as a ring warms and cools)
+  useFrame((_, dt) => {
+    const n = heatNow(SOUP.heat, SOUP.pot), k = Math.min(1, dt * 1.5)
+    model.glow?.color.lerp(GLOW_AT[n], k)
+    model.lamp?.color.lerp(LAMP_AT[n], Math.min(1, dt * 8))
+  })
+  const heatSays = () => {
+    const h = SOUP.heat, n = heatNow(h, SOUP.pot)
+    return `${h === 'auto' ? `自動（${n ? '有湯，弱火' : '鍋子空的，不加熱'}）` : ['關', '弱火', '強火'][h]}｜點一下切換：自動、關、弱、強`
+  }
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, WARMER_AT.along).addScaledVector(LAY, WARMER_AT.lay)
   return (
     <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '味噌湯在加熱座上保溫；白飯從電鍋取，在砧板上捏飯糰')}>
-      <primitive object={model} />
+      <primitive object={model.root} />
+      {/* (the warming well's knob, its dial and pilot lamp under the top's front: clicked, its heat turned on round (the owner's)) */}
+      <mesh position={[0, 1.091, 0.49]} visible={false}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SOUP.heat = nextHeat(SOUP.heat); setTip({ title: '加熱座旋鈕', hint: heatSays() }) }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; setTip({ title: '加熱座旋鈕', hint: heatSays() }) }}
+        onPointerOut={() => { document.body.style.cursor = ''; setTip(null) }}>
+        <boxGeometry args={[0.36, 0.11, 0.06]} />
+      </mesh>
     </group>
   )
 }
+/** the warming well's glow and its pilot lamp at each heat (off, low, high) */
+const GLOW_AT = [new THREE.Color('#2e2a28'), new THREE.Color('#6a2814'), new THREE.Color('#b8461e')]
+const LAMP_AT = [new THREE.Color('#3a1a14'), new THREE.Color('#ff7a3a'), new THREE.Color('#ffb060')]
 /**
  * The rice-ball counter (blender/warmer.py's prepcounter.glb; the owner's, 2026-11-11: where the warming counter stood, a counter for making
  * the rice balls): made like the sink, its height; on it a hinoki board with rice balls and their nori, a bowl of hand water, a box of nori

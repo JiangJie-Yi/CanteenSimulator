@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { HEAT_S, SOUP_BOWLS, emptyPot, potTick, setSoup, soupGoes, soupReady, takeBowl } from '@/game/soup'
+import { HEAT_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, nextHeat, potTick, setSoup, soupGoes, soupReady, takeBowl } from '@/game/soup'
 
 feature('味噌湯：開店時湯鍋是空的，三廚煮好才有', () => {
   scenario('湯鍋空著才去煮', ({ then, but }) => {
@@ -36,6 +36,25 @@ feature('味噌湯：開店時湯鍋是空的，三廚煮好才有', () => {
       const last = takeBowl(hot, 1)
       expect(last.left).toBe(0)
       expect(soupGoes(last.pot)).toBe(true)
+    })
+  })
+  scenario('加熱座的火力：自動時有湯才開弱火，也能手動切換關、弱、強', ({ then, and }) => {
+    then('自動：鍋子空的不加熱（不亮），有湯開弱火', () => {
+      expect(heatNow('auto', emptyPot())).toBe(0)
+      expect(heatNow('auto', setSoup())).toBe(1)
+    })
+    and('手動設定就照設定，不管鍋裡有沒有湯', () => {
+      expect(heatNow(2, emptyPot())).toBe(2)
+      expect(heatNow(0, setSoup())).toBe(0)
+    })
+    and('關掉不加熱，強火比弱火快', () => {
+      expect(heatRate(0)).toBe(0)
+      expect(heatRate(2)).toBeGreaterThan(heatRate(1))
+    })
+    and('點旋鈕依序切換：自動、關、弱、強，再回到自動', () => {
+      expect(nextHeat('auto')).toBe(0)
+      expect(nextHeat(0)).toBe(1)
+      expect(nextHeat(2)).toBe('auto')
     })
   })
 })

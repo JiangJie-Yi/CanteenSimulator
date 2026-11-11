@@ -3,7 +3,7 @@ import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
 import { emptyKama, type Kama } from '@/game/rice'
-import { emptyPot, type SoupPot } from '@/game/soup'
+import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -810,7 +810,7 @@ export const SEAT_BONES = new Map<number, number>()
 export const RICE: { rice: number; kama: Kama; washing: boolean } = { rice: 0, kama: emptyKama(), washing: false }
 /** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
  * plater; Decor draws it) */
-export const SOUP: { pot: SoupPot; left: number; served: number } = { pot: emptyPot(), left: 0, served: 0 }
+export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat } = { pot: emptyPot(), left: 0, served: 0, heat: 'auto' }
 /** the seats with a bowl of miso soup set at them (Roasting ladles it out to those who ordered it; GuestBar3D draws it; `SOUP.served` counts
  * each change, for the drawing to see) */
 export const SOUP_SEATS = new Set<number>()

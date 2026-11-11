@@ -15,6 +15,17 @@ export const takeBowl = (pot: SoupPot, left: number): { pot: SoupPot; left: numb
 /** whether a bowl can be ladled now: hot, some left */
 export const soupReady = (pot: SoupPot, left: number) => pot.state === 'hot' && left > 0
 
+/** the warming well's heat (the owner's, 2026-11-11: it glowed red all the time; to be turned by hand): left to itself ('auto') it's on low
+ * while there's soup in the pot and off while it's empty; turned by hand, off, low or high whatever's in it */
+export type Heat = 'auto' | 0 | 1 | 2
+export const HEATS: Heat[] = ['auto', 0, 1, 2]
+/** the heat it's at: auto's, low with soup in the pot, off without */
+export const heatNow = (h: Heat, pot: SoupPot) => (h === 'auto' ? (pot.state === 'empty' ? 0 : 1) : h)
+/** how fast the pot heats up at that heat (1 low, faster high, not at all off) */
+export const heatRate = (n: 0 | 1 | 2) => [0, 1, 1.6][n]
+/** the next setting, a click on its knob turning it on round */
+export const nextHeat = (h: Heat): Heat => HEATS[(HEATS.indexOf(h) + 1) % HEATS.length]
+
 /** seconds: the third cook at the pot making it; the pot heating up in the well after */
 export const MAKE_S = 5
 export const HEAT_S = 20
