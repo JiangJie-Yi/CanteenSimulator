@@ -2524,23 +2524,31 @@ function WcHalo({ who, size, strength }: { who: 'm' | 'f'; size: number; strengt
 /** a hanging wall lantern (掛け行灯, blender/wcdecor.py) on a wall: its backboard on the wall at `at`, the wall facing `yaw` (unturned, +z); its
  * washi lit on the switch by the door (WcLamp's way), a soft glow round it on the wall; `bright`, the one by the washroom's door, its glow
  * the stronger and wider */
+/** the wall lantern's washi: a box a little inside its frame */
+const WC_LANTERN_GEO = new THREE.BoxGeometry(0.11, 0.17, 0.05)
 function WcSconce({ who, at, yaw, bright = false }: { who: 'm' | 'f'; at: [number, number, number]; yaw: number; bright?: boolean }) {
-  const obj = useWcDecor('WcLantern')
-  const paper = useRef<THREE.MeshBasicMaterial | null>(null)
+  // (a small Japanese wall lantern, the one it had first (the owner's, 2026-11-12: back to it from the hanging lantern): a dark wooden frame
+  // on a backboard against the wall, its washi lit from inside on the switch, a kumiko of thin bars over its front; low on triangles, its
+  // glow its own (a soft halo on the wall round it), no light of its own)
+  const paper = useRef<THREE.MeshBasicMaterial>(null)
   const k = useRef(0.4)
-  useMemo(() => {
-    const m = new THREE.MeshBasicMaterial({ color: '#fff1cc', toneMapped: false })
-    obj.traverse((o) => { if ((o as THREE.Mesh).isMesh && /Paper/.test(o.name)) (o as THREE.Mesh).material = m })
-    paper.current = m
-  }, [obj])
-  useEffect(() => () => paper.current?.dispose(), [])
   useFrame(() => {
     k.current += ((getLights().wc[who] ? 1 : 0.12) - k.current) * 0.08
     paper.current?.color.set('#fff1cc').multiplyScalar(k.current)
   })
+  const out = 0.045
+  const D = '#3a2416'
   return (
-    <group position={[at[0], at[1] - 0.08, at[2]]} rotation-y={yaw}>
-      <primitive object={obj} />
+    <group position={[at[0], at[1] - 0.06, at[2]]} rotation-y={yaw}>
+      <mesh geometry={WC_LANTERN_GEO} position={[0, 0, out]}><meshBasicMaterial ref={paper} color="#fff1cc" toneMapped={false} /></mesh>
+      <StaticBatch plain>
+        <mesh position={[0, 0, 0.006]}><boxGeometry args={[0.15, 0.26, 0.012]} /><meshToonMaterial color="#5a3a22" /></mesh>
+        {[-1, 1].map((sd) => <mesh key={`p${sd}`} position={[sd * 0.06, 0, out]}><boxGeometry args={[0.012, 0.2, 0.064]} /><meshToonMaterial color={D} /></mesh>)}
+        {[-1, 1].map((sd) => <mesh key={`c${sd}`} position={[0, sd * 0.098, out]}><boxGeometry args={[0.14, 0.014, 0.07]} /><meshToonMaterial color={D} /></mesh>)}
+        {/* (its kumiko: one bar up the middle, three across) */}
+        <mesh position={[0, 0, out + 0.0262]}><boxGeometry args={[0.005, 0.18, 0.004]} /><meshToonMaterial color={D} /></mesh>
+        {[-0.045, 0, 0.045].map((y) => <mesh key={`h${y}`} position={[0, y, out + 0.0262]}><boxGeometry args={[0.11, 0.005, 0.004]} /><meshToonMaterial color={D} /></mesh>)}
+      </StaticBatch>
       <group position={[0, 0, 0.004]}><WcHalo who={who} size={bright ? 0.75 : 0.5} strength={bright ? 0.9 : 0.6} /></group>
     </group>
   )
