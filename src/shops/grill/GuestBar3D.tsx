@@ -5330,7 +5330,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
  * time), its own copy for each customer (the fade sets the opacity: shared, one fading out faded every other bag), the hashed program made at
  * loading (warmLater) */
 const fading = (color: string) => { const m = new THREE.MeshToonMaterial({ color, alphaHash: true }); m.userData.hashed = true; return m }
-const TO_LOOKS = { bag: '#c9a274', seal: '#b3241c', helmet: '#2a2d33', band: '#e0a21c', dark: '#3a3a3e' }
+const TO_LOOKS = { bag: '#c9a274', seal: '#b3241c', helmet: '#2a2d33', band: '#e0a21c', dark: '#3a3a3e', stripe: '#f2f2ee', strap: '#26282c' }
 const ownLooks = () => Object.fromEntries(Object.entries(TO_LOOKS).map(([k, c]) => [k, fading(c)])) as Record<keyof typeof TO_LOOKS, THREE.MeshToonMaterial>
 if (typeof document !== 'undefined') {
   const warm = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), fading('#ffffff'))
@@ -5488,9 +5488,19 @@ function RiderGear({ size, fade }: { size: number; fade: () => number }) {
       {/* (the helmet over the crown of the head, clear of the hair, down to the brow; a band round its rim) */}
       <mesh position-y={0.8} material={m.helmet}><sphereGeometry args={[0.34, 16, 6, 0, Math.PI * 2, 0, Math.PI * 0.4]} /></mesh>
       <mesh position-y={0.8 + 0.34 * Math.cos(Math.PI * 0.4) - 0.01} material={m.band}><cylinderGeometry args={[0.326, 0.328, 0.035, 16, 1, true]} /></mesh>
-      {/* (the insulated box of a delivery on their back) */}
+      {/* (the insulated box of a delivery on their back, worn as a backpack (the owner's, 2026-11-12: a strange brown bag floating behind
+          them): its two straps over the shoulders and down the chest, a white reflective stripe round it, the seam of its lid, a dark label
+          on its back) */}
       <mesh position={[0, 0.36, -0.42]} material={m.band}><boxGeometry args={[0.46, 0.44, 0.3]} /></mesh>
-      <mesh position={[0, 0.36, -0.572]} material={m.dark}><boxGeometry args={[0.28, 0.1, 0.004]} /></mesh>
+      <mesh position={[0, 0.3, -0.42]} material={m.stripe}><boxGeometry args={[0.47, 0.035, 0.31]} /></mesh>
+      <mesh position={[0, 0.535, -0.42]} material={m.dark}><boxGeometry args={[0.465, 0.012, 0.305]} /></mesh>
+      <mesh position={[0, 0.4, -0.572]} material={m.dark}><boxGeometry args={[0.28, 0.1, 0.004]} /></mesh>
+      {[-1, 1].map((sd) => (
+        <group key={sd}>
+          <mesh position={[sd * 0.11, 0.56, -0.1]} rotation-x={-0.25} material={m.strap}><boxGeometry args={[0.05, 0.02, 0.36]} /></mesh>
+          <mesh position={[sd * 0.11, 0.42, 0.235]} rotation-x={0.25} material={m.strap}><boxGeometry args={[0.05, 0.26, 0.02]} /></mesh>
+        </group>
+      ))}
     </group>
   )
 }
