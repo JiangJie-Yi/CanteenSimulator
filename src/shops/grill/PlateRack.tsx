@@ -105,16 +105,16 @@ function plateProfile(R: number): [number, number][] {
     [0.74, 0.088], [0.45, 0.042], [0, 0.04]]
   return pts.map(([x, y]) => [x * R, y * R])
 }
-// (sixteen round: fifty of them stand in the racks, each inked, seen from across the kitchen, stood on edge or stacked; 288 faces each,
+// (twelve round (sixteen before: the owner's, 2026-11-12, the triangle count rose; 216 faces each): fifty of them stand in the racks, each inked, seen from across the kitchen, stood on edge or stacked; 288 faces each,
 // 680 before (the owner's: the racks drew 68,000 between them))
-const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R, 16)
+const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R, 12)
 /** a plate's place; `pile`: which pile it's in, if it's in one (its plates drawn as the bottom one, the top one and the rims between: thinPiles) */
 type Spot = { m: THREE.Matrix4; design: number; pile?: number }
 /** the plates in a pile between its bottom one and its top one (the owner's, 2026-11-12: no more faces than need be): each seen only as its
- * rim over the one below, so drawn as its rim alone, the band from the edge of its well out over its lip (fourteen round, 70 faces, its
+ * rim over the one below, so drawn as its rim alone, the band from the edge of its well out over its lip (ten round, 40 faces, fourteen before, its
  * pattern's edge on it from the same picture), each still turned and set a hair off as it lies; the bottom and top ones whole */
 const RIM_GEO = wareGeometry(([[0.62, 0.042], [0.76, 0.065], [0.995, 0.165], [0.975, 0.172], [0.8, 0.1]] as [number, number][])
-  .map(([x, y]) => [x * PLATE_R, y * PLATE_R] as [number, number]), PLATE_R, 14)
+  .map(([x, y]) => [x * PLATE_R, y * PLATE_R] as [number, number]), PLATE_R, 10)
 /** what's drawn of the plates shown, by design: whole, every plate not in a pile and each pile's bottom and top one; rims only, the rest */
 function thinPiles(shown: Spot[]) {
   const whole: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
