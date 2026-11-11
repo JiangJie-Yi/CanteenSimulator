@@ -274,7 +274,7 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
         # going out into its corners, the same cloth (they were cones stuck on); round again higher up, filled out)
         # (only at the very foot: higher it read as a bell; the point one vertex's, its neighbours only a little out)
         flat = math.exp(-(t / 0.09) ** 2)
-        base *= (1 - 0.12 * flat) * (1 + 0.8 * flat * abs(math.cos(a - front - math.pi / 2)) ** 40)
+        base *= (1 - 0.12 * flat) * (1 + 0.5 * flat * abs(math.cos(a - front - math.pi / 2)) ** 40)
         # (the cloth gathered into soft folds hanging down from under the cuff, deepest just under it, gone by the middle)
         base += r * 0.03 * smooth_(0.45, 0.95, t) * math.sin(9 * a + ph[7] + 1.5 * t) * (0.6 + 0.4 * math.sin(4 * a + ph[8]))
         for (la, lt, amp) in lumps:
@@ -653,9 +653,10 @@ def board(name, cx, cy, cz, w, h, d):
 # ---- the three sacks, standing close together, a little apart at their cuffs; the middle one a step back ----
 SACKS = [  # (x, z, height, radius, material, lean, what's in it)
     # (squatter than they were, as full sacks of potatoes sag (the owner's, 2026-11-11: not like vases))
-    (-0.43, 0.02, 0.41, 0.154, "sackP", (-0.02, -0.014), "potato"),
+    # (close together (the owner's, 2026-11-11): 0.39 apart, they were 0.43)
+    (-0.39, 0.02, 0.41, 0.154, "sackP", (-0.02, -0.014), "potato"),
     (0.0, -0.04, 0.45, 0.162, "sackS", (0.006, -0.016), "sweet"),
-    (0.425, 0.03, 0.38, 0.149, "sackO", (0.02, -0.012), "onion"),
+    (0.385, 0.03, 0.38, 0.149, "sackO", (0.02, -0.012), "onion"),
 ]
 
 
@@ -731,9 +732,9 @@ def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14, stand=Fa
         if stand:
             # (stood on it: its foot not sewn thin but settled, full and a little spread; its belly full; drawn in to shoulders up toward the
             # sewn top, whose two corners stand out past them)
-            if u < 0:
-                pinch = max(0.7, (1 - abs(u) ** 6)) ** 0.4
-            wide = (1 + 0.07 * math.cos(u * math.pi / 2) + (0.08 * abs(u) ** 3 if u < 0 else 0)) * (1 - 0.3 * (max(0.0, u - 0.35) / 0.65) ** 1.5) + 0.42 * max(0.0, u) ** 14
+            # (its top flat (the owner's, 2026-11-11): full nearly to the top, then closed quickly into the sewn edge, no sloping shoulders)
+            pinch = max(0.7, (1 - abs(u) ** 6)) ** 0.4 if u < 0 else max(0.06, 1 - u ** 12) ** 0.3
+            wide = (1 + 0.05 * math.cos(u * math.pi / 2) + (0.08 * abs(u) ** 3 if u < 0 else 0)) * (1 - 0.06 * max(0.0, u - 0.6) / 0.4) + 0.12 * max(0.0, u) ** 16
         row = []
         for j in range(seg):
             th = 2 * math.pi * j / seg
@@ -771,13 +772,13 @@ def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14, stand=Fa
 
 # ---- a sack of potatoes not yet opened, stood up on its end beside the open ones, at the potatoes' end (the owner's, 2026-11-11: it lay
 # on the floor in front of them; stood up, clear of the counter's face behind) ----
-sealed_sack("ProduceSackSealed", -0.84, 0.05, 0.5, 0.34, 0.28, -0.18, "sackP", salt=3, stand=True)
+sealed_sack("ProduceSackSealed", -0.765, 0.03, 0.5, 0.34, 0.26, -0.12, "sackP", salt=3, stand=True)
 # ---- a few rolled out in front ----
 tuber("ProduceLoose0", -0.22, 0.045, 0.29, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 # (a potato and an onion: the owner's)
 onion("ProduceLooseOnion", 0.24, 0.044, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
 # ---- the crate of carrots and burdock, beside the onions' sack ----
-CX, CW, CD, CH = 0.81, 0.38, 0.26, 0.18
+CX, CW, CD, CH = 0.77, 0.38, 0.26, 0.18
 # (three boards across its floor, a gap between; solid end boards, a hand hole's worth lower in their middle; three slats a side with gaps
 # between them; a square post in each corner inside, the slats nailed to them)
 for k in range(3):

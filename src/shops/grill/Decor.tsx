@@ -843,7 +843,8 @@ function SinkAt() {
  * cupboard's doors swing open clear of them */
 // (0.294 further out, off the counter's face (the owner's, 2026-11-11: through the wall): the sacks' backs reached 0.1 to 0.19 into it, the
 // model's 0.21 at its 1.4 times)
-const SACKS_AT = { along: -2.36 + 0.294, lay: 3.42 }
+// (then back toward it, 1.5 cm off it: against the wall (the owner's))
+const SACKS_AT = { along: -2.36 + 0.21, lay: 3.42 }
 function SacksAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)
