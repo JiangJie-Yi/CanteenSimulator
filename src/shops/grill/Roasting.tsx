@@ -1256,7 +1256,7 @@ const CHEF_AT = new THREE.Vector3().addScaledVector(LAY, 2.3).addScaledVector(AL
   .setY(KITCHEN_FLOOR_Y)
 /** how high the step is in the owner's notch and the third cook's bay (a low wooden step, a duckboard's height: the owner's, 2026-11-10; at
  * 0.2 the owner stood up out of his notch, the table's top at his hips, and the third cook's bay had none, the floor showing in it) */
-const STEP_H = 0.05
+const STEP_H = 0.09  // (a duckboard's slats on its battens: the owner's, 2026-11-11, thicker; 0.05 before)
 /** where the third cook stands: in his bay at the table's far end (SOUS_NOTCH), a little out from its back wall (his front's some 0.3 ahead
  * of his feet), in the middle of it across, facing in at the fire (KITCHEN_YAW), on his step; he stood out past the table's end, the crate
  * out of reach */
@@ -1324,47 +1324,8 @@ const COOK_TABLE_WOOD = woodTex('keyaki_top.jpg', 1.6, 1.6)
 const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
 /** the bar's base: boards standing side by side, straight grain and flat-sawn in turn, their grain clear (the owner: it didn't show) */
 const BAR_BASE_WOOD = woodTex('bar_base.jpg', 1, 1)
-/**
- * A duckboard's top (すのこ): dark oiled cedar slats across it, each its own shade and grain, a dark gap between each and the next; one tile
- * 0.4 of a unit square, five slats to it (its UVs are in units: the notch steps')
- */
-const SUNOKO_TOP = (() => {
-  const c = document.createElement('canvas')
-  c.width = 256; c.height = 256
-  const g = c.getContext('2d')!
-  let seed = 11
-  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
-  g.fillStyle = '#140c07'; g.fillRect(0, 0, 256, 256)
-  const n = 5, pitch = 256 / n, gap = 6
-  for (let k = 0; k < n; k++) {
-    const y0 = k * pitch + gap / 2, h = pitch - gap
-    const base = [58 + rnd() * 14, 39 + rnd() * 9, 29 + rnd() * 7]
-    const grad = g.createLinearGradient(0, y0, 0, y0 + h)
-    grad.addColorStop(0, `rgb(${base[0] + 14},${base[1] + 10},${base[2] + 7})`)
-    grad.addColorStop(1, `rgb(${base[0] - 8},${base[1] - 6},${base[2] - 4})`)
-    g.fillStyle = grad; g.fillRect(0, y0, 256, h)
-    // (its grain: long fine streaks along it, a few darker, wandering a little)
-    for (let q = 0; q < 16; q++) {
-      const yy = y0 + 2 + rnd() * (h - 4), dark = rnd() < 0.35
-      g.strokeStyle = dark ? 'rgba(20,12,7,0.45)' : 'rgba(120,88,64,0.28)'
-      g.lineWidth = 0.8 + rnd() * 1.2
-      g.beginPath(); g.moveTo(0, yy)
-      for (let x = 0; x <= 256; x += 32) g.lineTo(x, yy + Math.sin(x / 40 + q) * 1.2)
-      g.stroke()
-    }
-    // (the slat's edges eased: a lighter lip along its top edge, a shade under its foot)
-    g.fillStyle = 'rgba(150,112,82,0.35)'; g.fillRect(0, y0, 256, 2)
-    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, y0 + h - 2, 256, 2)
-  }
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-  tex.repeat.set(1 / 0.4, 1 / 0.4)
-  tex.anisotropy = 4
-  return tex
-})()
 /** the cook table's dark kick round its foot: as high as the notch steps, so none shows over their backs */
-const KICK_H = 0.05
+const KICK_H = 0.09
 /** below its top: honed white marble with soft grey veining (blender/marbletex.py), a tile 1.2 across (the owner had it dark a while, and
  * wanted it white again) */
 const COOK_MARBLE = woodTex('marble_panel.jpg', 1, 1)
@@ -2926,15 +2887,16 @@ const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階
   const obj = useMemo(() => {
     const r = gltf.scene.getObjectByName(node)!.clone(true)
     r.position.set(0, 0, 0)
-    // (a duckboard's (すのこ): dark cedar slats across it, its sides the same dark wood; the owner's, 2026-11-10: it was the table's own light
-    // keyaki, a piece of the top laid on the floor)
-    const top = new THREE.MeshToonMaterial({ color: '#ffffff', map: SUNOKO_TOP })
-    const skirt = new THREE.MeshToonMaterial({ color: '#6b4c38', map: BAR_BASE_WOOD })
+    // (a duckboard (すのこ): oiled cedar slats with gaps between, on three battens, the model's own wood (the owner's, 2026-11-11: the flat
+    // block painted with slats was ugly))
+    const made = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
-      const n = (m.material as THREE.Material).name
-      m.material = n === 'StepTop' ? top : skirt
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      m.material = t
       m.castShadow = true
       m.receiveShadow = true
     })
