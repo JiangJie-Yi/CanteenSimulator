@@ -61,6 +61,7 @@ TT = 0.05                       # the counter's thickness
 FRONT = D / 2 - 0.04            # the cabinet's face (the top overhangs it)
 BASIN = (-0.71, -0.09, -0.28, 0.28)   # its opening: x from, x to, z from (back), z to (front)
 BASIN_FLOOR = H - 0.22
+DRAIN_R = 0.026                 # its drain's hole
 UP = 0.07                       # the upstand along the back
 
 
@@ -146,6 +147,7 @@ M = {
     "brass": pbr("SinkBrass", lin("#c9a14a"), rough=0.25, metal=1.0),
     "copper": pbr("SinkCopper", lin("#b8734a"), rough=0.3, metal=1.0),
     "drain": pbr("SinkDrain", lin("#2b2620"), rough=0.6),
+    "rubber": pbr("SinkRubber", lin("#232120"), rough=0.75),
     "bag": pbr("SinkBag", lin("#f2f0ea"), rough=0.9),
     "plate": pbr("SinkPlate", lin("#f4f1ea"), rough=0.3),
     "rim": pbr("SinkPlateRim", lin("#2c4f8a"), rough=0.3),
@@ -311,16 +313,130 @@ bmesh.ops.bevel(bm, geom=[e for e in bm.edges if abs((e.verts[0].co - e.verts[1]
                 affect="EDGES", profile=0.5)
 bmesh.ops.bevel(bm, geom=[e for e in bm.edges if not e.is_boundary and abs((e.verts[0].co - e.verts[1].co).normalized().z) < 0.1
                           and min(v_.co.z for v_ in e.verts) < bas.dimensions.z * -0.49], offset=0.025, segments=3, affect="EDGES", profile=0.5)
+# (the drain dug through its floor (the owner's, 2026-11-11: a hole, and the plug to stop it): its floor face taken out and its edge joined
+# to the hole's ring in quads, each of its edge's corners to the point of the ring the same way round from the middle)
+_zmin = min(v_.co.z for v_ in bm.verts)
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if all(abs(v_.co.z - _zmin) < 1e-5 for v_ in f.verts)], context="FACES")
+_edge = [v_ for v_ in bm.verts if abs(v_.co.z - _zmin) < 1e-5 and v_.is_boundary]
+_edge.sort(key=lambda v_: math.atan2(v_.co.y, v_.co.x))
+_hole = [bm.verts.new((DRAIN_R * math.cos(math.atan2(v_.co.y, v_.co.x)), DRAIN_R * math.sin(math.atan2(v_.co.y, v_.co.x)), _zmin)) for v_ in _edge]
+for i in range(len(_edge)):
+    j = (i + 1) % len(_edge)
+    f = bm.faces.new((_edge[i], _edge[j], _hole[j], _hole[i]))
+    f.normal_update()
+    if f.normal.z > 0:
+        f.normal_flip()
+DRAIN_N = len(_edge)
 bmesh.ops.reverse_faces(bm, faces=bm.faces)
 bm.to_mesh(bas.data)
 bm.free()
 box_uv(bas, 0.5)
 finish(bas, "SinkBasin", M["basin"])
 parts.append(bas)
-# (its drain: a brass ring and a dark grate)
-cyl("SinkDrainRing", (x0 + x1) / 2, BASIN_FLOOR, BASIN_FLOOR + 0.004, (zb + zf) / 2, 0.035, "brass", seg=20)
-cyl("SinkDrainHole", (x0 + x1) / 2, BASIN_FLOOR + 0.004, BASIN_FLOOR + 0.0045, (zb + zf) / 2, 0.026, "drain", seg=20)
-empty("SinkBasinFloor", (x0 + x1) / 2, BASIN_FLOOR + 0.005, (zb + zf) / 2 + 0.03)
+# (its drain: a brass cup down from the hole, seen from inside it, as deep as there's room above the cabinet's top under the basin (BY);
+# its foot dark, two brass bars across it a little down; a brass flange
+# round its mouth over the floor's edge (a ring: its top and its outer side, no cap into the middle))
+DX, DZ = (x0 + x1) / 2, (zb + zf) / 2
+DRAIN_D = 0.0105
+bm = bmesh.new()
+_top = [bm.verts.new(P(DX + DRAIN_R * math.cos(a), BASIN_FLOOR, DZ + DRAIN_R * math.sin(a))) for a in (k * 2 * math.pi / 20 for k in range(20))]
+_bot = [bm.verts.new(P(DX + DRAIN_R * math.cos(a), BASIN_FLOOR - DRAIN_D, DZ + DRAIN_R * math.sin(a))) for a in (k * 2 * math.pi / 20 for k in range(20))]
+for i in range(20):
+    j = (i + 1) % 20
+    f = bm.faces.new((_top[i], _top[j], _bot[j], _bot[i]))
+    f.normal_update()
+    # (facing in, toward its middle)
+    c_ = f.calc_center_median()
+    if f.normal.dot(Vector((P(DX, 0, DZ).x - c_.x, P(DX, 0, DZ).y - c_.y, 0))) < 0:
+        f.normal_flip()
+pipe = bpy.data.objects.new("SinkDrainPipe", bpy.data.meshes.new("SinkDrainPipe"))
+bm.to_mesh(pipe.data)
+bm.free()
+bpy.context.collection.objects.link(pipe)
+finish(pipe, "SinkDrainPipe", M["brass"])
+parts.append(pipe)
+cyl("SinkDrainHole", DX, BASIN_FLOOR - DRAIN_D + 0.0003, BASIN_FLOOR - DRAIN_D + 0.0008, DZ, DRAIN_R - 0.001, "drain", seg=20)
+for k, (ax, az) in enumerate(((1, 0), (0, 1))):
+    hw = DRAIN_R - 0.0015
+    box(f"SinkDrainBar{k}", DX - (hw if ax else 0.002), DX + (hw if ax else 0.002), BASIN_FLOOR - 0.0045 - k * 0.0025, BASIN_FLOOR - 0.0025 - k * 0.0025,
+        DZ - (hw if az else 0.002), DZ + (hw if az else 0.002), "brass")
+bm = bmesh.new()
+FL_IN, FL_OUT, FL_H = DRAIN_R - 0.002, DRAIN_R + 0.011, 0.0025
+_ri, _ro, _rb = [], [], []
+for k in range(20):
+    a = k * 2 * math.pi / 20
+    _ri.append(bm.verts.new(P(DX + FL_IN * math.cos(a), BASIN_FLOOR + FL_H, DZ + FL_IN * math.sin(a))))
+    _ro.append(bm.verts.new(P(DX + FL_OUT * math.cos(a), BASIN_FLOOR + FL_H, DZ + FL_OUT * math.sin(a))))
+    _rb.append(bm.verts.new(P(DX + FL_OUT * math.cos(a), BASIN_FLOOR, DZ + FL_OUT * math.sin(a))))
+for i in range(20):
+    j = (i + 1) % 20
+    f = bm.faces.new((_ri[i], _ri[j], _ro[j], _ro[i]))
+    f.normal_update()
+    if f.normal.z < 0:
+        f.normal_flip()
+    f = bm.faces.new((_ro[i], _ro[j], _rb[j], _rb[i]))
+    f.normal_update()
+    if f.normal.dot(f.calc_center_median() - P(DX, BASIN_FLOOR, DZ)) < 0:
+        f.normal_flip()
+flange = bpy.data.objects.new("SinkDrainRing", bpy.data.meshes.new("SinkDrainRing"))
+bm.to_mesh(flange.data)
+bm.free()
+bpy.context.collection.objects.link(flange)
+finish(flange, "SinkDrainRing", M["brass"], smooth_shade=False)
+parts.append(flange)
+empty("SinkBasinFloor", DX, BASIN_FLOOR + 0.005, DZ + 0.03)
+# (the plug (栓): black rubber, tapered, its top a little proud of the flange when it's in, a brass ring on top to lift it by; the game lifts
+# it out and lays it by the drain, and puts it back)
+bm = bmesh.new()
+_pr = []
+for y_, r_ in ((BASIN_FLOOR - DRAIN_D + 0.0015, DRAIN_R - 0.003), (BASIN_FLOOR + FL_H + 0.004, DRAIN_R + 0.004), (BASIN_FLOOR + FL_H + 0.008, DRAIN_R + 0.002)):
+    _pr.append([bm.verts.new(P(DX + r_ * math.cos(a), y_, DZ + r_ * math.sin(a))) for a in (k * 2 * math.pi / 16 for k in range(16))])
+for r0_, r1_ in zip(_pr, _pr[1:]):
+    for i in range(16):
+        j = (i + 1) % 16
+        f = bm.faces.new((r0_[i], r0_[j], r1_[j], r1_[i]))
+        f.normal_update()
+        if f.normal.dot(f.calc_center_median() - P(DX, f.calc_center_median().z, DZ)) < 0:
+            f.normal_flip()
+for ring_, up_ in ((_pr[0], False), (_pr[-1], True)):
+    for f in ladder_fill(bm, ring_):
+        f.normal_update()
+        if (f.normal.z > 0) != up_:
+            f.normal_flip()
+plug = bpy.data.objects.new("SinkPlug", bpy.data.meshes.new("SinkPlug"))
+bm.to_mesh(plug.data)
+bm.free()
+bpy.context.collection.objects.link(plug)
+finish(plug, "SinkPlug", M["rubber"], smooth_shade=False)
+parts.append(plug)
+bpy.ops.mesh.primitive_torus_add(major_radius=0.008, minor_radius=0.0022, major_segments=12, minor_segments=6,
+                                 location=P(DX, BASIN_FLOOR + FL_H + 0.008 + 0.008, DZ), rotation=(math.pi / 2, 0, 0))
+finish(active(), "SinkPlugRing", M["brass"])
+parts.append(active())
+# (the water held in the basin with the plug in: a sheet the basin's own shape, its rounded corners, at its floor; the game lifts it as it
+# fills, up to the overflow (SinkWaterTop), and hides it empty)
+bm = bmesh.new()
+_hx, _hz, _cr = (x1 - x0) / 2 - 0.002, (zf - zb) / 2 - 0.002, 0.048
+_wr = []
+for qx, qz, a0 in ((-_hx + _cr, -_hz + _cr, math.pi), (_hx - _cr, -_hz + _cr, 1.5 * math.pi), (_hx - _cr, _hz - _cr, 0.0), (-_hx + _cr, _hz - _cr, 0.5 * math.pi)):
+    for k in range(5):
+        a = a0 + k / 4 * math.pi / 2
+        _wr.append(bm.verts.new(P(DX + qx + math.cos(a) * _cr, BASIN_FLOOR + 0.001, DZ + qz + math.sin(a) * _cr)))
+for f in ladder_fill(bm, _wr):
+    f.normal_update()
+    if f.normal.z < 0:
+        f.normal_flip()
+water = bpy.data.objects.new("SinkWater", bpy.data.meshes.new("SinkWater"))
+bm.to_mesh(water.data)
+bm.free()
+bpy.context.collection.objects.link(water)
+finish(water, "SinkWater", M["drain"], smooth_shade=False)
+parts.append(water)
+# (the overflow (溢水口) in the basin's back wall near its top: a brass plate with a dark slot in it; the water never rises past its foot)
+OVER_Y = H - TT - 0.045
+box("SinkOverflow", DX - 0.026, DX + 0.026, OVER_Y - 0.008, OVER_Y + 0.016, zb + 0.0005, zb + 0.0025, "brass")
+box("SinkOverflowSlot", DX - 0.017, DX + 0.017, OVER_Y - 0.001, OVER_Y + 0.009, zb + 0.0025, zb + 0.0032, "drain")
+empty("SinkWaterTop", DX, OVER_Y - 0.008, DZ)
 # (the low upstand along the back)
 box("SinkUpstand", -W / 2, W / 2, H, H + UP, -D / 2, -D / 2 + 0.04, "terrazzo", bev=0.008, seg=3)
 

@@ -14,7 +14,8 @@ import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { Steam } from '@/scene/Steam'
 import { canOpen, DRAIN_CAP, DRY_S, DRYER_CAP, dryerPhase, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
-import { DRAIN, DRYER, SINK, tipOver } from './bar'
+import { DRAIN, DRYER, SINK, SINK_BIN, tipOver } from './bar'
+import { basinSays, waterTick } from '@/game/sinkWater'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { getEdit } from './edit'
@@ -24,7 +25,7 @@ const URL = import.meta.env.BASE_URL + 'models/sink.glb'
 /** the brass, the copper and the dryer's stainless: real metal, reflecting the studio (it only reads as metal by what it reflects) */
 const METAL = /^Sink(Brass|Copper|Steel|SteelTap|DryerLiner)$/
 /** too fine for an ink line, or cloth: the tap's arms and knobs, its bag and string, the rods, rims and pegs, the plates' rims, the slats */
-const FINE = /^Sink(Tap(Arm|Knob|String|Bag|Cap|Stem|Screen|Mouth)|Basket(Rim|Foot|Slat|Rail|Post)|NorenRod|Noren\d|Towel|Pull|RackPlateRim|DrainHole|Slat|PailWater|Dryer(Button|Lamp|Rail|Handle|Cavity|Glass)|Bin(Liner|Floor|Rim)|RackWire|Detergent(Soap|Collar|Pump|Head|Spout))/
+const FINE = /^Sink(Tap(Arm|Knob|String|Bag|Cap|Stem|Screen|Mouth)|Basket(Rim|Foot|Slat|Rail|Post)|Plug|Drain(Bar|Pipe|Ring)|Overflow|Water|NorenRod|Noren\d|Towel|Pull|RackPlateRim|DrainHole|Slat|PailWater|Dryer(Button|Lamp|Rail|Handle|Cavity|Glass)|Bin(Liner|Floor|Rim)|RackWire|Detergent(Soap|Collar|Pump|Head|Spout))/
 /** cloth, seen from either side (and the bin's liner, seen from inside it) */
 const CLOTH = /^Sink(Noren|Cloth|BinLiner)$/
 
@@ -85,6 +86,14 @@ function dressSink(r: THREE.Object3D) {
 }
 
 const SINK_AT_V = new THREE.Vector3()
+/** the water standing in the basin (the plug in): clear, a little blue, catching the studio's light; see-through to nothing when it's empty */
+const POOL = (() => {
+  const g = new THREE.MeshStandardMaterial({ color: '#5f9fc0', transparent: true, opacity: 0, roughness: 0.05, metalness: 0.1, depthWrite: false, envMapIntensity: 1.2 })
+  reflectStudio(g)
+  return g
+})()
+/** where the plug lies out of the drain, from where it sits in it: on the basin's floor beside the drain, tipped a little on its edge */
+const PLUG_OUT = new THREE.Vector3(0.075, 0.016, 0.065)
 const WATER = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.6, depthWrite: false, toneMapped: false })
 const SPLASH = new THREE.MeshBasicMaterial({ color: '#e8f6fc', transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
 
@@ -128,10 +137,21 @@ const RACK_OUT = 0.16
 export function SinkModel() {
   useStudio()
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const { root, tip, floor, handle, door, rack, rackZ, ringAt, steamAt } = useMemo(() => {
+  const { root, tip, floor, handle, door, rack, rackZ, ringAt, steamAt, plug, plugAt, pool, poolY, base, rise } = useMemo(() => {
     const r = gltf.scene.clone(true)
     // (what stands on it taken off: each placed as a piece of its own)
     for (const set of SINK_SETS) r.getObjectByName(set.node)?.removeFromParent()
+    // (the plug and its ring, lifted in and out of the drain as one, turned about the drain's middle; the water, raised as it fills)
+    r.updateMatrixWorld(true)
+    const lift = (n: string) => { const o = r.getObjectByName(n)!, m = o.matrixWorld.clone(); o.removeFromParent(); m.decompose(o.position, o.quaternion, o.scale); return o }
+    const pool = lift('SinkWater') as THREE.Mesh
+    const base = new THREE.Box3().setFromObject(pool).min.y, poolY = pool.position.y
+    const plug = new THREE.Group()
+    for (const n of ['SinkPlug', 'SinkPlugRing']) plug.add(lift(n))
+    const plugAt = new THREE.Box3().setFromObject(plug).getCenter(new THREE.Vector3())
+    for (const o of plug.children) o.position.sub(plugAt)
+    plug.position.copy(plugAt)
+    const top = r.getObjectByName('SinkWaterTop')!.getWorldPosition(new THREE.Vector3()).y
     // (and the tap's handle, turned as the water's turned on and off: in a group of its own, to take the pointer; and the washer's door,
     // turned down about its hinge as it's loaded and emptied, and its basket, slid out with it (the plates' marks in it go with it))
     const handle = r.getObjectByName('SinkTapHandle')!
@@ -149,6 +169,11 @@ export function SinkModel() {
     r.updateMatrixWorld(true)
     const at = (n: string) => r.worldToLocal(r.getObjectByName(n)!.getWorldPosition(new THREE.Vector3()))
     const tip = at('SinkSpoutTip'), floor = at('SinkBasinFloor'), ringAt = at('SinkDryerRing'), steamAt = at('SinkDryerSteam')
+    dressSink(plug)
+    mergeByMaterial(plug)
+    pool.material = POOL
+    pool.renderOrder = 2
+    pool.raycast = () => {}
     // (never moving: a mesh or two for each material, its ink one line; the marks the game reads (the tap's mouth, the basin's floor) kept)
     plainColours(r)
     mergeByMaterial(r)
@@ -157,8 +182,10 @@ export function SinkModel() {
     mergeByMaterial(rack)
     door.position.copy(doorAt)
     rack.position.copy(rackAt)
-    return { root: r, tip, floor, handle, door, rack, rackZ: rackAt.z, ringAt, steamAt }
+    return { root: r, tip, floor, handle, door, rack, rackZ: rackAt.z, ringAt, steamAt, plug, plugAt, pool, poolY, base, rise: top - base }
   }, [gltf])
+  // (the plug's way out of the drain and back: 0 in, 1 lying beside it)
+  const plugOut = useRef(SINK.plug ? 0 : 1)
   // (the washer's door eased down and up; it drops forward, about its foot)
   const opened = useRef(0)
   // (what it was doing a moment ago, when it finished, and its steam's strength)
@@ -173,6 +200,7 @@ export function SinkModel() {
   const ring = useRef<THREE.Mesh>(null)
   const len = tip.y - floor.y
   const says = () => (SINK.tap ? '點一下關水' : SINK.washing ? '正在洗碗；點一下也能自己開水' : '點一下開水')
+  const plugSays = () => (SINK.plug ? '塞著，可以蓄水｜點一下拔開，把水放掉' : '拔開著，水會直接流掉｜點一下塞上')
   // (what the washer's door and its basket say, as it is now)
   const doorSays = () => {
     const ph = dryerPhase(DRYER), n = DRYER.n
@@ -190,11 +218,21 @@ export function SinkModel() {
     return '流理台沒有髒盤子'
   }
   // (which of the washer's is pointed at: its tag kept up to date as it counts down, and as it's loaded and emptied by the staff)
-  const hov = useRef<'door' | 'rack' | null>(null)
+  const hov = useRef<'door' | 'rack' | 'basin' | null>(null)
   useFrame(({ clock, camera }, dt) => {
     if (hov.current === 'door') setTip({ title: '洗碗機', hint: doorSays() })
     else if (hov.current === 'rack') setTip({ title: '洗碗籃', hint: rackSays() })
+    else if (hov.current === 'basin') setTip({ title: '流理台', hint: basinSays(SINK.water, SINK.plug) })
     const on = SINK.washing || SINK.tap
+    // (the basin's water: filled by the tap with the plug in, let out by the drain without it, never over the overflow (game/sinkWater))
+    SINK.water = waterTick(SINK.water, on, SINK.plug, Math.min(dt, 0.1))
+    pool.position.y = poolY + rise * SINK.water
+    POOL.opacity = SINK.water > 0.002 ? 0.38 : 0
+    // (the plug lifted out and laid by the drain, or back in: up out of the hole first, then over)
+    plugOut.current += ((SINK.plug ? 0 : 1) - plugOut.current) * Math.min(1, Math.min(dt, 0.1) * 6)
+    const k = plugOut.current
+    plug.position.set(plugAt.x + PLUG_OUT.x * k, plugAt.y + PLUG_OUT.y * k + Math.sin(Math.PI * k) * 0.05, plugAt.z + PLUG_OUT.z * k)
+    plug.rotation.z = 0.12 * k
     // (heard running, as loud as it's near)
     const near = Math.max(0, Math.min(1, 1 - (root.getWorldPosition(SINK_AT_V).distanceTo(camera.position) - 1.5) / 7))
     tapRunning('sink', on ? near : 0)
@@ -223,6 +261,8 @@ export function SinkModel() {
     if (ring.current) {
       ring.current.visible = on
       if (on) { const k = 1 + ((t * 2.4) % 1) * 1.6; ring.current.scale.set(k, k, k); (ring.current.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - ((t * 2.4) % 1)) }
+      // (where the stream lands: on the water once there's any)
+      ring.current.position.y = SINK.water > 0.002 ? Math.max(floor.y + 0.004, base + rise * SINK.water + 0.002) : floor.y + 0.004
     }
   })
   const doorClick = (e: Parameters<NonNullable<ReturnType<typeof tipOver>['onPointerOver']>>[0] & { stopPropagation: () => void }) => {
@@ -248,7 +288,18 @@ export function SinkModel() {
   }
   return (
     <group>
-      <primitive object={root} />
+      {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
+      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); setTip({ title: '流理台', hint: basinSays(SINK.water, SINK.plug) }) }}
+        onPointerOut={() => { if (hov.current === 'basin') hov.current = null; if (!HOVER.paused) setTip(null) }}>
+        <primitive object={root} />
+      </group>
+      <primitive object={pool} />
+      {/* (the plug: pointed at it lights and says so; clicked, it's pulled out and laid by the drain, or put back in) */}
+      <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('塞子', plugSays()).onPointerOver(e) }}
+        onPointerOut={(e) => { if (getEdit().on) return; tipOver('塞子', '').onPointerOut(e) }}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.plug = !SINK.plug; tapTurnSound(SINK.plug, 0.4); tipOver('塞子', plugSays()).onPointerOver(e) }}>
+        <primitive object={plug} />
+      </group>
       {/* (the washer's door: pointed at it lights and says what the washer's doing; clicked, down or up (not while it washes)) */}
       <group onPointerOver={(e) => { if (getEdit().on) return; hov.current = 'door'; tipOver('洗碗機', doorSays()).onPointerOver(e) }}
         onPointerOut={(e) => { if (hov.current === 'door') hov.current = null; if (getEdit().on) return; tipOver('洗碗機', '').onPointerOut(e) }}
@@ -302,13 +353,32 @@ export function SinkPart({ node }: { node: string }) {
     return r
   }, [gltf, node])
   // (the draining basket says how many plates stand in it and whether they're dry (the owner's: every plate counted))
-  if (node === 'SinkBasketSet') return (
+  const name = SINK_SETS.find((s) => s.node === node)?.label ?? ''
+  if (node !== 'SinkBasketSet') return (
+    // (the rest name themselves pointed at (the owner's, 2026-11-11: every one of them), the bin with how many sticks are in it)
+    <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: name, hint: partSays(node) }) }}
+      onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
+      <primitive object={obj} />
+    </group>
+  )
+  return (
     <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '瀝水籃', hint: basketSays() }) }}
       onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
       <primitive object={obj} />
     </group>
   )
-  return <primitive object={obj} />
+}
+/** what each of the rest of what stands on the sink says pointed at */
+function partSays(node: string) {
+  switch (node) {
+    case 'SinkScrubSet': return '棕櫚刷，刷鍋子和烤網'
+    case 'SinkSoapSet': return '洗手用的肥皂'
+    case 'SinkTowelSet': return '擦乾碗盤的布巾'
+    case 'SinkBinSet': return SINK_BIN.sticks > 0 ? `用過的竹籤 ${SINK_BIN.sticks} 根` : '用過的竹籤丟這裡，現在是空的'
+    case 'SinkDetergentSet': return '洗碗精，按一下出一點'
+    case 'SinkSpongeSet': return '菜瓜布，黃的那面軟，綠的那面刷'
+    default: return ''
+  }
 }
 /** what the draining basket says pointed at */
 function basketSays() {
