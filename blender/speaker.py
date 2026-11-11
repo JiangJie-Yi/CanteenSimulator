@@ -281,15 +281,19 @@ cab_parts.append(box("SpeakerTerminal", (0.07, 0.006, 0.05), (0, BACK + 0.001, -
 for x, mat in ((-0.015, M["red"]), (0.015, M["baffle"])):
     cab_parts.append(box(f"SpeakerClip{x}", (0.012, 0.012, 0.02), (x, BACK + 0.006, -0.09), mat, bev=0.002))
 
-# the cabinet hangs tilted in the yoke, pivoting on the knobs a little behind and above its middle
-PIVOT = Vector((0, 0.02, 0.02))
+# the cabinet hangs tilted in the yoke, pivoting on the knobs a little behind and above its middle; made 1.25 times as big on its own (the
+# owner's, 2026-11-11), and the yoke's arms drawn out forward to hold it clear of the yoke's back, the arm behind as it was
+CAB_S = 1.25
+PIVOT0 = Vector((0, 0.02, 0.02))           # where it was made about
+PIVOT = PIVOT0 + Vector((0, -0.06, 0))
 tilt = bpy.data.objects.new("SpeakerTilt", None)
 bpy.context.collection.objects.link(tilt)
 tilt.location = PIVOT
 tilt.rotation_euler = (TILT, 0, 0)
+tilt.scale = (CAB_S, CAB_S, CAB_S)
 for o in cab_parts:
     o.parent = tilt
-    o.location = Vector(o.location) - PIVOT
+    o.location = Vector(o.location) - PIVOT0
 parts += cab_parts
 
 # =====================================================================
@@ -315,7 +319,7 @@ def strip(name, path, h, t, mat):
     return mesh_obj(name, bm, mat)
 
 
-YX = W / 2 + 0.014
+YX = W * CAB_S / 2 + 0.014
 YB = 0.19
 R = 0.035
 path = [(-YX, PIVOT.y - 0.03)]
@@ -384,7 +388,7 @@ parts += [mount] + mp
 
 # ---- the cable: out of the terminal, a loose loop down, back up into the arm at the joint (it runs inside the arm to the corner)
 bpy.context.view_layer.update()
-term = tilt.matrix_world @ (Vector((0, BACK + 0.01, -0.09)) - PIVOT)
+term = tilt.matrix_world @ (Vector((0, BACK + 0.01, -0.09)) - PIVOT0)
 pts = [term, term + Vector((0, 0.03, -0.05)), Vector((0.02, 0.17, -0.2)), Vector((0.012, YB + 0.03, PIVOT.z - 0.05)),
        Vector((0.0, YB + 0.045, PIVOT.z - 0.012))]
 cd = bpy.data.curves.new("SpeakerCable", "CURVE")
