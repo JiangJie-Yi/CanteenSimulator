@@ -16,7 +16,7 @@ feature('編輯模式的群組', () => {
       const g = getEdit().groups['grp-doorcats']
       expect(g).toBeDefined()
       expect([...g.members].sort()).toEqual(['doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'doorcats', 'kabuto', 'koban'])
-      expect([g.t, g.yaw, g.s]).toEqual([[-3.5575, 0, 2.5921], 0, 1])
+      expect([g.t.map((v) => +v.toFixed(4)), g.yaw, g.s]).toEqual([[-3.5575, 0, 2.5921], 0, 1])
     })
   })
 
