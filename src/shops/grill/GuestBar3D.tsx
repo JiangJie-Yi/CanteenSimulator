@@ -27,7 +27,7 @@ import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
-import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom } from '@/scene/StaffFigure'
+import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom, sweepPose } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
 import { BossModel } from './Boss'
@@ -124,10 +124,13 @@ const PEOPLE_SCALE = 1.3
 const STAFF_SCALE = (1.05 * 0.8 * 2 * 0.95) / (0.97 * 2)
 /** the owner's figure out serving, inside a server's frame (STAFF_SCALE): his own height (Roasting's BOSS_SCALE in the shop's frame) */
 const OWNER_IN_STAFF = (1.05 * 0.8) / STAFF_SCALE
+const OWNER_HAND = new THREE.Vector3()
 /** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a black-lacquered tray held in front */
 function OwnerWalker({ moving }: { moving: boolean }) {
   const g = useRef<THREE.Group>(null)
   const tray = useRef<THREE.Mesh>(null)
+  /** his hands (the model's own nodes) and where they rest, found once he's drawn */
+  const hands = useRef<{ node: THREE.Object3D; at: THREE.Vector3; q: THREE.Quaternion; upper: boolean }[] | null>(null)
   useFrame(({ clock }) => {
     const o = g.current
     if (!o) return
@@ -136,6 +139,20 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     o.position.y = moving ? Math.abs(Math.sin(t * 9)) * 0.014 : 0
     // (sweeping up broken glass, or the broom carried: the tray put by)
     if (tray.current) tray.current.visible = !o.parent?.userData.broom
+    // (sweeping: both his hands on the broom's handle, going with it from side to side, as a server's are (the owner's, 2026-11-11: his hands
+    // stood still at his sides while the broom swept); back where they rest after)
+    if (!hands.current) {
+      const l = o.getObjectByName('BossHandL'), r = o.getObjectByName('BossHandR')
+      if (l && r) hands.current = [l, r].map((node, k) => ({ node, at: node.position.clone(), q: node.quaternion.clone(), upper: k === 0 }))
+    }
+    const sweep = o.parent?.userData.sweep as number | undefined
+    if (hands.current) for (const h of hands.current) {
+      if (sweep === undefined || !h.node.parent) { h.node.position.copy(h.at); h.node.quaternion.copy(h.q); continue }
+      const p = sweepPose(sweep)
+      o.updateWorldMatrix(true, false)
+      h.node.parent.updateWorldMatrix(true, false)
+      h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? p.upper : p.lower))))
+    }
   })
   return (
     <group ref={g}>
@@ -2724,6 +2741,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * seat nearest it, and over to stand before it, the broom's reach short of its middle (StaffFigure's sweepPose: its foot that far out); walked
    * backwards, it's their way back
    */
+  /** the seat whose place on the aisle is nearest a point (the bar's frame) */
+  const nearestSeat = (p: THREE.Vector3) => {
+    let best = 0, bd = Infinity
+    seats.forEach((st, n) => { const d = Math.hypot(st.aisle.x - p.x, st.aisle.z - p.z); if (d < bd) { bd = d; best = n } })
+    return best
+  }
   const spillPath = (wi: number, s: Spill) => {
     const f = frame.current
     if (!f || !seats.length) return null
@@ -4567,7 +4590,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (!sp || w.t >= SWEEP_S) {
           SPILLS.list = SPILLS.list.filter((x) => x.key !== w.spill)
           w.spill = undefined
-          go(w.path.slice(0, -1).concat(w.pos.clone()), 'back')
+          // (any more glass broken that no one's on: straight on to it along the aisle, and only then back (the owner's, 2026-11-11: he went
+          // back to his place after each and came out again for the next))
+          const next = SHOP.leaving ? undefined : SPILLS.list.find((x) => x.by === null)
+          const to = next ? spillPath(wi, next) : null
+          const here = nearestSeat(w.pos)
+          if (next && to && to.length >= 2) {
+            next.by = wi
+            w.spill = next.key
+            const there = nearestSeat(to[to.length - 2])
+            const turn = seats[here].counter === seats[there].counter ? [] : [aisleCorner(counters[seats[here].counter === 0 ? seats[there].counter : seats[here].counter])]
+            go([w.pos.clone(), seats[here].aisle.clone(), ...turn, ...to.slice(-2)], 'sweepGo')
+          } else go([...backPath(wi, here).slice(0, -1), w.pos.clone()], 'back')
         }
       }
       else if (w.phase === 'toBox') walk(() => { w.phase = 'boxTake'; face(takeoutOf().at) })
