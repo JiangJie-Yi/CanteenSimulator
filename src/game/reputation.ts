@@ -94,8 +94,23 @@ export function remarkOf(v: Visit): Remark {
   return t >= 80 ? 'great' : t >= 60 ? 'good' : t >= 40 ? 'fine' : 'poor'
 }
 /** how many visits are kept (the rating needs only the latest; a few more for the list) */
-export const KEEP_VISITS = 120
-export const keepVisits = (vs: Visit[]) => (vs.length > KEEP_VISITS ? vs.slice(-KEEP_VISITS) : vs)
+/** every review kept, however many (the owner's, 2026-11-12: no limit; the rating still the latest RECENT's) */
+export const keepVisits = (vs: Visit[]) => vs
+/** the reviews a page at a time, as a map app lists them: how many to a page, how many pages, and the ones on a page (0 the first; past the
+ * last, the last) */
+export const REVIEWS_PER_PAGE = 10
+export const pagesOf = (n: number) => Math.max(1, Math.ceil(n / REVIEWS_PER_PAGE))
+export const pageOf = <T,>(list: readonly T[], page: number) => {
+  const p = Math.max(0, Math.min(pagesOf(list.length) - 1, page))
+  return list.slice(p * REVIEWS_PER_PAGE, (p + 1) * REVIEWS_PER_PAGE)
+}
+/** the page numbers to show under the list: the first, the last, and two either side of the one open; null for a gap between (…) */
+export function pageButtons(page: number, pages: number): (number | null)[] {
+  const keep = new Set([0, pages - 1, ...[-2, -1, 0, 1, 2].map((d) => page + d)].filter((k) => k >= 0 && k < pages))
+  const out: (number | null)[] = []
+  ;[...keep].sort((a, b) => a - b).forEach((k, i, all) => { if (i && k - all[i - 1] > 1) out.push(null); out.push(k) })
+  return out
+}
 
 /** a visit's three sides as a map app's review of a restaurant shows them (料理 5/5, サービス 4/5, 雰囲気 5/5): whole stars, 1 to 5; nothing
  * eaten, none for the food */

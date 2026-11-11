@@ -6,14 +6,14 @@
 // useful (game/reputation, data/reviewers). A new game's shop has none: nought stars. A drawer out from the left edge under the sign, back again at its ×, at a click on
 // nothing in the room or at Esc (the owner's), in the office's finish: its wood title bar, its glass, a section under a rule, a card each.
 // Its second tab, 關於 (the owner's): the game, who makes it, its source on GitHub, and the work used in it under licence with its authors.
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { CC_BY_URL, CREDITS, DEV_MODEL, DEVELOPER, DEVELOPER_URL, REPO_URL, VERSION, versionText } from '@/data/credits'
 import { guestLabel } from '@/data/guests'
 import { reviewerNames, reviewerProfile } from '@/data/reviewers'
 import { tl, type Lang } from '@/data/i18n'
 import { STORY } from '@/data/story'
 import { CAPITAL, SHOP_COST } from '@/game/economy'
-import { agoOf, remarkOf, REVIEW_PACKS, sortReviews, starCounts, visitSides, visitStars, type Rating, type Remark, type ReviewOrder, type Visit } from '@/game/reputation'
+import { agoOf, pageButtons, pageOf, pagesOf, remarkOf, REVIEW_PACKS, sortReviews, starCounts, visitSides, visitStars, type Rating, type Remark, type ReviewOrder, type Visit } from '@/game/reputation'
 import { FitLine } from './FitLine'
 import { ReviewerAvatar } from './ReviewerAvatar'
 import { Glyph, StarIcon } from './GameIcons'
@@ -139,8 +139,6 @@ function sidesText(s: ReturnType<typeof visitSides>, lang: Lang) {
   const parts: [string, string, string, number | null][] = [['料理', '料理', 'Food', s.food], ['服務', 'サービス', 'Service', s.service], ['環境', '雰囲気', 'Atmosphere', s.place]]
   return parts.filter(([, , , v]) => v !== null).map(([zh, ja, en, v]) => `${tl(lang, zh, ja, en)}：${v}/5`).join('｜')
 }
-/** how many reviews show at once (the drawer scrolls) */
-const SHOWN = 20
 
 export const Reputation = memo(function Reputation({ open, lang, rating, visits, today, cash, onBuy, onClose }:
   { open: boolean; lang: Lang; rating: Rating; visits: Visit[]; today: number; cash: number; onBuy: (pack: number) => void; onClose: () => void }) {
@@ -163,7 +161,16 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
     [tl(lang, '環境', '店内', 'The place'), rating.place],
   ]
   const counts = starCounts(visits), most = Math.max(1, ...counts)
-  const shown = sortReviews(visits, order).slice(0, SHOWN)
+  // (a page of them at a time, the pages under them as a map app has them (the owner's, 2026-11-12: no limit, a page at a time))
+  const [page, setPage] = useState(0)
+  const sorted = sortReviews(visits, order)
+  const pages = pagesOf(sorted.length)
+  const at = Math.min(page, pages - 1)
+  const shown = pageOf(sorted, at)
+  // (to the top of the list as the page turns)
+  const listTop = useRef<HTMLElement>(null)
+  const turned = useRef(at)
+  useEffect(() => { if (turned.current !== at) { turned.current = at; listTop.current?.scrollIntoView({ block: 'start' }) } }, [at])
   const names = reviewerNames(shown.map((v) => v.id))
   const stars = rating.stars ?? 0
   return (
@@ -265,9 +272,9 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
               )}
             </div>
             <h4>{tl(lang, '評論', 'クチコミ', 'Reviews')}<small>{rating.n}</small></h4>
-            <nav className="rep-sort" aria-label={tl(lang, '排序', '並べ替え', 'Sort')}>
+            <nav ref={listTop} className="rep-sort" aria-label={tl(lang, '排序', '並べ替え', 'Sort')}>
               {ORDERS.map(([k, zh, ja, en]) => (
-                <button key={k} type="button" aria-pressed={order === k} onClick={() => setOrder(k)}>{tl(lang, zh, ja, en)}</button>
+                <button key={k} type="button" aria-pressed={order === k} onClick={() => { setOrder(k); setPage(0) }}>{tl(lang, zh, ja, en)}</button>
               ))}
             </nav>
             {shown.length === 0 ? (
@@ -298,6 +305,15 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
                   )
                 })}
               </ul>
+            )}
+            {pages > 1 && (
+              <nav className="rep-pages" aria-label={tl(lang, '評論頁數', 'ページ', 'Pages')}>
+                <button type="button" disabled={at === 0} onClick={() => setPage(at - 1)}>{tl(lang, '上一頁', '前へ', 'Previous')}</button>
+                {pageButtons(at, pages).map((k, i) => k === null
+                  ? <span key={`g${i}`} className="rep-gap">…</span>
+                  : <button key={k} type="button" aria-current={k === at ? 'page' : undefined} onClick={() => setPage(k)}>{k + 1}</button>)}
+                <button type="button" disabled={at === pages - 1} onClick={() => setPage(at + 1)}>{tl(lang, '下一頁', '次へ', 'Next')}</button>
+              </nav>
             )}
             <p className="rep-note">{tl(lang, '最近 60 位客人（越近的越重）：料理 45%、服務 35%、環境 20%。沒吃就走的給 1 星。評價會影響來客：4.6 以上客人多五成，2.5 以下只剩三成。',
               '最近 60 人（新しいほど重い）：料理 45%・サービス 35%・雰囲気 20%。食べずに帰った客は星 1。評価は客足に響く：4.6 以上で 5 割増、2.5 未満で 3 割に。',

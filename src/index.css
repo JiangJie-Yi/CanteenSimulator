@@ -7598,6 +7598,12 @@ html.theme-fading::view-transition-new(brand) { animation: none; }
 .rep-kind { padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 400; opacity: 0.75; background: rgb(127 127 127 / 0.16); }
 .rep-said { font-size: 13.5px; }
 .rep-note { margin: 0; padding: 10px 2px 12px; font-size: 11.5px; }
+/* (the reviews' pages under them, as a map app has them: back and on, the page numbers, a gap where they're skipped) */
+.rep-pages { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 10px 0 0; flex-wrap: nowrap; }
+.rep-pages button { flex: none; min-width: 28px; padding: 4px 8px; border: 1px solid rgb(59 42 32 / 0.25); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.rep-pages button[aria-current='page'] { background: #5a3d28; border-color: #5a3d28; color: #f6e8cc; }
+.rep-pages button:disabled { opacity: 0.35; cursor: default; }
+.rep-pages .rep-gap { padding: 0 2px; opacity: 0.6; }
 /* (how many gave five stars down to one: a bar each, the most of them full) */
 .rep-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 .rep-bars li { display: grid; grid-template-columns: 0.8em minmax(0, 1fr); align-items: center; gap: 6px; font-size: 11.5px; line-height: 1; color: #7a6250; }
