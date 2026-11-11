@@ -5436,6 +5436,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
   // (each place's drinks sliding down into the place of the one taken from its front: how many fewer, since when; and how many it held)
   const slides = useRef(new Map<string, { from: number; count: number }>())
   const had = useRef(new Map<string, number>())
+  const hadVer = useRef(-1)
   const [, setSliding] = useState(0)
   const doorOpen = () => FRIDGE_STATE[n].open || FRIDGE_STATE[n].passing > 0
   // (what the shelves' batch was made with: each place's drink, an empty one as the drink that's its own (its home), so a place emptied and
@@ -5455,13 +5456,17 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // down to the front (the owner's, 2026-11-11: as a convenience store's; before, they stood from the back wall forward and the front one
     // taken left a gap); the front one hidden while it's pointed at or carried, drawn on its own then; and a place whose drinks are sliding
     // down, all of it hidden, drawn on its own (SlideRun) till they're down)
-    FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {
-      const key = `${r}-${k}`, c = id ? FRIDGE_STOCK.counts[n][r][k] : 0, before = had.current.get(key)
-      had.current.set(key, c)
-      if (before !== undefined && c > 0 && c < before && id === baked[r]?.[k]) { slides.current.set(key, { from: before - c, count: c }); setSliding((v) => v + 1) }
-    }))
+    // (only when the stock's changed: not every frame)
+    if (hadVer.current !== FRIDGE_STOCK.ver) {
+      hadVer.current = FRIDGE_STOCK.ver
+      FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {
+        const key = `${r}-${k}`, c = id ? FRIDGE_STOCK.counts[n][r][k] : 0, before = had.current.get(key)
+        had.current.set(key, c)
+        if (before !== undefined && c > 0 && c < before && id === baked[r]?.[k]) { slides.current.set(key, { from: before - c, count: c }); setSliding((v) => v + 1) }
+      }))
+    }
     const api = batch.current
-    const now = `${FRIDGE_STOCK.ver}|${lifted}|${raised}|${[...slides.current.keys()].join(',')}`
+    const now = `${FRIDGE_STOCK.ver}|${lifted}|${raised}|${slides.current.size ? [...slides.current.keys()].join(',') : ''}`
     if (api && (shown.current.now !== now || shown.current.api !== api)) {
       shown.current = { now, api }
       FRIDGE_STOCK.units[n].forEach((row, r) => row.forEach((id, k) => {

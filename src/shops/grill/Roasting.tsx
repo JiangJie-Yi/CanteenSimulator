@@ -6975,7 +6975,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // (it went by the piece's own size against what it was meant to be, and the whole fish, drawn 1.1 to 1.3 as they're served, kept rods
         // to 2 m long))
         const hs = p.node.userData.home?.s as THREE.Vector3 | undefined
-        const wk = hs && hs.x > 0 ? p.node.getWorldScale(ROD_WS).x / hs.x : 1
+        // (read from its world matrix as last drawn: getWorldScale would work the whole chain above it out again, for every piece, every frame)
+        const wk = hs && hs.x > 0 ? ROD_WS.setFromMatrixScale(p.node.matrixWorld).x / hs.x : 1
         const keep = wk > 1.0 ? 1 / wk : 1
         for (const m of p.sticks) {
           m.visible = grow > 0.001 && !p.stickOnly ? true : p.stickOnly && p.pullAt === undefined
