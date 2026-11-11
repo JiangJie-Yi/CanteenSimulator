@@ -1835,6 +1835,7 @@ function RoundWindow() {
 
 /** a hanging scroll: the painting on paper mounted in brocade, its cord over a nail, a weighted rod at the foot */
 /** what the pieces only to look at say when they're pointed at (the owner's): a tag, no glow, the cursor left an arrow, no click */
+const KOI_SAYS = nameOver('【版畫】錦鯉', '紅白與山吹色的錦鯉在深水中悠游，象徵好運與興旺')
 const BIJIN_SAYS = nameOver('【掛軸】三味線美人圖', '江戶浮世繪藝伎，洋溢典雅古韻')
 const BAMBOO_SAYS = nameOver('【觀賞盆栽】青竹', '象徵節節高升，增添店內沉靜綠意')
 function Scroll({ art }: { art: ArtKey }) {
@@ -3907,8 +3908,8 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
         <group key={sd} position={[-0.15, VASE_LIFT, sd * 0.3]}><BouquetPick slot={sd < 0 ? 0 : 1} /><ContactShadow r={0.05} y={0.0013} /></group>
       ))}
       {/* the cups' stand (blender/kamidana.py), the cups on it */}
-      {(part === 'all' || part === 'cups') && <group position={[-0.3, 0, 0]}><KamidanaModel part="cupstand" /><ContactShadow r={0.15} /></group>}
-      {(part === 'all' || part === 'cups') && [-0.09, 0, 0.09].map((z) => (
+      {(part === 'all' || part === 'cups') && <group position={[-0.3, 0, 0]}><group scale-z={CUPSTAND_SHORT}><KamidanaModel part="cupstand" /></group><ContactShadow r={0.15 * CUPSTAND_SHORT} /></group>}
+      {(part === 'all' || part === 'cups') && [-CUP_DZ, 0, CUP_DZ].map((z) => (
         <group key={z} position={[-0.3, 0.03, z]}>
           {/* (a cup with a wall of its own: a thick rim, a foot ring, a floor, the sake poured in is seen in it) */}
           <mesh geometry={SAKE_CUP} position-y={-0.0125}><meshToonMaterial color="#f4f1ea" /></mesh>
@@ -3921,6 +3922,11 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
 
 /** the shrine's scale on the shelf (its cups too) */
 const KAMI_SC = 1.25
+/** the cups' glass stand drawn shorter, and the cups on it closer (the owner's, 2026-11-11: the stand shortened, the cups the closer; they
+ * were 0.09 apart): their spacing in the cups' own frame, and in the altar's (KAMI_SC), which the pour goes by */
+const CUPSTAND_SHORT = 0.7
+const CUP_DZ = 0.09 * CUPSTAND_SHORT
+const CUP_DZ_ALTAR = CUP_DZ * KAMI_SC
 /** the cup's inside: its floor's height, how high it's filled, and its radius at a height (the inner wall of SAKE_CUP's profile, in its own units) */
 const CUP_FLOOR = 0.0058, CUP_FULL = 0.0212
 const CUP_INNER: [number, number][] = [[0.0056, 0], [0.0062, 0.0066], [0.0125, 0.0088], [0.0225, 0.0102], [0.0246, 0.0106]]
@@ -4335,6 +4341,10 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           {/* (the moon's dust in its shaft by night, outside the batch: it drifts, and a batch's pieces stand still) */}
           {a.round && <group position={[0, 1.4, a.z + nudgeArt(a.z)]}><WindowDust /><RoundShoji /></group>}
           {/* (the beauty with her shamisen: only to look at (the owner's), named when pointed at, the cursor left an arrow) */}
+          {/* (the koi print: only to look at, named when pointed at (the owner's, 2026-11-11)) */}
+          {!a.round && !a.scroll && a.print === 'koi' && (
+            <mesh visible={false} position={[-0.01, 1.5, a.z + nudgeArt(a.z)]} {...KOI_SAYS}><boxGeometry args={[0.02, 0.52, 0.66]} /></mesh>
+          )}
           {a.scroll === 'bijin' && (
             <mesh visible={false} position={[-0.01, 1.42, a.z + nudgeArt(a.z)]} {...BIJIN_SAYS}><boxGeometry args={[0.02, 0.92, 0.34]} /></mesh>
           )}
@@ -4438,7 +4448,9 @@ const ALTAR_D = 0.58
 const TABLE_DEEP = 0.53 / ALTAR_D
 /** where the two little lanterns stand on the shelf, in its frame: beside the shrine's base's front corners (its plinth out to 0.2475 across,
  * its front at 0.065), between it and the vases (from 0.325 across), behind the flask and the book */
-const SHRINE_LAMP_X = 0.07, SHRINE_LAMP_Z = 0.288
+// (forward of where they stood and in a little, either side of the cups' shortened stand, and a little smaller (the owner's, 2026-11-11):
+// they stood at 0.07, 0.288, full size)
+const SHRINE_LAMP_X = 0.0, SHRINE_LAMP_Z = 0.23, SHRINE_LAMP_SC = 0.85
 /** where the flask stands, by the cups' stand (back 0.02 with them) */
 const FLASK_X = -0.04
 /** and its height: up over the beckoning cats' stand below it, by the door */
@@ -4632,7 +4644,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       cupsOff.set(l.x - (ALTAR_D / 2 - 0.375 + CUPS_SHIFT), l.y - 0.03 * KAMI_SC, l.z)
     }
     const CUP_X = ALTAR_D / 2 - 0.375 + CUPS_SHIFT + cupsOff.x, CUP_TOP = 0.05 + cupsOff.y, POUR_Y = 0.085 + cupsOff.y
-    const cupZ = [-0.1125, 0, 0.1125].map((z) => z + cupsOff.z)
+    const cupZ = [-CUP_DZ_ALTAR, 0, CUP_DZ_ALTAR].map((z) => z + cupsOff.z)
     const rest = { x: FLASK_X, y: 0, z: 0.3 }
     const f = flaskRef.current
     // (one cup after another: 1.1 s each from 0.7 s in, the first quarter second gliding over from the last cup, tipped back a little so
@@ -4694,7 +4706,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       const fill = !on ? 0 : THREE.MathUtils.smoothstep(since - 0.7 - i * 1.1, i ? 0.32 : 0.1, 1.0)
       m.visible = fill > 0
       const h = CUP_FLOOR + (CUP_FULL - CUP_FLOOR) * fill
-      m.position.set(ALTAR_D / 2 - 0.375 + CUPS_SHIFT + cupsOff.x, KAMI_SC * (0.03 - 0.0125 + h) + cupsOff.y, [-0.1125, 0, 0.1125][i] + cupsOff.z)
+      m.position.set(ALTAR_D / 2 - 0.375 + CUPS_SHIFT + cupsOff.x, KAMI_SC * (0.03 - 0.0125 + h) + cupsOff.y, [-CUP_DZ_ALTAR, 0, CUP_DZ_ALTAR][i] + cupsOff.z)
       m.scale.setScalar(Math.max(0.0001, KAMI_SC * cupInnerR(h) * 0.96))
     }
   })
@@ -4729,7 +4741,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
           the vases, lit; clear of the side doors as they open, of the flask and of the book */}
       {[-1, 1].map((sd) => (
         <Movable key={sd} id={`shrinelamp${sd}`} label={sd < 0 ? '神前廊燈（左）' : '神前廊燈（右）'}>
-          <group position={[SHRINE_LAMP_X, 0, sd * SHRINE_LAMP_Z]} scale={SC} {...nameOver('【廊燈】神前廊燈', '供在神前的木造廊燈，柔和照亮神龕門戶。')}><StaticBatch plain><KamiCopy part="lantern" /></StaticBatch><ContactShadow r={0.032} /></group>
+          <group position={[SHRINE_LAMP_X, 0, sd * SHRINE_LAMP_Z]} scale={SC * SHRINE_LAMP_SC} {...nameOver('【廊燈】神前廊燈', '供在神前的木造廊燈，柔和照亮神龕門戶。')}><StaticBatch plain><KamiCopy part="lantern" /></StaticBatch><ContactShadow r={0.032} /></group>
         </Movable>
       ))}
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
@@ -4777,7 +4789,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
         <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} /><meshBasicMaterial color="#e6f4ff" transparent opacity={0.55} depthWrite={false} />
       </mesh>
       {[0, 1, 2].map((i) => (
-        <mesh key={i} ref={(m) => { liquid.current[i] = m }} position={[ALTAR_D / 2 - 0.375 + CUPS_SHIFT, 0.035, [-0.1125, 0, 0.1125][i]]} rotation-x={-Math.PI / 2} visible={false}>
+        <mesh key={i} ref={(m) => { liquid.current[i] = m }} position={[ALTAR_D / 2 - 0.375 + CUPS_SHIFT, 0.035, [-CUP_DZ_ALTAR, 0, CUP_DZ_ALTAR][i]]} rotation-x={-Math.PI / 2} visible={false}>
           <circleGeometry args={[1, 24]} /><meshBasicMaterial color="#e3f1fb" transparent opacity={0.8} depthWrite={false} />
         </mesh>
       ))}
