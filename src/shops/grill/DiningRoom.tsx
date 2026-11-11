@@ -6158,20 +6158,20 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false }: { id
           <mesh geometry={shaded(PACK.seam, d.label[0], true)} position-y={PACK.h} material={SHELF_PARTS} />
           <mesh geometry={PACK.hole} position={PACK.holeAt} material={SHELF_METAL} />
         </> : kind === 'can' && id !== 'cola' && id !== 'greenTea' ? <>
-          <mesh geometry={shadedLabel(LITE_GEO.canLabel, id)} position-y={0.045} material={SHELF_LABEL} />
-          <mesh geometry={LITE_CAN_LID} material={SHELF_METAL} />
+          <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO.canLabel) : LITE_GEO.canLabel, id)} position-y={0.045} material={SHELF_LABEL} />
+          <mesh geometry={back ? LITE_CAN_LID_FAR : LITE_CAN_LID} material={SHELF_METAL} />
         </> : kind === 'small' ? <>
-          <mesh geometry={shadedLabel(BOTTLE_GEO.small, id)} position-y={0.036} material={SHELF_LABEL} />
-          <mesh geometry={shaded(BOTTLE_GEO.smallTop, d.cap)} position-y={0.074} material={SHELF_PARTS} />
+          <mesh geometry={shadedLabel(back ? SMALL_FAR : BOTTLE_GEO.small, id)} position-y={0.036} material={SHELF_LABEL} />
+          <mesh geometry={shaded(back ? SMALL_LID_FAR : SMALL_LID, d.cap)} position-y={0.074} material={SHELF_PARTS} />
         </> : shaped && <>
           {/* (the drink in it seen through its glass (the owner's: they were solid plastic colours), the neck above it only glass: the drink
               first, so the glass is laid over it; the ramune's marble in its neck) */}
           {/* (one behind another (`back`): its glass tinted the drink's colour, the drink in it not drawn, nor the ramune's marble or a collar) */}
           {!back && <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />}
-          <mesh geometry={shadedGlass(LITE_GEO[shaped].body, body, back ? Math.min(1, glassAlpha(id) + 0.25) : glassAlpha(id))} material={SHELF_GLASS} />
+          <mesh geometry={shadedGlass(back ? LITE_FAR[shaped] : LITE_GEO[shaped].body, body, back ? Math.min(1, glassAlpha(id) + 0.25) : glassAlpha(id))} material={SHELF_GLASS} />
           {!back && shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
-          <mesh geometry={shadedLabel(LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
-          <mesh geometry={shaded(LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
+          <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO[shaped].label) : LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
+          <mesh geometry={shaded(back ? LITE_GEO.capFar : LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
           {/* (the beer's gold foil round its neck, the sake's paper collar under its cap (the plum wine's red), as the full bottles have them) */}
           {!back && LITE_GEO[shaped].collar && !soju(id) && (
             <mesh geometry={shaded(LITE_GEO[shaped].collar!.geo, f === 'beer' ? '#d4b04a' : id === 'umeshu' ? '#b8261c' : '#f4efe2')}
@@ -6340,6 +6340,27 @@ const LITE_PTS: Record<'beer' | 'sake' | 'pet500' | 'pet' | 'milk' | 'ramune', [
 }
 /** a collar round a shelf bottle's neck: a band open at both ends, `rb` round at its foot, `rt` at its top, `h` tall */
 const liteCollar = (rb: number, rt: number, h: number) => new THREE.CylinderGeometry(rt, rb, h, 8, 1, true)
+/** a shelf bottle's cap: its side and its top turned in to a small ring (no fan of triangles into its middle (the owner's, 2026-11-12: the
+ * caps showed spokes); open underneath, where it sits on the neck), `seg` round */
+const liteCap = (seg: number) => new THREE.LatheGeometry([new THREE.Vector2(0.013, -0.005), new THREE.Vector2(0.013, 0.005), new THREE.Vector2(0.0035, 0.005)], seg)
+/** the bottles behind the front one in each place, all but hidden by it (the owner's, 2026-11-12: no more faces than need be): six round,
+ * their bodies in fewer rings (the foot, the body's top, the shoulder, the lip), their labels and caps six round too; a third of the faces */
+const LITE_FAR_PTS: Record<keyof typeof LITE_PTS, [number, number][]> = {
+  beer: [[0.012, 0], [0.0275, 0.003], [0.0275, 0.12], [0.0145, 0.17], [0.0135, 0.206], [0.004, 0.207]],
+  sake: [[0.012, 0], [0.0245, 0.003], [0.0245, 0.12], [0.014, 0.178], [0.0115, 0.206], [0.004, 0.207]],
+  pet500: [[0.012, 0], [0.0235, 0.004], [0.0235, 0.1], [0.0135, 0.145], [0.0105, 0.158], [0.004, 0.159]],
+  pet: [[0.014, 0], [0.032, 0.006], [0.032, 0.17], [0.017, 0.225], [0.0135, 0.246], [0.004, 0.247]],
+  milk: [[0.012, 0], [0.0225, 0.004], [0.0225, 0.085], [0.0175, 0.106], [0.0175, 0.118], [0.004, 0.119]],
+  ramune: [[0.012, 0], [0.025, 0.006], [0.025, 0.085], [0.0115, 0.122], [0.0122, 0.178], [0.004, 0.179]],
+}
+const LITE_FAR = Object.fromEntries(Object.entries(LITE_FAR_PTS).map(([k, pts]) => [k, new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 6)])) as unknown as Record<keyof typeof LITE_PTS, THREE.BufferGeometry>
+const LITE_FAR_LABEL = new Map<THREE.BufferGeometry, THREE.BufferGeometry>()
+/** a label band six round, the same size as the one given */
+const farLabel = (g: THREE.CylinderGeometry) => {
+  let f = LITE_FAR_LABEL.get(g)
+  if (!f) { const p = g.parameters; f = new THREE.CylinderGeometry(p.radiusTop, p.radiusBottom, p.height, 6, 1, true); LITE_FAR_LABEL.set(g, f) }
+  return f
+}
 const LITE_GEO = {
   beer: { body: liteBody(LITE_PTS.beer), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 8, 1, true), labelY: 0.065, capY: 0.21, capR: 1.1,
     collar: { geo: liteCollar(0.0152, 0.0136, 0.028), y: 0.186 } as { geo: THREE.BufferGeometry; y: number } | null },
@@ -6353,7 +6374,8 @@ const LITE_GEO = {
     collar: null as { geo: THREE.BufferGeometry; y: number } | null },
   ramune: { body: liteBody(LITE_PTS.ramune), label: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 8, 1, true), labelY: 0.055, capY: 0.181, capR: 1.0,
     collar: null as { geo: THREE.BufferGeometry; y: number } | null },
-  cap: new THREE.CylinderGeometry(0.013, 0.013, 0.01, 8),
+  cap: liteCap(8),
+  capFar: liteCap(6),
   marble: new THREE.IcosahedronGeometry(0.0108, 0),
   canLabel: new THREE.CylinderGeometry(0.0212, 0.0212, 0.088, 8, 1, true),
 }
@@ -6950,6 +6972,14 @@ CAN_LID.computeVertexNormals()
 const LITE_CAN_LID = new THREE.LatheGeometry([[0.0214, 0.0884], [0.0203, 0.0897], [0.0189, 0.0912], [0.0187, 0.0928], [0.0181, 0.0935], [0.0174, 0.0929],
   [0.0168, 0.0915], [0.0164, 0.0909], [0.0045, 0.0911]].map(([r, y]) => new THREE.Vector2(r, y)), 8)
 LITE_CAN_LID.computeVertexNormals()
+/** a can behind the front one: its lid in four rings, six round (36 faces against 128) */
+const LITE_CAN_LID_FAR = new THREE.LatheGeometry([[0.0214, 0.0884], [0.0187, 0.0928], [0.0168, 0.0915], [0.0045, 0.0911]].map(([r, y]) => new THREE.Vector2(r, y)), 6)
+LITE_CAN_LID_FAR.computeVertexNormals()
+/** a little bottle behind the front one: its body six round in five rings; and every little bottle's lid, its side and its top turned in to
+ * a small ring (it was a cylinder whose top was a fan of triangles into its middle) */
+const SMALL_FAR = new THREE.LatheGeometry([[0, 0], [0.016, 0], [0.017, 0.02], [0.013, 0.036], [0.015, 0.072], [0, 0.072]].map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 6)
+const smallLid = (seg: number) => new THREE.LatheGeometry([new THREE.Vector2(0.0155, -0.002), new THREE.Vector2(0.0155, 0.002), new THREE.Vector2(0.004, 0.002)], seg)
+const SMALL_LID = smallLid(8), SMALL_LID_FAR = smallLid(6)
 const CAN_TAB = (() => {
   // (the ring pull: a rounded tongue with its finger hole, lying flat, its rivet end over the lid's middle)
   const s = new THREE.Shape()

@@ -429,7 +429,7 @@ export const FRIDGE_STOCK = {
 }
 /** a fridge's places as game/drinkStock takes them (its own rows and counts, changed in place) */
 export const placesOf = (unit: number): Places<DrinkId> => ({ rows: FRIDGE_STOCK.units[unit], counts: FRIDGE_STOCK.counts[unit] })
-if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stock?: typeof FRIDGE_STOCK }).__stock = FRIDGE_STOCK
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __stock: FRIDGE_STOCK, __fridgeUnits: FRIDGE_UNITS })
 // (kept again whenever the fridges or the back change: looked at every second and a half)
 if (typeof window !== 'undefined') {
   let seen = ''
