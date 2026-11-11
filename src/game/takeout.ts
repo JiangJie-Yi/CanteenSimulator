@@ -23,3 +23,8 @@ export const takeoutSize = (rider: boolean, r: number) => 1 + Math.floor(r * (ri
  * first's lid) */
 export type TakeoutOrder = { id: number; rider: boolean; items: number; packed: number; ready: boolean; taken: boolean; handed: boolean; gone: boolean
   tier?: number }
+
+/** how many takeaways the warming tub on the takeaway table is keeping warm (the owner's, 2026-11-11: it holds the takeaways, not rice): those
+ * packed and ready that haven't been handed over yet, as many as it holds */
+export const WARM_TUB_HOLDS = 6
+export const keptWarm = (orders: readonly TakeoutOrder[]) => Math.min(WARM_TUB_HOLDS, orders.filter((o) => o.ready && !o.handed).length)

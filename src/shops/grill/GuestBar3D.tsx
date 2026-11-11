@@ -66,6 +66,7 @@ import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTi
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
+import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
 import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes } from '@/game/soup'
 import { bottleClink, plateClink, stoolSound, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
@@ -5415,11 +5416,24 @@ const STAND_SLOTS: [number, number, number][] = [-0.75, 0, 0.75].map((a) => [Mat
 const WARM_TUB_Z = 0, WARM_TUB_SCALE = 0.44 * 1.65 * 1.1
 /** the warming tub (保溫桶; the owner's, 2026-11-11: the old rice tub, put on the takeaway table): the sawara tub bound in copper, its lid on */
 // (opened by a click as the rice tub was: its lid lifted off and leant against its side, the rice kept warm in it seen; another, shut)
+/** the takeaways kept warm in the tub (the owner's, 2026-11-11: it holds the takeaways, not rice): kraft paper boxes, a red band round each, two
+ * to a layer, up from its floor; as many shown as are packed and waiting (game/takeout keptWarm), the rest shrunk to nothing (drawn from the
+ * start, so none is new to the renderer when it's shown) */
+const WARM_PACK_GEO = new THREE.BoxGeometry(0.18, 0.055, 0.125)
+const WARM_BAND_GEO = new THREE.BoxGeometry(0.03, 0.058, 0.128)
+const WARM_PACK_MAT = new THREE.MeshToonMaterial({ color: '#c79d66' })
+const WARM_BAND_MAT = new THREE.MeshToonMaterial({ color: '#b3362c' })
+const WARM_PACKS: [number, number, number][] = Array.from({ length: WARM_TUB_HOLDS }, (_, i) => [(i % 2 ? 1 : -1) * 0.094, 0.028 + 0.0275 + Math.floor(i / 2) * 0.057, (i % 4 < 2 ? 1 : -1) * 0.01])
 const WarmTub = memo(function WarmTub() {
   const tub = useRiceTub()
   const [open, setOpen] = useState(false)
-  const lid = useRef<THREE.Group>(null), rice = useRef<THREE.Group>(null)
+  const lid = useRef<THREE.Group>(null)
+  const packs = useRef<(THREE.Group | null)[]>([])
   const lidT = useRef(0)
+  const says = () => {
+    const n = keptWarm(TAKEOUT.orders)
+    return `外型像盛白飯的木飯桶（おひつ），裡面保溫著打包好的外帶（${n} 份）｜點一下${open ? '蓋上' : '打開'}`
+  }
   useFrame((_, dt) => {
     lidT.current = THREE.MathUtils.clamp(lidT.current + (open ? 1 : -1) * Math.min(dt, 0.1) * 2.2, 0, 1)
     const k = lidT.current * lidT.current * (3 - 2 * lidT.current)
@@ -5427,14 +5441,20 @@ const WarmTub = memo(function WarmTub() {
       lid.current.position.set(-0.32 * k, 0.42 - 0.1585 * k + Math.sin(k * Math.PI) * 0.22, 0)
       lid.current.rotation.z = k * 1.36
     }
-    if (rice.current) rice.current.visible = k > 0.05
+    const n = keptWarm(TAKEOUT.orders)
+    packs.current.forEach((g, i) => { if (g) g.scale.setScalar(i < n ? 1 : 0.0001) })
   })
   return (
     <group scale={WARM_TUB_SCALE}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
-      {...nameOver('保溫桶', `外型像盛白飯的木飯桶（おひつ），保溫著白飯｜點一下${open ? '蓋上' : '打開'}`)}>
+      onPointerOver={(e) => nameOver('保溫桶', says()).onPointerOver(e)} onPointerOut={() => nameOver('保溫桶', '').onPointerOut()}>
       <primitive object={tub.body} />
-      <group ref={rice} visible={false}><primitive object={tub.rice} /></group>
+      {WARM_PACKS.map((at, i) => (
+        <group key={i} ref={(g) => { packs.current[i] = g }} position={at} scale={0.0001}>
+          <mesh geometry={WARM_PACK_GEO} material={WARM_PACK_MAT} castShadow />
+          <mesh geometry={WARM_BAND_GEO} material={WARM_BAND_MAT} />
+        </group>
+      ))}
       <group ref={lid} position={[0, 0.42, 0]}><primitive object={tub.lid} /></group>
     </group>
   )
