@@ -3924,7 +3924,8 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
 const KAMI_SC = 1.25
 /** the cups' glass stand drawn shorter, and the cups on it closer (the owner's, 2026-11-11: the stand shortened, the cups the closer; they
  * were 0.09 apart): their spacing in the cups' own frame, and in the altar's (KAMI_SC), which the pour goes by */
-const CUPSTAND_SHORT = 0.7
+// (0.6 now: shorter again, the owner's)
+const CUPSTAND_SHORT = 0.6
 const CUP_DZ = 0.09 * CUPSTAND_SHORT
 const CUP_DZ_ALTAR = CUP_DZ * KAMI_SC
 /** the cup's inside: its floor's height, how high it's filled, and its radius at a height (the inner wall of SAKE_CUP's profile, in its own units) */
@@ -4445,12 +4446,13 @@ const ALTAR_SCALE = 1.2
 const ALTAR_D = 0.58
 /** the offering table drawn shallower than it was modelled (ALTAR_D), its back still to the wall: the owner's, a little less deep (0.53);
  * what's on it brought back to fit, the cups, the flask, the oranges (a little smaller) and the sutra */
-const TABLE_DEEP = 0.53 / ALTAR_D
+// (its front cut back again (the owner's, 2026-11-11: the table too big), to just before what stands on it: 0.47)
+const TABLE_DEEP = 0.47 / ALTAR_D
 /** where the two little lanterns stand on the shelf, in its frame: beside the shrine's base's front corners (its plinth out to 0.2475 across,
  * its front at 0.065), between it and the vases (from 0.325 across), behind the flask and the book */
 // (forward of where they stood and in a little, either side of the cups' shortened stand, and a little smaller (the owner's, 2026-11-11):
 // they stood at 0.07, 0.288, full size)
-const SHRINE_LAMP_X = 0.0, SHRINE_LAMP_Z = 0.23, SHRINE_LAMP_SC = 0.85
+const SHRINE_LAMP_X = 0.0, SHRINE_LAMP_Z = 0.25, SHRINE_LAMP_SC = 0.85
 /** where the flask stands, by the cups' stand (back 0.02 with them) */
 const FLASK_X = -0.04
 /** and its height: up over the beckoning cats' stand below it, by the door */
@@ -4464,7 +4466,9 @@ function AltarTable() {
 }
 function Sutra() {
   return (
-    <group position={[-0.105, 0.001, -0.34]} rotation-y={-Math.PI / 2}><KamidanaModel part="sutra" /></group>
+    // (in from the table's front with it, a little smaller, between the table's side lip and the lantern (it stood at -0.105, -0.34, full
+    // size: out along the table it ran into the lip, in it ran into the lantern))
+    <group position={[-0.073, 0.001, -0.371]} rotation-y={-Math.PI / 2} scale={0.85}><KamidanaModel part="sutra" /></group>
   )
 }
 function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => void } }) {
@@ -4796,7 +4800,13 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       {/* the oranges on their dish, a leaf on the top one */}
       {/* (in front of the cups' stand, a little smaller: where the owner set it in the edit panel (X −0.010, Z −0.203); brought back and made
           a touch smaller with the shallower table) */}
-      <Movable id="oranges" label="橘子盤"><group name="look-oranges" position={[-0.176, 0, 0.002]} scale={0.76} {...nameOver('椪柑', '供品，圓滿吉祥')}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group></Movable>
+      {/* (two plates of them now, smaller, in either side of the cups' stand by its front (the owner's, 2026-11-11: one more plate, smaller,
+          further in; there was one, before the stand)) */}
+      {[-1, 1].map((sd) => (
+        <Movable key={sd} id={sd < 0 ? 'oranges' : 'oranges2'} label={sd < 0 ? '橘子盤（左）' : '橘子盤（右）'}>
+          <group name={sd < 0 ? 'look-oranges' : undefined} position={[-0.03, 0, sd * 0.164]} scale={0.45} {...nameOver('椪柑', '供品，圓滿吉祥')}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group>
+        </Movable>
+      ))}
     </group>
   )
 }
