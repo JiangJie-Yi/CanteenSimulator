@@ -40,7 +40,7 @@ import type { Lang } from '@/data/i18n'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { setTip } from '@/scene/hoverTip'
 import { shrineDoor } from './shrineSound'
-import { getLights } from '@/scene/lightsStore'
+import { getLights, setLightSwitch } from '@/scene/lightsStore'
 import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
@@ -68,7 +68,7 @@ import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
 import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
 import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes } from '@/game/soup'
-import { bottleClink, plateClink, stoolSound, washSplash } from './restroomSound'
+import { bottleClink, lightSwitchSound, plateClink, stoolSound, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
@@ -2174,6 +2174,9 @@ const STOOL_PULL_S = 0.25, STOOL_STEP_S = 0.3, STOOL_SLIDE_S = 0.4, STOOL_HOME_W
 /** the way back from a place's stool toward the aisle (level) */
 const backOf = (st: { stool: THREE.Vector3; aisle: THREE.Vector3 }) => st.aisle.clone().sub(st.stool).setY(0).normalize()
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
+  /** (in a toilet) sat on it just now; whether they switched its light on going in (and so put it out after, if they're the last); their
+   * way out from it to the washstand once they're up (and how far along it, in seconds walked) */
+  wcSit?: boolean; wcLit?: boolean; wcOut?: { path: THREE.Vector3[]; len: number; t: number }
   /** done eating, a tissue to their mouth a moment before they get up (the owner's): since when */
   wipeAt?: number
   /** their drink, sipped now and then as they sit (the bar's clock): when this sip began (none under way: undefined), when the next is
@@ -2344,6 +2347,9 @@ const HER = new Set(['officeLady', 'schoolgirl', 'yukataLady', 'grandma', 'maidC
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
 const WC_RATE = 1 / 240
 const WC_STAY = 6
+/** seconds from the stall's way in to sat on the toilet; and how far a customer sat on it is lowered from a stool's seat (FolkFigure's SEAT,
+ * 0.31) to its seat (blender/wc.py's bowl, 0.40 up) */
+const WC_TO_SEAT = 1.0, WC_SIT_LIFT = 0.40 - 0.31
 /** how long each one's in the toilet: 4 to 6 seconds, their own (the owner's) */
 const wcStayOf = (id: number) => WC_STAY - 2 + ((id * 7919) % 100) / 50
 /** and how long they wash their hands at the washstand after, the tap running (Restroom's HAND_MS) */
@@ -2452,10 +2458,6 @@ const CRUMPLE_GEO = (() => {
 })()
 const CRUMPLE_MAT = new THREE.MeshToonMaterial({ color: '#f7f5ef' })
 const TISSUE_ON: [number, number, number] = [-0.035, 0.006, 0.025]
-/** how much of their way into a toilet's stall they fade out over (and fade in at the washstand coming out) */
-const WC_FADE_LEN = 0.45
-/** how faded they are at the stall's door, and how long the rest takes once they're in (seconds) */
-const WC_FADE_IN = 0.35, WC_FADE_LAST = 0.35
 /** how long a customer wipes their mouth with a tissue before getting up */
 const WIPE_MOUTH_MS = 900
 /** a sip of their drink: how long (the bar's clock), about how long between sips, how many to a drink */
@@ -3363,15 +3365,50 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // through the slats of its ceiling)
         // (to a third of themselves at the stall's door, the rest just inside it (below): at x2 the last step was two or three frames, and
         // they still went in a blink)
-        if (s.phase === 'wcGo' && w.who !== 'drink') s.fade = WC_FADE_IN + (1 - WC_FADE_IN) * Math.max(0, Math.min(1, (w.len - d) / WC_FADE_LEN))
+        // (not faded out any more: seen all the way in, round the corner to the toilet, and sat on it (the owner's, 2026-11-12))
         if (d >= w.len) {
           if (s.phase === 'wcGo') SICK.delete(s.id)
           s.phase = s.phase === 'wcGo' ? 'wcIn' : s.leaving ? 'leave' : 'sit'
           s.t = 0
         }
       } else if (s.phase === 'wcIn') {
-        // (in the stall: the last of them faded out, then out of sight)
-        if (s.wc?.who !== 'drink' && (s.fade ?? 0) > 0) s.fade = Math.max(0, (s.fade ?? 0) - Math.min(dt, 0.1) * WC_FADE_IN / WC_FADE_LAST)
+        // (in a toilet (the owner's, 2026-11-12: its light switched on going in, and seen using it): its light on if it's off, the last steps
+        // from the stall's way in to the toilet, turned round, sat on it a while; up again, it flushes behind them, they say what they
+        // thought (below), and walk out round the corner to the washstand)
+        let toiletDone = true
+        if (s.wc && s.wc.who !== 'drink' && wcs) {
+          const who = s.wc.who as 'm' | 'f'
+          const w = wcs[who]
+          if (s.t - Math.min(dt, 0.1) <= 0 && !getLights().wc[who]) { setLightSwitch(who === 'm' ? 'wcM' : 'wcF', true); lightSwitchSound(true); s.wcLit = true }
+          const seat = inBar(`wc-seat-${who}`, w.stall), face = inBar(`wc-seatface-${who}`, w.stall)
+          s.fade = undefined
+          toiletDone = false
+          if (s.wcOut) {
+            // (on the way out to the washstand: there, washing their hands)
+            const o = s.wcOut
+            o.t += Math.min(dt, 0.1)
+            const d = Math.min(o.len, o.t * SPEED * walkSpeedOf(kindOf(s.id).kind))
+            const { p: at, dir } = alongPath(o.path, d)
+            g?.position.copy(at)
+            if (g) g.rotation.y = turnToward(g.rotation.y, Math.atan2(dir.x, dir.z), dt * 3)
+            if (d >= o.len) { s.wcOut = undefined; TOILETS[who].handAt = performance.now(); s.phase = 'wcWash'; s.t = 0 }
+          } else if (s.t < WC_TO_SEAT) {
+            g?.position.lerpVectors(w.stall, seat, s.t / WC_TO_SEAT)
+            if (g) g.rotation.y = turnToward(g.rotation.y, Math.atan2(seat.x - w.stall.x, seat.z - w.stall.z), dt * 3)
+          } else if (s.t < WC_TO_SEAT + wcStayOf(s.id)) {
+            g?.position.copy(seat)
+            if (g) g.rotation.y = turnToward(g.rotation.y, Math.atan2(face.x - seat.x, face.z - seat.z), dt * 4)
+            if (!s.wcSit) { s.wcSit = true; s.still = true; redraw() }
+          } else {
+            // (up off it: what's done as they leave it, below, and the way out)
+            s.wcSit = false
+            s.still = false
+            toiletDone = true
+            const out = [seat.clone(), w.stall.clone(), w.turn.clone(), w.basin.clone()]
+            s.wcOut = { path: out, len: pathLength(out), t: 0 }
+            redraw()
+          }
+        }
         // (at the fridge: facing it, choosing; then their drink in hand, back to their stool. Stood where their way ends each frame, the
         // stepping aside for others on top of it: left where it was, that piled up while someone stood by them, and they jumped back as
         // they set off)
@@ -3379,7 +3416,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
           g.position.copy(s.wc.path[s.wc.path.length - 1])
         }
-        if (s.t > (s.wc?.who === 'drink' ? DRINK_STAY : wcStayOf(s.id))) {
+        if (toiletDone && (s.wc?.who === 'drink' ? s.t > DRINK_STAY : s.wcOut?.t === 0)) {
           // (out of the toilet: it flushes behind them, and they say what they thought of it, if it's worth saying)
           if (s.wc && s.wc.who !== 'drink') {
             const t = TOILETS[s.wc.who]
@@ -3410,10 +3447,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             const turn = st.counter === 1 ? [] : [aisleCorner(counters[1])]
             const back = [st.stool.clone(), st.aisle.clone(), ...turn, w.aisle.clone(), w.front.clone(), w.inside.clone(), w.basin.clone()]
             s.wc = { ...s.wc, path: back, len: pathLength(back) }
-            TOILETS[who].handAt = performance.now()
-            s.phase = 'wcWash'
-          } else s.phase = 'wcBack'
-          s.t = 0
+          } else {
+            s.phase = 'wcBack'
+            s.t = 0
+          }
         }
       } else if (s.phase === 'wcWash') {
         // (at the washstand, facing it, washing their hands)
@@ -3421,8 +3458,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(w.basin)
         if (g) g.rotation.y = w.basinYaw
         s.still = true
-        // (and out of it at the washstand, faded in)
-        s.fade = Math.min(1, s.t / 0.4)
+        // (walked out to it from the toilet, seen all the way)
+        s.fade = undefined
         if (s.t > HAND_S) {
           // (then a step to the hand dryer on the wall beside, turned to it, hands under it while it blows)
           const who = s.wc!.who as 'm' | 'f'
@@ -3438,7 +3475,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           g?.position.lerpVectors(w.basin, to, k * k * (3 - 2 * k))
           if (g) g.rotation.y = w.basinYaw + Math.atan2(Math.sin(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw), Math.cos(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw)) * k
         }
-        if (s.t > HAND_S + HAND_DRY_S) { s.phase = 'wcBack'; s.t = 0; s.still = false; s.fade = undefined }
+        if (s.t > HAND_S + HAND_DRY_S) {
+          // (out of the toilet: its light put out behind them if they switched it on and nobody else is in it)
+          const who = s.wc!.who as 'm' | 'f'
+          if (s.wcLit && !shown.some((x) => x !== s && x.wc?.who === who && (x.phase === 'wcIn' || x.phase === 'wcWash'))) {
+            setLightSwitch(who === 'm' ? 'wcM' : 'wcF', false)
+            lightSwitchSound(false)
+          }
+          s.wcLit = false
+          s.phase = 'wcBack'; s.t = 0; s.still = false; s.fade = undefined
+        }
       } else {
         // a moment to get up, then off the way they came, by the till: they stop there to pay, and again at the genkan's step
         const lp = leavePaths[s.seat]
@@ -3511,7 +3557,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // (the name tag goes with the body: gone a little before they are, so none is left hanging in the doorway)
       const tag = labels.current.get(s.id)
-      const hidden = s.phase === 'wcIn' && s.wc?.who !== 'drink' && (s.fade ?? 0) <= 0
+      // (seen in the toilet now, sat on it (the owner's, 2026-11-12): hidden only if faded right out)
+      const hidden = s.phase === 'wcIn' && s.wc?.who !== 'drink' && s.fade !== undefined && s.fade <= 0
       if (g) g.visible = !hidden
       // (drei's Html draws its page bit whether its group's shown or not: inside the stall, their words hung on the toilet's wall with no
       // one under them, the owner's ghost bubble; hidden here with the body)
@@ -3533,7 +3580,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       }
       // (down a step, standing in the genkan)
-      if (g && given) g.position.y = inGenkan(counters, g.position) ? -GENKAN.depth : 0
+      // (sat on a toilet: lowered so the seat they're lifted onto is its seat's height (FolkFigure's SEAT, a stool's))
+      if (g && given) g.position.y = s.wcSit ? WC_SIT_LIFT : inGenkan(counters, g.position) ? -GENKAN.depth : 0
     }
     // (the register and the money follow what's being paid: each dish rung up in turn, the total, the note laid on the tray, the drawer out and
     // the note put in it, the change worked out and set on the tray, the drawer shut, the change taken)
@@ -5244,7 +5292,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             {/* (a soft shadow under them, sat or walking) */}
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
-              <PersonClock s={s} phase={s.phase} drink={s.drink} eating={s.phase === 'sit' && FED.has(s.id)}
+              <PersonClock s={s} phase={s.wcSit ? 'wcSit' : s.phase} drink={s.drink} eating={s.phase === 'sit' && FED.has(s.id)}
                 clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} plateOf={plateWorld} drinkOf={drinkWorld} drunk={s.drunk} />
               {/* (named as the pointer's over them; picked up and carried to another stool while they wait) */}
               <FigureHit title={() => guestLabel(s.id, lang)} hint={() => (canMove(s) ? (lang === 'ja' ? 'ドラッグして空席へ' : lang === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : '')}
@@ -5619,7 +5667,7 @@ function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s
   ) : undefined
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'
   // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them)
-  return <Suspense fallback={null}><FolkFigure id={s.id} eating={eating} walking={s.phase !== 'sit'} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
+  return <Suspense fallback={null}><FolkFigure id={s.id} eating={eating} walking={s.phase !== 'sit' && !s.wcSit} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : s.phase === 'sit' && s.wipeAt ? 'Wipe' : undefined} fit={FOLK_FIT}
     held={inHand} heldShown={() => s.phase === 'wcBack' || (sipK() >= 0.2 && sipK() < 0.86)} cup={cup}
     sip={() => (s.phase === 'sit' && s.drink ? sipK() : -1)} drinkAt={() => (s.drink ? drinkOf(s.seat, cup) : null)}

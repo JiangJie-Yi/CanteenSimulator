@@ -2728,6 +2728,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {/* (as modelled: its washlet's panel on the sitter's left (+z), the wall remote's side; the paper on the right, to the right hand
             (the owner's: the panel and the paper were both on the right, crowding the one hand)) */}
         <ToiletLive who={who} at={[E - 0.4, 0, 0]} />
+        {/* (where a customer sits on it, and the way they face sat there (GuestBar3D: they walk in round the corner, sit, and get up again)) */}
+        <group name={`wc-seat-${who}`} position={[E - 0.5, 0, 0]} userData={{ marker: true }} />
+        <group name={`wc-seatface-${who}`} position={[E - 1.0, 0, 0]} userData={{ marker: true }} />
         </Movable>
         {/* (marks on the floor before it as it gets dirty) */}
         <WcMarks who={who} at={[0.03, 0.006, 0]} size={[0.3, 0.5]} />
