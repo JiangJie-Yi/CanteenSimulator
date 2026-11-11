@@ -904,7 +904,8 @@ useGLTF.preload(MISOPOT_URL)
 // (beside the rice tub, on its far side from the cook table, in a row with it (the owner's: it stood behind the tub, where the crew stand))
 // (on the warming counter's second well (WARMER): it stood on a little stand of its own)
 // (in the warming counter's one well (WARMER: its WELL_X, -0.4 along it), the counter moved up between the cook table and the till)
-const MISO_AT = { along: 4.28, lay: -0.2 }
+// (in the middle of the warmer cut to half, its well there (2026-11-11)); the counters moved up against the bar's back (WARMER_AT)
+const MISO_AT = { along: 4.28, lay: -0.5 - 0.937 }
 const MISO_SCALE = 1.05
 const MISO_TOP = COUNTER_TOP
 function MisoPot() {
@@ -1019,8 +1020,9 @@ const DENKI_URL = import.meta.env.BASE_URL + 'models/denkinabe.glb'
 useGLTF.preload(DENKI_URL)
 // (on the warming counter's last well (WARMER): it stood on a little stand of its own)
 // (on the rice-ball counter (PREP_AT), at its sink end (its rice is washed there), larger (the owner's, 2026-11-11: the rice is taken from it))
-// (moved with the counter, up against the warmer (PREP_AT))
-const DENKI_AT = { along: 4.3, lay: 2.692 }
+// (at the rice-ball counter's left end, beside the miso pot (the owner's, 2026-11-11), 1.1 from its middle: blender/warmer.py's board and
+// the rest moved right for it)
+const DENKI_AT = { along: 4.3, lay: 1.742 - 1.1 - 0.937 }
 const DENKI_SCALE = 1.45
 const DENKI_TOP = COUNTER_TOP
 const LAMP_OFF = new THREE.Color('#3a1a14'), LAMP_COOK = new THREE.Color('#ff3a20'), LAMP_WARM = new THREE.Color('#ffb030')
@@ -1098,11 +1100,13 @@ function DenkiNabe() {
  */
 const WARMER_URL = import.meta.env.BASE_URL + 'models/warmer.glb'
 useGLTF.preload(WARMER_URL)
-/** its middle (along, back from the table's line) and its depth, as blender/warmer.py has it (its length 1.4, its well at 0.3 along it) */
+/** its middle (along, back from the table's line) and its depth, as blender/warmer.py has it (its length 1.4, its well in its middle) */
 // (cut to half its length, its left end where it was (the owner's, 2026-11-11): its middle 0.7 to the left, its well where it stood)
 // (up the floor between the cook table's end and the till, its front to the cook table (the owner's red box, 2026-11-11): it stood in the
 // back of the kitchen beside the sink, where the rice-ball counter is now (PREP_AT))
-const WARMER_AT = { along: 4.3, lay: -0.5 }
+// (the two counters moved together toward the bar until the warmer's top meets the bar's lip, 0.937 (measured: 1.0 to the bar's back, the
+// lip 0.06 proud of it at the counter's height; the owner's, 2026-11-11: 貼合))
+const WARMER_AT = { along: 4.3, lay: -0.5 - 0.937 }
 const WARMER_D = 1.0
 function Warmer() {
   useStudio()
@@ -1141,7 +1145,7 @@ function Warmer() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, WARMER_AT.along).addScaledVector(LAY, WARMER_AT.lay)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('保溫餐檯', '味噌湯放在加熱座上保溫（只有湯需要加熱）')}>
+    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '味噌湯放在加熱座上保溫（只有湯需要加熱）')}>
       <primitive object={model} />
     </group>
   )
@@ -1156,7 +1160,7 @@ const PREP_URL = import.meta.env.BASE_URL + 'models/prepcounter.glb'
 useGLTF.preload(PREP_URL)
 // (up against the warmer's right end, in line with it (the owner's, 2026-11-11: 併桌): their tops' ends 2 mm apart (each 0.02 proud of its
 // cabinet); it stood back in the kitchen at along 5.19, lay 3.4)
-const PREP_AT = { along: 4.3, lay: -0.5 + 0.7 + 0.02 + 0.002 + 0.02 + 1.5 }
+const PREP_AT = { along: 4.3, lay: -0.5 + 0.7 + 0.02 + 0.002 + 0.02 + 1.5 - 0.937 }
 function PrepCounter() {
   const gltf = useGLTF(PREP_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
@@ -1186,7 +1190,7 @@ function PrepCounter() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, PREP_AT.along).addScaledVector(LAY, PREP_AT.lay)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('飯糰料理台', '包飯糰的地方：白飯從電鍋取，在這裡捏')}>
+    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '包飯糰的地方：白飯從電鍋取，在這裡捏')}>
       <primitive object={model} />
     </group>
   )
@@ -1199,8 +1203,8 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <HeldStick held={held} />
       <HeldRod held={held} />
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
-      <Movable id="warmer" label="保溫餐檯"><Warmer /></Movable>
-      <Movable id="prepcounter" label="飯糰料理台"><PrepCounter /></Movable>
+      <Movable id="warmer" label="料理台（保溫座）"><Warmer /></Movable>
+      <Movable id="prepcounter" label="料理台（飯糰）"><PrepCounter /></Movable>
       <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="hagama" label="羽釜與爐灶"><Hagama /></Movable>

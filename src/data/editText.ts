@@ -196,10 +196,10 @@ const PIECES_JA: Record<string, string> = {
   服務鈴: '呼び鈴', 元寶: '金の馬蹄銀', 招財樹: '発財樹', '木質台座（含抽屜）': '木の台（引き出し付き）', 結帳牌: 'お会計札', 櫃檯招財貓: 'カウンターの招き猫',
   老闆: '店主', '紙箱（紙袋）': '段ボール箱（紙袋）', '紙箱（收銀紙捲）': '段ボール箱（レジロール）', '紙箱（紙巾）': '段ボール箱（紙ナプキン）', '紙箱（杯墊）': '段ボール箱（コースター）', '紙箱（割箸）': '段ボール箱（割り箸）', 收銀機操作說明書: 'レジスター取扱説明書',
   '平板（iPad）': 'タブレット（iPad）', 音箱: 'スピーカー', 酒樽: '酒樽', 店內電燈開關: '店内照明スイッチ', 門口燈籠開關: '提灯のスイッチ', 男廁電燈開關: '男性トイレの照明スイッチ', 女廁電燈開關: '女性トイレの照明スイッチ', 逃生出口燈: '非常口誘導灯', 收銀高腳凳: 'レジの高いスツール', 收銀矮凳: 'レジの低いスツール', 餐盤堆: '皿の山', 柳樹: '柳',
-  竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', 電鍋: '電気釜', 羽釜與爐灶: '羽釜とかまど', 飯糰料理台: 'おにぎりの作業台', 外帶檯: '持ち帰り台', 白米袋: '米袋', 武士頭盔: '兜', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
+  竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', 電鍋: '電気釜', 羽釜與爐灶: '羽釜とかまど', '料理台（飯糰）': '調理台（おにぎり）', '料理台（保溫座）': '調理台（保温）', 外帶檯: '持ち帰り台', 白米袋: '米袋', 武士頭盔: '兜', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
   瀝水籃: '水切りかご', 棕櫚刷: '棕櫚たわし', 肥皂: '石けん', 檜木手桶: '檜の手桶', 布巾: '布巾', 竹籤垃圾桶: '串入れのごみ箱', 洗碗精: '食器用洗剤', 菜瓜布: 'スポンジたわし',
   門口招財貓組: '入口の招き猫', 小神龕組: '神棚', 收銀櫃組: 'レジ一式', 吧台座椅: 'カウンター席',
-  保溫與飯糰料理台: '保温台とおにぎり台', 流理台組: '流し一式', 碗盤架組: '食器棚', 米袋與舊飯桶: '米袋と飯桶', 男廁組: '男子トイレ一式', 女廁組: '女子トイレ一式',
+  料理台組: '調理台一式', 流理台組: '流し一式', 碗盤架組: '食器棚', 米袋與舊飯桶: '米袋と飯桶', 男廁組: '男子トイレ一式', 女廁組: '女子トイレ一式',
   火烤灶台區: '炉端エリア', 櫃檯區: 'レジエリア', 玄關區: '玄関エリア', 小神龕區: '神棚エリア', 飲品櫃區: '飲み物エリア', 廁所區: 'お手洗いエリア', 後台區: '裏方エリア', 窗口區: '丸窓エリア',
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
@@ -214,12 +214,12 @@ const PIECES_EN: Record<string, string> = {
   '收銀機（含抽屜）': 'Cash register', 刷卡機: 'Card reader', 明細印表機: 'Receipt printer', 找零盤: 'Change tray', 筆筒: 'Pen pot', 御守: 'Omamori',
   服務鈴: 'Service bell', 元寶: 'Gold ingot', 招財樹: 'Money tree', '木質台座（含抽屜）': 'Wooden stand', 櫃檯招財貓: 'Counter lucky cat',
   瀝水籃: 'Draining basket', 棕櫚刷: 'Palm scrubber', 肥皂: 'Soap', 檜木手桶: 'Hinoki pail', 布巾: 'Dish cloth', 竹籤垃圾桶: 'Skewer bin', 洗碗精: 'Dish soap', 菜瓜布: 'Sponge scourer',
-  '平板（iPad）': 'Tablet (iPad)', 音箱: 'Speaker', 酒樽: 'Sake barrel', 店內電燈開關: 'Room light switch', 門口燈籠開關: 'Lantern switch', 男廁電燈開關: "Men's toilet light switch", 女廁電燈開關: "Women's toilet light switch", 柳樹: 'Willow', 竹盆栽: 'Potted bamboo', 酒箱: 'Sake crate', 電鍋: 'Rice cooker', 羽釜與爐灶: 'Rice pot and stove', 飯糰料理台: 'Rice ball counter', 外帶檯: 'Takeaway stand', 白米袋: 'Rice sacks',
+  '平板（iPad）': 'Tablet (iPad)', 音箱: 'Speaker', 酒樽: 'Sake barrel', 店內電燈開關: 'Room light switch', 門口燈籠開關: 'Lantern switch', 男廁電燈開關: "Men's toilet light switch", 女廁電燈開關: "Women's toilet light switch", 柳樹: 'Willow', 竹盆栽: 'Potted bamboo', 酒箱: 'Sake crate', 電鍋: 'Rice cooker', 羽釜與爐灶: 'Rice pot and stove', '料理台（飯糰）': 'Cook counter (rice balls)', '料理台（保溫座）': 'Cook counter (warmer)', 外帶檯: 'Takeaway stand', 白米袋: 'Rice sacks',
   '紙箱（紙袋）': 'Box (paper bags)', '紙箱（收銀紙捲）': 'Box (till rolls)', '紙箱（紙巾）': 'Box (napkins)', '紙箱（杯墊）': 'Box (coasters)',
   '紙箱（割箸）': 'Box (chopsticks)', 收銀機操作說明書: 'Register manual',
   老闆: 'Owner', 惠比壽石像: 'Ebisu statue', 武士頭盔: 'Samurai helmet', 門口招財貓組: 'Lucky cats (group)', 小神龕組: 'Shrine (group)',
   收銀櫃組: 'Till (group)', 吧台座椅: 'Bar stools',
-  保溫與飯糰料理台: 'Warmer and rice ball counter (group)', 流理台組: 'Sink (group)', 碗盤架組: 'Dish racks (group)', 米袋與舊飯桶: 'Rice sacks and old tub (group)',
+  料理台組: 'Cook counters (group)', 流理台組: 'Sink (group)', 碗盤架組: 'Dish racks (group)', 米袋與舊飯桶: 'Rice sacks and old tub (group)',
   男廁組: "Men's washroom (group)", 女廁組: "Women's washroom (group)",
   火烤灶台區: 'Grill area', 櫃檯區: 'Till area', 玄關區: 'Entrance area', 小神龕區: 'Shrine area', 飲品櫃區: 'Drinks area', 廁所區: 'Toilets area', 後台區: 'Back room area', 窗口區: 'Window area',
 }

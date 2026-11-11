@@ -35,10 +35,11 @@ TT = 0.07                # the terrazzo top's thickness
 UP = 0.1                 # the upstand along the back
 KICK = 0.1               # the black kick under the cabinet, set back
 # (the warmer cut to half its length, its left end kept, the rice-ball counter pushed up against its right end (the owner's, 2026-11-11: 併桌);
-# its well where it was from that end (it was 2.8 long, the well at -0.4))
+# its well in its middle (kept where it stood, it came 2 cm from the counter's end: the owner's, moved off its place)
 WARMER_L, PREP_L = 1.4, 3.0
-WELL_X, WELL_R = 0.3, 0.4
-BOARD_X = -0.35
+WELL_X, WELL_R = 0.0, 0.4
+# (to the right: the cooker stands at its left end now, by the miso pot (the owner's, 2026-11-11))
+BOARD_X = 0.35
 
 
 def P(x, y, z):
@@ -62,7 +63,8 @@ for cells, thr, col, k in ((90, 0.9, (0.18, 0.18, 0.19), 0.95), (140, 0.88, (0.5
     terr = mix(terr, col, chip * k)
 terr = terr * (0.96 + 0.06 * fbm(N, 64, 64, 2))[..., None]
 grain = np.sin((u * 34 + (fbm(N, 2, 5, 4) - 0.5) * 0.9 + (fbm(N, 6, 2, 3) - 0.5) * 0.25) * 2 * math.pi) * 0.5 + 0.5
-sugi = mix((0.34, 0.22, 0.14), (0.25, 0.155, 0.095), smooth(0.6, 1.0, grain) * 0.6)
+# (stained black, its grain just showing through (the owner's, 2026-11-11: the wood's colour black): it was a dark brown)
+sugi = mix((0.04, 0.034, 0.03), (0.016, 0.014, 0.013), smooth(0.6, 1.0, grain) * 0.7)
 sugi = sugi * (0.94 + 0.08 * fbm(N, 3, 12, 4))[..., None]
 hin = mix((0.86, 0.74, 0.55), (0.76, 0.62, 0.42), smooth(0.6, 1.0, np.sin((u * 40 + fbm(N, 2, 4, 3)) * 2 * math.pi) * 0.5 + 0.5) * 0.6)
 # (a thermometer's face: cream, a scale round its top, a red needle at 70 or so)
@@ -177,7 +179,7 @@ def join(objs, name):
 
 def counter(L, pre, doors):
     """the counter's body: the black kick set back, the sugi cabinet with its doors' panels proud of it and a brass pull on each, the
-    terrazzo top a little proud all round with an upstand along its back"""
+    terrazzo top a little proud all round (no upstand along its back: the owner's, 2026-11-11, taken away)"""
     k = "" if pre == "Warmer" else "p_"
     x0, x1, z0, z1 = -L / 2, L / 2, -D / 2, D / 2
     front = z1 - 0.04
@@ -185,7 +187,6 @@ def counter(L, pre, doors):
         box("kick", x0 + 0.04, x1 - 0.04, 0, KICK, z0 + 0.02, front - 0.06, k + "kick"),
         box("cabinet", x0, x1, KICK, H - TT, z0, front, k + "sugi"),
         box("top", x0 - 0.02, x1 + 0.02, H - TT, H, z0, z1, k + "terrazzo", bev=0.008),
-        box("upstand", x0 - 0.02, x1 + 0.02, H, H + UP, z0, z0 + 0.04, k + "terrazzo", bev=0.006),
     ]
     dw = (L - 0.08) / doors
     for i in range(doors):

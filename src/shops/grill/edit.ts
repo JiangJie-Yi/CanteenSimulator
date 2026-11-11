@@ -59,7 +59,7 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-stools': { zh: '吧台座椅', ja: 'カウンター席', members: Array.from({ length: GRILL_SEATS.length }, (_, n) => `stool${n}`), spans: true },
   // (each part of the shop kept together, as the owner asked (2026-11-11: every piece in its area's group, the warmer and the rice ball
   // counter as one): the warmer with its miso pot and the rice ball counter with its cooker, side by side between the cook table and the till)
-  'grp-ricestation': { zh: '保溫與飯糰料理台', ja: '保温台とおにぎり台', members: ['warmer', 'misopot', 'prepcounter', 'denkinabe'] },
+  'grp-ricestation': { zh: '料理台組', ja: '調理台一式', members: ['warmer', 'misopot', 'prepcounter', 'denkinabe'] },
   // (the sink and all that's on it and by it)
   'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge'] },
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
