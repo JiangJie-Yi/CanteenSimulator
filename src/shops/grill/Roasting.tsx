@@ -1416,31 +1416,37 @@ function HearthGuard() {
 
 /**
  * The two recesses in the cook table's body (the owner's notch at its front, the third cook's bay at its end) shaded inside, under the top's
- * overhang, as they are: a soft dark wash down their back and side walls, deepest up under the top (the owner's, 2026-11-10: their walls the
+ * overhang, as they are: a soft dark wash down their back walls, deepest up under the top (the side walls lit by their cove strips) (the owner's, 2026-11-10: their walls the
  * same white as the table's faces round them, the bay looked to be no recess at all, the top cut and the body under it flat). The walls are the
  * body's faces, set 0.06 back from the cuts (COOK_TABLE_PARTS' insets); the wash 2 mm off them, from the kick's top to the body's
  */
-const recessTex = (k: number) => {
-  const c = document.createElement('canvas')
-  c.width = 4; c.height = 64
-  const g = c.getContext('2d')!
-  const grad = g.createLinearGradient(0, 0, 0, 64)
-  // (deep enough to read as in under the top, not as a stain: at 0.5 at its top to 0.1 at its foot, the walls' middles came out a tenth darker
-  // than the outer faces, and the bay still looked to be no recess)
-  grad.addColorStop(0, `rgba(26,18,12,${0.6 * k})`)
-  grad.addColorStop(0.35, `rgba(26,18,12,${0.38 * k})`)
-  grad.addColorStop(1, `rgba(26,18,12,${0.26 * k})`)
-  g.fillStyle = grad; g.fillRect(0, 0, 4, 64)
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  return tex
+/** the recesses' cove lights (the owner's, 2026-11-11: the slot lights in the side walls, in the owner's notch and the third cook's bay both):
+ * a warm lit strip along the top of each side wall, up under the top's edge, seen as a line of light; its glow washing down the wall, bright
+ * under it and fading two thirds of the way down (no light of its own) */
+const RECESS_COVE = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false, side: THREE.DoubleSide })
+/** a wash down a wall in its vertices' colours (linear, a row at each stop from the top: [t, r, g, b]); no alpha in them (a picture's alpha,
+ * or the vertices', never showed on the wall here: the shading under the top was never seen) but the way it's laid on: the back walls'
+ * multiplied over them (darkened), the side walls' added (lit) */
+function washGeo(len: number, h: number, stops: [number, number, number, number][]) {
+  const g = new THREE.PlaneGeometry(len, h, 1, stops.length - 1)
+  const pos = g.attributes.position, col = new Float32Array(pos.count * 3)
+  for (let i = 0; i < pos.count; i++) {
+    // (rows from the top down, two vertices a row)
+    const [t, r, gg, b] = stops[Math.floor(i / 2)]
+    col.set([r, gg, b], i * 3)
+    pos.setY(i, h / 2 - t * h)
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+  return g
 }
-const recessMat = (k: number) => new THREE.MeshBasicMaterial({ map: recessTex(k), transparent: true, depthWrite: false, polygonOffset: true,
-  polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
-const RECESS_MAT = recessMat(1)
-/** the recesses' side walls the deeper (the owner's, 2026-11-11: they face the room's light, and with the back wall's wash they still read as
- * the table's white outer faces, as if not in under the top at all) */
-const RECESS_SIDE_MAT = recessMat(1.45)
+const washMat = (blend: Partial<THREE.MeshBasicMaterialParameters>) => new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false,
+  toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, ...blend })
+/** the back walls' shading under the top: the wall times these (deepest up under the top) */
+const SHADE_MAT = washMat({ blending: THREE.CustomBlending, blendSrc: THREE.DstColorFactor, blendDst: THREE.ZeroFactor })
+const BACK_WASH: [number, number, number, number][] = [[0, 0.45, 0.43, 0.41], [0.35, 0.62, 0.6, 0.58], [1, 0.74, 0.72, 0.7]]
+/** the side walls' warm light from their cove strips, added to them: bright under the strip, gone by two thirds of the way down */
+const GLOW_MAT = washMat({ blending: THREE.AdditiveBlending })
+const SIDE_WASH: [number, number, number, number][] = [[0, 0.55, 0.33, 0.12], [0.1, 0.36, 0.21, 0.07], [0.35, 0.12, 0.07, 0.02], [0.7, 0, 0, 0]]
 const RecessShade = memo(function RecessShade() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP + KICK_H, top = -0.08, h = top - floor
   const IN = 0.06, OFF = 0.002
@@ -1464,9 +1470,17 @@ const RecessShade = memo(function RecessShade() {
           : new THREE.Vector3().addScaledVector(ALONG, mid).addScaledVector(LAY, w.at)
         p.y = floor + h / 2
         const n = (w.across === 'along' ? ALONG : LAY).clone().multiplyScalar(w.face)
-        return <mesh key={i} position={p} rotation-y={Math.atan2(n.x, n.z)} material={i % 3 ? RECESS_SIDE_MAT : RECESS_MAT} raycast={() => {}} renderOrder={1}>
-          <planeGeometry args={[len, h]} />
-        </mesh>
+        // (the side walls (each recess's second and third): the cove light along the top, its glow down the wall; the back wall only shaded)
+        const side = i % 3 !== 0
+        return <group key={i} position={p} rotation-y={Math.atan2(n.x, n.z)}>
+          {!side && <mesh material={SHADE_MAT} geometry={washGeo(len, h, BACK_WASH)} raycast={() => {}} renderOrder={1} />}
+          {side && <>
+            <mesh name={`recess-cove-${i}`} position={[0, h / 2 - 0.012, 0.008]} material={RECESS_COVE} raycast={() => {}}>
+              <boxGeometry args={[len - 0.01, 0.014, 0.008]} />
+            </mesh>
+            <mesh position={[0, 0, 0.002]} material={GLOW_MAT} geometry={washGeo(len - 0.01, h, SIDE_WASH)} raycast={() => {}} renderOrder={2} />
+          </>}
+        </group>
       })}
     </group>
   )
