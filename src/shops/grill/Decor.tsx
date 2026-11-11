@@ -18,7 +18,7 @@ import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
-import { COOK_S } from '@/game/rice'
+import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
 import { HEAT_S } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
@@ -1052,7 +1052,7 @@ function DenkiNabe() {
       if (!t) {
         // (the stainless rim and lid real metal, the studio in it; the lamp lit by the game; the rest in the room's toon light)
         if (src.name === 'DenkiLamp') t = lamp
-        else if (src.name === 'DenkiSteel') { const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.85, roughness: 0.28, envMapIntensity: 0.9 }); reflectStudio(g); t = g }
+        else if (src.name === 'DenkiSteel' || src.name === 'DenkiPot') { const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.85, roughness: 0.28, envMapIntensity: 0.9 }); reflectStudio(g); t = g }
         else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
         made.set(src, t)
       }
@@ -1061,17 +1061,27 @@ function DenkiNabe() {
       m.receiveShadow = true
     })
     inkModel(r, (m) => m.name.startsWith('DenkiLamp'), { width: 0.0016, weld: true })
-    const lid = r.getObjectByName('DenkiLid')!, lever = r.getObjectByName('DenkiLever')!
+    const lid = r.getObjectByName('DenkiLid')!, lever = r.getObjectByName('DenkiLever')!, rice = r.getObjectByName('DenkiRice')!
     plainColours(r)
-    mergeByMaterial(r, (o) => o === lid || o.parent === lid || o === lever || o.parent === lever)
-    return { root: r, lid, lidY: lid.position.y, lever, leverY: lever.position.y, lamp }
+    mergeByMaterial(r, (o) => o === lid || o.parent === lid || o === lever || o.parent === lever || o === rice)
+    return { root: r, lid, lidY: lid.position.y, lidZ: lid.position.z, lever, leverY: lever.position.y, lamp, rice, riceY: rice.position.y }
   }, [gltf])
   const steam = useRef<THREE.Group>(null)
   const was = useRef(RICE.kama.state)
-  const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒` : RICE.kama.state === 'done' ? `保溫中，還有 ${RICE.rice} 份飯` : '空了，等著洗米煮飯')
+  // (opened by a click (the owner's, 2026-11-11: the cooker to be used), its lid lifted up and back off the rim, the rice in it seen, as high as
+  // what's left of the pot's twenty; empty and shut, a click washes a pot's rice and sets it on)
+  const open = useRef(false), openK = useRef(0)
+  const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒`
+    : RICE.kama.state === 'done' ? `保溫中，還有 ${RICE.rice}/${RICE_FULL} 份飯｜點一下${open.current ? '蓋上' : '掀開鍋蓋'}`
+      : open.current ? '空了｜點一下蓋上' : '空了｜點一下洗米煮飯')
+  const click = () => {
+    if (riceGoes(RICE.kama) && !open.current && !RICE.washing) { RICE.kama = setOn(); lightSwitchSound(false) }
+    else open.current = !open.current
+    setTip({ title: '電鍋', hint: say() })
+  }
   // (pointed at, its tag kept up to date as it counts down: it was set once, as the pointer came over it, and stood still)
   const hov = useRef(false)
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
     if (hov.current) setTip({ title: '電鍋', hint: say() })
     const k = RICE.kama, t = clock.elapsedTime
     const cooking = k.state === 'cooking'
@@ -1082,7 +1092,17 @@ function DenkiNabe() {
     was.current = k.state
     // (boiling hard in the middle of its time: the lid lifting a little on the steam)
     const boil = cooking ? Math.max(0, Math.sin(Math.PI * (1 - k.left / COOK_S))) : 0
-    model.lid.position.y = model.lidY + boil * Math.max(0, Math.sin(t * 19)) * 0.004
+    // (opened: up and back off the rim, tipped back on its hinge side; shut while it cooks)
+    if (cooking) open.current = false
+    openK.current += ((open.current ? 1 : 0) - openK.current) * Math.min(1, dt * 7)
+    const o = openK.current * openK.current * (3 - 2 * openK.current)
+    model.lid.position.y = model.lidY + boil * Math.max(0, Math.sin(t * 19)) * 0.004 + o * 0.06
+    model.lid.position.z = model.lidZ - o * 0.13
+    model.lid.rotation.x = -o * 1.05
+    // (the rice in it: as high as what's left, nothing when it's empty (shrunk away: its material drawn from the start); cooking, a full pot)
+    const left = k.state === 'cooking' ? 1 : k.state === 'done' ? RICE.rice / RICE_FULL : 0
+    model.rice.position.y = model.riceY + Math.max(0, left) * 0.15
+    model.rice.scale.setScalar(left > 0 ? 1 : 0.0001)
     if (steam.current) steam.current.visible = k.state !== 'empty'
   })
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
@@ -1090,6 +1110,7 @@ function DenkiNabe() {
   return (
     <group position={[p.x, 0, p.z]} rotation-y={WARMER_FACE}>
       <group position-y={DENKI_TOP} scale={DENKI_SCALE}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; click() }}
         onPointerOver={(e) => { e.stopPropagation(); hov.current = true; setTip({ title: '電鍋', hint: say() }) }}
         onPointerOut={() => { hov.current = false; setTip(null) }}>
         <primitive object={model.root} />

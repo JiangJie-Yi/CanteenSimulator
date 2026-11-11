@@ -48,6 +48,8 @@ M = {
     "black": pbr("DenkiBlack", lin("#1e1c1b"), rough=0.5),
     "lamp": pbr("DenkiLamp", lin("#3a1a14"), rough=0.4),
     "badge": pbr("DenkiBadge", lin("#f4f1e6"), rough=0.5),
+    "pot": pbr("DenkiPot", lin("#b9bcc0"), rough=0.3, metal=0.85),
+    "rice": pbr("DenkiRice", lin("#f4f1e8"), rough=0.85),
 }
 parts = []
 
@@ -100,6 +102,16 @@ def box(name, size, at, mat, parent=None):
 lathe("DenkiFoot", [(R * 0.8, 0.0), (R * 0.92, 0.0), (R * 0.95, 0.018)], "black")
 lathe("DenkiBody", [(R * 0.93, 0.016), (R * 0.99, 0.04), (R, 0.08), (R, H - 0.05), (R * 0.97, H - 0.015), (R * 0.9, H)], "body")
 lathe("DenkiRim", [(R * 0.9, H - 0.002), (R * 0.93, H + 0.006), (R * 0.88, H + 0.014), (R * 0.84, H + 0.008)], "steel")
+# ---- inside (the owner's, 2026-11-11: the cooker opened by a click, its rice seen): the inner pot, stainless, its faces turned to be seen from
+# within; the rice in it, a soft dome, its own node ("DenkiRice": the game sets it as high as the rice left, at y 0 it's on the pot's floor) ----
+pot = lathe("DenkiPot", [(R * 0.85, H + 0.008), (R * 0.83, H - 0.012), (R * 0.81, 0.05), (R * 0.72, 0.036), (0.0, 0.036)], "pot")
+bm_ = bmesh.new()
+bm_.from_mesh(pot.data)
+bmesh.ops.reverse_faces(bm_, faces=bm_.faces)
+bm_.to_mesh(pot.data)
+bm_.free()
+rice = lathe("DenkiRice", [(R * 0.8, 0.0), (R * 0.62, 0.012), (R * 0.3, 0.019), (0.0, 0.021)], "rice")
+rice.location = P(0, 0.038, 0)
 # ---- the lid: a stainless dome on the rim, a black knob on top; its own node ----
 lid = lathe("DenkiLid", [(R * 0.86, 0.0), (R * 0.84, 0.02), (R * 0.65, 0.055), (R * 0.32, 0.072), (0.0, 0.076)], "steel")
 knob = lathe("DenkiKnob", [(0.0, 0.07), (0.025, 0.07), (0.028, 0.085), (0.02, 0.1), (0.0, 0.102)], "black", segs=12)

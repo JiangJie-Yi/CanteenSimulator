@@ -3,8 +3,8 @@
 // stove are out of use); when it's empty, the plater washes a pot's worth of rice at the sink, sets it in the cooker, and it cooks (steaming,
 // its lid lifting). Pure rules; GuestBar3D walks it, Decor draws it.
 
-/** how many rice balls' rice the cooker holds (a pot's worth: it's the big one now) */
-export const RICE_FULL = 16
+/** how many rice balls' rice the cooker holds (a pot's worth: it's the big one now; about twenty, the owner's, 2026-11-11) */
+export const RICE_FULL = 20
 /** seconds: washing the rice at the sink; the cooker cooking; scooping raw rice from the sack; a rice ball shaped in the hands */
 export const WASH_S = 3
 export const COOK_S = 15
