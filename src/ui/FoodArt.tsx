@@ -1,4 +1,5 @@
 import { memo, useId } from 'react'
+import { CUTE_IDS, CuteFood } from './CuteFood'
 
 /*
  * A food's picture for the pantry: a hand-inked illustration in SVG, drawn the way the workers' faces are (ui/Avatar). Flat colours,
@@ -564,7 +565,7 @@ const RENDERED = new Set(['Aji', 'ExtraFish', 'Iwashi', 'Mackerel', 'Nodoguro', 
 const renderedOf = (id: string) => `${import.meta.env.BASE_URL}food/${id}.webp`
 /** the foods there's a picture of (the rest are drawn as a plain round) */
 const OTHER = new Set(['Nori', 'Onion', 'Negi', 'Carrot', 'Gobo', 'Daikon', 'RiceBag', 'Asparagus', 'BloodCake', 'GrilledCorn', 'GrilledShiitake', 'KingOyster', 'MisoSoup', 'NetMochi', 'Okra', 'Onigiri', 'PorkBelly', 'Potato', 'Sake', 'Sausage', 'Scallop', 'Shishito', 'ShrimpSkewer', 'Squid', 'SweetPotato', 'Yakitori'])
-export const hasFoodArt = (id: string) => id in FISH || OTHER.has(id)
+export const hasFoodArt = (id: string) => CUTE_IDS.has(id) || id in FISH || OTHER.has(id)
 
 /** `band`: drawn across the top of a card (no round tile, the food cropped close to fill the band; the card's band behind it) */
 // (drawn again only when its own props change: the menu's strips are redrawn with the app, several times a second while the shop's open, and
@@ -582,9 +583,11 @@ function FoodArtImpl({ id, store, size = 34, band = false }: { id: string; store
     const y0 = cy - Math.max(H * top, T) - 3, y1 = cy + Math.max(H * 1.5, T) + 3
     return `${a} ${y0} ${b - a} ${y1 - y0}`
   }
-  const shot = RENDERED.has(id)
+  // (the cute pictures (ui/CuteFood; the owner's, 2026-11-12) for every food there's one of; the old drawings and renders only for any other)
+  const cute = CUTE_IDS.has(id)
+  const shot = !cute && RENDERED.has(id)
   // (a picture from the model is twice as wide as it's tall: across the middle of the round, or the whole of a card's band)
-  const view = !band ? '0 0 128 128' : shot ? '0 32 128 64' : f ? (f.fillet ? '14 26 100 70' : fishView(f)) : '6 4 116 116'
+  const view = !band ? '0 0 128 128' : cute ? '6 16 116 96' : shot ? '0 32 128 64' : f ? (f.fillet ? '14 26 100 70' : fishView(f)) : '6 4 116 116'
   return (
     <svg className="food-art" width={band ? undefined : size} height={band ? undefined : size} viewBox={view} aria-hidden="true">
       {!band && <>
@@ -596,7 +599,7 @@ function FoodArtImpl({ id, store, size = 34, band = false }: { id: string; store
         <circle cx="64" cy="64" r="50" fill="none" stroke="#fff" strokeOpacity=".2" strokeWidth="2" strokeDasharray="4 6" />
       </>}
       <g clipPath={band ? undefined : `url(#${u}t)`} transform={band ? undefined : 'translate(64 64) scale(0.86) translate(-64 -64)'}>
-        {shot ? <image href={renderedOf(id)} x="0" y="32" width="128" height="64" preserveAspectRatio="xMidYMid meet" />
+        {cute ? <CuteFood id={id} u={u} /> : shot ? <image href={renderedOf(id)} x="0" y="32" width="128" height="64" preserveAspectRatio="xMidYMid meet" />
           : f ? (f.fillet ? <FilletArt f={f.fillet} u={u} /> : <FishArt f={f} u={u} />) : <OtherArt id={id} />}
       </g>
     </svg>
