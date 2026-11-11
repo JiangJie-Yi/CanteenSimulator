@@ -199,6 +199,7 @@ const PIECES_JA: Record<string, string> = {
   竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', 電鍋: '電気釜', 羽釜與爐灶: '羽釜とかまど', 飯糰料理台: 'おにぎりの作業台', 外帶檯: '持ち帰り台', 白米袋: '米袋', 武士頭盔: '兜', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
   瀝水籃: '水切りかご', 棕櫚刷: '棕櫚たわし', 肥皂: '石けん', 檜木手桶: '檜の手桶', 布巾: '布巾', 竹籤垃圾桶: '串入れのごみ箱', 洗碗精: '食器用洗剤', 菜瓜布: 'スポンジたわし',
   門口招財貓組: '入口の招き猫', 小神龕組: '神棚', 收銀櫃組: 'レジ一式', 吧台座椅: 'カウンター席',
+  保溫與飯糰料理台: '保温台とおにぎり台', 流理台組: '流し一式', 碗盤架組: '食器棚', 米袋與舊飯桶: '米袋と飯桶', 男廁組: '男子トイレ一式', 女廁組: '女子トイレ一式',
   火烤灶台區: '炉端エリア', 櫃檯區: 'レジエリア', 玄關區: '玄関エリア', 小神龕區: '神棚エリア', 飲品櫃區: '飲み物エリア', 廁所區: 'お手洗いエリア', 後台區: '裏方エリア', 窗口區: '丸窓エリア',
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
@@ -218,6 +219,8 @@ const PIECES_EN: Record<string, string> = {
   '紙箱（割箸）': 'Box (chopsticks)', 收銀機操作說明書: 'Register manual',
   老闆: 'Owner', 惠比壽石像: 'Ebisu statue', 武士頭盔: 'Samurai helmet', 門口招財貓組: 'Lucky cats (group)', 小神龕組: 'Shrine (group)',
   收銀櫃組: 'Till (group)', 吧台座椅: 'Bar stools',
+  保溫與飯糰料理台: 'Warmer and rice ball counter (group)', 流理台組: 'Sink (group)', 碗盤架組: 'Dish racks (group)', 米袋與舊飯桶: 'Rice sacks and old tub (group)',
+  男廁組: "Men's washroom (group)", 女廁組: "Women's washroom (group)",
   火烤灶台區: 'Grill area', 櫃檯區: 'Till area', 玄關區: 'Entrance area', 小神龕區: 'Shrine area', 飲品櫃區: 'Drinks area', 廁所區: 'Toilets area', 後台區: 'Back room area', 窗口區: 'Window area',
 }
 /** the words in the names made up as they're placed (畫（-5, -4.2）, 馬桶（男廁）, 座位 3…) */

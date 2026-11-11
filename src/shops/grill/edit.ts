@@ -57,6 +57,16 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
     'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
   // (the customers' stools, the length of the bars: the views' cameras each see a few of them, so left out of their areas and kept together)
   'grp-stools': { zh: '吧台座椅', ja: 'カウンター席', members: Array.from({ length: GRILL_SEATS.length }, (_, n) => `stool${n}`), spans: true },
+  // (each part of the shop kept together, as the owner asked (2026-11-11: every piece in its area's group, the warmer and the rice ball
+  // counter as one): the warmer with its miso pot and the rice ball counter with its cooker, side by side between the cook table and the till)
+  'grp-ricestation': { zh: '保溫與飯糰料理台', ja: '保温台とおにぎり台', members: ['warmer', 'misopot', 'prepcounter', 'denkinabe'] },
+  // (the sink and all that's on it and by it)
+  'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge'] },
+  'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
+  // (the rice sacks in the kitchen's corner, and the old rice tub and stove set aside by them)
+  'grp-ricecorner': { zh: '米袋與舊飯桶', ja: '米袋と飯桶', members: ['ricesacks', 'ricetub', 'hagama'] },
+  'grp-wc-m': { zh: '男廁組', ja: '男子トイレ一式', members: ['wc2-m-noren', 'wc2-m-basin', 'wc2-m-moss', 'wc2-m-dryer', 'wc2-m-towelbox', 'wc2-m-duck', 'wc2-m-lamp', 'wc2-m-toilet', 'wc2-m-remote3', 'wc2-m-paper', 'wc2-m-brush', 'wc2-m-lamp2', 'wc-m-slippers'] },
+  'grp-wc-f': { zh: '女廁組', ja: '女子トイレ一式', members: ['wc2-f-noren', 'wc2-f-basin', 'wc2-f-vase', 'wc2-f-dryer', 'wc2-f-towelbox', 'wc2-f-duck', 'wc2-f-lamp', 'wc2-f-toilet', 'wc2-f-remote3', 'wc2-f-oto', 'wc2-f-brush', 'wc2-f-paper', 'wc2-f-bin', 'wc2-f-pads', 'wc2-f-lamp2', 'wc-f-slippers'] },
 }
 const unsettled = new Set<string>()
 /** the groups the owner has broken up (the shop's own, and the views' areas): not made again (kept here too, for when storage is blocked) */
@@ -607,7 +617,11 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
  * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
  * out of it, and nearer what the till's or the shrine's camera looks at */
 const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan',
-  koban: 'genkan' }
+  koban: 'genkan', bench: 'genkan', takeoutstand: 'till',
+  // (the kitchen's back: the rice station between the cook table and the till was nearer the till's camera; the rice corner and the sake
+  // barrel by it in no view's sight at all)
+  'grp-ricestation': 'back', 'grp-sink': 'back', 'grp-racks': 'back', 'grp-ricecorner': 'back', sake: 'back', freezer: 'back',
+  'grp-wc-m': 'toilet', 'grp-wc-f': 'toilet' }
 /** an area's name: its view's, as an area (後台區 is one already) */
 const areaName = (view: string) => { const n = VIEW_SPOTS.find((v) => v.id === view)?.zh ?? view; return n.endsWith('區') ? n : `${n}區` }
 /** each view's area made a group, of the pieces (and the shop's groups, whole) loose at the top that are new to it */
