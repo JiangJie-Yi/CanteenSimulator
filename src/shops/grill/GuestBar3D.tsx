@@ -2419,6 +2419,8 @@ const RAG_GEO = new RoundedBoxGeometry(0.085, 0.007, 0.05, 1, 0.003)
 const PASS_STACK_SHOWN = STACK_CAP + 3
 /** a plate's size in the sink, against its own */
 const IN_SINK = 0.78
+/** a plate standing in the draining basket: its size, a third of its depth */
+const IN_DRAIN: [number, number, number] = [IN_SINK, IN_SINK * 0.3, IN_SINK]
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
@@ -3049,8 +3051,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** where the k-th plate stands in the dish dryer (along its rack, from its first slot to its last), and the way its plates face */
   const dryerAt = (k: number) => inBar('SinkDryerRack0', endOf(1)).lerp(inBar('SinkDryerRack1', endOf(1)), DRYER_CAP > 1 ? k / (DRYER_CAP - 1) : 0)
   /** where the k-th plate stands in the draining basket: along its slots (blender/sink.py's SinkRackSlot0, 1, 6 cm apart as it's made), from
-   * just inside its end, 1.8 cm apart, thirty of them nested close (the owner's, 2026-11-11), the bowl upside down at its far end clear of them) */
-  const basketAt = (k: number) => { const a = inBar('SinkRackSlot0', endOf(1)), b = inBar('SinkRackSlot1', endOf(1)); return a.clone().add(b.sub(a).multiplyScalar(-0.833 + k * 0.299)) }
+   * the first notch on (blender/sink.py's notched rails: SinkRackSlot0 and 1 are two notches apart), each in its own notch, a gap between them
+   * (the owner's, 2026-11-12) */
+  const basketAt = (k: number) => { const a = inBar('SinkRackSlot0', endOf(1)), b = inBar('SinkRackSlot1', endOf(1)); return a.clone().add(b.sub(a).multiplyScalar(k / 2)) }
   /** each server's stack of dried plates, drawn on their tray while they carry it to the racks */
   const stackObjs = useRef<(THREE.Group | null)[]>([])
   const ragObjs = useRef<(THREE.Mesh | null)[]>([])
@@ -5108,7 +5111,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (and those washed by hand while the washer was busy, standing in the draining basket on the sink's counter) */}
       {given && (
         <group ref={drainPlates} name="drain-plates">
-          {Array.from({ length: DRAIN_CAP }, (_, i) => <group key={i} scale={IN_SINK} visible={false}><Plate design={i + 2} /></group>)}
+          {/* (drawn shallower than they are, so thirty stood in their notches show a gap between each (the owner's, 2026-11-12): the shop's
+              plates are deep, and at the notches' pitch they lay nested into one another) */}
+          {Array.from({ length: DRAIN_CAP }, (_, i) => <group key={i} scale={IN_DRAIN} visible={false}><Plate design={i + 2} /></group>)}
         </group>
       )}
       {given && (

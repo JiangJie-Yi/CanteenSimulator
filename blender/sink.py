@@ -676,49 +676,48 @@ tube("SinkBasketRimLow", rim2 + [rim2[0]], 0.0045, "rod", res=1, sides=6)
 # (feet: two little bamboo runners under it)
 for z_ in (bz0 + 0.04, bz1 - 0.04):
     tube(f"SinkBasketFoot{z_:+.2f}", [(bx0 + 0.02, H + 0.006, z_), (bx1 - 0.02, H + 0.006, z_)], 0.006, "rod", res=1, sides=8)
-# (in it: three bamboo rods along its floor down its middle, the plates standing on them out of the wet)
-SLAT_TOP = y0_ + 0.012 + 0.0045
-for z_ in (-0.195, -0.16, -0.125):
-    tube(f"SinkBasketSlat{z_:+.3f}", [(bx0 + 0.03, y0_ + 0.012, z_), (bx1 - 0.03, y0_ + 0.012, z_)], 0.0045, "rod", res=1, sides=6)
-# (the game's plates (GuestBar3D's, 0.197 round in the sink's units) stand on the slats, across its middle, along its slots)
-RACK_PLATE_R = 0.197
-# (three plates standing in it, edge on, and a bowl upside down beside them)
-for k in range(3):
-    px = 0.085 + k * 0.06
-    py, pz = H + 0.012 + 0.11, (bz0 + bz1) / 2 - 0.02
-    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.11, depth=0.012, location=P(px, py, pz), rotation=(0, math.pi / 2, 0))
-    o = active()
-    o.rotation_euler = (0, math.pi / 2 + 0.12, 0)
-    finish(o, f"SinkRackPlate{k}", M["plate"])
+# (in it: two notched bamboo rails along it either side of the plates' row, a notch for each plate, so they stand each in its own, a gap
+# between them (the owner's, 2026-11-12: the three rods along its floor and the bowl read as nothing, the plates packed together); one solid
+# comb each, the notches cut in its top (no rod or peg apiece))
+RACK_N, RACK_X0, RACK_X1 = 30, 0.04, 0.70
+RACK_PITCH = (RACK_X1 - RACK_X0) / (RACK_N - 1)
+RAIL_LO, RAIL_HI, NOTCH = y0_ + 0.004, y0_ + 0.045, y0_ + 0.022
+SLAT_TOP = y0_ + 0.004
+LANE_Z = (bz0 + bz1) / 2
+# (8 cm either side of the row's middle: where a plate's round edge comes down to the notches' floor)
+for zi, z_ in enumerate((LANE_Z - 0.082, LANE_Z + 0.082)):
+    bm = bmesh.new()
+    top = []
+    # (from just before the first plate to just past the last: up at each tooth between plates, down in each notch where one stands)
+    for k in range(RACK_N + 1):
+        xt = RACK_X0 - RACK_PITCH / 2 + k * RACK_PITCH
+        top += [(xt - RACK_PITCH * 0.18, RAIL_HI), (xt + RACK_PITCH * 0.18, RAIL_HI)]
+        if k < RACK_N:
+            xn = RACK_X0 + k * RACK_PITCH
+            top += [(xn - RACK_PITCH * 0.16, NOTCH), (xn + RACK_PITCH * 0.16, NOTCH)]
+    outline = [(top[0][0], RAIL_LO)] + top + [(top[-1][0], RAIL_LO)]
+    front = [bm.verts.new(P(x_, y_, z_ - 0.003)) for x_, y_ in outline]
+    back = [bm.verts.new(P(x_, y_, z_ + 0.003)) for x_, y_ in outline]
+    ff = bm.faces.new(front)
+    fb = bm.faces.new(back[::-1])
+    n = len(outline)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((front[i], back[i], back[j], front[j]))
+    bmesh.ops.triangulate(bm, faces=[ff, fb], quad_method="BEAUTY", ngon_method="EAR_CLIP")
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(f"SinkBasketRail{zi}")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(f"SinkBasketRail{zi}", me)
+    bpy.context.collection.objects.link(o)
+    finish(o, f"SinkBasketRail{zi}", M["rod"], smooth_shade=False)
     parts.append(o)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.106, minor_radius=0.004, major_segments=28, minor_segments=6, location=P(px, py, pz), rotation=(0, math.pi / 2 + 0.12, 0))
-    finish(active(), f"SinkRackPlateRim{k}", M["rim"])
-    parts.append(active())
-    empty(f"SinkRackSlot{k}", px, SLAT_TOP + RACK_PLATE_R, (bz0 + bz1) / 2)
-# (the bowl, smaller, upside down at the basket's far end past the thirty plates' row (the owner's: thirty plates at least))
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(0.655, SLAT_TOP, (bz0 + bz1) / 2))
-bowl = active()
-bowl.scale = (0.05, 0.05, 0.04)
-apply_scale(bowl)
-bm = bmesh.new()
-bm.from_mesh(bowl.data)
-bmesh.ops.delete(bm, geom=[v_ for v_ in bm.verts if v_.co.z < -0.001], context="VERTS")
-# (its foot (the top, turned over) closed in a ladder across its last ring, not a fan of triangles into the sphere's pole: the owner's rule)
-_top = max(bm.verts, key=lambda v_: v_.co.z)
-bmesh.ops.delete(bm, geom=[_top], context="VERTS")
-_ring = [e for e in bm.edges if e.is_boundary and min(v_.co.z for v_ in e.verts) > 0.03]
-_vs = list({v_ for e in _ring for v_ in e.verts})
-_c = sum((v_.co for v_ in _vs), Vector()) / len(_vs)
-_vs.sort(key=lambda v_: math.atan2(v_.co.y - _c.y, v_.co.x - _c.x))
-ladder_fill(bm, _vs)
-bm.to_mesh(bowl.data)
-bm.free()
-sol = bowl.modifiers.new("s", "SOLIDIFY")
-sol.thickness = 0.004
-bpy.context.view_layer.objects.active = bowl
-bpy.ops.object.modifier_apply(modifier="s")
-finish(bowl, "SinkRackBowl", M["plate"])
-parts.append(bowl)
+# (the game's plates (GuestBar3D's, 0.197 round in the sink's units) stand in the notches across its middle, along its slots: the slots'
+# marks two pitches apart from the first notch, so the game finds the pitch and the start)
+RACK_PLATE_R = 0.197
+for k in range(3):
+    empty(f"SinkRackSlot{k}", RACK_X0 + k * RACK_PITCH * 2, SLAT_TOP + RACK_PLATE_R, LANE_Z)
 # (by the basin's front right corner: the palm scrubber on its dish, the soap on its)
 cyl("SinkDish0", -0.02, H, H + 0.01, 0.2, 0.05, "dish", seg=20, r1=0.055)
 bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(-0.02, H + 0.035, 0.2))
