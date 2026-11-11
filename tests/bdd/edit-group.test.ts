@@ -11,12 +11,12 @@ const setup = () => {
 }
 
 feature('編輯模式的群組', () => {
-  scenario('門口的招財貓台、四隻招財貓、兩隻貓中間的小判與下層的頭盔，一開始就是一組，擺在沿牆往圓窗移 3.4 的地方（候位長凳在它原本的位置）', ({ then }) => {
+  scenario('門口的招財貓台、四隻招財貓、兩隻貓中間的小判與下層的頭盔，一開始就是一組，擺在沿牆往圓窗移 4.4 的地方（候位長凳在它原本的位置，再空出一公尺給第二張）', ({ then }) => {
     then('有一個群組，成員是貓台、四隻貓、小判與頭盔', () => {
       const g = getEdit().groups['grp-doorcats']
       expect(g).toBeDefined()
       expect([...g.members].sort()).toEqual(['doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'doorcats', 'kabuto', 'koban'])
-      expect([g.t, g.yaw, g.s]).toEqual([[-2.749, 0, 2.003], 0, 1])
+      expect([g.t, g.yaw, g.s]).toEqual([[-3.5575, 0, 2.5921], 0, 1])
     })
   })
 

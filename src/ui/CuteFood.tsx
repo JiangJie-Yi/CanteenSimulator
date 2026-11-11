@@ -1,8 +1,8 @@
 /*
  * The pantry's pictures of the foods, cute (the owner's, 2026-11-12: the fine inked drawings and the pictures rendered from the models both
  * not right; cute and neat, cartoon). Each food a round, chunky form in one ink line (thick, a warm dark brown, its corners rounded), filled
- * with its colour lit softly from the top left (a gradient, lighter there, deeper at the bottom right), a white gleam on it; most of them a
- * little face (two dot eyes with a catch-light, a small smile, pink cheeks); the fish a big round eye. Drawn on a 128 square, the food in
+ * with its colour lit softly from the top left (a gradient, lighter there, deeper at the bottom right), a white gleam on it; none with a
+ * face or an eye (the owner's, 2026-11-12: food doesn't grow eyes because it's cute). Drawn on a 128 square, the food in
  * the middle of it, about 100 across.
  */
 import type { ReactNode } from 'react'
@@ -41,23 +41,6 @@ function Blob({ c, d, k, at, sw = LINE, tf }: { c: Ctx; d: string; k: string; at
 /** a white gleam */
 const Gleam = ({ x, y, rx = 6, ry = 3.4, rot = -30, o = 0.85 }: { x: number; y: number; rx?: number; ry?: number; rot?: number; o?: number }) =>
   <ellipse cx={x} cy={y} rx={rx} ry={ry} fill="#ffffff" opacity={o} transform={`rotate(${rot} ${x} ${y})`} />
-/** a little face: two dot eyes with their catch-lights, a small smile, pink cheeks; `s` its size */
-function Face({ x, y, s = 1, w = 1 }: { x: number; y: number; s?: number; w?: number }) {
-  const ex = 7 * s * w
-  return (
-    <g>
-      <ellipse cx={x - ex - 4 * s} cy={y + 4.5 * s} rx={3.6 * s} ry={2.3 * s} fill="#ff8fa0" opacity="0.6" />
-      <ellipse cx={x + ex + 4 * s} cy={y + 4.5 * s} rx={3.6 * s} ry={2.3 * s} fill="#ff8fa0" opacity="0.6" />
-      {[-ex, ex].map((dx) => (
-        <g key={dx}>
-          <ellipse cx={x + dx} cy={y} rx={2.3 * s} ry={3 * s} fill={INK} />
-          <circle cx={x + dx + 0.8 * s} cy={y - 1.1 * s} r={0.9 * s} fill="#ffffff" />
-        </g>
-      ))}
-      <path d={`M${x - 2.6 * s} ${y + 3.6 * s} Q${x} ${y + 6.4 * s} ${x + 2.6 * s} ${y + 3.6 * s}`} fill="none" stroke={INK} strokeWidth={1.5 * s} strokeLinecap="round" />
-    </g>
-  )
-}
 /** a bamboo skewer from one end to the other, inked */
 const Stick = ({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: number }) => (
   <g strokeLinecap="round">
@@ -78,14 +61,13 @@ const FISH: Record<string, FishLook> = {
   Hokke: { back: '#8a7856', belly: '#f4ead2', fin: '#c8b084', bars: '#5a4a30' },
   Nodoguro: { back: '#d9473e', belly: '#fde2d6', fin: '#e8826e', deep: 1.05 },
 }
-/** a fish, cute: a round plump body facing left, its back's colour fading to its pale belly, a round tail, small fins, a big eye, blush */
+/** a fish, cute: a round plump body facing left, its back's colour fading to its pale belly, a round tail, small fins, no eye */
 function Fish({ c, f }: { c: Ctx; f: FishLook }) {
   const L = 44 * (f.len ?? 1), D = 26 * (f.deep ?? 1), cx = 58, cy = 64
   const id = `${c.u}f${c.n++}`
   const body = `M${cx - L} ${cy} C${cx - L} ${cy - D * 1.1} ${cx + L * 0.55} ${cy - D * 1.15} ${cx + L * 0.8} ${cy - D * 0.2} L${cx + L * 0.8} ${cy + D * 0.2} C${cx + L * 0.55} ${cy + D * 1.15} ${cx - L} ${cy + D * 1.1} ${cx - L} ${cy} Z`
   const tx = cx + L * 0.78
   const tail = `M${tx} ${cy} C${tx + 8} ${cy - 6} ${tx + 14} ${cy - D * 0.95} ${tx + 22} ${cy - D * 0.8} C${tx + 17} ${cy - 6} ${tx + 17} ${cy + 6} ${tx + 22} ${cy + D * 0.8} C${tx + 14} ${cy + D * 0.95} ${tx + 8} ${cy + 6} ${tx} ${cy} Z`
-  const ex = cx - L * 0.55, ey = cy - D * 0.22
   return (
     <g>
       <defs>
@@ -104,13 +86,8 @@ function Fish({ c, f }: { c: Ctx; f: FishLook }) {
       {f.spot && <ellipse cx={cx - L * 0.12} cy={cy - D * 0.15} rx="5" ry="3.4" fill={f.spot} opacity="0.9" />}
       {f.roe && <ellipse cx={cx + 2} cy={cy + D * 0.45} rx="14" ry="5" fill="#f6b24c" opacity="0.55" />}
       {f.beak && <path d={`M${cx - L - 1} ${cy - 1} l-7 1.5 l7 1.5 Z`} fill={f.beak} stroke={INK} strokeWidth="2" strokeLinejoin="round" />}
-      {/* (the gill's curve, the big eye with its shine, the blush and the smile) */}
+      {/* (the gill's curve) */}
       {line(`M${cx - L * 0.3} ${cy - D * 0.62} Q${cx - L * 0.18} ${cy} ${cx - L * 0.3} ${cy + D * 0.62}`, tone(f.back, -0.35), 2)}
-      <circle cx={ex} cy={ey} r="6.6" fill="#ffffff" stroke={INK} strokeWidth="2.4" />
-      <circle cx={ex - 0.6} cy={ey + 0.6} r="3.8" fill={INK} />
-      <circle cx={ex + 0.8} cy={ey - 1.2} r="1.4" fill="#ffffff" />
-      <ellipse cx={ex + 3} cy={ey + 10} rx="4" ry="2.4" fill="#ff8fa0" opacity="0.55" />
-      {line(`M${cx - L + 4} ${cy + 4} q3 2.4 6 0`, INK, 1.6)}
       <Gleam x={cx - 2} y={cy - D * 0.62} rx={10} ry={3} rot={-8} o={0.7} />
     </g>
   )
@@ -122,7 +99,6 @@ function Fillet({ c, flesh, skin, fat }: { c: Ctx; flesh: string; skin: string; 
       <Blob c={c} k={flesh} d="M20 52 C20 40 30 36 44 37 L96 40 C108 41 112 48 110 60 L106 84 C104 94 96 96 84 95 L32 92 C22 91 18 84 18 74 Z" />
       <path d="M22 50 C26 40 36 36 46 37 L96 40 C104 41 109 45 110 52 C96 47 70 44 22 50 Z" fill={skin} stroke={INK} strokeWidth="2.4" strokeLinejoin="round" />
       {[0, 1, 2, 3].map((k) => line(`M${36 + k * 17} 54 C${30 + k * 17} 66 ${40 + k * 17} 78 ${34 + k * 17} 90`, fat, 2.6, k))}
-      <Face x={66} y={66} s={1.05} />
       <Gleam x={40} y={58} rx={8} ry={3} rot={-20} />
     </g>
   )
@@ -153,7 +129,6 @@ function draw(id: string, c: Ctx): ReactNode {
       <Blob c={c} k="#f1d8c4" d="M64 16 C72 20 84 26 92 24 C90 32 84 36 78 34 Z" sw={2.6} />
       <Blob c={c} k="#f1d8c4" d="M64 16 C56 20 44 26 36 24 C38 32 44 36 50 34 Z" sw={2.6} />
       {[0, 1, 2].map((k) => line(`M${52} ${42 + k * 10} l24 4`, '#e2b8a0', 1.8, k))}
-      <Face x={64} y={64} />
       <Gleam x={56} y={36} rx={4} ry={8} rot={10} />
     </g>
     case 'Scallop': return <g>
@@ -162,7 +137,6 @@ function draw(id: string, c: Ctx): ReactNode {
         <g key={k}>
           <Blob c={c} k="#f8eedc" d={ell(x, y, 16, 13)} />
           <path d={ell(x, y + 7, 15, 5)} fill="#efd9b6" opacity="0.7" />
-          <Face x={x} y={y - 2} s={0.75} />
           <Gleam x={x - 7} y={y - 6} rx={4} ry={2} />
         </g>
       ))}
@@ -178,7 +152,6 @@ function draw(id: string, c: Ctx): ReactNode {
               : <Blob c={c} k={piece} d={rrect(x - 12, y - 13, 24, 26, 9)} tf={`rotate(-30 ${x} ${y})`} />}
             {id === 'PorkBelly' && line(`M${x - 10} ${y + 2} q10 -6 20 -12`, '#ffffff', 2.6)}
             {id === 'BloodCake' && [0, 1, 2].map((j) => <circle key={j} cx={x - 5 + j * 5} cy={y - 4 + (j % 2) * 6} r="1.4" fill="#f6f0e8" opacity="0.7" />)}
-            {k === 2 && <Face x={x + 1} y={y - 3} s={0.75} />}
           </g>
         ))}
         {id === 'Yakitori' && <path d="M53 58 q4 -6 8 -4" fill="none" stroke="#7fb24a" strokeWidth="3" strokeLinecap="round" />}
@@ -191,7 +164,6 @@ function draw(id: string, c: Ctx): ReactNode {
       <Blob c={c} k="#b8442e" d={ell(112, 70, 5, 4)} sw={2.4} />
       <Blob c={c} k="#c9573e" d="M22 70 C20 56 36 48 64 50 C92 52 110 56 108 70 C106 82 90 88 64 86 C36 84 24 82 22 70 Z" />
       {[44, 64, 84].map((x) => line(`M${x - 4} 54 l8 6`, '#8a2f20', 2.2, x))}
-      <Face x={64} y={68} />
       <Gleam x={42} y={56} rx={10} ry={3} rot={-6} />
     </g>
     case 'GrilledCorn': return <g>
@@ -199,34 +171,29 @@ function draw(id: string, c: Ctx): ReactNode {
       <Blob c={c} k="#f4c844" d="M30 64 C40 40 76 30 100 40 C116 48 114 70 98 82 C78 96 44 96 34 86 C26 80 26 72 30 64 Z" />
       {[0, 1, 2, 3, 4].map((r) => [0, 1, 2, 3, 4, 5].map((k) => <ellipse key={`${r}${k}`} cx={44 + k * 11 - r * 1.5} cy={48 + r * 9} rx="3.6" ry="3" fill="#fbe08a" stroke="#d9a53a" strokeWidth="1" />))}
       <Blob c={c} k="#9ccc5a" d="M24 82 C38 86 58 88 76 94 C58 100 34 98 24 82 Z" sw={2.8} />
-      <Face x={72} y={64} />
       <Gleam x={60} y={44} rx={10} ry={3} rot={-14} />
     </g>
     case 'GrilledShiitake': return <g>
       <Blob c={c} k="#efe1c6" d={rrect(54, 64, 20, 34, 8)} />
       <Blob c={c} k="#9a6a44" d="M18 66 C18 38 42 24 64 24 C86 24 110 38 110 66 C98 74 30 74 18 66 Z" />
       {line('M46 40 L82 56 M82 40 L46 56', '#f4e6cc', 3.4)}
-      <Face x={64} y={78} s={0.9} />
       <Gleam x={42} y={38} rx={9} ry={3.4} rot={-24} />
     </g>
     case 'KingOyster': return <g>
       <Blob c={c} k="#f3ead8" d="M44 46 C44 70 40 96 48 106 C58 112 74 112 82 104 C90 94 84 70 84 46 Z" />
       <Blob c={c} k="#b48a5e" d="M30 50 C30 30 46 20 64 20 C82 20 98 30 98 50 C86 56 42 56 30 50 Z" />
-      <Face x={64} y={78} />
       <Gleam x={46} y={32} rx={8} ry={3} rot={-20} />
     </g>
     case 'Shishito': return <g>
       <Blob c={c} k="#5aa040" d="M20 62 C30 48 64 46 92 50 C104 52 110 58 108 64 C104 72 76 80 50 80 C32 80 16 74 20 62 Z" />
       <path d="M106 58 C112 52 116 46 118 40" fill="none" stroke={INK} strokeWidth="6" strokeLinecap="round" />
       <path d="M106 58 C112 52 116 46 118 40" fill="none" stroke="#6aa848" strokeWidth="3" strokeLinecap="round" />
-      <Face x={60} y={64} />
       <Gleam x={46} y={56} rx={10} ry={3} rot={-6} />
     </g>
     case 'Okra': return <g>
       <Blob c={c} k="#6cae4a" d="M22 64 C34 50 70 44 98 52 L108 60 L98 70 C72 80 34 78 22 64 Z" />
       {line('M36 58 L98 56 M36 70 L96 64', '#4a8a30', 2)}
       <Blob c={c} k="#8cc05e" d={rrect(100, 52, 14, 18, 5)} sw={2.8} />
-      <Face x={58} y={62} s={0.9} />
       <Gleam x={46} y={56} rx={9} ry={2.4} rot={-6} />
     </g>
     case 'Asparagus': return <g>
@@ -237,32 +204,27 @@ function draw(id: string, c: Ctx): ReactNode {
           {[34, 56, 78].map((x) => line(`M${x} ${55 + k * 12} l4 2`, '#4a7e2c', 1.6, x))}
         </g>
       ))}
-      <Face x={60} y={66} s={0.9} />
     </g>
     case 'Potato': return <g>
       <Blob c={c} k="#d9b47a" d="M22 66 C20 44 42 34 66 36 C92 38 110 50 108 70 C106 88 84 96 62 94 C38 92 24 84 22 66 Z" />
       {[[40, 50], [86, 52], [92, 78], [36, 80]].map(([x, y]) => <ellipse key={`${x}${y}`} cx={x} cy={y} rx="2.6" ry="1.6" fill="#9a7444" />)}
-      <Face x={64} y={64} />
       <Gleam x={44} y={46} rx={9} ry={3.4} rot={-18} />
     </g>
     case 'SweetPotato': return <g>
       <Blob c={c} k="#b03e5e" d="M14 70 C24 52 50 44 72 44 C96 44 114 56 116 66 C110 78 92 88 66 88 C42 88 24 82 14 70 Z" />
       {line('M30 62 q8 4 14 2 M78 54 q8 4 14 2 M84 80 q6 -3 12 -2', '#7e2440', 1.8)}
-      <Face x={66} y={66} />
       <Gleam x={48} y={56} rx={10} ry={3} rot={-10} />
     </g>
     case 'Onion': return <g>
       <Blob c={c} k="#e0a050" d="M64 24 C70 34 98 44 100 70 C102 92 84 102 64 102 C44 102 26 92 28 70 C30 44 58 34 64 24 Z" />
       {line('M64 30 C56 50 52 76 56 100 M64 30 C72 50 76 76 72 100', '#b8762e', 1.8)}
       <path d="M64 24 L62 14 M64 24 L68 15" stroke={INK} strokeWidth="2.6" strokeLinecap="round" />
-      <Face x={64} y={72} />
       <Gleam x={46} y={58} rx={4} ry={9} rot={18} />
     </g>
     case 'Negi': return <g transform="rotate(-20 64 64)">
       <Blob c={c} k="#f6f6e6" d={rrect(14, 54, 66, 20, 9)} />
       <Blob c={c} k="#8ccf5c" d="M76 54 C92 46 108 46 118 50 L118 58 C108 56 96 58 84 64 L84 74 C96 70 108 72 118 76 L116 82 C102 80 90 80 76 74 Z" sw={2.8} />
       {line('M20 58 v12', '#cfd4b4', 1.6)}
-      <Face x={46} y={62} s={0.9} />
       <Gleam x={30} y={58} rx={8} ry={2.4} rot={0} />
     </g>
     case 'Carrot': return <g>
@@ -270,33 +232,28 @@ function draw(id: string, c: Ctx): ReactNode {
       <Blob c={c} k="#5ea83c" d="M92 38 C102 30 114 28 120 30 C114 36 104 40 96 42 Z" sw={2.6} />
       <Blob c={c} k="#f08a2c" d="M16 104 C30 86 66 54 86 36 C94 32 100 38 98 46 C80 66 46 96 22 108 C18 110 14 108 16 104 Z" />
       {line('M46 76 l6 5 M62 62 l6 5 M74 50 l5 4', '#c4641a', 2)}
-      <Face x={70} y={58} s={0.9} />
       <Gleam x={78} y={44} rx={6} ry={2} rot={-40} />
     </g>
     case 'Gobo': return <g transform="rotate(-24 64 64)">
       {[0, 1].map((k) => <Blob key={k} c={c} k="#8a6a48" d={rrect(10, 52 + k * 16, 108, 13, 6)} sw={2.8} />)}
       {[30, 54, 78, 98].map((x) => line(`M${x} 55 v8 M${x + 6} 71 v8`, '#5e4428', 1.6, x))}
-      <Face x={60} y={58} s={0.8} />
     </g>
     case 'Daikon': return <g>
       <Blob c={c} k="#7ab84c" d="M52 30 C46 18 50 10 58 8 C60 18 62 24 64 30 Z" sw={2.6} />
       <Blob c={c} k="#7ab84c" d="M64 30 C66 18 74 10 82 12 C80 20 74 26 70 32 Z" sw={2.6} />
       <Blob c={c} k="#f6f4ea" d="M44 34 C56 28 76 28 86 34 C90 56 86 84 70 104 C66 110 60 110 56 104 C42 84 40 56 44 34 Z" />
-      <Face x={64} y={58} />
       <Gleam x={52} y={50} rx={3.6} ry={10} rot={6} />
     </g>
     // ---- the summer vegetables (the owner's, 2026-11-12)
     case 'Tomato': return <g>
       <Blob c={c} k="#ec3a2c" d="M24 64 C24 42 42 32 64 32 C86 32 104 42 104 64 C104 88 86 100 64 100 C42 100 24 88 24 64 Z" />
       <Blob c={c} k="#5ea83c" d="M64 30 L56 40 L64 38 L70 44 L72 36 L82 36 L72 30 L74 22 L66 28 L58 22 Z" sw={2.4} />
-      <Face x={64} y={66} />
       <Gleam x={44} y={48} rx={9} ry={4} rot={-30} />
     </g>
     case 'Cucumber': return <g transform="rotate(-18 64 64)">
       <Blob c={c} k="#3f8a34" d="M14 66 C14 54 30 50 64 50 C98 50 114 54 114 66 C114 78 98 82 64 82 C30 82 14 78 14 66 Z" />
       {[[30, 58], [52, 56], [76, 57], [98, 60], [40, 74], [66, 76], [90, 72]].map(([x, y]) => <circle key={`${x}${y}`} cx={x} cy={y} r="1.6" fill="#cfe6a8" />)}
       <path d="M112 64 l6 -3" stroke={INK} strokeWidth="3" strokeLinecap="round" />
-      <Face x={60} y={64} s={0.95} />
       <Gleam x={40} y={56} rx={12} ry={2.6} rot={0} />
     </g>
     case 'Eggplant': return <g>
@@ -304,14 +261,12 @@ function draw(id: string, c: Ctx): ReactNode {
       <Blob c={c} k="#3e7a34" d="M28 36 C34 28 46 28 52 34 C48 40 44 46 38 50 C34 46 30 42 28 36 Z" sw={2.6} />
       <path d="M32 34 L22 24" stroke={INK} strokeWidth="5" strokeLinecap="round" />
       <path d="M32 34 L22 24" stroke="#3e7a34" strokeWidth="2.4" strokeLinecap="round" />
-      <Face x={80} y={82} />
       <Gleam x={60} y={52} rx={10} ry={3.6} rot={36} />
     </g>
     case 'Piman': return <g>
       <Blob c={c} k="#2f8a26" d="M30 44 C38 32 54 34 64 38 C74 34 90 32 98 44 C106 58 100 84 88 96 C80 102 72 98 64 94 C56 98 48 102 40 96 C28 84 22 58 30 44 Z" />
       {line('M64 40 C60 60 60 80 64 94', '#1f6a18', 2)}
       <Blob c={c} k="#5ea83c" d={rrect(58, 26, 12, 14, 4)} sw={2.6} />
-      <Face x={64} y={66} />
       <Gleam x={44} y={52} rx={4} ry={10} rot={14} />
     </g>
     case 'Paprika': return <g>
@@ -319,7 +274,6 @@ function draw(id: string, c: Ctx): ReactNode {
         <g key={j}>
           <Blob c={c} k={k} d={`M${x - 24} ${y - 16} C${x - 16} ${y - 28} ${x} ${y - 26} ${x} ${y - 24} C${x} ${y - 26} ${x + 16} ${y - 28} ${x + 24} ${y - 16} C${x + 30} ${y} ${x + 24} ${y + 28} ${x} ${y + 30} C${x - 24} ${y + 28} ${x - 30} ${y} ${x - 24} ${y - 16} Z`} />
           <Blob c={c} k="#5ea83c" d={rrect(x - 5, y - 34, 10, 12, 3)} sw={2.4} />
-          <Face x={x} y={y + 2} s={0.85} />
           <Gleam x={x - 12} y={y - 10} rx={3.4} ry={8} rot={14} />
         </g>
       ))}
@@ -328,7 +282,6 @@ function draw(id: string, c: Ctx): ReactNode {
       <Blob c={c} k="#fffdf6" d="M64 20 C76 20 106 70 104 88 C102 102 26 102 24 88 C22 70 52 20 64 20 Z" />
       <path d="M38 74 H90 L94 100 Q64 104 34 100 Z" fill="#26342c" stroke={INK} strokeWidth={LINE} strokeLinejoin="round" />
       {line('M50 76 v24 M64 76 v26 M78 76 v24', '#3c5044', 1.6)}
-      <Face x={64} y={56} />
       <Gleam x={48} y={42} rx={8} ry={3} rot={-50} />
     </g>
     case 'NetMochi': return <g>
@@ -336,7 +289,6 @@ function draw(id: string, c: Ctx): ReactNode {
         <g key={k}>
           <Blob c={c} k="#fbf6ea" d={`M${x - 20} ${y + 10} C${x - 22} ${y - 8} ${x - 8} ${y - 22} ${x + 4} ${y - 18} C${x + 16} ${y - 14} ${x + 22} ${y} ${x + 20} ${y + 12} C${x + 10} ${y + 18} ${x - 10} ${y + 18} ${x - 20} ${y + 10} Z`} />
           <ellipse cx={x + 4} cy={y + 10} rx="10" ry="3" fill="#e7b76a" opacity="0.6" />
-          <Face x={x} y={y} s={0.85} />
         </g>
       ))}
       <Gleam x={36} y={56} rx={6} ry={2.6} />

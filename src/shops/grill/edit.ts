@@ -45,11 +45,14 @@ export type Tool = 'select' | 'move' | 'rotate' | 'scale'
  * (degrees) and `s` how much larger (one number for all three axes). Each member still keeps its own place inside it.
  */
 export type Group = { name: string; members: string[]; pivot: V3; t: V3; yaw: number; s: number; r?: V3 }
+/** a metre further along the wall, the same way as the 3.4 before it (unit (-0.8085, 0, 0.5891)) */
+const CATS_SHIFT_3: V3 = [-0.8085, 0, 0.5891]
 /** groups the shop comes with (the owner's own are added to them): the door's cat stand with its four cats; their pivot is found the first time
  * edit mode opens, once the pieces have been measured. `spans`: it runs across the room, in no one view's area (see groupByViews) */
 const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean; t?: V3 }> = {
-  // (it and the shrine moved 3.4 along the wall toward the round window (the owner's, 2026-11-11), the waiting bench in their place: GENKAN_SHIFT)
-  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban', 'kabuto'], t: [-2.749, 0, 2.003] },
+  // (it and the shrine moved 3.4 along the wall toward the round window (the owner's, 2026-11-11), the waiting bench in their place: GENKAN_SHIFT;
+  // the stand a metre further along the same way (the owner's, 2026-11-12, room for a second bench): CATS_SHIFT_3)
+  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban', 'kabuto'], t: [-2.749 + CATS_SHIFT_3[0], 0, 2.003 + CATS_SHIFT_3[2]] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
   'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-2.749, 0, 2.003] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
@@ -123,6 +126,13 @@ const loadGroups = (): Record<string, Group> => {
     if (g[id] && d && !made.has(id)) g[id] = { ...g[id], t: [0, 1, 2].map((k) => g[id].t[k] + d[k]) as V3 }
     try { localStorage.setItem(key, '1'); localStorage.setItem(KEY_G, JSON.stringify(g)) } catch { /* storage blocked */ }
   }
+  // (a kept cat stand moved on a metre more, once)
+  try {
+    if (!localStorage.getItem('jgs-edit-groupshift-3')) {
+      if (g['grp-doorcats'] && !made.has('grp-doorcats')) g['grp-doorcats'] = { ...g['grp-doorcats'], t: [0, 1, 2].map((k) => g['grp-doorcats'].t[k] + CATS_SHIFT_3[k]) as V3 }
+      localStorage.setItem('jgs-edit-groupshift-3', '1'); localStorage.setItem(KEY_G, JSON.stringify(g))
+    }
+  } catch { /* storage blocked */ }
   // (a kept cat stand from before the coin and the helmet were set on it: they join it, out of whatever else held them, so they go where it goes
   // (the owner's, 2026-11-11: left behind when the stand moved for the bench))
   const cats = g['grp-doorcats']
