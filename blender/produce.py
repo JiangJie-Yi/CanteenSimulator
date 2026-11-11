@@ -257,6 +257,9 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
     # (2026-11-11, the owner's: more like an old burlap sack: the tubers pressing the cloth out harder, more of them)
     lumps = [(rnd.uniform(0, 2 * math.pi), rnd.uniform(0.08, 0.95) ** 0.8, r * rnd.uniform(0.03, 0.06)) for _ in range(20)]
     TIE_T = 0.62
+    # (the bottom seam's two ends, where the corners stand out: either side, a little toward the front (the sacks stand close side by side))
+    # (turned toward the front so both are seen from it: at their sides they were hidden between the sacks)
+    EAR_A = 0.95
 
     def prof(t):
         f = 1 + 0.13 * math.exp(-((t - 0.19) / 0.16) ** 2) - 0.045 * math.exp(-((t - 0.55) / 0.13) ** 2) + 0.01 * math.exp(-((t - 0.86) / 0.1) ** 2)
@@ -268,11 +271,10 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
 
     def radius(t, a):
         base = r * prof(t) * (1 + 0.035 * math.cos(2 * a + ph[0]))
-        # (a sewn sack's: squarer toward its foot, the four corners standing out where its bottom's sewn (the owner's, 2026-11-11: like a
-        # sack, not a bucket); round higher up, filled out)
-        rel = a - front + math.pi / 4
-        sq = 1 / (abs(math.cos(rel)) ** 3 + abs(math.sin(rel)) ** 3) ** (1 / 3)
-        base *= 1 + (sq - 1) * 0.9 * math.exp(-(t / 0.32) ** 2)
+        # (a sewn sack's foot: its bottom seam runs across it from side to side, the cloth drawn out toward its two ends, where its corners
+        # stand out (EAR_A; the owner's, 2026-11-11: the corners at the foot made); round higher up, filled out)
+        pull = max(math.exp(-(math.atan2(math.sin(a - e), math.cos(a - e)) / 0.55) ** 2) for e in (front + EAR_A, front - EAR_A))
+        base *= 1 + 0.1 * pull * math.exp(-(t / 0.24) ** 2)
         # (the cloth gathered into soft folds hanging down from under the cuff, deepest just under it, gone by the middle)
         base += r * 0.03 * smooth_(0.45, 0.95, t) * math.sin(9 * a + ph[7] + 1.5 * t) * (0.6 + 0.4 * math.sin(4 * a + ph[8]))
         for (la, lt, amp) in lumps:
@@ -325,6 +327,51 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
                 loop[uv].uv = (jj / seg * 2, vv)
     ladder_fill(bm, rows[0][0])
     o = mesh_object(name, bm, mat)
+    # ---- the bottom corners (the owner's, 2026-11-11, after a photo of old burlap sacks): at each end of the seam across its foot the cloth
+    # pinched into a flattened point standing out from it, drooping to the floor, a little twisted, its tip crumpled thin (closed across in a
+    # ladder, not into one point); rooted inside the body
+    for k, e in enumerate((front + EAR_A, front - EAR_A)):
+        e += 0.06 * math.sin(ph[9] + k * 2.1)
+        t0, y0 = 0.07, h * 0.07
+        r0 = radius(t0, e)
+        out = (math.cos(e), math.sin(e))
+        tan = (-math.sin(e), math.cos(e))
+        twist = 0.35 * (1 if k else -1) + 0.2 * math.sin(ph[3] + k)
+        bm = bmesh.new()
+        uv = bm.loops.layers.uv.new()
+        # (radial reach, half-width along the foot, half-height, droop: the root in the body, then out to the crumpled tip)
+        prof_ = [(-0.02, 0.26, 0.2, 0.0), (0.07, 0.18, 0.1, -0.015), (0.18, 0.09, 0.04, -0.04), (0.28, 0.03, 0.01, -0.06)]
+        rings = []
+        for (reach, hw, hh, droop) in prof_:
+            ring = []
+            for j in range(8):
+                th = 2 * math.pi * j / 8
+                w_, v_ = hw * r * math.cos(th), hh * r * math.sin(th)
+                # (twisted about its own length as it goes out: flat side tipped)
+                tw = twist * (reach + 0.02) / 0.3
+                wx, wy = w_ * math.cos(tw) - v_ * math.sin(tw), w_ * math.sin(tw) + v_ * math.cos(tw)
+                rr = r0 + reach * r
+                x = cx + rr * out[0] + wx * tan[0] + dx * y0
+                z = cz + rr * out[1] + wx * tan[1] + dz * y0
+                y = max(0.002, y0 + droop * r * 1.0 + wy - 0.04 * reach * r)
+                ring.append(bm.verts.new(P(x, y, z)))
+            rings.append(ring)
+        for q in range(len(rings) - 1):
+            for j in range(8):
+                j2 = (j + 1) % 8
+                f = bm.faces.new((rings[q][j], rings[q + 1][j], rings[q + 1][j2], rings[q][j2]))
+                for loop, (jj, qq) in zip(f.loops, ((j, q), (j, q + 1), (j + 1, q + 1), (j + 1, q))):
+                    loop[uv].uv = (e / (2 * math.pi) * 2 + jj * 0.006, 0.02 + qq * 0.02)
+        ladder_fill(bm, rings[-1])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        ear = mesh_object(f"{name}Ear{k}", bm, mat)
+        # (the corners part of the sack: joined to it)
+        bpy.ops.object.select_all(action="DESELECT")
+        ear.select_set(True)
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.join()
+        parts.remove(ear)
     # ---- the dark floor just inside the mouth, under what's heaped there
     bm = bmesh.new()
     ring = [bm.verts.new(at(top[j] * 0.93, 2 * math.pi * j / seg, h - 0.006)) for j in range(seg)]
