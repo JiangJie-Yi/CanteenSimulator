@@ -298,19 +298,18 @@ const SIZZLE_AT = new THREE.Vector3()
 const HAND_OFFSET = new THREE.Vector3(0, 0.07, 0)
 /** the water bucket, drawn this much bigger than modelled (its water is for damping the fire down, not for the food: the owner's); and its
  * footprint. At a bucket's own size (on the table it was once drawn three times as big, nearly a metre across) */
-const BUCKET_SCALE = 0.55
+// (its own size again, on the floor (the owner's, 2026-11-11: off the table onto the floor, at the size it was): it was 0.55 on the table)
+const BUCKET_SCALE = 1
 const BIN_R = 0.27 * BUCKET_SCALE
 /** (scratch: a piece's size in the world, for its rod) */
 const ROD_WS = new THREE.Vector3()
 /** the trash bin for bare sticks, burnt scraps and the like (the water bucket is only for water), on the floor by the cook's right foot */
 const TRASH_R = 0.15
 const TRASH_H = 0.3
-/** where the bucket stands: back on the table (the owner's, 2026-11-09 "水桶也沒放回桌上"; it had been put on the floor by the cook's left
- * foot, 2026-11-07), on its top past the hearth's right-hand side, just in front of the third cook's bay: he dips it from there, a step
- * toward it, the fire's water at hand; clear of the hearth's frame, the bay's edge (3 cm), the plating's stack of clean plates (3 cm) and
- * the side dishes' place (DISH_TOP: nearer, they were pushed off it, and on along the table, the rice balls' dish out over its edge). Along
- * (the bar's, as COOK_NOTCH) and out (lay) */
-const TABLE_BIN = { along: 2.55, lay: 0.5 }
+/** where the bucket stands: on the floor past the table's end, beside the low dish rack toward the table's front corner, its back by the
+ * table's end face (the owner's, 2026-11-11: off the table onto the floor, its own size; it stood on the table's top in front of the third
+ * cook's bay (2026-11-09), and before that on the floor by the cook's left foot). Along (the bar's, as COOK_NOTCH) and out (lay) */
+const FLOOR_BUCKET = { along: 3.475, lay: 1.25 }
 /** where the trash bin stands: on the floor in front of the strip of table right of the cook's notch (the notch is only as wide as his step;
  * past the strip, the fridge's doors swing out). Along and out, as the bucket */
 const FLOOR_TRASH = { along: 1.43, lay: 2.26 }
@@ -4541,8 +4540,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const floorY = CHEF_AT.y
     if (carriers.bin) {
       const h = carriers.bin[0].home
-      const want = new THREE.Vector3().addScaledVector(ALONG, TABLE_BIN.along - FIRE_SHIFT.dot(ALONG)).addScaledVector(LAY, TABLE_BIN.lay)
-      moved.current.set('bin', new THREE.Vector3(want.x - h.x, -h.y, want.z - h.z))
+      const want = new THREE.Vector3().addScaledVector(ALONG, FLOOR_BUCKET.along - FIRE_SHIFT.dot(ALONG)).addScaledVector(LAY, FLOOR_BUCKET.lay)
+      moved.current.set('bin', new THREE.Vector3(want.x - h.x, floorY - h.y, want.z - h.z))
     }
     if (roast.trash) {
       const t = roast.trash
