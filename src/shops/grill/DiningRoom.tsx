@@ -31,7 +31,7 @@ import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { useSfxMuted } from '@/scene/sfx'
 import { drawGlyph } from '@/ui/glyphs'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
-import { lampGlow, lightOn, type Circuit } from '@/game/roomLights'
+import { lampGlow, lightOn, wcDarkness, type Circuit } from '@/game/roomLights'
 import type { Sky } from '@/game/clock'
 import { lampLit } from './lampShades'
 import { replaces } from '@/scene/hot'
@@ -2376,7 +2376,7 @@ function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number
   useEffect(() => () => mat.dispose(), [mat])
   const group = useRef<THREE.Group>(null)
   useFrame(() => {
-    const want = getLights().wc[who] ? 0 : 0.62
+    const want = wcDarkness(getLights().wc[who], skyNow())
     mat.opacity += (want - mat.opacity) * 0.08
     if (group.current) group.current.visible = mat.opacity > 0.01
   })

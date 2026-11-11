@@ -27,6 +27,10 @@ export function switchLights(s: RoomLights, c: Circuit = 'room'): RoomLights {
  * puts them out or lights them in between */
 export const lanternsLit = (open: boolean, closing: boolean) => open && !closing
 
+/** how dark a toilet's rooms fall with its light off (0: as lit; the shade laid over them): by day its window lets the daylight in, so only a
+ * little dimmer (the owner's, 2026-11-11: by day it fell black as night, unnatural); at dusk and dawn half way; by night dark */
+export const wcDarkness = (on: boolean, sky: Sky) => (on ? 0 : sky === 'night' ? 0.62 : sky === 'day' ? 0.18 : 0.4)
+
 /** the exit sign: the emergency light, lit whatever the switches are */
 export const exitSignLit = (_s: RoomLights) => true
 
