@@ -3744,7 +3744,7 @@ function KamiCopy({ part }: { part: KamiPart }) {
  * the plate smaller, not the oranges): the plate's meshes are the wide ones (the dish and its cobalt line, some 18 across; the oranges and
  * their leaf under 10) */
 const DISH_K = 0.6
-function OrangePlate() {
+function OrangePlate({ bare = false }: { bare?: boolean }) {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   useStudio()
   const obj = useMemo(() => {
@@ -3756,12 +3756,39 @@ function OrangePlate() {
       mesh.geometry.computeBoundingBox()
       const b = mesh.geometry.boundingBox!
       // (its ink, a child of it, goes with it)
-      if (b.max.x - b.min.x > 0.15) mesh.scale.multiply(new THREE.Vector3(DISH_K, 1, DISH_K))
+      // (on a stand: no plate at all)
+      if (b.max.x - b.min.x > 0.15) mesh.scale.multiply(bare ? new THREE.Vector3(0.0001, 0.0001, 0.0001) : new THREE.Vector3(DISH_K, 1, DISH_K))
     }
     return o
-  }, [gltf])
+  }, [gltf, bare])
   return <primitive object={obj} />
 }
+/** the offering stands (三方) and the rice dumplings (blender/sanbo.py), in the room's toon light, a copy each; the stand's tray floor's height */
+const SANBO_URL = import.meta.env.BASE_URL + 'models/sanbo.glb'
+useGLTF.preload(SANBO_URL)
+const SANBO_FLOOR = 0.054
+function SanboPart({ name }: { name: 'Sanbo' | 'Dango' }) {
+  const gltf = useGLTF(SANBO_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.getObjectByName(name)!.clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.0008, weld: true })
+    return r
+  }, [gltf, name])
+  return <primitive object={obj} />
+}
+const Sanbo = () => <SanboPart name="Sanbo" />
 function KamidanaModel({ part = 'shrine' }: { part?: KamiPart }) {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   useStudio()
@@ -4776,7 +4803,8 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       ))}
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase1" /></group></Movable>
-      <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT} scale={SC} {...nameOver('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch plain><Kamidana part="cups" /></StaticBatch></group></Movable>
+      {/* (5 cm along to the left as the owner set it by hand (2026-11-11)) */}
+      <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT} position-z={-0.05} scale={SC} {...nameOver('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch plain><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={STAR} vertexColors size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
       </points>
@@ -4826,13 +4854,18 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       {/* the oranges on their dish, a leaf on the top one */}
       {/* (in front of the cups' stand, a little smaller: where the owner set it in the edit panel (X −0.010, Z −0.203); brought back and made
           a touch smaller with the shallower table) */}
-      {/* (two plates of them now, smaller, in either side of the cups' stand by its front (the owner's, 2026-11-11: one more plate, smaller,
-          further in; there was one, before the stand)) */}
-      {[-1, 1].map((sd) => (
-        <Movable key={sd} id={sd < 0 ? 'oranges' : 'oranges2'} label={sd < 0 ? '橘子盤（左）' : '橘子盤（右）'}>
-          <group name={sd < 0 ? 'look-oranges' : undefined} position={[-0.08, 0, sd * 0.164]} scale={0.76} {...nameOver('椪柑', '供品，圓滿吉祥')}><OrangePlate /><ContactShadow r={0.07 * DISH_K} /></group>
-        </Movable>
-      ))}
+      {/* (the offerings on two 三方 stands (the owner's, 2026-11-11, after a photo): the oranges on one in the room the cups' stand leaves
+          on its right, glutinous rice dumplings on the other before the left lantern) */}
+      <Movable id="oranges" label="三方（橘子）">
+        <group name="look-oranges" position={[-0.08, 0, 0.139]} {...nameOver('椪柑', '供品，圓滿吉祥')}>
+          <Sanbo /><group position-y={SANBO_FLOOR} scale={0.76}><OrangePlate bare /></group><ContactShadow r={0.05} />
+        </group>
+      </Movable>
+      <Movable id="oranges2" label="三方（糯米糰子）">
+        <group position={[-0.11, 0, -0.24]} {...nameOver('糯米糰子', '供品，白糰子疊成小山')}>
+          <Sanbo /><group position-y={SANBO_FLOOR}><SanboPart name="Dango" /></group><ContactShadow r={0.05} />
+        </group>
+      </Movable>
     </group>
   )
 }

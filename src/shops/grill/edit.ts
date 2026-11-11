@@ -178,6 +178,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-9', ['shrinelamp-1', 'shrinelamp1']],
   // (the oranges two plates in by the cups, the lanterns out a little, the table shallower (2026-11-11))
   ['jgs-edit-relaid-10', ['oranges', 'oranges2', 'shrinelamp-1', 'shrinelamp1', 'shrinecups']],
+  // (the cups' stand 5 cm along as the owner set it, the offerings on their stands (2026-11-11))
+  ['jgs-edit-relaid-11', ['shrinecups', 'oranges', 'oranges2']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
