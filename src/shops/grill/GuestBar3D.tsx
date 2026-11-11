@@ -62,7 +62,7 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
-import { DRY_S, DRYER_CAP, LOW_FULL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, HAND_EACH, handOne, unbasket } from '@/game/plates'
+import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, HAND_EACH, handOne, unbasket } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
@@ -3067,8 +3067,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (the kitchen's floor looked at again tomorrow: things may be moved about in the meantime; the servers' places with it)
     blocksMade.current = null
     clearHomes.current.clear()
-    // (every plate washed and back on the racks for the next day, the low rack by the table full)
-    PLATE_RACK.n = RACK_FULL - LOW_FULL
+    // (every plate washed and back on the racks for the next day, the racks full and the low rack by the table full besides)
+    PLATE_RACK.n = RACK_FULL
     LOW_RACK.n = LOW_FULL
     LOW_RACK.coming = 0
     dirty.current = 0
@@ -4925,7 +4925,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     PLATE_COUNT.sink = dirty.current
     PLATE_COUNT.washer = DRYER.n
     PLATE_COUNT.basket = DRAIN.n
-    PLATE_COUNT.out = Math.max(0, RACK_FULL - PLATE_RACK.n - LOW_RACK.n - dirty.current - DRYER.n - DRAIN.n)
+    PLATE_COUNT.out = Math.max(0, PLATES_ALL - PLATE_RACK.n - LOW_RACK.n - dirty.current - DRYER.n - DRAIN.n)
     if (drainPlates.current) {
       if (DRAIN.n > 0) {
         const along = inBar('SinkRackSlot1', endOf(1)).sub(inBar('SinkRackSlot0', endOf(1))).normalize()

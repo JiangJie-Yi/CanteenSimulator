@@ -1422,10 +1422,16 @@ function HearthGuard() {
  * same white as the table's faces round them, the bay looked to be no recess at all, the top cut and the body under it flat). The walls are the
  * body's faces, set 0.06 back from the cuts (COOK_TABLE_PARTS' insets); the wash 2 mm off them, from the kick's top to the body's
  */
-/** the recesses' cove lights (the owner's, 2026-11-11: the slot lights in the side walls, in the owner's notch and the third cook's bay both):
- * a warm lit strip along the top of each side wall, up under the top's edge, seen as a line of light; its glow washing down the wall, bright
- * under it and fading two thirds of the way down (no light of its own) */
-const RECESS_COVE = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false, side: THREE.DoubleSide })
+/** the recesses' slot lights (槽燈; the owner's, 2026-11-11: in the side walls of the owner's notch and the third cook's bay, a groove cut
+ * up each in the recess near its inner corner, the light in it): the groove from the kick's top to the top's underside, GROOVE wide, its floor dark, a shadow
+ * along its one edge and a catch of light along the other as a cut's are; a warm strip of light up its middle; its warm light on the wall
+ * either side of it, fading out over GLOW_W (no light of its own: drawn as light, added to the wall). The wall's one solid face: the groove's
+ * drawn on it, 2 mm off */
+const GROOVE = 0.036, GROOVE_IN = 0.07, GLOW_W = 0.2
+const RECESS_COVE = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false })
+const GROOVE_FLOOR = new THREE.MeshBasicMaterial({ color: '#3a3028', polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })
+const GROOVE_SHADE = new THREE.MeshBasicMaterial({ color: '#1e1814', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })
+const GROOVE_LIP = new THREE.MeshBasicMaterial({ color: '#f4efe6', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })
 /** a wash down a wall in its vertices' colours (linear, a row at each stop from the top: [t, r, g, b]); no alpha in them (a picture's alpha,
  * or the vertices', never showed on the wall here: the shading under the top was never seen) but the way it's laid on: the back walls'
  * multiplied over them (darkened), the side walls' added (lit) */
@@ -1446,9 +1452,22 @@ const washMat = (blend: Partial<THREE.MeshBasicMaterialParameters>) => new THREE
 /** the back walls' shading under the top: the wall times these (deepest up under the top) */
 const SHADE_MAT = washMat({ blending: THREE.CustomBlending, blendSrc: THREE.DstColorFactor, blendDst: THREE.ZeroFactor })
 const BACK_WASH: [number, number, number, number][] = [[0, 0.45, 0.43, 0.41], [0.35, 0.62, 0.6, 0.58], [1, 0.74, 0.72, 0.7]]
-/** the side walls' warm light from their cove strips, added to them: bright under the strip, gone by two thirds of the way down */
+/** the side walls' warm light from their slot lights, added to them: brightest by the groove, gone GLOW_W off either side (columns across
+ * the wall, the vertices' colours by how far each is from it) */
 const GLOW_MAT = washMat({ blending: THREE.AdditiveBlending })
-const SIDE_WASH: [number, number, number, number][] = [[0, 0.55, 0.33, 0.12], [0.1, 0.36, 0.21, 0.07], [0.35, 0.12, 0.07, 0.02], [0.7, 0, 0, 0]]
+function glowGeo(h: number) {
+  const xs = [-1, -0.45, -0.15, 0.15, 0.45, 1]
+  const g = new THREE.PlaneGeometry(GLOW_W * 2, h, xs.length - 1, 1)
+  const pos = g.attributes.position, col = new Float32Array(pos.count * 3)
+  for (let i = 0; i < pos.count; i++) {
+    const x = xs[i % xs.length]
+    pos.setX(i, x * GLOW_W)
+    const k = Math.max(0, 1 - Math.abs(x)) ** 1.6
+    col.set([0.5 * k, 0.3 * k, 0.11 * k], i * 3)
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+  return g
+}
 const RecessShade = memo(function RecessShade() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP + KICK_H, top = -0.08, h = top - floor
   const IN = 0.06, OFF = 0.002
@@ -1476,12 +1495,21 @@ const RecessShade = memo(function RecessShade() {
         const side = i % 3 !== 0
         return <group key={i} position={p} rotation-y={Math.atan2(n.x, n.z)}>
           {!side && <mesh material={SHADE_MAT} geometry={washGeo(len, h, BACK_WASH)} raycast={() => {}} renderOrder={1} />}
-          {side && <>
-            <mesh name={`recess-cove-${i}`} position={[0, h / 2 - 0.012, 0.008]} material={RECESS_COVE} raycast={() => {}}>
-              <boxGeometry args={[len - 0.01, 0.014, 0.008]} />
-            </mesh>
-            <mesh position={[0, 0, 0.002]} material={GLOW_MAT} geometry={washGeo(len - 0.01, h, SIDE_WASH)} raycast={() => {}} renderOrder={2} />
-          </>}
+          {side && (() => {
+            // (in the recess, near the wall's inner end by the back wall (the owner's, 2026-11-11: inside it; at the open end it stood on the
+            // corner, its glow reaching on past the wall's end into the air): along the wall its +x is toward the a-range's high end (the open
+            // side) on a wall facing along LAY (face +1), the low end on one facing along ALONG; what of its glow reaches past the inner end is
+            // in the back wall, hidden)
+            const x = -(w.across === 'along' ? -w.face : w.face) * (len / 2 - GROOVE_IN)
+            const gh = h - 0.004
+            return <group position={[x, 0, 0.003]}>
+              <mesh material={GROOVE_FLOOR} raycast={() => {}}><planeGeometry args={[GROOVE, gh]} /></mesh>
+              <mesh position={[-GROOVE / 2 + 0.003, 0, 0.0005]} material={GROOVE_SHADE} raycast={() => {}}><planeGeometry args={[0.006, gh]} /></mesh>
+              <mesh position={[GROOVE / 2 - 0.0015, 0, 0.0005]} material={GROOVE_LIP} raycast={() => {}}><planeGeometry args={[0.003, gh]} /></mesh>
+              <mesh name={`recess-cove-${i}`} position={[0.002, 0, 0.002]} material={RECESS_COVE} raycast={() => {}}><boxGeometry args={[0.01, gh - 0.02, 0.003]} /></mesh>
+              <mesh position={[0, 0, -0.001]} material={GLOW_MAT} geometry={glowGeo(gh)} raycast={() => {}} renderOrder={2} />
+            </group>
+          })()}
         </group>
       })}
     </group>

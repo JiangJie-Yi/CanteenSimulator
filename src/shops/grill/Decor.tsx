@@ -853,7 +853,8 @@ function SacksAt() {
  * beyond it): along and across, in the fire's frame */
 // (on the floor in the corner under the charcoal crate, past the cook table's end against the bar (the owner's, 2026-11-11): it stood by the
 // table's right-hand end, toward the cook's side)
-const COAL_SACK_AT = { along: 3.0, lay: -2.0 }
+// (0.4 back along its own x, the table's along (the owner's, 2026-11-11, set so by hand and made its place))
+const COAL_SACK_AT = { along: 2.6, lay: -2.0 }
 function CharcoalSackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, COAL_SACK_AT.along).addScaledVector(LAY, COAL_SACK_AT.lay)

@@ -44,6 +44,8 @@ export const platesToBring = (stock: number, rack: number) => Math.max(0, Math.m
  * carry at a time when it's run low and the kitchen has nothing else to do.
  */
 export const LOW_FULL = 20
+/** every plate the shop has: the dish racks full, and the low rack's besides (the owner's, 2026-11-11: the racks full) */
+export const PLATES_ALL = RACK_FULL + LOW_FULL
 export const LOW_LOW = 15
 /** whether the low rack's to be filled now: it (with what's on its way to it) run low, and the racks not bare */
 export const lowGoes = (low: number, coming: number, rack: number) => low + coming < LOW_LOW && rack > 0

@@ -172,6 +172,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-6', ['warmer', 'misopot', 'prepcounter', 'denkinabe']],
   // (the binchotan sack moved to the corner under the charcoal crate (2026-11-11))
   ['jgs-edit-relaid-7', ['coalsack']],
+  // (the binchotan sack's place moved 0.4 along as the owner set it by hand: what's held for it dropped, it stands there now)
+  ['jgs-edit-relaid-8', ['coalsack']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length

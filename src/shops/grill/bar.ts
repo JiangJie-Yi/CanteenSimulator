@@ -649,7 +649,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  */
 export const TILL_CASH: { drawer: DrawerCash; rolls: Rolls; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), rolls: startingRolls(), onTake: null }
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
-export const PLATE_RACK = { n: RACK_FULL - LOW_FULL }
+export const PLATE_RACK = { n: RACK_FULL }
 /** the low rack by the cook table (game/plates' LOW_FULL; the owner's, 2026-11-11): how many clean plates are on it, and how many are on their
  * way to it from the dish racks */
 export const LOW_RACK = { n: LOW_FULL, coming: 0 }
