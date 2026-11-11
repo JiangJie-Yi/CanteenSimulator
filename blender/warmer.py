@@ -292,6 +292,71 @@ set_.append(disc("water", BOARD_X - 0.62, H + 0.07, 0.02, 0.1, 0.004, "water", s
 set_.append(box("noribox", BOARD_X + 0.5, BOARD_X + 0.78, H, H + 0.06, -0.22, 0.0, "lacquerin", bev=0.006))
 set_.append(box("norisheets", BOARD_X + 0.52, BOARD_X + 0.76, H + 0.06, H + 0.066, -0.2, -0.02, "nori"))
 set_.append(disc("salt", BOARD_X + 0.62, H + 0.04, 0.12, 0.045, 0.08, "salt", segs=12, r1=0.038))
+# (the owner's, 2026-11-12: the counter's top was bare, a board, three rice balls, a bowl, a box and a pot: the fillings in their dishes before the
+# board, the rice paddle and the pickles and the sesame behind it, a folded towel, the box of wrap, and a bamboo tray of the finished ones at the
+# right end, each wrapped with its band of nori)
+M.update({
+    "dish": pbr("PrepDish", lin("#f1eee4"), rough=0.3),
+    "ume": pbr("PrepUme", lin("#b3262a"), rough=0.45),
+    "salmon": pbr("PrepSalmon", lin("#ee8a66"), rough=0.6),
+    "kombu": pbr("PrepKombu", lin("#2c261e"), rough=0.5),
+    "takuan": pbr("PrepTakuan", lin("#e8c23a"), rough=0.5),
+    "sesame": pbr("PrepSesame", lin("#3a3128"), rough=0.5),
+    "towel": pbr("PrepTowel", lin("#eef0ea"), rough=0.9),
+    "towelband": pbr("PrepTowelBand", lin("#3a5f8f"), rough=0.9),
+    "bamboo": pbr("PrepBamboo", lin("#cfae70"), rough=0.55),
+    "card": pbr("PrepCard", lin("#c9a26c"), rough=0.8),
+    "label": pbr("PrepLabel", lin("#f4f0e4"), rough=0.7),
+})
+
+
+def onigiri_at(name, x, y0, z):
+    """a rice ball stood in place (the same make as the three on the board), its nori band at its foot"""
+    bpy.ops.mesh.primitive_cylinder_add(vertices=3, radius=0.06, depth=0.045, location=P(x, y0 + 0.05, z))
+    o = active()
+    o.rotation_euler = (0, 0, math.pi / 2)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+    o.rotation_euler = (math.pi / 2, 0, 0)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+    b = bevel(o, 0.024, 2)
+    b.limit_method = "NONE"
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier=b.name)
+    finish(o, name, M["rice"])
+    parts.append(o)
+    set_.append(o)
+    set_.append(box(name + "nori", x - 0.036, x + 0.036, y0 + 0.002, y0 + 0.05, z + 0.0225 + 0.0005, z + 0.0265, "nori"))
+
+
+# (the fillings, each in a small white dish before the board: a pickled plum, flaked salmon, kombu)
+for i, (fill, dx) in enumerate((("ume", -0.2), ("salmon", 0.0), ("kombu", 0.2))):
+    x = BOARD_X + dx
+    set_.append(disc(f"dish{i}", x, H + 0.015, 0.345, 0.034, 0.03, "dish", segs=14, r1=0.055))
+    set_.append(disc(f"fill{i}", x, H + 0.034, 0.345, 0.042, 0.016, fill, segs=12, r1=0.026))
+# (behind the board: the paddle on its rest, a dish of pickled radish, the pot of sesame)
+set_.append(box("paddle", BOARD_X - 0.32, BOARD_X + 0.02, H + 0.012, H + 0.02, -0.33, -0.29, "bamboo", bev=0.003))
+set_.append(box("paddlehead", BOARD_X + 0.02, BOARD_X + 0.14, H + 0.012, H + 0.02, -0.36, -0.26, "bamboo", bev=0.004))
+set_.append(box("paddlerest", BOARD_X - 0.2, BOARD_X - 0.17, H, H + 0.012, -0.34, -0.28, "bamboo"))
+set_.append(disc("pickledish", BOARD_X + 0.3, H + 0.015, -0.32, 0.034, 0.03, "dish", segs=14, r1=0.06))
+for k in range(3):
+    set_.append(disc(f"takuan{k}", BOARD_X + 0.3 + (k - 1) * 0.022, H + 0.034 + k * 0.004, -0.32 + (k % 2) * 0.01, 0.026, 0.008, "takuan", segs=10))
+set_.append(disc("sesamepot", BOARD_X + 0.46, H + 0.04, -0.32, 0.034, 0.08, "sesame", segs=12, r1=0.03))
+set_.append(disc("sesamelid", BOARD_X + 0.46, H + 0.088, -0.32, 0.034, 0.012, "bamboo", segs=12))
+# (a folded towel with a blue stripe, between the water bowl and the board's front corner)
+set_.append(box("towel", BOARD_X - 0.5, BOARD_X - 0.34, H, H + 0.04, 0.28, 0.4, "towel", bev=0.008))
+set_.append(box("towelband", BOARD_X - 0.4, BOARD_X - 0.38, H + 0.0005, H + 0.0405, 0.2795, 0.4005, "towelband"))
+# (the box of wrap behind the nori box, its label on its front)
+set_.append(box("wrapbox", BOARD_X + 0.52, BOARD_X + 0.78, H, H + 0.06, -0.4, -0.3, "card", bev=0.004))
+set_.append(box("wraplabel", BOARD_X + 0.58, BOARD_X + 0.72, H + 0.012, H + 0.048, -0.3, -0.2985, "label"))
+# (the bamboo tray of finished rice balls at the right end: a floor, four low walls, three of them stood in it)
+TX0, TX1, TZ0, TZ1 = BOARD_X + 0.62, BOARD_X + 1.05, 0.04, 0.36
+set_.append(box("trayfloor", TX0, TX1, H, H + 0.008, TZ0, TZ1, "bamboo"))
+set_.append(box("traywallb", TX0, TX1, H, H + 0.05, TZ0, TZ0 + 0.012, "bamboo"))
+set_.append(box("traywallf", TX0, TX1, H, H + 0.05, TZ1 - 0.012, TZ1, "bamboo"))
+set_.append(box("traywalll", TX0, TX0 + 0.012, H, H + 0.05, TZ0, TZ1, "bamboo"))
+set_.append(box("traywallr", TX1 - 0.012, TX1, H, H + 0.05, TZ0, TZ1, "bamboo"))
+for k in range(3):
+    onigiri_at(f"done{k}", TX0 + 0.075 + k * 0.14, H + 0.008, (TZ0 + TZ1) / 2 - 0.02)
 prep_set = join(set_, "PrepSet")
 root = root_of("PrepCounter", [prep_set])
 if PREVIEW:
