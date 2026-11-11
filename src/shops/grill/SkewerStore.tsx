@@ -147,6 +147,8 @@ export const SkewerStore = memo(function SkewerStore({ holderAt, usedAt, yaw, la
     let n = 0
     ug.updateWorldMatrix(true, false)
     for (const f of PULLED) {
+      // (not yet: still being drawn out of its food (Roasting))
+      if (now < f.at) continue
       const k = Math.min(1, (now - f.at) / FLY_MS), e = k * k * (3 - 2 * k)
       ug.worldToLocal(FLY_FROM.copy(f.from))
       FLY_AT.lerpVectors(FLY_FROM, FLY_INTO, e)

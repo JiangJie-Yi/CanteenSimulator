@@ -3559,13 +3559,15 @@ const STICK_POINT = 0.14
 const STICK_RING = 0.034
 /** the size of piece the rod is STICK_LEN long in (its world length the same in every one) */
 const STICK_BASE = 0.95
-const RODS = new WeakMap<THREE.BufferGeometry, Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3 }>>()
+const RODS = new WeakMap<THREE.BufferGeometry, Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3; out: THREE.Vector3 }>>()
+/** ms: an iron skewer drawn out of its food as it's plated; and how far, in its lengths (all of it and a little, clear of the food) */
+const PULL_MS = 450, PULL_OUT = 1.1
 /** `scale`: its piece's own (each piece is authored at its own size in the dish's model, some not even alike every way: the rod drawn that
  * much the other way, so it doesn't grow and shrink with the food); `turn`: the rod's own frame in its piece's, where the scale is; `out`: the
  * way out from the fire, in the rod's own frame */
 function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: THREE.Quaternion, out: THREE.Vector3, upIn: THREE.Vector3) {
   const key = [...scale.toArray(), ...turn.toArray(), ...out.toArray(), ...upIn.toArray()].map((x) => x.toFixed(3)).join()
-  const mine = RODS.get(src) ?? new Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3 }>()
+  const mine = RODS.get(src) ?? new Map<string, { geo: THREE.BufferGeometry; mid: THREE.Vector3; out: THREE.Vector3 }>()
   RODS.set(src, mine)
   const had = mine.get(key)
   if (had) return had
@@ -3607,7 +3609,8 @@ function standardStick(src: THREE.BufferGeometry, scale: THREE.Vector3, turn: TH
     const s0 = src.attributes[name] as THREE.BufferAttribute
     geo.setAttribute(name, new THREE.Float32BufferAttribute(new Array(geo.attributes.position.count * s0.itemSize).fill(1), s0.itemSize))
   }
-  const res = { geo, mid: foot.clone().addScaledVector(up, (STICK_LEN / 2) * along(up)) }
+  // (`out`: its whole length along it toward its loop, the way it's drawn out of the food when it's pulled)
+  const res = { geo, mid: foot.clone().addScaledVector(up, (STICK_LEN / 2) * along(up)), out: up.clone().multiplyScalar(STICK_LEN * along(up)) }
   mine.set(key, res)
   return res
 }
@@ -4076,6 +4079,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         m.geometry = rod.geo
         for (const c of m.children) if (c instanceof THREE.Mesh && c.name.endsWith('_outline')) c.geometry = rod.geo
         p.stickMid = rod.mid.clone().applyQuaternion(m.quaternion).add(m.position)
+        // (where it sits through the food, and the way out by its loop end: pulled, it slides out of the food that way (the owner's, 2026-11-12:
+        // drawn out, not shrunk away))
+        m.userData.rodHome = m.position.clone()
+        m.userData.rodOut = rod.out.clone().applyQuaternion(m.quaternion)
         p.sticks.push(m)
       }
       else p.food.push(m)
@@ -7032,8 +7039,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           SKEWERS.s = usedSkewer(SKEWERS.s)
           clinkSound()
           // (pulled out by the chef, the food left on the plate, the rod dropped in the used bucket (SkewerStore flies it there))
+          // (it flies from where it's drawn out to, once it's out)
           const rod = p.sticks[0]
-          if (rod && PULLED.length < 8) PULLED.push({ from: rod.getWorldPosition(new THREE.Vector3()), at: now })
+          if (rod?.parent && PULLED.length < 8) PULLED.push({ from: rod.parent.localToWorld((rod.userData.rodHome as THREE.Vector3).clone().addScaledVector(rod.userData.rodOut as THREE.Vector3, rod.scale.x * PULL_OUT)), at: now + PULL_MS })
         }
         if (here && p.skewerAt !== undefined && p.pullAt === undefined) inUse++
         // (the rod: in as it's pushed, out as it's pulled; none before or after)
@@ -7048,6 +7056,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const wk = hs && hs.x > 0 ? ROD_WS.setFromMatrixScale(p.node.matrixWorld).x / hs.x : 1
         const keep = wk > 1.0 ? 1 / wk : 1
         for (const m of p.sticks) {
+          const home = m.userData.rodHome as THREE.Vector3 | undefined
+          if (p.pullAt !== undefined && !p.stickOnly && home) {
+            // (pulled: drawn out along itself by its loop, quicker as it comes, its whole length and a little more, then gone to the bucket)
+            const t = Math.min(1, (now - p.pullAt) / PULL_MS)
+            m.visible = t < 1
+            m.scale.setScalar(keep)
+            m.position.copy(home).addScaledVector(m.userData.rodOut as THREE.Vector3, keep * PULL_OUT * t * t)
+            continue
+          }
+          if (home) m.position.copy(home)
           m.visible = grow > 0.001 && !p.stickOnly ? true : p.stickOnly && p.pullAt === undefined
           m.scale.setScalar((p.stickOnly ? 1 : Math.max(0.001, grow)) * keep)
         }
