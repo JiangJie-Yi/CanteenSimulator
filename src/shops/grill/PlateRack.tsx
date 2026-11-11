@@ -108,7 +108,25 @@ function plateProfile(R: number): [number, number][] {
 // (sixteen round: fifty of them stand in the racks, each inked, seen from across the kitchen, stood on edge or stacked; 288 faces each,
 // 680 before (the owner's: the racks drew 68,000 between them))
 const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R, 16)
-type Spot = { m: THREE.Matrix4; design: number }
+/** a plate's place; `pile`: which pile it's in, if it's in one (its plates drawn as the bottom one, the top one and the rims between: thinPiles) */
+type Spot = { m: THREE.Matrix4; design: number; pile?: number }
+/** the plates in a pile between its bottom one and its top one (the owner's, 2026-11-12: no more faces than need be): each seen only as its
+ * rim over the one below, so drawn as its rim alone, the band from the edge of its well out over its lip (fourteen round, 70 faces, its
+ * pattern's edge on it from the same picture), each still turned and set a hair off as it lies; the bottom and top ones whole */
+const RIM_GEO = wareGeometry(([[0.62, 0.042], [0.76, 0.065], [0.995, 0.165], [0.975, 0.172], [0.8, 0.1]] as [number, number][])
+  .map(([x, y]) => [x * PLATE_R, y * PLATE_R] as [number, number]), PLATE_R, 14)
+/** what's drawn of the plates shown, by design: whole, every plate not in a pile and each pile's bottom and top one; rims only, the rest */
+function thinPiles(shown: Spot[]) {
+  const whole: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
+  const rims: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
+  const piles = new Map<number, Spot[]>()
+  for (const sp of shown) {
+    if (sp.pile === undefined) whole[sp.design % DESIGN_COUNT].push(sp.m)
+    else { const l = piles.get(sp.pile) ?? []; l.push(sp); piles.set(sp.pile, l) }
+  }
+  for (const l of piles.values()) l.forEach((sp, j) => (j === 0 || j === l.length - 1 ? whole : rims)[sp.design % DESIGN_COUNT].push(sp.m))
+  return { whole, rims }
+}
 
 /** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well (the plate's well sits 0.04 R up,
  * its foot 0.02 R into the one below) */
@@ -143,7 +161,7 @@ function platesOf(part: number) {
       e.set(0, k * 1.3 + j * 0.7 + part, 0)
       q.setFromEuler(e)
       p.set(x + Math.sin(j * 2.1 + k) * 0.004, shelfTop(SHELVES[1]) + j * NEST, Math.cos(j * 1.7 + k) * 0.004)
-      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 1 + part * 2 })
+      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 1 + part * 2, pile: k })
     }
   }
   return out
@@ -212,12 +230,7 @@ export function PlateRack({ part = 0 }: { part?: number }) {
   const all = useMemo(() => platesOf(part), [part])
   const [count, setCount] = useState(PLATE_RACK.n)
   useFrame(() => { if (PLATE_RACK.n !== count) setCount(PLATE_RACK.n) })
-  const byDesign = useMemo(() => {
-    const out: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
-    const mine = Math.max(0, Math.min(PER_RACK, count - part * PER_RACK))
-    for (const sp of all.slice(0, mine)) out[sp.design % DESIGN_COUNT].push(sp.m)
-    return out
-  }, [all, count, part])
+  const { whole, rims } = useMemo(() => thinPiles(all.slice(0, Math.max(0, Math.min(PER_RACK, count - part * PER_RACK)))), [all, count, part])
   const w = woodsOf()
   const wood = (tex: THREE.Texture, rx: number, ry: number) => {
     // (each tiling made once and kept)
@@ -282,7 +295,8 @@ export function PlateRack({ part = 0 }: { part?: number }) {
       </group>
       </StaticBatch>
       <group position-y={CAB}>
-        {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+        {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+        {rims.map((list, i) => <Plates key={`r${i}-${list.length}`} design={i} list={list} geo={RIM_GEO} />)}
       </group>
     </group>
   )
@@ -306,7 +320,7 @@ const LOW_SPOTS: Spot[] = (() => {
       e.set(0, k * 1.1 + j * 0.7, 0)
       q.setFromEuler(e)
       p.set(Math.sin(j * 2.1 + k) * 0.004, y + 0.002 + j * NEST, 0.01 + Math.cos(j * 1.7 + k) * 0.004)
-      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 2 })
+      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 2, pile: k })
     }
   }
   return out
@@ -331,11 +345,7 @@ export function LowPlateRack() {
   }, [gltf])
   const [count, setCount] = useState(LOW_RACK.n)
   useFrame(() => { if (LOW_RACK.n !== count) setCount(LOW_RACK.n) })
-  const byDesign = useMemo(() => {
-    const out: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
-    for (const sp of LOW_SPOTS.slice(0, Math.min(count, LOW_SPOTS.length))) out[sp.design % DESIGN_COUNT].push(sp.m)
-    return out
-  }, [count])
+  const { whole, rims } = useMemo(() => thinPiles(LOW_SPOTS.slice(0, Math.min(count, LOW_SPOTS.length))), [count])
   return (
     <group>
       <mesh position={[0, 0.22, 0]} visible={false}
@@ -346,7 +356,8 @@ export function LowPlateRack() {
       <group name="lowrack-front" position={[0, 0, LOW_D / 2 + 0.45]} />
       <group name="lowrack-top" position={[0, LOW_SHELVES[1] + 0.08, 0.02]} />
       <primitive object={body} />
-      {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+      {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+      {rims.map((list, i) => <Plates key={`r${i}-${list.length}`} design={i} list={list} geo={RIM_GEO} />)}
     </group>
   )
 }
