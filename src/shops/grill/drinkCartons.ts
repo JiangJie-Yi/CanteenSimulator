@@ -5,7 +5,7 @@
 // strength and malt under it; a green tea's dark green straight on the board, its name upright beside 京都宇治, a pale teapot and a round
 // tea seal in a plain double frame; a cola's red rounded panel with its name knocked out in round heavy letters, kept-cool and handle-with-
 // care on either side; a sour's modern look, a strip of its colour, flat blocks for its flavour and a mark of its own (a whisky barrel, a
-// lemon). No cans drawn. The JAN code at its real size (some 3.5 by 1.6 cm), in a different corner, or on the end, case by case; this way
+// lemon). No cans drawn. The JAN code small (a third of its first size, some 1.2 by 0.5 cm), in a different corner, or on the end, case by case; this way
 // up (天地無用), the recycling marks; on each end a die-cut handhole, the name, the best-before and lot inked on; the top its flaps' seam and
 // an inspection stamp. The board's flutes, its crushed edges, its creases and the handholes in a normal map.
 import * as THREE from 'three'
@@ -200,9 +200,9 @@ function marks(g: CanvasRenderingContext2D, x: number, y: number, s: number, ink
   g.restore()
 }
 
-/** a JAN bar code at its real size on a case (the owner's, 2026-11-10: it was three times that, filling a corner): CODE_M px a module (some
- * 3.5 cm across, 1.6 cm tall with its digits), its top left (the quiet zone's) at x, y, the digits under its bars */
-const CODE_M = 0.31, CODE_H = 9.5
+/** a JAN bar code on a case, a third of its first size (the owner's, 2026-11-11: it was 3.5 cm across and filling a corner; now about 1.2 cm,
+ * under 15% of the case's height): CODE_M px a module, its top left (the quiet zone's) at x, y, the digits under its bars */
+const CODE_M = 0.1, CODE_H = 3.2
 const CODE_W = (95 + 18) * CODE_M, CODE_TALL = CODE_H + 14 * CODE_M
 function barcode(g: CanvasRenderingContext2D, x: number, y: number, twelve: string) {
   const { digits, bits } = ean13(twelve), m = CODE_M
