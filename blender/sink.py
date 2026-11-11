@@ -105,15 +105,28 @@ for row in range(3):
             wv = np.maximum(wv, smooth(0.004, 0.0, np.abs(dist - rr)) * (v > cy))
 indigo = mix(indigo, (0.93, 0.93, 0.9), wv * 0.92)
 indigo = mix(indigo, (0.93, 0.93, 0.9), smooth(0.006, 0.0, np.abs(v - 0.24)) * 0.9)
-# (woven bamboo: strips over and under, each strip its own shade, a gap between them)
-strips = 14
+# (woven bamboo, a twill (網代) as a draining basket's is (the owner's, 2026-11-11: finer made): flat strips two over and two under, each row
+# stepped one along, so the weave runs in diagonals; each strip rounded across (lit along its middle, shaded at its edges), its own shade, a
+# dark gap between them, the skin's fine fibres along it)
+strips = 24
 su, sv = np.floor(u * strips), np.floor(v * strips)
-over = (su + sv) % 2
-shade = 0.85 + 0.15 * np.sin(su * 7.1) * np.cos(sv * 3.3)
 fu, fv = (u * strips) % 1, (v * strips) % 1
-gap = smooth(0.0, 0.08, np.minimum(fu, 1 - fu)) * smooth(0.0, 0.08, np.minimum(fv, 1 - fv))
-bamboo = np.stack([0.78 * shade, 0.64 * shade, 0.38 * shade], -1) * (0.55 + 0.45 * gap)[..., None]
-bamboo = mix(bamboo, (0.68, 0.53, 0.3), (over * 0.25).astype(np.float32))
+m_ = (su + sv) % 4
+over = m_ < 2
+# (a strip across (over) runs two cells along u, one going down (under) two along v: dark only along its edges and where it dives under)
+across = np.where(over, fv, fu)
+along_ = np.where(over, fu, fv)
+end0 = (m_ == 0) | (m_ == 2)
+edge = smooth(0.0, 0.14, np.minimum(across, 1 - across))
+dive = np.where(end0, smooth(0.0, 0.22, along_), smooth(0.0, 0.22, 1 - along_))
+cell = np.where(over, np.floor((su - m_) / 2) * 13 + sv, np.floor((sv - (m_ - 2)) / 2) * 7 + su * 3)
+shade = 0.86 + 0.14 * np.sin(cell * 2.7) * np.cos(cell * 1.3)
+round_ = 0.7 + 0.3 * np.sin(np.clip(across, 0, 1) * math.pi) ** 0.5
+fibre = 0.93 + 0.07 * np.sin((np.where(over, v, u) * strips * 7 + np.where(over, u, v) * 2) * 2 * math.pi)
+k_ = shade * round_ * fibre * (0.35 + 0.65 * edge * (0.55 + 0.45 * dive))
+bamboo = np.stack([0.82 * k_, 0.68 * k_, 0.42 * k_], -1)
+# (the strips going down a little darker and browner: in the shade of those across them)
+bamboo = bamboo * np.where(over, 1.0, 0.8)[..., None]
 # (hinoki for the pail: pale, a fine straight grain)
 hin = mix((0.86, 0.74, 0.55), (0.76, 0.62, 0.42), smooth(0.6, 1.0, np.sin((u * 40 + fbm(N, 2, 4, 3)) * 2 * math.pi) * 0.5 + 0.5) * 0.6)
 # (palm fibre: brown, coarse, its fibres all one way)
@@ -507,18 +520,27 @@ bx0, bx1, bz0, bz1 = 0.0, 0.74, -0.34, 0.02
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
 y0_, y1_ = H + 0.012, H + 0.13
-corners = [(bx0, bz0), (bx1, bz0), (bx1, bz1), (bx0, bz1)]
+# (its corners rounded, as a woven basket's are (the owner's: finer made), four steps round each)
+CR, cx_, cz_ = 0.035, (bx0 + bx1) / 2, (bz0 + bz1) / 2
+corners = []
+for qx, qz, a0 in ((bx0 + CR, bz0 + CR, math.pi), (bx1 - CR, bz0 + CR, 1.5 * math.pi), (bx1 - CR, bz1 - CR, 0.0), (bx0 + CR, bz1 - CR, 0.5 * math.pi)):
+    for k in range(4):
+        a = a0 + k / 3 * math.pi / 2
+        corners.append((qx + math.cos(a) * CR, qz + math.sin(a) * CR))
 lo = [bm.verts.new(P(x_, y0_, z_)) for x_, z_ in corners]
-hi = [bm.verts.new(P(x_ + (0.012 if x_ > 0.25 else -0.012), y1_, z_ + (0.012 if z_ > 0 else -0.012))) for x_, z_ in corners]
+hi = [bm.verts.new(P(x_ + 0.012 * np.sign(x_ - cx_), y1_, z_ + 0.012 * np.sign(z_ - cz_))) for x_, z_ in corners]
 fb = bm.faces.new(lo[::-1])
 for loop in fb.loops:
     loop[uvl].uv = ((loop.vert.co.x + 1) * 2, (loop.vert.co.y + 1) * 2)
-for i in range(4):
-    j = (i + 1) % 4
+_run = 0.0
+for i in range(len(corners)):
+    j = (i + 1) % len(corners)
     f = bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
     L_ = (Vector(corners[j]) - Vector(corners[i])).length
-    for loop, uv in zip(f.loops, ((0, 0), (L_ * 3, 0), (L_ * 3, 0.36), (0, 0.36))):
+    # (the weave run on round its sides, unbroken at the corners)
+    for loop, uv in zip(f.loops, ((_run * 3, 0), ((_run + L_) * 3, 0), ((_run + L_) * 3, 0.36), (_run * 3, 0.36))):
         loop[uvl].uv = uv
+    _run += L_
 me = bpy.data.meshes.new("SinkBasket")
 bm.to_mesh(me)
 bm.free()
@@ -530,11 +552,20 @@ sol.thickness = 0.006
 bpy.context.view_layer.objects.active = basket
 bpy.ops.object.modifier_apply(modifier="s")
 parts.append(basket)
-rim = [(x_ + (0.012 if x_ > 0.25 else -0.012), y1_, z_ + (0.012 if z_ > 0 else -0.012)) for x_, z_ in corners]
-tube("SinkBasketRim", rim + [rim[0]], 0.006, "rod", res=2, sides=8)
+# (its rim a thick bound hoop of split bamboo, round its rounded top; a second, thinner, just under it on its outside)
+rim = [(x_ + 0.012 * np.sign(x_ - cx_), y1_, z_ + 0.012 * np.sign(z_ - cz_)) for x_, z_ in corners]
+tube("SinkBasketRim", rim + [rim[0]], 0.008, "rod", res=1, sides=8)
+rim2 = [(x_ + 0.0115 * np.sign(x_ - cx_), y1_ - 0.022, z_ + 0.0115 * np.sign(z_ - cz_)) for x_, z_ in corners]
+tube("SinkBasketRimLow", rim2 + [rim2[0]], 0.0045, "rod", res=1, sides=6)
 # (feet: two little bamboo runners under it)
 for z_ in (bz0 + 0.04, bz1 - 0.04):
     tube(f"SinkBasketFoot{z_:+.2f}", [(bx0 + 0.02, H + 0.006, z_), (bx1 - 0.02, H + 0.006, z_)], 0.006, "rod", res=1, sides=8)
+# (in it: three bamboo rods along its floor down its middle, the plates standing on them out of the wet)
+SLAT_TOP = y0_ + 0.012 + 0.0045
+for z_ in (-0.195, -0.16, -0.125):
+    tube(f"SinkBasketSlat{z_:+.3f}", [(bx0 + 0.03, y0_ + 0.012, z_), (bx1 - 0.03, y0_ + 0.012, z_)], 0.0045, "rod", res=1, sides=6)
+# (the game's plates (GuestBar3D's, 0.197 round in the sink's units) stand on the slats, across its middle, along its slots)
+RACK_PLATE_R = 0.197
 # (three plates standing in it, edge on, and a bowl upside down beside them)
 for k in range(3):
     px = 0.085 + k * 0.06
@@ -547,10 +578,11 @@ for k in range(3):
     bpy.ops.mesh.primitive_torus_add(major_radius=0.106, minor_radius=0.004, major_segments=28, minor_segments=6, location=P(px, py, pz), rotation=(0, math.pi / 2 + 0.12, 0))
     finish(active(), f"SinkRackPlateRim{k}", M["rim"])
     parts.append(active())
-    empty(f"SinkRackSlot{k}", px, py, pz)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(0.65, H + 0.018, (bz0 + bz1) / 2 + 0.07))
+    empty(f"SinkRackSlot{k}", px, SLAT_TOP + RACK_PLATE_R, (bz0 + bz1) / 2)
+# (the bowl, smaller, upside down at the basket's far end past the thirty plates' row (the owner's: thirty plates at least))
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=16, ring_count=8, location=P(0.655, SLAT_TOP, (bz0 + bz1) / 2))
 bowl = active()
-bowl.scale = (0.075, 0.075, 0.055)
+bowl.scale = (0.05, 0.05, 0.04)
 apply_scale(bowl)
 bm = bmesh.new()
 bm.from_mesh(bowl.data)

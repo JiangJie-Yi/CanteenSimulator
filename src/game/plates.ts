@@ -26,7 +26,8 @@ export type Dryer = { n: number; left: number | null }
  * washed by hand and stood in the basket beside it to drain, then taken to the racks): how many it holds, how long they take to drain dry
  * (seconds, from the last put in), and how long a plate takes to wash by hand (the washer's are rinsed in half a second)
  */
-export const DRAIN_CAP = 12
+// (thirty at least (the owner's, 2026-11-11): its plates stood close, its length on to the counter's end)
+export const DRAIN_CAP = 30
 export const DRAIN_S = 20
 export const HAND_EACH = 1.2
 /** the draining basket: how many plates stand in it, and how long till they're dry (null: empty; 0: dry, to be taken to the racks) */

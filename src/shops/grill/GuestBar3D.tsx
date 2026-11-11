@@ -3048,8 +3048,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** where the k-th plate stands in the dish dryer (along its rack, from its first slot to its last), and the way its plates face */
   const dryerAt = (k: number) => inBar('SinkDryerRack0', endOf(1)).lerp(inBar('SinkDryerRack1', endOf(1)), DRYER_CAP > 1 ? k / (DRYER_CAP - 1) : 0)
   /** where the k-th plate stands in the draining basket: along its slots (blender/sink.py's SinkRackSlot0, 1, 6 cm apart as it's made), from
-   * just inside its end, 4.5 cm apart (the bowl upside down at its far end clear of them) */
-  const basketAt = (k: number) => { const a = inBar('SinkRackSlot0', endOf(1)), b = inBar('SinkRackSlot1', endOf(1)); return a.clone().add(b.sub(a).multiplyScalar(-0.67 + k * 0.75)) }
+   * just inside its end, 1.8 cm apart, thirty of them nested close (the owner's, 2026-11-11), the bowl upside down at its far end clear of them) */
+  const basketAt = (k: number) => { const a = inBar('SinkRackSlot0', endOf(1)), b = inBar('SinkRackSlot1', endOf(1)); return a.clone().add(b.sub(a).multiplyScalar(-0.833 + k * 0.299)) }
   /** each server's stack of dried plates, drawn on their tray while they carry it to the racks */
   const stackObjs = useRef<(THREE.Group | null)[]>([])
   const ragObjs = useRef<(THREE.Mesh | null)[]>([])
@@ -5106,7 +5106,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       )}
       {/* (and those washed by hand while the washer was busy, standing in the draining basket on the sink's counter) */}
       {given && (
-        <group ref={drainPlates}>
+        <group ref={drainPlates} name="drain-plates">
           {Array.from({ length: DRAIN_CAP }, (_, i) => <group key={i} scale={IN_SINK} visible={false}><Plate design={i + 2} /></group>)}
         </group>
       )}

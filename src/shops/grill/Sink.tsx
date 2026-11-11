@@ -24,7 +24,7 @@ const URL = import.meta.env.BASE_URL + 'models/sink.glb'
 /** the brass, the copper and the dryer's stainless: real metal, reflecting the studio (it only reads as metal by what it reflects) */
 const METAL = /^Sink(Brass|Copper|Steel|SteelTap|DryerLiner)$/
 /** too fine for an ink line, or cloth: the tap's arms and knobs, its bag and string, the rods, rims and pegs, the plates' rims, the slats */
-const FINE = /^Sink(Tap(Arm|Knob|String|Bag|Cap|Stem|Screen|Mouth)|BasketRim|BasketFoot|NorenRod|Noren\d|Towel|Pull|RackPlateRim|DrainHole|Slat|PailWater|Dryer(Button|Lamp|Rail|Handle|Cavity|Glass)|Bin(Liner|Floor|Rim)|RackWire|Detergent(Soap|Collar|Pump|Head|Spout))/
+const FINE = /^Sink(Tap(Arm|Knob|String|Bag|Cap|Stem|Screen|Mouth)|Basket(Rim|Foot|Slat|Rail|Post)|NorenRod|Noren\d|Towel|Pull|RackPlateRim|DrainHole|Slat|PailWater|Dryer(Button|Lamp|Rail|Handle|Cavity|Glass)|Bin(Liner|Floor|Rim)|RackWire|Detergent(Soap|Collar|Pump|Head|Spout))/
 /** cloth, seen from either side (and the bin's liner, seen from inside it) */
 const CLOTH = /^Sink(Noren|Cloth|BinLiner)$/
 
