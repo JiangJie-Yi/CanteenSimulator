@@ -5,8 +5,8 @@
 // a dryer (烘碗機) until 2026-11-10, the owner's) and, washed, take them back to the racks (the owner's: the kitchen plates, the floor only
 // carries; one server clears, the other washes). The player can work the washer by hand too (Sink: its door, its basket).
 
-/** how many plates the racks hold when full (and how many the shop has) */
-export const RACK_FULL = 50
+/** how many plates the racks hold when full (and how many the shop has: two hundred, the owner's, 2026-11-11; it was fifty) */
+export const RACK_FULL = 200
 /** the clean plates stacked at the chef's plating place for plating on, at most, and the fewest before the kitchen goes for more */
 export const STACK_CAP = 4
 export const STACK_LOW = 2

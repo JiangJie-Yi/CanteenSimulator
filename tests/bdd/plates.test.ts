@@ -21,7 +21,8 @@ feature('廚房擺盤：三廚從碗盤櫃把盤子拿到主廚身旁的裝盤�
   })
   scenario('搬回碗盤櫃的盤子最多放到滿', ({ then, and }) => {
     then('碗盤櫃 40 個，搬回 5 個：變 45 個', () => { expect(putBack(40, 5)).toBe(45) })
-    and(`碗盤櫃 48 個，搬回 5 個：最多 ${RACK_FULL} 個`, () => { expect(putBack(48, 5)).toBe(RACK_FULL) })
+    and(`全店 ${RACK_FULL} 個盤子：碗盤櫃 ${RACK_FULL - 2} 個，搬回 5 個：最多 ${RACK_FULL} 個`, () => { expect(putBack(RACK_FULL - 2, 5)).toBe(RACK_FULL) })
+    and('全店的盤子是 200 個（店主要的）', () => { expect(RACK_FULL).toBe(200) })
   })
 })
 

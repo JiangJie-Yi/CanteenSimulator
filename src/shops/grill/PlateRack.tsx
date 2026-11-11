@@ -18,8 +18,9 @@ import { DESIGN_COUNT, wareDesign } from './wareDesigns'
 const W = 0.95, H = 0.86, D = 0.44
 /** the cupboard it stands on (blender/platecabinet.py), its height: the rack's shelves start on its top */
 const CAB = 0.56
-/** how many plates each rack holds: the shop's (game/plates RACK_FULL) are shared between the two */
-export const PER_RACK = 25
+/** how many plates each rack holds: the shop's (game/plates RACK_FULL) are shared between the two; those past what stands on its shelves
+ * (PILE_N) are put away in the cupboard under it */
+export const PER_RACK = 100
 const CABINET_URL = import.meta.env.BASE_URL + 'models/platecabinet.glb'
 /** the cupboard under the rack, in the room's toon light, its wood merged with the rack's */
 function CabinetBase() {
@@ -68,6 +69,8 @@ const SLOT = 0.075, SLOTS = 11
 const slotX = (k: number) => -((SLOTS - 1) * SLOT) / 2 + k * SLOT
 /** where the four show plates stand on the third shelf, and the four piles on the top one */
 const PILE_X = [-0.22, 0.22]
+/** how many plates in each pile on the top shelf (30 nested stand some 23 cm, under the rack's top; seven before, fifty plates in the shop) */
+const PILE_N = 30
 /** the bowls on the second shelf: piles turned over, as bowls are put away */
 /** every plate on the rack: where it is, and which design. Set as they'd really stand, none through another: on the lowest shelf each stands
  * on its edge in its slot between the dowels, its face to the side, leaning back a touch; on the middle one three show their faces, leaning
@@ -87,7 +90,7 @@ function platesOf(part: number) {
   }
   // (the piles on the upper shelf: nested, each turned and set a hair off the one under it)
   for (const [k, x] of PILE_X.entries()) {
-    for (let j = 0; j < 7; j++) {
+    for (let j = 0; j < PILE_N; j++) {
       e.set(0, k * 1.3 + j * 0.7 + part, 0)
       q.setFromEuler(e)
       p.set(x + Math.sin(j * 2.1 + k) * 0.004, shelfTop(SHELVES[1]) + j * NEST, Math.cos(j * 1.7 + k) * 0.004)
