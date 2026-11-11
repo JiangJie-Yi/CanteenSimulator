@@ -7,6 +7,7 @@ import { LOADS, USES, POWER_TIERS, WATER_TIERS, WATER_BASE, BILL_DAYS, type Mete
 import { createPortal } from 'react-dom'
 import { nameIn, tl, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
+import { SeasoningArt } from '@/ui/SeasoningArt'
 import { SEASONINGS, SEASON_COST, type Seasoning } from '@/data/recipes'
 import { STORAGES, stockNameOf, storageName, storageOf, type Storage } from '@/data/storage'
 import { PAR, STOCK_CAP, inPacks, keepsDry, packOf, roomFor } from '@/game/economy'
@@ -33,31 +34,9 @@ const TABS: { id: StockTab; zh: string; ja: string; en: string }[] = [
   { id: 'supplies', zh: '耗材', ja: '消耗品', en: 'Supplies' },
 ]
 
-/** each seasoning's little pot as the panel draws it: the pot's glaze, what's in it, and the character on its label */
-const SEASON_LOOK: Record<Seasoning, { pot: string; fill: string; mark: string }> = {
-  salt: { pot: '#3a5a9a', fill: '#f4f4f0', mark: '鹽' },
-  soy: { pot: '#3b2a20', fill: '#2a140a', mark: '醬' },
-  milk: { pot: '#e2dccb', fill: '#f6efd8', mark: '乳' },
-  peanut: { pot: '#8a5a32', fill: '#d9a86a', mark: '花' },
-  miso: { pot: '#3a5a9a', fill: '#b5793a', mark: '噌' },
-  wasabi: { pot: '#2f4f8a', fill: '#9ac36a', mark: '葵' },
-  shichimi: { pot: '#8a5a32', fill: '#c0442a', mark: '七' },
-  yuzu: { pot: '#3b2a20', fill: '#b9c64a', mark: '柚' },
-  lemon: { pot: '#2f4f8a', fill: '#f2d64a', mark: '檸' },
-}
+/** each seasoning's picture as the panel draws it: its own vessel (ui/SeasoningArt) */
 function SeasonIcon({ k }: { k: Seasoning }) {
-  const l = SEASON_LOOK[k]
-  return (
-    <svg className="season-icon" viewBox="0 0 32 32" aria-hidden="true">
-      <ellipse cx="16" cy="29" rx="10" ry="1.6" fill="#1d2a36" opacity="0.2" />
-      <path d="M7 12 C7 9.5 9 8.5 16 8.5 C23 8.5 25 9.5 25 12 L24 25 C23.8 27 22 28 16 28 C10 28 8.2 27 8 25 Z" fill={l.pot} stroke="#2a1d14" strokeWidth="1.2" />
-      <ellipse cx="16" cy="10.2" rx="8.2" ry="2.4" fill={l.fill} stroke="#2a1d14" strokeWidth="1" />
-      <path d="M10.5 9.6 q2.5 -1.4 5 -0.6" stroke="#fff" strokeWidth="1" fill="none" opacity="0.7" />
-      <rect x="11" y="15" width="10" height="9" rx="1.4" fill="#f6efe0" stroke="#2a1d14" strokeWidth="0.8" />
-      <text x="16" y="22.2" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#2a1d14">{l.mark}</text>
-      <path d="M9.5 14 L9 22" stroke="#fff" strokeWidth="1" opacity="0.35" />
-    </svg>
-  )
+  return <SeasoningArt k={k} className="season-icon" />
 }
 /** the sack of binchotan: a burlap sack, its mouth rolled down, the black sticks standing in it */
 function CharcoalIcon() {
