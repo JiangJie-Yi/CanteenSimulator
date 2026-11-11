@@ -895,12 +895,13 @@ for k in range(4):
         return (sx * (X0 - s_), sy * (Y0 - t_), z_)
 
     def end(z_):
-        # (how far along each face the cap reaches at this height: the diagonal, 45° down toward the corner)
-        return CAP_LEG - (Z_RIDGE - z_)
+        # (how far along each face the cap reaches at this height: as far all the way down, its end cut square (the owner's, 2026-11-11: flat,
+        # not on the diagonal))
+        return CAP_LEG
 
     def end_up(z_):
         # (and the shoe, the cap's mirror: widest at the floor, 45° up toward the corner)
-        return CAP_LEG - z_
+        return CAP_LEG
     cap = hull_object(f"RobuchiCap{k}", [at(0, 0, Z_TOP), at(CAP_LEG - 2 * CAP_BT, 0, Z_TOP), at(0, CAP_LEG - 2 * CAP_BT, Z_TOP),
                                           at(CAP_LEG, 0, Z_RIDGE), at(0, CAP_LEG, Z_RIDGE),
                                           at(0, 0, Z_CAP0), at(end(Z_CAP0), 0, Z_CAP0), at(0, end(Z_CAP0), Z_CAP0)])
