@@ -840,7 +840,9 @@ function SinkAt() {
 /** where the sacks of potatoes and sweet potatoes stand: on the kitchen's floor against the side counter's kitchen face, between its gate
  * and the cook's table, their mouths toward the kitchen (along and lay as the freezer's); far enough toward the gate that the left-hand
  * cupboard's doors swing open clear of them */
-const SACKS_AT = { along: -2.36, lay: 3.42 }
+// (0.294 further out, off the counter's face (the owner's, 2026-11-11: through the wall): the sacks' backs reached 0.1 to 0.19 into it, the
+// model's 0.21 at its 1.4 times)
+const SACKS_AT = { along: -2.36 + 0.294, lay: 3.42 }
 function SacksAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)

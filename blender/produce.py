@@ -259,7 +259,8 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
     TIE_T = 0.62
 
     def prof(t):
-        f = 1 + 0.13 * math.exp(-((t - 0.19) / 0.16) ** 2) - 0.045 * math.exp(-((t - 0.55) / 0.13) ** 2) + 0.01 * math.exp(-((t - 0.86) / 0.1) ** 2)
+        # (only a little fuller low down: at 13 per cent its lower third bulged round like a belly (the owner's, 2026-11-11))
+        f = 1 + 0.04 * math.exp(-((t - 0.22) / 0.2) ** 2) - 0.022 * math.exp(-((t - 0.55) / 0.13) ** 2) + 0.01 * math.exp(-((t - 0.86) / 0.1) ** 2)
         if t < 0.04:
             f *= 0.9 + 0.1 * (t / 0.04) ** 0.5            # (rounded under where it slumps on the floor)
         if tie:
@@ -708,11 +709,13 @@ for i, (x, z, h, r, mat, lean, kind) in enumerate(SACKS):
     print("SETTLED", i, {k_: v for k_, v in lifts.items() if v})
 
 
-def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14):
+def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14, stand=False):
     """a sack of potatoes not yet opened (the owner's, 2026-11-11, after a photo of old burlap sacks), lying on the floor as it was set down:
     a pillow stuffed full, its ends sewn shut across into a thin flat lip, each end's two corners standing out in points (dog-ears), what's
     inside pressing the cloth out in lumps, slumped flat under its own weight where it lies. Along x (L long) before it's turned `yaw`, W across,
-    T thick; its middle over (cx, cz), its underside on the floor. Its picture as the standing sacks': round it twice (u), along it (v)"""
+    T thick; its middle over (cx, cz), its underside on the floor. Its picture as the standing sacks': round it twice (u), along it (v).
+    `stand`: stood up on its end instead (the owner's, 2026-11-11), its sewn end at the top, its foot settled flatter and wider under its
+    weight, W across its front, T front to back"""
     rnd = __import__("random").Random(salt * 131 + 7)
     ph = [rnd.uniform(0, 6.3) for _ in range(6)]
     lumps = [(rnd.uniform(-0.8, 0.8), rnd.uniform(0, 2 * math.pi), rnd.uniform(0.06, 0.11)) for _ in range(16)]
@@ -725,12 +728,18 @@ def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14):
         # (full in its middle, drawn in to the sewn lip at its ends; the lip as wide as the sack, its corners drawn out a little further)
         pinch = max(0.06, (1 - abs(u) ** 5)) ** 0.55
         wide = 1 + 0.08 * abs(u) ** 8
+        if stand:
+            # (stood on it: its foot not sewn thin but settled, full and a little spread; its belly full; drawn in to shoulders up toward the
+            # sewn top, whose two corners stand out past them)
+            if u < 0:
+                pinch = max(0.7, (1 - abs(u) ** 6)) ** 0.4
+            wide = (1 + 0.07 * math.cos(u * math.pi / 2) + (0.08 * abs(u) ** 3 if u < 0 else 0)) * (1 - 0.3 * (max(0.0, u - 0.35) / 0.65) ** 1.5) + 0.42 * max(0.0, u) ** 14
         row = []
         for j in range(seg):
             th = 2 * math.pi * j / seg
             y = T / 2 * pinch * math.sin(th)
             # (slumped: flatter under, where it lies, than over)
-            if y < 0:
+            if y < 0 and not stand:
                 y *= 0.6
             z = W / 2 * wide * math.cos(th) * (0.88 + 0.12 * pinch)
             # (the potatoes inside pressing it out here and there, more on top; a few soft creases across it)
@@ -739,7 +748,12 @@ def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14):
             k = 1 + bump * pinch
             x = L / 2 * u * (1 + 0.02 * math.sin(3 * th + ph[2]))
             lx, ly, lz = x, y * k, z * k
-            row.append(bm.verts.new(P(cx + lx * cy - lz * sy, ly + T / 2 * 0.6, cz + lx * sy + lz * cy)))
+            if stand:
+                # (up on its end: along it up, across it along x, its thickness front to back; turned yaw about up)
+                X, Y, Z = lz, lx + L / 2, ly
+                row.append(bm.verts.new(P(cx + X * cy - Z * sy, max(0.0, Y), cz + X * sy + Z * cy)))
+            else:
+                row.append(bm.verts.new(P(cx + lx * cy - lz * sy, ly + T / 2 * 0.6, cz + lx * sy + lz * cy)))
         rows.append((row, (u + 1) / 2 * 0.9))
     for q in range(NU):
         (r0, v0), (r1, v1) = rows[q], rows[q + 1]
@@ -755,10 +769,11 @@ def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14):
     return mesh_object(name, bm, mat)
 
 
-# ---- a sack of potatoes not yet opened, lying on the floor in front of the open ones, as it was set down (the owner's, 2026-11-11) ----
-sealed_sack("ProduceSackSealed", -0.36, 0.44, 0.6, 0.34, 0.22, 0.22, "sackP", salt=3)
+# ---- a sack of potatoes not yet opened, stood up on its end beside the open ones, at the potatoes' end (the owner's, 2026-11-11: it lay
+# on the floor in front of them; stood up, clear of the counter's face behind) ----
+sealed_sack("ProduceSackSealed", -0.84, 0.05, 0.5, 0.34, 0.28, -0.18, "sackP", salt=3, stand=True)
 # ---- a few rolled out in front ----
-tuber("ProduceLoose0", 0.03, 0.045, 0.3, 0.055, "potato", rot=(0.3, 0.2, 0.9))
+tuber("ProduceLoose0", -0.22, 0.045, 0.29, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 # (a potato and an onion: the owner's)
 onion("ProduceLooseOnion", 0.24, 0.044, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
 # ---- the crate of carrots and burdock, beside the onions' sack ----
@@ -851,7 +866,7 @@ croot.parent = top
 print("PRODUCE_TRIS", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))
 if PREVIEW:
     # (from in front, a little above, as the kitchen's floor sees them)
-    target = P(0.05, 0.15, 0.15)
+    target = P(-0.15, 0.2, 0.05)
     cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))
     bpy.context.collection.objects.link(cam)
     cam.location = P(0.05, 0.75, 2.4)
