@@ -2472,10 +2472,6 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
           </group>
         )
       })}
-      {/* the little waste basket each two places share, in front of their soy pot and wasabi */}
-      {sharedAlong(c).map((x, k) => (
-        <group key={`basket${k}`} position={[x, BAR_TOP + 0.001, PLACE.basket]} rotation-y={(k % 2 ? 1 : -1) * 0.25}><TableBasket /></group>
-      ))}
     </group>
   )
 }
@@ -2557,11 +2553,21 @@ const BarTableware = memo(function BarTableware() {
             {sharedAlong(c).map((x, j) => {
               const a = seatLabel(base + 2 * j), b = 2 * j + 1 < c.seats ? seatLabel(base + 2 * j + 1) : null
               return (
-                <Movable key={`shared${j}`} id={`condiments${base}-${j}`} label={`醬油壺與山葵（座位 ${b === null ? a : `${Math.min(a, b)}・${Math.max(a, b)}`}）`}>
+                <group key={`shared${j}`}>
+                <Movable id={`condiments${base}-${j}`} label={`醬油壺與山葵（座位 ${b === null ? a : `${Math.min(a, b)}・${Math.max(a, b)}`}）`}>
                   <group ref={keep(k++)} position={[x, BAR_TOP + 0.001, PLACE.shared]} {...nameOver('醬油壺與山葵', '兩個座位共用的染付醬油壺與青瓷山葵罐')}>
                     <StaticBatch plain><BarPiece name="BarCondiments" /></StaticBatch>
                   </group>
                 </Movable>
+                {/* (the little waste basket the two places share, in front of their soy pot and wasabi: a piece of its own to be moved (the
+                    owner's, 2026-11-12: it was in the bar's batch, not to be moved)) */}
+                <Movable id={`tablebasket${base}-${j}`} label={`桌上垃圾桶（座位 ${b === null ? a : `${Math.min(a, b)}・${Math.max(a, b)}`}）`}>
+                  <group ref={keep(k++)} position={[x, BAR_TOP + 0.001, PLACE.basket]} rotation-y={(j % 2 ? 1 : -1) * 0.25}
+                    {...nameOver('桌上垃圾桶', '兩個座位共用的竹編小垃圾桶，放用過的紙巾')}>
+                    <StaticBatch plain><TableBasket /></StaticBatch>
+                  </group>
+                </Movable>
+                </group>
               )
             })}
           </group>
