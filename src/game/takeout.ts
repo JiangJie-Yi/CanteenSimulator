@@ -19,4 +19,7 @@ export const takeoutGap = (lastCall: boolean, crowd = 1) => TAKEOUT_GAP * crowd 
 export const takeoutSize = (rider: boolean, r: number) => 1 + Math.floor(r * (rider ? 3 : 2))
 /** one order: who for (their number), a rider or not, how many dishes, how many packed so far; then taken out of the kitchen by a server,
  * handed to them at the till, and their going out of the door */
-export type TakeoutOrder = { id: number; rider: boolean; items: number; packed: number; ready: boolean; taken: boolean; handed: boolean; gone: boolean }
+/** (`tier`: which of the boxes stacked at the plating place is its, from the bottom: each order its own box, a second one waiting set on the
+ * first's lid) */
+export type TakeoutOrder = { id: number; rider: boolean; items: number; packed: number; ready: boolean; taken: boolean; handed: boolean; gone: boolean
+  tier?: number }

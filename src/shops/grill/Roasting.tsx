@@ -3104,29 +3104,62 @@ function SideDishImpl({ position, container }: { position: [number, number, numb
  */
 // (a bento's size: a fish at the plate's size lies in it, its length across the table, three side by side along it)
 const BOX_W = 0.4, BOX_D = 0.26, BOX_H = 0.07
+/** how high each box stands over the one under it (its lid's top): a second order's box set on the first's while that waits to be taken
+ * (the owner's, 2026-11-11: a second order's fish were laid on the first's shut lid, "a strange little board with a fish on it") */
+const BOX_TIER = BOX_H + 0.03  // (over the lid's band and the chopsticks on it)
+/** the takeaways' boxes that can stand stacked at once */
+const BOX_TIERS = 3
+/** which box an order's food goes in: the one it has, or the lowest no other order waiting holds */
+const tierOf = (id: number) => {
+  const o = TAKEOUT.orders.find((x) => x.id === id)
+  if (!o) return 0
+  if (o.tier === undefined) {
+    const held = new Set(TAKEOUT.orders.filter((x) => x !== o && !x.taken && x.tier !== undefined).map((x) => x.tier))
+    let t = 0
+    while (held.has(t) && t < BOX_TIERS - 1) t++
+    o.tier = t
+  }
+  return o.tier
+}
 const KRAFT = new THREE.MeshToonMaterial({ color: '#b8875a' })
 const KRAFT_IN = new THREE.MeshToonMaterial({ color: '#9c6f45' })
 const SEAL = new THREE.MeshToonMaterial({ color: '#b3241c' })
+const BAND = new THREE.MeshToonMaterial({ color: '#f3ede0' })
+const SLEEVE = new THREE.MeshToonMaterial({ color: '#e8dcc4' })
 const TakeoutBox = memo(function TakeoutBox({ position }: { position: [number, number, number] }) {
+  return (
+    <group name="takeout-boxes" position={position} rotation-y={Math.atan2(ALONG.x, ALONG.z)}>
+      {Array.from({ length: BOX_TIERS }, (_, k) => <OneBox key={k} tier={k} />)}
+    </group>
+  )
+})
+/** one order's box, at its tier: shown from its first piece in, its lid on once all of it is */
+function OneBox({ tier }: { tier: number }) {
   const g = useRef<THREE.Group>(null)
   const lid = useRef<THREE.Group>(null)
   useFrame(() => {
-    const o = TAKEOUT.orders.find((x) => !x.taken && x.packed > 0)
+    const o = TAKEOUT.orders.find((x) => !x.taken && x.packed > 0 && x.tier === tier)
     if (g.current) g.current.visible = !!o
     if (lid.current) lid.current.visible = !!o?.ready
   })
   return (
-    <group ref={g} position={position} rotation-y={Math.atan2(ALONG.x, ALONG.z)} visible={false}>
+    <group ref={g} position-y={tier * BOX_TIER} visible={false}>
       <mesh position-y={0.004} material={KRAFT_IN}><boxGeometry args={[BOX_W, 0.008, BOX_D]} /></mesh>
       {[-1, 1].map((sd) => <mesh key={`l${sd}`} position={[0, BOX_H / 2, sd * BOX_D / 2]} material={KRAFT}><boxGeometry args={[BOX_W, BOX_H, 0.008]} /></mesh>)}
       {[-1, 1].map((sd) => <mesh key={`e${sd}`} position={[sd * BOX_W / 2, BOX_H / 2, 0]} material={KRAFT}><boxGeometry args={[0.008, BOX_H, BOX_D]} /></mesh>)}
       <group ref={lid} visible={false}>
         <mesh position-y={BOX_H + 0.006} material={KRAFT}><boxGeometry args={[BOX_W + 0.012, 0.012, BOX_D + 0.012]} /></mesh>
-        <mesh position-y={BOX_H + 0.013} material={SEAL}><boxGeometry args={[0.05, 0.003, BOX_D + 0.016]} /></mesh>
+        {/* (a takeaway bento's, not a plain board (the owner's, 2026-11-11: "what is this?"): a white paper band (掛け紙) round the lid and
+            down its sides, the shop's red seal on it, and a pair of disposable chopsticks in their paper sleeve tucked under it) */}
+        <mesh position-y={BOX_H + 0.0135} material={BAND}><boxGeometry args={[0.11, 0.003, BOX_D + 0.016]} /></mesh>
+        {[-1, 1].map((sd) => <mesh key={`b${sd}`} position={[0, BOX_H - 0.012, sd * (BOX_D / 2 + 0.0075)]} material={BAND}><boxGeometry args={[0.11, 0.05, 0.003]} /></mesh>)}
+        <mesh position={[0, BOX_H + 0.0155, -0.05]} material={SEAL}><boxGeometry args={[0.036, 0.002, 0.036]} /></mesh>
+        <mesh position={[0.075, BOX_H + 0.019, 0.01]} rotation-y={0.08} material={SLEEVE}><boxGeometry args={[0.024, 0.008, 0.22]} /></mesh>
+        <mesh position={[0.075, BOX_H + 0.0235, 0.06]} rotation-y={0.08} material={SEAL}><boxGeometry args={[0.025, 0.002, 0.03]} /></mesh>
       </group>
     </group>
   )
-})
+}
 const TasteBowl = memo(TasteBowlImpl, sameProps)
 function TasteBowlImpl({ position, container }: { position: [number, number, number]; container: string }) {
   const geometry = wareOnce('bowl', () => {
@@ -4605,7 +4638,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.body = null
       // (lying the box's long way, across the table, side by side along it; at the plate's size (BAR_FOOD_SCALE): at the fire's, a fish
       // lay out over the box's sides and the tasting bowl beside it)
-      p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, sideOf(row) * 0.075).add(new THREE.Vector3(0, 0.05 + Math.floor(row / 3) * 0.035, 0))
+      p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, sideOf(row) * 0.075)
+        .add(new THREE.Vector3(0, 0.05 + Math.floor(row / 3) * 0.035 + tierOf(owner.id) * BOX_TIER, 0))
       flatQ(p, p.toQ, LAY)
       p.local.copy(p.toP).sub(containerAt('takeout'))
       return
@@ -5521,6 +5555,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
     }
     TAKEOUT.orders = TAKEOUT.orders.filter((o) => !o.gone)
+    // (a box under another taken away: those over it come down onto the table, their food with them)
+    TAKEOUT.orders.filter((o) => !o.taken && o.tier !== undefined).sort((a, b) => a.tier! - b.tier!).forEach((o, k) => {
+      if (o.tier === k) return
+      const d = (o.tier! - k) * BOX_TIER
+      o.tier = k
+      for (const p of pieces.current) if (p.guest === o.id && p.container === 'takeout' && !p.eaten) { p.local.y -= d; p.toP.y -= d; p.fromP.y -= d }
+    })
     // someone kept waiting too long goes
     for (const g of seated) {
       if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience) {
@@ -7008,6 +7049,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.userData.onPlate = true
         }
       }
+      // (a takeaway's, shut in its box once its lid's on, or gone out with it: not drawn through the lid (it lay over it, the owner saw);
+      // drawn again as soon as it's anything else)
+      const boxed = p.container === 'takeout' && p.collected && (p.eaten || TAKEOUT.orders.some((o) => o.id === p.guest && o.ready))
+      if (boxed) { p.node.visible = false; p.node.userData.boxed = true } else if (p.node.userData.boxed) { p.node.visible = true; p.node.userData.boxed = false }
       if (!present(p)) {
         // taken off the order: next time it comes back raw, on the tray
         // (sent home to the fire's place but kept at no size, so it isn't seen there for the moment it takes Dish to shrink it away)
