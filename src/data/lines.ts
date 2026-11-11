@@ -48,6 +48,7 @@ const ZH = {
   skewerWash: '把鐵串刷得亮晶晶！',
   burntAway: '哎呀焦黑了！這份不能砸了招牌，丟掉重烤！',
   orphanAway: '客人等不及先走了…先放進大碗保溫，等下一位點的客人！',
+  staffMeal: (n: number) => `打烊了，大碗裡剩下的 ${n} 份當大家的員工餐！`,
   // (takeout, the owner's: someone at the till for a takeaway, a delivery rider for an order; the last half hour, only these)
   takeoutOrder: (items: string[], rider: boolean) => rider ? `外送單進來了：${items.join('、')}，外送員在收銀台等！` : `外帶一份：${items.join('、')}，客人在收銀台等！`,
   takeoutHand: (rider: boolean): string => rider ? '外送的餐好了，路上小心！' : '久等了！您的外帶，請慢用～',
@@ -182,6 +183,7 @@ const JA: typeof ZH = {
   skewerWash: '鉄串をピカピカに磨くぞ！',
   burntAway: 'あちゃー、焦げちまった！店の看板に関わる、焼き直しだ！',
   orphanAway: 'お客さん帰っちゃったか…大鉢で保温して、次の注文に回そう！',
+  staffMeal: (n: number) => `閉店だ、大鉢に残った ${n} 人前はみんなのまかないに！`,
   takeoutOrder: (items: string[], rider: boolean) => rider ? `デリバリー注文：${items.join('、')}、配達員さんがレジで待ってます！` : `お持ち帰り：${items.join('、')}、お客さんがレジでお待ちです！`,
   takeoutHand: (rider: boolean) => rider ? 'お待たせしました、配達お気をつけて！' : 'お待たせしました！お持ち帰りです、どうぞ～',
   lastCall: 'あと三十分で閉店、ここからはお持ち帰りだけです！',
@@ -311,6 +313,7 @@ const EN: typeof ZH = {
   skewerWash: 'Scrubbing the skewers till they shine!',
   burntAway: 'Blast, it charred! Can’t serve this to valued guests—toss it and restart!',
   orphanAway: 'The patron left... Into the big bowl to keep warm for the next order!',
+  staffMeal: (n: number) => `Closing time: the ${n} left in the big bowl make the staff's supper!`,
   takeoutOrder: (items: string[], rider: boolean) => rider ? `Delivery order: ${items.join(', ')}. The rider's waiting at the till!` : `Takeaway: ${items.join(', ')}. They're waiting at the till!`,
   takeoutHand: (rider: boolean) => rider ? 'Here you go. Ride safe!' : 'Thanks for waiting! Your takeaway, enjoy~',
   lastCall: 'Half an hour to closing: takeaway only from now!',

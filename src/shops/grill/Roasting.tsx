@@ -5120,6 +5120,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const noSkewerSaid = useRef(-1e9)
   // (the shop shut: every used skewer washed and back in the holder (the staff wash them as they close))
   useEffect(() => { if (space !== 'open') SKEWERS.s = washAll(SKEWERS.s) }, [space])
+  // (the shop shut: what's left kept warm in the big bowl, cooked for customers who went before it reached them (they were refunded:
+  // App's refund), eaten up by the staff as their supper, not left there into the night (the owner's, 2026-11-12))
+  useEffect(() => {
+    if (space === 'open') return
+    const left = pieces.current.filter((p) => p.keepWarm && !p.eaten && p.container?.startsWith('bowl'))
+    if (!left.length) return
+    for (const p of left) { p.eaten = true; p.keepWarm = false; p.slot = null }
+    onSay?.('chef', L().staffMeal(left.length))
+  }, [space])
 
   /** the best seasoning for a food by the PAIRING table (null if nothing suits it) */
   const bestSeasoning = (id: string) => {
