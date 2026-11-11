@@ -11,7 +11,7 @@ import type { HearthRole } from '@/game/hearthGuard'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { openingFloat, startingRolls, type DrawerCash, type Rolls } from '@/game/till'
-import { RACK_FULL, type Dryer, type Drain } from '@/game/plates'
+import { LOW_FULL, RACK_FULL, type Dryer, type Drain } from '@/game/plates'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyBasin } from '@/game/basin'
@@ -649,12 +649,15 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  */
 export const TILL_CASH: { drawer: DrawerCash; rolls: Rolls; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), rolls: startingRolls(), onTake: null }
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
-export const PLATE_RACK = { n: RACK_FULL }
+export const PLATE_RACK = { n: RACK_FULL - LOW_FULL }
+/** the low rack by the cook table (game/plates' LOW_FULL; the owner's, 2026-11-11): how many clean plates are on it, and how many are on their
+ * way to it from the dish racks */
+export const LOW_RACK = { n: LOW_FULL, coming: 0 }
 /** the sink (Sink.tsx): its plates being washed (the tap runs); and its tap turned on by hand (the owner's: its handle's to be turned) */
 /** the sink: someone's washing at it, its tap's on, how many dirty plates are in it (GuestBar3D keeps them; told here for the washer's
  * label) */
 export const SINK = { washing: false, tap: false, dirty: 0 }
-if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __sink: SINK })
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __lowRack: LOW_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */
 export const COAL_BRIDGE: { place: (() => number) | null } = { place: null }
@@ -789,7 +792,7 @@ export const DRYER: Dryer & { open: number; manual: boolean; ask: number } = { n
 export const DRAIN: Drain = { n: 0, left: null }
 /** where the shop's plates are just now, told over for the racks' and the basket's labels (the owner's: every plate counted): on the racks, in
  * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
-export const PLATE_COUNT = { rack: 0, sink: 0, washer: 0, basket: 0, out: 0 }
+export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __drain: DRAIN, __plateCount: PLATE_COUNT })
 /** the bin by the sink: how many used sticks are in it (cleared off the customers' plates with them; the owner's: thrown away there) */
 export const SINK_BIN = { sticks: 0 }

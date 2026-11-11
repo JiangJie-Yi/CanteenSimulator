@@ -38,6 +38,20 @@ export const platerGoes = (stock: number, coming: number, rack: number) => stock
 /** how many it brings: up to the plating place's stack full, no more than it carries or the racks have */
 export const platesToBring = (stock: number, rack: number) => Math.max(0, Math.min(STACK_CAP - stock, CARRY, rack))
 
+/**
+ * The low rack by the cook table (矮碗盤架; the owner's, 2026-11-11): a store of clean plates a few steps from the plating place. The plating
+ * place's stack is kept up from it while it has any (from the dish racks across the kitchen only when it's bare); it's filled from the racks a
+ * carry at a time when it's run low and the kitchen has nothing else to do.
+ */
+export const LOW_FULL = 20
+export const LOW_LOW = 15
+/** whether the low rack's to be filled now: it (with what's on its way to it) run low, and the racks not bare */
+export const lowGoes = (low: number, coming: number, rack: number) => low + coming < LOW_LOW && rack > 0
+/** how many are brought to it: up to it full, no more than one carries or the racks have */
+export const lowToBring = (low: number, rack: number) => Math.max(0, Math.min(LOW_FULL - low, CARRY, rack))
+/** where the plating place's plates come from: the low rack while it has any, else the racks */
+export const plateSource = (low: number): 'low' | 'rack' => (low > 0 ? 'low' : 'rack')
+
 /** the racks' count once plates are put back: as many as there's room for */
 export const putBack = (rack: number, n: number, full = RACK_FULL) => Math.min(full, rack + n)
 

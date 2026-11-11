@@ -62,7 +62,7 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
-import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, HAND_EACH, handOne, unbasket } from '@/game/plates'
+import { DRY_S, DRYER_CAP, LOW_FULL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, HAND_EACH, handOne, unbasket } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
@@ -75,7 +75,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, SOUP, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, SOUP, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2377,7 +2377,7 @@ const IN_SINK = 0.78
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'hagama', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'sink', 'sink-bin', 'produce', 'coalsack'])
+const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'hagama', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'coalsack'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
@@ -2764,6 +2764,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // (and the kitchen's rice (game/rice): to the open sack of rice to scoop a pot's worth ('toSack', 'scoopRaw'), to the sink to wash it, to the
   // electric cooker to set it on ('toSink', 'wash', 'toKama', 'load'); cooked, it keeps the rice warm and the rice balls' rice is taken from it)
   const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'settle' | 'toSack' | 'scoopRaw' | 'toSink' | 'wash' | 'toKama' | 'load'
+    | 'toRackLow' | 'takeLow' | 'toLow' | 'putLow'
     | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
     | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir'
     | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate'
@@ -2772,7 +2773,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** what they've gone for for the fire: the charcoal or the water (what's in their hands to the hearth, whatever the grill asks meanwhile) */
     fire?: 'coal' | 'water'
     /** at the soup's pot to make it (the pot empty), not just to stir it */
-    making?: boolean }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
+    making?: boolean
+    /** where the plating place's plates are taken from this time: the low rack by the table, or the dish racks (game/plates' plateSource) */
+    src?: 'low' | 'rack' }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   const platerObj = useRef<THREE.Group | null>(null)
   const [platerMoving, setPlaterMoving] = useState(false)
   const platerStack = useRef<THREE.Group>(null)
@@ -2856,6 +2859,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** where a plate's lifted off rack `i`, and where a server stands for it */
   const rackTop = (i: number) => inBar(`rack-top-${i}`, endOf(-1))
   const rackFront = (i: number) => inBar(`rack-front-${i}`, endOf(-1)).setY(0)
+  /** the low rack by the cook table: where the plates are lifted off it, and where the plater stands at it (looked for afresh: it's moved by hand) */
+  const lowTop = () => { marks.current.delete('lowrack-top'); return inBar('lowrack-top', endOf(-1)) }
+  const lowFront = () => { marks.current.delete('lowrack-front'); return inBar('lowrack-front', endOf(-1)).setY(0) }
   /** the rack a plate comes off now, and goes back onto: the count is shown across the two, the second's emptying first */
   const rackNow = (n = PLATE_RACK.n) => (n > PER_RACK ? 1 : 0)
   /** the k-th plate up the dirty stack in the sink's basin (they're stacked there a little smaller: the customers' plates are drawn big, the
@@ -3035,8 +3041,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (the kitchen's floor looked at again tomorrow: things may be moved about in the meantime; the servers' places with it)
     blocksMade.current = null
     clearHomes.current.clear()
-    // (every plate washed and back on the racks for the next day)
-    PLATE_RACK.n = RACK_FULL
+    // (every plate washed and back on the racks for the next day, the low rack by the table full)
+    PLATE_RACK.n = RACK_FULL - LOW_FULL
+    LOW_RACK.n = LOW_FULL
+    LOW_RACK.coming = 0
     dirty.current = 0
     wash.current = null
     SINK.washing = false
@@ -3814,7 +3822,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (!given || ownerServes) {
         // (nobody to plate: a bar on its own, or the owner out serving it all himself; the plating place's stack kept up as it's used, and
         // the rice cooked by itself)
-        if (open && PLATING.stock < STACK_CAP && PLATE_RACK.n > 0) { PLATING.stock += 1; PLATE_RACK.n -= 1 }
+        // (the low rack kept full off the racks, and the plating place's stack off it first)
+        if (open && LOW_RACK.n < LOW_FULL && PLATE_RACK.n > 0) { LOW_RACK.n += 1; PLATE_RACK.n -= 1 }
+        if (open && PLATING.stock < STACK_CAP) {
+          if (LOW_RACK.n > 0) { PLATING.stock += 1; LOW_RACK.n -= 1 } else if (PLATE_RACK.n > 0) { PLATING.stock += 1; PLATE_RACK.n -= 1 }
+        }
         if (open && riceGoes(RICE.kama)) RICE.kama = setOn()
         if (open && soupGoes(SOUP.pot)) SOUP.pot = setSoup()
         if (open && washGoes(SKEWERS.s)) SKEWERS.s = washAll(SKEWERS.s)
@@ -3833,19 +3845,19 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
               else setOff(reachOf(coalSackAt()), 'toCoalSack')
             } else { const near = dipFrom(); if (near) stepTo(near, 'toBucket'); else setOff(reachOf(bucketAt()), 'toBucket') }
-          } else if (open && !SHOP.leaving && !waiters.current.length && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n))) {
+          } else if (open && !SHOP.leaving && !waiters.current.length && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
             // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server to wash them (theirs, the owner's): to the used
             // bucket by the plating place for all of them)
             pl.pos.copy(home())
             setOff(skTraySpot(), 'toSkTray')
             away(true)
-          } else if (open && !SHOP.leaving && soupGoes(SOUP.pot) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
+          } else if (open && !SHOP.leaving && soupGoes(SOUP.pot) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
             // (the soup's pot empty (the day's start): to it to make it, water and dashi in and the miso stirred in, then it heats in its well)
             pl.pos.copy(home())
             pl.making = true
             setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
             away(true)
-          } else if (open && !SHOP.leaving && riceGoes(RICE.kama) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
+          } else if (open && !SHOP.leaving && riceGoes(RICE.kama) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
             // (the cooker's empty: to the open sack for the next pot's rice, over the kitchen's edge to it, then to the sink to wash it)
             pl.pos.copy(home())
             const sk = sackSpots()
@@ -3854,11 +3866,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             pl.phase = 'toSack'
             pl.t = 0
             away(true)
-          } else if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
+          } else if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
+            pl.pos.copy(home())
+            // (off the low rack by the table while it has any: a few steps; else across the kitchen to the racks)
+            pl.src = plateSource(LOW_RACK.n)
+            pl.path = kitchenRoute(pl.pos, pl.src === 'low' ? lowFront() : rackFront(rackNow()))
+            pl.len = pathLength(pl.path)
+            pl.phase = 'toRack'
+            away(true)
+          } else if (open && !SHOP.leaving && lowGoes(LOW_RACK.n, LOW_RACK.coming, PLATE_RACK.n)) {
+            // (the low rack by the table run low, nothing else wanting: across to the racks for a carry of plates to fill it)
             pl.pos.copy(home())
             pl.path = kitchenRoute(pl.pos, rackFront(rackNow()))
             pl.len = pathLength(pl.path)
-            pl.phase = 'toRack'
+            pl.phase = 'toRackLow'
+            pl.t = 0
             away(true)
           } else if (open && !SHOP.leaving && performance.now() / 1000 - soupAt.current > SOUP_EVERY) {
             // (nothing else wanting: to the miso soup now and then, to stir it as it's kept warm)
@@ -3907,13 +3929,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       else if (pl.phase === 'toRack') walk(() => {
         pl.phase = 'take'
-        const at = rackTop(rackNow())
+        const at = pl.src === 'low' ? lowTop() : rackTop(rackNow())
         pl.yaw = Math.atan2(at.x - pl.pos.x, at.z - pl.pos.z)
       })
       else if (pl.phase === 'take' && pl.t > 0.5) {
         // (off the racks into their hands, as many as the plating place's stack wants)
-        pl.n = platesToBring(PLATING.stock, PLATE_RACK.n)
-        PLATE_RACK.n -= pl.n
+        if (pl.src === 'low') { pl.n = platesToBring(PLATING.stock, LOW_RACK.n); LOW_RACK.n -= pl.n }
+        else { pl.n = platesToBring(PLATING.stock, PLATE_RACK.n); PLATE_RACK.n -= pl.n }
         PLATING.coming = pl.n
         pl.path = kitchenRoute(pl.pos, plating.in.clone().setY(0))
         pl.len = pathLength(pl.path)
@@ -3932,6 +3954,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.len = pathLength(pl.path)
         pl.phase = 'home'
         pl.t = 0
+      }
+      // ---- the low rack by the table filled: a carry off the racks, across to it, set down on it
+      else if (pl.phase === 'toRackLow') walk(() => { pl.phase = 'takeLow'; faceTo(rackTop(rackNow())) })
+      else if (pl.phase === 'takeLow' && pl.t > 0.5) {
+        pl.n = lowToBring(LOW_RACK.n, PLATE_RACK.n)
+        PLATE_RACK.n -= pl.n
+        LOW_RACK.coming = pl.n
+        setOff(lowFront(), 'toLow')
+      } else if (pl.phase === 'toLow') walk(() => { pl.phase = 'putLow'; faceTo(lowTop()) })
+      else if (pl.phase === 'putLow' && pl.t > 0.5) {
+        LOW_RACK.n += pl.n
+        LOW_RACK.coming = 0
+        pl.n = 0
+        setOff(home(), 'home')
       } else if (pl.phase === 'home') walk(() => { pl.phase = 'settle' })
       else if (pl.phase === 'settle') {
         // (turned to face as they do at their place, then they're themselves again there: turned at once, they snapped round)
@@ -3985,7 +4021,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         RICE.kama = setOn()
         setOff(home(), 'home')
       }
-      const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama'
+      const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'toRackLow' || pl.phase === 'toLow' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama'
         || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder'
         || pl.phase === 'toCrate' || pl.phase === 'toBucket' || pl.phase === 'toHearth' || pl.phase === 'toSoup' || pl.phase === 'toCoalSack' || pl.phase === 'toFill'
       if (mv !== platerMoving) setPlaterMoving(mv)
@@ -4097,9 +4133,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (ps && o) {
         ps.visible = pl.n > 0 && pl.phase !== 'idle'
         if (ps.visible) {
-          const k = pl.phase === 'take' ? Math.min(1, pl.t / 0.4) : pl.phase === 'put' ? 1 - Math.min(1, pl.t / 0.4) : 1
+          const k = pl.phase === 'take' || pl.phase === 'takeLow' ? Math.min(1, pl.t / 0.4) : pl.phase === 'put' || pl.phase === 'putLow' ? 1 - Math.min(1, pl.t / 0.4) : 1
           const hands = heldBase().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
-          const from = pl.phase === 'put' ? platingPlace(PLATE_STACK_ALONG).addScaledVector(plating.across, PLATE_STACK_ACROSS) : rackTop(rackNow())
+          const from = pl.phase === 'put' ? platingPlace(PLATE_STACK_ALONG).addScaledVector(plating.across, PLATE_STACK_ACROSS)
+            : pl.phase === 'putLow' || (pl.phase === 'take' && pl.src === 'low') ? lowTop() : rackTop(rackNow())
           ps.position.lerpVectors(from, hands, k * k * (3 - 2 * k))
           ps.children.forEach((c, i) => { c.visible = i < pl.n })
         }
@@ -4858,10 +4895,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (every plate told over: the racks', the sink's, the washer's, the basket's, and the rest out (at the plating place, on their way, at the
     // seats))
     PLATE_COUNT.rack = PLATE_RACK.n
+    PLATE_COUNT.low = LOW_RACK.n
     PLATE_COUNT.sink = dirty.current
     PLATE_COUNT.washer = DRYER.n
     PLATE_COUNT.basket = DRAIN.n
-    PLATE_COUNT.out = Math.max(0, RACK_FULL - PLATE_RACK.n - dirty.current - DRYER.n - DRAIN.n)
+    PLATE_COUNT.out = Math.max(0, RACK_FULL - PLATE_RACK.n - LOW_RACK.n - dirty.current - DRYER.n - DRAIN.n)
     if (drainPlates.current) {
       if (DRAIN.n > 0) {
         const along = inBar('SinkRackSlot1', endOf(1)).sub(inBar('SinkRackSlot0', endOf(1))).normalize()

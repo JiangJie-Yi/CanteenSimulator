@@ -6,12 +6,12 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { PLATE_COUNT, PLATE_RACK } from './bar'
-import { RACK_FULL } from '@/game/plates'
+import { LOW_RACK, PLATE_COUNT, PLATE_RACK } from './bar'
+import { LOW_FULL, RACK_FULL } from '@/game/plates'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { wareGeometry } from './ware'
-import { StaticBatch } from '@/scene/StaticBatch'
+import { mergeByMaterial, StaticBatch } from '@/scene/StaticBatch'
 import { DESIGN_COUNT, wareDesign } from './wareDesigns'
 
 // (each of the two: a metre across, two shelves, its 25 plates; low)
@@ -156,7 +156,7 @@ const woodsOf = () => (woods ??= { light: grain(WOOD, '#6a4426'), dark: grain(WO
 /** what a rack says pointed at (the owner's, 2026-11-10: every plate counted): how many it holds, and where all the shop's are */
 function rackSays(part: number) {
   const mine = Math.max(0, Math.min(PER_RACK, PLATE_COUNT.rack - part * PER_RACK))
-  return `這一組 ${mine}/${PER_RACK}・全店 ${PLATE_COUNT.rack}/${RACK_FULL}｜使用中 ${PLATE_COUNT.out}・水槽 ${PLATE_COUNT.sink}・洗碗機 ${PLATE_COUNT.washer}・瀝水籃 ${PLATE_COUNT.basket}`
+  return `這一組 ${mine}/${PER_RACK}・全店 ${PLATE_COUNT.rack}/${RACK_FULL}｜矮架 ${PLATE_COUNT.low}・使用中 ${PLATE_COUNT.out}・水槽 ${PLATE_COUNT.sink}・洗碗機 ${PLATE_COUNT.washer}・瀝水籃 ${PLATE_COUNT.basket}`
 }
 export function PlateRack({ part = 0 }: { part?: number }) {
   const all = useMemo(() => platesOf(part), [part])
@@ -232,6 +232,69 @@ export function PlateRack({ part = 0 }: { part?: number }) {
       <group position-y={CAB}>
         {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
       </group>
+    </group>
+  )
+}
+
+/**
+ * The low rack by the cook table (矮碗盤架; blender/lowrack.py; the owner's, 2026-11-11): a knee-high stand of oiled cedar a few steps from the
+ * plating place, two shelves, a pile of clean plates on each (game/plates' LOW_FULL between them: the bottom one filled first, the top one
+ * emptied first). The plater takes the plating place's plates from it, and fills it from the dish racks (`lowrack-front`, where they stand;
+ * `lowrack-top`, where the plates are lifted off). Origin at the middle of its foot, its front toward +z
+ */
+const LOWRACK_URL = import.meta.env.BASE_URL + 'models/lowrack.glb'
+useGLTF.preload(LOWRACK_URL)
+/** its shelves' tops (blender/lowrack.py's SHELF), its depth, and how many plates a pile on each */
+const LOW_SHELVES = [0.1, 0.34], LOW_D = 0.38, LOW_PILE = LOW_FULL / 2
+const LOW_SPOTS: Spot[] = (() => {
+  const out: Spot[] = []
+  const q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1)
+  for (const [k, y] of LOW_SHELVES.entries()) {
+    for (let j = 0; j < LOW_PILE; j++) {
+      e.set(0, k * 1.1 + j * 0.7, 0)
+      q.setFromEuler(e)
+      p.set(Math.sin(j * 2.1 + k) * 0.004, y + 0.002 + j * NEST, 0.01 + Math.cos(j * 1.7 + k) * 0.004)
+      out.push({ m: new THREE.Matrix4().compose(p.clone(), q.clone(), s), design: k + 2 })
+    }
+  }
+  return out
+})()
+export function LowPlateRack() {
+  const gltf = useGLTF(LOWRACK_URL) as unknown as { scene: THREE.Group }
+  const body = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('LowRack') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    return mergeByMaterial(r)
+  }, [gltf])
+  const [count, setCount] = useState(LOW_RACK.n)
+  useFrame(() => { if (LOW_RACK.n !== count) setCount(LOW_RACK.n) })
+  const byDesign = useMemo(() => {
+    const out: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
+    for (const sp of LOW_SPOTS.slice(0, Math.min(count, LOW_SPOTS.length))) out[sp.design % DESIGN_COUNT].push(sp.m)
+    return out
+  }, [count])
+  return (
+    <group>
+      <mesh position={[0, 0.22, 0]} visible={false}
+        onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '矮碗盤架', hint: `乾淨盤子 ${LOW_RACK.n}/${LOW_FULL}｜裝盤處的盤子從這裡補，快空了三廚會去碗盤架搬` }) }}
+        onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
+        <boxGeometry args={[0.66, 0.46, 0.42]} />
+      </mesh>
+      <group name="lowrack-front" position={[0, 0, LOW_D / 2 + 0.45]} />
+      <group name="lowrack-top" position={[0, LOW_SHELVES[1] + 0.08, 0.02]} />
+      <primitive object={body} />
+      {byDesign.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
     </group>
   )
 }

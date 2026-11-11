@@ -20,7 +20,7 @@ import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { COOK_S } from '@/game/rice'
 import { HEAT_S } from '@/game/soup'
-import { PlateRack } from './PlateRack'
+import { LowPlateRack, PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
 import { CharcoalSack, ProduceSacks } from './KitchenStores'
 import { coolerDoorSound, lightSwitchSound } from './restroomSound'
@@ -800,16 +800,22 @@ function FridgeAt() {
 }
 // (two low racks side by side where the one tall cabinet stood, each half its width: their middles this far either side of where its was)
 const RACK_AT = { along: 1.12, lay: 5.05, apart: 0.62 }
+/** the low rack by the cook table: its back 3 cm off the table's end (at along 2.52 here), beside the third cook's bay (its edge at lay 0) */
+const LOW_AT = { along: 2.52 + 0.03 + (0.38 / 2) * 1.12, lay: 0.56 }
 function RackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const at = (k: number) => new THREE.Vector3().addScaledVector(ALONG, RACK_AT.along + k * RACK_AT.apart).addScaledVector(LAY, RACK_AT.lay)
   const p = at(-1), q = at(1)
+  const lo = new THREE.Vector3().addScaledVector(ALONG, LOW_AT.along).addScaledVector(LAY, LOW_AT.lay)
   return (
     <>
       {/* (what the back room's view looks at: between the two, facing out with them) */}
       <group name="look-back" position={[(p.x + q.x) / 2, floor, (p.z + q.z) / 2]} rotation-y={Math.atan2(-LAY.x, -LAY.z)} />
       <Movable id="platerack" label="碗盤架 1" baseScale={1.12} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={0} /></group></Movable>
       <Movable id="platerack2" label="碗盤架 2" baseScale={1.12} ground={floor}><group position={[q.x, floor, q.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={1} /></group></Movable>
+      {/* (the low rack by the cook table: against the table's end beside the third cook's bay, toward the plating place, its front out to the
+          kitchen's floor (the owner's, 2026-11-11)) */}
+      <Movable id="lowrack" label="矮碗盤架" baseScale={1.12} ground={floor}><group position={[lo.x, floor, lo.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><LowPlateRack /></group></Movable>
     </>
   )
 }
@@ -843,7 +849,9 @@ function SacksAt() {
 }
 /** where the sack of binchotan stands (the owner's: on the floor by the cook table's right-hand end, toward the cook's side, the rice tub
  * beyond it): along and across, in the fire's frame */
-const COAL_SACK_AT = { along: 2.72, lay: 1.7 }
+// (on the floor in the corner under the charcoal crate, past the cook table's end against the bar (the owner's, 2026-11-11): it stood by the
+// table's right-hand end, toward the cook's side)
+const COAL_SACK_AT = { along: 3.0, lay: -2.0 }
 function CharcoalSackAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, COAL_SACK_AT.along).addScaledVector(LAY, COAL_SACK_AT.lay)
