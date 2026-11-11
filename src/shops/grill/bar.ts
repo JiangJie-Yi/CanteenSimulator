@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
-import { RICE_FULL, warmKama, type Kama } from '@/game/rice'
+import { emptyKama, type Kama } from '@/game/rice'
+import { emptyPot, type SoupPot } from '@/game/soup'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -801,7 +802,12 @@ export const SEAT_BONES = new Map<number, number>()
  * whether someone's washing the next pot's rice at the sink just now (GuestBar3D's plater does it all; Decor draws the pot; Roasting
  * takes a portion for each rice ball)
  */
-export const RICE: { rice: number; kama: Kama; washing: boolean } = { rice: RICE_FULL, kama: warmKama(), washing: false }
+// (empty when the day starts, the third cook to cook it (the owner's, 2026-11-11): it opened with a pot's worth cooked)
+export const RICE: { rice: number; kama: Kama; washing: boolean } = { rice: 0, kama: emptyKama(), washing: false }
+/** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
+ * plater; Decor draws it) */
+export const SOUP: { pot: SoupPot } = { pot: emptyPot() }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __soup: SOUP })
 /**
  * The fire kept by the third cook (三廚, the plater: the owner's, a robata's kitchen split three ways): the grill (Roasting) asks for charcoal
  * when the fire's low or for water when it's run too hot (`want`); the third cook, walking (GuestBar3D's platerRun), takes it from the crate

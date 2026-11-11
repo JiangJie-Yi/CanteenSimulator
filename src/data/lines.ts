@@ -92,6 +92,7 @@ const ZH = {
     '碎片交給我，掃一掃就好了！',
   ][Math.abs(k) % 3],
   riceDone: '[內場] 呼～新潟越光米剛炊熟！粒粒分明、米香撲鼻！',
+  soupDone: '[內場] 味噌湯煮好了，豆腐、海帶芽都下鍋，保溫中！',
 
   // 結帳與離店
   payGo: (_id: number, k: number) => pick(k, [
@@ -223,6 +224,7 @@ const JA: typeof ZH = {
     '破片はお任せください、さっと掃いちゃいます！',
   ][Math.abs(k) % 3],
   riceDone: '[厨房] 新潟産コシヒカリがふっくら艶やかに炊き上がりました！',
+  soupDone: '[厨房] 味噌汁ができました！豆腐とわかめ入り、保温中です！',
 
   // 会計と退店
   payGo: (_id, k) => pick(k, [
@@ -351,6 +353,7 @@ const EN: typeof ZH = {
     'Leave the broken glass to me, it\'s a quick sweep!',
   ][Math.abs(k) % 3],
   riceDone: '[Kitchen] Freshly steamed Koshihikari rice is ready! Fluffy and fragrant!',
+  soupDone: '[Kitchen] The miso soup is hot, tofu and wakame in, kept warm!',
 
   // Checkout & Departure
   payGo: (_id, k) => pick(k, [

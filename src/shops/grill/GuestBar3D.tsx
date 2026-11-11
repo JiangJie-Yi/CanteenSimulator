@@ -65,7 +65,8 @@ import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, STACK_CAP, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, HAND_EACH, handOne, unbasket } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
-import { RICE_FULL, SCOOP_S, WASH_S, kamaTick, riceGoes, setOn } from '@/game/rice'
+import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
+import { MAKE_S, emptyPot, potTick, setSoup, soupGoes } from '@/game/soup'
 import { bottleClink, plateClink, stoolSound, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -74,7 +75,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, SOUP, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2769,7 +2770,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number
     /** what they've gone for for the fire: the charcoal or the water (what's in their hands to the hearth, whatever the grill asks meanwhile) */
-    fire?: 'coal' | 'water' }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
+    fire?: 'coal' | 'water'
+    /** at the soup's pot to make it (the pot empty), not just to stir it */
+    making?: boolean }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   const platerObj = useRef<THREE.Group | null>(null)
   const [platerMoving, setPlaterMoving] = useState(false)
   const platerStack = useRef<THREE.Group>(null)
@@ -2997,6 +3000,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const shownRef = useRef<Shown[]>([])
   // (the shop open: its furnishings can't be moved about by hand; shut, they can: edit mode, key G)
   useEffect(() => { setLocked(open) }, [open])
+  // (the day's rice and soup made fresh: the cooker and the soup's pot empty as the shop opens, the third cook to cook them (the owner's,
+  // 2026-11-11))
+  useEffect(() => {
+    if (!open) return
+    RICE.rice = 0
+    RICE.kama = emptyKama()
+    SOUP.pot = emptyPot()
+  }, [open])
   /** each shown guest's name tag, faded with them as they go out of the door */
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
@@ -3728,6 +3739,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const r = kamaTick(RICE.kama, step)
         RICE.kama = r.kama
         if (r.cooked) { RICE.rice = RICE_FULL; onSay?.('chef', LINES[lang].riceDone) }
+        // (the soup's pot heating up in its well, the same)
+        const s = potTick(SOUP.pot, step)
+        SOUP.pot = s.pot
+        if (s.hot) onSay?.('chef', LINES[lang].soupDone)
       }
       /** where they stand at the cooker; its top, where the rice goes in */
       const kamaSpot = () => { marks.current.delete('cooker-front'); return inBar('cooker-front', home()).setY(0) }
@@ -3801,6 +3816,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // the rice cooked by itself)
         if (open && PLATING.stock < STACK_CAP && PLATE_RACK.n > 0) { PLATING.stock += 1; PLATE_RACK.n -= 1 }
         if (open && riceGoes(RICE.kama)) RICE.kama = setOn()
+        if (open && soupGoes(SOUP.pot)) SOUP.pot = setSoup()
         if (open && washGoes(SKEWERS.s)) SKEWERS.s = washAll(SKEWERS.s)
       } else if (pl.phase === 'idle') {
         // (the second cook, plating with no third cook to: not while he's fetching an order or skewering it at the board)
@@ -3822,6 +3838,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             // bucket by the plating place for all of them)
             pl.pos.copy(home())
             setOff(skTraySpot(), 'toSkTray')
+            away(true)
+          } else if (open && !SHOP.leaving && soupGoes(SOUP.pot) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
+            // (the soup's pot empty (the day's start): to it to make it, water and dashi in and the miso stirred in, then it heats in its well)
+            pl.pos.copy(home())
+            pl.making = true
+            setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
             away(true)
           } else if (open && !SHOP.leaving && riceGoes(RICE.kama) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n)) {
             // (the cooker's empty: to the open sack for the next pot's rice, over the kitchen's edge to it, then to the sink to wash it)
@@ -3878,7 +3900,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.phase = 'settle'
         pl.t = 0
       } else if (pl.phase === 'toSoup') walk(() => { pl.phase = 'stir'; faceTo(soupPot()) })
-      else if (pl.phase === 'stir' && pl.t > STIR_S) setOff(home(), 'home')
+      else if (pl.phase === 'stir' && pl.t > (pl.making ? MAKE_S : STIR_S)) {
+        // (made: in its well heating up (the water for it metered as the rice's is))
+        if (pl.making) { SOUP.pot = setSoup(); meterWater('cooking', 10); pl.making = false; soupAt.current = performance.now() / 1000 }
+        setOff(home(), 'home')
+      }
       else if (pl.phase === 'toRack') walk(() => {
         pl.phase = 'take'
         const at = rackTop(rackNow())

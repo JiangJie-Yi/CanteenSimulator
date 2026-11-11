@@ -34,8 +34,10 @@ H, D = 1.236, 1.0        # the sink's top (1.236 in the kitchen's units), deep
 TT = 0.07                # the terrazzo top's thickness
 UP = 0.1                 # the upstand along the back
 KICK = 0.1               # the black kick under the cabinet, set back
-WARMER_L, PREP_L = 2.8, 3.0
-WELL_X, WELL_R = -0.4, 0.4
+# (the warmer cut to half its length, its left end kept, the rice-ball counter pushed up against its right end (the owner's, 2026-11-11: 併桌);
+# its well where it was from that end (it was 2.8 long, the well at -0.4))
+WARMER_L, PREP_L = 1.4, 3.0
+WELL_X, WELL_R = 0.3, 0.4
 BOARD_X = -0.35
 
 
@@ -227,7 +229,7 @@ def clear():
 
 
 # ---------------------------------------------------------------------------------------------------- the soup counter
-body = counter(WARMER_L, "Warmer", 3)
+body = counter(WARMER_L, "Warmer", 2)
 wells = [disc("well", WELL_X, H + 0.002, 0.02, WELL_R, 0.006, "well", segs=24),
          disc("glow", WELL_X, H + 0.005, 0.02, WELL_R * 0.8, 0.002, "glow", segs=24)]
 warmer_wells = join(wells, "WarmerWells")

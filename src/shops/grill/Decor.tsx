@@ -13,12 +13,13 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { RICE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
+import { RICE, SOUP, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { COOK_S } from '@/game/rice'
+import { HEAT_S } from '@/game/soup'
 import { PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
 import { CharcoalSack, ProduceSacks } from './KitchenStores'
@@ -932,17 +933,35 @@ function MisoPot() {
       m.receiveShadow = true
     })
     inkModel(r, (m) => /Soup|Inside/.test(m.name), { width: 0.0016, weld: true })
-    // (it never moves: its parts and their ink lines folded together by material (they were some twenty draws))
+    // (it never moves: its parts and their ink lines folded together by material (they were some twenty draws)); the soup's surface kept apart,
+    // drawn only when there's soup in it (game/soup: empty when the day starts)
+    const soup = r.getObjectByName('MisoSoup')!
     plainColours(r)
-    return mergeByMaterial(r)
+    mergeByMaterial(r, (o) => o === soup)
+    return { root: r, soup, soupY: soup.position.y }
   }, [gltf])
+  const steam = useRef<THREE.Group>(null)
+  // (empty: no soup in it (shrunk to nothing, not hidden: its material drawn from the start), no steam; made, it fills and steams faintly as
+  // it heats, fully once hot)
+  useFrame(() => {
+    const st = SOUP.pot.state
+    const k = st === 'empty' ? 0.0001 : 1
+    pot.soup.scale.set(k, 1, k)
+    if (steam.current) {
+      steam.current.visible = st !== 'empty'
+      const s = st === 'hot' ? 1 : st === 'heating' ? 0.4 + 0.6 * (1 - SOUP.pot.left / HEAT_S) : 0
+      steam.current.scale.setScalar(Math.max(0.01, s))
+    }
+  })
   const p = new THREE.Vector3().addScaledVector(ALONG, MISO_AT.along).addScaledVector(LAY, MISO_AT.lay)
   return (
     <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} name="miso-pot">
       {/* (nothing to do with it: named when pointed at, no glow, no pointing hand (bar.ts's nameOver)) */}
       <group position-y={MISO_TOP} scale={MISO_SCALE} {...nameOver('味噌湯鍋', '一直保溫著的味噌湯（豆腐、海帶芽、蔥）')}>
-        <primitive object={pot} />
-        <Steam position={[0, 0.4, 0]} width={0.36} height={0.5} opacity={0.3} layers={2} />
+        <primitive object={pot.root} />
+        <group ref={steam} position={[0, 0.4, 0]} visible={false}>
+          <Steam width={0.36} height={0.5} opacity={0.3} layers={2} />
+        </group>
       </group>
     </group>
   )
@@ -1000,7 +1019,8 @@ const DENKI_URL = import.meta.env.BASE_URL + 'models/denkinabe.glb'
 useGLTF.preload(DENKI_URL)
 // (on the warming counter's last well (WARMER): it stood on a little stand of its own)
 // (on the rice-ball counter (PREP_AT), at its sink end (its rice is washed there), larger (the owner's, 2026-11-11: the rice is taken from it))
-const DENKI_AT = { along: 5.19, lay: 4.35 }
+// (moved with the counter, up against the warmer (PREP_AT))
+const DENKI_AT = { along: 4.3, lay: 2.692 }
 const DENKI_SCALE = 1.45
 const DENKI_TOP = COUNTER_TOP
 const LAMP_OFF = new THREE.Color('#3a1a14'), LAMP_COOK = new THREE.Color('#ff3a20'), LAMP_WARM = new THREE.Color('#ffb030')
@@ -1078,10 +1098,11 @@ function DenkiNabe() {
  */
 const WARMER_URL = import.meta.env.BASE_URL + 'models/warmer.glb'
 useGLTF.preload(WARMER_URL)
-/** its middle (along, back from the table's line) and its depth, as blender/warmer.py has it (its length 2.8, its well at -0.4 along it) */
+/** its middle (along, back from the table's line) and its depth, as blender/warmer.py has it (its length 1.4, its well at 0.3 along it) */
+// (cut to half its length, its left end where it was (the owner's, 2026-11-11): its middle 0.7 to the left, its well where it stood)
 // (up the floor between the cook table's end and the till, its front to the cook table (the owner's red box, 2026-11-11): it stood in the
 // back of the kitchen beside the sink, where the rice-ball counter is now (PREP_AT))
-const WARMER_AT = { along: 4.3, lay: 0.2 }
+const WARMER_AT = { along: 4.3, lay: -0.5 }
 const WARMER_D = 1.0
 function Warmer() {
   useStudio()
@@ -1133,7 +1154,9 @@ function Warmer() {
  */
 const PREP_URL = import.meta.env.BASE_URL + 'models/prepcounter.glb'
 useGLTF.preload(PREP_URL)
-const PREP_AT = { along: 5.19, lay: 3.4 }
+// (up against the warmer's right end, in line with it (the owner's, 2026-11-11: 併桌): their tops' ends 2 mm apart (each 0.02 proud of its
+// cabinet); it stood back in the kitchen at along 5.19, lay 3.4)
+const PREP_AT = { along: 4.3, lay: -0.5 + 0.7 + 0.02 + 0.002 + 0.02 + 1.5 }
 function PrepCounter() {
   const gltf = useGLTF(PREP_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
