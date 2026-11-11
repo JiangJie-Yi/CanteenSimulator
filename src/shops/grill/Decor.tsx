@@ -538,7 +538,7 @@ const COUNTER_TOP = 0.236
  * in the room's toon light, the copper keeping a little shine */
 const RICETUB_URL = import.meta.env.BASE_URL + 'models/ricetub.glb'
 let riceParts: { body: THREE.Object3D; lid: THREE.Object3D; rice: THREE.Object3D } | null = null
-function useRiceTub() {
+export function useRiceTub() {
   const gltf = useGLTF(RICETUB_URL) as unknown as { scene: THREE.Group }
   return useMemo(() => {
     if (riceParts) return riceParts
@@ -569,7 +569,8 @@ function useRiceTub() {
 }
 useGLTF.preload(RICETUB_URL)
 
-function RiceTub() {
+// (moved onto the takeaway table by the till as its warming tub (the owner's, 2026-11-11): GuestBar3D's WarmTub)
+export function RiceTub() {
   const tub = useRiceTub()
   const [x, z] = DECOR.rice.at
   // (the lid: on the tub, or lifted off and leant against its side; click the tub to lift it or put it back. It's out of use: empty)
@@ -1237,7 +1238,6 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
       <Movable id="warmer" label="料理台（保溫座）"><Warmer /></Movable>
       <Movable id="prepcounter" label="料理台（飯糰）"><PrepCounter /></Movable>
-      <Movable id="ricetub" label="飯桶"><RiceTub /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="hagama" label="羽釜與爐灶"><Hagama /></Movable>
       <Movable id="denkinabe" label="電鍋"><DenkiNabe /></Movable>

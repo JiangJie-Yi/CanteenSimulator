@@ -1,8 +1,10 @@
 """The takeaway stand and its kraft bags (takeout.glb; the owner's, 2026-11-11: a stand of its own for the takeaways, right behind the
 cashier's chair; the takeaways in kraft paper bags):
 
-- node "TakeoutStand": a small hinoki stand, two tiers (a top and a shelf low down), square legs, a dark rail round under its top; its
-  front toward +z (the cashier's chair).
+- node "TakeoutStand": a small round table (the owner's, 2026-11-11: made to go with the till's walnut chairs, its triangles minded): a
+  round top of black walnut, flat-sawn, its edge eased; an apron of four rails under it; four square legs, tapered and splayed a touch as
+  the chairs' are, on little blue silicone caps; two stretchers crossed low between them. Its front toward +z (the cashier's chair). The
+  warming tub stands on its back half, the bags along its front (GuestBar3D).
 - node "KraftBag": a kraft paper bag, its top folded over twice, two twisted paper handles, a red seal on its fold.
 
 The game's frame, in the bar's units (GuestBar3D's): y up from the floor, x across, the stand's front toward +z; its middle at the origin on
@@ -29,6 +31,7 @@ PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 STAND_W, STAND_D, STAND_H = 0.5, 0.32, 0.42
+TOP_R = 0.31
 BAG_W, BAG_D, BAG_H = 0.15, 0.09, 0.15
 
 
@@ -46,7 +49,16 @@ u, v = grid01(N)
 hin = mix((0.86, 0.74, 0.55), (0.76, 0.62, 0.42), smooth(0.6, 1.0, np.sin((u * 30 + fbm(N, 2, 4, 3)) * 2 * math.pi) * 0.5 + 0.5) * 0.6)
 # (kraft paper: brown, its fibres flecked darker and paler)
 kraft = mix((0.72, 0.53, 0.33), (0.62, 0.44, 0.26), fbm(N, 8, 8, 4)) * (0.94 + 0.08 * vnoise(N, 120, 120))[..., None]
+# (black walnut as the till's chairs' (blender/tillstools.py): a deep chocolate brown, a cool grey in it, its grain in long soft arches)
+wob = fbm(N, 3, 2, 4) - 0.5
+ring = ((u - (0.5 + 0.12 * np.sin(2 * math.pi * v) + wob * 0.1)) * 2.0) ** 2 * 3.0 + 0.2 * np.sin(2 * math.pi * (v * 2 + 0.3)) + wob * 0.3
+wbase = np.array((0.36, 0.235, 0.16), np.float32)
+wal = mix(wbase, wbase * np.float32(0.62), smooth(0.55, 0.98, np.sin(2 * math.pi * ring * 2.2)) * 0.7)
+wal = mix(wal, wbase * np.float32(0.75), smooth(0.75, 1.0, np.sin(2 * math.pi * (u * 46 + wob * 4))) * 0.35)
+wal = wal * (0.92 + 0.12 * fbm(N, 4, 16, 3))[..., None]
 M = {
+    "walnut": pbr("TakeoutWalnut", (1, 1, 1), tex=image("takeout_walnut", np.clip(wal, 0, 1).astype(np.float32)), rough=0.45),
+    "cap": pbr("TakeoutCap", (0.078, 0.212, 0.552), rough=0.7),
     "hinoki": pbr("TakeoutHinoki", (1, 1, 1), tex=image("takeout_hinoki", np.clip(hin, 0, 1).astype(np.float32)), rough=0.55),
     "rail": pbr("TakeoutRail", lin("#3a2416"), rough=0.6),
     "kraft": pbr("KraftPaper", (1, 1, 1), tex=image("takeout_kraft", np.clip(kraft, 0, 1).astype(np.float32)), rough=0.9),
@@ -127,19 +139,94 @@ def join(objs, name):
     return o
 
 
-# ---------------------------------------------------------------------------------------------------- the stand
-w, d, h = STAND_W / 2, STAND_D / 2, STAND_H
-s = [box("top", -w, w, h - 0.025, h, -d, d, "hinoki", bev=0.006),
-     box("shelf", -w + 0.03, w - 0.03, 0.08, 0.1, -d + 0.03, d - 0.03, "hinoki", bev=0.004)]
-for sx in (-1, 1):
-    for sz in (-1, 1):
-        x, z = sx * (w - 0.035), sz * (d - 0.035)
-        s.append(box(f"leg{sx}{sz}", x - 0.018, x + 0.018, 0, h - 0.025, z - 0.018, z + 0.018, "hinoki"))
-# (the rail round under the top, set in between the legs)
-for sz in (-1, 1):
-    s.append(box(f"railz{sz}", -w + 0.05, w - 0.05, h - 0.075, h - 0.03, sz * (d - 0.035) - 0.008, sz * (d - 0.035) + 0.008, "rail"))
-for sx in (-1, 1):
-    s.append(box(f"railx{sx}", sx * (w - 0.035) - 0.008, sx * (w - 0.035) + 0.008, h - 0.075, h - 0.03, -d + 0.05, d - 0.05, "rail"))
+# ---------------------------------------------------------------------------------------------------- the round table
+h = STAND_H
+TT, SEGS = 0.028, 24
+
+
+def top_disc():
+    """the round top: its upper face and underside closed in ladders (no fan into the middle), its edge eased in two steps; the grain laid
+    across it once"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    prof = [(TOP_R - 0.006, h), (TOP_R, h - 0.006), (TOP_R, h - TT + 0.004), (TOP_R - 0.004, h - TT)]
+    rings = [[bm.verts.new(P(r * math.cos(2 * math.pi * j / SEGS), y, r * math.sin(2 * math.pi * j / SEGS))) for j in range(SEGS)] for r, y in prof]
+    for a, b in zip(rings, rings[1:]):
+        for j in range(SEGS):
+            j2 = (j + 1) % SEGS
+            bm.faces.new((a[j], b[j], b[j2], a[j2]))
+    ladder_fill(bm, rings[0][::-1])
+    ladder_fill(bm, rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces:
+        for loop in f.loops:
+            c = loop.vert.co
+            # (boards across it: the picture's arches narrow, three or so boards' worth across the top, its grain long along them)
+            loop[uvl].uv = (c.x / (2 * TOP_R) * 2.6 + 0.5, c.y / (2 * TOP_R) * 0.55 + 0.5 + (0 if abs(f.normal.z) > 0.5 else c.z * 2))
+    me = bpy.data.meshes.new("top")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("top", me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M["walnut"])
+    parts.append(o)
+    return o
+
+
+def leg(name, foot, head, w0, w1):
+    """a square leg from its foot to its head, tapering from w1 at the head to w0 at the foot (a frustum along the line between)"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    a, b = Vector(foot), Vector(head)
+    ax = (b - a).normalized()
+    side = Vector((1, 0, 0)) - ax * ax.x
+    side.normalize()
+    fwd = ax.cross(side)
+    rings = []
+    for c, w_ in ((a, w0), (b, w1)):
+        rings.append([bm.verts.new(P(*(c + side * sx * w_ / 2 + fwd * sz * w_ / 2))) for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
+    for j in range(4):
+        j2 = (j + 1) % 4
+        f = bm.faces.new((rings[0][j], rings[0][j2], rings[1][j2], rings[1][j]))
+        for loop, (uu, vv) in zip(f.loops, ((0, 0), (0.08, 0), (0.08, 1), (0, 1))):
+            loop[uvl].uv = (uu + j * 0.1, vv)
+    bm.faces.new(rings[0][::-1])
+    bm.faces.new(rings[1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M["walnut"])
+    parts.append(o)
+    return o
+
+
+s = [top_disc()]
+# (four legs under the apron's corners, splayed out a touch toward their feet, their caps)
+LA, LF = 0.17, 0.2      # (each leg's head in from the middle, its foot out)
+APR = h - TT - 0.06
+heads = []
+for k, (sx, sz) in enumerate(((-1, -1), (1, -1), (1, 1), (-1, 1))):
+    head = (sx * LA * 0.7071, h - TT, sz * LA * 0.7071)
+    foot = (sx * LF * 0.7071, 0.018, sz * LF * 0.7071)
+    heads.append(head)
+    s.append(leg(f"leg{k}", foot, head, 0.026, 0.036))
+    s.append(box(f"cap{k}", foot[0] - 0.016, foot[0] + 0.016, 0.0, 0.02, foot[2] - 0.016, foot[2] + 0.016, "cap", bev=0.004))
+# (the apron: a rail between each two legs' heads, under the top)
+for k in range(4):
+    a, b = heads[k], heads[(k + 1) % 4]
+    cx, cz = (a[0] + b[0]) / 2, (a[2] + b[2]) / 2
+    if abs(a[0] - b[0]) > 1e-6:
+        s.append(box(f"apron{k}", min(a[0], b[0]) + 0.018, max(a[0], b[0]) - 0.018, APR, h - TT, cz - 0.009, cz + 0.009, "walnut", bev=0.002))
+    else:
+        s.append(box(f"apron{k}", cx - 0.009, cx + 0.009, APR, h - TT, min(a[2], b[2]) + 0.018, max(a[2], b[2]) - 0.018, "walnut", bev=0.002))
+# (two stretchers crossed low between opposite legs, halved where they cross)
+ys = 0.11
+for k, (sx, sz) in enumerate(((1, 1), (1, -1))):
+    r_ = 0.19 * 0.7071
+    s.append(tube(f"stretch{k}", [(-sx * r_, ys + k * 0.012, -sz * r_), (sx * r_, ys + k * 0.012, sz * r_)], 0.011, "walnut", sides=4))
 stand = join(s, "TakeoutStand")
 
 # ---------------------------------------------------------------------------------------------------- the bag

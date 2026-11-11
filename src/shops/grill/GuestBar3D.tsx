@@ -28,7 +28,7 @@ import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWal
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom } from '@/scene/StaffFigure'
-import { CRATE, CRATE_FULL } from './Decor'
+import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
 import { BossModel } from './Boss'
 import { Omamori } from './Omamori'
@@ -5214,13 +5214,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       })}
       {/* the takeaway stand behind the cashier's chair (bar.ts's TAKEOUT_STAND): its bags on its top, set there by the servers */}
       {given && (
-        <Movable id="takeoutstand" label="外帶檯">
+        <Movable id="takeoutstand" label="外帶桌">
           <group position={[STAND_AT.x, 0, STAND_AT.z]} rotation-y={STAND_AT.yaw}>
             <TakeoutStandModel />
             <group ref={standTop} name="takeout-stand-top" position-y={STAND_TOP} userData={{ marker: true }} />
-            {STAND_SLOTS.map((x, k) => (
-              <group key={k} ref={(o) => { standBags.current[k] = o }} position={[x, STAND_TOP, 0]} visible={false}><KraftBag /></group>
+            {STAND_SLOTS.map(([x, z], k) => (
+              <group key={k} ref={(o) => { standBags.current[k] = o }} position={[x, STAND_TOP, z]} visible={false}><KraftBag /></group>
             ))}
+            {/* (the old rice tub on its back half, as the warming tub (the owner's, 2026-11-11)) */}
+            <group position={[0, STAND_TOP, WARM_TUB_Z]}><WarmTub /></group>
           </group>
         </Movable>
       )}
@@ -5360,11 +5362,25 @@ const KraftBag = memo(function KraftBag() {
 const TakeoutStandModel = memo(function TakeoutStandModel() {
   const gltf = useGLTF(TAKEOUT_URL) as unknown as { scene: THREE.Group }
   const stand = useMemo(() => takeoutPart(gltf.scene, 'TakeoutStand'), [gltf])
-  return <group {...nameOver('外帶檯', '外帶的牛皮紙袋放這裡，收銀員轉身拿給客人')}><primitive object={stand} /></group>
+  return <group {...nameOver('外帶桌', '外帶的牛皮紙袋放這裡，收銀員轉身拿給客人')}><primitive object={stand} /></group>
 })
 /** the stand's top's height (blender/takeout.py's STAND_H), and its bags' places along it */
 const STAND_TOP = 0.42
-const STAND_SLOTS = [-0.15, 0, 0.15]
+/** where the bags stand on the round table (its top's radius 0.31, blender/takeout.py's TOP_R): along its front half, side by side (x, z) */
+const STAND_SLOTS: [number, number][] = [[-0.155, 0.14], [0, 0.14], [0.155, 0.14]]
+/** the warming tub on its back half: its middle back from the table's, and how big it's drawn (the rice tub's model (blender/ricetub.py, 0.27
+ * round its staves, 0.42 high) a little under half its size: some 25 across, beside the bags, on a table 62 across) */
+const WARM_TUB_Z = -0.13, WARM_TUB_SCALE = 0.44
+/** the warming tub (保溫桶; the owner's, 2026-11-11: the old rice tub, put on the takeaway table): the sawara tub bound in copper, its lid on */
+const WarmTub = memo(function WarmTub() {
+  const tub = useRiceTub()
+  return (
+    <group scale={WARM_TUB_SCALE} {...nameOver('保溫桶', '外型像盛白飯的木飯桶（おひつ），蓋著保溫')}>
+      <primitive object={tub.body} />
+      <group position={[0, 0.42, 0]}><primitive object={tub.lid} /></group>
+    </group>
+  )
+})
 /** seconds: the cashier turning round to the stand (and back), taking the bag up, holding it out over the till to the customer */
 const STAND_TURN = 0.7, STAND_LIFT = 0.4, STAND_GIVE = 0.5
 /** (in the figure's hand: its fade reaches these, as it does everything it holds) */
