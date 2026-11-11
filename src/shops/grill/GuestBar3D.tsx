@@ -558,10 +558,11 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <Movable id="doorcats" label="門口招財貓台"><StaticBatch plain>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
       <group position={[0.4, 0, CAT_STAND_Z]}>
-        {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower) */}
-        {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7]].map(([x, d, h, l], i) => (
+        {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower; and a third, the top, a
+            narrow step at the back of the upper one, for the koban (the owner's, 2026-11-12)) */}
+        {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7], [0.05, 0.1, 0.84, 0.44]].map(([x, d, h, l], i) => (
           <group key={i}>
-            <Part geo={REG_GEO.round} color={i ? '#4a2e1c' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
+            <Part geo={REG_GEO.round} color={i === 1 ? '#4a2e1c' : i === 2 ? '#3e2616' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
             {/* (a red felt (毛氈) laid over each tier, hanging a little down its front, as under a festival's dolls) */}
             <mesh position={[x, h + 0.004, 0]}><boxGeometry args={[d + 0.01, 0.008, l + 0.01]} /><meshToonMaterial color="#b8261c" /></mesh>
             <mesh position={[x - d / 2 - 0.004, h - 0.03, 0]}><boxGeometry args={[0.008, 0.06, l + 0.01]} /><meshToonMaterial color="#a8201a" /></mesh>
@@ -576,8 +577,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
             <group position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
           </StaticBatch></Movable>
         ))}
-        {/* (a koban, the old oval gold coin, on its little stand between the two big cats on top (the owner's)) */}
-        <Movable id="koban" label="小判金幣"><group position={[-0.07, 0.6, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
+        {/* (a koban, the old oval gold coin, on its little stand, up on the top step (the owner's, 2026-11-12: a step more, the coin on top)) */}
+        <Movable id="koban" label="小判金幣"><group position={[0.05, 0.844, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
       </group>
       {/* a samurai helmet (兜) on its stand, set out on the cats' stand's lower tier between its two small cats, facing into the room (the
           owner's: off the shoe cupboard's top); small enough to sit on the tier's front strip, clear of the upper tier behind it */}
@@ -1682,8 +1683,9 @@ const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
   // (each its own model and size, in its own colours: two big ones on top, two smaller below)
   // (each with room round it: none touching the next, nor the shoe cupboard and the helmet beside the stand)
-  { x: -0.05, y: 0.6, z: -0.17, yaw: 0.2, kind: 1 as const, h: 0.5 },
-  { x: -0.05, y: 0.6, z: 0.17, yaw: -0.2, kind: 3 as const, h: 0.44 },
+  // (the big pair forward on the upper tier, clear of the top step behind them)
+  { x: -0.075, y: 0.6, z: -0.17, yaw: 0.2, kind: 1 as const, h: 0.5 },
+  { x: -0.075, y: 0.6, z: 0.17, yaw: -0.2, kind: 3 as const, h: 0.44 },
   { x: -0.27, y: 0.32, z: -0.3, yaw: 0.25, kind: 2 as const, h: 0.38 },
   { x: -0.27, y: 0.32, z: 0.3, yaw: -0.25, kind: 1 as const, h: 0.42 },
 ]
