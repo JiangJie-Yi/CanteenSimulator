@@ -67,18 +67,26 @@ WEAVE = weave_of()
 WEAVE_N = image("produce_weave_n", to_normal(WEAVE["relief"], 1.4), data=True)
 
 
-def burlap(name, band=None, base=("#7a6648", "#c8b38a"), stripes=False, creases=True, nrm=None):
+def burlap(name, band=None, base=("#7e5f3a", "#d2b07c"), stripes=False, creases=True, nrm=None):
     """burlap: the weave (WEAVE) flecked, a little hairy; grimier toward the foot, and (`creases`) in the creases round its upper part (where
     v is 0.55, 0.7, 0.83 up it); `band` a colour woven round it near the top; `stripes` three black bands printed round it and a red stamp
     (the charcoal's); `nrm` its relief"""
     S, u, v, f = WEAVE["S"], WEAVE["u"], WEAVE["v"], WEAVE["f"]
     wx, wy, over, tone, gaps = WEAVE["wx"], WEAVE["wy"], WEAVE["over"], WEAVE["tone"], WEAVE["gaps"]
-    thread = np.where(over > 0, 0.3 + 0.7 * wx, 0.3 + 0.7 * wy)
+    # (jute as it's woven (the owner's, 2026-11-11: the sacks nothing like sacks, a checkerboard in olive): each thread round, lighter along
+    # its crown, its thickness uneven along it (slubs); between them only a narrow dark gap; the whole a warm tan, faded in broad soft patches,
+    # loose fibres lying over it here and there, lighter than the cloth)
+    thread = np.where(over > 0, 0.45 + 0.55 * wx, 0.45 + 0.55 * wy)
+    slub = fbm(S, 5, 90)
     n = fbm(S, 6, 6)
-    fleck = smooth(0.62, 0.8, fbm(S, 24, 24))
-    col = mix(lin(base[0]), lin(base[1]), np.clip(thread * 0.55 + n * 0.35 + (tone - 0.5) * 0.3, 0, 1))
-    col = mix(col, lin("#3e2c18"), fleck * 0.25)
-    col *= (0.7 + 0.3 * gaps)[..., None]
+    fleck = smooth(0.66, 0.82, fbm(S, 24, 24))
+    col = mix(lin(base[0]), lin(base[1]), np.clip(thread * 0.42 + n * 0.3 + (tone - 0.5) * 0.18 + (slub - 0.5) * 0.25 + 0.12, 0, 1))
+    col = mix(col, lin("#e6cfa2"), smooth(0.58, 0.82, fbm(S, 2, 2)) * 0.22)
+    col = mix(col, lin("#4a3520"), fleck * 0.18)
+    col *= (0.62 + 0.38 * smooth(0.0, 0.18, np.minimum(wx, wy) + 0.06))[..., None]
+    hair = smooth(0.8, 0.95, vnoise(S, 7, 260)) * smooth(0.45, 0.7, fbm(S, 9, 9))
+    hair = np.maximum(hair, smooth(0.82, 0.96, vnoise(S, 260, 7)) * smooth(0.5, 0.75, fbm(S, 11, 9)))
+    col = mix(col, lin("#e8d2a8"), hair * 0.35)
     # (grime: up from the foot, and settled in the creases; blotches here and there)
     blot = fbm(S, 3, 3)
     grime = smooth(0.2, 0.0, v) * 0.4 + smooth(0.62, 0.9, blot) * 0.16
@@ -230,7 +238,7 @@ def seam_of(name, cx, cz, h, r, mat, lean, front, ts, radius, ph, o):
         for i in range(2):
             f = bm.faces.new((a0[i], a0[i + 1], a1[i + 1], a1[i]))
             for loop, (ii, tt) in zip(f.loops, ((i, t0), (i + 1, t0), (i + 1, t1), (i, t1))):
-                loop[uv].uv = (0.5 + ii * 0.02, tt)
+                loop[uv].uv = (0.25 + ii * 0.02, tt)   # (a part of the cloth with nothing printed on it: KitchenStores' SACK_PRINT)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     mesh_object(name + "Seam", bm, mat)
     return o
@@ -260,12 +268,23 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
 
     def radius(t, a):
         base = r * prof(t) * (1 + 0.035 * math.cos(2 * a + ph[0]))
+        # (a sewn sack's: squarer toward its foot, the four corners standing out where its bottom's sewn (the owner's, 2026-11-11: like a
+        # sack, not a bucket); round higher up, filled out)
+        rel = a - front + math.pi / 4
+        sq = 1 / (abs(math.cos(rel)) ** 3 + abs(math.sin(rel)) ** 3) ** (1 / 3)
+        base *= 1 + (sq - 1) * 0.9 * math.exp(-(t / 0.32) ** 2)
+        # (the cloth gathered into soft folds hanging down from under the cuff, deepest just under it, gone by the middle)
+        base += r * 0.03 * smooth_(0.45, 0.95, t) * math.sin(9 * a + ph[7] + 1.5 * t) * (0.6 + 0.4 * math.sin(4 * a + ph[8]))
         for (la, lt, amp) in lumps:
             da = math.atan2(math.sin(a - la), math.cos(a - la))
             base += amp * math.exp(-(da / 0.33) ** 2 - ((t - lt) / 0.11) ** 2) * (0.35 + 0.65 * t)
         base += r * 0.008 * math.sin(5 * a + 7 * t + ph[1]) * math.cos(3 * a - 5 * t + ph[2])
         return base
     ts = [0.0, 0.025, 0.07, 0.14, 0.22, 0.31, 0.41, 0.51] + ([TIE_T - 0.02, TIE_T, TIE_T + 0.02] if tie else [0.6]) + [0.69, 0.78, 0.86, 0.93, 1.0]
+
+    def smooth_(e0, e1, x):
+        k = min(1.0, max(0.0, (x - e0) / (e1 - e0)))
+        return k * k * (3 - 2 * k)
     dx, dz = lean
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new()
@@ -316,7 +335,8 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
             fc.normal_flip()
     mesh_object(name + "Inside", bm, "inside")
     # ---- the seam, below the cuff
-    seam_of(name, cx, cz, h, r, mat, lean, front, [t for t in ts if t <= 0.92], radius, ph, o)
+    # (down its side, toward the back, as a sack's is sewn: its front left for what's printed on it (the owner's, 2026-11-11))
+    seam_of(name, cx, cz, h, r, mat, lean, front + math.pi * 0.62, [t for t in ts if t <= 0.92], radius, ph, o)
     # ---- the twine: round the waist, knotted at the front's side, its ends hanging
     if tie:
         y = h * TIE_T
@@ -513,7 +533,27 @@ M["onion_root"] = pbr("ProduceOnionRoot", tuple(lin("#b89a70")), rough=0.9)
 M["carrot"] = pbr("ProduceCarrot", (1, 1, 1), tex=skin_picture("produce_carrot", "#ec7f2c", "#c55a16", 10), rough=0.6)
 M["carrot_leaf"] = pbr("ProduceCarrotLeaf", tuple(lin("#4f8a34")), rough=0.7)
 M["gobo"] = pbr("ProduceGobo", (1, 1, 1), tex=skin_picture("produce_gobo", "#8a6a48", "#5e4428", 18), rough=0.85)
-M["crate"] = pbr("ProduceCrate", tuple(lin("#b48a58")), rough=0.8)
+def crate_wood(n=512):
+    """an old produce crate's pine (the owner's, 2026-11-11: a better crate): planed boards gone grey-brown with use, the grain running
+    along u, a knot or two, darker toward the board's ends and edges where it's handled and wet, and a nail's head in near each end"""
+    u, v = grid01(n)
+    warp = (fbm(n, 3, 2) - 0.5) * 0.15
+    rings = np.sin((v + warp + 0.04 * np.sin(u * 6.0)) * 2 * np.pi * 9) * 0.5 + 0.5
+    fine = vnoise(n, 3, 120)
+    col = mix(lin("#9a7448"), lin("#c9a273"), smooth(0.2, 0.9, rings) * 0.7 + fine * 0.3)
+    col = mix(col, lin("#7a6a58"), smooth(0.5, 0.85, fbm(n, 5, 4)) * 0.3)
+    kn = np.hypot((u - 0.62) * 3.0, (v - 0.4) * 6.0)
+    col = mix(col, lin("#5a3e22"), smooth(0.22, 0.06, kn) * 0.8)
+    edge = np.minimum(np.minimum(u, 1 - u) * 6.0, np.minimum(v, 1 - v) * 10.0)
+    col *= (0.72 + 0.28 * smooth(0.0, 1.0, edge))[..., None]
+    for cu in (0.06, 0.94):
+        nail = np.hypot((u - cu) * 40.0, (v - 0.5) * 22.0)
+        col = mix(col, lin("#2e2a26"), smooth(1.0, 0.7, nail))
+        col = mix(col, lin("#8a8580"), smooth(0.55, 0.2, nail) * 0.6)
+    return col
+
+
+M["crate"] = pbr("ProduceCrate", (1, 1, 1), tex=image("produce_crate", crate_wood()), rough=0.8)
 
 
 def lathe_veg(name, prof, seg, mat):
@@ -578,12 +618,28 @@ def gobo(name, x, y, z, length, rot):
 
 
 def board(name, cx, cy, cz, w, h, d):
-    """one plank of the crate, its middle at (cx, cy, cz) in the game's frame, w along x, h up, d along z"""
+    """one plank of the crate, its middle at (cx, cy, cz) in the game's frame, w along x, h up, d along z: its edges eased, the wood's
+    picture laid along its longest side once (its grain along it, a nail near each end)"""
     bpy.ops.mesh.primitive_cube_add(size=1, location=P(cx, cy, cz))
     o = active()
     o.scale = (w, d, h)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     o.name = name
+    m = o.modifiers.new("ease", "BEVEL")
+    m.width = min(0.003, min(w, h, d) * 0.3)
+    m.segments = 1
+    bpy.ops.object.modifier_apply(modifier=m.name)
     o.data.materials.append(M["crate"])
+    dims = sorted([(w, 0), (d, 1), (h, 2)], reverse=True)
+    la, sa = dims[0][1], dims[1][1]
+    me = o.data
+    uvl = me.uv_layers.active or me.uv_layers.new()
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            c = (co.x, co.y, co.z)
+            ext = (w, d, h)
+            uvl.data[li].uv = (c[la] / ext[la] + 0.5, c[sa] / ext[sa] + 0.5 if abs(poly.normal[sa]) < 0.5 else c[3 - la - sa] / ext[3 - la - sa] + 0.5)
     parts.append(o)
     return o
 
@@ -651,11 +707,16 @@ tuber("ProduceLoose0", -0.22, 0.045, 0.29, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 onion("ProduceLooseOnion", 0.24, 0.044, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
 # ---- the crate of carrots and burdock, beside the onions' sack ----
 CX, CW, CD, CH = 0.81, 0.38, 0.26, 0.18
-board("ProduceCrateBottom", CX, 0.012, 0.0, CW, 0.024, CD)
+# (three boards across its floor, a gap between; solid end boards, a hand hole's worth lower in their middle; three slats a side with gaps
+# between them; a square post in each corner inside, the slats nailed to them)
+for k in range(3):
+    board(f"ProduceCrateBottom{k}", CX - CW / 2 + 0.02 + (k + 0.5) * (CW - 0.04) / 3, 0.009, 0.0, (CW - 0.04) / 3 - 0.006, 0.018, CD - 0.004)
 for sd in (-1, 1):
-    board(f"ProduceCrateSide{sd}", CX + sd * (CW / 2 - 0.01), CH / 2, 0.0, 0.02, CH, CD)
-    for k, yy in enumerate((0.05, 0.13)):
-        board(f"ProduceCrateSlat{sd}{k}", CX, yy, sd * (CD / 2 - 0.01), CW - 0.04, 0.06, 0.016)
+    board(f"ProduceCrateEnd{sd}", CX + sd * (CW / 2 - 0.009), CH / 2, 0.0, 0.018, CH, CD)
+    for k, yy in enumerate((0.04, 0.095, 0.15)):
+        board(f"ProduceCrateSlat{sd}{k}", CX, yy, sd * (CD / 2 - 0.006), CW - 0.036, 0.04, 0.012)
+    for sx in (-1, 1):
+        board(f"ProduceCratePost{sd}{sx}", CX + sx * (CW / 2 - 0.03), CH / 2, sd * (CD / 2 - 0.024), 0.022, CH - 0.004, 0.022)
 # (the carrots lying across it, front to back, in two layers, their leaves to the back; the burdock leaning in its far end)
 for k in range(7):
     layer = k // 4

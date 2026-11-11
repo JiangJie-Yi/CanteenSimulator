@@ -64,6 +64,73 @@ function dyeBurlap(map: THREE.Texture, hex: string) {
   t.name = map.name
   return t
 }
+/** what's printed on each produce sack's front, as a farm's sacks are (the owner's, 2026-11-11: to read as sacks at a glance): where round it
+ * (`u`: blender/produce.py's sacks face front at a / π round their picture, twice round), and the words: the produce, where it's from, its
+ * weight, a red mark */
+const SACK_PRINT: Record<string, { u: number; name: string; from: string; kg: string; mark: string }> = {
+  ProduceSackPotato: { u: 0.389, name: 'じゃがいも', from: '北海道産', kg: '20kg', mark: '特' },
+  ProduceSackSweet: { u: 0.5, name: 'さつまいも', from: '鹿児島産', kg: '10kg', mark: '甘' },
+  ProduceSackOnion: { u: 0.611, name: '玉ねぎ', from: '淡路島産', kg: '20kg', mark: '秀' },
+}
+/** a sack's picture with its print on it: stencilled ink soaked into the weave (lighter where the threads stand, broken here and there),
+ * mirrored (u runs round the sack the other way to how it's read from outside) */
+function printSack(map: THREE.Texture, p: (typeof SACK_PRINT)[string]) {
+  const img = map.image as CanvasImageSource & { width: number; height: number }
+  const c = document.createElement('canvas')
+  c.width = img.width
+  c.height = img.height
+  const g = c.getContext('2d')!
+  g.drawImage(img, 0, 0)
+  const W = c.width, H = c.height
+  // (the ink on its own first, then laid over the cloth multiplied, so the weave shows through it)
+  const ink = document.createElement('canvas')
+  ink.width = W
+  ink.height = H
+  const k = ink.getContext('2d')!
+  // (once: the picture goes round the sack twice, so it's on its back as well)
+  for (const u of [p.u]) {
+    const cx = (u % 1) * W
+    k.save()
+    k.translate(cx, 0)
+    k.scale(-1, 1)
+    k.textAlign = 'center'
+    k.textBaseline = 'middle'
+    // (v up the sack's body is 0.9 at its mouth: the print between 0.25 and 0.58 of its height; the picture's top its foot's other end)
+    const y = (v: number) => (1 - v) * H
+    k.fillStyle = '#b3261e'
+    k.beginPath(); k.arc(0, y(0.53), W * 0.032, 0, Math.PI * 2); k.fill()
+    k.fillStyle = '#f2e6cc'
+    k.font = `900 ${Math.round(W * 0.036)}px "Noto Serif JP", "Yu Mincho", serif`
+    k.fillText(p.mark, 0, y(0.53))
+    k.fillStyle = '#1c1712'
+    k.font = `900 ${Math.round(W * 0.052)}px "Noto Sans JP", "Yu Gothic", sans-serif`
+    k.fillText(p.name, 0, y(0.43))
+    k.font = `700 ${Math.round(W * 0.034)}px "Noto Sans JP", "Yu Gothic", sans-serif`
+    k.fillText(p.from, 0, y(0.355))
+    k.fillStyle = '#b3261e'
+    k.fillText(p.kg, 0, y(0.3))
+    k.restore()
+  }
+  // (worn: knocked back where the threads stand proud, broken in a few blotches)
+  k.globalCompositeOperation = 'destination-out'
+  let seed = 7
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  for (let i = 0; i < 900; i++) {
+    k.fillStyle = `rgba(0,0,0,${0.15 + rnd() * 0.35})`
+    k.fillRect(rnd() * W, rnd() * H, 2 + rnd() * 5, 2 + rnd() * 3)
+  }
+  g.globalAlpha = 0.82
+  g.globalCompositeOperation = 'multiply'
+  g.drawImage(ink, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.flipY = map.flipY
+  t.colorSpace = map.colorSpace
+  t.wrapS = map.wrapS
+  t.wrapT = map.wrapT
+  t.anisotropy = map.anisotropy
+  t.name = map.name
+  return t
+}
 /** too small or too fine for an ink line (the skewers, their ties, the labels and the marks on things) */
 const UNINKED = /Skewer|Label|Mark|Spice\d|SpiceCap|FoilRoll|Lemon\d/
 
@@ -94,6 +161,8 @@ function partOf(scene: THREE.Group, node: string, width: number, keep?: (o: THRE
           if (lift) toon.color.multiplyScalar(lift)
           const dye = BURLAP_DYE[sm.name]
           if (dye && sm.map?.image) toon.map = dyeBurlap(sm.map, dye)
+          const print = SACK_PRINT[sm.name]
+          if (print && toon.map?.image) toon.map = printSack(toon.map, print)
           t = toon
           if ((BAKED.test(sm.name) || WOVEN.test(sm.name)) && sm.normalMap) Object.assign(t, { normalMap: sm.normalMap, normalScale: sm.normalScale.clone() })
         }
