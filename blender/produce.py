@@ -269,6 +269,8 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
 
     def radius(t, a):
         base = r * prof(t) * (1 + 0.035 * math.cos(2 * a + ph[0]))
+        # (out of round as a stuffed sack is, lopsided, its bulges wandering up it (the owner's, 2026-11-11: irregular))
+        base *= 1 + 0.06 * math.sin(2 * a + ph[2] + 3 * t) + 0.04 * math.sin(3 * a + ph[4] - 2 * t)
         # (a sewn sack's foot, as an old burlap sack's (the owner's, 2026-11-11, a photo beside ours): its bottom seam runs across it from side to
         # side, so low down it's pressed flat into a long eye, drawn out to a point at each end of the seam, its left and right; the body itself
         # going out into its corners, the same cloth (they were cones stuck on); round again higher up, filled out)
@@ -295,7 +297,8 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
     rows = []
 
     def at(rr, a, y):
-        return P(cx + rr * math.cos(a) + dx * y, y, cz + rr * math.sin(a) + dz * y)
+        # (its back pressed flat where it leans on the counter's face behind (the owner's, 2026-11-11: sunk in against the wall))
+        return P(cx + rr * math.cos(a) + dx * y, y, max(WALL_Z, cz + rr * math.sin(a) + dz * y))
     # (the weave about as tall as it's wide round it, once up the body, so the picture's grimy foot is only at the sack's foot (at 1.4 times
     # up it the foot's grime came round again, a dark band three quarters up); the cuff back down the picture's clean part)
     for t in ts:
@@ -651,13 +654,16 @@ def board(name, cx, cy, cz, w, h, d):
 
 
 # ---- the three sacks, standing close together, a little apart at their cuffs; the middle one a step back ----
+# (the counter's face behind them, in this frame (Decor's SACKS_AT puts it here): every sack's back pressed flat this side of it)
+WALL_Z = -0.255
 SACKS = [  # (x, z, height, radius, material, lean, what's in it)
     # (squatter than they were, as full sacks of potatoes sag (the owner's, 2026-11-11: not like vases))
     # (close together (the owner's, 2026-11-11): 0.39 apart, they were 0.43)
     # (half as tall again (the owner's, 2026-11-11): 0.41, 0.45, 0.38 before)
-    (-0.39, 0.02, 0.615, 0.154, "sackP", (-0.02, -0.014), "potato"),
-    (0.0, -0.04, 0.675, 0.162, "sackS", (0.006, -0.016), "sweet"),
-    (0.385, 0.03, 0.57, 0.149, "sackO", (0.02, -0.012), "onion"),
+    # (fuller, 1.12 times as round (the owner's, 2026-11-11), a little further apart for it)
+    (-0.405, -0.035, 0.615, 0.172, "sackP", (-0.02, -0.014), "potato"),
+    (0.0, -0.04, 0.675, 0.181, "sackS", (0.006, -0.016), "sweet"),
+    (0.4, -0.045, 0.57, 0.167, "sackO", (0.02, -0.012), "onion"),
 ]
 
 
@@ -754,7 +760,7 @@ def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14, stand=Fa
             if stand:
                 # (up on its end: along it up, across it along x, its thickness front to back; turned yaw about up)
                 X, Y, Z = lz, lx + L / 2, ly
-                row.append(bm.verts.new(P(cx + X * cy - Z * sy, max(0.0, Y), cz + X * sy + Z * cy)))
+                row.append(bm.verts.new(P(cx + X * cy - Z * sy, max(0.0, Y), max(WALL_Z, cz + X * sy + Z * cy))))
             else:
                 row.append(bm.verts.new(P(cx + lx * cy - lz * sy, ly + T / 2 * 0.6, cz + lx * sy + lz * cy)))
         rows.append((row, (u + 1) / 2 * 0.9))
@@ -774,13 +780,13 @@ def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14, stand=Fa
 
 # ---- a sack of potatoes not yet opened, stood up on its end beside the open ones, at the potatoes' end (the owner's, 2026-11-11: it lay
 # on the floor in front of them; stood up, clear of the counter's face behind) ----
-sealed_sack("ProduceSackSealed", -0.765, 0.03, 0.75, 0.34, 0.26, -0.12, "sackP", salt=3, stand=True)
+sealed_sack("ProduceSackSealed", -0.81, -0.08, 0.75, 0.38, 0.3, -0.12, "sackP", salt=3, stand=True)
 # ---- a few rolled out in front ----
 tuber("ProduceLoose0", -0.22, 0.045, 0.29, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 # (a potato and an onion: the owner's)
 onion("ProduceLooseOnion", 0.24, 0.044, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
 # ---- the crate of carrots and burdock, beside the onions' sack ----
-CX, CW, CD, CH = 0.77, 0.38, 0.26, 0.18
+CX, CW, CD, CH = 0.78, 0.38, 0.26, 0.18
 # (three boards across its floor, a gap between; solid end boards, a hand hole's worth lower in their middle; three slats a side with gaps
 # between them; a square post in each corner inside, the slats nailed to them)
 for k in range(3):
