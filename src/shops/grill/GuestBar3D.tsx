@@ -5128,8 +5128,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && takeoutWay && (
         <Movable id="bench" label="候位長凳">
           <group position={[takeoutWay.bench.x, BENCH_PLACE.y, takeoutWay.bench.z]} rotation-y={takeoutWay.benchYaw}>
-            {/* (drawn at the customers' size, as the stools are: its seat a stool's height under them) */}
-            <group scale={[0.48 * PEOPLE_SCALE, PEOPLE_SCALE, 0.8 * PEOPLE_SCALE]}><WaitingBench /></group>
+            {/* (drawn at the customers' size, as the stools are, the same every way (it was squashed along and across to fit, its
+                proportions off: the owner's, 2026-11-11)) */}
+            <group scale={PEOPLE_SCALE}><WaitingBench /></group>
           </group>
           {/* (its places, where those waiting sit: they go with it, moved by hand) */}
           {takeoutWay.benchSpots.map((p, k) => (

@@ -1,10 +1,11 @@
 """The waiting bench in the genkan (bench.glb; the owner's, 2026-11-09: somewhere for those who come in with every stool taken to sit and wait
-their turn): a long low bench of cedar, two planks for its seat with a gap between, six legs (a pair at each end splayed a little, a pair in the
-middle), a stretcher across each pair and one along, the ends of the planks rounded off; long enough for four (the owner's, 2026-11-11). About
-250 triangles.
+their turn). Remade (the owner's, 2026-11-11: it looked odd, its proportions off; it was drawn squashed, its thin legs splayed): a bench of
+hinoki as a joiner makes one, drawn at one scale: one thick seat board, its edges eased; two board legs at its ends, set in, each cut away
+at its foot to leave two feet; an apron under the seat's front and back edges between them; a low stretcher through both legs, its tenons
+showing through their outer faces. About 300 triangles.
 
-The game's frame: y up from the floor, x along the bench, z across it; its middle at the origin; SEAT_H the seat's top (a stool's, so those
-sat on it sit as at the bar), LENGTH long, DEPTH deep.
+The game's frame: y up from the floor, x along the bench, z across it; its middle at the origin; SEAT_H the seat's top, LENGTH long, DEPTH
+deep (the people's units: the game draws it at the people's scale, the same every way).
 
 Run:
     blender -b --factory-startup --python blender/bench.py -- <project path> [preview.png]
@@ -13,6 +14,7 @@ import math
 import os
 import sys
 
+import bmesh
 import bpy
 import numpy as np
 from mathutils import Vector
@@ -25,7 +27,7 @@ PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(_
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-LENGTH, DEPTH, SEAT_H, PLANK_T = 1.8, 0.34, 0.29, 0.035
+LENGTH, DEPTH, SEAT_H, SEAT_T = 0.86, 0.28, 0.29, 0.036
 
 
 def P(x, y, z):
@@ -43,8 +45,8 @@ v = np.linspace(0, 1, Hh)[:, None]
 u = np.linspace(0, 1, W)[None, :]
 grain = 0.5 + 0.5 * np.sin((v * 22 + np.sin(u * 7 + v * 2) * 0.9) * math.pi * 2)
 wood = np.clip(0.8 + 0.16 * grain - 0.2 * rng.random((Hh, 1)) + rng.normal(0, 0.025, (Hh, W)), 0, 1)
-seat_rgb = (wood[..., None] * np.array(lin("#9a6a3e"))[None, None, :] * 1.1).astype(np.float32)
-leg_rgb = (wood[..., None] * np.array(lin("#5e3c22"))[None, None, :] * 1.1).astype(np.float32)
+seat_rgb = (wood[..., None] * np.array(lin("#c99a66"))[None, None, :] * 1.1).astype(np.float32)
+leg_rgb = (wood[..., None] * np.array(lin("#a8774a"))[None, None, :] * 1.1).astype(np.float32)
 M = {
     "seat": pbr("BenchSeat", (1, 1, 1), tex=image("bench_seat", seat_rgb), rough=0.6),
     "leg": pbr("BenchLeg", (1, 1, 1), tex=image("bench_leg", leg_rgb), rough=0.7),
@@ -82,35 +84,61 @@ def join(objs, name):
     return o
 
 
-seat = []
-gap = 0.012
-pw = (DEPTH - gap) / 2
-for k, z in enumerate((-DEPTH / 2, gap / 2)):
-    seat.append(box(f"plank{k}", -LENGTH / 2, LENGTH / 2, SEAT_H - PLANK_T, SEAT_H, z, z + pw, "seat", bev=0.008))
-bench_seat = join(seat, "BenchSeat")
+# (the seat: one board, its edges eased)
+bench_seat = box("BenchSeat", -LENGTH / 2, LENGTH / 2, SEAT_H - SEAT_T, SEAT_H, -DEPTH / 2, DEPTH / 2, "seat", bev=0.008)
 legs = []
-lx, lz, splay = LENGTH / 2 - 0.1, DEPTH / 2 - 0.06, 0.03
-for sx in (-1, 0, 1):
-    for sz in (-1, 1):
-        o = box(f"leg{sx}{sz}", -0.022, 0.022, 0, SEAT_H - PLANK_T, -0.022, 0.022, "leg")
-        # (splayed out a little at the foot)
-        for vtx in o.data.vertices:
-            if vtx.co.z < 0.01:
-                vtx.co.x += sx * splay
-                vtx.co.y -= sz * splay
-        o.location = P(sx * lx, 0, sz * lz)
-        bpy.ops.object.select_all(action="DESELECT")
-        o.select_set(True)
-        bpy.context.view_layer.objects.active = o
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
-        legs.append(o)
-    # (a stretcher across each end)
-    legs.append(box(f"cross{sx}", sx * lx - 0.016, sx * lx + 0.016, 0.07, 0.1, -lz, lz, "leg"))
-# (and one along the middle, low)
-legs.append(box("along", -lx, lx, 0.07, 0.1, -0.016, 0.016, "leg"))
-# (a rail under the seat's long edges)
+UNDER = SEAT_H - SEAT_T + 0.002      # (the seat's underside, a hair into it)
+LEG_X = LENGTH / 2 - 0.07            # (each leg's middle, set in from the seat's ends)
+LEG_T, LEG_D = 0.032, DEPTH - 0.04   # (a leg board's thickness, and how deep it is across)
+FOOT, ARCH = 0.06, 0.05              # (each foot's width, and how high the cut between them)
+
+
+def leg(name, x):
+    """a board leg standing across the bench at x: its outline (an upright board with the middle of its foot cut away, leaving two feet)
+    pushed through its thickness"""
+    hd = LEG_D / 2
+    outline = [(-hd, 0), (-hd + FOOT, 0), (-hd + FOOT, ARCH), (hd - FOOT, ARCH), (hd - FOOT, 0), (hd, 0), (hd, UNDER), (-hd, UNDER)]
+    bm_ = bmesh.new()
+    lo = [bm_.verts.new(P(x - LEG_T / 2, y, z)) for z, y in outline]
+    hi = [bm_.verts.new(P(x + LEG_T / 2, y, z)) for z, y in outline]
+    bm_.faces.new(lo)
+    bm_.faces.new(hi[::-1])
+    for i in range(len(outline)):
+        j = (i + 1) % len(outline)
+        bm_.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me = bpy.data.meshes.new(name)
+    bm_.to_mesh(me)
+    bm_.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    m = o.modifiers.new("b", "BEVEL")
+    m.width = 0.004
+    m.segments = 1
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    o.data.materials.append(M["leg"])
+    # (its grain up the board: u up it, v across it, in units)
+    me = o.data
+    uv = me.uv_layers.new()
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            uv.data[li].uv = (co.z * 1.5, (-co.y if abs(poly.normal.x) > 0.5 else co.x) * 1.5)
+    parts.append(o)
+    return o
+
+
+for sx in (-1, 1):
+    legs.append(leg(f"leg{sx}", sx * LEG_X))
+# (the aprons under the seat's long edges, between the legs, set in from its edges)
 for sz in (-1, 1):
-    legs.append(box(f"apron{sz}", -lx - 0.02, lx + 0.02, SEAT_H - PLANK_T - 0.05, SEAT_H - PLANK_T, sz * lz - 0.012, sz * lz + 0.012, "leg"))
+    z = sz * (DEPTH / 2 - 0.03)
+    legs.append(box(f"apron{sz}", -LEG_X + LEG_T / 2 - 0.002, LEG_X - LEG_T / 2 + 0.002, UNDER - 0.045, UNDER, z - 0.011, z + 0.011, "leg", bev=0.003))
+# (the stretcher low through both legs, its tenons showing a little through their outer faces)
+legs.append(box("stretcher", -LEG_X - LEG_T / 2 - 0.012, LEG_X + LEG_T / 2 + 0.012, ARCH + 0.03, ARCH + 0.062, -0.014, 0.014, "leg", bev=0.003))
 bench_legs = join(legs, "BenchLegs")
 
 root = bpy.data.objects.new("Bench", None)
@@ -122,7 +150,7 @@ if PREVIEW:
     target = P(0, 0.15, 0)
     cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = P(0.9, 0.7, 1.1)
+    cam.location = P(0.6, 0.55, 0.8)
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
     bpy.context.scene.camera = cam
     lt = bpy.data.objects.new("Key", bpy.data.lights.new("Key", "SUN"))
