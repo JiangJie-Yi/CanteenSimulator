@@ -759,7 +759,8 @@ export const BENCH_SEATS = 4
 /** where the bench stands, in the bar's frame (the owner's, 2026-11-11: against the wall where the door's cat stand was, the stand and the shrine
  * moved along toward the round window): its middle, its turn (its length along the wall, those on it facing into the room) and how far apart its
  * places are along it; `y`, the room's floor there, over the genkan's frame */
-export const BENCH_PLACE = { x: -1.18, z: -3.978, y: 0.169, yaw: 0.6297, pitch: 0.28 }
+// (y 0: blender/bench.py's bench has its feet at its origin (the old one's 0.169 left it floating, its seat high: the owner's, 2026-11-11))
+export const BENCH_PLACE = { x: -1.18, z: -3.978, y: 0, yaw: 0.6297, pitch: 0.28 }
 export const BENCH_WAIT = 90
 export const BENCH = { ids: [] as number[], since: new Map<number, number>(), up: new Set<number>(), gone: new Set<number>() }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bench: BENCH, __seatsTaken: SEATS_TAKEN })
