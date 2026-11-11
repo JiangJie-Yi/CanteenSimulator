@@ -3759,6 +3759,17 @@ function OrangePlate({ bare = false }: { bare?: boolean }) {
       // (on a stand: no plate at all)
       if (b.max.x - b.min.x > 0.15) mesh.scale.multiply(bare ? new THREE.Vector3(0.0001, 0.0001, 0.0001) : new THREE.Vector3(DISH_K, 1, DISH_K))
     }
+    // (on a stand, the oranges let down onto its tray: they sat as high as the plate under them held them (the owner's, 2026-11-11: floating))
+    if (bare) {
+      o.updateMatrixWorld(true)
+      let low = Infinity
+      for (const m of o.children) {
+        const mesh = m as THREE.Mesh
+        if (!mesh.isMesh || mesh.geometry.boundingBox!.max.x - mesh.geometry.boundingBox!.min.x > 0.15) continue
+        low = Math.min(low, new THREE.Box3().setFromObject(mesh).min.y)
+      }
+      if (isFinite(low)) o.position.y -= low
+    }
     return o
   }, [gltf, bare])
   return <primitive object={obj} />
@@ -3784,6 +3795,9 @@ function SanboPart({ name }: { name: 'Sanbo' | 'Dango' }) {
       m.receiveShadow = true
     })
     inkModel(r, () => false, { width: 0.0008, weld: true })
+    // (its foot on the origin, whatever height it was made at: the dumplings sat 3 cm over the stand's tray (the owner's, 2026-11-11: floating))
+    r.updateMatrixWorld(true)
+    r.position.y -= new THREE.Box3().setFromObject(r).min.y
     return r
   }, [gltf, name])
   return <primitive object={obj} />
@@ -4487,6 +4501,8 @@ const AURA = canvasTex(128, 128, (g) => {
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015), and back 0.02
  * toward the shrine's steps with the shallower table (TABLE_DEEP) */
 const CUPS_SHIFT = 0.005
+/** where the owner set the cups' stand by hand (2026-11-11: z -0.05, then on 0.055 along and 0.066 further in), along and across */
+const CUPS_SET = [0.055, -0.05 - 0.066] as const
 /** where the Ebisu's feet are, on his pedestal (the ring of light spreads out from there) */
 // (where the shrine's back stands, ALTAR_D / 2, and the Ebisu brought back toward it with the shrine's shallower depth)
 const EBISU_FEET: [number, number, number] = [0.29 + (0.145 - 0.29) * SHRINE_DEEP, 0.077, 0]
@@ -4804,7 +4820,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       <Movable id="vase-1" label="花瓶（左）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase-1" /></group></Movable>
       <Movable id="vase1" label="花瓶（右）"><group position-x={ALTAR_D / 2} scale={SC}><Kamidana part="vase1" /></group></Movable>
       {/* (5 cm along to the left as the owner set it by hand (2026-11-11)) */}
-      <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT} position-z={-0.05} scale={SC} {...nameOver('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch plain><Kamidana part="cups" /></StaticBatch></group></Movable>
+      <Movable id="shrinecups" label="清酒杯與琉璃台"><group ref={cupsRef} position-x={ALTAR_D / 2 + CUPS_SHIFT + CUPS_SET[0]} position-z={CUPS_SET[1]} scale={SC} {...nameOver('清酒杯', '供神的酒杯；點御神酒壺倒酒')}><StaticBatch plain><Kamidana part="cups" /></StaticBatch></group></Movable>
       <points ref={motes} geometry={moteGeo} frustumCulled={false} renderOrder={4}>
         <pointsMaterial ref={moteMat} map={STAR} vertexColors size={1} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} onBeforeCompile={pointsEach} />
       </points>
