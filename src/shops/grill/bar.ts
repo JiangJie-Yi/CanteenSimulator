@@ -130,6 +130,9 @@ export const STAFF_DOOR_HOLD = { until: -1e9 }
 /** each place's stool pulled out from the bar this far (the bar's frame, back toward the aisle; GuestBar3D: a customer pulls it out, sits,
  * slides in with it; gets up with it pushed back, and it's pushed home behind them) */
 export const SEAT_PULL = new Map<number, number>()
+/** how far in under the counter's top a stool's pushed while its place is empty (the owner's, 2026-11-11: put away under the table), from
+ * where it stands sat at: none in SEAT_PULL is put away; its seat clear under the drawer case, its far edge clear of the counter's base */
+export const STOOL_TUCK = 0.3
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __seatPull?: unknown }).__seatPull = SEAT_PULL
 export const SHOE_CELLS = { shoes: new Map<number, string>(), kick: new Map<number, number>(), at: new THREE.Vector3(), ready: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shoes?: typeof SHOE_CELLS }).__shoes = SHOE_CELLS

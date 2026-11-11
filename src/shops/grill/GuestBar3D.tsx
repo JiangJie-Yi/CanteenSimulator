@@ -74,7 +74,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -3195,7 +3195,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (d >= stand) {
           s.pullT = (s.pullT ?? 0) + dt
           const k1 = Math.min(1, s.pullT / STOOL_PULL_S), k2 = Math.min(1, Math.max(0, s.pullT - STOOL_PULL_S) / STOOL_STEP_S)
-          SEAT_PULL.set(s.seat, STOOL_OUT * k1 * k1 * (3 - 2 * k1))
+          // (out from under the counter, where it's put away)
+          SEAT_PULL.set(s.seat, -STOOL_TUCK + (STOOL_OUT + STOOL_TUCK) * k1 * k1 * (3 - 2 * k1))
           if (k1 >= 1 && !s.pulledSound) { s.pulledSound = true; if (g) stoolSound(g.getWorldPosition(new THREE.Vector3())) }
           // (stepping from where they stood onto the stool where it's been pulled to)
           p.copy(alongPath(path, stand + (STOOL_STAND - STOOL_OUT) * k2).p)
@@ -3229,7 +3230,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           s.slideT += dt
           const k = Math.min(1, s.slideT / STOOL_SLIDE_S)
           SEAT_PULL.set(s.seat, STOOL_OUT * (1 - k * k * (3 - 2 * k)))
-        } else SEAT_PULL.delete(s.seat)
+        } else SEAT_PULL.set(s.seat, 0)
         g?.position.copy(st.stool).addScaledVector(backOf(st), SEAT_PULL.get(s.seat) ?? 0)
         if (g) g.rotation.y = st.yaw
         if (s.wipeAt && performance.now() - s.wipeAt > WIPE_MOUTH_MS) { s.phase = 'leave'; s.t = 0; redraw() }
@@ -3382,7 +3383,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v))))
         const { p, dir } = alongPath(lp.path, lp.len - d)
         const home = Math.max(0, s.t - 0.8 - STOOL_LEAVE / v - STOOL_HOME_WAIT)
-        if (home < STOOL_SLIDE_S) SEAT_PULL.set(s.seat, s.t < 0.8 ? back : STOOL_LEAVE * (1 - home / STOOL_SLIDE_S))
+        // (pushed home in under the counter)
+        if (home < STOOL_SLIDE_S) SEAT_PULL.set(s.seat, s.t < 0.8 ? back : STOOL_LEAVE - (STOOL_LEAVE + STOOL_TUCK) * (home / STOOL_SLIDE_S))
         else SEAT_PULL.delete(s.seat)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
         // (at the step on the way out: their shoes out of their cubby and on)
@@ -5312,7 +5314,7 @@ const Stools = memo(function Stools({ seats }: { seats: ReturnType<typeof seatsO
     seats.forEach((st, n) => {
       const o = pulls.current[n]
       if (!o) return
-      const k = SEAT_PULL.get(n) ?? 0
+      const k = SEAT_PULL.get(n) ?? -STOOL_TUCK
       const b = backOf(st)
       if (Math.abs(o.position.x - b.x * k) > 1e-5 || Math.abs(o.position.z - b.z * k) > 1e-5) o.position.set(b.x * k, 0, b.z * k)
     })

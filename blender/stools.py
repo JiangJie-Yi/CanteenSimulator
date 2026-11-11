@@ -128,6 +128,10 @@ def cloth(kind="blue", N=512):
                 d = np.hypot(u - i * r, v - j * r)
                 lines = np.maximum(lines, smooth(0.007, 0.0018, np.abs(d - r * 0.7071)))
         h = lines
+    # (woven in a thread of its own colour, to be seen from across the room (the owner's, 2026-11-11: the pattern on the cushions; tone on tone
+    # it never showed): the blue's waves in an off-white, the red's rings in gold)
+    thread = (0.82, 0.8, 0.72) if kind == "blue" else (0.86, 0.64, 0.24)
+    col = mix(col, thread, h * 0.8)
     # (pressed: the raised lines a shade lighter, a highlight along their tops and a shadow along their feet)
     up = np.roll(h, 1, axis=0)
     down = np.roll(h, -1, axis=0)
