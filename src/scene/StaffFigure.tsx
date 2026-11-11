@@ -50,11 +50,15 @@ const BROOM_URL = import.meta.env.BASE_URL + 'models/broom.glb'
 const BROOM_LEN = 0.6
 const SWEEP = { foot: new THREE.Vector3(), dir: new THREE.Vector3(), upper: new THREE.Vector3(), lower: new THREE.Vector3() }
 const SWEEP_TOP = new THREE.Vector3()
-export function sweepPose(t: number) {
+/** how far forward of the figure the handle's top is (the figure's frame): a server's, slim, holds it back near the belly; the owner's belly is
+ * broad, so his hands, on that line, were inside it and showed as a fist at his side (the owner's, 2026-11-12): his handle stands nearer upright,
+ * its hands out where his tray is carried (TRAY_AT) */
+export const SWEEP_LEAN = { server: 0.07, owner: 0.3 }
+export function sweepPose(t: number, lean = SWEEP_LEAN.server) {
   const s = Math.sin(t * Math.PI * 1.8)
   // (the floor's top a little over their own foot's level, as they stand on the room's boards (measured: 4 of the figure's hundredths))
   SWEEP.foot.set(-0.04 + s * 0.11, 0.04, 0.36)
-  SWEEP_TOP.set(-0.07 + s * 0.03, 0.5, 0.07)
+  SWEEP_TOP.set(-0.07 + s * 0.03, 0.5, lean)
   SWEEP.dir.copy(SWEEP_TOP).sub(SWEEP.foot).normalize()
   SWEEP.upper.copy(SWEEP.foot).addScaledVector(SWEEP.dir, BROOM_LEN * 0.84)
   SWEEP.lower.copy(SWEEP.foot).addScaledVector(SWEEP.dir, BROOM_LEN * 0.6)
@@ -84,22 +88,22 @@ const BROOM_MATS = new Map<THREE.Material, THREE.Material>()
  * pose; carried upright at their side, its foot clear of the floor. For a figure that isn't a StaffFigure (the owner out serving, GuestBar3D's
  * OwnerWalker): it finds its holder's userData up the way
  */
-export function SweepBroom() {
+export function SweepBroom({ lean = SWEEP_LEAN.server }: { lean?: number }) {
   const gltf = useGLTF(BROOM_URL) as unknown as { scene: THREE.Group }
   const broom = useMemo(() => makeBroom(gltf.scene), [gltf])
   const g = useRef<THREE.Group>(null)
   useFrame(() => {
     let job: { sweep?: number; broom?: boolean } | undefined
     for (let q = g.current?.parent ?? null, k = 0; q && k < 4; q = q.parent, k++) if ('broom' in q.userData) { job = q.userData; break }
-    poseBroom(broom, job?.sweep, !!job?.broom, null)
+    poseBroom(broom, job?.sweep, !!job?.broom, null, lean)
   })
   return <group ref={g}><primitive object={broom} /></group>
 }
 /** the broom posed: swept (`sweep` seconds in), carried (by `hand`, or at the side), or put away */
-function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: boolean, hand: THREE.Object3D | null) {
+function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: boolean, hand: THREE.Object3D | null, lean = SWEEP_LEAN.server) {
   broom.visible = sweep !== undefined || carried
   if (sweep !== undefined) {
-    const p = sweepPose(sweep)
+    const p = sweepPose(sweep, lean)
     broom.position.copy(p.foot)
     broom.quaternion.setFromUnitVectors(UP_Y, p.dir)
   } else if (carried) {
