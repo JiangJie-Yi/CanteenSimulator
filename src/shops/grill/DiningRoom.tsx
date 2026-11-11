@@ -3575,10 +3575,27 @@ function ToiletDoor({ who }: { who: 'm' | 'f' }) {
 /** the two vases' arrangements (blender/shrinevase.py): 0 white and gold chrysanthemums, 1 pink, crimson and violet blooms */
 const VASE_URLS = ['shrinevase', 'shrinevase0', 'shrinevase1'].map((v) => import.meta.env.BASE_URL + `models/${v}.glb`)
 /** a shrine vase (榊立て, blender/shrinevase.py): white porcelain with a cobalt band of waves, a spray of glossy sakaki and small chrysanthemums */
-function Bouquet({ variant = 0 }: { variant?: number }) {
+function Bouquet({ variant = 0, spray = [1, 1, 1] }: { variant?: number; spray?: [number, number, number] }) {
   const gltf = useGLTF(VASE_URLS[variant]) as unknown as { scene: THREE.Group }
   const root = useMemo(() => {
     const r = gltf.scene.clone(true)
+    // (the arrangement's own size (VASE_POSE) on the flowers alone, about the vase's mouth, their stems kept in it: the vase the same one
+    // whichever flowers are in it (the owner's, 2026-11-11: it was sized with them, wider or slimmer for each))
+    const body = r.getObjectByName('VaseBody')
+    if (body && spray.some((k) => k !== 1)) {
+      r.updateWorldMatrix(true, true)
+      const inv = r.matrixWorld.clone().invert(), vb = new THREE.Box3()
+      const pos = (body as THREE.Mesh).geometry.attributes.position, v = new THREE.Vector3()
+      for (let i = 0; i < pos.count; i++) vb.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(body.matrixWorld).applyMatrix4(inv))
+      const pivot = new THREE.Group()
+      pivot.position.set((vb.min.x + vb.max.x) / 2, vb.max.y, (vb.min.z + vb.max.z) / 2)
+      r.add(pivot)
+      pivot.updateWorldMatrix(true, false)
+      const sprays: THREE.Object3D[] = []
+      r.traverse((o) => { if ((o as THREE.Mesh).isMesh && o !== body) sprays.push(o) })
+      for (const o of sprays) pivot.attach(o)
+      pivot.scale.set(...spray)
+    }
     // (one material for each of the model's: the petals sharing theirs, the bouquet folds into a few draws below)
     const mats = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
@@ -3612,19 +3629,20 @@ function Bouquet({ variant = 0 }: { variant?: number }) {
       for (let i = 0; i < pos.count; i++) foot = Math.min(foot, v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld).y)
     })
     return { r, foot: Number.isFinite(foot) ? foot : 0 }
-  }, [gltf])
+  }, [gltf, spray])
   return <group position-y={-root.foot}><primitive object={root.r} /></group>
 }
 VASE_URLS.forEach((u) => useGLTF.preload(u))
 /**
  * each arrangement's own turn and size (the owner's, 2026-11-10): the sakaki as it was made; the white and gold turned a little under half
- * round, 2 cm along, a touch slimmer and taller; the pink and crimson turned the other way past half round (its blooms to the right and
- * back), a touch wider and lower. Upright, all of them: no lean, so the whole foot is down on the table
+ * round, a touch slimmer and taller; the pink and crimson turned the other way past half round (its blooms to the right and back), a touch
+ * wider and lower. Upright, all of them: no lean, so the whole foot is down on the table. The size the flowers' only, and the vase where it
+ * stands whichever's in it (the owner's, 2026-11-11: three different vases, and moved about: the white and gold's was 2 cm along)
  */
-const VASE_POSE: { turn: number; along: number; scale: [number, number, number] }[] = [
-  { turn: 0, along: 0, scale: [1, 1, 1] },
-  { turn: Math.PI * 0.45, along: 0.02, scale: [0.95, 1.05, 0.95] },
-  { turn: -Math.PI * 0.65, along: 0, scale: [1.05, 0.92, 1.05] },
+const VASE_POSE: { turn: number; spray: [number, number, number] }[] = [
+  { turn: 0, spray: [1, 1, 1] },
+  { turn: Math.PI * 0.45, spray: [0.95, 1.05, 0.95] },
+  { turn: -Math.PI * 0.65, spray: [1.05, 0.92, 1.05] },
 ]
 /** a vase whose flowers change at a click: the sakaki with small chrysanthemums, the white and gold, the pink and crimson, each bringing its
  * own blessing while it stands there (game/shrineFlowers), each set at its own turn and size (VASE_POSE). `slot`: 0 the left vase, 1 the right */
@@ -3633,14 +3651,14 @@ function BouquetPick({ slot }: { slot: number }) {
   const pose = VASE_POSE[v] ?? VASE_POSE[0]
   return (
     // (smaller than they were: the vases stood nearly as tall as the shrine; a sakaki vase comes to about two thirds of it)
-    <group position-z={pose.along} rotation-y={pose.turn} scale={[0.78 * pose.scale[0], 0.78 * pose.scale[1], 0.78 * pose.scale[2]]}
+    <group rotation-y={pose.turn} scale={0.78}
       onClick={(e) => {
         e.stopPropagation(); if (getEdit().on) return; const n = nextFlower(v); setShrineFlower(slot, n); setV(n)
         // (its tag says the flowers now there: it was still naming the ones just taken out, till the pointer moved off and back)
         setTip({ title: `供花・${FLOWERS[n].name}`, hint: `${FLOWERS[n].buff}｜點一下換一組花` })
       }}
       {...tipOver(`供花・${FLOWERS[v].name}`, `${FLOWERS[v].buff}｜點一下換一組花`)}>
-      <Bouquet variant={v} />
+      <Bouquet variant={v} spray={pose.spray} />
     </group>
   )
 }
