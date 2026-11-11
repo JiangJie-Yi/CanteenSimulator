@@ -2396,6 +2396,78 @@ def daikon_steak(at):
 place(negi_lengths(), 300, 0.6, "Negi")
 place(carrot_rounds(), 312, 0.6, "Carrot")
 place(gobo_sticks(), 322, 0.6, "Gobo")
+
+
+# ---- the summer vegetables kept in wooden baskets at room temperature (the owner's, 2026-11-12): cherry tomatoes, rounds of cucumber and
+# of eggplant, green pepper and red and yellow bell pepper, each on its skewer
+TEX["cucumber"] = veg_picture("T_Cucumber",
+    # (its cut face pale green, a ring of seeds round the middle, the dark green skin's edge)
+    lambda r: mix(mix(mix((0.86, 0.92, 0.7), (0.74, 0.84, 0.52), smooth(0.25, 0.45, r)),
+                      (0.95, 0.96, 0.82), ((np.abs(r - 0.32) < 0.06) * (0.5 + 0.5 * np.cos(r * 90))).clip(0, 1) * 0.6),
+                  (0.16, 0.36, 0.12), smooth(0.86, 0.95, r)),
+    lambda u, v: mix((0.16, 0.38, 0.12), (0.1, 0.26, 0.08), smooth(0.4, 0.8, vnoise(256, 30, 4))))
+TEX["eggplant"] = veg_picture("T_Eggplant",
+    # (its cut face cream, its seeds a faint ring of specks, the skin a deep glossy purple)
+    lambda r: mix(mix((0.95, 0.9, 0.74), (0.86, 0.78, 0.56), smooth(0.3, 0.8, r) * 0.5), (0.26, 0.1, 0.24), smooth(0.9, 0.97, r)),
+    lambda u, v: mix((0.3, 0.1, 0.3), (0.18, 0.05, 0.18), smooth(0.4, 0.8, vnoise(256, 3, 30))))
+M.update({k: pbr(k.capitalize(), tex=TEX[k], rough=0.35, coat=0.4) for k in ("cucumber", "eggplant")})
+M["tomato"] = pbr("Tomato", (0.78, 0.08, 0.05), rough=0.25, coat=0.6)
+M["calyx"] = pbr("TomatoCalyx", (0.22, 0.42, 0.14), rough=0.6)
+M["piman"] = pbr("Piman", (0.1, 0.32, 0.07), rough=0.25, coat=0.5)
+M["paprika_r"] = pbr("PaprikaRed", (0.72, 0.06, 0.04), rough=0.25, coat=0.5)
+M["paprika_y"] = pbr("PaprikaYellow", (0.95, 0.66, 0.05), rough=0.25, coat=0.5)
+
+
+def cherry_tomatoes():
+    """Three cherry tomatoes through their middles, each a little squashed round, its green calyx a small star of two crossed slips on top
+    (an icosphere: no pole fanning into a point; 80 faces)."""
+    parts = []
+    for i, x in enumerate((-0.085, 0.0, 0.085)):
+        r = random.uniform(0.036, 0.041)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=r, location=(x, 0, 0))
+        o = active()
+        o.scale = (1.0, 1.0, 0.88)
+        apply_scale(o)
+        parts.append(finish(o, "Tomato", M["tomato"]))
+        for k in range(2):
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(x, 0, r * 0.86), rotation=(0, 0, k * math.pi / 2 + random.uniform(0, 0.6)))
+            c = active()
+            c.scale = (r * 0.9, r * 0.22, 0.004)
+            apply_scale(c)
+            parts.append(finish(c, "TomatoCalyx", M["calyx"], smooth_shade=False))
+    return parts
+
+
+def cucumber_rounds():
+    """Four thick rounds of cucumber cut on the slant, faces out, their seeds showing."""
+    return [cut_piece("Cucumber", M["cucumber"], random.uniform(0.022, 0.025), 0.032, (x, 0, 0), (math.radians(90), random.uniform(-0.3, 0.3), 0), seg=14)
+            for x in (-0.14, -0.047, 0.047, 0.14)]
+
+
+def eggplant_rounds():
+    """Three thick rounds of eggplant, faces out, cream and purple."""
+    return [cut_piece("Eggplant", M["eggplant"], random.uniform(0.034, 0.038), 0.03, (x, 0, 0), (math.radians(90), 0, 0), seg=16)
+            for x in (-0.11, 0.0, 0.11)]
+
+
+def pepper_skewer(mats, n, size):
+    """Cut squares of a pepper's wall threaded one after another, each its own size and at its own angle; `mats` their outsides in turn
+    (green pepper: all green; bell pepper: red and yellow by turns)."""
+    parts = []
+    xs = [(-0.13 + 0.26 * k / max(1, n - 1)) for k in range(n)]
+    for k, x in enumerate(xs):
+        o = pepper_chunk(x, random.uniform(*size[0]), random.uniform(*size[1]), random.uniform(0.06, 0.08),
+                         random.choice((-1, 1)) * random.uniform(1.0, 1.3), random.uniform(-0.4, 0.4))
+        o.data.materials[0] = M[mats[k % len(mats)]]
+        parts.append(o)
+    return parts
+
+
+place(cherry_tomatoes(), 285, 0.6, "Tomato")
+place(cucumber_rounds(), 292, 0.6, "Cucumber")
+place(eggplant_rounds(), 232, 0.6, "Eggplant")
+place(pepper_skewer(["piman"], 3, ((0.085, 0.105), (0.08, 0.1))), 150, 0.6, "Piman")
+place(pepper_skewer(["paprika_r", "paprika_y"], 4, ((0.075, 0.095), (0.07, 0.09))), 168, 0.6, "Paprika")
 # ---------------------------------------------------------------------------------------------------------
 
 place(fish(), 95, 0.64, "ExtraFish")

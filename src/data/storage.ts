@@ -8,8 +8,10 @@ const FROZEN = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shis
   'ShrimpSkewer', 'Squid', 'Scallop'])
 // (and the seasonings that keep dry: salt, the peanut powder, shichimi; the sauces, once opened, go in the fridge)
 // (the rice balls' rice too: white rice keeps at room temperature, in its sacks by the sake (the owner's))
-// (the onions, carrots and burdock in their sacks and crate on the floor too; the leeks and the daikon chilled)
-const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato', 'Onigiri', 'Onion', 'Carrot', 'Gobo', 'season:salt', 'season:peanut', 'season:shichimi', 'charcoal'])
+// (the onions and burdock in their sacks on the floor too; the leeks, the daikon and the carrots chilled (the carrots moved to the fridge, the
+// owner's, 2026-11-12); the summer vegetables in their wooden baskets at room temperature)
+const AMBIENT = new Set(['Sake', 'Potato', 'SweetPotato', 'Onigiri', 'Onion', 'Gobo', 'Tomato', 'Cucumber', 'Eggplant', 'Piman', 'Paprika',
+  'season:salt', 'season:peanut', 'season:shichimi', 'charcoal'])
 
 /** where a food is kept (anything not named frozen or at room temperature is chilled) */
 export const storageOf = (id: string): Storage => (FROZEN.has(id) ? 'frozen' : AMBIENT.has(id) ? 'ambient' : 'chilled')
@@ -32,6 +34,11 @@ const STOCK_NAMES: Record<string, { zh: string; ja: string; en: string }> = {
   Carrot: { zh: '紅蘿蔔', ja: '人参', en: 'Carrot' },
   Gobo: { zh: '牛蒡', ja: 'ごぼう', en: 'Burdock root' },
   Daikon: { zh: '白蘿蔔', ja: '大根', en: 'Daikon' },
+  Tomato: { zh: '小番茄', ja: 'ミニトマト', en: 'Cherry tomatoes' },
+  Cucumber: { zh: '小黃瓜', ja: 'きゅうり', en: 'Cucumber' },
+  Eggplant: { zh: '茄子', ja: 'なす', en: 'Eggplant' },
+  Piman: { zh: '青椒', ja: 'ピーマン', en: 'Green pepper' },
+  Paprika: { zh: '甜椒', ja: 'パプリカ', en: 'Bell pepper' },
 }
 export const stockNameOf = (id: string, lang: Lang): string | null => {
   const n = STOCK_NAMES[id]

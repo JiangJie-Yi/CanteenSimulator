@@ -48,6 +48,7 @@ export const COST_SHARE: Record<string, number> = {
   PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3, GrilledCorn: 0.28, GrilledShiitake: 0.3, Shishito: 0.25,
   KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24,
   Rice: 0.18, MisoSoup: 0.2, Sake: 0.4, Onion: 0.24, Negi: 0.26, Carrot: 0.24, Gobo: 0.3, Daikon: 0.24,
+  Tomato: 0.28, Cucumber: 0.24, Eggplant: 0.28, Piman: 0.26, Paprika: 0.32,
 }
 
 /** what one of something costs to buy in */

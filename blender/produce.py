@@ -785,26 +785,125 @@ sealed_sack("ProduceSackSealed", -0.81, -0.08, 0.75, 0.38, 0.3, -0.12, "sackP", 
 tuber("ProduceLoose0", -0.22, 0.045, 0.29, 0.055, "potato", rot=(0.3, 0.2, 0.9))
 # (a potato and an onion: the owner's)
 onion("ProduceLooseOnion", 0.24, 0.044, 0.31, 0.044, rot=(1.4, 0.3, 0.6))
-# ---- the crate of carrots and burdock, beside the onions' sack ----
-CX, CW, CD, CH = 0.78, 0.38, 0.26, 0.18
-# (three boards across its floor, a gap between; solid end boards, a hand hole's worth lower in their middle; three slats a side with gaps
-# between them; a square post in each corner inside, the slats nailed to them)
-for k in range(3):
-    board(f"ProduceCrateBottom{k}", CX - CW / 2 + 0.02 + (k + 0.5) * (CW - 0.04) / 3, 0.009, 0.0, (CW - 0.04) / 3 - 0.006, 0.018, CD - 0.004)
+# ---- the summer vegetables and the burdock in wooden baskets on a stepped stand, beside the onions' sack (the owner's, 2026-11-12: the
+# tomatoes, cucumbers, eggplants, green peppers and bell peppers at room temperature in wooden baskets; the carrots chilled now, out of the
+# crate that stood here) ----
+CX, CW, CD = 0.75, 0.41, 0.32
+TIER = ((0.1, 0.07), (0.22, -0.085))      # (each tier's top, and its middle front to back: the front one low, the back one up behind it)
+# (the stand: its two shelves of three boards, the front one's front board a little proud as a lip, the back one on a riser board; its ends
+# two boards each, stepped)
+for t, (ty, tz) in enumerate(TIER):
+    for k in range(3):
+        board(f"ProduceStandShelf{t}{k}", CX, ty - 0.009, tz - 0.05 + k * 0.05, CW - 0.03, 0.018, 0.046)
+    board(f"ProduceStandRiser{t}", CX, (ty - 0.018) / 2, tz + 0.074, CW - 0.03, ty - 0.018, 0.012)
 for sd in (-1, 1):
-    board(f"ProduceCrateEnd{sd}", CX + sd * (CW / 2 - 0.009), CH / 2, 0.0, 0.018, CH, CD)
-    for k, yy in enumerate((0.04, 0.095, 0.15)):
-        board(f"ProduceCrateSlat{sd}{k}", CX, yy, sd * (CD / 2 - 0.006), CW - 0.036, 0.04, 0.012)
-    for sx in (-1, 1):
-        board(f"ProduceCratePost{sd}{sx}", CX + sx * (CW / 2 - 0.03), CH / 2, sd * (CD / 2 - 0.024), 0.022, CH - 0.004, 0.022)
-# (the carrots lying across it, front to back, in two layers, their leaves to the back; the burdock leaning in its far end)
-for k in range(7):
-    layer = k // 4
-    # (their leaves to the back, all of them inside the crate: the leaves had stood out through its front slats)
-    carrot(f"ProduceCarrot{k}", CX - 0.14 + (k % 4) * 0.045 + layer * 0.02, 0.13 + layer * 0.035, 0.03, 0.18,
-           rot=(-math.pi / 2 + 0.08 * (k % 3 - 1), 0.0, 0.12 * (k % 2) - 0.06))
+    board(f"ProduceStandEndLow{sd}", CX + sd * (CW / 2 - 0.009), TIER[0][0] / 2, TIER[0][1], 0.018, TIER[0][0], 0.16)
+    board(f"ProduceStandEndHigh{sd}", CX + sd * (CW / 2 - 0.009), TIER[1][0] / 2, TIER[1][1], 0.018, TIER[1][0], 0.16)
+
+
+def basket_wood(n=256):
+    """a round wooden basket's bent strips: upright slats round it, a dark gap between each, each its own shade, the grain along it"""
+    u, v = grid01(n)
+    k = np.floor(u * 20)
+    f = (u * 20) % 1
+    col = mix(lin("#b08452"), lin("#d2a872"), (0.5 + 0.5 * np.sin(k * 2.3)) * 0.6 + vnoise(n, 3, 90) * 0.4)
+    col *= (0.55 + 0.45 * smooth(0.0, 0.12, np.minimum(f, 1 - f)))[..., None]
+    return col
+
+
+M["basket"] = pbr("ProduceBasket", (1, 1, 1), tex=image("produce_basket", basket_wood()), rough=0.75)
+M["tomato"] = pbr("ProduceTomato", tuple(lin("#c8261a")), rough=0.3, coat=0.5)
+M["calyx"] = pbr("ProduceCalyx", tuple(lin("#3f7a2a")), rough=0.7)
+M["cucumber"] = pbr("ProduceCucumber", tuple(lin("#2f6a24")), rough=0.5)
+M["eggplant"] = pbr("ProduceEggplant", tuple(lin("#3a1438")), rough=0.25, coat=0.6)
+M["piman"] = pbr("ProducePiman", tuple(lin("#2c7a1e")), rough=0.25, coat=0.5)
+M["paprika_r"] = pbr("ProducePaprikaRed", tuple(lin("#c81e14")), rough=0.25, coat=0.5)
+M["paprika_y"] = pbr("ProducePaprikaYellow", tuple(lin("#f2b414")), rough=0.25, coat=0.5)
+
+
+def basket(name, x, y, z, r=0.064, h=0.06):
+    """a round wooden basket: its wall out from its floor to its rim, 16 round, seen inside and out, its rim a rolled band; its floor a ring
+    of rows (filled on export, no fan)"""
+    seg = 16
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    prof = [(r * 0.78, 0.0), (r * 0.9, h * 0.3), (r, h)]
+    inner = [(rr - 0.006, yy + (0.006 if k == 0 else 0)) for k, (rr, yy) in enumerate(prof)][::-1]
+    rows = [[bm.verts.new((rr * math.cos(2 * math.pi * j / seg), rr * math.sin(2 * math.pi * j / seg), yy)) for j in range(seg)] for rr, yy in prof + inner]
+    for k in range(len(rows) - 1):
+        for j in range(seg):
+            j2 = (j + 1) % seg
+            f = bm.faces.new((rows[k][j], rows[k][j2], rows[k + 1][j2], rows[k + 1][j]))
+            for l, (uu, vv) in zip(f.loops, ((j, k), (j + 1, k), (j + 1, k + 1), (j, k + 1))):
+                l[uvl].uv = (uu / seg, vv / (len(rows) - 1))
+    bm.faces.new(list(reversed(rows[0])))
+    bm.faces.new(rows[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = mesh_object(name, bm, "basket")
+    o.location = P(x, y, z)
+    return o
+
+
+def ball(name, x, y, z, r, mat, squash=(1.0, 1.0, 1.0), rot=(0.0, 0.0, 0.0)):
+    """a round vegetable: an icosphere (no pole fanning to a point), 80 faces, squashed as given"""
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=r, location=P(x, y, z), rotation=rot)
+    o = active()
+    o.scale = squash
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    o.name = name
+    o.data.materials.append(M[mat])
+    for pg in o.data.polygons:
+        pg.use_smooth = True
+    parts.append(o)
+    return o
+
+
+def stem(name, x, y, z, length, mat="calyx", r=0.004):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=5, radius=r, depth=length, location=P(x, y + length / 2, z))
+    o = active()
+    o.name = name
+    o.data.materials.append(M[mat])
+    parts.append(o)
+    return o
+
+
+def long_veg(name, x, y, z, length, r, mat, rot, seg=8, tip=0.6):
+    """a cucumber or an eggplant lying in its basket: a long round shape, its stem end narrower (`tip`)"""
+    prof = [(r * 0.35, -length / 2), (r * 0.85, -length * 0.38), (r, -length * 0.1), (r * 0.95, length * 0.2), (r * tip, length * 0.42), (r * tip * 0.5, length / 2)]
+    o = lathe_veg(name, prof, seg, mat)
+    o.location = P(x, y, z)
+    o.rotation_euler = rot
+    return o
+
+
+BX = (-0.13, 0.0, 0.13)
+FLOOR = 0.008
+# (front tier: the tomatoes, the cucumbers, the eggplants)
+y0, z0 = TIER[0]
+for k, bx in enumerate(BX):
+    basket(f"ProduceBasket0{k}", CX + bx, y0, z0)
+for k, (dx, dz, dy) in enumerate(((-0.025, -0.018, 0), (0.022, -0.02, 0), (0.0, 0.022, 0), (-0.03, 0.025, 0), (0.026, 0.024, 0), (0.0, 0.0, 0.03))):
+    t = ball(f"ProduceTomato{k}", CX + BX[0] + dx, y0 + FLOOR + 0.022 + dy, z0 + dz, 0.022, "tomato", squash=(1, 1, 0.88))
+    stem(f"ProduceTomatoStem{k}", CX + BX[0] + dx, y0 + FLOOR + 0.04 + dy, z0 + dz, 0.008)
 for k in range(4):
-    gobo(f"ProduceGobo{k}", CX + 0.09 + 0.012 * k, 0.17, -0.06 + 0.04 * k, 0.36, rot=(0.08 * (k - 1.5), 0.55, 0.0))
+    long_veg(f"ProduceCucumber{k}", CX + BX[1] - 0.03 + k * 0.02, y0 + FLOOR + 0.018 + (k % 2) * 0.022, z0 + 0.0, 0.15, 0.016, "cucumber",
+             rot=(math.pi / 2, 0.0, 0.25 * (k - 1.5)), tip=0.7)
+for k in range(3):
+    e = long_veg(f"ProduceEggplant{k}", CX + BX[2] - 0.025 + k * 0.025, y0 + FLOOR + 0.024 + (k == 1) * 0.026, z0 + 0.0, 0.13, 0.026, "eggplant",
+                 rot=(math.pi / 2, 0.0, 0.3 * (k - 1)), tip=0.5)
+# (back tier: the green peppers, the bell peppers, the burdock)
+y1, z1 = TIER[1]
+for k, bx in enumerate(BX):
+    basket(f"ProduceBasket1{k}", CX + bx, y1, z1)
+for k, (dx, dz, dy) in enumerate(((-0.024, -0.016, 0), (0.024, -0.014, 0), (0.0, 0.024, 0), (0.0, 0.0, 0.03))):
+    ball(f"ProducePiman{k}", CX + BX[0] + dx, y1 + FLOOR + 0.026 + dy, z1 + dz, 0.027, "piman", squash=(0.92, 0.92, 1.15))
+    stem(f"ProducePimanStem{k}", CX + BX[0] + dx, y1 + FLOOR + 0.052 + dy, z1 + dz, 0.012)
+for k, (dx, dz, dy, mat) in enumerate(((-0.022, -0.012, 0, "paprika_r"), (0.024, 0.0, 0, "paprika_y"), (-0.004, 0.026, 0.026, "paprika_r"))):
+    ball(f"ProducePaprika{k}", CX + BX[1] + dx, y1 + FLOOR + 0.032 + dy, z1 + dz, 0.032, mat, squash=(1, 1, 1.05))
+    stem(f"ProducePaprikaStem{k}", CX + BX[1] + dx, y1 + FLOOR + 0.064 + dy, z1 + dz, 0.012, r=0.005)
+for k in range(4):
+    # (short enough, and stood up enough, to keep clear of the counter's face behind)
+    gobo(f"ProduceGobo{k}", CX + BX[2] - 0.02 + 0.012 * k, y1 + 0.11, z1 - 0.01 + 0.015 * k, 0.26, rot=(0.08 * (k - 1.5), 0.3, 0.0))
 sack_parts = list(parts)
 for lo in LOWS.values():
     bpy.data.objects.remove(lo, do_unlink=True)

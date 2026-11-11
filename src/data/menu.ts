@@ -173,7 +173,8 @@ export const DISHES: Dish[] = [
       { id: 'Yakitori', name: '雞肉蔥串', ja: 'ねぎま', en: 'Negima', price: 70, kcal: 170 },
       { id: 'PorkBelly', name: '豬五花串', ja: '豚バラ', en: 'Pork Belly', price: 70, kcal: 280 },
       { id: 'Squid', name: '魷魚', ja: 'イカ', en: 'Squid', price: 220, kcal: 120 },
-      { id: 'Shishito', name: '青椒', ja: 'ししとう', en: 'Shishito', price: 50, kcal: 20 },
+      // (the little Japanese pepper called 獅子唐 now: 青椒 is the bell-shaped green pepper (the owner's, 2026-11-12))
+      { id: 'Shishito', name: '獅子唐', ja: 'ししとう', en: 'Shishito', price: 50, kcal: 20 },
       { id: 'KingOyster', name: '杏鮑菇', ja: 'エリンギ', en: 'King Oyster', price: 60, kcal: 25 },
       { id: 'Asparagus', name: '蘆筍', ja: 'アスパラ', en: 'Asparagus', price: 70, kcal: 20 },
       { id: 'Okra', name: '秋葵', ja: 'オクラ', en: 'Okra', price: 60, kcal: 25 },
@@ -184,6 +185,13 @@ export const DISHES: Dish[] = [
       { id: 'Carrot', name: '烤紅蘿蔔', ja: '人参焼き', en: 'Grilled Carrot', price: 50, kcal: 35 },
       { id: 'Gobo', name: '烤牛蒡', ja: 'ごぼう焼き', en: 'Grilled Burdock', price: 60, kcal: 50 },
       { id: 'Daikon', name: '烤白蘿蔔', ja: '大根ステーキ', en: 'Daikon Steak', price: 60, kcal: 30 },
+      // (the summer vegetables kept at room temperature in wooden baskets (the owner's, 2026-11-12): cherry tomatoes, rounds of cucumber and
+      // of eggplant, green pepper and red and yellow bell pepper, each on its skewer)
+      { id: 'Tomato', name: '番茄串', ja: 'トマト串', en: 'Cherry Tomatoes', price: 60, kcal: 20 },
+      { id: 'Cucumber', name: '烤小黃瓜', ja: 'きゅうり焼き', en: 'Grilled Cucumber', price: 50, kcal: 15 },
+      { id: 'Eggplant', name: '烤茄子', ja: '焼きなす', en: 'Grilled Eggplant', price: 70, kcal: 30 },
+      { id: 'Piman', name: '青椒串', ja: 'ピーマン串', en: 'Green Pepper', price: 50, kcal: 20 },
+      { id: 'Paprika', name: '甜椒串', ja: 'パプリカ串', en: 'Bell Pepper', price: 70, kcal: 30 },
       { id: 'Scallop', name: '干貝串', ja: 'ホタテ串', en: 'Scallop', price: 160, kcal: 90 },
       { id: 'BloodCake', name: '米血', ja: '米血糕', en: 'Rice Blood Cake', price: 50, kcal: 160 },
       // toasted on the grill net, three at a time; more wait their turn
@@ -200,12 +208,14 @@ export const DISHES: Dish[] = [
         Sausage: 25, Potato: 55, SweetPotato: 55,
         Yakitori: 30, PorkBelly: 30, Squid: 25, Shishito: 15,  KingOyster: 20, Asparagus: 15, Okra: 15, Scallop: 20, BloodCake: 20,
         Onion: 25, Negi: 15, Carrot: 20, Gobo: 20, Daikon: 25,
+        Tomato: 15, Cucumber: 15, Eggplant: 25, Piman: 15, Paprika: 20,
         NetMochi: 25 },
       names: { Fish: '香魚', ExtraFish: '香魚', Saury: '秋刀魚', Mackerel: '鯖魚', Aji: '竹筴魚', Iwashi: '沙丁魚', Shishamo: '柳葉魚',
         Salmon: '鮭魚', Hokke: '花魚', Buri: '鰤魚', Gindara: '銀鱈', Nodoguro: '紅喉', GrilledCorn: '玉米', GrilledShiitake: '香菇', Onigiri: '飯糰',
         ShrimpSkewer: '蝦串', Sausage: '香腸', Potato: '馬鈴薯', SweetPotato: '地瓜',
-        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '青椒',  KingOyster: '杏鮑菇', Asparagus: '蘆筍', Okra: '秋葵', Scallop: '干貝', BloodCake: '米血',
+        Yakitori: '雞肉串', PorkBelly: '五花串', Squid: '魷魚', Shishito: '獅子唐',  KingOyster: '杏鮑菇', Asparagus: '蘆筍', Okra: '秋葵', Scallop: '干貝', BloodCake: '米血',
         Onion: '洋蔥', Negi: '大蔥', Carrot: '紅蘿蔔', Gobo: '牛蒡', Daikon: '白蘿蔔',
+        Tomato: '番茄', Cucumber: '小黃瓜', Eggplant: '茄子', Piman: '青椒', Paprika: '甜椒',
         NetMochi: '年糕' },
       loose: ['Potato', 'SweetPotato', 'NetMochi', 'Onigiri', 'Onion', 'Daikon'],
       // toasted on the grill net, which holds three at a time between them (the rest wait their turn)

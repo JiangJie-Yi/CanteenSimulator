@@ -13,9 +13,10 @@ export const FOOD_KINDS: FoodKind[] = [
   { words: ['肉', 'お肉', 'meat'], zh: '肉', ja: '肉', ids: ['Yakitori', 'PorkBelly', 'Sausage', 'BloodCake', 'BeefSlice', 'Meatball'] },
   { words: ['蔬菜', '青菜', '野菜', '素食', '健康', 'vegetable', 'veg'], zh: '蔬菜', ja: '野菜',
     ids: ['GrilledCorn', 'GrilledShiitake', 'Shishito', 'KingOyster', 'Asparagus', 'Okra', 'Potato', 'SweetPotato', 'Onion', 'Negi', 'Carrot', 'Gobo', 'Daikon',
-      'NapaCabbage', 'BokChoy', 'Corn', 'Taro'] },
+      'Tomato', 'Cucumber', 'Eggplant', 'Piman', 'Paprika', 'NapaCabbage', 'BokChoy', 'Corn', 'Taro'] },
   { words: ['主食', '澱粉', '飽', '飯', 'ご飯', 'rice'], zh: '吃得飽的', ja: 'ご飯もの', ids: ['Onigiri', 'NetMochi', 'Potato', 'SweetPotato'] },
   { words: ['甜', 'スイーツ', '甘い', 'sweet'], zh: '甜的', ja: '甘いもの', ids: ['NetMochi', 'SweetPotato', 'GrilledCorn'] },
   { words: ['串', '串焼き', 'skewer'], zh: '串燒', ja: '串焼き',
-    ids: ['Yakitori', 'PorkBelly', 'ShrimpSkewer', 'Scallop', 'Sausage', 'BloodCake', 'Shishito', 'Asparagus', 'Okra', 'KingOyster', 'Onion', 'Negi', 'Carrot', 'Gobo', 'Daikon'] },
+    ids: ['Yakitori', 'PorkBelly', 'ShrimpSkewer', 'Scallop', 'Sausage', 'BloodCake', 'Shishito', 'Asparagus', 'Okra', 'KingOyster', 'Onion', 'Negi', 'Carrot', 'Gobo', 'Daikon',
+      'Tomato', 'Cucumber', 'Eggplant', 'Piman', 'Paprika'] },
 ]

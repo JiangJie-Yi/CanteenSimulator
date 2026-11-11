@@ -201,16 +201,17 @@ export function ProduceSacks() {
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     return r
   }, [gltf])
-  // (the sacks of potatoes, sweet potatoes and onions, and the crate of carrots and burdock beside them: how many of each)
+  // (the sacks of potatoes, sweet potatoes and onions, and the baskets of the summer vegetables and the burdock beside them: how many of each
+  // (the carrots chilled now, the owner's))
   const says = () => {
     const n = (id: string) => SUPPLIES.has(id)
     return n('Potato') < 0 ? '點一下看常溫區的庫存'
-      : `馬鈴薯 ${n('Potato')}・地瓜 ${n('SweetPotato')}・洋蔥 ${n('Onion')}・紅蘿蔔 ${n('Carrot')}・牛蒡 ${n('Gobo')}｜點一下看常溫區的庫存`
+      : `馬鈴薯 ${n('Potato')}・地瓜 ${n('SweetPotato')}・洋蔥 ${n('Onion')}・牛蒡 ${n('Gobo')}・番茄 ${n('Tomato')}・小黃瓜 ${n('Cucumber')}・茄子 ${n('Eggplant')}・青椒 ${n('Piman')}・甜椒 ${n('Paprika')}｜點一下看常溫區的庫存`
   }
   return (
     // (handlers on a group round it: a primitive's own aren't attached)
-    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('根莖蔬菜', says()).onPointerOver(e) }}
-      onPointerOut={(e) => { if (getEdit().on) return; tipOver('根莖蔬菜', '').onPointerOut(e) }}
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('常溫蔬菜', says()).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver('常溫蔬菜', '').onPointerOut(e) }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack') }}>
       <primitive object={obj} />
     </group>
