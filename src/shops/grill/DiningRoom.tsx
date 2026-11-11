@@ -2761,8 +2761,9 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         </Movable>
         <Movable id={`wc2-${who}-paper`} label={`衛生紙架（${name}）`}>
           {/* the paper, on its walnut holder on the wall by the toilet (Restroom: thinning with use, a new roll at a click) */}
-          {/* (on the right-hand wall (-z), to the right hand, just forward of the seat, clear of the lid as it lifts) */}
-          <group position={[E - 0.62, 0.62, -W2]}><WcPaper who={who} /></group>
+          {/* (just forward of the seat, clear of the lid as it lifts, on the wall the camera sees in each (the owner's, 2026-11-12: the
+              women's on the same side as the men's; it was on the far wall in theirs, the room being turned the other way)) */}
+          <group position={[E - 0.62, 0.62, who === 'f' ? W2 : -W2]} rotation-y={who === 'f' ? Math.PI : 0}><WcPaper who={who} /></group>
         </Movable>
         {who === 'f' && (
           <Movable id="wc2-f-bin" label="生理用品垃圾桶（女廁）">
