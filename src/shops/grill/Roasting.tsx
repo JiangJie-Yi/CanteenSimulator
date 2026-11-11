@@ -39,6 +39,7 @@ import { fireCall, HOT_AT } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { SHAPE_S, takeRice } from '@/game/rice'
+import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
 import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
@@ -55,7 +56,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -5368,7 +5369,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (entries) {
           // a dish (or a set) off the menu, made the way it's listed
           const e = entries[Math.floor(Math.random() * entries.length)]
-          if (!e || !e.parts.every((pt) => pt.id in roast.times)) continue
+          // (the miso soup too, ladled from the pot (the owner's, 2026-11-11): it was left off, not grilled, and every set with it never ordered)
+          if (!e || !e.parts.every((pt) => pt.id in roast.times || pt.id === 'MisoSoup')) continue
           wants.current.push(...e.parts)
           // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
           const again: Piece[] = [], warm: Piece[] = []
@@ -5393,7 +5395,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           }
           continue
         }
-        const pick = itemIds.filter((x) => x in roast.times)[Math.floor(Math.random() * itemIds.filter((x) => x in roast.times).length)]
+        const orderable = itemIds.filter((x) => x in roast.times || x === 'MisoSoup')
+        const pick = orderable[Math.floor(Math.random() * orderable.length)]
         const warm = pick ? warmFor(pick, new Set()) : undefined
         const again = pick && !warm ? recyclable(pick, new Set()) : undefined
         if (pick && onOrder?.(pick, id, !!(again || warm))) {
@@ -5402,6 +5405,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           orders.push(pick)
           said.push(nameOf(pick))
         }
+      }
+      // (a bowl of miso soup alongside, as many have (the owner's, 2026-11-11: the soup ordered): charged and taken from the stock as any
+      // order is, ladled from the pot)
+      if (orders.length && !orders.includes('MisoSoup') && Math.random() < SOUP_SIDE && onOrder?.('MisoSoup', id, false)) {
+        orders.push('MisoSoup')
+        said.push(nameOf('MisoSoup'))
       }
       return { orders, said }
     }
@@ -5513,7 +5522,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const { orders, said } = placeOrders(id, takeoutSize(rider, Math.random()))
       if (orders.length) {
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat: -1, takeout: true })
-        TAKEOUT.orders.push({ id, rider, items: orders.length, packed: 0, ready: false, taken: false, handed: false, gone: false })
+        // (its soup in a cup of its own, not in the box: only what's grilled is packed there)
+        TAKEOUT.orders.push({ id, rider, items: orders.filter((x) => x !== 'MisoSoup').length, packed: 0, ready: false, taken: false, handed: false, gone: false })
         onSay?.('chef', L().takeoutOrder(said, rider))
       }
     }
@@ -5560,6 +5570,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       g.leftAt ??= now
       if (now - g.leftAt < 1.6) continue
       g.cleared = true
+      // (their soup bowl cleared with their plate)
+      if (SOUP_SEATS.delete(g.seat)) SOUP.served++
       // (their visit, scored: the food, the wait for it, what put them out (the tissues, the toilet, the dark, their stomach))
       const gr = GRIPES.get(g.id) ?? new Set<Gripe>()
       if (SICK.has(g.id)) gr.add('sick')
@@ -5598,6 +5610,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       const owed = [...g.orders]
       for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
+      // (their miso soup: ladled from the pot a while after they've ordered, once it's hot, set at their place and drunk (bar.ts's SOUP_SEATS);
+      // the pot run dry, they wait for the next (the third cook makes it); a takeaway's in a cup with the box)
+      if (space === 'open' && owed.includes('MisoSoup') && now - g.since > SOUP_SERVE_S && soupReady(SOUP.pot, SOUP.left)) {
+        const b = takeBowl(SOUP.pot, SOUP.left)
+        SOUP.pot = b.pot
+        SOUP.left = b.left
+        if (!g.takeout) { SOUP_SEATS.add(g.seat); SOUP.served++ }
+        g.firstAte ??= now
+        g.lastAte = now
+        g.eaten.push(Math.max(0, SOUP_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
+        g.ate.push('MisoSoup')
+        g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
+        report()
+        return
+      }
       const dish = pieces.current.find((p) => present(p) && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly &&
         // (with the shop open only their own, and only once it's set before them (via 'plated': still on the plating place, the server not
         // there yet): one nobody's in the kitchen's bowl, or their own on the plating place, was eaten where it lay, from the bar, and what was

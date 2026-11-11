@@ -809,7 +809,10 @@ export const SEAT_BONES = new Map<number, number>()
 export const RICE: { rice: number; kama: Kama; washing: boolean } = { rice: 0, kama: emptyKama(), washing: false }
 /** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
  * plater; Decor draws it) */
-export const SOUP: { pot: SoupPot } = { pot: emptyPot() }
+export const SOUP: { pot: SoupPot; left: number; served: number } = { pot: emptyPot(), left: 0, served: 0 }
+/** the seats with a bowl of miso soup set at them (Roasting ladles it out to those who ordered it; GuestBar3D draws it; `SOUP.served` counts
+ * each change, for the drawing to see) */
+export const SOUP_SEATS = new Set<number>()
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __soup: SOUP })
 /**
  * The fire kept by the third cook (三廚, the plater: the owner's, a robata's kitchen split three ways): the grill (Roasting) asks for charcoal

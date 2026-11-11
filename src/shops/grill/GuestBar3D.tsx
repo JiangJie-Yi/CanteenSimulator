@@ -66,7 +66,7 @@ import { DRY_S, DRYER_CAP, LOW_FULL, STACK_CAP, dryerStarts, dryerTick, dutyOf, 
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
-import { MAKE_S, emptyPot, potTick, setSoup, soupGoes } from '@/game/soup'
+import { MAKE_S, SOUP_BOWLS, emptyPot, potTick, setSoup, soupGoes } from '@/game/soup'
 import { bottleClink, plateClink, stoolSound, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -75,7 +75,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, SOUP, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, SOUP, SOUP_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2229,10 +2229,17 @@ function shoeStep(s: Shown, g: THREE.Object3D | undefined, f: number, entering: 
   if (f > 0.55 && !entering && s.shoesIn !== false) { s.shoesIn = false; SHOE_CELLS.shoes.delete(cell) }
 }
 /** what's set at a customer's place (their soy, their drink) and their shoes left in the genkan: shared shapes */
+/** the miso soup's bowl at a customer's place: how tall */
+const SOUP_BOWL_H = 0.045
+const NO_SOUPS: THREE.Vector3[] = []
 const AT_SEAT = {
   soy: new THREE.CircleGeometry(0.03, 16),
   daikon: new THREE.SphereGeometry(0.011, 8, 6),
   shoe: new THREE.SphereGeometry(1, 8, 6),
+  // (a lacquered soup bowl, its foot ring narrower, open at the top, and the miso soup in it)
+  // (open at its top, its inside drawn too: closed, its lid hid the soup)
+  bowl: new THREE.CylinderGeometry(0.048, 0.03, SOUP_BOWL_H, 16, 1, true).translate(0, SOUP_BOWL_H / 2, 0),
+  broth: new THREE.CircleGeometry(0.045, 16),
 }
 /** the colours of the shoes left at the door, by the customer's id */
 const SHOE_COLOURS = ['#2a2220', '#5a3a22', '#f2f0ea', '#1c1c22', '#7a2a22']
@@ -2242,6 +2249,8 @@ const BIT_MATS = {
   shoe: new THREE.MeshToonMaterial({ color: '#ffffff' }),
   soy: new THREE.MeshToonMaterial({ color: '#3a1c0c' }),
   daikon: new THREE.MeshToonMaterial({ color: '#f2efe4' }),
+  bowl: new THREE.MeshToonMaterial({ color: '#7a1a14', side: THREE.DoubleSide }),
+  broth: new THREE.MeshToonMaterial({ color: '#b07a3a' }),
 }
 const BIT_M = new THREE.Matrix4(), BIT_N = new THREE.Matrix4(), BIT_Q = new THREE.Quaternion(), BIT_C = new THREE.Color()
 const BIT_ID = new THREE.Quaternion()
@@ -2251,8 +2260,20 @@ const BIT_UP = new THREE.Vector3(0, 1, 0), BIT_X = new THREE.Vector3(1, 0, 0), B
  * the bar full): the pairs of shoes left on the genkan's stone, and the soy in the dish at each seated customer's place with its dab of
  * daikon. Laid out as they were, each the shape and colour it had.
  */
-const SeatBits = memo(function SeatBits({ shoes, soys }: { shoes: { at: THREE.Vector3; turn: number; colour: string }[]; soys: THREE.Vector3[] }) {
+const SeatBits = memo(function SeatBits({ shoes, soys, soups = NO_SOUPS }: { shoes: { at: THREE.Vector3; turn: number; colour: string }[]; soys: THREE.Vector3[]; soups?: THREE.Vector3[] }) {
   const shoe = useRef<THREE.InstancedMesh>(null), soy = useRef<THREE.InstancedMesh>(null), daikon = useRef<THREE.InstancedMesh>(null)
+  const bowl = useRef<THREE.InstancedMesh>(null), broth = useRef<THREE.InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const a = bowl.current, b = broth.current
+    if (!a || !b) return
+    const n = Math.min(BITS_MAX, soups.length)
+    for (let i = 0; i < n; i++) {
+      a.setMatrixAt(i, BIT_M.compose(soups[i], BIT_ID, BIT_S.set(1, 1, 1)))
+      b.setMatrixAt(i, BIT_M.compose(BIT_P.copy(soups[i]).setY(soups[i].y + SOUP_BOWL_H - 0.008), BIT_Q.setFromAxisAngle(BIT_X, -Math.PI / 2), BIT_S.set(1, 1, 1)))
+    }
+    a.count = n; b.count = n
+    a.instanceMatrix.needsUpdate = true; b.instanceMatrix.needsUpdate = true
+  }, [soups])
   useLayoutEffect(() => {
     const m = shoe.current
     if (!m) return
@@ -2291,6 +2312,8 @@ const SeatBits = memo(function SeatBits({ shoes, soys }: { shoes: { at: THREE.Ve
       <instancedMesh ref={shoe} args={[AT_SEAT.shoe, BIT_MATS.shoe, BITS_MAX]} count={0} frustumCulled={false} />
       <instancedMesh ref={soy} args={[AT_SEAT.soy, BIT_MATS.soy, BITS_MAX]} count={0} frustumCulled={false} />
       <instancedMesh ref={daikon} args={[AT_SEAT.daikon, BIT_MATS.daikon, BITS_MAX]} count={0} frustumCulled={false} />
+      <instancedMesh ref={bowl} args={[AT_SEAT.bowl, BIT_MATS.bowl, BITS_MAX]} count={0} frustumCulled={false} castShadow />
+      <instancedMesh ref={broth} args={[AT_SEAT.broth, BIT_MATS.broth, BITS_MAX]} count={0} frustumCulled={false} />
     </>
   )
 })
@@ -3013,6 +3036,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     RICE.rice = 0
     RICE.kama = emptyKama()
     SOUP.pot = emptyPot()
+    SOUP.left = 0
+    SOUP_SEATS.clear()
+    SOUP.served++
   }, [open])
   /** each shown guest's name tag, faded with them as they go out of the door */
   const labels = useRef(new Map<number, HTMLElement>())
@@ -3750,7 +3776,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (the soup's pot heating up in its well, the same)
         const s = potTick(SOUP.pot, step)
         SOUP.pot = s.pot
-        if (s.hot) onSay?.('chef', LINES[lang].soupDone)
+        if (s.hot) { SOUP.left = SOUP_BOWLS; onSay?.('chef', LINES[lang].soupDone) }
       }
       /** where they stand at the cooker; its top, where the rice goes in */
       const kamaSpot = () => { marks.current.delete('cooker-front'); return inBar('cooker-front', home()).setY(0) }
@@ -4937,6 +4963,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [shown.map((s) => (s.phase !== 'enter' && s.phase !== 'leave' ? s.seat : -1)).join(), seats, counters, top])
 
+  // (the bowls of miso soup set at their places (bar.ts's SOUP_SEATS: Roasting ladles them out): on the other side of their plate from the soy)
+  const [soupVer, setSoupVer] = useState(SOUP.served)
+  useFrame(() => { if (SOUP.served !== soupVer) setSoupVer(SOUP.served) })
+  const seatSoups = useMemo(() => [...SOUP_SEATS].filter((n) => seats[n]).map((n) => {
+    const st = seats[n], c = counters[st.counter]
+    const x = st.mid.clone().sub(c.at).dot(c.along)
+    return st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]).setY(top + 0.002)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [soupVer, seats, counters, top])
+
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (one customer made with the page, never shown: their program linked while it loads) */}
@@ -4990,7 +5026,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           sits and the way to it stay as they are, so no one is put out of a seat) */}
       <Stools seats={seats} />
       {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside (all of them one draw: SeatBits) */}
-      {given && <SeatBits shoes={NO_SHOES} soys={seatSoys} />}
+      {given && <SeatBits shoes={NO_SHOES} soys={seatSoys} soups={seatSoups} />}
       {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
           for the pair, between them, and here from the first, not with the fridges as they come in later: a light added to the scene has every
           material in it made again, a stall) */}
