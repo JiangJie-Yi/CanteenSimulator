@@ -75,7 +75,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, RICE, SOUP, SOUP_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -154,9 +154,13 @@ const STAFF_DOOR_AT = -3.55
 /** the koi print, moved (the owner's): on the toilets' wall past the drinks fridges, on the plain plaster there; once only, the same array
  * each time (the wall's memo compares it) */
 const koiHangs = new Map<string, { z: number; print: 'koi' }[]>()
-function koiHang(clear: [number, number][], from: number) {
+// (by the men's toilet now, on the wall between the drinks fridges and its doorway, over the supplies' stack (the owner's, 2026-11-11): it hung on
+// the fridges' other side)
+function koiHang(clear: [number, number][], from: number, door?: number) {
+  const g0 = door === undefined ? undefined : door - WC_W - 0.12
+  const below = g0 === undefined ? [] : clear.filter((r) => r[1] <= g0)
   const lo = clear.length ? Math.min(...clear.map((r) => r[0])) : from + 1
-  const z = Math.max(from + 0.4, lo - 0.55)
+  const z = g0 !== undefined && below.length ? (Math.max(...below.map((r) => r[1])) + g0) / 2 : Math.max(from + 0.4, lo - 0.55)
   const key = z.toFixed(3)
   let v = koiHangs.get(key)
   if (!v) { v = [{ z, print: 'koi' }]; koiHangs.set(key, v) }
@@ -5011,7 +5015,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} wall={!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lampId="sidelamp" lampName="側吧台" top={top} door={wcs?.door ?? (meet + corner) / 2}
-              clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35)} />}
+              clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35, wcs?.door ?? (meet + corner) / 2)} />}
           </group>
         )
       })}
@@ -5370,14 +5374,31 @@ const STAND_TOP = 0.42
 const STAND_SLOTS: [number, number][] = [[-0.155, 0.14], [0, 0.14], [0.155, 0.14]]
 /** the warming tub on its back half: its middle back from the table's, and how big it's drawn (the rice tub's model (blender/ricetub.py, 0.27
  * round its staves, 0.42 high) a little under half its size: some 25 across, beside the bags, on a table 62 across) */
-const WARM_TUB_Z = -0.13, WARM_TUB_SCALE = 0.44
+// (1.65 times what it was drawn (the owner's, 2026-11-11): some 39 across; forward a little to stay on the table, the bags clear of it)
+const WARM_TUB_Z = -0.11, WARM_TUB_SCALE = 0.44 * 1.65
 /** the warming tub (保溫桶; the owner's, 2026-11-11: the old rice tub, put on the takeaway table): the sawara tub bound in copper, its lid on */
+// (opened by a click as the rice tub was: its lid lifted off and leant against its side, the rice kept warm in it seen; another, shut)
 const WarmTub = memo(function WarmTub() {
   const tub = useRiceTub()
+  const [open, setOpen] = useState(false)
+  const lid = useRef<THREE.Group>(null), rice = useRef<THREE.Group>(null)
+  const lidT = useRef(0)
+  useFrame((_, dt) => {
+    lidT.current = THREE.MathUtils.clamp(lidT.current + (open ? 1 : -1) * Math.min(dt, 0.1) * 2.2, 0, 1)
+    const k = lidT.current * lidT.current * (3 - 2 * lidT.current)
+    if (lid.current) {
+      lid.current.position.set(-0.32 * k, 0.42 - 0.1585 * k + Math.sin(k * Math.PI) * 0.22, 0)
+      lid.current.rotation.z = k * 1.36
+    }
+    if (rice.current) rice.current.visible = k > 0.05
+  })
   return (
-    <group scale={WARM_TUB_SCALE} {...nameOver('保溫桶', '外型像盛白飯的木飯桶（おひつ），蓋著保溫')}>
+    <group scale={WARM_TUB_SCALE}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
+      {...nameOver('保溫桶', `外型像盛白飯的木飯桶（おひつ），保溫著白飯｜點一下${open ? '蓋上' : '打開'}`)}>
       <primitive object={tub.body} />
-      <group position={[0, 0.42, 0]}><primitive object={tub.lid} /></group>
+      <group ref={rice} visible={false}><primitive object={tub.rice} /></group>
+      <group ref={lid} position={[0, 0.42, 0]}><primitive object={tub.lid} /></group>
     </group>
   )
 })

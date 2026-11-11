@@ -3740,6 +3740,28 @@ function KamiCopy({ part }: { part: KamiPart }) {
   const obj = useMemo(() => kamidanaOf(gltf.scene)[part].clone(true), [gltf, part])
   return <primitive object={obj} />
 }
+/** a plate of oranges of its own (a copy: there are two), its plate drawn smaller and the oranges on it as they were (the owner's, 2026-11-11:
+ * the plate smaller, not the oranges): the plate's meshes are the wide ones (the dish and its cobalt line, some 18 across; the oranges and
+ * their leaf under 10) */
+const DISH_K = 0.6
+function OrangePlate() {
+  const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
+  useStudio()
+  const obj = useMemo(() => {
+    const o = kamidanaOf(gltf.scene).oranges.clone(true)
+    o.updateWorldMatrix(true, true)
+    for (const m of o.children) {
+      const mesh = m as THREE.Mesh
+      if (!mesh.isMesh) continue
+      mesh.geometry.computeBoundingBox()
+      const b = mesh.geometry.boundingBox!
+      // (its ink, a child of it, goes with it)
+      if (b.max.x - b.min.x > 0.15) mesh.scale.multiply(new THREE.Vector3(DISH_K, 1, DISH_K))
+    }
+    return o
+  }, [gltf])
+  return <primitive object={obj} />
+}
 function KamidanaModel({ part = 'shrine' }: { part?: KamiPart }) {
   const gltf = useGLTF(KAMIDANA_URL) as unknown as { scene: THREE.Group }
   useStudio()
@@ -3820,7 +3842,8 @@ const easeOut = (q: number) => 1 - (1 - q) ** 3
 /** the shrine drawn wider than it was modelled, across its front (along z): the owner's 1.1 (it was 1.25, too wide for its height) */
 const SHRINE_WIDE = 1.1
 /** and a little shallower front to back, its back still to the wall (the offerings' shelf in front of it as it was) */
-const SHRINE_DEEP = 0.8
+// (0.72 now: shallower again (the owner's, 2026-11-11))
+const SHRINE_DEEP = 0.72
 /** how far the doors swing open (radians): wide, square to the front and a little past (the owner's: the railing round the outside, nothing
  * across the front; it ran before the side bays' doors and beside the steps, and stopped them at 57° and 70°) */
 const DOOR_SWING = { middle: 1.62, side: 1.7 }
@@ -3922,6 +3945,7 @@ function Kamidana({ part = 'all' }: { part?: 'all' | 'shrine' | 'vase-1' | 'vase
 
 /** the shrine's scale on the shelf (its cups too) */
 const KAMI_SC = 1.25
+const SHRINE_BACK = 0.018
 /** the cups' glass stand drawn shorter, and the cups on it closer (the owner's, 2026-11-11: the stand shortened, the cups the closer; they
  * were 0.09 apart): their spacing in the cups' own frame, and in the altar's (KAMI_SC), which the pour goes by */
 // (0.6 now: shorter again, the owner's)
@@ -4374,7 +4398,8 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {altar && <Movable id="altar" label="供桌"><StaticBatch plain><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* hung on the wall on two cloud brackets (雲形の棚受け, blender/kamidana.py's KamiBracket, the owner's after their photo): an arm under
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
-          {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
+          {/* (half as long down the wall as they were (the owner's, 2026-11-11), from the shelf's underside) */}
+          {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]} scale-y={0.5}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
         {/* (the omiki poured, the motes rising over the shrine: not merged) */}
         {altar && <Movable id="altarfittings" label="供桌上的供品"><group name="look-altar" position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><Altar omiki={altar === true ? undefined : altar} /></group></Movable>}
       </group>
@@ -4727,7 +4752,8 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
   return (
     <group>
       {/* the household shrine (神棚) on the shelf, up against the wall, a size larger than it hung up on a wall */}
-      <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2} scale={SC}>
+      {/* (back against the wall: 1.8 cm further back than the table's back edge (the owner's, 2026-11-11: it stood 2.6 cm off the wall)) */}
+      <Movable id="shrine" label="神龕"><group position-x={ALTAR_D / 2 + SHRINE_BACK} scale={SC}>
         {/* (pointed at, the shrine is only named (it isn't clicked: no glow, the cursor as it is); its doors and the flask are what's worked) */}
         <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '神棚', hint: '供奉惠比壽；點御神酒供酒，點門開關' }) }}
           onPointerOut={() => setTip(null)}>
@@ -4804,7 +4830,7 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
           further in; there was one, before the stand)) */}
       {[-1, 1].map((sd) => (
         <Movable key={sd} id={sd < 0 ? 'oranges' : 'oranges2'} label={sd < 0 ? '橘子盤（左）' : '橘子盤（右）'}>
-          <group name={sd < 0 ? 'look-oranges' : undefined} position={[-0.03, 0, sd * 0.164]} scale={0.45} {...nameOver('椪柑', '供品，圓滿吉祥')}><KamidanaModel part="oranges" /><ContactShadow r={0.07} /></group>
+          <group name={sd < 0 ? 'look-oranges' : undefined} position={[-0.08, 0, sd * 0.164]} scale={0.76} {...nameOver('椪柑', '供品，圓滿吉祥')}><OrangePlate /><ContactShadow r={0.07 * DISH_K} /></group>
         </Movable>
       ))}
     </group>
