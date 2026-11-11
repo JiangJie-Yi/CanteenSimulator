@@ -314,8 +314,9 @@ export function fridgesOf(cs: Counter[]) {
   // its middle, clear of it; the fridge's own +x is (lay.z, -lay.x) in this frame)
   const side = new THREE.Vector3(c.lay.z, 0, -c.lay.x).multiplyScalar(0.17)
   return [0, 1].map((n) => {
-    // (a hand's width apart: their signs on top stand a little wider than the cabinets)
-    const z = z0 - n * (FRIDGE.W + 0.08)
+    // (side by side, three centimetres apart (the owner's, 2026-11-11: the gap too wide (a hand's, 8), then too tight at 1.2: their signs are in their headers,
+    // no wider than the cabinets), their sides not in one plane)
+    const z = z0 - n * (FRIDGE.W + 0.03)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
     return { n, z, at: at(farOf(c) + FRIDGE_GAP + FRIDGE.D / 2), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE_GAP + FRIDGE.D + 0.33).add(side), aisle: at(-AISLE) }
   })
