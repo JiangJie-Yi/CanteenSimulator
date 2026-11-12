@@ -402,7 +402,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
     const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number
-      sweep?: number; broom?: boolean } | undefined
+      sweep?: number; broom?: boolean; scrub?: number } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -513,6 +513,13 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
           if (sd < 0) hand.position.set(-0.06, 0.28, 0.32)
           else hand.position.set(0.3 - 0.2 * shove, 0.3, 0.3)
         }
+      }
+      if (job?.scrub !== undefined) {
+        // (washing up at the sink (the owner's, 2026-11-12: the servers had no washing motion): both hands down in front into the basin, the
+        // right scrubbing round on the plate, the left holding it, a little dip of the head's height in the arms' reach)
+        const k = job.scrub * Math.PI * 10 + (sd > 0 ? 0 : 1.6)
+        hand.position.set(sd * 0.1 + Math.sin(k) * (sd > 0 ? 0.07 : 0.02), 0.27 + (sd > 0 ? Math.abs(Math.sin(k * 0.5)) * 0.03 : 0), 0.34 + Math.cos(k) * (sd > 0 ? 0.04 : 0.01))
+        hand.rotation.x = -0.9
       }
       if (job?.wipe !== undefined && sd > 0) {
         // (wiping the bar down: the hand out in front, its palm down on the cloth on the bar's top (0.79 the cloth at a server's height, the

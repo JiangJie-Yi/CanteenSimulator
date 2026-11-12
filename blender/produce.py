@@ -802,12 +802,30 @@ for sd in (-1, 1):
 
 
 def basket_wood(n=256):
-    """a round wooden basket's bent strips: upright slats round it, a dark gap between each, each its own shade, the grain along it"""
+    """a round wooden basket woven of bent strips (the owner's, 2026-11-12: made as a wooden basket's material): upright strips round it and
+    horizontal ones woven over and under them, a dark gap between each strand, each strand its own shade with the grain along it, a darker
+    band at the rim and at the foot"""
     u, v = grid01(n)
-    k = np.floor(u * 20)
-    f = (u * 20) % 1
-    col = mix(lin("#b08452"), lin("#d2a872"), (0.5 + 0.5 * np.sin(k * 2.3)) * 0.6 + vnoise(n, 3, 90) * 0.4)
-    col *= (0.55 + 0.45 * smooth(0.0, 0.12, np.minimum(f, 1 - f)))[..., None]
+    NU, NV = 24, 9
+    ku, kv = np.floor(u * NU), np.floor(v * NV)
+    fu, fv = (u * NU) % 1, (v * NV) % 1
+    over = ((ku + kv) % 2) == 0                       # (the upright strip on top here, the horizontal one under it: and the other way)
+    tone = 0.5 + 0.5 * np.sin(ku * 2.3 + kv * 1.7)
+    grain_u = vnoise(n, 90, 3)                         # (the grain along the upright strips)
+    grain_v = vnoise(n, 3, 90)                         # (and along the horizontal ones)
+    grain = np.where(over, grain_u, grain_v)
+    col = mix(lin("#8a5a2c"), lin("#d9aa6c"), np.clip(tone * 0.55 + grain * 0.45, 0, 1))
+    # (each strand rounded: lit along its middle, darker at its edges; the one underneath darker where the other crosses it)
+    edge_u = smooth(0.0, 0.22, np.minimum(fu, 1 - fu))
+    edge_v = smooth(0.0, 0.22, np.minimum(fv, 1 - fv))
+    shade = np.where(over, 0.5 + 0.5 * edge_u, 0.5 + 0.5 * edge_v)
+    shade *= np.where(over, 1.0, 0.82)
+    gap = np.minimum(edge_u, edge_v)                   # (the dark gap where one strand ends and the next begins)
+    col = col * (0.35 + 0.65 * shade * (0.45 + 0.55 * gap))[..., None]
+    # (the rim and the foot: a darker band, the wood's own colour)
+    band = np.maximum(smooth(0.5, 0.5, v) * 0, 0)
+    rim = smooth(0.38, 0.5, np.abs(v - 0.5))           # (v 0 the foot outside, v 1 the rim inside: the middle's the rolled rim)
+    col = col * (1 - 0.35 * rim)[..., None]
     return col
 
 

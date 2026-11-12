@@ -4911,6 +4911,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (o) o.userData.wipe = wiping ? (w.t - 0.45) / WIPE_S : undefined
       // (sweeping up broken glass: how long into it; the broom in hand there and back (StaffFigure, the owner's SweepBroom))
       if (o) { o.userData.sweep = w.phase === 'sweep' ? w.t : undefined; o.userData.broom = !!w.broom }
+      // (washing up at the sink, by hand or into the washer: the scrubbing motion (StaffFigure's scrub))
+      if (o) o.userData.scrub = w.phase === 'wash' || w.phase === 'handwash' ? w.t : undefined
       // (they step in to the bar's edge between the stools for it, facing it, and back out: the cloth's under their hand (StaffFigure's
       // wipe: the right hand out on the top, along and back), on the near edge of the top where the plate was)
       let wipeAt: { p: THREE.Vector3; yaw: number; k: number } | null = null
