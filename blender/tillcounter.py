@@ -495,7 +495,7 @@ YT = TOP + SH - CAP                        # the top rail's top, under the cap
 Y0 = TOP + SHOE                            # the bottom rail's foot, on the shoe
 
 
-def path(ext=0.0, n_arc=14):
+def path(ext=0.0, n_arc=6):
     """the partition's line, from its customers'-side start round the rounded corner by the cats to the cashier's edge, as (x, z) points"""
     pts = [(XL - ext, ZF)]
     cx, cz = XE - RC, ZF + RC
@@ -506,7 +506,7 @@ def path(ext=0.0, n_arc=14):
     return pts
 
 
-def profile(hw, y0, y1, rc, seg=4):
+def profile(hw, y0, y1, rc, seg=2):
     """a rectangle across the line (half-width hw, from y0 to y1) with its corners rounded off (radius rc), as (across, up) points"""
     out = []
     for (cl, cy, a0) in ((hw - rc, y0 + rc, -90), (hw - rc, y1 - rc, 0), (-hw + rc, y1 - rc, 90), (-hw + rc, y0 + rc, 180)):
@@ -576,7 +576,7 @@ for tag, (ex, ez) in (("Start", (XL, ZF)), ("End", (XE, ZB))):
     dome = bpy.data.objects.new(f"TillPost{tag}Top", dm)
     bpy.context.collection.objects.link(dome)
     sh.append(finish(dome, f"TillPost{tag}Top", M["walnut"]))
-mid = path()[8]
+mid = path()[1 + 3]   # (the corner arc's middle: n_arc 6)
 sh.append(cyl("TillPostCorner", FT / 2 + 0.006, YT - Y0, P(mid[0], (Y0 + YT) / 2, mid[1]), M["walnut"], verts=16))
 
 
