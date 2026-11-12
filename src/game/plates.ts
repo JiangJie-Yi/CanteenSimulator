@@ -137,3 +137,8 @@ export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DR
 }
 /** each server's duty: two or more, the first on the floor and the second at the dishes (any more on the floor); one alone does both */
 export const dutyOf = (k: number, servers: number): Duty => (servers < 2 ? 'all' : k === 1 ? 'dish' : 'floor')
+
+/** the big bowl on the cook's table keeps warm the food cooked for customers who've gone, till the next to order it has it (the owner's, 2026-11-12:
+ * a mountain of fish piled in it): at most this many, and how many of the oldest the staff eat up to keep to it */
+export const BOWL_WARM_MAX = 8
+export const warmToEat = (kept: number, max = BOWL_WARM_MAX) => Math.max(0, kept - max)

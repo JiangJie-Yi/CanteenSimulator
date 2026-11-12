@@ -1,6 +1,7 @@
 import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
+import { warmToEat } from '@/game/plates'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -5251,6 +5252,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (cooked for someone who's since gone: left on the cook's table with no one to go to, or out on the plating place for a customer who's left;
     // the next customer owed one of these has it at once, and if nobody is, after a while it's cold and it's binned)
     if (space === 'open') {
+      // (the bowl keeps no more than BOWL_WARM_MAX warm: the oldest over it the staff eat up (the owner's: a mountain of fish piled in it))
+      const warmKept = live.filter((p) => p.keepWarm && !p.eaten && p.container?.startsWith('bowl'))
+      for (const p of warmKept.slice(0, warmToEat(warmKept.length))) { p.eaten = true; p.keepWarm = false; p.slot = null }
       const here = (id: number) => guests.current.some((g) => g.id === id && (g.state === 'waiting' || g.state === 'eating'))
       const stray = live.find((p) => p.collected && (p.flight >= 1 || (p.via === 'plated' && p.readyAt === undefined)) && !p.stickOnly &&
         !SERVICE.claimed.has(p.key) && !SERVICE.carried.has(p.key) && p.container !== 'takeout' && (p.container !== 'bar' || (p.via === 'plated' && !here(p.guest))) &&
