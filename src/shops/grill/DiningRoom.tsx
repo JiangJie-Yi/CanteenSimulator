@@ -4628,7 +4628,9 @@ const ALTAR_D = 0.58
 /** the offering table drawn shallower than it was modelled (ALTAR_D), its back still to the wall: the owner's, a little less deep (0.53);
  * what's on it brought back to fit, the cups, the flask, the oranges (a little smaller) and the sutra */
 // (its front cut back again (the owner's, 2026-11-11: the table too big), to just before what stands on it: 0.47)
-const TABLE_DEEP = 0.47 / ALTAR_D
+// (and again (the owner's, 2026-11-13: the empty strip along its front taken away, once what's on it had been set back toward the wall), to
+// 1.5 cm before the front of the cups' stand, the foremost thing on it: 0.39)
+const TABLE_DEEP = 0.39 / ALTAR_D
 /** where the two little lanterns stand on the shelf, in its frame: beside the shrine's base's front corners (its plinth out to 0.2475 across,
  * its front at 0.065), between it and the vases (from 0.325 across), behind the flask and the book */
 // (forward of where they stood and in a little, either side of the cups' shortened stand, and a little smaller (the owner's, 2026-11-11):
