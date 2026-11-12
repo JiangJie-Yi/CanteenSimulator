@@ -13,8 +13,8 @@ import { inkModel } from '@/scene/inkHull'
 import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { Steam } from '@/scene/Steam'
-import { canOpen, DRAIN_CAP, DRY_S, DRYER_CAP, dryerPhase, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
-import { DRAIN, DRYER, SINK, SINK_BIN, tipOver } from './bar'
+import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, HAND_EACH, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
+import { DRAIN, DRYER, HAND_WASH, SINK, SINK_BIN, tipOver } from './bar'
 import { basinSays, waterTick } from '@/game/sinkWater'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
@@ -354,8 +354,9 @@ export function SinkModel() {
   return (
     <group>
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
-      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); setTip({ title: '流理台', hint: basinSays(SINK.water, SINK.plug) }) }}
-        onPointerOut={() => { if (hov.current === 'basin') hov.current = null; if (!HOVER.paused) setTip(null) }}>
+      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }) }}
+        onPointerOut={() => { if (hov.current === 'basin') hov.current = null; if (!HOVER.paused) setTip(null) }}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const now = performance.now(); if (now < HAND_WASH.until || SINK.dirty <= 0) return; HAND_WASH.ask = 'wash'; HAND_WASH.until = now + HAND_EACH * 1000; window.setTimeout(() => setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }), 80) }}>
         <primitive object={root} />
       </group>
       <primitive object={pool} />
@@ -428,8 +429,9 @@ export function SinkPart({ node }: { node: string }) {
     </group>
   )
   return (
-    <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '瀝水籃', hint: basketSays() }) }}
-      onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
+    <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '瀝水籃', hint: drainSays(DRAIN) }) }}
+      onPointerOut={() => { if (!HOVER.paused) setTip(null) }}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; HAND_WASH.ask = 'take'; window.setTimeout(() => setTip({ title: '瀝水籃', hint: drainSays(DRAIN) }), 80) }}>
       <primitive object={obj} />
     </group>
   )
@@ -445,10 +447,5 @@ function partSays(node: string) {
     case 'SinkSpongeSet': return '菜瓜布，黃的那面軟，綠的那面刷'
     default: return ''
   }
-}
-/** what the draining basket says pointed at */
-function basketSays() {
-  if (DRAIN.n <= 0) return `0/${DRAIN_CAP} 個盤子・空的`
-  return `${DRAIN.n}/${DRAIN_CAP} 個盤子・` + (DRAIN.left !== null && DRAIN.left > 0 ? `還要 ${Math.ceil(DRAIN.left)} 秒瀝乾` : '乾了，等著搬回碗盤架')
 }
 useGLTF.preload(URL)

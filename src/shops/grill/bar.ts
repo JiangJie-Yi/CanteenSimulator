@@ -792,6 +792,9 @@ export const DRYER: Dryer & { open: number; manual: boolean; ask: number } = { n
 /** the draining basket on the sink's counter (game/plates' Drain: the plates washed by hand while the washer's busy, and how long till
  * they're dry); GuestBar3D runs it, draws its plates */
 export const DRAIN: Drain = { n: 0, left: null }
+/** the player's own washing up, asked of the sink (Sink) and done where the sink's plates are counted (GuestBar3D): one plate washed by hand into
+ * the basket, or the basket's dry plates taken back to the racks; `until`: not again before the last one's washed */
+export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number } = { ask: null, until: 0 }
 /** where the shop's plates are just now, told over for the racks' and the basket's labels (the owner's: every plate counted): on the racks, in
  * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
 export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 }

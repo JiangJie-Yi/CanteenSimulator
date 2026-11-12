@@ -146,3 +146,14 @@ export const warmToEat = (kept: number, max = BOWL_WARM_MAX) => Math.max(0, kept
 /** the tasting bowl by hand (researching, the shop shut): at most this many in it, two layers (the owner's, 2026-11-12: a mountain of fish piled
  * in it, the twenty-first on the first); the oldest eaten up to make room for the next (warmToEat counts how many) */
 export const BOWL_HAND_MAX = 10
+
+/**
+ * The player washing up by hand (the owner's, 2026-11-12: "the player can wash by hand too, make it a flow"): pointed at the sink, what it
+ * says; clicked, one dirty plate washed into the draining basket (handOne); the basket's plates, dried (DRAIN_MIN game minutes), taken
+ * back to the racks a carry at a time (unbasket). What the sink and the basket say
+ */
+export const handWashSays = (dirty: number, drain: Drain) =>
+  dirty <= 0 ? '沒有髒盤子' : drain.n >= DRAIN_CAP ? `瀝水籃滿了，先把乾的收回碗盤架（髒盤 ${dirty}）` : `點一下手洗一個，放進瀝水籃（髒盤 ${dirty}）`
+export const drainSays = (drain: Drain) =>
+  drain.n <= 0 ? `0/${DRAIN_CAP} 個盤子・空的`
+    : `${drain.n}/${DRAIN_CAP} 個盤子・` + (drain.left !== null && drain.left > 0 ? `還要 ${Math.ceil(drain.left * MINUTES_PER_SECOND)} 分鐘瀝乾（遊戲時間）` : '乾了，點一下搬回碗盤架')
