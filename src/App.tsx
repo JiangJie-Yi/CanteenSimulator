@@ -11,6 +11,7 @@ import { setEar } from '@/scene/sfx'
 import { IndoorHDRI } from '@/scene/IndoorHDRI'
 import { FpsMeter } from '@/scene/FpsMeter'
 import { Html, OrbitControls, useGLTF } from '@react-three/drei'
+import { sayOver, unsayOver } from '@/ui/speechStore'
 import { LoadingScreen } from '@/ui/LoadingScreen'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -437,7 +438,6 @@ type SceneProps = {
   onGuests: (dishId: string, g: GuestView[]) => void
   spotOn: boolean
   guestsBy: Record<string, GuestView[]>
-  speech: Record<number, { key: number; text: string; ms: number }>
   /** shops with food out on either table (tasting or open): they stay loaded, so nothing on them is lost */
   inUse: string[]
   /** on a phone the customers are drawn in 2D on the guest board, not at the bar in 3D */
@@ -588,7 +588,7 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
  * the GPU process died); never drawn finer than the screen either */
 const DPR_MAX = 1.25
 const HOLD_POSE = { next: false }
-function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, speech, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -1084,7 +1084,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
               {(ai || !!dish.roast) && i === active && !phone && (
                 // the customers, in 3D (a phone has them in 2D on the guest board, and no 3D bar at all), at the bar behind (the grill's bar is drawn by Roasting, which serves onto it);
                 // the grill's room is there before it opens too, empty
-                <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast} speech={speech}
+                <group position={dish.roast ? FIRE_SHIFT.clone().negate() : undefined}><GuestBar3D open={ai} guests={ai ? guestsBy[dish.id] ?? [] : []} lang={lang} drawCounter={!dish.roast}
                   servers={dish.roast && ai ? (() => { const hired = crewOf(dish.id).filter((w) => w.role === 'server'); return hired.length ? hired : [HOUSE_SERVER] })() : []}
                   plater={dish.roast && ai ? (() => {
                     // (who plates at the pass, fetching its plates from the racks, and keeps the fire: the third cook; with none, the second (hired,
@@ -1989,8 +1989,7 @@ export default function App() {
     window.addEventListener('wheel', onWheel, { capture: true, passive: false })
     return () => window.removeEventListener('wheel', onWheel, { capture: true })
   }, [])
-  /** what each customer's saying just now (over their head) */
-  const [speech, setSpeech] = useState<Record<number, { key: number; text: string; ms: number }>>({})
+  // (what each customer's saying just now, over their head: ui/speechStore's, not the page's state)
   const chatId = useRef(0)
   // (a guest's order in the log, each language's way round: 點了 X, Xを注文, ordered X)
   const ordered = (name: string) => (lang === 'ja' ? `${name}を注文` : lang === 'en' ? `ordered ${name}` : `點了 ${name}`)
@@ -2002,8 +2001,8 @@ export default function App() {
       const key = ++chatId.current
       // (long enough for a long line to be said a piece at a time; the bubble's told, so it fades out as its time ends)
       const ms = Math.max(4500, sayChunks(raw).length * SAY_EACH * 1000 + 1500)
-      setSpeech((sp) => ({ ...sp, [gid]: { key, text: raw, ms } }))
-      window.setTimeout(() => setSpeech((sp) => (sp[gid]?.key === key ? Object.fromEntries(Object.entries(sp).filter(([k]) => +k !== gid)) : sp)), ms)
+      sayOver(gid, { key, text: raw, ms })
+      window.setTimeout(() => unsayOver(gid, key), ms)
       return
     }
     // customers are named by how they look (上班族, 老奶奶…), not by number: their name before their words in the log
@@ -2908,7 +2907,7 @@ export default function App() {
             resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             omiki={omikiProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
-            guestsBy={guestsBy} speech={speech}
+            guestsBy={guestsBy}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests}
             phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />}
         </Canvas>}

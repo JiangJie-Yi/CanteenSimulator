@@ -1,6 +1,7 @@
-import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes } from '@/game/skewers'
 import { rattleSound } from './skewerSound'
+import { useSaid } from '@/ui/speechStore'
 import { getClock } from '@/ui/clockStore'
 import { NO_RAY } from '@/scene/pickable'
 import { sweeps, SWEEP_S } from '@/game/spills'
@@ -2538,8 +2539,26 @@ function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass, ti
   )
 }
 
+/**
+ * Whether each waiter (by their place in the line, 0 the first) is walking, for their figure's stride: kept here, each figure listening for
+ * its own, not in GuestBar3D's state (a waiter setting off or stopping redrew the whole bar, three times a second while they cleared up at
+ * closing, 30-40 ms each in the dev build: item 24)
+ */
+const WAITER_MOVING: boolean[] = []
+const movingSubs = new Set<() => void>()
+const setWaiterMoving = (i: number, on: boolean) => { if (!!WAITER_MOVING[i] === on) return; WAITER_MOVING[i] = on; movingSubs.forEach((f) => f()) }
+const subMoving = (f: () => void) => { movingSubs.add(f); return () => { movingSubs.delete(f) } }
+const useWaiterMoving = (i: number) => useSyncExternalStore(subMoving, () => !!WAITER_MOVING[i])
+/** the owner serving, walking or not, as his figure has it */
+function OwnerWalking() {
+  return <OwnerWalker moving={useWaiterMoving(0)} />
+}
+/** a server's figure, walking or not */
+function ServerWalking({ i, id, look }: { i: number; id: string; look: StaffLook }) {
+  return <StaffFigure id={id} role="server" look={look} moving={useWaiterMoving(i)} />
+}
 export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
-  speech = {}, servers = [], plater = null, stocker = null, omiki, onDrink, onSay, open = true }:
+  servers = [], plater = null, stocker = null, omiki, onDrink, onSay, open = true }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
     counters?: Counter[]
@@ -2551,8 +2570,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     top?: number
     /** draw the customers themselves (a phone shows them in 2D instead; the plates still come and go) */
     people?: boolean
-    /** what each customer's saying just now, shown over their head */
-    speech?: Record<number, { key: number; text: string; ms: number }>
     /** a customer's taken a drink from the fridge (it's paid for) */
     onDrink?: (guest: number, drink: DrinkId) => void
     /** the shop's open: shut, nobody's in the room and the plates are back where they started */
@@ -2874,7 +2891,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** how long each of the plating place's slots has been ready to go */
   const readyFor = useRef<number[]>(Array.from({ length: READY_SLOTS }, () => 0))
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
-  const [moving, setMoving] = useState<boolean[]>([])
+  // (no one walking as the bar's set up afresh (the waiters' flags kept outside it: WAITER_MOVING))
+  useEffect(() => () => { WAITER_MOVING.length = 0; movingSubs.forEach((f) => f()) }, [])
   /** the money just paid, rising over the one who paid it (the owner's: +NT$ in green) */
   const [payFloats, setPayFloats] = useState<{ key: number; id: number; text: string }[]>([])
   useEffect(() => {
@@ -4532,7 +4550,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const trayAt = () => w.pos.clone().add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE)
         .applyAxisAngle(UP_Y, w.look ?? w.yaw)).add(new THREE.Vector3(0, onDais() ? 0 : -rise, 0))
       const run = () => runs.current.find((x) => x.key === w.run)
-      const setMove = (on: boolean) => setMoving((m) => { if (!!m[wi] === on) return m; const n = [...m]; n[wi] = on; return n })
+      const setMove = (on: boolean) => setWaiterMoving(wi, on)
       const go = (path: THREE.Vector3[], phase: WaiterPhase) => { w.path = path; w.len = pathLength(path); w.phase = phase; w.t = 0; setMove(true) }
       const walk = (then: () => void) => {
         const d = Math.min(w.len, w.t * SERVER_SPEED)
@@ -5317,7 +5335,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, 'owner') }
         }} position={ownerAt()} rotation-y={OWNER_YAW} scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.2} />
-          <OwnerWalker moving={!!moving[0]} />
+          <OwnerWalking />
         </group>
       )}
       {!ownerServes && servers.slice(0, homes.length).map((w, i) => (
@@ -5328,7 +5346,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, 'other') }
         }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE} userData={{ staffId: w.id }}>
           <BlobShadow r={0.17} />
-          <StaffFigure id={w.id} role="server" look={w.look} moving={!!moving[i]} />
+          <ServerWalking i={i} id={w.id} look={w.look} />
         </group>
       ))}
       {people && shown.map((s) => {
@@ -5347,7 +5365,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             </group>
             {/* (their label just over their head, sat up on the seat or standing) */}
             <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.08}
-              say={speech[s.id]} dots={!!g && !walking && g.state === 'waiting' && g.rating === null} rating={g?.rating ?? null} angry={g?.state === 'angry'}
+              dots={!!g && !walking && g.state === 'waiting' && g.rating === null} rating={g?.rating ?? null} angry={g?.state === 'angry'}
               partner={g?.partner !== undefined} name={guestLabel(s.id, lang)} onEl={labelEl} />
           </group>
         )
@@ -5665,9 +5683,11 @@ const LABEL_Z = [20, 10]
 /** one customer's label over their head (what they're saying, or the dots while they wait; their face once they've eaten; their number): drawn
  * again only when one of those changes. Each is a page of its own (drei's Html renders its children into a root of their own), so drawn again
  * with every redraw of the bar, several times a second, every label was laid out again each time */
-const GuestLabel = memo(function GuestLabel({ id, y, say, dots, rating, angry, partner, name, onEl }: { id: number; y: number
-  say?: { key: number; text: string; ms: number }; dots: boolean; rating: number | null; angry: boolean; partner: boolean; name: string
+const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partner, name, onEl }: { id: number; y: number
+  dots: boolean; rating: number | null; angry: boolean; partner: boolean; name: string
   onEl: (id: number, el: HTMLElement | null) => void }) {
+  // (what they're saying, read here from ui/speechStore: only this label drawn again as it changes, not the bar, nor the page)
+  const say = useSaid(id)
   const at = useMemo(() => [0, y, 0] as [number, number, number], [y])
   return (
     <Html position={at} center zIndexRange={LABEL_Z} style={LABEL_STYLE}>
