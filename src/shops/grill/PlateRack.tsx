@@ -128,7 +128,7 @@ function thinPiles(shown: Spot[]) {
     if (l.length < 3) continue
     const at = (sp: Spot) => new THREE.Vector3().setFromMatrixPosition(sp.m)
     const a = at(l[0]), b = at(l[l.length - 1])
-    const y0 = a.y + 0.17 * PLATE_R, y1 = b.y + 0.02 * PLATE_R
+    const y0 = a.y + 0.17 * PLATE_R, y1 = b.y + 0.135 * PLATE_R
     if (y1 > y0 + 0.002) cols.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, y: y0, h: y1 - y0, n: Math.max(1, l.length - 2) })
   }
   return { whole, cols }
