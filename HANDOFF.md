@@ -2,6 +2,8 @@
 
 最後更新：2026-11-10 晚上。`main` 在 `0689e3f`，跟 GitHub 同步，沒有未提交的程式修改。
 
+**2026-11-12 起，店主交辦的每件事、執行順序與狀態在 `TASKS.md`，每項怎麼做、怎麼驗的在 `WORKLOG.md`：新的 session 先讀那兩個。**
+
 新的 session：先讀本檔，再讀 `CLAUDE.md`（工作守則、固定規則、檔案分層、指令、BDD、模型與效能守則）。每件擺設、每個流程的細節在 `docs/DETAILS.md`（不會自動載入，需要時搜尋那一段）。
 
 本檔的路徑簡寫：`grill/` = `src/shops/grill/`、`game/` = `src/game/`、`scene/` = `src/scene/`、`ui/` = `src/ui/`、`data/` = `src/data/`、`App.tsx` = `src/App.tsx`、`bdd/` = `tests/bdd/`、`models/` = `public/models/`。`blender/*.py` 產生的 `.blend` 不另外列。
@@ -528,6 +530,8 @@ $env:WC_ONLY = "washstand"; & "C:\Program Files\Blender Foundation\Blender 5.2\b
 | 正式版營業 15 分鐘（2026-11-08 夜，全員、×2） | 60 FPS、最差一格 17～25 ms；heap 83 → 89 MB 後持平 | `soak.mjs`，`BASE=http://localhost:4173` |
 | 營業時總覽（2026-11-09） | 1,391～1,465 次繪製、約 51～57 FPS | `perf.mjs OPEN=60000 BY=1` |
 | 著色程式（2026-11-08 下午起） | 約 53～56 個 | `tests/e2e/_progcount.mjs`（在 git 外） |
+| 閉店總覽（2026-11-13 清晨，dev、1920×1080） | 繪製 1,304（含陰影 1,590）、三角面 56.2 萬（含陰影 76.6 萬）、著色程式 58、巡航平均 57.9 FPS | `npm run bench`（`bench-1113.md`） |
+| 收店時段（2026-11-13，客滿 ×2，04:38～05:10，34 人） | 改前 46～52 FPS、p95 50 ms；改後 56.8 FPS、p95 16.9 ms（整頁、吧台、灶台少重畫） | `tests/e2e/_closeperf.mjs`（在 git 外） |
 
 ## 附錄 D　注意
 
