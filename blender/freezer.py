@@ -72,6 +72,78 @@ def cyl(name, r, depth, at, rot, mat, parts, v=16):
     return o
 
 
+def mx(c1, c2, m):
+    """c1 to c2 by m (an (h, w, 1) mask)"""
+    return c1 * (1 - m) + c2 * m
+
+
+def fish_skin(kind, W=256, H=64):
+    """a fish's skin laid out for its body: u from the tail (0) to the nose (1), v round it from its back (0), down one side to its belly (0.5),
+    up the other to its back again (1); the eye and the gill's line on each side"""
+    u = np.tile((np.arange(W) + 0.5) / W, (H, 1))
+    v = np.tile(((np.arange(H) + 0.5) / H)[:, None], (1, W))
+    dorsal = np.abs(v - 0.5) * 2            # 1 along the back, 0 along the belly
+    side = 1 - np.abs(dorsal - 0.5) * 2     # 1 along the middle of each flank
+    c = lambda h: np.array([int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)], np.float32)
+    P_ = {
+        "mackerel": ("#2c5a68", "#e6edee", "#14313c"),
+        "aji": ("#5f7f7c", "#eef0ea", "#2c403c"),
+        "ayu": ("#7d8c3c", "#efe9c4", "#3e4a1c"),
+        "tai": ("#d65c5a", "#f6e4e2", "#a82f35"),
+        "iwashi": ("#34527a", "#e8eef0", "#16243c"),
+        "saury": ("#1e3560", "#dfe7ee", "#0e1a34"),
+    }
+    back, belly, ink = (c(h) for h in P_[kind])
+    t = smooth(0.2, 0.8, dorsal)[..., None]
+    col = mx(np.broadcast_to(belly, (H, W, 3)).copy(), np.broadcast_to(back, (H, W, 3)).copy(), t)
+    if kind == "mackerel":
+        # (the wavy dark bars over the back)
+        bars = np.sin(u * 70 + np.sin(v * 25) * 1.6 + dorsal * 9) * 0.5 + 0.5
+        m = smooth(0.55, 0.9, bars) * smooth(0.45, 0.8, dorsal)
+        col = mx(col, np.broadcast_to(ink, (H, W, 3)), (m * 0.7)[..., None])
+    elif kind == "aji":
+        # (the gold lateral line, and the dark spot on the gill cover)
+        ll = smooth(0.05, 0.0, np.abs(dorsal - 0.52))
+        col = mx(col, np.broadcast_to(c("#d8b04a"), (H, W, 3)), (ll * smooth(0.1, 0.3, u) * 0.9)[..., None])
+    elif kind == "ayu":
+        yy = smooth(1.0, 0.0, np.sqrt(((u - 0.8) / 0.05) ** 2 + ((dorsal - 0.5) / 0.22) ** 2))
+        col = mx(col, np.broadcast_to(c("#f4c63a"), (H, W, 3)), yy[..., None])
+    elif kind == "tai":
+        dots = smooth(0.7, 1.0, np.sin(u * 90) * np.sin(v * 50 * math.pi)) * smooth(0.5, 0.8, dorsal)
+        col = mx(col, np.broadcast_to(c("#4a9ad8"), (H, W, 3)), (dots * 0.7)[..., None])
+    elif kind == "iwashi":
+        sp = smooth(0.8, 1.0, np.sin(u * 55) * np.sin(v * 12 * math.pi)) * smooth(0.3, 0.6, side)
+        col = mx(col, np.broadcast_to(ink, (H, W, 3)), (sp * 0.8)[..., None])
+    elif kind == "saury":
+        stripe = smooth(0.12, 0.0, np.abs(dorsal - 0.45))
+        col = mx(col, np.broadcast_to(c("#b9cde0"), (H, W, 3)), (stripe * 0.7)[..., None])
+        col = mx(col, np.broadcast_to(c("#d8a23a"), (H, W, 3)), smooth(0.95, 0.99, u)[..., None])
+    # (the eye on each flank, ringed in silver, and the gill cover's line)
+    for vv in (0.27, 0.73):
+        d = np.sqrt(((u - 0.9) / 0.03) ** 2 + ((v - vv) / 0.05) ** 2)
+        col = mx(col, np.broadcast_to(c("#e9eef0"), (H, W, 3)), smooth(1.4, 1.0, d)[..., None])
+        col = mx(col, np.broadcast_to(c("#0c0c10"), (H, W, 3)), smooth(0.75, 0.55, d)[..., None])
+    gill = smooth(0.012, 0.0, np.abs(u - 0.84)) * smooth(0.1, 0.4, side)
+    return mx(col, np.broadcast_to(ink, (H, W, 3)), (gill * 0.5)[..., None])
+
+
+def fillet_skin(kind, N=128):
+    """a fillet's top as its picture: salmon orange with its white fat in lines, yellowtail pink with a red band and its white fat"""
+    u, v = grid01(N)
+    if kind == "salmon":
+        base, fat = np.array((0.94, 0.42, 0.26), np.float32), np.array((0.99, 0.86, 0.78), np.float32)
+        lines = np.sin((u * 1.0 + v * 0.35) * 46) * 0.5 + 0.5
+        m = smooth(0.78, 0.95, lines)
+    else:
+        base, fat = np.array((0.95, 0.72, 0.68), np.float32), np.array((0.99, 0.95, 0.92), np.float32)
+        lines = np.sin((u * 0.5 + v) * 30) * 0.5 + 0.5
+        m = smooth(0.7, 0.95, lines)
+        red = smooth(0.12, 0.0, np.abs(v - 0.72))
+        base = mx(np.broadcast_to(base, (N, N, 3)).copy(), np.broadcast_to(np.array((0.78, 0.22, 0.2), np.float32), (N, N, 3)), (red * 0.8)[..., None])
+    col = np.broadcast_to(base, (N, N, 3)).copy() if base.ndim == 1 else base
+    return mx(col, np.broadcast_to(fat, (N, N, 3)), (m * 0.8)[..., None])
+
+
 W, D, H, HOUSE, PLINTH, WALL, LID = 1.5, 0.74, 0.86, 0.34, 0.1, 0.05, 0.09
 LW = W - HOUSE
 CX = -HOUSE / 2          # (the cavity's middle along x)
@@ -90,13 +162,17 @@ M = {
     "wire": pbr("FzWire", lin("#d8dee4"), rough=0.25, metal=0.8),
     "ice": pbr("FzIce", lin("#cfe8f6"), rough=0.08, coat=0.9),
     "film": pbr("FzFilm", lin("#f4f8fb"), rough=0.1, coat=1.0),
-    "salmon": pbr("FzSalmon", lin("#f08a64"), rough=0.4),
-    "buri": pbr("FzBuri", lin("#e8b0a0"), rough=0.4),
-    "mackerel": pbr("FzMackerel", lin("#4a7a86"), rough=0.3, coat=0.5),
-    "aji": pbr("FzAji", lin("#8aa0ac"), rough=0.3, coat=0.5),
-    "ayu": pbr("FzAyu", lin("#7c9474"), rough=0.3, coat=0.5),
+    # (each fish kind its own painted skin (the owner's, 2026-11-12: the freezer should be fine, the kinds of fish told apart, by a picture on a
+    # low-poly body, not by faces))
+    "salmon": pbr("FzSalmon", (1, 1, 1), tex=image("fzsalmon", fillet_skin("salmon")), rough=0.4),
+    "buri": pbr("FzBuri", (1, 1, 1), tex=image("fzburi", fillet_skin("buri")), rough=0.4),
+    "mackerel": pbr("FzMackerel", (1, 1, 1), tex=image("fzmackerel", fish_skin("mackerel")), rough=0.3, coat=0.5),
+    "aji": pbr("FzAji", (1, 1, 1), tex=image("fzaji", fish_skin("aji")), rough=0.3, coat=0.5),
+    "ayu": pbr("FzAyu", (1, 1, 1), tex=image("fzayu", fish_skin("ayu")), rough=0.3, coat=0.5),
+    "tai": pbr("FzTai", (1, 1, 1), tex=image("fztai", fish_skin("tai")), rough=0.3, coat=0.5),
+    "iwashi": pbr("FzIwashi", (1, 1, 1), tex=image("fziwashi", fish_skin("iwashi")), rough=0.3, coat=0.5),
     "belly": pbr("FzBelly", lin("#eceee6"), rough=0.3, coat=0.5),
-    "saury": pbr("FzSaury", lin("#3c5c8c"), rough=0.3, coat=0.5),
+    "saury": pbr("FzSaury", (1, 1, 1), tex=image("fzsaury", fish_skin("saury")), rough=0.3, coat=0.5),
     "styro": pbr("FzStyro", lin("#f6f6f2"), rough=0.9),
     "label": pbr("FzLabel", lin("#f2e6c8"), rough=0.7),
     "labelInk": pbr("FzLabelInk", lin("#c8302a"), rough=0.7),
@@ -180,14 +256,48 @@ for i in range(4):
         box(f"FzStockInk{i}{j}", (0.08, 0.004, 0.018), (bx + 0.03, FL0 + 0.333, bz - 0.01), M["labelInk"], 0, 1, goods)
 
 
-def fish(name, at, length, depth, mat, turn=0.0):
-    """a whole fish frozen stiff, glazed in a skin of ice: a slim oval body, its tail, laid on its side"""
+def fish(name, at, length, depth, mat, turn=0.0, tall=1.0):
+    """a whole fish frozen stiff, laid on its side: a body lofted through eight sections of eight points (about 130 faces), its skin a painted
+    picture (fish_skin: the eye, the gill, the bars or the lateral line), a fin on its back and a forked tail, flat; no glaze copy (the material's
+    own gloss is the ice's)"""
+    ts = (0.0, 0.1, 0.24, 0.42, 0.6, 0.76, 0.9, 1.0)
+    hs = (0.10, 0.30, 0.64, 0.92, 1.0, 0.86, 0.52, 0.08)
+    ws = (0.08, 0.22, 0.52, 0.82, 0.92, 0.80, 0.50, 0.10)
+    SEG = 8
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=12, radius=1)
-    for v in bm.verts:
-        x, y, z = v.co
-        taper = 1 - max(0.0, -x) * 0.7
-        v.co = Vector((x * length / 2, y * depth * 0.32 * taper, z * depth / 2 * taper))
+    uvl = bm.loops.layers.uv.new("UVMap")
+    hh, ww = depth / 2 * tall, depth * 0.32
+    rings = []
+    for t, hf, wf in zip(ts, hs, ws):
+        x = (t - 0.5) * length
+        ring = []
+        for j in range(SEG):
+            a_ = 2 * math.pi * j / SEG
+            y = math.cos(a_) * hh * hf * (1.0 if math.cos(a_) > 0 else 0.85)
+            ring.append(bm.verts.new((x, math.sin(a_) * ww * wf, y)))
+        rings.append(ring)
+    for k in range(len(ts) - 1):
+        for j in range(SEG):
+            j2 = (j + 1) % SEG
+            f = bm.faces.new((rings[k][j], rings[k][j2], rings[k + 1][j2], rings[k + 1][j]))
+            for lp, (kk, jj) in zip(f.loops, ((k, j), (k, j + 1), (k + 1, j + 1), (k + 1, j))):
+                lp[uvl].uv = (ts[kk], jj / SEG)
+    for ring, kk, rev in ((rings[0], 0, True), (rings[-1], len(ts) - 1, False)):
+        f = bm.faces.new(list(reversed(ring)) if rev else ring)
+        for lp in f.loops:
+            lp[uvl].uv = (ts[kk], 0.0)
+    # (the dorsal fin, a flat sail on its back; the forked tail, two flat blades; each drawn double-sided by the game's material)
+    def flat(pts):
+        vs = [bm.verts.new(q) for q in pts]
+        f = bm.faces.new(vs)
+        for lp in f.loops:
+            lp[uvl].uv = (0.5, 0.0)
+    xt = lambda t: (t - 0.5) * length
+    top = lambda t: hh * hs[min(range(len(ts)), key=lambda i: abs(ts[i] - t))]
+    flat([(xt(0.42), 0.0, top(0.42) * 0.95), (xt(0.52), 0.0, top(0.5) + depth * 0.22), (xt(0.66), 0.0, top(0.66) * 0.9)])
+    flat([(xt(0.0) + 0.004, 0.0, 0.0), (xt(0.0) - length * 0.14, 0.0, depth * 0.42), (xt(0.0) - length * 0.09, 0.0, 0.0)])
+    flat([(xt(0.0) + 0.004, 0.0, 0.0), (xt(0.0) - length * 0.09, 0.0, 0.0), (xt(0.0) - length * 0.14, 0.0, -depth * 0.42)])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o)
     o.data.materials.append(mat)
@@ -196,26 +306,12 @@ def fish(name, at, length, depth, mat, turn=0.0):
     o.rotation_euler = (math.pi / 2, 0, turn)
     o.location = P(at[0], at[1] + depth * 0.32, at[2])
     goods.append(o)
-    # (the tail)
-    bm = bmesh.new()
-    vs = [bm.verts.new(q) for q in ((0, 0, 0), (-length * 0.16, 0, depth * 0.38), (-length * 0.12, 0, 0), (-length * 0.16, 0, -depth * 0.38))]
-    bm.faces.new(vs)
-    me = bpy.data.meshes.new(name + "Tail"); bm.to_mesh(me); bm.free()
-    t = bpy.data.objects.new(name + "Tail", me); bpy.context.collection.objects.link(t)
-    t.data.materials.append(mat)
-    sm = t.modifiers.new("s", "SOLIDIFY"); sm.thickness = 0.004
-    t.location = (-length / 2 + 0.01, 0, 0)
-    t.parent = o
-    goods.append(t)
-    # (its glaze: the same shape a hair bigger, clear ice)
-    g = o.copy(); g.data = o.data.copy(); g.data.materials.clear(); g.data.materials.append(M["ice"])
-    g.scale = (1.04, 1.08, 1.06); bpy.context.collection.objects.link(g); g.name = name + "Glaze"
-    goods.append(g)
 
 
 # (whole fish side by side on the floor at the left: mackerel, horse mackerel, ayu)
 x0 = CX - LW / 2 + WALL + 0.19
-for k, (mat, ln, dp) in enumerate(((M["mackerel"], 0.3, 0.08), (M["mackerel"], 0.29, 0.08), (M["aji"], 0.24, 0.07), (M["aji"], 0.25, 0.07), (M["ayu"], 0.22, 0.06))):
+for k, (mat, ln, dp) in enumerate(((M["mackerel"], 0.3, 0.08), (M["tai"], 0.28, 0.12), (M["aji"], 0.24, 0.07), (M["mackerel"], 0.29, 0.08), (M["iwashi"], 0.19, 0.05),
+                                   (M["aji"], 0.25, 0.07), (M["ayu"], 0.22, 0.06), (M["iwashi"], 0.18, 0.05), (M["ayu"], 0.21, 0.06))):
     fish(f"FzFish{k}", (x0 + 0.02 * (k % 2), FL + 0.002 + (k // 3) * 0.05, -D / 2 + WALL + 0.09 + (k % 3) * 0.1), ln, dp, mat, random.uniform(-0.08, 0.08))
 # (vacuum-packed fillets, flat under their film, in the middle)
 for k, mat in enumerate((M["salmon"], M["salmon"], M["buri"], M["buri"])):
