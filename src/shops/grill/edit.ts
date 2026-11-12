@@ -213,6 +213,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-14', ['doorcat0', 'doorcat1', 'koban']],
   // (the tissues and cleaning things set at X -0.2, Z -0.095 in the room's frame as the owner said, made the default and the held one dropped (2026-11-12))
   ['jgs-edit-relaid-15', ['supplies']],
+  // (and on to X -0.38 (the owner's, 2026-11-12), made the default and the held one dropped again)
+  ['jgs-edit-relaid-16', ['supplies']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -301,8 +303,9 @@ export const BASES: Record<string, V3> = {
   // (the speaker set at X -0.285 Y 0.518 Z 0.169, in the room's frame: back in its corner (the owner's); the red lantern raised 0.25)
   // (then on 0.05 along its own width, as the owner set it (2026-11-12): [0.0039, 0, -0.0247] in this parent's units)
   speaker: [0.3083, 0.518, 0.1062],
-  // (the tissues and cleaning things at X -0.2, Z -0.095 in the room's frame (the owner's, 2026-11-12), taken into this parent's units: its frame is turned 2.512)
-  supplies: [0.1057, 0, 0.1945],
+  // (the tissues and cleaning things at X -0.38, Z -0.095 in the room's frame (the owner's, 2026-11-12: first X -0.2, then -0.38), taken into
+  // this parent's units: its frame is turned 2.512)
+  supplies: [0.2512, 0, 0.3005],
   chochin: [0, 0.25, 0],
   chochin2: [0, 0.25, 0],
   sake: [0.084, 0, 0.118],
