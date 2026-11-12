@@ -3080,7 +3080,10 @@ const TOOL_NAMES: Record<Seasoning, string> = { salt: '鹽', soy: '醬油', milk
   shichimi: '七味粉', yuzu: '柚子胡椒', lemon: '檸檬', water: '水' }
 // skewer geometry from blender/grilledfish.py: foot radius, tip radius, tip height
 const STICK_FOOT_R = 0.76
-const STICK_TOP_R = 0.42
+// (its top 0.64 out from the fire's middle, not the model's 0.42: stood up by STAND_UP as the pieces are first found)
+const STICK_TOP_R = 0.64
+/** how far each skewer's turned up from the model's lean in over the fire (radians): from a top 0.42 out to 0.64 at the top's height */
+const STAND_UP = Math.atan2(0.76 - 0.42, 1.15) - Math.atan2(0.76 - 0.64, 1.15)
 const STICK_TOP_Y = 1.15
 const LAYER_HEIGHT = 0.1
 const CHAR_COLOR = new THREE.Color(0.045, 0.035, 0.03)
@@ -4001,6 +4004,30 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (home) {
         obj.position.copy(home.p)
         obj.quaternion.copy(home.q)
+      }
+      // (a skewer stood more upright in the ash, once (the owner's, 2026-11-13: in a rush the fire "blew up": seen from above, as he
+      // looks at it, every skewer's top leant in over the coals (the model's: its foot 0.76 out, its top 0.42), so the food of all of
+      // them heaped up over the middle; now its top 0.64 out, the food round the fire, each in its own place): turned about its foot, the
+      // lowest point of its rod, about the level line square to its bearing)
+      if (!roast.loose.includes(id) && !obj.userData.stoodUp) {
+        obj.userData.stoodUp = true
+        obj.updateWorldMatrix(true, true)
+        let low: THREE.Vector3 | null = null
+        const v = new THREE.Vector3()
+        obj.traverse((m) => {
+          const mesh = m as THREE.Mesh
+          if (!mesh.isMesh || !(mesh.material as THREE.Material)?.name?.startsWith('BambooSkewer') || mesh.name.endsWith('_outline')) return
+          const pos = mesh.geometry.attributes.position
+          for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld); if (!low || v.y < low.y) low = v.clone() }
+        })
+        if (low && obj.parent) {
+          const foot = obj.parent.worldToLocal(low as THREE.Vector3)
+          const phi = Math.atan2(obj.position.z, obj.position.x)
+          const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.sin(phi), 0, -Math.cos(phi)), STAND_UP)
+          obj.position.sub(foot).applyQuaternion(turn).add(foot)
+          obj.quaternion.premultiply(turn)
+          if (home) { home.p.copy(obj.position); home.q.copy(obj.quaternion) }
+        }
       }
       const looks: Looks = { uChar: { value: 0 }, uSear: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
         uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
