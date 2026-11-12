@@ -227,11 +227,11 @@ def mesh_obj(name, bm, smooth_shade=True):
     return o
 
 
-def soy_dish(name, segs=24):
+def soy_dish(name, segs=16):
     """turned on the wheel: the profile (radius, height) from the middle of its underside out round the foot, up the outside, over the rim and
     back in across the well; its picture laid flat from above (u, v from x, z over its 9 cm)"""
-    prof = [(0.023, 0.004), (0.025, 0.0), (0.0295, 0.0), (0.031, 0.004), (0.039, 0.0105), (0.0442, 0.0165), (0.0452, 0.0188),
-            (0.0438, 0.0194), (0.0405, 0.0158), (0.031, 0.0092), (0.016, 0.0066)]
+    # (eight points, sixteen round (the owner's low-poly rule: it was eleven, twenty-four round, 600 triangles a place); the foot, the wall, the rim, the well)
+    prof = [(0.0245, 0.002), (0.0295, 0.0), (0.0315, 0.005), (0.0442, 0.0165), (0.0452, 0.0188), (0.0405, 0.0158), (0.031, 0.0092), (0.016, 0.0066)]
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     rings = []
@@ -275,11 +275,11 @@ def soy_dish(name, segs=24):
     return mesh_obj(name, bm)
 
 
-def chopstick(name, L=0.22, w0=0.0068, r1=0.0016, segs=8):
+def chopstick(name, L=0.22, w0=0.0068, r1=0.0016, segs=6):
     """one chopstick along +x from its top (x 0) to its tip (x L): square at the top, its corners easing round as it tapers to a fine tip"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    n = 7
+    n = 4
     loops = []
     for k in range(n + 1):
         t = k / n
@@ -310,7 +310,7 @@ def chopstick(name, L=0.22, w0=0.0068, r1=0.0016, segs=8):
     return mesh_obj(name, bm)
 
 
-def hashioki(name, L=0.045, r0=0.0062, rw=0.0044, segs=12, n=8):
+def hashioki(name, L=0.045, r0=0.0062, rw=0.0044, segs=10, n=6):
     """a pillow of porcelain along x, drawn in at its waist, its underside flattened to sit"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
@@ -675,7 +675,7 @@ def condiments(name, M, ps):
     bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
     mod = tr.modifiers.new("ease", "BEVEL")
     mod.width = 0.004
-    mod.segments = 2
+    mod.segments = 1
     bpy.ops.object.modifier_apply(modifier=mod.name)
     out.append(fin(tr, M["tray"], ps))
     # (the soy pot: a squat round body narrowing to a short neck, a lid with a knob; the spout off its shoulder, toward the places)
@@ -685,19 +685,19 @@ def condiments(name, M, ps):
     def up_to(y):
         return y / top
     body = lathe(f"{name}Shoyu", [(0.0, 0.012), (0.02, 0.012), (0.022, 0.0135), (0.026, 0.024), (0.0275, 0.04), (0.025, 0.056),
-                                  (0.017, 0.066), (0.0135, 0.071), (0.0135, 0.075), (0.0, 0.075)], segs=20, v_of=up_to)
+                                  (0.017, 0.066), (0.0135, 0.071), (0.0135, 0.075), (0.0, 0.075)], segs=14, v_of=up_to)
     lid = lathe(f"{name}ShoyuLid", [(0.0, 0.074), (0.0158, 0.074), (0.0158, 0.078), (0.012, 0.083), (0.005, 0.085), (0.0042, 0.09),
-                                    (0.0055, 0.094), (0.0, top)], segs=16, v_of=up_to)
-    spout = tube(f"{name}ShoyuSpout", (0, 0.05, -0.02), (0, 0.066, -0.036), 0.0058, 0.0032, segs=10)
+                                    (0.0055, 0.094), (0.0, top)], segs=12, v_of=up_to)
+    spout = tube(f"{name}ShoyuSpout", (0, 0.05, -0.02), (0, 0.066, -0.036), 0.0058, 0.0032, segs=6)
     for o in (body, lid, spout):
         o.location = P(sx, 0, 0)
         out.append(fin(o, M["shoyu"], ps))
     # (the wasabi: a little lidded jar, a wooden spoon's handle out from under its lid)
     wx = -0.036
     jar = lathe(f"{name}Wasabi", [(0.0, 0.012), (0.014, 0.012), (0.016, 0.014), (0.0195, 0.024), (0.019, 0.04), (0.0168, 0.044),
-                                  (0.0, 0.044)], segs=18)
+                                  (0.0, 0.044)], segs=12)
     jl = lathe(f"{name}WasabiLid", [(0.0, 0.0435), (0.0182, 0.0435), (0.0175, 0.047), (0.012, 0.0505), (0.0045, 0.051), (0.0045, 0.055),
-                                    (0.0, 0.056)], segs=18)
+                                    (0.0, 0.056)], segs=12)
     for o in (jar, jl):
         o.location = P(wx, 0, 0)
         out.append(fin(o, M["celadon"], ps))
