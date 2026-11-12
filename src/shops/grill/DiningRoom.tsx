@@ -6329,7 +6329,7 @@ const BOTTLE_DRINK = {
 /** the shelf's plain bottles (DrinkBottleLite): each body a few rings (its foot, its shoulder rounded by a ring more, its neck and its lip),
  * 8 round, open under its foot and under its cap (no fan of triangles to a point); a label band; a cap; the beer's gold foil round its
  * neck, the sake's paper collar (`collar`, its radius at its foot and its top, how tall, where) */
-const liteBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 8)
+const liteBody = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 7)
 const LITE_PTS: Record<'beer' | 'sake' | 'pet500' | 'pet' | 'milk' | 'ramune', [number, number][]> = {
   beer: [[0.012, 0], [0.0275, 0.003], [0.0275, 0.12], [0.0235, 0.145], [0.0145, 0.17], [0.0125, 0.2], [0.0135, 0.206], [0.004, 0.207]],
   sake: [[0.012, 0], [0.0245, 0.003], [0.0245, 0.12], [0.0225, 0.15], [0.014, 0.178], [0.0105, 0.2], [0.0115, 0.206], [0.004, 0.207]],
@@ -6339,7 +6339,7 @@ const LITE_PTS: Record<'beer' | 'sake' | 'pet500' | 'pet' | 'milk' | 'ramune', [
   ramune: [[0.012, 0], [0.025, 0.006], [0.025, 0.085], [0.0115, 0.122], [0.0152, 0.146], [0.0098, 0.16], [0.0122, 0.178], [0.004, 0.179]],
 }
 /** a collar round a shelf bottle's neck: a band open at both ends, `rb` round at its foot, `rt` at its top, `h` tall */
-const liteCollar = (rb: number, rt: number, h: number) => new THREE.CylinderGeometry(rt, rb, h, 8, 1, true)
+const liteCollar = (rb: number, rt: number, h: number) => new THREE.CylinderGeometry(rt, rb, h, 7, 1, true)
 /** a shelf bottle's cap: its side and its top turned in to a small ring (no fan of triangles into its middle (the owner's, 2026-11-12: the
  * caps showed spokes); open underneath, where it sits on the neck), `seg` round */
 const liteCap = (seg: number) => new THREE.LatheGeometry([new THREE.Vector2(0.013, -0.005), new THREE.Vector2(0.013, 0.005), new THREE.Vector2(0.0035, 0.005)], seg)
@@ -6362,22 +6362,22 @@ const farLabel = (g: THREE.CylinderGeometry) => {
   return f
 }
 const LITE_GEO = {
-  beer: { body: liteBody(LITE_PTS.beer), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 8, 1, true), labelY: 0.065, capY: 0.21, capR: 1.1,
+  beer: { body: liteBody(LITE_PTS.beer), label: new THREE.CylinderGeometry(0.0282, 0.0282, 0.07, 7, 1, true), labelY: 0.065, capY: 0.21, capR: 1.1,
     collar: { geo: liteCollar(0.0152, 0.0136, 0.028), y: 0.186 } as { geo: THREE.BufferGeometry; y: number } | null },
-  sake: { body: liteBody(LITE_PTS.sake), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 8, 1, true), labelY: 0.07, capY: 0.208, capR: 0.95,
+  sake: { body: liteBody(LITE_PTS.sake), label: new THREE.CylinderGeometry(0.0249, 0.0249, 0.085, 7, 1, true), labelY: 0.07, capY: 0.208, capR: 0.95,
     collar: { geo: liteCollar(0.0129, 0.0116, 0.012), y: 0.196 } as { geo: THREE.BufferGeometry; y: number } | null },
-  pet500: { body: liteBody(LITE_PTS.pet500), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 8, 1, true), labelY: 0.07, capY: 0.162, capR: 0.9,
+  pet500: { body: liteBody(LITE_PTS.pet500), label: new THREE.CylinderGeometry(0.0238, 0.0238, 0.075, 7, 1, true), labelY: 0.07, capY: 0.162, capR: 0.9,
     collar: null as { geo: THREE.BufferGeometry; y: number } | null },
-  pet: { body: liteBody(LITE_PTS.pet), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 8, 1, true), labelY: 0.1, capY: 0.25, capR: 1.1,
+  pet: { body: liteBody(LITE_PTS.pet), label: new THREE.CylinderGeometry(0.0326, 0.0326, 0.1, 7, 1, true), labelY: 0.1, capY: 0.25, capR: 1.1,
     collar: null as { geo: THREE.BufferGeometry; y: number } | null },
-  milk: { body: liteBody(LITE_PTS.milk), label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 8, 1, true), labelY: 0.05, capY: 0.12, capR: 1.5,
+  milk: { body: liteBody(LITE_PTS.milk), label: new THREE.CylinderGeometry(0.0228, 0.0228, 0.06, 7, 1, true), labelY: 0.05, capY: 0.12, capR: 1.5,
     collar: null as { geo: THREE.BufferGeometry; y: number } | null },
-  ramune: { body: liteBody(LITE_PTS.ramune), label: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 8, 1, true), labelY: 0.055, capY: 0.181, capR: 1.0,
+  ramune: { body: liteBody(LITE_PTS.ramune), label: new THREE.CylinderGeometry(0.0252, 0.0252, 0.05, 7, 1, true), labelY: 0.055, capY: 0.181, capR: 1.0,
     collar: null as { geo: THREE.BufferGeometry; y: number } | null },
   cap: liteCap(8),
   capFar: liteCap(6),
   marble: new THREE.IcosahedronGeometry(0.0108, 0),
-  canLabel: new THREE.CylinderGeometry(0.0212, 0.0212, 0.088, 8, 1, true),
+  canLabel: new THREE.CylinderGeometry(0.0212, 0.0212, 0.088, 7, 1, true),
 }
 const BOTTLE_GEO = {
   body: new THREE.CylinderGeometry(0.026, 0.028, 0.13, 9),
