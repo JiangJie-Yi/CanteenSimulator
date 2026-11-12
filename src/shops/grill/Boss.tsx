@@ -728,7 +728,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
 }
 
 /** the middle of the vertices a bone carries as they're drawn, in the bone's own frame (a rigidly skinned figure: each vertex one bone's) */
-function drawnCentre(root: THREE.Object3D, bone: THREE.Object3D) {
+export function drawnCentre(root: THREE.Object3D, bone: THREE.Object3D) {
   let sm: THREE.SkinnedMesh | null = null
   root.traverse((o) => { const m = o as THREE.SkinnedMesh; if (!sm && m.isSkinnedMesh && m.skeleton.bones.includes(bone as THREE.Bone)) sm = m })
   const out = new THREE.Vector3()

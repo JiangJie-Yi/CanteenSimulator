@@ -30,7 +30,7 @@ import { STAFF_IDLE, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom, ownerSweepPose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
-import { BossModel } from './Boss'
+import { BossModel, drawnCentre } from './Boss'
 import { Omamori } from './Omamori'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
@@ -131,7 +131,7 @@ function OwnerWalker({ moving }: { moving: boolean }) {
   const g = useRef<THREE.Group>(null)
   const tray = useRef<THREE.Mesh>(null)
   /** his hands (the model's own nodes) and where they rest, found once he's drawn */
-  const hands = useRef<{ node: THREE.Object3D; at: THREE.Vector3; q: THREE.Quaternion; upper: boolean }[] | null>(null)
+  const hands = useRef<{ node: THREE.Object3D; at: THREE.Vector3; q: THREE.Quaternion; upper: boolean; palm: THREE.Vector3 | null }[] | null>(null)
   useFrame(({ clock }) => {
     const o = g.current
     if (!o) return
@@ -144,17 +144,27 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     // stood still at his sides while the broom swept); back where they rest after)
     if (!hands.current) {
       const l = o.getObjectByName('BossHandL'), r = o.getObjectByName('BossHandR')
-      if (l && r) hands.current = [l, r].map((node, k) => ({ node, at: node.position.clone(), q: node.quaternion.clone(), upper: k === 0 }))
+      // (each hand's palm, where it's drawn, from its bone's origin (in the bone's parent's frame): the bone's origin isn't in the hand, so it's
+      // the palm that's put on the handle (the owner's, 2026-11-12: set by its origin, his hands stood out wide at his sides, off the broom).
+      // Worked out the first time he sweeps, his whole figure's matrices brought up to date first (on his first frame they weren't: the
+      // palm came out in the room's frame, metres off, and flung his hands away))
+      if (l && r && l.parent && r.parent) hands.current = [l, r].map((node, k) => ({ node, at: node.position.clone(), q: node.quaternion.clone(), upper: k === 1, palm: null }))
     }
     const sweep = o.parent?.userData.sweep as number | undefined
     // (stooped over the small broom while he sweeps, upright after)
     o.rotation.x += ((sweep !== undefined ? OWNER_BEND : 0) - o.rotation.x) * 0.2
     if (hands.current) for (const h of hands.current) {
       if (sweep === undefined || !h.node.parent) { h.node.position.copy(h.at); h.node.quaternion.copy(h.q); continue }
+      if (!h.palm) {
+        o.updateWorldMatrix(true, true)
+        const parent = h.node.parent
+        const palmAt = h.node.localToWorld(drawnCentre(o, h.node)), boneAt = h.node.getWorldPosition(new THREE.Vector3())
+        h.palm = parent.worldToLocal(palmAt).sub(parent.worldToLocal(boneAt))
+      }
       const p = ownerSweepPose(sweep)
       o.updateWorldMatrix(true, false)
       h.node.parent.updateWorldMatrix(true, false)
-      h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? p.upper : p.lower))))
+      h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? p.upper : p.lower)))).sub(h.palm!)
     }
   })
   return (

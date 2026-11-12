@@ -65,30 +65,76 @@ export function sweepPose(t: number, lean = SWEEP_LEAN.server) {
   return SWEEP
 }
 /**
- * The owner sweeps stooped over with a small hand broom (the owner's, 2026-11-12: he needs to bend over, with a little broom): his whole figure
- * tipped forward `OWNER_BEND` about his feet (GuestBar3D's OwnerWalker), the broom half the length, its foot on the floor out before him and its
- * top held low, both his hands on it. Worked out where it is in the room's upright frame (floor at y 0, forward z) and carried back into his
- * tipped one, so the foot is on the floor whatever the bend
+ * The owner sweeps stooped over a hand broom and a dustpan (the owner's, 2026-11-12: bent over, with a little broom; then "change the broom, and
+ * his hands don't move": the long broom made smaller was a thin stick, and his hands, set by their bones' origins, stood out wide or inside
+ * his belly). His whole figure tipped forward `OWNER_BEND` about his feet (GuestBar3D's OwnerWalker); a short hand broom (a straw fan bound
+ * on a bamboo handle, 手箒) in his right hand, swept across toward the dustpan held flat on the floor in his left. Worked out in the room's
+ * upright frame (the floor at y 0, forward +z; his right hand at +x) and carried back into his tipped one, so what's on the floor stays on it
  */
 export const OWNER_BEND = 0.5
-export const OWNER_SMALL = 0.5
-const OWNER_SWEEP = { foot: new THREE.Vector3(), dir: new THREE.Vector3(), upper: new THREE.Vector3(), lower: new THREE.Vector3() }
+/** the hand broom's whole length (the straw and the handle), in the figure's frame */
+export const HAND_BROOM_LEN = 0.2
+const OWNER_SWEEP = { foot: new THREE.Vector3(), dir: new THREE.Vector3(), upper: new THREE.Vector3(), lower: new THREE.Vector3(), pan: new THREE.Vector3() }
 const OWNER_TOP = new THREE.Vector3()
 const unbend = (v: THREE.Vector3) => {
   const c = Math.cos(OWNER_BEND), n = Math.sin(OWNER_BEND)
   return v.set(v.x, v.y * c + v.z * n, -v.y * n + v.z * c)
 }
+/** `upper`: the right hand, on the broom's handle; `lower`: the left, on the dustpan's grip; `pan`: the dustpan's middle on the floor */
 export function ownerSweepPose(t: number) {
-  const s = Math.sin(t * Math.PI * 1.8)
+  const s = Math.sin(t * Math.PI * 2.2)
   const f = OWNER_SWEEP
-  f.foot.set(-0.04 + s * 0.11, 0.03, 0.5)
-  OWNER_TOP.set(-0.06 + s * 0.03, 0.4, 0.38)
+  // (the straw's tip on the floor out in front, swept from his right across toward the pan at his left, the handle up and back to his hand)
+  f.foot.set(0.1 - (s * 0.5 + 0.5) * 0.14, 0.012, 0.66)
+  OWNER_TOP.set(0.16 - (s * 0.5 + 0.5) * 0.06, 0.2, 0.58)
   f.dir.copy(OWNER_TOP).sub(f.foot).normalize()
-  const L = BROOM_LEN * OWNER_SMALL
-  f.upper.copy(f.foot).addScaledVector(f.dir, L * 0.92)
-  f.lower.copy(f.foot).addScaledVector(f.dir, L * 0.62)
-  unbend(f.foot); unbend(f.upper); unbend(f.lower); unbend(f.dir)
+  f.upper.copy(f.foot).addScaledVector(f.dir, HAND_BROOM_LEN * 0.9)
+  f.pan.set(-0.12, 0.006, 0.68)
+  f.lower.set(-0.15, 0.06, 0.6)
+  unbend(f.foot); unbend(f.upper); unbend(f.lower); unbend(f.dir); unbend(f.pan)
   return f
+}
+/** the hand broom and the dustpan, made once in plain colours (a few dozen faces each; Low-Poly rule): the broom's straw tip at its origin, up +y */
+const HAND_BROOM_MATS = {
+  straw: new THREE.MeshToonMaterial({ color: '#c9a35c' }),
+  cane: new THREE.MeshToonMaterial({ color: '#7a5230' }),
+  cord: new THREE.MeshToonMaterial({ color: '#b3261e' }),
+  tin: new THREE.MeshToonMaterial({ color: '#2f5f7a' }),
+}
+function makeHandBroom() {
+  const g = new THREE.Group()
+  // (the straw: a flat fan, wide at its tip, narrowing up to where it's bound)
+  const W0 = 0.075, W1 = 0.016, T0 = 0.012, T1 = 0.01, H = 0.1
+  const fan = new THREE.BufferGeometry()
+  const v = [-W0, 0, -T0, W0, 0, -T0, W0, 0, T0, -W0, 0, T0, -W1, H, -T1, W1, H, -T1, W1, H, T1, -W1, H, T1]
+  fan.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+  fan.setIndex([0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7, 4, 5, 6, 4, 6, 7, 0, 3, 2, 0, 2, 1])
+  fan.computeVertexNormals()
+  const straw = new THREE.Mesh(fan, HAND_BROOM_MATS.straw)
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.014, 8), HAND_BROOM_MATS.cord)
+  cord.scale.z = 0.7
+  cord.position.y = H - 0.004
+  const cane = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.009, HAND_BROOM_LEN - H, 6), HAND_BROOM_MATS.cane)
+  cane.position.y = H + (HAND_BROOM_LEN - H) / 2
+  for (const m of [straw, cord, cane]) { m.castShadow = true; m.raycast = () => {}; g.add(m) }
+  g.visible = false
+  return g
+}
+function makeDustpan() {
+  const g = new THREE.Group()
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.006, 0.1), HAND_BROOM_MATS.tin)
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.045, 0.006), HAND_BROOM_MATS.tin)
+  back.position.set(0, 0.022, -0.05)
+  const sideL = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.03, 0.1), HAND_BROOM_MATS.tin)
+  sideL.position.set(-0.062, 0.015, 0)
+  const sideR = sideL.clone()
+  sideR.position.x = 0.062
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.07, 6), HAND_BROOM_MATS.cane)
+  grip.position.set(0, 0.05, -0.08)
+  grip.rotation.x = -0.6
+  for (const m of [floor, back, sideL, sideR, grip]) { m.castShadow = true; m.raycast = () => {}; g.add(m) }
+  g.visible = false
+  return g
 }
 const UP_Y = new THREE.Vector3(0, 1, 0)
 /** the broom, made over for the room (its toon light; its straw, bamboo and cord as they're made), a copy for each who might hold it, hidden */
@@ -116,14 +162,20 @@ const BROOM_MATS = new Map<THREE.Material, THREE.Material>()
  */
 export function SweepBroom({ lean = SWEEP_LEAN.server, owner = false }: { lean?: number; owner?: boolean }) {
   const gltf = useGLTF(BROOM_URL) as unknown as { scene: THREE.Group }
-  const broom = useMemo(() => { const b = makeBroom(gltf.scene); if (owner) b.scale.setScalar(OWNER_SMALL); return b }, [gltf, owner])
+  const broom = useMemo(() => (owner ? makeHandBroom() : makeBroom(gltf.scene)), [gltf, owner])
+  // (the owner's dustpan, held flat on the floor in his left hand while he sweeps)
+  const pan = useMemo(() => (owner ? makeDustpan() : null), [owner])
   const g = useRef<THREE.Group>(null)
   useFrame(() => {
     let job: { sweep?: number; broom?: boolean } | undefined
     for (let q = g.current?.parent ?? null, k = 0; q && k < 4; q = q.parent, k++) if ('broom' in q.userData) { job = q.userData; break }
     poseBroom(broom, job?.sweep, !!job?.broom, null, lean, owner)
+    if (pan) {
+      pan.visible = job?.sweep !== undefined
+      if (pan.visible) { pan.position.copy(ownerSweepPose(job!.sweep!).pan); pan.rotation.set(-OWNER_BEND, 0, 0) }
+    }
   })
-  return <group ref={g}><primitive object={broom} /></group>
+  return <group ref={g}><primitive object={broom} />{pan && <primitive object={pan} />}</group>
 }
 /** the broom posed: swept (`sweep` seconds in), carried (by `hand`, or at the side), or put away */
 function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: boolean, hand: THREE.Object3D | null, lean = SWEEP_LEAN.server, owner = false) {
@@ -133,7 +185,9 @@ function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: bo
     broom.position.copy(p.foot)
     broom.quaternion.setFromUnitVectors(UP_Y, p.dir)
   } else if (carried) {
-    if (hand) broom.position.set(hand.position.x, hand.position.y - 0.25, hand.position.z + 0.015)
+    // (the hand broom carried hanging from the right hand at the side, its handle in it)
+    if (owner) broom.position.set(hand ? hand.position.x : 0.31, (hand ? hand.position.y : 0.26) - HAND_BROOM_LEN * 0.9, (hand ? hand.position.z : 0.05) + 0.01)
+    else if (hand) broom.position.set(hand.position.x, hand.position.y - 0.25, hand.position.z + 0.015)
     else broom.position.set(-0.3, 0.03, 0.12)
     broom.quaternion.identity()
   }
@@ -381,9 +435,12 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   }, [])
   useEffect(() => { fig.root.add(handheld); return () => { fig.root.remove(handheld) } }, [fig, handheld])
   // (and a broom, put away till they sweep up broken glass (in the scene from the first, hidden, as the game is))
-  const broomSrc = useGLTF(BROOM_URL) as unknown as { scene: THREE.Group }
-  const broom = useMemo(() => makeBroom(broomSrc.scene), [broomSrc])
-  useEffect(() => { fig.root.add(broom); return () => { fig.root.remove(broom) } }, [fig, broom])
+  // (a hand broom and a dustpan (the owner's, 2026-11-12: whoever sweeps stoops over a little broom; the long one put their hands, on its
+  // handle near the body, inside the round belly, and they looked to hang still at their sides))
+  const bend = useRef(0)
+  const broom = useMemo(() => makeHandBroom(), [])
+  const pan = useMemo(() => makeDustpan(), [])
+  useEffect(() => { fig.root.add(broom, pan); return () => { fig.root.remove(broom, pan) } }, [fig, broom, pan])
   useFrame((_, delta) => {
     const dt = Math.min(0.1, delta)
     const t = (clock.current += dt)
@@ -440,7 +497,6 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07
     // (a bow of the head and shoulders at the door)
     fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0) + (!id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' ? 0.1 : 0)
-      + (job?.sweep !== undefined ? 0.1 : 0)
     // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
     // wait (RUSH); talking while a word of theirs is up (STAFF_TALK); a blink every few seconds; the viewer's face over all of it
     const now = performance.now()
@@ -465,7 +521,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     fw.said = word?.key ?? fw.said
     fw.carry = !!job?.carry
     setFace(fig.root, face)
-    const [jw, jh] = jelly(t - fw.at)
+    // (no squash and stretch while they sweep, stooped: it pushed the broom's straw and the dustpan into the floor and lifted them off it)
+    const [jw, jh] = job?.sweep !== undefined ? [1, 1] : jelly(t - fw.at)
     fig.body.scale.set(jw, (1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008) * jh, jw)
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
     handheld.visible = slack
@@ -474,8 +531,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       if (!hand) continue
       // (sweeping up broken glass: both hands on the broom's handle, the right above the left, going with it from side to side)
       if (job?.sweep !== undefined) {
-        const p = sweepPose(job.sweep)
-        hand.position.copy(sd < 0 ? p.upper : p.lower)
+        // (stooped (the body tipped below): the right hand on the hand broom's handle, the left on the dustpan's grip, both out in front)
+        const p = ownerSweepPose(job.sweep)
+        hand.position.copy(sd > 0 ? p.upper : p.lower)
         hand.rotation.set(-0.5, 0, 0)
         continue
       }
@@ -540,7 +598,12 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // (the stock keeper's clipboard, held up while they stand)
     fig.clip?.scale.setScalar(role === 'stock' && !moving && !slack ? 1 : 0)
     // (a server's broom: swept, or carried at their side in their right hand, there and back; their tray put by meanwhile)
-    poseBroom(broom, job?.sweep, !!job?.broom, fig.handL)
+    // (stooped over it while they sweep, upright after: the whole figure tipped about its feet, the broom and pan in its frame with it)
+    bend.current += ((job?.sweep !== undefined ? OWNER_BEND : 0) - bend.current) * Math.min(1, dt * 8)
+    fig.body.rotation.x += bend.current
+    poseBroom(broom, job?.sweep, !!job?.broom, fig.handR, undefined, true)
+    pan.visible = job?.sweep !== undefined
+    if (pan.visible) { pan.position.copy(ownerSweepPose(job!.sweep!).pan); pan.rotation.set(-OWNER_BEND, 0, 0) }
     fig.tray?.scale.setScalar(role === 'server' && !job?.broom ? 1 : 0)
   })
   return (
