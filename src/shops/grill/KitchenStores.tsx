@@ -201,14 +201,18 @@ const SACK_PARTS = /^Produce(Sack|Potato|Sweet|Onion|Loose)/
 export function ProduceSacks() {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
-    const r = partOf(gltf.scene, 'ProduceSacks', 0.004)
-    r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     // (the owner's, 2026-11-12: the sacks over to the right, toward the baskets, and the little baskets out in front: each part of the model
-    // moved as it stands, the sacks (and what's in them) along the row, the baskets' stand and the summer vegetables in them out toward the room)
-    for (const c of r.children) {
+    // moved as it stands in a copy of it BEFORE partOf draws its ink line (one welded line round all of them: moved after, it stayed where the parts
+    // were, black scraps all about the sacks), the sacks (and what's in them) along the row, the baskets' stand and its vegetables out toward the room)
+    const moved = gltf.scene.getObjectByName('ProduceSacks')?.clone(true)
+    if (moved) for (const c of moved.children) {
       if (BASKET_PARTS.test(c.name)) c.position.z += BASKETS_FORWARD
       else if (SACK_PARTS.test(c.name)) c.position.x += SACKS_RIGHT
     }
+    const holder = new THREE.Group()
+    if (moved) holder.add(moved)
+    const r = partOf(holder, 'ProduceSacks', 0.004)
+    r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     return r
   }, [gltf])
   // (the sacks of potatoes, sweet potatoes and onions, and the baskets of the summer vegetables and the burdock beside them: how many of each
