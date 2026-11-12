@@ -9,10 +9,11 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
+import { ROOM_TURN } from '@/game/editGroups'
 import { holdVeil } from '@/scene/Later'
 import { warmLater } from '@/scene/Prewarm'
 import { solidHit, pieceOf } from '@/scene/pickable'
-import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
+import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -27,6 +28,9 @@ export function focusCamera(camera: THREE.Camera, controls: Controls, p: THREE.V
 }
 
 const DEG = Math.PI / 180
+/** the room's axes (X along the bar) from the world's, about the vertical: the developer mode's world axes are the room's (the owner's,
+ * 2026-11-12: the pieces and the world's axes lined up; the world's own stood 36° across every wall and piece) */
+const ROOM = ROOM_TURN * DEG
 /** how long the handles are on the screen, in pixels */
 const GIZMO_PX = 130
 
@@ -156,9 +160,13 @@ const GT = { world: new THREE.Matrix4(), local: new THREE.Matrix4(), m: new THRE
 /** a group's move, turn and size about its pivot, as a matrix (into `out`: not GT.m, which it works in) */
 function groupMatrix(gt: Group, out: THREE.Matrix4) {
   const r = gt.r ?? [0, gt.yaw, 0]
-  return out.makeTranslation(gt.pivot[0] + gt.t[0], gt.pivot[1] + gt.t[1], gt.pivot[2] + gt.t[2])
-    .multiply(GT.m.makeRotationFromEuler(GT.e.set(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
-    .multiply(GT.m.makeScale(gt.s, gt.s, gt.s))
+  // (a tilt about the room's X and Z, as editGroups' applyGroup has it: turned into the room's frame and back about it)
+  const tilt = r[0] !== 0 || r[2] !== 0
+  out.makeTranslation(gt.pivot[0] + gt.t[0], gt.pivot[1] + gt.t[1], gt.pivot[2] + gt.t[2])
+  if (tilt) out.multiply(GT.m.makeRotationY(ROOM))
+  out.multiply(GT.m.makeRotationFromEuler(GT.e.set(r[0] * DEG, r[1] * DEG, r[2] * DEG)))
+  if (tilt) out.multiply(GT.m.makeRotationY(-ROOM))
+  return out.multiply(GT.m.makeScale(gt.s, gt.s, gt.s))
     .multiply(GT.m.makeTranslation(-gt.pivot[0], -gt.pivot[1], -gt.pivot[2]))
 }
 /** the groups a piece is in, laid over one another (the one holding it first, then the one that's in…), as one matrix in the world */
@@ -182,7 +190,7 @@ export function GroupGizmo() {
     <group name="group-gizmo" position={p} quaternion={q} scale={s}>
       <group>
         {/* (on the room's axes; or, in object space, the group's own: its first piece's turned by the group's) */}
-        <AxisGizmo id={selected} at={[g.pivot[0] + g.t[0], g.pivot[1] + g.t[1], g.pivot[2] + g.t[2]]} theta={space === 'local' ? groupFrame(selected) : 0} />
+        <AxisGizmo id={selected} at={[g.pivot[0] + g.t[0], g.pivot[1] + g.t[1], g.pivot[2] + g.t[2]]} theta={space === 'local' ? groupFrame(selected) : ROOM} />
       </group>
     </group>
   )
@@ -641,7 +649,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
    * Its size and middle. In the piece's own (inner) frame, the turn and scale of the wrapper outside it not entering into it (that's the pivot they act
    * about); or, in the frame of the whole piece as it now stands, turned and scaled (that's what the box and the camera and a group see).
    */
-  const measure = (frame: 'inner' | 'whole' = 'inner') => {
+  const measure = (frame: 'inner' | 'whole' = 'inner', at?: number) => {
     const grp = g.current, inn = inner.current
     if (!grp || !inn) return null
     grp.updateWorldMatrix(true, true)
@@ -681,12 +689,13 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       return { a, x0, x1, z0, z1 }
     }
     const innYaw = new THREE.Euler().setFromQuaternion(ref.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
-    const best = fit(Math.atan2(ALONG.x, ALONG.z) - innYaw)
+    // (squared to the room; or to the turn `at`, in its frame: the box it's drawn with, squared to its own axes (useEditBox's))
+    const best = fit(at ?? Math.atan2(ALONG.x, ALONG.z) - innYaw)
     // (the room's direction against the parent's own frame: what the move arrows and the position fields are turned by)
     const frameNode = gw.current ?? grp.parent
     const parentYaw = frameNode ? new THREE.Euler().setFromQuaternion(frameNode.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y : 0
-    // (the world's axes against the parent's own frame)
-    const theta = -parentYaw
+    // (the room's axes against the parent's own frame: the developer mode's world axes)
+    const theta = -parentYaw + ROOM
     const cx = (best.x0 + best.x1) / 2, cz = (best.z0 + best.z1) / 2
     const co = Math.cos(best.a), si = Math.sin(best.a)
     // (the middle back out of the turned frame)
@@ -718,21 +727,30 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
    * or a pivot moved by hand), so it stands just where it did
    */
   const poseFrom = (m: { c: V3; s: V3; y0: number; empty: boolean }) => {
-    const foot = footOf(m)
+    // (its middle across: the box it's drawn with's (squared to its own axes, as the yellow box is), not one squared to the room: a piece
+    // turned against the room (the willow, the speaker, a cat) had its handles off its box (the owner's, 2026-11-12))
+    const own = m.empty ? null : measure('inner', facing())
+    const c: V3 = own ? [own.c[0], m.c[1], own.c[2]] : m.c
+    const foot = footOf({ ...m, c })
     setMid((was) => (was[0] === foot[0] && was[1] === foot[1] && was[2] === foot[2] ? was : foot))
-    if (!footed || m.empty) return
-    const d = new THREE.Vector3(0, foot[1] - m.c[1], 0)
+    if (m.empty) return
     const now = turnAndSize(), made = turnAndSize(true)
     if (!now || !made) return
+    // (from the room-squared box's middle, which it was laid out about: down to its foot (a standing piece's) and across to its own box's)
+    const dy = new THREE.Vector3(0, footed ? foot[1] - m.c[1] : 0, 0), dxz = new THREE.Vector3(c[0] - m.c[0], 0, c[2] - m.c[2])
+    const d = dy.clone().add(dxz)
     const madeD = d.clone().applyMatrix4(made).sub(d)
     setMadeShift((was) => (Math.abs(was[0] - madeD.x) + Math.abs(was[1] - madeD.y) + Math.abs(was[2] - madeD.z) < 1e-7 ? was : [madeD.x, madeD.y, madeD.z]))
-    if (footSettled(id)) return
-    const nowD = d.clone().applyMatrix4(now).sub(d)
     const moved = pivotOf(id).some((v) => Math.abs(v) > 1e-9)
-    // (with a pivot moved by hand, that pivot stays where it is (counted from the foot now): nothing to make up for but madeShift's; else
-    // all of the difference, less madeShift's)
-    const shift: V3 = moved ? [-madeD.x, -madeD.y, -madeD.z] : [nowD.x - madeD.x, nowD.y - madeD.y, nowD.z - madeD.z]
-    settleFoot(id, [0, d.y, 0], shift)
+    // (what's been saved for it, turned or sized by hand about where its pivot was, made up for once each way: with a pivot moved by hand,
+    // that pivot stays where it is (counted from the new one): nothing to make up for but madeShift's; else all of the difference, less madeShift's)
+    const settle = (v: THREE.Vector3, done: (id: string, d: V3, shift: V3) => void) => {
+      const nowD = v.clone().applyMatrix4(now).sub(v), madeV = v.clone().applyMatrix4(made).sub(v)
+      const shift: V3 = moved ? [-madeV.x, -madeV.y, -madeV.z] : [nowD.x - madeV.x, nowD.y - madeV.y, nowD.z - madeV.z]
+      done(id, [v.x, v.y, v.z], shift)
+    }
+    if (footed && !footSettled(id)) settle(dy, settleFoot)
+    if (!footXzSettled(id)) settle(dxz, settleFootXz)
   }
 
   /** the turn about the vertical its contents carry: down the chain of single groups inside it to where it branches or a mesh is */
@@ -829,11 +847,22 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const par = gw.current
     if (!par) return
     par.updateWorldMatrix(true, false)
-    const t = -new THREE.Euler().setFromQuaternion(par.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y
+    const t = -new THREE.Euler().setFromQuaternion(par.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y + ROOM
     setFrame(id, t, ownYaw)
     setTheta(t)
   }
   useLayoutEffect(frame, [])
+  // (its turn as kept, if it tilts (about X or Z), taken into the room's axes once: they're the frame it's turned in now (thetaW), the world's
+  // before; a view's camera looking down would have tipped another way)
+  useLayoutEffect(() => settleRoomTurn(id, (r) => {
+    const e = [r[0] + baseTurn[0], r[1] + baseTurn[1], r[2] + baseTurn[2]]
+    if (Math.abs(e[0]) < 1e-6 && Math.abs(e[2]) < 1e-6) return null
+    const up = new THREE.Vector3(0, 1, 0)
+    const q = new THREE.Quaternion().setFromAxisAngle(up, -ROOM).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(e[0] * DEG, e[1] * DEG, e[2] * DEG)))
+      .multiply(new THREE.Quaternion().setFromAxisAngle(up, ROOM))
+    const n = new THREE.Euler().setFromQuaternion(q, 'XYZ')
+    return [n.x / DEG - baseTurn[0], n.y / DEG - baseTurn[1], n.z / DEG - baseTurn[2]].map((v) => Math.round(v * 1000) / 1000) as V3
+  }), [])
 
   // (on the list of what can be moved, with a way to bring the camera to the middle of it)
   const parentPiece = useContext(ParentPiece)
@@ -847,6 +876,21 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // (the middle of its foot in the world: where a group of it has its pivot)
     const m = measure('whole')
     return m && !m.empty && g.current ? (g.current.localToWorld(new THREE.Vector3(m.c[0], m.y0, m.c[2])).toArray() as V3) : null
+  }, () => {
+    // (its box's eight corners in the world, squared as it's drawn: what a group of it finds its middle by)
+    // (none at all for one with nothing drawn (a pair of chopsticks put away): it's left out of its group's middle, not waited for)
+    const m = measure('whole')
+    const grp = g.current
+    if (!m || !grp) return null
+    if (m.empty) return []
+    const co = Math.cos(m.yaw), si = Math.sin(m.yaw)
+    const cx = m.c[0] * co - m.c[2] * si, cz = m.c[0] * si + m.c[2] * co
+    const out: V3[] = []
+    for (const u of [-1, 1]) for (const w of [-1, 1]) for (const y of [m.y0, m.y0 + m.s[1] - 0.02]) {
+      const x = cx + u * (m.s[0] - 0.02) / 2, z = cz + w * (m.s[2] - 0.02) / 2
+      out.push(grp.localToWorld(new THREE.Vector3(x * co + z * si, y, -x * si + z * co)).toArray() as V3)
+    }
+    return out
   }), [id, label, camera, controls, parentPiece])
 
   // (the groups this piece is in, if any has been moved, turned or sized: their moves, turns and sizes laid over the piece as one, each about its

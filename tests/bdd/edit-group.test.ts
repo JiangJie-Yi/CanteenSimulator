@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { dissolveGroup, getEdit, groupable, groupOf, makeGroup, moveTo, offsetOf, pickToggle, registerMovable, resetAll, scaleOf, scaleTo, select, toRoom, type V3 } from '@/shops/grill/edit'
+import { dissolveGroup, fromRoom, getEdit, groupable, groupOf, makeGroup, moveTo, offsetOf, pickToggle, registerMovable, resetAll, scaleOf, scaleTo, select, toRoom, type V3 } from '@/shops/grill/edit'
 
 const centers: Record<string, V3> = { a: [0, 0, 0], b: [2, 0, 0], c: [0, 0, 4], noCenter: [9, 9, 9] }
 const setup = () => {
@@ -57,8 +57,9 @@ feature('編輯模式的群組', () => {
 
   scenario('移動群組是整組一起動，成員自己的位置不變', ({ given, when, then, and }) => {
     given('a、b 已成一組', (w) => { w.off = setup(); select(null); pickToggle('a'); pickToggle('b'); makeGroup(); w.gid = getEdit().selected })
-    when('把群組往 X 方向移 0.5', (w) => { moveTo(w.gid, [0.5, 0, 0]) })
-    then('群組的位移是 0.5', (w) => { expect(offsetOf(w.gid)).toEqual([0.5, 0, 0]); expect(toRoom(w.gid, offsetOf(w.gid))).toEqual([0.5, 0, 0]) })
+    // (the panel's X is the room's (along the bar), as the developer mode's world axes are: 2026-11-12)
+    when('把群組沿店裡的 X 方向（沿吧台）移 0.5', (w) => { moveTo(w.gid, fromRoom(w.gid, [0.5, 0, 0])) })
+    then('面板上群組的位移是 X 0.5', (w) => { toRoom(w.gid, offsetOf(w.gid)).forEach((v, k) => expect(v).toBeCloseTo([0.5, 0, 0][k], 9)) })
     and('成員 a、b 自己的偏移還是 0', () => { expect(offsetOf('a')).toEqual([0, 0, 0]); expect(offsetOf('b')).toEqual([0, 0, 0]) })
     then('清理', (w) => { dissolveGroup(w.gid); w.off() })
   })

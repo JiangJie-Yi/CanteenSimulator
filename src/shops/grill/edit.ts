@@ -9,7 +9,7 @@ import { RENDER_DEFAULT, type RenderPref } from '@/game/renderPrefs'
 import { EDIT_TEXT, pieceName } from '@/data/editText'
 import type { Lang } from '@/data/i18n'
 import { VIEW_SPOTS } from '@/data/views'
-import { applyGroup, areasOf, chainOf, isStill, leavesOf, parentOf, undoGroup, within, type ViewCam } from '@/game/editGroups'
+import { applyGroup, areasOf, chainOf, isStill, leavesOf, parentOf, ROOM_TURN, undoGroup, within, type ViewCam } from '@/game/editGroups'
 import { glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { GRILL_SEATS } from './bar'
@@ -163,7 +163,9 @@ function settleGroups() {
     if (!g) { unsettled.delete(id); continue }
     const pts = leavesOf(state.groups, id).map((m) => registry.get(m)?.center?.() ?? null)
     if (pts.some((v) => !v)) continue
-    state.groups = { ...state.groups, [id]: { ...g, pivot: intoGroup(parentOf(state.groups, id), middle(pts as V3[])) } }
+    // (in the group's own frame, before its own move: taken in its parent's, a group made with a place of its own (the cats' stand, the
+    // shrine) had its pivot that far off its pieces, and its handles stood metres away)
+    state.groups = { ...state.groups, [id]: { ...g, pivot: intoGroup(id, middle(pts as V3[])) } }
     unsettled.delete(id)
   }
 }
@@ -366,11 +368,47 @@ export const pivotOf = (id: string): V3 => state.pivots[id] ?? [0, 0, 0]
 export const HANGS = /^(barlamp|sidelamp|chochin|fishlantern|noren$|speaker$|exitsign$|lightswitch|wcswitch$|art-|knives$|altar$|viewcam-)|^wc2-[mf]-(lamp|noren|dryer|towelbox|remote|paper|oto|pads)/
 // (each piece and each group whose pivot has been brought down to its foot, once: what was saved for it made up for then, so nothing moved)
 const KEY_FOOT = 'jgs-edit-foot-1'
-const KEY_GFOOT = 'jgs-edit-group-foot-1'
+const KEY_GFOOT = 'jgs-edit-group-foot-2'
 const footSets = (key: string) => { try { return new Set<string>(JSON.parse(localStorage.getItem(key) ?? '[]')) } catch { return new Set<string>() } }
-const footDone = footSets(KEY_FOOT), groupFootDone = footSets(KEY_GFOOT)
-const keepFeet = () => { try { localStorage.setItem(KEY_FOOT, JSON.stringify([...footDone])); localStorage.setItem(KEY_GFOOT, JSON.stringify([...groupFootDone])) } catch { /* storage blocked */ } }
+// (and each piece whose pivot was brought across to the middle of the box it's drawn with (KEY_FOOTXZ), and each whose kept turn was taken
+// into the room's axes (KEY_ROOM): once each, as the foot was)
+const KEY_FOOTXZ = 'jgs-edit-foot-xz-1'
+const KEY_ROOM = 'jgs-edit-room-axes-1'
+const footDone = footSets(KEY_FOOT), groupFootDone = footSets(KEY_GFOOT), footXzDone = footSets(KEY_FOOTXZ), roomDone = footSets(KEY_ROOM)
+const keepFeet = () => { try { localStorage.setItem(KEY_FOOT, JSON.stringify([...footDone])); localStorage.setItem(KEY_GFOOT, JSON.stringify([...groupFootDone])); localStorage.setItem(KEY_FOOTXZ, JSON.stringify([...footXzDone])); localStorage.setItem(KEY_ROOM, JSON.stringify([...roomDone])) } catch { /* storage blocked */ } }
 export const footSettled = (id: string) => footDone.has(id)
+export const footXzSettled = (id: string) => footXzDone.has(id)
+/**
+ * A piece's pivot brought across (by `d`, in its own frame, level) from the middle of a box squared to the room to the middle of the box it's
+ * drawn with (squared to its own axes, as the yellow box in developer mode is), once: as settleFoot does it, so nothing moves (the owner's,
+ * 2026-11-12: every piece's handles at its middle; a turned piece's, the willow's or the speaker's, stood off its box)
+ */
+export function settleFootXz(id: string, d: V3, shift: V3) {
+  if (footXzDone.has(id)) return
+  footXzDone.add(id)
+  const pv = state.pivots[id]
+  if (pv) state.pivots = { ...state.pivots, [id]: [pv[0] - d[0], pv[1] - d[1], pv[2] - d[2]] }
+  if (shift.some((v) => Math.abs(v) > 1e-7)) {
+    const o = state.offsets[id] ?? [0, 0, 0]
+    state.offsets = { ...state.offsets, [id]: [o[0] + shift[0], o[1] + shift[1], o[2] + shift[2]] }
+  }
+  keepFeet()
+  if (pv || shift.some((v) => Math.abs(v) > 1e-7)) { save(); emit() }
+}
+/**
+ * A piece's kept turn taken into the room's axes, once (`into`: its turn as it was kept, about the world's axes, as the same turn about the
+ * room's; null when it's about the vertical alone, the same in both): the editor's world axes became the room's (2026-11-12), and a tilt
+ * kept from before (a view's camera looking down) would have tipped another way
+ */
+export function settleRoomTurn(id: string, into: (r: V3) => V3 | null) {
+  if (roomDone.has(id)) return
+  roomDone.add(id)
+  keepFeet()
+  const r = into(state.rotations[id] ?? [0, 0, 0])
+  if (!r) return
+  state.rotations = { ...state.rotations, [id]: r }
+  save(); emit()
+}
 /**
  * A standing piece's pivot brought down from its middle to its foot (by `d`, in its own frame), once: a pivot moved by hand (D) kept where it
  * was put (counted from the foot now); and `shift` added to its place, what was saved for it turned or sized about its middle made up for
@@ -389,20 +427,30 @@ export function settleFoot(id: string, d: V3, shift: V3) {
   if (pv || shift.some((v) => Math.abs(v) > 1e-7)) { save(); emit() }
 }
 /**
- * Each group's pivot brought down to its pieces' feet as a piece's is (its lowest foot's height, its middle across as it was), once for each,
- * its own move made up for, so nothing moves; a group with a piece not yet measured waits for the next time
+ * Each group's pivot brought to the middle of its pieces' foot as a piece's is (the middle of all their boxes, squared to the room, at their
+ * lowest foot's height; before, the middle across stayed where it was made, and a group with a place of its own had its handles metres off
+ * it: the owner's, 2026-11-12), once for each, its own move made up for, so nothing moves; a group with a piece not yet measured waits
  */
 export function settleGroupFeet() {
   let changed = false
   for (const [gid, g] of Object.entries(state.groups)) {
     if (groupFootDone.has(gid) || unsettled.has(gid)) continue
-    const feet = leavesOf(state.groups, gid).map((m) => registry.get(m)?.foot?.() ?? null)
-    if (!feet.length || feet.some((v) => !v)) continue
-    const y = Math.min(...feet.map((v) => intoGroup(gid, v as V3)[1]))
-    const d: V3 = [0, y - g.pivot[1], 0]
+    // (its pieces' boxes, every corner, in the group's own frame: the middle of all of them squared to the room, at their lowest foot)
+    const boxes = leavesOf(state.groups, gid).map((m) => registry.get(m)?.corners?.() ?? null)
+    if (!boxes.length || boxes.some((v) => !v)) continue
+    const pts = (boxes as V3[][]).flat().map((v) => intoGroup(gid, v))
+    const ra = ROOM_TURN * Math.PI / 180, ax = Math.cos(ra), az = -Math.sin(ra)
+    let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity, y = Infinity
+    for (const v of pts) {
+      const u = v[0] * ax + v[2] * az, w = -v[0] * az + v[2] * ax
+      u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); y = Math.min(y, v[1])
+    }
+    const um = (u0 + u1) / 2, wm = (w0 + w1) / 2
+    const at: V3 = [um * ax - wm * az, y, um * az + wm * ax]
+    const d: V3 = [at[0] - g.pivot[0], at[1] - g.pivot[1], at[2] - g.pivot[2]]
     // (turned and sized about the old pivot, now about the new: the difference made up for in its move)
     const ad = applyGroup({ ...g, pivot: [0, 0, 0], t: [0, 0, 0] }, d)
-    state.groups = { ...state.groups, [gid]: { ...g, pivot: [g.pivot[0], y, g.pivot[2]], t: [g.t[0] + ad[0] - d[0], g.t[1] + ad[1] - d[1], g.t[2] + ad[2] - d[2]] } }
+    state.groups = { ...state.groups, [gid]: { ...g, pivot: at, t: [g.t[0] + ad[0] - d[0], g.t[1] + ad[1] - d[1], g.t[2] + ad[2] - d[2]] } }
     groupFootDone.add(gid)
     changed = true
   }
@@ -570,7 +618,7 @@ export function setScaleAxis(a: 0 | 1 | 2 | null) {
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
 // (kept on the window, so a live code update in development (which loads this module afresh) doesn't lose the pieces that weren't remounted: the
 // panel would list only some of them)
-type Entry = { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null; foot?: () => V3 | null }
+type Entry = { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null; foot?: () => V3 | null; corners?: () => V3[] | null }
 const registry: Map<string, Entry> = typeof window !== 'undefined'
   ? ((window as unknown as { __editRegistry?: Map<string, Entry> }).__editRegistry ??= new Map())
   : new Map()
@@ -583,8 +631,8 @@ export function frameSelected() {
   const target = leavesOf(state.groups, id).find((m) => registry.has(m)) ?? id
   registry.get(target)?.focus()
 }
-export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null, foot?: () => V3 | null) {
-  registry.set(id, { label, focus, center, parent, foot })
+export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null, foot?: () => V3 | null, corners?: () => V3[] | null) {
+  registry.set(id, { label, focus, center, parent, foot, corners })
   panel()
   return () => { registry.delete(id); panel() }
 }
@@ -835,11 +883,12 @@ export function groupFrame(gid: string): number {
   if (!g) return 0
   // (its piece's own turn is from that piece's parent's frame, which `frames` has turned from the room's: both, for the turn from the room's)
   const first = leavesOf(state.groups, gid).find((m) => framesObj.has(m))
-  return (first ? framesObj.get(first)! - (frames.get(first) ?? 0) : 0) + ((g.r?.[1] ?? g.yaw) * Math.PI) / 180
+  // (`frames` is the room's axes now (ROOM_TURN): the world's, which a group's frame is, that much the other way)
+  return (first ? framesObj.get(first)! - (frames.get(first) ?? 0) : 0) + (ROOM_TURN * Math.PI) / 180 + ((g.r?.[1] ?? g.yaw) * Math.PI) / 180
 }
 /** the turn (about the vertical) the panel's place goes by: the world's (world space) or the piece's own (object space), into its parent's frame
  * (a group's parent's frame is the room's: its own in object space) */
-const frameFor = (id: string) => (state.groups[id] ? (state.space === 'local' ? groupFrame(id) : 0)
+const frameFor = (id: string) => (state.groups[id] ? (state.space === 'local' ? groupFrame(id) : (ROOM_TURN * Math.PI) / 180)
   : state.space === 'local' ? framesObj.get(id) ?? 0 : frames.get(id) ?? 0)
 export const toRoom = (id: string, v: V3): V3 => turnY(v, -frameFor(id))
 /** what the panel shows: the place, turn and size counted from the piece's zero */

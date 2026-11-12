@@ -1,6 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { applyGroup, areasOf, chainOf, leavesOf, undoGroup, viewOf, within, type ViewCam } from '@/game/editGroups'
+import { applyGroup, areasOf, chainOf, leavesOf, ROOM_TURN, undoGroup, viewOf, within, type ViewCam } from '@/game/editGroups'
+import { ALONG } from '@/shops/grill/bar'
 import { clickPick, dissolveGroup, getEdit, groupByViews, isPicked, makeGroup, pickToggle, registerMovable, select, setViewCams } from '@/shops/grill/edit'
 
 // (two cameras eight back from what they look at, a lens as the game's: 40° high, 16:9)
@@ -121,6 +122,32 @@ feature('開發者模式依視角攝影機自動分組', () => {
       expect(getEdit().groups['grp-view-grill'].members).toEqual(['fan', 'lantern'])
       for (const off of w.off) off()
       setViewCams(null)
+    })
+  })
+})
+
+feature('開發者模式的世界座標就是店裡的座標（X 沿著吧台）', () => {
+  scenario('世界座標的 X 軸與吧台同方向，不再斜 36°', ({ then }) => {
+    then('ROOM_TURN 轉出來的 X 軸就是吧台的方向', () => {
+      const a = (ROOM_TURN * Math.PI) / 180, len = Math.hypot(ALONG.x, ALONG.z)
+      expect(Math.cos(a)).toBeCloseTo(ALONG.x / len, 9)
+      expect(-Math.sin(a)).toBeCloseTo(ALONG.z / len, 9)
+    })
+  })
+
+  scenario('群組繞 X 軸傾斜時，是繞店裡的 X（沿吧台），不是繞斜的世界 X', ({ given, then, and }) => {
+    given('一個群組以原點為中心，繞 X 傾斜 20°', (w) => { w.g = { pivot: [0, 0, 0], t: [0, 0, 0], yaw: 0, s: 1, r: [20, 0, 0] } })
+    then('沿吧台方向的一點不動（它就在轉軸上）', (w) => {
+      const a = (ROOM_TURN * Math.PI) / 180, p: [number, number, number] = [Math.cos(a), 0, -Math.sin(a)]
+      applyGroup(w.g, p).forEach((v, k) => expect(v).toBeCloseTo(p[k], 9))
+    })
+    and('橫過吧台的一點往上翹', (w) => {
+      const a = (ROOM_TURN * Math.PI) / 180, p: [number, number, number] = [Math.sin(a), 0, Math.cos(a)]
+      expect(applyGroup(w.g, p)[1]).toBeCloseTo(-Math.sin((20 * Math.PI) / 180), 9)
+    })
+    and('放進去再拿回來還是同一點', (w) => {
+      const back = undoGroup(w.g, applyGroup(w.g, [0.3, 1.2, -0.7]))
+      back.forEach((v, k) => expect(v).toBeCloseTo([0.3, 1.2, -0.7][k], 9))
     })
   })
 })

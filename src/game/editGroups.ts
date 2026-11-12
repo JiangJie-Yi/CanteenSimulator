@@ -37,22 +37,30 @@ const D = Math.PI / 180
 const rx = (v: V3, a: number): V3 => [v[0], v[1] * Math.cos(a) - v[2] * Math.sin(a), v[1] * Math.sin(a) + v[2] * Math.cos(a)]
 const ry = (v: V3, a: number): V3 => [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)]
 const rz = (v: V3, a: number): V3 => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a), v[2]]
+/**
+ * The room's turn from the world's about the vertical, in degrees: its X runs along the bar (the shop's ALONG, (0.81, 0, -0.59), in
+ * shops/grill/bar.ts). The developer mode's world axes are the room's (the owner's, 2026-11-12: every piece and the world's axes lined up;
+ * the world's own stood 36° across the walls): a group's tilt (its turn about X and Z) is about the room's X and Z
+ */
+export const ROOM_TURN = (Math.atan2(0.59, 0.81) * 180) / Math.PI
+/** a turn about X or Z in it (one about the vertical alone is the same about either frame's) */
+const tilted = (r: V3) => r[0] !== 0 || r[2] !== 0
 
 /** whether a group stands as it was made (not moved, turned or sized): it changes nothing for what's in it */
 export const isStill = (g: GroupMove) => g.s === 1 && g.t.every((v) => v === 0) && turnOf(g).every((v) => v === 0)
 
 /** a point inside the group, where the group's move, turn and size carry it (as three's Euler XYZ: X's turn last) */
 export function applyGroup(g: GroupMove, v: V3): V3 {
-  const r = turnOf(g)
-  const w = rx(ry(rz([v[0] - g.pivot[0], v[1] - g.pivot[1], v[2] - g.pivot[2]], r[2] * D), r[1] * D), r[0] * D)
+  const r = turnOf(g), k = tilted(r) ? ROOM_TURN * D : 0
+  const w = ry(rx(ry(rz(ry([v[0] - g.pivot[0], v[1] - g.pivot[1], v[2] - g.pivot[2]], -k), r[2] * D), r[1] * D), r[0] * D), k)
   return [g.pivot[0] + g.t[0] + w[0] * g.s, g.pivot[1] + g.t[1] + w[1] * g.s, g.pivot[2] + g.t[2] + w[2] * g.s]
 }
 
 /** where a point seen now stands inside the group, before its move, turn and size: what a pivot inside a moved group is kept as */
 export function undoGroup(g: GroupMove, v: V3): V3 {
-  const r = turnOf(g)
+  const r = turnOf(g), k = tilted(r) ? ROOM_TURN * D : 0
   const w: V3 = [(v[0] - g.pivot[0] - g.t[0]) / g.s, (v[1] - g.pivot[1] - g.t[1]) / g.s, (v[2] - g.pivot[2] - g.t[2]) / g.s]
-  const u = rz(ry(rx(w, -r[0] * D), -r[1] * D), -r[2] * D)
+  const u = ry(rz(ry(rx(ry(w, -k), -r[0] * D), -r[1] * D), -r[2] * D), k)
   return [g.pivot[0] + u[0], g.pivot[1] + u[1], g.pivot[2] + u[2]]
 }
 

@@ -54,7 +54,7 @@ import { GAME_SPEED, paused } from '@/scene/speed'
 import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
-import type { ViewCam } from '@/game/editGroups'
+import { ROOM_TURN, type ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
 import { Bgm } from '@/ui/Bgm'
@@ -456,8 +456,10 @@ function AxisWidget() {
     const root = document.getElementById('axis-widget')
     if (!root) return
     const inv = camera.matrixWorldInverse
-    // (the world's own axes, as the developer panel's world space goes by)
-    const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    // (the room's axes, as the developer panel's world space goes by (editGroups' ROOM_TURN): X along the bar; the world's own stood 36°
+    // across every wall)
+    const ra = (ROOM_TURN * Math.PI) / 180
+    const axes = [[Math.cos(ra), 0, -Math.sin(ra)], [0, 1, 0], [Math.sin(ra), 0, Math.cos(ra)]]
     axes.forEach((v, i) => {
       const d = new THREE.Vector3(...v).transformDirection(inv)
       const line = root.querySelector<SVGLineElement>(`.aw-line-${i}`), dot = root.querySelector<SVGGElement>(`.aw-dot-${i}`), neg = root.querySelector<SVGCircleElement>(`.aw-neg-${i}`)
