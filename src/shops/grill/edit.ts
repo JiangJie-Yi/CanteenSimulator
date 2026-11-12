@@ -233,6 +233,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-18', ['doorcat0', 'doorcat1', 'koban']],
   // (the shrine's pieces where the owner set them made their defaults, and what was kept for them reset (the owner's, 2026-11-13: 'then reset them all'))
   ['jgs-edit-relaid-19', ['shrinecups', 'oranges', 'oranges2', 'shrinelamp-1', 'shrinelamp1', 'vase-1', 'vase1', 'flask', 'sutra']],
+  // (the supplies where the owner's X -0.38, Z -0.095 meant in its own axes (item 26))
+  ['jgs-edit-relaid-20', ['supplies']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -329,9 +331,13 @@ export const BASES: Record<string, V3> = {
   // (the speaker set at X -0.285 Y 0.518 Z 0.169, in the room's frame: back in its corner (the owner's); the red lantern raised 0.25)
   // (then on 0.05 along its own width, as the owner set it (2026-11-12): [0.0039, 0, -0.0247] in this parent's units)
   speaker: [0.3083, 0.518, 0.1062],
-  // (the tissues and cleaning things at X -0.38, Z -0.095 in the room's frame (the owner's, 2026-11-12: first X -0.2, then -0.38), taken into
-  // this parent's units: its frame is turned 2.512)
-  supplies: [0.2512, 0, 0.3005],
+  // (the tissues and cleaning things: the owner's X -0.38, Z -0.095 (2026-11-12: first X -0.2, then -0.38) were taken as the world's axes
+  // (turned 2.512), and it went 0.3 into the men's door's way and 11 cm into the wall: its door slid through its cartons (clips.mjs, item
+  // 26). As the panel reads them on selecting it (its own axes: X along the wall, away from the door; Z out from the wall; -Z, X here) the
+  // X would take it 37 cm into the drinks fridge beside it, as the shop's laid out to begin with, and the Z back against the wall, where
+  // the door's panel slides along behind it, out on its track 8-11 cm off the wall: it stands in the gap between the fridge and the
+  // door, 1 cm off the fridge, as far back as clears the panel's track by 1.5 cm)
+  supplies: [0.015, 0, -0.012],
   chochin: [0, 0.25, 0],
   chochin2: [0, 0.25, 0],
   sake: [0.084, 0, 0.118],
