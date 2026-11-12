@@ -5894,7 +5894,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     const deep = depthOf(id)
     return Array.from({ length: deep }, (_, i) => deep - 1 - i).map((j) => (
       <group key={`p${r}-${k}-${j}`} position={[sp.x, shelves[r].y + riseAt(sp.z - step * j), sp.z - step * j]} rotation-x={SHELF_TILT} userData={{ batchPart: `p${r}-${k}-${j}` }}>
-        <DrinkBottleLite id={id} back={j > 0} />
+        <DrinkBottleLite id={id} back={j > 0} deep={j > 1} />
       </group>
     ))
   })), [baked, n])
@@ -5968,7 +5968,7 @@ function SlideRun({ id, count, from, x, y, step, onDone }: { id: DrinkId; count:
   return (
     <group ref={g}>
       {Array.from({ length: count }, (_, j) => (
-        <group key={j} rotation-x={SHELF_TILT}><DrinkBottleLite id={id} back={j > 0} /></group>
+        <group key={j} rotation-x={SHELF_TILT}><DrinkBottleLite id={id} back={j > 0} deep={j > 1} /></group>
       ))}
     </group>
   )
@@ -6141,7 +6141,7 @@ export const cupped = (id: string) => id === 'sake' || id === 'umeshu'
  * bottle or can in a few turned rings, opaque, its glass's and its drink's colour in its points; its label, and its cap. Two materials for
  * all of them (PARTS and the label's), so a fridge's whole stock is two draws; the one taken up, pointed at or carried is the full one.
  */
-const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false }: { id: DrinkId; back?: boolean }) {
+const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false, deep = false }: { id: DrinkId; back?: boolean; deep?: boolean }) {
   const d = DRINKS.find((x) => x.id === id)!
   const kind = KIND_OF[id]
   const f = formOf(id)
@@ -6170,7 +6170,8 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false }: { id
           {!back && !(shaped === 'ramune' || shaped === 'sake' || soju(id) || id === 'sports') && <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />}
           <mesh geometry={shadedGlass(back ? LITE_FAR[shaped] : LITE_GEO[shaped].body, body, back ? Math.min(1, glassAlpha(id) + 0.25) : glassAlpha(id))} material={SHELF_GLASS} />
           {!back && shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
-          <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO[shaped].label) : LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
+          {/* (the third bottle back and those behind it: no label drawn, hidden by the two before them; their caps still are: tried without them, the back rows showed bare) */}
+          {!deep && <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO[shaped].label) : LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />}
           <mesh geometry={shaded(back ? LITE_GEO.capFar : LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
           {/* (the beer's gold foil round its neck, the sake's paper collar under its cap (the plum wine's red), as the full bottles have them) */}
           {!back && LITE_GEO[shaped].collar && !soju(id) && (
