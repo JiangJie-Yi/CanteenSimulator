@@ -5928,7 +5928,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       {[...slides.current].map(([key, sl]) => {
         const [r, k] = key.split('-').map(Number), id = baked[r]?.[k]
         if (!id) return null
-        return <SlideRun key={`slide${key}`} id={id} count={sl.count} from={sl.from} x={shelfLayout(n, r).xs[k]} y={shelves[r].y} step={rankStep(id)}
+        return <SlideRun key={`slide${key}`} id={id} count={Math.min(sl.count, depthOf(id))} from={sl.from} x={shelfLayout(n, r).xs[k]} y={shelves[r].y} step={rankStep(id)}
           onDone={() => { slides.current.delete(key); setSliding((v) => v + 1) }} />
       })}
       {/* (what's been taken out, stood on the floor before the fridge) */}
@@ -6141,14 +6141,102 @@ export const cupped = (id: string) => id === 'sake' || id === 'umeshu'
  * bottle or can in a few turned rings, opaque, its glass's and its drink's colour in its points; its label, and its cap. Two materials for
  * all of them (PARTS and the label's), so a fridge's whole stock is two draws; the one taken up, pointed at or carried is the full one.
  */
+/** a shelf bottle's body colour: the beer's brown glass, the ramune's aqua, the milk white; a clear bottle the colour of what's in it, paled by
+ * the glass */
+function liteBodyColour(id: DrinkId) {
+  const d = DRINKS.find((x) => x.id === id)!, f = formOf(id)
+  return id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#86d0e2' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : soju(id) ? '#3f8a4a' : f === 'sake' ? '#e4ece6'
+    : `#${new THREE.Color(d.color).lerp(new THREE.Color('#ffffff'), 0.25).getHexString()}`
+}
+/**
+ * The pictures of the drinks for the ranks deep in the fridges (DrinkBottleLite's `deep`): each drink's side as it stands (its outline from
+ * the shelf bottle's own profile, its glass, its label's band and its cap; a can's print; a pack's paper), one slot each of one picture, and
+ * for each drink two cards crossed upright, its width and height, mapped to its slot; one material, so a fridge's are one draw
+ */
+const BACK_SLOT_W = 64, BACK_SLOT_H = 256
+const BACK_IDS = DRINKS.map((x) => x.id as DrinkId)
+const BACK_ATLAS = typeof document === 'undefined' ? null : (() => {
+  const c = document.createElement('canvas')
+  c.width = BACK_SLOT_W * BACK_IDS.length; c.height = BACK_SLOT_H
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return { c, t, drawn: false }
+})()
+function backDims(id: DrinkId) {
+  const sc = DRINK_SCALE[id]
+  return { w: shelfSize(id)[0] / sc, h: shelfTall(id) / sc }
+}
+function drawBackAtlas() {
+  if (!BACK_ATLAS || BACK_ATLAS.drawn) return
+  BACK_ATLAS.drawn = true
+  const g = BACK_ATLAS.c.getContext('2d')!
+  g.clearRect(0, 0, BACK_ATLAS.c.width, BACK_SLOT_H)
+  BACK_IDS.forEach((id, i) => {
+    const d = DRINKS.find((x) => x.id === id)!
+    const kind = KIND_OF[id], shaped = shapeOf(id), { w, h } = backDims(id)
+    const x0 = i * BACK_SLOT_W, X = (x: number) => x0 + (x / w + 0.5) * BACK_SLOT_W, Y = (y: number) => BACK_SLOT_H * (1 - y / h)
+    const [l0, l1] = d.label as [string, string, string]
+    g.save()
+    if (shaped) {
+      // (the bottle's outline from its profile, its glass's colour shaded across it, the label's band, the cap)
+      const pts = LITE_PTS[shaped]
+      g.beginPath()
+      pts.forEach(([r, y], k) => (k ? g.lineTo(X(r), Y(y)) : g.moveTo(X(r), Y(y))))
+      for (let k = pts.length - 1; k >= 0; k--) g.lineTo(X(-pts[k][0]), Y(pts[k][1]))
+      g.closePath()
+      const gr = g.createLinearGradient(X(-w / 2), 0, X(w / 2), 0)
+      const body = liteBodyColour(id)
+      gr.addColorStop(0, '#202020'); gr.addColorStop(0.3, body); gr.addColorStop(0.55, '#ffffff'); gr.addColorStop(0.62, body); gr.addColorStop(1, '#303030')
+      g.fillStyle = body; g.fill(); g.globalAlpha = 0.35; g.fillStyle = gr; g.fill(); g.globalAlpha = 1
+      g.clip()
+      const lg = LITE_GEO[shaped], lh = (lg.label as THREE.CylinderGeometry).parameters.height
+      g.fillStyle = l0; g.fillRect(x0, Y(lg.labelY + lh / 2), BACK_SLOT_W, Y(lg.labelY - lh / 2) - Y(lg.labelY + lh / 2))
+      g.fillStyle = l1; g.fillRect(x0, Y(lg.labelY + lh * 0.12), BACK_SLOT_W, Y(lg.labelY - lh * 0.12) - Y(lg.labelY + lh * 0.12))
+      g.restore(); g.save()
+      g.fillStyle = d.cap; g.fillRect(X(-0.013 * lg.capR), Y(lg.capY + 0.005 * lg.capR), X(0.013 * lg.capR) - X(-0.013 * lg.capR), Y(lg.capY - 0.005 * lg.capR) - Y(lg.capY + 0.005 * lg.capR))
+    } else {
+      // (a can: its print all round, a silver lid; a pack: its paper, a band; a little bottle: its shape, its foil lid)
+      const r = w / 2
+      g.fillStyle = l0; g.fillRect(X(-r), Y(h * (kind === 'can' ? 0.95 : 1)), X(r) - X(-r), Y(0) - Y(h * (kind === 'can' ? 0.95 : 1)))
+      g.fillStyle = l1; g.fillRect(X(-r), Y(h * 0.62), X(r) - X(-r), Y(h * 0.42) - Y(h * 0.62))
+      if (kind === 'can') { g.fillStyle = '#c8ccd2'; g.fillRect(X(-r * 0.9), Y(h), X(r * 0.9) - X(-r * 0.9), Y(h * 0.95) - Y(h)) }
+      if (kind === 'small') { g.fillStyle = d.cap; g.fillRect(X(-r * 0.9), Y(h), X(r * 0.9) - X(-r * 0.9), Y(h * 0.93) - Y(h)) }
+      const gr = g.createLinearGradient(X(-r), 0, X(r), 0)
+      gr.addColorStop(0, 'rgba(0,0,0,0.35)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.15)'); gr.addColorStop(1, 'rgba(0,0,0,0.35)')
+      g.fillStyle = gr; g.fillRect(X(-r), Y(h), X(r) - X(-r), Y(0) - Y(h))
+    }
+    g.restore()
+  })
+  BACK_ATLAS.t.needsUpdate = true
+}
+const BACK_CARD = new THREE.MeshStandardMaterial({ color: '#ffffff', map: BACK_ATLAS?.t ?? null, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.45 })
+const BACK_CARDS = new Map<DrinkId, THREE.BufferGeometry>()
+function backCard(id: DrinkId) {
+  const hit = BACK_CARDS.get(id)
+  if (hit) return hit
+  drawBackAtlas()
+  const { w, h } = backDims(id), i = BACK_IDS.indexOf(id)
+  const u0 = i / BACK_IDS.length, u1 = (i + 1) / BACK_IDS.length
+  const card = (turn: number) => {
+    const p = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0).rotateY(turn)
+    const uv = p.attributes.uv
+    for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
+    return p
+  }
+  const g = mergeGeometries([card(0), card(Math.PI / 2)])!
+  BACK_CARDS.set(id, g)
+  return g
+}
 const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false, deep = false }: { id: DrinkId; back?: boolean; deep?: boolean }) {
   const d = DRINKS.find((x) => x.id === id)!
   const kind = KIND_OF[id]
   const f = formOf(id)
   const shaped = shapeOf(id)
-  // (its body's colour: the beer's brown glass, the ramune's aqua, the milk white; a clear bottle the colour of what's in it, paled by the glass)
-  const body = id === 'beer' ? '#4a2a10' : id === 'darkBeer' ? '#2a1a0c' : id === 'ramune' ? '#86d0e2' : id === 'milk' ? '#f4f2ea' : id === 'umeshu' ? '#d6a060' : soju(id) ? '#3f8a4a' : f === 'sake' ? '#e4ece6'
-    : `#${new THREE.Color(d.color).lerp(new THREE.Color('#ffffff'), 0.25).getHexString()}`
+  const body = liteBodyColour(id)
+  // (the third back and those behind it (`deep`): a picture of the drink on two cards crossed, four faces where the bottle was sixty to a
+  // hundred (the owner's, 2026-11-12: the fridges' back ranks as pictures); hidden by the two before it, it slides up and is drawn whole
+  // once it's the second, so the change from picture to bottle is never in sight)
+  if (deep) return <group scale={DRINK_SCALE[id]}><mesh geometry={backCard(id)} material={BACK_CARD} /></group>
   return (
     <group scale={DRINK_SCALE[id]}>
       <group rotation-y={-Math.PI / 2}>
@@ -6170,8 +6258,7 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false, deep =
           {!back && !(shaped === 'ramune' || shaped === 'sake' || soju(id) || id === 'sports') && <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />}
           <mesh geometry={shadedGlass(back ? LITE_FAR[shaped] : LITE_GEO[shaped].body, body, back ? Math.min(1, glassAlpha(id) + 0.25) : glassAlpha(id))} material={SHELF_GLASS} />
           {!back && shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
-          {/* (the third bottle back and those behind it: no label drawn, hidden by the two before them; their caps still are: tried without them, the back rows showed bare) */}
-          {!deep && <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO[shaped].label) : LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />}
+          <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO[shaped].label) : LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
           <mesh geometry={shaded(back ? LITE_GEO.capFar : LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
           {/* (the beer's gold foil round its neck, the sake's paper collar under its cap (the plum wine's red), as the full bottles have them) */}
           {!back && LITE_GEO[shaped].collar && !soju(id) && (
