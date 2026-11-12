@@ -196,4 +196,12 @@
 
 ## 第 23 項　原本的桶子拿掉，改成垃圾桶與資源回收桶
 
-- 11-13 03:08 開始。
+- 11-13 03:04 開始。
+- 先確認是哪個桶子：翻出 11-11 22:16 店主那則的附圖（`owner-bucket-1739-0.png`）：灰色不鏽鋼圓桶、黑色口緣、暗灰牆、右邊深色木櫃——是流理台一端的竹籤垃圾桶（`sink-bin`，`blender/sink.py` 的 `SinkBinSet`），不是灶台的木水桶（那個舀水的水杓是遊戲裡的工具，不能拿掉）。
+- 做法：`SinkBinSet` 改成兩個方桶左右並排、都面向店內：靠櫃子的炭灰色一般垃圾桶（開口、黑色垃圾袋反折在口緣，用過的竹籤照舊丟這裡）、外側藍色資源回收桶（蓋子圓孔）；正面「一般垃圾／燃えるゴミ」「♻ 資源回收／びん・かん」畫進一張貼圖（DecalAtlas），每桶約 20 面；開發者模式仍是一件（改名「垃圾桶與資源回收桶」），提示改寫。一開始前後排，回收桶正面被擋住，改成左右並排。
+- 驗證：`piece-bins.png`（正面，字看得清楚）、`piece-bins-top.png`、`piece-bins-side.png`；`sink-old.png`／`sink-new.png`（重跑 sink.py 後流理台其他部分同一個鏡頭一樣）；`clips.mjs` 沒有桶子的穿模；`mesh-audit` 桶子沒有超標；`_binwalk.mjs` 營業客滿 150 秒，員工最近離桶子 0.55，沒有人走進去（`binwalk.log`）。
+- `npx tsc -b`、`npm test` 通過；提交（feat: the stainless bin by the sink a rubbish bin and a recycling bin）。**完成**。
+
+## 第 24 項　收店前後 FPS 掉到 24～31
+
+- 11-13 03:17 開始。
