@@ -28,16 +28,16 @@ export const setTip = (t: Tip) => {
 }
 export const useTip = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f) } }, () => tip)
 /**
- * A person under the pointer (scene/FigureHit): their name tag, the pointer a hand. The event's let through: what's behind them (the food on
- * the fire behind the owner) still answers, and its own tag, set after, wins; leaving, it takes down only a person's tag.
+ * A person under the pointer (scene/FigureHit): their name tag; the pointer left the plain arrow (the owner's, 2026-11-12: whatever can only
+ * be pointed at, not done anything with, keeps the default cursor: the staff and the owner can't be clicked; a customer who can be moved
+ * gets the open hand from FigureHit). The event's let through: what's behind them (the food on the fire behind the owner) still answers,
+ * and its own tag, set after, wins; leaving, it takes down only a person's tag.
  */
 export const whoOver = (title: () => string, hint: () => string = () => '') => ({
   onPointerOver: (e: { eventObject?: THREE.Object3D; camera?: THREE.Camera; nativeEvent?: Event }) => {
     if (HOVER.paused) return
     aimTip(e)
     setTip({ title: title(), hint: hint(), who: true })
-    const el = e.nativeEvent?.target as HTMLElement | null
-    if (el?.style) el.style.cursor = 'pointer'
   },
   onPointerOut: (e: { nativeEvent?: Event }) => {
     if (HOVER.paused) return

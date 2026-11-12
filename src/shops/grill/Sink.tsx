@@ -14,7 +14,7 @@ import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { Steam } from '@/scene/Steam'
 import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, HAND_EACH, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
-import { DRAIN, DRYER, HAND_WASH, SINK, SINK_BIN, tipOver } from './bar'
+import { DRAIN, DRYER, HAND_WASH, POINTER_HINT, SINK, SINK_BIN, tipOver } from './bar'
 import { basinSays, waterTick } from '@/game/sinkWater'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
@@ -354,8 +354,8 @@ export function SinkModel() {
   return (
     <group>
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
-      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }) }}
-        onPointerOut={() => { if (hov.current === 'basin') hov.current = null; if (!HOVER.paused) setTip(null) }}
+      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }) }}
+        onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null) }}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const now = performance.now(); if (now < HAND_WASH.until || SINK.dirty <= 0) return; HAND_WASH.ask = 'wash'; HAND_WASH.until = now + HAND_EACH * 1000; window.setTimeout(() => setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }), 80) }}>
         <primitive object={root} />
       </group>
@@ -429,8 +429,9 @@ export function SinkPart({ node }: { node: string }) {
     </group>
   )
   return (
-    <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: '瀝水籃', hint: drainSays(DRAIN) }) }}
-      onPointerOut={() => { if (!HOVER.paused) setTip(null) }}
+    // (clickable now (the player takes its dry plates back to the racks): the pointing hand and its glow, as everything that can be clicked)
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('瀝水籃', drainSays(DRAIN)).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver('瀝水籃', '').onPointerOut(e) }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; HAND_WASH.ask = 'take'; window.setTimeout(() => setTip({ title: '瀝水籃', hint: drainSays(DRAIN) }), 80) }}>
       <primitive object={obj} />
     </group>
