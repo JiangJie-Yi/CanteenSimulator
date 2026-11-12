@@ -6167,7 +6167,7 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false }: { id
           {/* (the drink in it seen through its glass (the owner's: they were solid plastic colours), the neck above it only glass: the drink
               first, so the glass is laid over it; the ramune's marble in its neck) */}
           {/* (one behind another (`back`): its glass tinted the drink's colour, the drink in it not drawn, nor the ramune's marble or a collar) */}
-          {!back && <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />}
+          {!back && !(shaped === 'ramune' || shaped === 'sake' || soju(id) || id === 'sports') && <mesh geometry={liteDrink(shaped, id)} material={SHELF_GLASS} />}
           <mesh geometry={shadedGlass(back ? LITE_FAR[shaped] : LITE_GEO[shaped].body, body, back ? Math.min(1, glassAlpha(id) + 0.25) : glassAlpha(id))} material={SHELF_GLASS} />
           {!back && shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
           <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO[shaped].label) : LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
