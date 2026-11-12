@@ -194,11 +194,21 @@ export function CubbyStock({ which }: { which: 'right' | 'left' }) {
  * The sacks of potatoes and sweet potatoes, their backs to the bar, along it: what's kept at room temperature, so pointed at they light and
  * say how many there are, and clicked the stock opens on its larder's tab (the owner's).
  */
+/** how far (in the model's own units, its 1.4 times in the room) the sacks stand to the right, and the baskets forward, of where it was modelled */
+const SACKS_RIGHT = 0.2, BASKETS_FORWARD = 0.4
+const BASKET_PARTS = /^Produce(Basket|Stand|Cucumber|Eggplant|Gobo|Paprika|Piman|Tomato)/
+const SACK_PARTS = /^Produce(Sack|Potato|Sweet|Onion|Loose)/
 export function ProduceSacks() {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
     const r = partOf(gltf.scene, 'ProduceSacks', 0.004)
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
+    // (the owner's, 2026-11-12: the sacks over to the right, toward the baskets, and the little baskets out in front: each part of the model
+    // moved as it stands, the sacks (and what's in them) along the row, the baskets' stand and the summer vegetables in them out toward the room)
+    for (const c of r.children) {
+      if (BASKET_PARTS.test(c.name)) c.position.z += BASKETS_FORWARD
+      else if (SACK_PARTS.test(c.name)) c.position.x += SACKS_RIGHT
+    }
     return r
   }, [gltf])
   // (the sacks of potatoes, sweet potatoes and onions, and the baskets of the summer vegetables and the burdock beside them: how many of each
