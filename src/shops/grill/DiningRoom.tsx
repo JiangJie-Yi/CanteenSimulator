@@ -126,6 +126,43 @@ function grain() {
  * drawing scaled up, then the paper multiplied over it (its grain and fibres) and its edges aged a shade (a woodblock print's paper, a scroll's
  * silk)
  */
+/**
+ * A finger in a print's hand (the bijin scroll's): a slim tapering shape from its root (x0, y0) to its tip (x1, y1), `w0` wide at the root and
+ * `w1` at the tip, bowed by `bend` across its length; its outline thin, its tip round with the nail's pale edge, a soft crease at its middle
+ * joint. `curl`: seen bent round toward us (a fist's), only the crease of its turn near the tip, no nail. `open`: no line across its root (one
+ * laid over the hand, the thumb)
+ */
+function handFinger(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, w0: number, w1: number, bend: number, skin: string, curl = false, open = false) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux
+  const mx = (x0 + x1) / 2 + nx * bend, my = (y0 + y1) / 2 + ny * bend, wm = (w0 + w1) / 2
+  const f = new Path2D()
+  f.moveTo(x0 + nx * w0 / 2, y0 + ny * w0 / 2)
+  f.quadraticCurveTo(mx + nx * wm / 2, my + ny * wm / 2, x1 + nx * w1 / 2, y1 + ny * w1 / 2)
+  f.bezierCurveTo(x1 + nx * w1 / 2 + ux * w1 * 0.7, y1 + ny * w1 / 2 + uy * w1 * 0.7, x1 - nx * w1 / 2 + ux * w1 * 0.7, y1 - ny * w1 / 2 + uy * w1 * 0.7, x1 - nx * w1 / 2, y1 - ny * w1 / 2)
+  f.quadraticCurveTo(mx - nx * wm / 2, my - ny * wm / 2, x0 - nx * w0 / 2, y0 - ny * w0 / 2)
+  f.closePath()
+  g.fillStyle = skin; g.fill(f)
+  g.lineWidth = 0.38; g.strokeStyle = '#1a1210'
+  if (!open) g.stroke(f)
+  else {
+    // (`open`: laid over the hand, its root running on into it: its two sides and its tip outlined, not across its root)
+    g.beginPath()
+    g.moveTo(x0 + nx * w0 / 2, y0 + ny * w0 / 2)
+    g.quadraticCurveTo(mx + nx * wm / 2, my + ny * wm / 2, x1 + nx * w1 / 2, y1 + ny * w1 / 2)
+    g.bezierCurveTo(x1 + nx * w1 / 2 + ux * w1 * 0.7, y1 + ny * w1 / 2 + uy * w1 * 0.7, x1 - nx * w1 / 2 + ux * w1 * 0.7, y1 - ny * w1 / 2 + uy * w1 * 0.7, x1 - nx * w1 / 2, y1 - ny * w1 / 2)
+    g.quadraticCurveTo(mx - nx * wm / 2, my - ny * wm / 2, x0 - nx * w0 / 2, y0 - ny * w0 / 2)
+    g.stroke()
+  }
+  // (the middle joint's soft crease across it, a little past half way out)
+  const t = curl ? 0.72 : 0.55, cx = x0 + dx * t + nx * bend * 0.9, cy = y0 + dy * t + ny * bend * 0.9, cw = (w0 + (w1 - w0) * t) * 0.32
+  g.lineWidth = 0.26; g.strokeStyle = 'rgba(170,118,98,0.55)'
+  g.beginPath(); g.moveTo(cx + nx * cw, cy + ny * cw); g.quadraticCurveTo(cx + ux * 0.35, cy + uy * 0.35, cx - nx * cw, cy - ny * cw); g.stroke()
+  if (!curl) {
+    // (the nail's pale edge at the tip)
+    g.lineWidth = 0.3; g.strokeStyle = 'rgba(214,150,140,0.8)'
+    g.beginPath(); g.moveTo(x1 + nx * w1 * 0.3 - ux * 0.5, y1 + ny * w1 * 0.3 - uy * 0.5); g.quadraticCurveTo(x1 + ux * 0.35, y1 + uy * 0.35, x1 - nx * w1 * 0.3 - ux * 0.5, y1 - ny * w1 * 0.3 - uy * 0.5); g.stroke()
+  }
+}
 function artTex(kind: 'print' | 'scroll', w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const k = Math.max(1, Math.round(((kind === 'print' ? 770 : 400) / w) * 2) / 2)
   const W = Math.round(w * k), H = Math.round(h * k)
@@ -746,8 +783,11 @@ const ART = {
     line(0.4, 'rgba(252,246,230,0.95)')
     for (const o of [-1.2, 0, 1.2]) { g.beginPath(); g.moveTo(o * 1.3, 20); g.lineTo(o, 10); g.lineTo(o * 0.75, -22); g.lineTo(o * 0.55, -20 - NECK); g.stroke() }
     g.restore()
-    // (her left hand round the neck, two thirds of the way up it, out of her left sleeve's mouth: the wrist up from it, the back of the hand
-    // to us, four fingers arched over the neck's face to the strings, the first a little apart, pressing one; the thumb behind, unseen)
+    // (her left hand round the neck, two thirds of the way up it, out of her left sleeve's mouth: the back of the hand to us, the thumb behind,
+    // unseen; four slim fingers over the neck's face to the strings, the first a little apart, pressing one. Drawn as an ukiyo-e hand is: the
+    // wrist running on into the back of the hand in one line, no seam at the joint; the fingers tapering, each laid under the hand so its
+    // root is hidden in it; the knuckles' ridge a fainter line than the outline; a soft crease at each finger's middle joint (the owner's,
+    // 2026-11-12: the joints looked stiff, a glove's: a block of a wrist, a seam across it, the fingers sausages))
     {
       const nx = Math.cos(ang), ny = Math.sin(ang)
       const at = 22 + NECK * 0.62, hx = DX + nx * at, hy = DY + ny * at
@@ -756,22 +796,31 @@ const ART = {
       g.save(); g.translate(hx, hy); g.rotate(Math.atan2(sy, sx)); g.scale(1.2, 1.2)
       // (in here: +x out from the neck's middle toward her wrist, +y down the neck)
       const SKIN = '#faf3e8'
-      const piece = (p: Path2D) => { g.fillStyle = SKIN; g.fill(p); line(0.4); g.stroke(p) }
-      const wrist = new Path2D(); wrist.moveTo(8.5, -3.2); wrist.lineTo(19, -3.6); wrist.lineTo(19, 3.9); wrist.lineTo(8.5, 4.1); wrist.closePath()
-      piece(wrist)
-      const back = new Path2D(); back.moveTo(10, -4.4); back.bezierCurveTo(6, -6, 2.6, -5.4, 1.4, -3.2)
-      back.bezierCurveTo(0.8, 0, 1.2, 3.6, 2.8, 5); back.bezierCurveTo(5.6, 5.9, 8.6, 5.5, 10, 4.2); back.closePath()
-      piece(back)
-      // (the fingers over the neck's face, from the knuckles on its near side to their tips on the strings by its far edge, the little one
-      // shortest; the first lifted off the rest, its tip down on a string)
-      for (let k = 0; k < 4; k++) {
-        const y = -4.1 + k * 2.7 + (k === 0 ? -0.9 : 0), len = 6.4 - Math.abs(k - 1.1) * 0.55
-        const f = new Path2D(); f.roundRect(2.6 - len, y - 1.2, len, 2.4, 1.2)
-        piece(f)
-        // (the knuckle's crease and the nail's edge at the tip)
-        line(0.3, 'rgba(160,110,90,0.65)'); g.beginPath(); g.moveTo(1.4 - len * 0.45, y - 1); g.lineTo(1.4 - len * 0.45, y + 1); g.stroke()
-        line(0.3, 'rgba(210,150,140,0.8)'); g.beginPath(); g.moveTo(3.3 - len, y - 0.7); g.quadraticCurveTo(2.6 - len, y, 3.3 - len, y + 0.7); g.stroke()
+      // (the fingers, first: from the knuckles on the neck's near side over its face to their tips on the strings by its far edge)
+      // (to the neck's far edge and no further, their tips down on the strings there; the first apart from the rest, pressing one)
+      for (const [by, tx, ty, w0, w1] of [[-3.5, -2.2, -4.6, 2.3, 1.55], [-1.15, -2.7, -0.75, 2.4, 1.6], [1.15, -2.6, 1.55, 2.3, 1.55], [3.3, -2.0, 3.7, 2.0, 1.4]]) {
+        handFinger(g, 2.4, by, tx, ty, w0, w1, -0.5, SKIN)
       }
+      // (the back of the hand and the wrist, one shape: the wrist slender out of the sleeve, widening to the hand)
+      const hand = new Path2D()
+      hand.moveTo(17, -2.9)
+      hand.bezierCurveTo(13, -3.1, 10.6, -3.4, 8.6, -4.3)
+      hand.bezierCurveTo(6.4, -5.3, 3.8, -5.6, 2.2, -4.6)
+      hand.bezierCurveTo(1.0, -3.6, 0.9, 3.4, 2.0, 4.6)
+      hand.bezierCurveTo(3.6, 5.6, 6.6, 5.2, 8.6, 4.0)
+      hand.bezierCurveTo(10.6, 3.2, 13, 3.0, 17, 3.1)
+      hand.closePath()
+      g.fillStyle = SKIN; g.fill(hand)
+      // (its outline along the wrist and the hand's two sides; the knuckles' ridge over the finger roots fainter, as the brush lifts)
+      line(0.42)
+      g.beginPath(); g.moveTo(17, -2.9); g.bezierCurveTo(13, -3.1, 10.6, -3.4, 8.6, -4.3); g.bezierCurveTo(6.4, -5.3, 3.8, -5.6, 2.2, -4.6); g.stroke()
+      g.beginPath(); g.moveTo(2.0, 4.6); g.bezierCurveTo(3.6, 5.6, 6.6, 5.2, 8.6, 4.0); g.bezierCurveTo(10.6, 3.2, 13, 3.0, 17, 3.1); g.stroke()
+      line(0.3, 'rgba(26,18,16,0.55)')
+      g.beginPath(); g.moveTo(2.2, -4.6); g.bezierCurveTo(1.0, -3.6, 0.9, 3.4, 2.0, 4.6); g.stroke()
+      // (a breath of shade where the hand turns down to the fingers, and the tendon's faint line up the back of the wrist)
+      line(0.25, 'rgba(176,128,108,0.45)')
+      g.beginPath(); g.moveTo(4.2, -3.6); g.quadraticCurveTo(3.4, 0, 4.0, 3.6); g.stroke()
+      g.beginPath(); g.moveTo(13.5, -1.2); g.quadraticCurveTo(10, -1.6, 7.2, -2.2); g.stroke()
       // (her sleeve's mouth at the wrist, its red lining)
       const cuff = new Path2D(); cuff.moveTo(15.5, -7); cuff.quadraticCurveTo(13.2, 0, 15.5, 7.4); cuff.lineTo(24, 8.2); cuff.lineTo(24, -7.6); cuff.closePath()
       g.fillStyle = NAVY; g.fill(cuff)
@@ -800,23 +849,37 @@ const ART = {
       line(0.55, 'rgba(255,255,255,0.9)'); g.beginPath(); g.moveTo(13.3, -7); g.lineTo(14.5, 5.8); g.stroke()
       line(0.5, 'rgba(150,118,70,0.75)'); g.beginPath(); g.moveTo(4.4, 1.4); g.bezierCurveTo(8.2, 1.9, 11.2, 4, 14.3, 6.1); g.stroke()
       const SKIN = '#faf3e8'
-      const piece = (p: Path2D) => { g.fillStyle = SKIN; g.fill(p); line(0.4); g.stroke(p) }
-      const wrist = new Path2D(); wrist.moveTo(-18, -3.3); wrist.lineTo(-8, -3.7); wrist.lineTo(-8, 3.9); wrist.lineTo(-18, 3.5); wrist.closePath()
-      piece(wrist)
-      const back = new Path2D(); back.moveTo(-10.4, -3.9); back.bezierCurveTo(-5, -5.8, 1.2, -5.2, 2.8, -1.8); back.bezierCurveTo(3.2, 1.5, 1.6, 4.6, -1, 5)
-      back.lineTo(-9.4, 4.7); back.bezierCurveTo(-11.4, 3.9, -11.8, -2.6, -10.4, -3.9); back.closePath()
-      piece(back)
-      // (the fingers curled round under the handle, slim, each overlapping the next a little)
+      // (four slim fingers curled round under the handle, first: each down out of the knuckles' line and curling back under, its tip tucked
+      // in, only the middle joint's turn showing; their roots hidden under the back of the hand, no seam)
       for (let k = 0; k < 4; k++) {
-        const f = new Path2D(); f.roundRect(-8.7 + k * 2.6, 1.2, 2.5, 5.2 - Math.abs(k - 1.4) * 0.5, 1.25)
-        piece(f)
+        const x = -7.9 + k * 2.45, len = 3.6 - Math.abs(k - 1.4) * 0.35
+        handFinger(g, x, 2.4, x + 0.9, 2.4 + len, 2.45 - k * 0.08, 2.25 - k * 0.08, 0.3, SKIN, true)
       }
-      line(0.3, 'rgba(160,110,90,0.65)')
-      for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(-8.3 + k * 2.6, 4.3); g.lineTo(-6.6 + k * 2.6, 4.3); g.stroke() }
-      const thumb = new Path2D(); thumb.moveTo(-3.5, -3.7); thumb.bezierCurveTo(0, -4.5, 4.6, -3.7, 6.2, -2.3); thumb.bezierCurveTo(6.8, -1.4, 5.8, -0.6, 4.7, -1)
-      thumb.bezierCurveTo(2, -1.6, -1, -1.6, -3.3, -1.2); thumb.closePath()
-      piece(thumb)
-      line(0.3, 'rgba(160,110,90,0.7)'); g.beginPath(); g.moveTo(4.3, -2.9); g.quadraticCurveTo(5.5, -2.7, 5.8, -1.9); g.stroke()
+      // (the back of the hand and the wrist, one shape: the wrist slender out of the sleeve, widening to the hand, round its first knuckle onto
+      // the handle, along the knuckles' line to the heel of the hand)
+      const hand = new Path2D()
+      hand.moveTo(-17, -3.0)
+      hand.bezierCurveTo(-13.5, -3.3, -11.5, -3.9, -9.5, -4.6)
+      hand.bezierCurveTo(-6.5, -5.6, -2.0, -5.4, 0.6, -3.8)
+      hand.bezierCurveTo(2.4, -2.6, 2.8, 0.6, 1.8, 2.4)
+      hand.bezierCurveTo(0.4, 3.6, -3.0, 3.9, -6.5, 3.9)
+      hand.bezierCurveTo(-9.5, 3.8, -12.5, 3.2, -17, 3.2)
+      hand.closePath()
+      g.fillStyle = SKIN; g.fill(hand)
+      line(0.42)
+      g.beginPath(); g.moveTo(-17, -3.0); g.bezierCurveTo(-13.5, -3.3, -11.5, -3.9, -9.5, -4.6); g.bezierCurveTo(-6.5, -5.6, -2.0, -5.4, 0.6, -3.8)
+      g.bezierCurveTo(2.4, -2.6, 2.8, 0.6, 1.8, 2.4); g.stroke()
+      g.beginPath(); g.moveTo(-9.6, 3.85); g.bezierCurveTo(-12.5, 3.2, -14.5, 3.2, -17, 3.2); g.stroke()
+      // (the knuckles' line over the curled fingers fainter, a little wave along it at each knuckle)
+      line(0.3, 'rgba(26,18,16,0.55)')
+      g.beginPath(); g.moveTo(1.8, 2.4)
+      for (let k = 3; k >= 0; k--) { const x = -7.9 + k * 2.45; g.quadraticCurveTo(x + 1.2, 3.1, x - 0.1, 3.75) }
+      g.stroke()
+      // (her thumb along the handle's top toward the blade, tapering, its nail at the tip, a soft fold where it leaves the hand)
+      handFinger(g, -2.6, -3.3, 4.6, -2.2, 2.4, 1.5, -0.4, SKIN, false, true)
+      line(0.25, 'rgba(176,128,108,0.5)')
+      g.beginPath(); g.moveTo(-3.6, -2.1); g.quadraticCurveTo(-5.2, -2.6, -6.2, -3.6); g.stroke()
+      g.beginPath(); g.moveTo(-14, -0.6); g.quadraticCurveTo(-11, -1.2, -8.2, -2.0); g.stroke()
       const cuff = new Path2D(); cuff.moveTo(-15.5, -7); cuff.quadraticCurveTo(-13, 0, -15.5, 7.4); cuff.lineTo(-25, 8.4); cuff.lineTo(-25, -7.6); cuff.closePath()
       g.fillStyle = NAVY; g.fill(cuff)
       line(1.3, '#b8261c'); g.beginPath(); g.moveTo(-16.1, -6.4); g.quadraticCurveTo(-13.7, 0, -16.1, 6.8); g.stroke()
