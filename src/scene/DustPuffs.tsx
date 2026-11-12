@@ -74,18 +74,21 @@ export function DustPuffs() {
     m.raycast = () => {}
     M.makeScale(0, 0, 0)
     for (let i = 0; i < MAX; i++) m.setMatrixAt(i, M)
+    m.count = 0
     return m
   }, [])
   useEffect(() => () => mesh.dispose(), [mesh])
   useFrame((_, dt0) => {
     const dt = Math.min(dt0, 0.1)
-    let any = false
-    POOL.forEach((p, i) => {
+    // (the live ones packed to the front of the mesh, and only they drawn: the eighty, shrunk to nothing when not in use, were 6,400
+    // triangles every frame, a few dozen in use at most (item 25); its program's still made at loading, three setting it up before it
+    // finds there's nothing to draw)
+    let n = 0
+    POOL.forEach((p) => {
       if (!p.on) return
-      any = true
       p.t += dt
       const k = p.t / p.life
-      if (k >= 1) { p.on = false; M.makeScale(0, 0, 0); mesh.setMatrixAt(i, M); return }
+      if (k >= 1) { p.on = false; return }
       p.x += p.vx * dt
       p.z += p.vz * dt
       // (swelling quickly to its full size by 0.45 of its life, then shrinking away to a dot)
@@ -93,10 +96,10 @@ export function DustPuffs() {
       const r = p.size * s
       P.set(p.x, p.y + p.rise * Math.min(1, k * 1.4), p.z)
       M.compose(P, Q, S.set(r, r * 0.85, r))
-      mesh.setMatrixAt(i, M)
+      mesh.setMatrixAt(n++, M)
     })
-    if (any || mesh.userData.was) mesh.instanceMatrix.needsUpdate = true
-    mesh.userData.was = any
+    if (n || mesh.count) mesh.instanceMatrix.needsUpdate = true
+    mesh.count = n
   })
   return <primitive object={mesh} />
 }
