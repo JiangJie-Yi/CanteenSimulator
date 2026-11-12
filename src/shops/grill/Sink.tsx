@@ -35,7 +35,8 @@ export const SINK_SETS = [
   { node: 'SinkScrubSet', id: 'sink-scrub', label: '棕櫚刷' },
   { node: 'SinkSoapSet', id: 'sink-soap', label: '肥皂' },
   { node: 'SinkTowelSet', id: 'sink-towel', label: '布巾' },
-  { node: 'SinkBinSet', id: 'sink-bin', label: '竹籤垃圾桶' },
+  // (the rubbish bin and the recycling bin behind it (the owner's, 2026-11-11: in place of the stainless bin for the sticks): one piece)
+  { node: 'SinkBinSet', id: 'sink-bin', label: '垃圾桶與資源回收桶' },
   // (behind the tap to its left (the owner's): the dish soap's pump bottle and the sponge scourer)
   { node: 'SinkDetergentSet', id: 'sink-detergent', label: '洗碗精' },
   { node: 'SinkSpongeSet', id: 'sink-sponge', label: '菜瓜布' },
@@ -443,7 +444,7 @@ function partSays(node: string) {
     case 'SinkScrubSet': return '棕櫚刷，刷鍋子和烤網'
     case 'SinkSoapSet': return '洗手用的肥皂'
     case 'SinkTowelSet': return '擦乾碗盤的布巾'
-    case 'SinkBinSet': return SINK_BIN.sticks > 0 ? `用過的竹籤 ${SINK_BIN.sticks} 根` : '用過的竹籤丟這裡，現在是空的'
+    case 'SinkBinSet': return SINK_BIN.sticks > 0 ? `垃圾桶裡有用過的竹籤 ${SINK_BIN.sticks} 根；後面是資源回收桶` : '用過的竹籤丟垃圾桶，現在是空的；後面是資源回收桶'
     case 'SinkDetergentSet': return '洗碗精，按一下出一點'
     case 'SinkSpongeSet': return '菜瓜布，黃的那面軟，綠的那面刷'
     default: return ''

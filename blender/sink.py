@@ -758,27 +758,136 @@ box("SinkSpongeScour", SGX - 0.05, SGX + 0.05, H + 0.022, H + 0.032, SPZ - 0.035
 # (no hinoki hand pail at the far end now: the owner's, 2026-11-10, crossed out; the draining basket runs on to there)
 
 # (where the washed plates are stacked, and where whoever brings or takes them stands)
-# (beside the cabinet's other end, toward its front: a stainless bin for the used sticks cleared off the customers' plates (the owner's: thrown
-# away by the sink), open at its top, a black liner folded over its rim)
-BX, BZ, BR, BH = -W / 2 - 0.17, 0.2, 0.12, 0.42
-bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=BR * 0.92, radius2=BR, depth=BH, location=P(BX, BH / 2, BZ), end_fill_type="NOTHING")
-o = active()
-cyl_uv(o)
-finish(o, "SinkBinBody", M["steel"])
-parts.append(o)
-bpy.ops.mesh.primitive_circle_add(vertices=24, radius=BR * 0.92, fill_type="NGON", location=P(BX, 0.004, BZ))
-o = active()
-finish(o, "SinkBinFloor", M["liner"])
-parts.append(o)
-bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=BR * 0.9, radius2=BR * 0.97, depth=BH - 0.01, location=P(BX, BH / 2, BZ), end_fill_type="NOTHING")
-o = active()
-finish(o, "SinkBinLiner", M["liner"])
-parts.append(o)
-bpy.ops.mesh.primitive_torus_add(major_radius=BR + 0.004, minor_radius=0.008, major_segments=24, minor_segments=6, location=P(BX, BH, BZ))
-o = active()
-finish(o, "SinkBinRim", M["liner"])
-parts.append(o)
+# (beside the cabinet's other end, toward its front: the bins (the owner's, 2026-11-11: "the old bin taken away, a rubbish bin and a recycling
+# bin in its place"; it was a stainless bin for the used sticks): in front, an open charcoal bin for the rubbish, the used sticks cleared off
+# the customers' plates thrown in it, a black liner folded over its rim; beside it, out from the cabinet's end, a blue recycling bin, its lid
+# with a round hole in it for bottles and cans, both facing the room (one behind the other, the recycling bin's front was hidden). Square, a little narrower at the foot; each labelled on its front (一般垃圾 / 資源回收, the Japanese
+# under it, the recycling mark), the words drawn into one picture (BIN_PRINT), not made of triangles. About 40 faces a bin and a quad a label)
+BX, BW, BH = -W / 2 - 0.15, 0.2, 0.42
+BZ = 0.24                   # both bins' middles, toward the front
+RX = BX - BW - 0.03         # the recycling bin's, out beside the rubbish bin
+M["bin_char"] = pbr("SinkBinCharcoal", lin("#3b3e44"), rough=0.55)
+M["bin_blue"] = pbr("SinkBinBlue", lin("#2f6db5"), rough=0.5)
+M["bin_lid"] = pbr("SinkBinLid", lin("#4a86c8"), rough=0.45)
+M["bin_white"] = pbr("SinkBinInk", lin("#f4f4f0"), rough=0.6)
+M["bin_hole"] = pbr("SinkBinHole", lin("#141518"), rough=0.8)
+
+
+def tapered(name, x, z, y0, y1, b0, b1, mat, top=False, bottom=True, inward=False):
+    """a square shell, `b0` across at y0 and `b1` at y1, round (x, z): its four sides, its foot, its top if asked; facing in if `inward`"""
+    bm_ = bmesh.new()
+    lo = [bm_.verts.new(P(x + sx * b0 / 2, y0, z + sz * b0 / 2)) for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    hi = [bm_.verts.new(P(x + sx * b1 / 2, y1, z + sz * b1 / 2)) for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    for i in range(4):
+        j = (i + 1) % 4
+        bm_.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    if bottom:
+        bm_.faces.new(lo[::-1])
+    if top:
+        bm_.faces.new(hi)
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    if inward:
+        bmesh.ops.reverse_faces(bm_, faces=bm_.faces)
+    me = bpy.data.meshes.new(name)
+    bm_.to_mesh(me)
+    bm_.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    box_uv(o, 0.5)
+    o.data.materials.append(M[mat])
+    parts.append(o)
+    return o
+
+
+def rim(name, x, z, y, outer, inner, mat):
+    """the band over a bin's open top, from its outer edge to its inner, flat: four quads round the opening"""
+    bm_ = bmesh.new()
+    o_ = [bm_.verts.new(P(x + sx * outer / 2, y, z + sz * outer / 2)) for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    i_ = [bm_.verts.new(P(x + sx * inner / 2, y, z + sz * inner / 2)) for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    for i in range(4):
+        j = (i + 1) % 4
+        bm_.faces.new((o_[i], o_[j], i_[j], i_[i]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me = bpy.data.meshes.new(name)
+    bm_.to_mesh(me)
+    bm_.free()
+    for poly in me.polygons:
+        if poly.normal.z < 0:
+            poly.flip()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M[mat])
+    parts.append(o)
+    return o
+
+
+# ---- the rubbish bin: open, its liner black inside and folded down over its rim
+F0, F1 = BW * 0.9, BW
+tapered("SinkBinBody", BX, BZ, 0.0, BH, F0, F1, "bin_char")
+tapered("SinkBinLiner", BX, BZ, 0.03, BH, F0 - 0.016, F1 - 0.016, "liner", inward=True)
+rim("SinkBinRim", BX, BZ, BH + 0.002, F1 + 0.008, F1 - 0.016, "liner")
+# (the liner's fold down the outside, a hair proud of the bin)
+tapered("SinkBinFold", BX, BZ, BH - 0.045, BH + 0.002, F1 + 0.006, F1 + 0.008, "liner", bottom=False)
 empty("SinkBinTop", BX, BH - 0.05, BZ)
+
+# ---- the recycling bin: closed, its lid over it a little proud all round, a round hole in its lid
+# (its top a little up into the lid: no face of it in the lid's underside's plane)
+tapered("SinkBinRecBody", RX, BZ, 0.0, BH - 0.028, F0, F1 - 0.006, "bin_blue")
+box("SinkBinRecLid", RX - F1 / 2 - 0.004, RX + F1 / 2 + 0.004, BH - 0.03, BH, BZ - F1 / 2 - 0.004, BZ + F1 / 2 + 0.004, "bin_lid", bev=0.006, seg=1)
+
+# ---- their labels, on their fronts (+z), a few millimetres proud of the slope of each front
+BIN_PRINT = DecalAtlas("SinkBinPrint", ppm=3000, size=512)
+FONT_ZH = "C:/Windows/Fonts/msjhbd.ttc"
+FONT_JA = "C:/Windows/Fonts/YuGothB.ttc"
+FONT_SYM = "C:/Windows/Fonts/seguisym.ttf"
+ZH = bpy.data.fonts.load(FONT_ZH) if os.path.exists(FONT_ZH) else None
+JA = bpy.data.fonts.load(FONT_JA) if os.path.exists(FONT_JA) else ZH
+SYM = bpy.data.fonts.load(FONT_SYM) if os.path.exists(FONT_SYM) else None
+
+
+def front_at(y):
+    """how far out the bins' fronts are at height y (they taper toward the foot)"""
+    return F0 / 2 + (F1 - F0) / 2 * (y / BH)
+
+
+def print_on(name, body, size, x, y, z, font, lift=0.004):
+    bpy.ops.object.text_add(location=P(x, y, z + front_at(y) + lift), rotation=(math.pi / 2, 0, 0))
+    t = active()
+    t.data.body = body
+    t.data.size = size
+    t.data.align_x = "CENTER"
+    t.data.align_y = "CENTER"
+    t.data.extrude = 0.0
+    t.data.resolution_u = 8
+    if font:
+        t.data.font = font
+    bpy.ops.object.convert(target="MESH")
+    t = active()
+    if t.dimensions.x > F0 * 0.86:
+        t.scale.x = F0 * 0.86 / t.dimensions.x
+        apply_scale(t)
+    t.name = name
+    t.data.materials.clear()
+    t.data.materials.append(M["bin_white"])
+    q = BIN_PRINT.add(t)
+    parts.append(q)
+    return q
+
+
+print_on("SinkBinLabelZh", "一般垃圾", 0.044, BX, 0.30, BZ, ZH)
+print_on("SinkBinLabelJa", "燃えるゴミ", 0.026, BX, 0.245, BZ, JA)
+print_on("SinkBinRecMark", "\u267b", 0.09, RX, 0.315, BZ, SYM)
+print_on("SinkBinRecLabelZh", "資源回收", 0.044, RX, 0.235, BZ, ZH)
+print_on("SinkBinRecLabelJa", "びん・かん", 0.026, RX, 0.18, BZ, JA)
+# (the lid's hole: a dark disc a hair over the lid's top, toward its front)
+bpy.ops.mesh.primitive_circle_add(vertices=24, radius=0.045, fill_type="NGON", location=P(RX, BH + 0.0015, BZ + 0.02))
+hole = active()
+hole.name = "SinkBinRecHole"
+hole.data.materials.append(M["bin_hole"])
+# (its own frame laid on the lid: Blender's circle lies in x-y, the lid's top is x-y here too, facing up)
+q = BIN_PRINT.add(hole, lift=0.0)
+parts.append(q)
+BIN_PRINT.finish()
 empty("SinkFront", (x0 + x1) / 2, 0.0, D / 2 + 0.45)
 
 # ---------------------------------------------------------------------------------------------------- out
