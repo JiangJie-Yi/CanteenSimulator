@@ -229,6 +229,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-16', ['supplies']],
   // (the helmet off the cats' stand onto its own by the staff's door (the owner's, 2026-11-12): its place as kept was in the stand's frame)
   ['jgs-edit-relaid-17', ['kabuto']],
+  // (the cats' stand's top step deeper and shorter, the big cats either side of it, the koban in its middle (the owner's, 2026-11-12))
+  ['jgs-edit-relaid-18', ['doorcat0', 'doorcat1', 'koban']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length

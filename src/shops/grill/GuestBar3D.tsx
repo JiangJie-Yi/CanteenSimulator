@@ -570,8 +570,10 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
       <group position={[0.4, 0, CAT_STAND_Z]}>
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower; and a third, the top, a
-            narrow step at the back of the upper one, for the koban (the owner's, 2026-11-12)) */}
-        {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7], [0.05, 0.1, 0.84, 0.44]].map(([x, d, h, l], i) => (
+            step at the back of the upper one, for the koban (the owner's, 2026-11-12); that step deeper and shorter along the wall (the
+            owner's, 2026-11-12: 'the third step thicker, its width shorter, the cats moved to either side of it'): 0.2 deep, 0.26 long, the
+            two big cats either side of it) */}
+        {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7], [0, 0.2, 0.84, 0.26]].map(([x, d, h, l], i) => (
           <group key={i}>
             <Part geo={REG_GEO.round} color={i === 1 ? '#4a2e1c' : i === 2 ? '#3e2616' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
             {/* (a red felt (毛氈) laid over each tier, hanging a little down its front, as under a festival's dolls) */}
@@ -589,7 +591,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
           </StaticBatch></Movable>
         ))}
         {/* (a koban, the old oval gold coin, on its little stand, up on the top step (the owner's, 2026-11-12: a step more, the coin on top)) */}
-        <Movable id="koban" label="小判金幣"><group position={[0.05, 0.844, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
+        <Movable id="koban" label="小判金幣"><group position={[0, 0.844, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
       </group>
       {/* (the samurai helmet (兜) that sat on the lower tier between the two small cats is on its own little stand by the staff's door now
           (the owner's, 2026-11-12): DiningRoom's) */}
@@ -1693,9 +1695,10 @@ const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
   // (each its own model and size, in its own colours: two big ones on top, two smaller below)
   // (each with room round it: none touching the next, nor the shoe cupboard and the helmet beside the stand)
-  // (the big pair forward on the upper tier, clear of the top step behind them)
-  { x: -0.075, y: 0.6, z: -0.17, yaw: 0.2, kind: 1 as const, h: 0.5 },
-  { x: -0.075, y: 0.6, z: 0.17, yaw: -0.2, kind: 3 as const, h: 0.44 },
+  // (the big pair on the upper tier either side of the top step, clear of it (the owner's, 2026-11-12: they sat in front of it, their backs
+  // in it); each 0.18 across, 2 cm off the step's ends, inside the tier's)
+  { x: -0.075, y: 0.6, z: -0.24, yaw: 0.2, kind: 1 as const, h: 0.5 },
+  { x: -0.075, y: 0.6, z: 0.24, yaw: -0.2, kind: 3 as const, h: 0.44 },
   { x: -0.27, y: 0.32, z: -0.3, yaw: 0.25, kind: 2 as const, h: 0.38 },
   { x: -0.27, y: 0.32, z: 0.3, yaw: -0.25, kind: 1 as const, h: 0.42 },
 ]
