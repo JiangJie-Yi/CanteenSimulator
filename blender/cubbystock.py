@@ -148,7 +148,9 @@ def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0):
     o.scale = (x1 - x0, z1 - z0, y1 - y0)
     apply_scale(o)
     if bev:
-        b = bevel(o, bev, 2)
+        # (one step round each edge, not two: at a few centimetres across, behind the cupboard's glass, the second step doesn't show, and a
+        # cube of meat was 108 triangles, 44 now (item 25); outlined as well, that's twice over)
+        b = bevel(o, bev, 1)
         b.limit_method = "NONE"
         bpy.context.view_layer.objects.active = o
         bpy.ops.object.modifier_apply(modifier=b.name)
