@@ -80,7 +80,6 @@ import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
-import { Kabuto } from './Kabuto'
 /** where a sound's heard from, worked out in place */
 const SOUND_AT = new THREE.Vector3()
 
@@ -592,9 +591,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
         {/* (a koban, the old oval gold coin, on its little stand, up on the top step (the owner's, 2026-11-12: a step more, the coin on top)) */}
         <Movable id="koban" label="小判金幣"><group position={[0.05, 0.844, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
       </group>
-      {/* a samurai helmet (兜) on its stand, set out on the cats' stand's lower tier between its two small cats, facing into the room (the
-          owner's: off the shoe cupboard's top); small enough to sit on the tier's front strip, clear of the upper tier behind it */}
-      <Movable id="kabuto" label="武士頭盔"><group position={[0.4 - 0.26, 0.33, CAT_STAND_Z]} rotation-y={Math.PI / 2} scale={0.48}><Kabuto /></group></Movable>
+      {/* (the samurai helmet (兜) that sat on the lower tier between the two small cats is on its own little stand by the staff's door now
+          (the owner's, 2026-11-12): DiningRoom's) */}
       <Movable id="genkan" label="玄關地墊"><StaticBatch plain>
       {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
       {/* the coir mat lying on the genkan's stone, just inside */}

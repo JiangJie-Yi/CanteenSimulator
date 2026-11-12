@@ -11,12 +11,18 @@ const setup = () => {
 }
 
 feature('編輯模式的群組', () => {
-  scenario('門口的招財貓台、四隻招財貓、兩隻貓中間的小判與下層的頭盔，一開始就是一組，擺在沿牆往圓窗移 4.4 的地方（候位長凳在它原本的位置，再空出一公尺給第二張）', ({ then }) => {
-    then('有一個群組，成員是貓台、四隻貓、小判與頭盔', () => {
+  scenario('門口的招財貓台、四隻招財貓、上面的小判，一開始就是一組，擺在沿牆往圓窗移 4.4 的地方（候位長凳在它原本的位置，再空出一公尺給第二張）', ({ then }) => {
+    then('有一個群組，成員是貓台、四隻貓與小判（頭盔搬到員工門旁自己的木台上了）', () => {
       const g = getEdit().groups['grp-doorcats']
       expect(g).toBeDefined()
-      expect([...g.members].sort()).toEqual(['doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'doorcats', 'kabuto', 'koban'])
+      expect([...g.members].sort()).toEqual(['doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'doorcats', 'koban'])
       expect([g.t.map((v) => +v.toFixed(4)), g.yaw, g.s]).toEqual([[-3.5575, 0, 2.5921], 0, 1])
+    })
+  })
+
+  scenario('武士頭盔和員工專用門旁的小木台，一開始就是一組（一起搬）', ({ then }) => {
+    then('有一個群組，成員是木台和頭盔', () => {
+      expect([...getEdit().groups['grp-kabuto'].members].sort()).toEqual(['kabuto', 'kabutostand'])
     })
   })
 

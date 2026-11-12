@@ -52,8 +52,10 @@ const CATS_SHIFT_3: V3 = [-0.8085, 0, 0.5891]
 const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean; t?: V3 }> = {
   // (it and the shrine moved 3.4 along the wall toward the round window (the owner's, 2026-11-11), the waiting bench in their place: GENKAN_SHIFT;
   // the stand a metre further along the same way (the owner's, 2026-11-12, room for a second bench): CATS_SHIFT_3)
-  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban', 'kabuto'], t: [-2.749 + CATS_SHIFT_3[0], 0, 2.003 + CATS_SHIFT_3[2]] },
+  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban'], t: [-2.749 + CATS_SHIFT_3[0], 0, 2.003 + CATS_SHIFT_3[2]] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
+  // (the samurai helmet on its own little stand by the staff's door (the owner's, 2026-11-12): moved together)
+  'grp-kabuto': { zh: '頭盔與木台', ja: '兜と飾り台', members: ['kabutostand', 'kabuto'] },
   'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-2.749, 0, 2.003] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
@@ -89,6 +91,14 @@ const loadGroups = (): Record<string, Group> => {
   let g: Record<string, Group> = {}
   try { g = JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { /* storage blocked */ }
   for (const [k, x] of Object.entries(g)) if (x.members.some(RETIRED)) g[k] = { ...x, members: x.members.filter((m) => !RETIRED(m)) }
+  // (the helmet off the cats' stand, onto its own stand by the staff's door (the owner's, 2026-11-12): out of whatever kept group held it, once;
+  // it and its stand are a group of their own then (DEFAULT_GROUPS' grp-kabuto))
+  try {
+    if (!localStorage.getItem('jgs-edit-kabuto-out-1')) {
+      for (const [k, x] of Object.entries(g)) if (k !== 'grp-kabuto' && x.members.includes('kabuto')) g[k] = { ...x, members: x.members.filter((m) => m !== 'kabuto') }
+      localStorage.setItem('jgs-edit-kabuto-out-1', '1')
+    }
+  } catch { /* storage blocked */ }
   // (the views' areas planned again from where everything is now, once (the owner's, 2026-11-12: after the pieces were moved about): the old
   // areas broken up (their pieces and groups loose again, nothing else changed) and what they'd been made with forgotten, so the next time edit
   // mode opens each view's area is made afresh (groupByViews))
@@ -137,7 +147,7 @@ const loadGroups = (): Record<string, Group> => {
   // (the owner's, 2026-11-11: left behind when the stand moved for the bench))
   const cats = g['grp-doorcats']
   if (cats && !dropped().includes('grp-doorcats')) {
-    const join = ['koban', 'kabuto'].filter((m) => !cats.members.includes(m))
+    const join = ['koban'].filter((m) => !cats.members.includes(m))
     if (join.length) {
       for (const [k, x] of Object.entries(g)) if (x.members.some((m) => join.includes(m))) g[k] = { ...x, members: x.members.filter((m) => !join.includes(m)) }
       g['grp-doorcats'] = { ...g['grp-doorcats'], members: [...g['grp-doorcats'].members, ...join] }
@@ -217,6 +227,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-15', ['supplies']],
   // (and on to X -0.38 (the owner's, 2026-11-12), made the default and the held one dropped again)
   ['jgs-edit-relaid-16', ['supplies']],
+  // (the helmet off the cats' stand onto its own by the staff's door (the owner's, 2026-11-12): its place as kept was in the stand's frame)
+  ['jgs-edit-relaid-17', ['kabuto']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -715,7 +727,7 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
 /** what the views' own words (views.ts's about) say they're of, where their cameras alone don't settle it: the entrance is framed a little into
  * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
  * out of it, and nearer what the till's or the shrine's camera looks at */
-const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan',
+const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', 'grp-doorcats': 'genkan',
   koban: 'genkan', bench: 'genkan', bench2: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', coalsack: 'back',
   // (the kitchen's back: the rice station between the cook table and the till was nearer the till's camera; the rice corner and the sake
   // barrel by it in no view's sight at all)

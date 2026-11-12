@@ -35,6 +35,7 @@ import { lampGlow, lightOn, wcDarkness, type Circuit } from '@/game/roomLights'
 import type { Sky } from '@/game/clock'
 import { lampLit } from './lampShades'
 import { replaces } from '@/scene/hot'
+import { Kabuto } from './Kabuto'
 
 /**
  * The lamps' painted light (their halos and the pools they throw) by the time of day: faint by day, when the room's lit anyway; full and
@@ -3400,6 +3401,36 @@ const STAFF_SPILL = (() => {
   return t
 })()
 const STAFF_SPILL_MAT = new THREE.MeshBasicMaterial({ map: STAFF_SPILL ?? undefined, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
+/**
+ * The little wooden stand just past the staff's door, the samurai helmet on it (the owner's, 2026-11-12: off the cats' stand, onto a small
+ * wooden stand beside this door): blender/kabutostand.py, in the wall's own units, its foot's middle at its origin. It stands off the wall
+ * (KSTAND_OFF, its middle) clear of the door's panel, which slides open along the wall behind it, and along from the door's middle past its
+ * frame (KSTAND_ALONG); its top KSTAND_H up. Nothing else: the scroll beyond it hangs higher than the helmet's crest
+ */
+const KSTAND_URL = import.meta.env.BASE_URL + 'models/kabutostand.glb'
+useGLTF.preload(KSTAND_URL)
+const KSTAND_H = 0.7, KSTAND_OFF = 0.28, KSTAND_ALONG = 0.68
+function KabutoStandModel() {
+  const gltf = useGLTF(KSTAND_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('KabutoStand') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.0016, weld: true })
+    return mergeByMaterial(r)
+  }, [gltf])
+  return <primitive object={model} />
+}
 function StaffDoor() {
   const door = useWcDoor()
   const frame = useMemo(() => door.frame(), [door])
@@ -4433,6 +4464,13 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {supplies && <Movable id="supplies" label="衛生紙與清潔用品"><group position={[-0.13, 0, supplies.z]} rotation-y={-Math.PI / 2} scale={supplies.k}><CornerSupplies /></group></Movable>}
         {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
+        {/* (just past its frame, the little wooden stand and the samurai helmet on it, facing into the room (the owner's, 2026-11-12)) */}
+        {staffDoor !== undefined && <Movable id="kabutostand" label="頭盔木台"><StaticBatch plain>
+          <group position={[-KSTAND_OFF, 0, staffDoor + KSTAND_ALONG]} rotation-y={-Math.PI / 2}><KabutoStandModel /></group>
+        </StaticBatch></Movable>}
+        {staffDoor !== undefined && <Movable id="kabuto" label="武士頭盔">
+          <group position={[-KSTAND_OFF, KSTAND_H, staffDoor + KSTAND_ALONG]} rotation-y={-Math.PI / 2} scale={0.48}><Kabuto /></group>
+        </Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
         {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}
         {/* (by the way in, at hand height, between the shoe cupboard and the corner: the room's light switch, and beside it the door's lanterns'

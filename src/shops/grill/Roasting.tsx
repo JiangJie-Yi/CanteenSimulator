@@ -1129,7 +1129,9 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       const dW = sd.getWorldPosition(new THREE.Vector3()), room = sd.localToWorld(new THREE.Vector3(-1, 0, 0)).sub(dW).setY(0).normalize()
       const here = (v: THREE.Vector3) => floor(o.parent!.worldToLocal(v))
       const head = toGate ?? [from, ...way.slice(1, -2)]
-      return [...head.map((v, i) => (i ? floor(v) : v)), floor(fromBar(out[1])), here(dW.clone().addScaledVector(room, 0.75)), here(dW.clone()),
+      // (out in front of the door first, then straight in: coming along the wall from the bar they'd have cut the corner through the helmet's
+      // stand beside the door (the owner's, 2026-11-12))
+      return [...head.map((v, i) => (i ? floor(v) : v)), floor(fromBar(out[1])), here(dW.clone().addScaledVector(room, 1.6)), here(dW.clone().addScaledVector(room, 0.75)), here(dW.clone()),
         here(dW.clone().addScaledVector(room, -0.6))]
     }
     const w = (toGate ? [...toGate, ...out.slice(1).map(fromBar)] : [from, ...way.slice(1)]).map((v, i) => (i ? floor(v) : v))
