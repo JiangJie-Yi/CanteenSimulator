@@ -2312,14 +2312,22 @@ place(blood_cake(), 224, 0.6, "BloodCake")
 # ---- the root vegetables and the leek (the owner's: onion, leek, carrot, burdock and daikon on the robata) -------------------------
 # Each cut piece is a short cylinder (16 round, its ends filled in rows when exported, no centre fan), mapped to one picture: the cut face
 # in the left half (from its centre out), the skin in the right half (round it, along it); the grill's bars seared across both.
-def veg_picture(name, face, skin, n=256):
-    """A cut vegetable's picture: `face(r)` the cut face's colour at a distance r (0 centre .. 1 rim), `skin(u, v)` its outside."""
+def veg_picture(name, face, skin, n=256, skin_bars=True, face_xy=None):
+    """A cut vegetable's picture: `face(r)` the cut face's colour at a distance r (0 centre .. 1 rim), `skin(u, v)` its outside;
+    `face_xy(fx, fy, colour)` more over the face (a crosshatch); `skin_bars`: the grill's bars across its outside too. Lying flat on the net
+    (the onion, the daikon) its outside never touched the bars: seared stripes round it read as the rims of a stack of plates (the owner's,
+    2026-11-12: "an unknown plate in the salt-grilling area")"""
     uu, vv = grid01(n)
     left = uu < 0.5
     fx, fy = (uu / 0.5) * 2 - 1, vv * 2 - 1
     r = np.clip(np.sqrt(fx ** 2 + fy ** 2), 0, 1)
-    out = np.where(left[..., None], face(r), skin((uu - 0.5) / 0.5, vv))
+    fc = face(r)
+    if face_xy is not None:
+        fc = face_xy(fx, fy, fc)
+    out = np.where(left[..., None], fc, skin((uu - 0.5) / 0.5, vv))
     bars = smooth(0.86, 0.95, 0.5 + 0.5 * np.sin((vv * 9 + uu * 1.5) * 2 * np.pi)) * smooth(0.45, 0.75, fbm(n, 6, 6) + 0.25)
+    if not skin_bars:
+        bars = bars * left
     out = mix(out, (0.2, 0.12, 0.06), bars * 0.7)
     return image(name, out)
 
@@ -2346,15 +2354,20 @@ def cut_piece(name, mat, r, depth, at, rot, seg=16):
 
 
 TEX["onion"] = veg_picture("T_Onion",
-    lambda r: mix(mix((0.97, 0.94, 0.84), (0.86, 0.8, 0.62), (0.5 + 0.5 * np.cos(r * np.pi * 14)) ** 6), (0.62, 0.42, 0.2), smooth(0.85, 1.0, r) * 0.6),
-    lambda u, v: mix((0.95, 0.9, 0.76), (0.8, 0.68, 0.44), smooth(0.3, 0.7, fbm(256, 4, 4))))
+    # (its rings plain to see: pale translucent layers, a darker line between each, caramelised gold toward the middle, browned at the rim)
+    lambda r: mix(mix(mix((0.96, 0.92, 0.78), (0.7, 0.56, 0.32), (0.5 + 0.5 * np.cos(r * np.pi * 12)) ** 10 * 0.9), (0.86, 0.62, 0.28),
+                      smooth(0.6, 0.0, r) * 0.45), (0.55, 0.34, 0.14), smooth(0.86, 1.0, r) * 0.7),
+    # (its outside the onion's outer layer, roasted golden brown with darker patches, no grill stripes round it)
+    lambda u, v: mix((0.86, 0.66, 0.36), (0.58, 0.38, 0.16), smooth(0.35, 0.75, fbm(256, 4, 4))), skin_bars=False)
 TEX["carrot"] = veg_picture("T_Carrot",
     lambda r: mix(mix((0.98, 0.66, 0.3), (0.93, 0.48, 0.14), smooth(0.35, 0.5, r)), (0.82, 0.38, 0.1), smooth(0.92, 1.0, r)),
     lambda u, v: mix((0.9, 0.42, 0.12), (0.76, 0.32, 0.08), smooth(0.4, 0.8, vnoise(256, 3, 30))))
 TEX["daikon"] = veg_picture("T_Daikon",
-    # (glazed with miso over the whole face, scored in a crosshatch, browned at the rim)
-    lambda r: mix(mix((0.98, 0.97, 0.92), (0.85, 0.6, 0.25), np.full_like(r, 0.55)), (0.55, 0.32, 0.12), smooth(0.86, 1.0, r) * 0.8),
-    lambda u, v: mix((0.94, 0.92, 0.84), (0.6, 0.38, 0.16), smooth(0.4, 0.75, fbm(256, 5, 5))))
+    # (glazed with miso over the whole face, browned at the rim; scored in a crosshatch (face_xy))
+    lambda r: mix(mix((0.98, 0.97, 0.92), (0.78, 0.48, 0.18), np.full_like(r, 0.72)), (0.5, 0.28, 0.1), smooth(0.84, 1.0, r) * 0.85),
+    lambda u, v: mix((0.95, 0.94, 0.88), (0.8, 0.72, 0.56), smooth(0.4, 0.75, fbm(256, 5, 5))), skin_bars=False,
+    face_xy=lambda fx, fy, c: mix(c, (0.42, 0.22, 0.08), np.maximum(smooth(0.82, 0.97, 0.5 + 0.5 * np.cos((fx + fy) * np.pi * 4.5)),
+                                                                smooth(0.82, 0.97, 0.5 + 0.5 * np.cos((fx - fy) * np.pi * 4.5))) * 0.75))
 TEX["negi"] = veg_picture("T_Negi",
     lambda r: mix((0.94, 0.95, 0.86), (0.82, 0.88, 0.64), (0.5 + 0.5 * np.cos(r * np.pi * 8)) ** 4),
     lambda u, v: mix(mix((0.96, 0.96, 0.9), (0.78, 0.86, 0.58), smooth(0.6, 1.0, v)), (0.86, 0.86, 0.78), vnoise(256, 60, 2) * 0.3))
