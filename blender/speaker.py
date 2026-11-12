@@ -378,7 +378,8 @@ for sx in (-1, 1):
     for sz in (-1, 1):
         at = d * (FL * 0.62) + n * (FT + 0.0015)
         at = Vector((at.x, at.y, sz * 0.06))
-        mp.append(cyl(f"SpeakerMountScrew{sx}{sz}", 0.006, 0.003, tuple(at), M["screw"], rot=(math.pi / 2, 0, a_ + math.pi / 2), verts=16, bev=0.0012))
+        # (eight round and no bevel: 1.2 cm across, they were 188 triangles each, 28 now (item 25); nothing of the difference shows)
+        mp.append(cyl(f"SpeakerMountScrew{sx}{sz}", 0.006, 0.003, tuple(at), M["screw"], rot=(math.pi / 2, 0, a_ + math.pi / 2), verts=8))
 # (the spine where the flanges meet, rounded, and a boss on it the arm screws into)
 mp.append(cyl("SpeakerMountSpine", 0.008, FH, (0, -0.004, 0), M["steel"], verts=16))
 mp.append(cyl("SpeakerMountBoss", 0.02, 0.024, (0, -0.016, 0), M["steel"], rot=(math.pi / 2, 0, 0), verts=24))
