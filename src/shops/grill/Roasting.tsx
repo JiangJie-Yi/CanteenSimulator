@@ -1,7 +1,7 @@
 import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
-import { warmToEat } from '@/game/plates'
+import { BOWL_HAND_MAX, BOWL_WARM_MAX, warmToEat } from '@/game/plates'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -3794,6 +3794,8 @@ type Piece = {
   carried: boolean
   /** 0 → 1 while dropping into the bin (−1 otherwise), and where it fell from */
   trash: number
+  /** when it went into the tasting bowl (the bowl's oldest is eaten up to make room) */
+  bowlAt?: number
   trashFrom: THREE.Vector3
   /** seconds since it landed on the plate or in the basket (it steams a little at first) */
   landed: number
@@ -4770,6 +4772,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const bowl = inBowl(p)
     const basket = inBasket(p)
     const dish = onDish(p)
+    // (the bowl kept to two layers: with it full, what went in first is eaten up, its place the new one's (the owner's: a mountain piled up in
+    // it, the twenty-first laid on the first))
+    if (bowl) {
+      const inIt = pieces.current.filter((q) => q !== p && q.collected && !q.eaten && q.slot !== null && q.container?.startsWith('bowl'))
+        .sort((a, b) => (a.bowlAt ?? 0) - (b.bowlAt ?? 0))
+      for (const q of inIt.slice(0, warmToEat(inIt.length + 1, space === 'open' ? BOWL_WARM_MAX : BOWL_HAND_MAX))) { q.eaten = true; q.keepWarm = false; q.slot = null }
+      p.bowlAt = performance.now()
+    }
     // take the first free spot where it's going (basket, dishes or plates); eaten food frees its spot
     const taken = new Set(pieces.current.filter((q) => q.slot !== null && !q.eaten && present(q) &&
       destination(q) === destination(p)).map((q) => q.slot))

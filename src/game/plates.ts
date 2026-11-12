@@ -142,3 +142,7 @@ export const dutyOf = (k: number, servers: number): Duty => (servers < 2 ? 'all'
  * a mountain of fish piled in it): at most this many, and how many of the oldest the staff eat up to keep to it */
 export const BOWL_WARM_MAX = 8
 export const warmToEat = (kept: number, max = BOWL_WARM_MAX) => Math.max(0, kept - max)
+
+/** the tasting bowl by hand (researching, the shop shut): at most this many in it, two layers (the owner's, 2026-11-12: a mountain of fish piled
+ * in it, the twenty-first on the first); the oldest eaten up to make room for the next (warmToEat counts how many) */
+export const BOWL_HAND_MAX = 10
