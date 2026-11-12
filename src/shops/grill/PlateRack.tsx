@@ -110,22 +110,58 @@ function plateProfile(R: number): [number, number][] {
 const GEO = wareGeometry(plateProfile(PLATE_R), PLATE_R, 12)
 /** a plate's place; `pile`: which pile it's in, if it's in one (its plates drawn as the bottom one, the top one and the rims between: thinPiles) */
 type Spot = { m: THREE.Matrix4; design: number; pile?: number }
-/** the plates in a pile between its bottom one and its top one (the owner's, 2026-11-12: no more faces than need be): each seen only as its
- * rim over the one below, so drawn as its rim alone, the band from the edge of its well out over its lip (ten round, 40 faces, fourteen before, its
- * pattern's edge on it from the same picture), each still turned and set a hair off as it lies; the bottom and top ones whole */
-const RIM_GEO = wareGeometry(([[0.62, 0.042], [0.76, 0.065], [0.995, 0.165], [0.975, 0.172], [0.8, 0.1]] as [number, number][])
-  .map(([x, y]) => [x * PLATE_R, y * PLATE_R] as [number, number]), PLATE_R, 10)
-/** what's drawn of the plates shown, by design: whole, every plate not in a pile and each pile's bottom and top one; rims only, the rest */
+/** a pile's middle (the owner's, 2026-11-12: most plates in a pile can't be seen, only the stack of their rims: one column each): where it stands,
+ * how tall, how many plates' rims it shows */
+type Column = { x: number; y: number; z: number; h: number; n: number }
+/** what's drawn of the plates shown, by design: whole, every plate not in a pile and each pile's bottom and top one; and one striped column
+ * for all the plates between them */
 function thinPiles(shown: Spot[]) {
   const whole: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
-  const rims: Matrix4List[] = Array.from({ length: DESIGN_COUNT }, () => [])
+  const cols: Column[] = []
   const piles = new Map<number, Spot[]>()
   for (const sp of shown) {
     if (sp.pile === undefined) whole[sp.design % DESIGN_COUNT].push(sp.m)
     else { const l = piles.get(sp.pile) ?? []; l.push(sp); piles.set(sp.pile, l) }
   }
-  for (const l of piles.values()) l.forEach((sp, j) => (j === 0 || j === l.length - 1 ? whole : rims)[sp.design % DESIGN_COUNT].push(sp.m))
-  return { whole, rims }
+  for (const l of piles.values()) {
+    l.forEach((sp, j) => { if (j === 0 || j === l.length - 1) whole[sp.design % DESIGN_COUNT].push(sp.m) })
+    if (l.length < 3) continue
+    const at = (sp: Spot) => new THREE.Vector3().setFromMatrixPosition(sp.m)
+    const a = at(l[0]), b = at(l[l.length - 1])
+    const y0 = a.y + 0.17 * PLATE_R, y1 = b.y + 0.02 * PLATE_R
+    if (y1 > y0 + 0.002) cols.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, y: y0, h: y1 - y0, n: Math.max(1, l.length - 2) })
+  }
+  return { whole, cols }
+}
+/** the rims of nested plates, one band to a plate (made once): a thin shadow at its foot, white, a blue line by its edge */
+let columnTex: THREE.Texture | null = null
+function columnMap() {
+  if (columnTex) return columnTex
+  const c = document.createElement('canvas')
+  c.width = 8; c.height = 32
+  const g = c.getContext('2d')!
+  g.fillStyle = '#f3f3ee'; g.fillRect(0, 0, 8, 32)
+  g.fillStyle = '#3d5fa6'; g.fillRect(0, 4, 8, 8)       // (the blue line by the edge: a little under the top of its band)
+  g.fillStyle = '#7f8aa8'; g.fillRect(0, 25, 8, 7)      // (the shadow under the rim, at the band's foot)
+  columnTex = new THREE.CanvasTexture(c)
+  columnTex.colorSpace = THREE.SRGBColorSpace
+  columnTex.wrapS = columnTex.wrapT = THREE.RepeatWrapping
+  return columnTex
+}
+/** a pile's middle as a striped tube, twelve round, open at both ends (24 faces for what was a rim of 40 faces for each plate) */
+function PileColumn({ col }: { col: Column }) {
+  const geo = useMemo(() => {
+    const g = new THREE.CylinderGeometry(0.975 * PLATE_R, 0.975 * PLATE_R, col.h, 12, 1, true)
+    const uv = g.attributes.uv
+    for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * col.n)
+    return g
+  }, [col.h, col.n])
+  useLayoutEffect(() => () => geo.dispose(), [geo])
+  return (
+    <mesh geometry={geo} position={[col.x, col.y + col.h / 2, col.z]} castShadow receiveShadow>
+      <meshToonMaterial color="#ffffff" map={columnMap()} />
+    </mesh>
+  )
 }
 
 /** how far each plate in a pile stands above the one under it: they nest, foot in the one below's well (the plate's well sits 0.04 R up,
@@ -230,7 +266,7 @@ export function PlateRack({ part = 0 }: { part?: number }) {
   const all = useMemo(() => platesOf(part), [part])
   const [count, setCount] = useState(PLATE_RACK.n)
   useFrame(() => { if (PLATE_RACK.n !== count) setCount(PLATE_RACK.n) })
-  const { whole, rims } = useMemo(() => thinPiles(all.slice(0, Math.max(0, Math.min(PER_RACK, count - part * PER_RACK)))), [all, count, part])
+  const { whole, cols } = useMemo(() => thinPiles(all.slice(0, Math.max(0, Math.min(PER_RACK, count - part * PER_RACK)))), [all, count, part])
   const w = woodsOf()
   const wood = (tex: THREE.Texture, rx: number, ry: number) => {
     // (each tiling made once and kept)
@@ -296,7 +332,7 @@ export function PlateRack({ part = 0 }: { part?: number }) {
       </StaticBatch>
       <group position-y={CAB}>
         {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
-        {rims.map((list, i) => <Plates key={`r${i}-${list.length}`} design={i} list={list} geo={RIM_GEO} />)}
+        {cols.map((c, i) => <PileColumn key={`c${i}-${c.n}`} col={c} />)}
       </group>
     </group>
   )
@@ -345,7 +381,7 @@ export function LowPlateRack() {
   }, [gltf])
   const [count, setCount] = useState(LOW_RACK.n)
   useFrame(() => { if (LOW_RACK.n !== count) setCount(LOW_RACK.n) })
-  const { whole, rims } = useMemo(() => thinPiles(LOW_SPOTS.slice(0, Math.min(count, LOW_SPOTS.length))), [count])
+  const { whole, cols } = useMemo(() => thinPiles(LOW_SPOTS.slice(0, Math.min(count, LOW_SPOTS.length))), [count])
   return (
     <group>
       <mesh position={[0, 0.22, 0]} visible={false}
@@ -357,7 +393,7 @@ export function LowPlateRack() {
       <group name="lowrack-top" position={[0, LOW_SHELVES[1] + 0.08, 0.02]} />
       <primitive object={body} />
       {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
-      {rims.map((list, i) => <Plates key={`r${i}-${list.length}`} design={i} list={list} geo={RIM_GEO} />)}
+      {cols.map((c, i) => <PileColumn key={`c${i}-${c.n}`} col={c} />)}
     </group>
   )
 }
