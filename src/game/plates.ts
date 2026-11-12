@@ -1,3 +1,4 @@
+import { MINUTES_PER_SECOND } from './clock'
 // The plates: all of them kept on the dish racks (碗盤櫃). The kitchen (the third cook; with none, the second; with neither, the owner) brings
 // a few at a time across to the chef's plating place on the cook table, beside him, and he plates what's grilled there; a server comes into
 // the kitchen to him for each plate ready and carries it to its customer (no pass on the bar between: the owner's), clears the plates
@@ -28,7 +29,10 @@ export type Dryer = { n: number; left: number | null }
  */
 // (thirty at least (the owner's, 2026-11-11): its plates stood close, its length on to the counter's end)
 export const DRAIN_CAP = 30
-export const DRAIN_S = 20
+// (ten game minutes (the owner's, 2026-11-12: washed, a plate stands in the basket beside the sink to drain about ten game minutes before it's
+// taken in; it was twenty)
+export const DRAIN_MIN = 10
+export const DRAIN_S = DRAIN_MIN / MINUTES_PER_SECOND
 export const HAND_EACH = 1.2
 /** the draining basket: how many plates stand in it, and how long till they're dry (null: empty; 0: dry, to be taken to the racks) */
 export type Drain = { n: number; left: number | null }
