@@ -229,11 +229,11 @@ const WORDS_JA: [string, string][] = [
   ['廁所牌', 'お手洗い札'], ['竹花瓶', '竹の花入れ'], ['烘手機', 'ハンドドライヤー'], ['擦手紙盒', 'ペーパータオルホルダー'],
   ['吊燈', '吊り灯'], ['馬桶', '便器'], ['紙燈', '紙の灯り'], ['招財貓', '招き猫'], ['飲料櫃', 'ドリンク冷蔵庫'], ['座位', '席'],
   ['圓窗', '丸窓'], ['掛軸', '掛け軸'], ['男廁', '男性用'], ['女廁', '女性用'], ['畫', '絵'],
-  ['筷子與筷架', '箸と箸置き'], ['醬油碟', '醤油皿'], ['醬油壺與山葵', '醤油差しと山葵'], ['桌上垃圾桶', '卓上のごみ箱'],
+  ['筷子與筷架', '箸と箸置き'], ['筷架', '箸置き'], ['筷子', '箸'], ['醬油碟', '醤油皿'], ['醬油壺與山葵', '醤油差しと山葵'], ['桌上垃圾桶', '卓上のごみ箱'],
 ]
 /** and in English: the made-up names' words, and their brackets (the rest keep their Chinese) */
 const WORDS_EN: [string, string][] = [
-  ['筷子與筷架', 'Chopsticks and rest'], ['醬油碟', 'Soy dish'], ['醬油壺與山葵', 'Soy pot and wasabi'], ['桌上垃圾桶', 'Table waste basket'], ['座位', 'seat'], ['（', ' ('], ['）', ')'], ['・', ', '],
+  ['筷子與筷架', 'Chopsticks and rest'], ['筷架', 'Chopstick rest'], ['筷子', 'Chopsticks'], ['醬油碟', 'Soy dish'], ['醬油壺與山葵', 'Soy pot and wasabi'], ['桌上垃圾桶', 'Table waste basket'], ['座位', 'seat'], ['（', ' ('], ['）', ')'], ['・', ', '],
 ]
 /** a piece's name in the panel's language */
 export function pieceName(zh: string, lang: Lang) {

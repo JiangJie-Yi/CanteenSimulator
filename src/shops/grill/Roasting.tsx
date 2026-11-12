@@ -2533,11 +2533,16 @@ const BarTableware = memo(function BarTableware() {
               const x = seatAlong(c, n), seat = base + n, no = seatLabel(seat)
               return (
                 <group key={n}>
-                  <Movable id={`chopsticks${seat}`} label={`筷子與筷架（座位 ${no}）`}>
-                    {/* (the set's middle: the chopsticks' middle across the place, nearest the customer; the rest under their tips) */}
-                    <group ref={keep(k++)} name={`chop-set-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷子與筷架', '黑漆塗箸擱在靛藍釉筷架上，客人開動時拿起來')}>
+                  {/* (the chopstick rest: its own piece (the owner's, 2026-11-12: the chopsticks themselves a piece to be moved, said three times)) */}
+                  <Movable id={`chopsticks${seat}`} label={`筷架（座位 ${no}）`}>
+                    <group ref={keep(k++)} name={`chop-set-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷架', '靛藍釉的筷架，黑漆塗箸擱在上面')}>
                       <StaticBatch plain><group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group></StaticBatch>
-                      {/* (the chopsticks' own reach, to be pointed at: they're BarChopsticks', instanced) */}
+                    </group>
+                  </Movable>
+                  {/* (the pair of chopsticks: a piece of its own, moved apart from the rest; BarChopsticks, instanced, lays them where this stands, and
+                      picks them up for its customer; the box here is only their reach, to be pointed at and chosen) */}
+                  <Movable id={`chopstickpair${seat}`} label={`筷子（座位 ${no}）`}>
+                    <group ref={keep(k++)} name={`chop-pair-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷子', '黑漆塗箸，客人開動時拿起來')}>
                       <mesh visible={false} position={[0, 0.012, 0]}><boxGeometry args={[SETTING.chopL + 0.01, 0.026, 0.04]} /></mesh>
                     </group>
                   </Movable>
@@ -2779,7 +2784,7 @@ const BarChopsticks = memo(function BarChopsticks() {
     const hull = mergeVertices(shape, 1e-5)
     hull.computeVertexNormals()
     // (each place's two sticks where they lie, in the bars' frame: its counter, its place along it, and each stick on the rest; as laid
-    // there, and moved with their set's piece once it's drawn (BarTableware's chop-set-<place>, moved in edit mode as it may be))
+    // there, and moved with their own piece once it's drawn (BarTableware's chop-pair-<place>, moved in edit mode as it may be))
     const places: THREE.Matrix4[][] = []
     const e = new THREE.Euler(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1)
     const onSet = [-1, 1].map((sd) => new THREE.Matrix4().compose(new THREE.Vector3(-SETTING.chopL / 2, 0.0015, sd * 0.0075),
@@ -2813,7 +2818,7 @@ const BarChopsticks = memo(function BarChopsticks() {
     if (parent && (settled.current < 2 || getEdit().on)) {
       let all = true
       made.places.forEach((pair, i) => {
-        const o = sets.current[i]?.parent ? sets.current[i] : (sets.current[i] = scene.getObjectByName(`chop-set-${i}`) ?? null)
+        const o = sets.current[i]?.parent ? sets.current[i] : (sets.current[i] = scene.getObjectByName(`chop-pair-${i}`) ?? null)
         if (!o) { all = false; return }
         o.updateWorldMatrix(true, false)
         const m = new THREE.Matrix4().copy(parent.matrixWorld).invert().multiply(o.matrixWorld)
