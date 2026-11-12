@@ -231,6 +231,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-17', ['kabuto']],
   // (the cats' stand's top step deeper and shorter, the big cats either side of it, the koban in its middle (the owner's, 2026-11-12))
   ['jgs-edit-relaid-18', ['doorcat0', 'doorcat1', 'koban']],
+  // (the shrine's pieces where the owner set them made their defaults, and what was kept for them reset (the owner's, 2026-11-13: 'then reset them all'))
+  ['jgs-edit-relaid-19', ['shrinecups', 'oranges', 'oranges2', 'shrinelamp-1', 'shrinelamp1', 'vase-1', 'vase1', 'flask', 'sutra']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -301,12 +303,20 @@ export const useListHot = (id: string) =>
  */
 export const BASES: Record<string, V3> = {
   // (the shrine's oranges and its cups' stand set by hand at X 0.027 and X 0.050 in the room's frame)
-  oranges: [0.0275, 0, 0],
-  shrinecups: [0.0502, 0, 0],
   // (the sutra moved Z -0.030 and both vases X 0.07 along their own axes (the shelf's: X back toward the wall, Z along it), as the owner set them)
-  sutra: [0, 0, -0.03],
-  'vase-1': [0.07, 0, 0],
-  vase1: [0.07, 0, 0],
+  // (and then, the owner's, 2026-11-13, each as the panel reads it (its own axes: X along the shelf, Z out from the wall), then all reset:
+  // 清酒杯與琉璃台 X 0.115; 三方（橘子） X 0.025 Z -0.080; 三方（糯米糰子） X 0.080 Z -0.140; 神前廊燈（左） X -0.03 Z -0.03; 神前廊燈（右）
+  // X 0.03 Z -0.03; both vases Z -0.03; 御神酒壺 X 0.0425 Z -0.15; 經書 X 0.035 Z -0.142; taken into the shelf's own units (its frame
+  // turned -90°: the panel's X its Z, the panel's Z its -X), added to where each stood)
+  oranges: [0.0275 + 0.08, 0, 0.025],
+  oranges2: [0.14, 0, 0.08],
+  shrinecups: [0.0502, 0, 0.115],
+  'shrinelamp-1': [0.03, 0, -0.03],
+  shrinelamp1: [0.03, 0, 0.03],
+  flask: [0.15, 0, 0.0425],
+  sutra: [0.142, 0, -0.03 + 0.035],
+  'vase-1': [0.07 + 0.03, 0, 0],
+  vase1: [0.07 + 0.03, 0, 0],
   gate1: [0, 0, 0.16],
   gate0: [0, 0, 0.17],
   // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
