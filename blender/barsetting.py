@@ -352,7 +352,7 @@ def tissue_case(name, W=0.24, H=0.075, D=0.12, r=0.008):
     bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
     mod = body.modifiers.new("round", "BEVEL")
     mod.width = r
-    mod.segments = 2
+    mod.segments = 1
     bpy.ops.object.modifier_apply(modifier=mod.name)
     # (the seam's shadow: the body's top a hair under the lid, and the lid a hair in from its edges)
     bpy.ops.mesh.primitive_cube_add(size=1, location=P(0, H - LT / 2, 0))
@@ -364,7 +364,7 @@ def tissue_case(name, W=0.24, H=0.075, D=0.12, r=0.008):
     mod.segments = 1
     bpy.ops.object.modifier_apply(modifier=mod.name)
     # (the slot: a stadium cut down through the lid and on into the box)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=SD / 2, depth=0.05, location=P(0, H, 0))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=SD / 2, depth=0.05, location=P(0, H, 0))
     cut = bpy.context.view_layer.objects.active
     cut.scale = ((SW + SD) / SD, 1.0, 1.0)
     bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
