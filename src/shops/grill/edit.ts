@@ -716,7 +716,7 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
  * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
  * out of it, and nearer what the till's or the shrine's camera looks at */
 const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', kabuto: 'genkan', 'grp-doorcats': 'genkan',
-  koban: 'genkan', bench: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', coalsack: 'back',
+  koban: 'genkan', bench: 'genkan', bench2: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', coalsack: 'back',
   // (the kitchen's back: the rice station between the cook table and the till was nearer the till's camera; the rice corner and the sake
   // barrel by it in no view's sight at all)
   'grp-ricestation': 'back', 'grp-sink': 'back', 'grp-racks': 'back', 'grp-ricecorner': 'back', sake: 'back', freezer: 'back',

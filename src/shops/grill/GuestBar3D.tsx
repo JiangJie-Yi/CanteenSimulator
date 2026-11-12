@@ -76,7 +76,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_PLACE, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2693,9 +2693,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (across the line in, for a second one waiting beside the first)
     const side = new THREE.Vector3(-(spot.z - door.z), 0, spot.x - door.x).normalize()
     // (the waiting bench (BENCH): against the wall by the genkan, where BENCH_PLACE has it; its places along it, those sat there facing into the room)
+    // (and the second along the wall from it (BENCH2_ALONG); three places on each, the first bench's filled first)
     const bench = new THREE.Vector3(BENCH_PLACE.x, 0, BENCH_PLACE.z), u = new THREE.Vector3(Math.cos(BENCH_PLACE.yaw), 0, -Math.sin(BENCH_PLACE.yaw))
-    const benchSpots = Array.from({ length: BENCH_SEATS }, (_, k) => bench.clone().addScaledVector(u, (k - (BENCH_SEATS - 1) / 2) * BENCH_PLACE.pitch))
-    return { door: door.clone(), wait, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()], bench, benchYaw: BENCH_PLACE.yaw, benchSpots }
+    const bench2 = bench.clone().addScaledVector(u, BENCH2_ALONG)
+    const benchSpots = Array.from({ length: BENCH_SEATS }, (_, k) => (k < BENCH_EACH ? bench : bench2).clone()
+      .addScaledVector(u, ((k % BENCH_EACH) - (BENCH_EACH - 1) / 2) * BENCH_PLACE.pitch))
+    return { door: door.clone(), wait, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()], bench, bench2, benchYaw: BENCH_PLACE.yaw, benchSpots }
   }, [counters, seats, given])
   /** the cashier's chair (its seat's mark, Register's: it may be moved) in the bar's frame: where their hands are, turned round `turn` of the
    * way to the takeaway stand behind them (0: facing the till) */
@@ -4424,7 +4427,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (!way || !at) { sitters.current.delete(v.id); benchChanged = true; continue }
         // (which way the bench faces, as it stands now: across its row of places, away from the wall; and a step out in front of their place, the
         // way to it and from it bending there, clear of the shoe cupboard by the wall)
-        const m0 = BENCH_MARKS.get(0), m1 = BENCH_MARKS.get(BENCH_SEATS - 1)
+        // (the bench their place is on: its first place and its last)
+        const b0 = v.spot - (v.spot % BENCH_EACH), m0 = BENCH_MARKS.get(b0), m1 = BENCH_MARKS.get(b0 + BENCH_EACH - 1)
         if (m0 && m1 && fb) { fb.worldToLocal(m0.getWorldPosition(BENCH_A)); fb.worldToLocal(m1.getWorldPosition(BENCH_B)); BENCH_B.sub(BENCH_A) }
         else BENCH_B.set(Math.cos(BENCH_PLACE.yaw), 0, -Math.sin(BENCH_PLACE.yaw))
         BENCH_B.set(-BENCH_B.z, 0, BENCH_B.x).normalize()
@@ -5370,9 +5374,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <group scale={PEOPLE_SCALE}><WaitingBench /></group>
           </group>
           {/* (its places, where those waiting sit: they go with it, moved by hand) */}
-          {takeoutWay.benchSpots.map((p, k) => (
+          {takeoutWay.benchSpots.slice(0, BENCH_EACH).map((p, k) => (
             <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
           ))}
+        </Movable>
+      )}
+      {/* (the second bench, along the wall toward the cat stand, under the shrine: the same bench, its own three places (the owner's, 2026-11-12)) */}
+      {given && takeoutWay && (
+        <Movable id="bench2" label="候位長凳（二）">
+          <group position={[takeoutWay.bench2.x, BENCH_PLACE.y, takeoutWay.bench2.z]} rotation-y={takeoutWay.benchYaw}>
+            <group scale={PEOPLE_SCALE}><WaitingBench /></group>
+          </group>
+          {takeoutWay.benchSpots.slice(BENCH_EACH).map((p, j) => {
+            const k = BENCH_EACH + j
+            return <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
+          })}
         </Movable>
       )}
       {/* (gone from the bench's list, faded out: drawn so until React takes them away, never back at full (it was ?? 1: a blink of them whole in the

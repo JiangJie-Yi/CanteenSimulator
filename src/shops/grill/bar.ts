@@ -761,12 +761,18 @@ export const STAND_AT = { x: 1.72, z: -2.14, yaw: Math.atan2(-0.59, -0.81) }
  * wait their turn (Roasting puts them on it, `ids` in the order they came, `since` when), are called to the first stool to come free (`up`:
  * GuestBar3D walks them from the bench to it) and give up after BENCH_WAIT (`gone`: out of the door again)
  */
-export const BENCH_SEATS = 4
+/** how many sit on each bench, and on both (the owner's, 2026-11-11: two benches, three to each; one bench of four before) */
+export const BENCH_EACH = 3
+export const BENCH_SEATS = 2 * BENCH_EACH
 /** where the bench stands, in the bar's frame (the owner's, 2026-11-11: against the wall where the door's cat stand was, the stand and the shrine
  * moved along toward the round window): its middle, its turn (its length along the wall, those on it facing into the room) and how far apart its
  * places are along it; `y`, the room's floor there, over the genkan's frame */
 // (y 0: blender/bench.py's bench has its feet at its origin (the old one's 0.169 left it floating, its seat high: the owner's, 2026-11-11))
-export const BENCH_PLACE = { x: -1.18, z: -3.978, y: 0, yaw: 0.6297, pitch: 0.28 }
+// (three to a bench now: their places a third of its length apart, 1.12 long at the customers' size)
+export const BENCH_PLACE = { x: -1.18, z: -3.978, y: 0, yaw: 0.6297, pitch: 0.373 }
+/** the second bench (the owner's, 2026-11-12, the red box: between the cat stand and the first bench, under the shrine): along the wall from
+ * the first, toward the stand, by this much (its middle half way between them: 0.55 m of floor to either, in the world), the same way round */
+export const BENCH2_ALONG = -1.392
 export const BENCH_WAIT = 90
 export const BENCH = { ids: [] as number[], since: new Map<number, number>(), up: new Set<number>(), gone: new Set<number>() }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bench: BENCH, __seatsTaken: SEATS_TAKEN })
