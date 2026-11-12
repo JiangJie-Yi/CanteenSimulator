@@ -576,7 +576,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
         // (washing up at the sink (the owner's, 2026-11-12: the servers had no washing motion): both hands down in front into the basin, the
         // right scrubbing round on the plate, the left holding it, a little dip of the head's height in the arms' reach)
         const k = job.scrub * Math.PI * 10 + (sd > 0 ? 0 : 1.6)
-        hand.position.set(sd * 0.1 + Math.sin(k) * (sd > 0 ? 0.07 : 0.02), 0.27 + (sd > 0 ? Math.abs(Math.sin(k * 0.5)) * 0.03 : 0), 0.34 + Math.cos(k) * (sd > 0 ? 0.04 : 0.01))
+        // (at the basin's height (the counter's top a little over the waist) and out in it, over the plate under the tap: at 0.27 they were
+        // down at the knees, on the floor as seen; 0.36 out, they stopped at the counter's front edge)
+        hand.position.set(sd * 0.1 + Math.sin(k) * (sd > 0 ? 0.07 : 0.02), 0.64 + (sd > 0 ? Math.abs(Math.sin(k * 0.5)) * 0.03 : 0), 0.6 + Math.cos(k) * (sd > 0 ? 0.04 : 0.01))
         hand.rotation.x = -0.9
       }
       if (job?.wipe !== undefined && sd > 0) {
