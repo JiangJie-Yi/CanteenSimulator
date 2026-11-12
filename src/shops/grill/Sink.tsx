@@ -92,8 +92,39 @@ const POOL = (() => {
   reflectStudio(g)
   return g
 })()
-/** where the plug lies out of the drain, from where it sits in it: on the basin's floor beside the drain, tipped a little on its edge */
-const PLUG_OUT = new THREE.Vector3(0.075, 0.016, 0.065)
+/** where the plug lies out of the drain (the owner's, 2026-11-13, circled: on the counter by the tap's foot, to its left), in the model's frame
+ * (blender/sink.py: the counter's top at 0.86, the basin's back wall at z -0.28 and its floor at 0.64, the tap at x -0.40 z -0.355) */
+const SINK_TOP = 0.86, BASIN_BACK = -0.28, BASIN_FLOOR = 0.64
+const PLUG_REST = new THREE.Vector3(-0.475, SINK_TOP, -0.35)
+/**
+ * The plug's chain (the owner's, 2026-11-13: "add a chain"): from a little eye on the basin's back rim before where the plug's laid, over the
+ * rim, down the back wall and along the floor to the ring on the plug's top in the drain; drawn shorter as the plug comes out to lie by
+ * it. Low-poly: each link one small card with a link drawn on it (see-through round it), each turned a quarter to the one before, as a
+ * chain's links lie; one draw for all of them
+ */
+const CHAIN_STEP = 0.0125, CHAIN_MAX = 64
+const CHAIN_EYE = new THREE.Vector3(-0.475, SINK_TOP + 0.003, BASIN_BACK - 0.01)
+const CHAIN_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 32; c.height = 64
+  const g = c.getContext('2d')!
+  g.clearRect(0, 0, 32, 64)
+  g.strokeStyle = '#ffffff'; g.lineWidth = 7
+  g.beginPath(); g.moveTo(9, 16); g.arc(16, 16, 7, Math.PI, 0); g.lineTo(23, 48); g.arc(16, 48, 7, 0, Math.PI); g.closePath(); g.stroke()
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+const CHAIN_MAT = (() => {
+  const m = new THREE.MeshStandardMaterial({ color: '#c8cdd4', map: CHAIN_TEX, alphaTest: 0.5, side: THREE.DoubleSide, metalness: 0.7, roughness: 0.35 })
+  reflectStudio(m)
+  return m
+})()
+const CHAIN_GEO = new THREE.PlaneGeometry(0.0085, 0.0165)
+const CHAIN_UP = new THREE.Vector3(0, 1, 0), CHAIN_Q = new THREE.Quaternion(), CHAIN_TWIST = new THREE.Quaternion(), CHAIN_M = new THREE.Matrix4()
+const CHAIN_P = new THREE.Vector3(), CHAIN_D = new THREE.Vector3(), CHAIN_S = new THREE.Vector3(1, 1, 1), CHAIN_NONE = new THREE.Matrix4().makeScale(0, 0, 0)
+const CHAIN_PTS = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
 const WATER = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.6, depthWrite: false, toneMapped: false })
 const SPLASH = new THREE.MeshBasicMaterial({ color: '#e8f6fc', transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
 
@@ -137,7 +168,7 @@ const RACK_OUT = 0.16
 export function SinkModel() {
   useStudio()
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const { root, tip, floor, handle, door, rack, rackZ, ringAt, steamAt, plug, plugAt, pool, poolY, base, rise } = useMemo(() => {
+  const { root, tip, floor, handle, door, rack, rackZ, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise } = useMemo(() => {
     const r = gltf.scene.clone(true)
     // (what stands on it taken off: each placed as a piece of its own)
     for (const set of SINK_SETS) r.getObjectByName(set.node)?.removeFromParent()
@@ -148,9 +179,17 @@ export function SinkModel() {
     const base = new THREE.Box3().setFromObject(pool).min.y, poolY = pool.position.y
     const plug = new THREE.Group()
     for (const n of ['SinkPlug', 'SinkPlugRing']) plug.add(lift(n))
-    const plugAt = new THREE.Box3().setFromObject(plug).getCenter(new THREE.Vector3())
+    const plugBox = new THREE.Box3().setFromObject(plug)
+    const plugAt = plugBox.getCenter(new THREE.Vector3())
     for (const o of plug.children) o.position.sub(plugAt)
     plug.position.copy(plugAt)
+    // (out of the drain it stands on the counter by the tap: its foot on the counter's top; and its ring's top, where the chain's made fast)
+    const plugOut = new THREE.Vector3(PLUG_REST.x - plugAt.x, PLUG_REST.y + (plugAt.y - plugBox.min.y) - plugAt.y, PLUG_REST.z - plugAt.z)
+    const ringTop = plugBox.max.y - plugAt.y
+    const chain = new THREE.InstancedMesh(CHAIN_GEO, CHAIN_MAT, CHAIN_MAX)
+    chain.frustumCulled = false
+    chain.raycast = () => {}
+    chain.castShadow = false
     const top = r.getObjectByName('SinkWaterTop')!.getWorldPosition(new THREE.Vector3()).y
     // (and the tap's handle, turned as the water's turned on and off: in a group of its own, to take the pointer; and the washer's door,
     // turned down about its hinge as it's loaded and emptied, and its basket, slid out with it (the plates' marks in it go with it))
@@ -182,10 +221,10 @@ export function SinkModel() {
     mergeByMaterial(rack)
     door.position.copy(doorAt)
     rack.position.copy(rackAt)
-    return { root: r, tip, floor, handle, door, rack, rackZ: rackAt.z, ringAt, steamAt, plug, plugAt, pool, poolY, base, rise: top - base }
+    return { root: r, tip, floor, handle, door, rack, rackZ: rackAt.z, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise: top - base }
   }, [gltf])
   // (the plug's way out of the drain and back: 0 in, 1 lying beside it)
-  const plugOut = useRef(SINK.plug ? 0 : 1)
+  const plugK = useRef(SINK.plug ? 0 : 1)
   // (the washer's door eased down and up; it drops forward, about its foot)
   const opened = useRef(0)
   // (what it was doing a moment ago, when it finished, and its steam's strength)
@@ -229,10 +268,36 @@ export function SinkModel() {
     pool.position.y = poolY + rise * SINK.water
     POOL.opacity = SINK.water > 0.002 ? 0.38 : 0
     // (the plug lifted out and laid by the drain, or back in: up out of the hole first, then over)
-    plugOut.current += ((SINK.plug ? 0 : 1) - plugOut.current) * Math.min(1, Math.min(dt, 0.1) * 6)
-    const k = plugOut.current
-    plug.position.set(plugAt.x + PLUG_OUT.x * k, plugAt.y + PLUG_OUT.y * k + Math.sin(Math.PI * k) * 0.05, plugAt.z + PLUG_OUT.z * k)
-    plug.rotation.z = 0.12 * k
+    plugK.current += ((SINK.plug ? 0 : 1) - plugK.current) * Math.min(1, Math.min(dt, 0.1) * 6)
+    const k = plugK.current
+    // (up out of the hole and over the basin's back wall in an arc, down on the counter by the tap; a little tipped on the way)
+    plug.position.set(plugAt.x + plugOut.x * k, plugAt.y + plugOut.y * k + Math.sin(Math.PI * k) * 0.12, plugAt.z + plugOut.z * k)
+    plug.rotation.z = 0.15 * Math.sin(Math.PI * k)
+    // (the chain from its eye on the rim over the edge, down the wall and along the floor to the plug's ring; the wall and floor runs drawn
+    // in as the plug comes out, so it's the rim to the ring on the counter)
+    {
+      const [a, b, c, d] = CHAIN_PTS
+      a.copy(CHAIN_EYE)
+      b.set(CHAIN_EYE.x, SINK_TOP + 0.003, BASIN_BACK + 0.006)
+      c.set(THREE.MathUtils.lerp(CHAIN_EYE.x, plug.position.x, 0.35), BASIN_FLOOR + 0.004, BASIN_BACK + 0.012).lerp(b, k)
+      d.copy(plug.position).y += ringTop
+      let n = 0, carry = 0
+      for (let i = 0; i < 3 && n < CHAIN_MAX; i++) {
+        const p0 = CHAIN_PTS[i], p1 = CHAIN_PTS[i + 1]
+        const len = p0.distanceTo(p1)
+        if (len < 1e-5) continue
+        CHAIN_D.copy(p1).sub(p0).divideScalar(len)
+        CHAIN_Q.setFromUnitVectors(CHAIN_UP, CHAIN_D)
+        for (let s = carry; s < len && n < CHAIN_MAX; s += CHAIN_STEP, n++) {
+          CHAIN_P.copy(p0).addScaledVector(CHAIN_D, s)
+          CHAIN_TWIST.setFromAxisAngle(CHAIN_D, n % 2 ? Math.PI / 2 : 0).multiply(CHAIN_Q)
+          chain.setMatrixAt(n, CHAIN_M.compose(CHAIN_P, CHAIN_TWIST, CHAIN_S))
+        }
+        carry = (carry + Math.ceil((len - carry) / CHAIN_STEP) * CHAIN_STEP) - len
+      }
+      for (let i = n; i < CHAIN_MAX; i++) chain.setMatrixAt(i, CHAIN_NONE)
+      chain.instanceMatrix.needsUpdate = true
+    }
     // (heard running, as loud as it's near)
     const near = Math.max(0, Math.min(1, 1 - (root.getWorldPosition(SINK_AT_V).distanceTo(camera.position) - 1.5) / 7))
     tapRunning('sink', on ? near : 0)
@@ -300,6 +365,7 @@ export function SinkModel() {
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.plug = !SINK.plug; tapTurnSound(SINK.plug, 0.4); tipOver('塞子', plugSays()).onPointerOver(e) }}>
         <primitive object={plug} />
       </group>
+      <primitive object={chain} />
       {/* (the washer's door: pointed at it lights and says what the washer's doing; clicked, down or up (not while it washes)) */}
       <group onPointerOver={(e) => { if (getEdit().on) return; hov.current = 'door'; tipOver('洗碗機', doorSays()).onPointerOver(e) }}
         onPointerOut={(e) => { if (hov.current === 'door') hov.current = null; if (getEdit().on) return; tipOver('洗碗機', '').onPointerOut(e) }}
