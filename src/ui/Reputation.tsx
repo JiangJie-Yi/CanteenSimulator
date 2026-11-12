@@ -103,8 +103,9 @@ const remarkLine = (v: Visit) => {
   return lines[Math.abs(v.id * 31 + Math.round(v.waited) * 7 + Math.round(v.taste ?? 0)) % lines.length]
 }
 
-/** five stars, filled as far as `v` (1..5) goes */
-function Stars({ v, big = false }: { v: number; big?: boolean }) {
+/** five stars, filled as far as `v` (1..5) goes (drawn again only when `v` changes: each row's had its ten stars drawn again with every
+ * redraw of the list, 186 a second while the shop was open, item 24) */
+const Stars = memo(function Stars({ v, big = false }: { v: number; big?: boolean }) {
   return (
     <span className={`rep-stars${big ? ' is-big' : ''}`} aria-hidden="true">
       {/* (drawn stars, ui/GameIcons: no characters (the owner's)) */}
@@ -112,7 +113,7 @@ function Stars({ v, big = false }: { v: number; big?: boolean }) {
       <span className="rep-stars-fill" style={{ width: `${Math.max(0, Math.min(1, v / 5)) * 100}%` }}>{[0, 1, 2, 3, 4].map((i) => <StarIcon key={i} size="1em" />)}</span>
     </span>
   )
-}
+})
 
 // (drawn again only when it opens or shuts, or a new visit is rated: the shop's own re-renders, several a second while it's open, pass it by)
 /** each visit's own key for the list, given the first time it's shown and kept: keyed by its place, every row was made again as a new

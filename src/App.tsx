@@ -2350,9 +2350,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // tiredness: the open shop's staff tire as they work (the less stamina, the faster), everyone else rests; and wages
+  // (the clock, the meter and what's counted by the second still tick every second; the staff's tiredness and the wage and the water and
+  // power booked to the ledger every fifth, as five seconds' worth: each of those is a redraw of the whole page, and at one a second, with the
+  // payments and the talk, the page was drawn three times a second, each one 30-50 ms in the dev build: the stutter at closing time, item 24)
+  const slowTick = useRef({ n: 0, wage: 0, utility: 0 })
   useEffect(() => {
     const id = window.setInterval(() => {
-      setHired((h) => {
+      const st5 = slowTick.current
+      st5.n++
+      const fifth = st5.n % 5 === 0
+      if (fifth) setHired((h) => {
         // (nothing changes for someone fully rested and resting: then nothing re-renders)
         let changed = false
         const next: typeof h = {}
@@ -2366,9 +2373,9 @@ export default function App() {
             // (faster in the deep night, and as their special skills make it (the owner's); resting, not below what a run of days leaves)
             // (at work, as they're about (the owner's): busy, tiring; standing by, hardly; slacking, getting a little back (data/staff's
             // workFatigue); the cashier idle while no one's paying)
-            if (working && w.role === 'cashier') idleTick(wid, TILL_STATE.k < 0, GAME_SPEED.value)
-            const fatigue = working ? workFatigue(st.fatigue, tireNow(w, LATE.on), activityOf(STAFF_IDLE.get(wid)), GAME_SPEED.value / 60)
-              : Math.max(Math.min(st.fatigue, st.floor ?? 0), st.fatigue - restPerHour / 60 * GAME_SPEED.value)
+            if (working && w.role === 'cashier') idleTick(wid, TILL_STATE.k < 0, GAME_SPEED.value * 5)
+            const fatigue = working ? workFatigue(st.fatigue, tireNow(w, LATE.on), activityOf(STAFF_IDLE.get(wid)), GAME_SPEED.value * 5 / 60)
+              : Math.max(Math.min(st.fatigue, st.floor ?? 0), st.fatigue - restPerHour / 60 * GAME_SPEED.value * 5)
             if (w.skills?.length) STAFF_SKILLS.set(wid, w.skills)
             else STAFF_SKILLS.delete(wid)
             if (fatigue !== st.fatigue) changed = true
@@ -2397,7 +2404,7 @@ export default function App() {
       // (the hours over (04:30, the owner's): shut up as by hand, last orders and all)
       if (aiRef.current.ai && hoursEnd(was, getClock().minute)) hoursOver.current()
       // (and the chef's wage, by the second while the shop's open: in the same tick, so the two are one redraw of the page, not two)
-      if (aiRef.current.ai) book('wage', aiRef.current.wage / 3600 * GAME_SPEED.value)
+      if (aiRef.current.ai) st5.wage += aiRef.current.wage / 3600 * GAME_SPEED.value
       // (and the water and power (the owner's: what keeping it going costs), metered by the second against the month)
       const k = GAME_SPEED.value
       const uses = UTILITY.uses
@@ -2409,7 +2416,13 @@ export default function App() {
       const m = meterAdd(meterRef.current, energyOver(k, { open: aiRef.current.ai, lights: getLights().on, door: getLights().door, wcM: getLights().wc.m, wcF: getLights().wc.f, fire: fire.current > 0, music: !getBgmOff(),
         freezerSet: FREEZER_TEMP.set, freezerOpen: FREEZER.open, fridgeOpen: CUBBY_OPEN.left || CUBBY_OPEN.right }), uses)
       meterRef.current = m.meter
-      if (m.cost > 0) book('utility', m.cost)
+      if (m.cost > 0) st5.utility += m.cost
+      // (booked every fifth second, together: one redraw)
+      if (fifth) {
+        if (st5.wage > 0) book('wage', st5.wage)
+        if (st5.utility > 0) book('utility', st5.utility)
+        st5.wage = 0; st5.utility = 0
+      }
       meterTick.current++
       if (meterTick.current % 5 === 0) setMeterShown(m.meter)
       if (meterTick.current % 15 === 0) { try { localStorage.setItem(METER_KEY, JSON.stringify(m.meter)) } catch { /* (not kept) */ } }
