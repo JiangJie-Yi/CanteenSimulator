@@ -64,6 +64,32 @@ export function sweepPose(t: number, lean = SWEEP_LEAN.server) {
   SWEEP.lower.copy(SWEEP.foot).addScaledVector(SWEEP.dir, BROOM_LEN * 0.6)
   return SWEEP
 }
+/**
+ * The owner sweeps stooped over with a small hand broom (the owner's, 2026-11-12: he needs to bend over, with a little broom): his whole figure
+ * tipped forward `OWNER_BEND` about his feet (GuestBar3D's OwnerWalker), the broom half the length, its foot on the floor out before him and its
+ * top held low, both his hands on it. Worked out where it is in the room's upright frame (floor at y 0, forward z) and carried back into his
+ * tipped one, so the foot is on the floor whatever the bend
+ */
+export const OWNER_BEND = 0.5
+export const OWNER_SMALL = 0.5
+const OWNER_SWEEP = { foot: new THREE.Vector3(), dir: new THREE.Vector3(), upper: new THREE.Vector3(), lower: new THREE.Vector3() }
+const OWNER_TOP = new THREE.Vector3()
+const unbend = (v: THREE.Vector3) => {
+  const c = Math.cos(OWNER_BEND), n = Math.sin(OWNER_BEND)
+  return v.set(v.x, v.y * c + v.z * n, -v.y * n + v.z * c)
+}
+export function ownerSweepPose(t: number) {
+  const s = Math.sin(t * Math.PI * 1.8)
+  const f = OWNER_SWEEP
+  f.foot.set(-0.04 + s * 0.11, 0.03, 0.5)
+  OWNER_TOP.set(-0.06 + s * 0.03, 0.4, 0.38)
+  f.dir.copy(OWNER_TOP).sub(f.foot).normalize()
+  const L = BROOM_LEN * OWNER_SMALL
+  f.upper.copy(f.foot).addScaledVector(f.dir, L * 0.92)
+  f.lower.copy(f.foot).addScaledVector(f.dir, L * 0.62)
+  unbend(f.foot); unbend(f.upper); unbend(f.lower); unbend(f.dir)
+  return f
+}
 const UP_Y = new THREE.Vector3(0, 1, 0)
 /** the broom, made over for the room (its toon light; its straw, bamboo and cord as they're made), a copy for each who might hold it, hidden */
 function makeBroom(src: THREE.Object3D) {
@@ -88,22 +114,22 @@ const BROOM_MATS = new Map<THREE.Material, THREE.Material>()
  * pose; carried upright at their side, its foot clear of the floor. For a figure that isn't a StaffFigure (the owner out serving, GuestBar3D's
  * OwnerWalker): it finds its holder's userData up the way
  */
-export function SweepBroom({ lean = SWEEP_LEAN.server }: { lean?: number }) {
+export function SweepBroom({ lean = SWEEP_LEAN.server, owner = false }: { lean?: number; owner?: boolean }) {
   const gltf = useGLTF(BROOM_URL) as unknown as { scene: THREE.Group }
-  const broom = useMemo(() => makeBroom(gltf.scene), [gltf])
+  const broom = useMemo(() => { const b = makeBroom(gltf.scene); if (owner) b.scale.setScalar(OWNER_SMALL); return b }, [gltf, owner])
   const g = useRef<THREE.Group>(null)
   useFrame(() => {
     let job: { sweep?: number; broom?: boolean } | undefined
     for (let q = g.current?.parent ?? null, k = 0; q && k < 4; q = q.parent, k++) if ('broom' in q.userData) { job = q.userData; break }
-    poseBroom(broom, job?.sweep, !!job?.broom, null, lean)
+    poseBroom(broom, job?.sweep, !!job?.broom, null, lean, owner)
   })
   return <group ref={g}><primitive object={broom} /></group>
 }
 /** the broom posed: swept (`sweep` seconds in), carried (by `hand`, or at the side), or put away */
-function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: boolean, hand: THREE.Object3D | null, lean = SWEEP_LEAN.server) {
+function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: boolean, hand: THREE.Object3D | null, lean = SWEEP_LEAN.server, owner = false) {
   broom.visible = sweep !== undefined || carried
   if (sweep !== undefined) {
-    const p = sweepPose(sweep, lean)
+    const p = owner ? ownerSweepPose(sweep) : sweepPose(sweep, lean)
     broom.position.copy(p.foot)
     broom.quaternion.setFromUnitVectors(UP_Y, p.dir)
   } else if (carried) {

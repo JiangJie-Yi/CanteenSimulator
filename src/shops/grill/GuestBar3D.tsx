@@ -27,7 +27,7 @@ import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
-import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom, sweepPose, SWEEP_LEAN } from '@/scene/StaffFigure'
+import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom, ownerSweepPose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
 import { BossModel } from './Boss'
@@ -147,9 +147,11 @@ function OwnerWalker({ moving }: { moving: boolean }) {
       if (l && r) hands.current = [l, r].map((node, k) => ({ node, at: node.position.clone(), q: node.quaternion.clone(), upper: k === 0 }))
     }
     const sweep = o.parent?.userData.sweep as number | undefined
+    // (stooped over the small broom while he sweeps, upright after)
+    o.rotation.x += ((sweep !== undefined ? OWNER_BEND : 0) - o.rotation.x) * 0.2
     if (hands.current) for (const h of hands.current) {
       if (sweep === undefined || !h.node.parent) { h.node.position.copy(h.at); h.node.quaternion.copy(h.q); continue }
-      const p = sweepPose(sweep, SWEEP_LEAN.owner)
+      const p = ownerSweepPose(sweep)
       o.updateWorldMatrix(true, false)
       h.node.parent.updateWorldMatrix(true, false)
       h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? p.upper : p.lower))))
@@ -159,7 +161,7 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     <group ref={g}>
       <group scale={OWNER_IN_STAFF}><BossModel /></group>
       {/* (the broom, when he sweeps up broken glass in a server's stead) */}
-      <SweepBroom lean={SWEEP_LEAN.owner} />
+      <SweepBroom owner />
       <mesh ref={tray} position={[HELD_AT[0], HELD_AT[1] + 0.005, HELD_AT[2]]}>
         <cylinderGeometry args={[0.15, 0.14, 0.016, 28]} />
         <meshToonMaterial color="#1c1412" />
