@@ -319,6 +319,9 @@ export const BASES: Record<string, V3> = {
   sutra: [0.142, 0, -0.03 + 0.035],
   'vase-1': [0.07 + 0.03, 0, 0],
   vase1: [0.07 + 0.03, 0, 0],
+  // (the picture by the men's toilet: 3 cm along the wall from its door's frame, which its right edge ran 1 cm into (clips.mjs, the owner's
+  // item 44); in the wall's own frame (z along it))
+  'art-2.2_0.92': [0, 0, -0.03],
   gate1: [0, 0, 0.16],
   gate0: [0, 0, 0.17],
   // (the owner's settled spot: moved by [0.2, 0.19, 0.47] in the room's frame from [-1.508, 0, 1.974], taken into this parent's own units)
