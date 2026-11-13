@@ -83,6 +83,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `node tests/e2e/paths.mjs [url]` | 客人動線檢查：開店後每 0.3 秒量每位走動中的客人四周（膝、胸高度），報告撞到的擺設；坐上自己的椅子不算（`WATCH=<ms>` 觀察時間） |
 | `node tests/e2e/dayaudit.mjs` | 一整天巡檢（約 7 分鐘）：×2 從開店跑到員工下班，每格量每個人物有沒有一格跳太遠或上下一個台階（瞬移），記下跳出的提示與營業日誌（`AT`、`END`、`SHOT`、`JSON`）；開頭共用 `tests/e2e/shop.mjs`（`boot`、`openShop`、`rush`）。整套測試流程與探針清單在 `docs/DETAILS.md`「測試流程」 |
 | `node tests/e2e/crowd.mjs` | 客人走路的跳動與互相穿過：開店搶客 ×2，每格量比走路快的格數、一格跳超過 0.2 的、兩人疊在一起的（誰跟誰）、同一階段時間倒退（`WATCH`、`CALM=1`、`LIST=1`） |
+| `node tests/e2e/flowhealth.mjs` | 流程有沒有卡住：開店 ×2，每 2 秒記客人、盤子、外帶單各在一個狀態多久，水槽、碗盤架、裝盤處、鐵串的數量；印最長的、平均每一刻有幾個髒盤佔著座位、幾盤菜等人端、幾人在長凳等、幾位等菜（改誰先做什麼時用平均、各跑兩次比；`CALM=1` 一般人潮） |
 | `node tests/e2e/clips.mjs [url]` | 穿模檢查：量場景裡每個實心網格，不同擺設（`Movable` 的 id，群組上有 `userData.editId`）的包圍盒重疊時，取一邊的頂點檢查是否埋進另一邊超過 `TOL`（預設 1.5 公分），列出最嚴重的配對（`TOP`、`OUT=<json>`）。模型不是封閉網格（飲料櫃）、本來就插進孔裡的線（收銀台的機器）會誤報 |
 | `node tests/e2e/perf.mjs [free\|grill]` | 效能量測：用這台電腦的真顯示卡（headless Chrome＋ANGLE D3D11，不是軟體 GL）量每秒畫面數、慢的那幾格、每格的繪製次數與三角面、renderer 每格花的時間；`OPEN=<毫秒>` 先開店讓客人進來、`BY=1` 每件擺設各畫幾次、`SUBS=1` 每個 useFrame 的時間、`PROF=1` CPU 剖析、`WHO=1` 誰在呼叫 renderer（多出來的整場重畫會在這裡出現）。頁面加 `?pace=0`，量的時候不會自動降畫質 |
 | `node tests/e2e/alloc.mjs` | 開店時誰在製造垃圾（記憶體配置取樣）：開店、全員到齊、×2，跑 `WARM`（預設 60 秒）後取樣 `SPAN`（預設 30 秒），列出每秒配置幾 MB 與配置最多的函式（含呼叫者）。`BASE=http://localhost:4173`（`npx vite preview`）量正式版：dev 模式光 JSX 就多好幾倍 |
