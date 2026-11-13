@@ -2190,7 +2190,8 @@ export default function App() {
   // (`sticks`: how many went on the bed (the 3D grill places them first; none when it's full, and then nothing is paid); left out (the 2D
   // grill, which has no bed), a portion)
   const addCharcoal = (sticks?: number, byHand = false, fromCrate = false) => {
-    if (!canAddCharcoal(fire.current) || sticks === 0) { say(UI[lang].charcoalFull); return false }
+    // (the bed full: told to the player putting it on by hand; the kitchen's own handful, with the shop open, just doesn't go on)
+    if (!canAddCharcoal(fire.current) || sticks === 0) { if (!ai) say(UI[lang].charcoalFull); return false }
     // (a stick by hand comes out of the crate on the table, already taken from the sack when the crate was filled; a handful comes out of the
     // sack: none left there, none goes on. It was paid for as fuel when it was bought. The third cook's handful's out of the crate too)
     if (!byHand && !fromCrate) {

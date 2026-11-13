@@ -4986,7 +4986,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const taken = new Set(pieces.current.filter((q) => q !== p && q.ringSlot !== undefined).map((q) => q.ringSlot!))
       const k = p.ringSlot !== undefined && !taken.has(p.ringSlot) ? p.ringSlot : freeRingSlot(taken)
       if (k === null) {
-        onNotice?.('fireFull')
+        // (told only to the player putting it on by hand: with the shop open the kitchen does, and waits on its own; the notice, "take the done
+        // ones off first", came up for the player, who can't (the owner's item 35, found on a whole day's audit))
+        if (space !== 'open') onNotice?.('fireFull')
         p.node.userData.onPlate = true
         return false
       }
