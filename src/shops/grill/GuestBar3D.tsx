@@ -4400,7 +4400,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         } else if (v.phase === 'toTill' || v.phase === 'atTill') {
           // (called up by the cashier with their bag: along the genkan's edge to the till, as near as the genkan goes; there, their face to the till)
           v.fade = 1
-          const to = (v.till ??= tillSide(v.wait)), len = v.wait.distanceTo(to), d = Math.min(len, v.t * sp)
+          // (there, stood there: their time put back to nought on arriving, the walk from their place was walked again, from it (item 51:
+          // up to the till, back a body's length at a step to where they'd waited, and up to the till again))
+          const to = (v.till ??= tillSide(v.wait)), len = v.wait.distanceTo(to), d = v.phase === 'atTill' ? len : Math.min(len, v.t * sp)
           v.pos.lerpVectors(v.wait, to, len ? d / len : 1)
           if (v.phase === 'toTill') v.yaw = Math.atan2(to.x - v.wait.x, to.z - v.wait.z)
           if (d >= len && v.phase === 'toTill') { v.phase = 'atTill'; v.t = 0 }

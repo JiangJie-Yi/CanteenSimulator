@@ -1,6 +1,7 @@
 // A whole day watched (the owner's, 2026-11-13: "flows and animations"): the shop opened at x2 and left to run itself from AT through closing
 // till the staff have gone home (END, the next morning), and meanwhile, every frame:
-//   - every figure's place (customers, staff, the owner): one that moves further in a frame than a walk could (JUMP, the world's units) or
+//   - every figure's place (customers, those waiting on the benches, takeaway customers and riders, staff, the owner): one that moves
+//     further in a frame than a walk could (JUMP, the world's units) or
 //     up or down in one (a step's more than half of it) noted with what it was doing: a customer's phase (GuestBar3D's shown), a staff
 //     member's role, every server's phase, how many frames the scene ran in it;
 //   - every notice put up (the bar along the bottom), and every line of the day's log, with the shop's clock.
@@ -9,13 +10,15 @@
 //
 //   npm run dev     (in another terminal)
 //   node tests/e2e/dayaudit.mjs        (AT=<min> opening, 995 = 16:35; END=<min after midnight> 325 = 05:25; LIMIT=<ms>; JUMP; SHOT=<ms>;
-//                                        OUT=<shot prefix>; JSON=<file>, default dayaudit.json)
+//                                        OUT=<shot prefix>; JSON=<file>, default dayaudit.json; RUSH=1 busy)
 // About 7 minutes for a whole day. Each jump's printed; what it means: a server's way back given the wrong way round (item 36), a seat sat
 // on in a frame (37), a step's height twice (42).
 import fs from 'node:fs'
-import { boot, openShop } from './shop.mjs'
+import { boot, openShop, rush } from './shop.mjs'
 const { browser, page: p } = await boot({ width: 1600, height: 900 })
 await openShop(p, { x2: true, at: +(process.env.AT ?? 16 * 60 + 35) })
+// (RUSH=1: a busy evening, the benches filled and takeaways coming (shop.mjs's rush))
+if (process.env.RUSH) await rush(p)
 await p.evaluate((JUMP) => {
   const T = window.__THREE
   const A = window.__audit = { jumps: [], notices: [], chat: [], seen: new Map(), maxStep: {}, frames: 0 }
@@ -24,10 +27,17 @@ await p.evaluate((JUMP) => {
     window.__scene.traverse((o) => {
       const u = o.userData
       if (!u) return
-      if (u.guest !== undefined && u.shown !== undefined) out.push(['guest' + u.guest, o])
+      // (a customer's group: theirs alone has `guest` (not `shown` as well: React hands the group a new userData each time the bar's drawn
+      // again, `shown` back only at the next frame, and a customer missed in that look was put against where they'd been two looks back,
+      // a leap of two or three frames' walk: the second day's audit's 0.6-0.94 at x2)
+      if (u.guest !== undefined) out.push(['guest' + u.guest, o])
       else if (u.staffId !== undefined) out.push(['staff:' + u.staffId, o])
       else if (o.name === 'BossFollow' || o.name === 'plater-walker' || o.name === 'stocker-walker') out.push([o.name, o])
+      // (those waiting on the benches by the genkan)
+      else if (o.name.startsWith('bench-sitter-')) out.push(['bench' + o.name.slice(13), o])
     })
+    // (and the takeaway customers and riders: their groups have no name, only GuestBar3D's own list)
+    for (const [id, o] of window.__visitorObjs?.current ?? []) out.push(['takeout' + id, o])
     return out
   }
   const v = new T.Vector3()
@@ -37,7 +47,10 @@ await p.evaluate((JUMP) => {
   window.__r3f().internal.subscribe({ current: (_st, delta) => { R.calls++; R.maxDelta = Math.max(R.maxDelta, delta) } }, 0, { getState: window.__r3f })
   const clock = () => { const c = window.__clock?.get?.(); return c ? `${String(Math.floor(c.minute / 60) % 24).padStart(2, '0')}:${String(Math.floor(c.minute % 60)).padStart(2, '0')}` : '' }
   const plain = (u) => Object.fromEntries(Object.entries(u).filter(([, b]) => b === null || ['string', 'number', 'boolean'].includes(typeof b)).slice(0, 10))
-  const phaseOf = (o) => {
+  const phaseOf = (o, k) => {
+    // (the plater off their place: what they're about, how far along, the way they're on (GuestBar3D's platerRun))
+    if (k === 'plater-walker') { const r = window.__platerRun?.current; return r ? `${r.phase} t${(+r.t).toFixed(2)} len${(+r.len).toFixed(2)} path${r.path.length}:${r.path.map((q) => q.x.toFixed(2) + ',' + q.z.toFixed(2)).join(' ')}` : null }
+    if (k?.startsWith('takeout')) { const v = window.__visitors?.current?.get(+k.slice(7)); return v ? `${v.rider ? 'rider' : 'takeout'} ${v.phase} t${(+v.t).toFixed(2)}` : null }
     const id = o.userData.guest
     const s = id !== undefined ? (window.__shown?.current ?? []).find((x) => x.id === id) : null
     return s ? `${s.phase} t${typeof s.t === 'number' ? s.t.toFixed(2) : s.t} seat${s.seat}` : null
@@ -47,12 +60,16 @@ await p.evaluate((JUMP) => {
     prevT = now
     A.frames++
     for (const [k, o] of figures()) {
+      // (one just put in the scene and not yet stood anywhere (its group at its parent's origin till the next frame places it): not looked
+      // at, else it leapt from there to the door the frame after)
+      if (o.position.x === 0 && o.position.y === 0 && o.position.z === 0) { A.seen.delete(k); continue }
       let vis = true
       for (let q = o; q; q = q.parent) if (!q.visible) { vis = false; break }
       // (where it was drawn: its world matrix as the last render left it, nothing updated from here)
       v.setFromMatrixPosition(o.matrixWorld)
       const prev = A.seen.get(k)
-      if (prev && prev.vis && vis && dt < 250 && prev.o === o) {
+      // (and only against the look before this one: one missed in it isn't put against an older place)
+      if (prev && prev.vis && vis && dt < 250 && prev.o === o && prev.n === A.frames - 1) {
         const d = Math.hypot(v.x - prev.x, v.z - prev.z), dy = Math.abs(v.y - prev.y)
         const kind = k.replace(/[0-9]+$/, '').replace(/:.*/, '')
         A.maxStep[kind] = Math.max(A.maxStep[kind] ?? 0, d)
@@ -61,11 +78,11 @@ await p.evaluate((JUMP) => {
           o.traverse((m) => { if (m.userData?.staffRole && !role) role = m.userData.staffRole })
           A.jumps.push({ k, at: clock(), d: +d.toFixed(2), dy: +dy.toFixed(2), dt: Math.round(dt), role,
             from: [prev.x, prev.y, prev.z].map((n) => +n.toFixed(2)), to: [v.x, v.y, v.z].map((n) => +n.toFixed(2)),
-            phase: phaseOf(o), prevPhase: prev.phase, waiters: (window.__waiters?.current ?? []).map((w) => `${w.phase} t${(+w.t).toFixed(2)}`).join(', '),
+            phase: phaseOf(o, k), prevPhase: prev.phase, waiters: (window.__waiters?.current ?? []).map((w) => `${w.phase} t${(+w.t).toFixed(2)}`).join(', '),
             frames: `${R.calls}x${R.maxDelta.toFixed(3)}`, ud: plain(o.userData) })
         }
       }
-      A.seen.set(k, { x: v.x, y: v.y, z: v.z, vis, o, phase: phaseOf(o) })
+      A.seen.set(k, { x: v.x, y: v.y, z: v.z, vis, o, phase: phaseOf(o, k), n: A.frames })
     }
     R.calls = 0; R.maxDelta = 0
     requestAnimationFrame(tick)
