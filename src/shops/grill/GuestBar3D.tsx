@@ -4676,7 +4676,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       })
       else if (w.phase === 'skWash' && w.t > SKEWER_WASH_S) { meterWater('dish'); go(kitchenRoute(w.pos, skewerSpot('skewer-holder', w.pos)), 'skHolderGo') }
       else if (w.phase === 'skHolderGo') walk(() => { w.phase = 'skPut'; face(inBar('skewer-holder', w.pos)) })
-      else if (w.phase === 'skPut' && w.t > 0.5) { SKEWERS.s = putBackClean(SKEWERS.s); rattleSound(); go(kitchenRoute(w.pos, home.at), 'back') }
+      // ('back' walks its way from its end to its start, so it's given from their place to where they are, as every other way back is: given the
+      // other way round, they were at their place the moment they set off, walked back out to the holder and were at their place again)
+      else if (w.phase === 'skPut' && w.t > 0.5) { SKEWERS.s = putBackClean(SKEWERS.s); rattleSound(); go(kitchenRoute(home.at, w.pos), 'back') }
       else if (w.phase === 'sweepGo') walk(() => {
         // (at the broken glass: facing it, broom down, a word to the room)
         w.phase = 'sweep'
@@ -4728,7 +4730,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (w.box !== undefined) TAKEOUT_STAND.bags.push(w.box)
         boxClaimed.current.delete(w.box ?? -1)
         w.box = undefined
-        go(w.path.slice(0, -1).reverse().concat(home.at.clone()).map((v, i) => (i === 0 ? w.pos.clone() : v)), 'back')
+        // (the way they came, from their place to here: walked from its end, here, back to its start (the owner's item 36: given from here,
+        // they were back inside their gate the moment they set off, walked out to the stand again, and were at their place again, at a jump
+        // each time, every takeaway the cashier handed over)
+        go([home.at.clone(), ...w.path.slice(0, -1).map((v) => v.clone()), w.pos.clone()], 'back')
       } else if (w.phase === 'toTill') walk(() => {
         w.phase = 'hand'
         const v = visitors.current.get(w.box ?? -1)
