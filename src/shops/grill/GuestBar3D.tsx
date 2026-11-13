@@ -99,6 +99,10 @@ const LAY = new THREE.Vector3(0.59, 0, 0.81)       // toward the camera (the coo
 const ALONG = new THREE.Vector3(0.81, 0, -0.59)    // along the first counter
 const SPEED = 1.32                                  // how fast they walk in and out (per second: unhurried, the owner's)
 const SERVER_SPEED = 2.1                            // and the servers, carrying (brisk)
+// (stepping aside for each other (the owner's item 45): how far ahead they see someone coming (seconds), how quick a step aside is (per
+// second: about a walk), the fastest anyone walks (a quicker move between two frames is a leap, a phase begun elsewhere, not a walk))
+const AHEAD_S = 0.6, ASIDE_V = 1.5, WALK_MOST = 3.2
+const STOCKER_KEY = -99
 const INK = '#3b2a20'
 
 /** toon material, and its ink outline (a slightly bigger back-faced shell) */
@@ -266,6 +270,8 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
  * as a trip carries) and goes back to the crates.
  */
 const STOCK_CARRY = 8
+/** the stock keeper's figure (in the bar's frame, as the customers' are): they step round him as they do the servers (the owner's item 45) */
+const STOCKER_FIG: { o: THREE.Object3D | null } = { o: null }
 // (he walks by his own frame loop: drawn again only if he or the room changes, not with every redraw of the bar)
 /** a washroom's paper towels or soap down to where they're topped up, with a spare in stock for it: the stock keeper goes round to it */
 const wcLow = (w: 'm' | 'f') => {
@@ -519,7 +525,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
   useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear(); for (const f of FRIDGE_STATE) f.stocker = false }, [])
   return (
-    <group ref={(o) => { g.current = o; if (o) FIGURES.set(o, 'other') }} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
+    <group ref={(o) => { g.current = o; STOCKER_FIG.o = o; if (o) FIGURES.set(o, 'other') }} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
       <BlobShadow r={0.17} />
       <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
       <Html position={[0, 1.95, 0]} center zIndexRange={[19, 9]} style={{ pointerEvents: 'none' }}>
@@ -2601,6 +2607,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const groups = useRef(new Map<number, THREE.Group>())
   /** two customers passing each other: which way each steps aside, as they first met (keyed by their ids, low|high) */
   const passing = useRef(new Map<string, { x: number; z: number }>())
+  /** how far each walker's stepped aside off their way just now (eased to what's needed), and where their way had them the frame before
+   * (keyed by id: a customer's, a server's -1 - i, the stock keeper's) */
+  const aside = useRef(new Map<number, { x: number; z: number; f: number }>())
+  const lastAt = useRef(new Map<number, { x: number; z: number; f: number }>())
+  const asideTick = useRef(0)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestGroups?: typeof groups }).__guestGroups = groups
   const clock = useRef(0)
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
@@ -3189,7 +3200,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const s = shownRef.current.find((x) => x.id === g.id)
       if (s && g.state !== 'waiting' && g.state !== 'eating' && s.phase !== 'leave') clear(g.id)
     }
-    // (the same list back when nobody comes or goes: then the bar isn't drawn again for it)
+    // (one done, or gone off in a huff: away at the toilet, they go once they're back at their stool; done and satisfied, a tissue to the
+    // mouth first, then up (the frame's 'sit'); in a huff, straight up. Marked on their own entry, as the frame loop marks it: a copy put in
+    // the list in their place was made from them as the list was next drawn, and the frame loop walked them on a few frames more before it
+    // had the copy, which put them back by those frames along their way, a jump back on the way out of the toilet (item 45))
+    let marked = false
+    for (const g of guests) {
+      const s = shownRef.current.find((x) => x.id === g.id)
+      if (!s || g.state === 'waiting' || g.state === 'eating' || s.phase === 'leave' || s.leaving || s.wipeAt) continue
+      if (s.phase.startsWith('wc')) s.leaving = true
+      else if (s.phase === 'sit' && g.state === 'done') s.wipeAt = performance.now()
+      else { s.phase = 'leave'; s.t = 0 }
+      marked = true
+    }
+    if (marked) redraw()
+    // (the same list back when nobody comes: then the bar isn't drawn again for it)
     setShown((cur) => {
       let next = cur
       for (const g of guests) {
@@ -3204,11 +3229,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const from = benchFrom.current.get(g.id) ?? (BENCH.up.has(g.id) ? sitters.current.get(g.id)?.pos.clone() : undefined)
           if (from) benchFrom.current.delete(g.id)
           if (seat !== undefined) next = [...next, from ? { id: g.id, seat, phase: 'enter', t: 0, from, welcomed: true } : { id: g.id, seat, phase: 'enter', t: 0 }]
-        } else if (s && !seated && s.phase !== 'leave' && !s.leaving && !s.wipeAt) {
-          // (away at the toilet: they go once they're back at their stool; done and satisfied, a tissue to the mouth first, then up (the
-          // frame's 'sit'); gone off in a huff, straight up)
-          next = next.map((x) => (x.id === g.id ? (x.phase.startsWith('wc') ? { ...x, leaving: true }
-            : x.phase === 'sit' && g.state === 'done' ? { ...x, wipeAt: performance.now() } : { ...x, phase: 'leave', t: 0 }) : x))
         }
       }
       return next
@@ -3671,63 +3691,88 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     CHOPS_UP.clear()
     for (const x of shown) if (x.phase === 'sit' && FED.has(x.id)) CHOPS_UP.add(x.seat)
     // nobody walks through anybody: those walking (in, out, to the toilet or the fridge) keep a body's width apart,
-    // stepping aside for each other and for the servers (who keep to their way, their trays held level)
+    // stepping aside for each other, and for the servers and the stock keeper (who keep to their way, their trays and cases held level)
+    // (seen coming, and stepped aside at a walk (the owner's item 45, 2026-11-13): pushed apart only once they'd walked into each other, a
+    // customer met head on by a server with a tray stood half in them for a frame, and in the next was thrown up to half a body's width
+    // aside at x2 (tests/e2e/_pushjump.mjs); and the stock keeper they walked right through. Now how near each two will pass is seen from how
+    // they're going (where their ways had them this frame and the last): the nearest they'll come within AHEAD_S seconds. The step aside
+    // that needs is taken as they come up, the more the nearer they are to passing, and each one's step aside is eased to that, and back
+    // onto their way once they're by, no quicker than ASIDE_V)
     {
-      const walkers: { p: THREE.Vector3; give: boolean; id: number }[] = []
+      const step = Math.min(dt, 0.1)
+      const stamp = ++asideTick.current
+      const walkers: { p: THREE.Vector3; give: boolean; id: number; vx: number; vz: number; ax: number; az: number }[] = []
+      const add = (p: THREE.Vector3, give: boolean, id: number) => {
+        // (how they're going: from where their way had them the frame before; a leap (a phase begun somewhere else) is no walk)
+        const was = lastAt.current.get(id)
+        let vx = 0, vz = 0
+        if (was && step > 0) { vx = (p.x - was.x) / step; vz = (p.z - was.z) / step }
+        if (vx * vx + vz * vz > WALK_MOST * WALK_MOST) { vx = 0; vz = 0 }
+        walkers.push({ p, give, id, vx, vz, ax: 0, az: 0 })
+      }
       for (const x of shown) {
         if (x.phase === 'wcIn' && x.wc?.who !== 'drink') continue
         const gp = groups.current.get(x.id)?.position
         // (those sitting don't move aside, but nobody walks through them either: the ones going by step round them)
-        if (gp) walkers.push({ p: gp, give: x.phase !== 'sit', id: x.id })
+        if (gp) add(gp, x.phase !== 'sit', x.id)
       }
-      waiters.current.forEach((w, wi) => walkers.push({ p: waiterObjs.current[wi]?.position ?? w.pos, give: false, id: -1 - wi }))
+      waiters.current.forEach((w, wi) => add(waiterObjs.current[wi]?.position ?? w.pos, false, -1 - wi))
+      if (STOCKER_FIG.o?.visible) add(STOCKER_FIG.o.position, false, STOCKER_KEY)
       // (a body's width, the round bodies' shoulders and all, so no two ever overlap)
       const R = 0.38
       const met = new Set<string>()
       for (let i = 0; i < walkers.length; i++) for (let j = i + 1; j < walkers.length; j++) {
         const a = walkers[i], b = walkers[j]
-        const dx = a.p.x - b.p.x, dz = a.p.z - b.p.z, d = Math.hypot(dx, dz)
-        if (d >= R || (!a.give && !b.give)) continue
-        if (a.give && b.give) {
-          // (two walking into each other, or one up behind another: each steps aside, to either side of the line between them as they first
-          // met (kept till they're past: it doesn't turn about as they pass, nor as one turns a corner), the more the nearer, and they slide
-          // by. Pushed apart along the line between them, they stood stuck head on in the aisle till their ways crossed, and the push turned
-          // about with it: they swapped places in a frame (tests/e2e/_poptrail.mjs))
-          const lo = a.id < b.id ? a : b, hi = lo === a ? b : a
-          const key = `${lo.id}|${hi.id}`
-          met.add(key)
-          let side = passing.current.get(key)
-          if (!side) {
-            const ex = lo.p.x - hi.p.x, ez = lo.p.z - hi.p.z, e = Math.hypot(ex, ez) || 1
-            side = { x: -ez / e, z: ex / e }
-            passing.current.set(key, side)
-          }
-          const push = (R - d) * 0.5
-          lo.p.x += side.x * push; lo.p.z += side.z * push
-          hi.p.x -= side.x * push; hi.p.z -= side.z * push
-          continue
+        if (!a.give && !b.give) continue
+        const lo = a.id < b.id ? a : b, hi = lo === a ? b : a
+        const rx = lo.p.x - hi.p.x, rz = lo.p.z - hi.p.z, d = Math.hypot(rx, rz)
+        // (the nearest they'll pass, and how soon: lo from hi then)
+        const ux = lo.vx - hi.vx, uz = lo.vz - hi.vz, uu = ux * ux + uz * uz
+        const tc = uu > 1e-6 ? THREE.MathUtils.clamp(-(rx * ux + rz * uz) / uu, 0, AHEAD_S) : 0
+        const cx = rx + ux * tc, cz = rz + uz * tc, dc = Math.hypot(cx, cz)
+        const need = Math.max(R - d, (R - dc) * (1 - tc / AHEAD_S))
+        if (need <= 0) continue
+        const key = `${lo.id}|${hi.id}`
+        met.add(key)
+        // (which way lo steps from hi (and hi from lo): to the side they'd pass each other on, as it was when they first saw it coming,
+        // kept till they're by (it doesn't turn about as they pass, nor as one turns a corner). Pushed apart along the line between them,
+        // two head on stood stuck in the aisle till their ways crossed, and the push turned about with it: they swapped places in a frame
+        // (tests/e2e/_poptrail.mjs); dead on, to one side of the way they're coming)
+        let side = passing.current.get(key)
+        if (!side) {
+          let sx = cx, sz = cz, s = dc
+          if (s < 0.02) { sx = -uz; sz = ux; s = Math.sqrt(uu) }
+          if (s < 1e-4) { sx = 1; sz = 0; s = 1 }
+          side = { x: sx / s, z: sz / s }
+          passing.current.set(key, side)
         }
-        // (into someone who doesn't give (sat, or a server with a tray): round them, aside to the side of their own way they were on as
-        // they first came up to them (kept till they're by: along the line between them it turned about as they went by, a jump of
-        // 0.4 to 0.7 where their way ran close by the other)
-        {
-          const w = a.give ? a : b, o = w === a ? b : a
-          const key = `${w.id}|o${o.id}`
-          met.add(key)
-          let side = passing.current.get(key)
-          if (!side) {
-            const g = groups.current.get(w.id)
-            const yaw = g ? g.rotation.y : 0
-            const px = Math.cos(yaw), pz = -Math.sin(yaw)
-            const sgn = (w.p.x - o.p.x) * px + (w.p.z - o.p.z) * pz >= 0 ? 1 : -1
-            side = { x: px * sgn, z: pz * sgn }
-            passing.current.set(key, side)
-          }
-          const push = R - d
-          w.p.x += side.x * push; w.p.z += side.z * push
-        }
+        // (two walking: half of it each; one into someone who doesn't give (sat, or a server with a tray): all of it, round them)
+        const share = lo.give && hi.give ? need * 0.5 : need
+        if (lo.give) { lo.ax += side.x * share; lo.az += side.z * share }
+        if (hi.give) { hi.ax -= side.x * share; hi.az -= side.z * share }
       }
       for (const k of passing.current.keys()) if (!met.has(k)) passing.current.delete(k)
+      // (each one's step aside eased to what it should be now: out as they come up, back once they're by)
+      const most = ASIDE_V * step
+      for (const w of walkers) {
+        const was = lastAt.current.get(w.id)
+        if (was) { was.x = w.p.x; was.z = w.p.z; was.f = stamp } else lastAt.current.set(w.id, { x: w.p.x, z: w.p.z, f: stamp })
+        let off = aside.current.get(w.id)
+        if (!off) {
+          if (w.ax === 0 && w.az === 0) continue
+          off = { x: 0, z: 0, f: stamp }
+          aside.current.set(w.id, off)
+        }
+        off.f = stamp
+        const tx = w.ax - off.x, tz = w.az - off.z, t = Math.hypot(tx, tz)
+        const k = t > most ? most / t : 1
+        off.x += tx * k; off.z += tz * k
+        w.p.x += off.x; w.p.z += off.z
+        if (w.ax === 0 && w.az === 0 && Math.abs(off.x) + Math.abs(off.z) < 1e-4) aside.current.delete(w.id)
+      }
+      // (those gone, or into a toilet's stall, forgotten: out of it, they're stood where they come out and set off from there)
+      aside.current.forEach((v, id) => { if (v.f !== stamp) aside.current.delete(id) })
+      lastAt.current.forEach((v, id) => { if (v.f !== stamp) lastAt.current.delete(id) })
     }
     // the fridge's door opens for whoever's at it (as they come up to it, while they take their drink, as they leave it)
     if (fridges) for (const fr of fridges) {
@@ -5397,7 +5442,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             {/* (a soft shadow under them, sat or walking) */}
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
-              <PersonClock s={s} phase={s.wcSit ? 'wcSit' : s.phase} drink={s.drink} eating={s.phase === 'sit' && FED.has(s.id)}
+              <PersonClock s={s} phase={s.wcSit ? 'wcSit' : s.phase === 'sit' && s.wipeAt ? 'wipe' : s.phase} drink={s.drink} eating={s.phase === 'sit' && FED.has(s.id)}
                 clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} plateOf={plateWorld} drinkOf={drinkWorld} drunk={s.drunk} />
               {/* (named as the pointer's over them; picked up and carried to another stool while they wait) */}
               <FigureHit title={() => guestLabel(s.id, lang)} hint={() => (canMove(s) ? (lang === 'ja' ? 'ドラッグして空席へ' : lang === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : '')}
