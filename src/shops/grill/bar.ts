@@ -771,10 +771,14 @@ export const BENCH_SEATS = 2 * BENCH_EACH
  * places are along it; `y`, the room's floor there, over the genkan's frame */
 // (y 0: blender/bench.py's bench has its feet at its origin (the old one's 0.169 left it floating, its seat high: the owner's, 2026-11-11))
 // (three to a bench now: their places a third of its length apart, 1.12 long at the customers' size)
-export const BENCH_PLACE = { x: -1.18, z: -3.978, y: 0, yaw: 0.6297, pitch: 0.373 }
+// (0.06 along the wall from the genkan and 0.07 back against it (x -1.18, z -3.978 before; a 0.1 gap stood behind it): the customers' way in
+// and out runs along the aisle 0.12 in front of the benches, their robes over the benches' fronts as they passed, and over the first one's
+// end as they stopped at the genkan's edge to change their shoes (paths.mjs, every customer in and out; the owner's item 43); the second
+// bench along the wall where it was (BENCH2_ALONG the less by as much), back against the wall with the first)
+export const BENCH_PLACE = { x: -1.2697, z: -3.9993, y: 0, yaw: 0.6297, pitch: 0.373 }
 /** the second bench (the owner's, 2026-11-12, the red box: between the cat stand and the first bench, under the shrine): along the wall from
  * the first, toward the stand, by this much (its middle half way between them: 0.55 m of floor to either, in the world), the same way round */
-export const BENCH2_ALONG = -1.392
+export const BENCH2_ALONG = -1.332
 export const BENCH_WAIT = 90
 export const BENCH = { ids: [] as number[], since: new Map<number, number>(), up: new Set<number>(), gone: new Set<number>() }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bench: BENCH, __seatsTaken: SEATS_TAKEN })
