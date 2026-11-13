@@ -37,7 +37,12 @@ function useCabinet() {
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       let t = toon.get(src)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map }); toon.set(src, t) }
+      // (the bowls' and the renge's cards (item 74): their pictures cut out by their alpha, seen from either side)
+      if (!t) {
+        const card = /Cards/.test(src.name)
+        t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, ...(card ? { alphaTest: 0.5, side: THREE.DoubleSide } : {}) })
+        toon.set(src, t)
+      }
       m.material = t
       m.castShadow = true
       m.receiveShadow = true

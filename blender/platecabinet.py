@@ -257,12 +257,125 @@ def stack(kind, x, z, outer, line, inner, tag):
     return objs
 
 
-bowls = []
-for x_ in (-0.37, -0.225, -0.08):
-    bowls += stack(RICE, x_, -0.02, 0, 1, 0, f"CabRice{x_:.2f}_")
-for x_ in (0.08, 0.225, 0.37):
-    bowls += stack(SOUP, x_, -0.02, 2, 3, 3, f"CabSoup{x_:.2f}_")
-kept("CabBowls", bowls, ["porcelain", "blueline", "lacquer", "vermilion"])
+# (the bowls and the renge drawn on cards, not modelled (the owner's, 2026-11-13, item 74: "far too many faces; make them one card, its picture
+# or its angles making them"; they were 2,220 and 800 triangles): one stack of each made as it was, its picture taken straight on with
+# nothing behind it (from the front, and from above for the top bowl's inside and for the renge, looked down on in their drawer), the
+# pictures put together in one (CabCards), the made ones thrown away; each stack a card from the front and a card over its top, cut out by
+# their alpha (the game: alphaTest, both sides))
+CARD_PX = 256
+
+
+def snapshot(objs, eye, centre, w, h, px_w, px_h):
+    """a picture of `objs` alone, looked at along -eye (the game's frame) onto `centre`, w by h (metres) filling px_w by px_h, its back clear:
+    an RGBA array, row 0 its foot"""
+    sc_ = bpy.context.scene
+    keep = {o: o.hide_render for o in bpy.data.objects}
+    for o in bpy.data.objects:
+        o.hide_render = o not in objs
+    cam = bpy.data.objects.new("CardCam", bpy.data.cameras.new("CardCam"))
+    bpy.context.collection.objects.link(cam)
+    cam.data.type = "ORTHO"
+    cam.data.ortho_scale = max(w, h)
+    c, e = P(*centre), P(*eye)
+    cam.location = c + e.normalized() * 2.0
+    cam.rotation_mode = "QUATERNION"
+    cam.rotation_quaternion = (-e).to_track_quat("-Z", "Y" if abs(e.normalized().z) < 0.9 else "Y")
+    cam.data.clip_end = 10
+    sc_.camera = cam
+    sun = bpy.data.objects.new("CardSun", bpy.data.lights.new("CardSun", "SUN"))
+    sun.data.energy = 2.6
+    sun.rotation_mode = "QUATERNION"
+    sun.rotation_quaternion = (-(e.normalized() + Vector((0.3, 0, 0.6)))).to_track_quat("-Z", "Y")
+    bpy.context.collection.objects.link(sun)
+    if sc_.world is None:
+        sc_.world = bpy.data.worlds.new("CardWorld")
+    sc_.world.use_nodes = True
+    sc_.world.node_tree.nodes["Background"].inputs[0].default_value = (0.8, 0.8, 0.8, 1)
+    for engine in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):
+        try:
+            sc_.render.engine = engine
+            break
+        except TypeError:
+            continue
+    sc_.view_settings.view_transform = "Standard"
+    sc_.render.film_transparent = True
+    sc_.render.resolution_x, sc_.render.resolution_y = (px_w, px_h) if w >= h else (px_w, px_h)
+    sc_.render.resolution_percentage = 100
+    cam.data.sensor_fit = "HORIZONTAL" if w >= h else "VERTICAL"
+    path = os.path.join(bpy.app.tempdir or os.path.dirname(os.path.abspath(__file__)), f"card_{len(bpy.data.images)}.png")
+    sc_.render.filepath = path
+    sc_.render.image_settings.file_format = "PNG"
+    sc_.render.image_settings.color_mode = "RGBA"
+    bpy.ops.render.render(write_still=True)
+    img = bpy.data.images.load(path)
+    a = np.array(img.pixels[:], np.float32).reshape(img.size[1], img.size[0], 4)
+    bpy.data.images.remove(img)
+    os.remove(path)
+    bpy.data.objects.remove(sun)
+    bpy.data.objects.remove(cam)
+    for o, hr in keep.items():
+        o.hide_render = hr
+    return a
+
+
+# (one stack of each, made as it was, at the origin, for their pictures)
+_rice = kept("CardRice", stack(RICE, 0.0, 0.0, 0, 1, 0, "CardRice_"), ["porcelain", "blueline", "lacquer", "vermilion"])
+_soup = kept("CardSoup", stack(SOUP, 0.0, 0.0, 2, 3, 3, "CardSoup_"), ["porcelain", "blueline", "lacquer", "vermilion"])
+STACK_H = {id(RICE): FLOOR_Y + (STACK - 1) * RICE["pitch"] + RICE["rim"][0][1], id(SOUP): FLOOR_Y + (STACK - 1) * SOUP["pitch"] + SOUP["rim"][0][1]}
+RIM_R = {id(RICE): RICE["rim"][1][0] if len(RICE["rim"]) > 1 else RICE["rim"][0][0], id(SOUP): SOUP["rim"][0][0]}
+_pics = {}
+for kind, ob in ((RICE, _rice), (SOUP, _soup)):
+    r_, h_ = RIM_R[id(kind)] + 0.003, STACK_H[id(kind)] - FLOOR_Y + 0.003
+    side = max(2 * r_, h_)
+    _pics[(id(kind), "front")] = snapshot([ob], (0, 0, 1), (0, FLOOR_Y + side / 2 - 0.0015, 0), side, side, CARD_PX, CARD_PX), side
+    _pics[(id(kind), "top")] = snapshot([ob], (0, 1, 0.0001), (0, STACK_H[id(kind)], 0), 2 * r_, 2 * r_, CARD_PX, CARD_PX), 2 * r_
+for ob in (_rice, _soup):
+    parts.remove(ob)
+    bpy.data.objects.remove(ob)
+
+
+def card(bm, uvl, corners, uv):
+    """a quad through the four corners (the game's frame, round it), its picture the atlas's rectangle uv (u0, v0, u1, v1)"""
+    f = bm.faces.new([bm.verts.new(P(*c)) for c in corners])
+    u0, v0, u1, v1 = uv
+    for l, q in zip(f.loops, ((u0, v0), (u1, v0), (u1, v1), (u0, v1))):
+        l[uvl].uv = q
+    return f
+
+
+# (the atlas: 1024 by 512; the rice stack's front and top, the soup's, in 256 squares down its left half; the renge's look down at the right)
+ATLAS = np.zeros((512, 1024, 4), np.float32)
+CELLS = {(id(RICE), "front"): (0, 0), (id(RICE), "top"): (256, 0), (id(SOUP), "front"): (0, 256), (id(SOUP), "top"): (256, 256)}
+for key, (cx, cy) in CELLS.items():
+    ATLAS[cy:cy + 256, cx:cx + 256] = _pics[key][0]
+
+
+def cell_uv(cx, cy, w=256, h=256):
+    return ((cx + 1) / 1024, (cy + 1) / 512, (cx + w - 1) / 1024, (cy + h - 1) / 512)
+
+
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+for kind, xs in ((RICE, (-0.37, -0.225, -0.08)), (SOUP, (0.08, 0.225, 0.37))):
+    side = _pics[(id(kind), "front")][1]
+    tw = _pics[(id(kind), "top")][1]
+    top = STACK_H[id(kind)]
+    for x_ in xs:
+        z_ = -0.02
+        # (from the front: a card through the stack's axis, as wide as the stack, from the shelf up)
+        y0_ = FLOOR_Y - 0.0015
+        card(bm, uvl, ((x_ - side / 2, y0_, z_), (x_ + side / 2, y0_, z_), (x_ + side / 2, y0_ + side, z_), (x_ - side / 2, y0_ + side, z_)),
+             cell_uv(*CELLS[(id(kind), "front")]))
+        # (over its top, a hair under the rim: the top bowl's inside, seen looking down into the cupboard)
+        yt = top - 0.002
+        card(bm, uvl, ((x_ - tw / 2, yt, z_ + tw / 2), (x_ + tw / 2, yt, z_ + tw / 2), (x_ + tw / 2, yt, z_ - tw / 2), (x_ - tw / 2, yt, z_ - tw / 2)),
+             cell_uv(*CELLS[(id(kind), "top")]))
+me = bpy.data.meshes.new("CabBowlCards")
+bm.to_mesh(me)
+bm.free()
+_bc = bpy.data.objects.new("CabBowlCards", me)
+bpy.context.collection.objects.link(_bc)
+parts.append(_bc)
 
 # (the drawers' boxes behind their fronts, to be pulled out: their sides, back and bottom of the lighter cedar; in the left one three bundles
 # of ten pairs of chopsticks, a paper band round each; in the right one twelve renge spoons in two stacks of six)
@@ -308,7 +421,38 @@ for i in range(2):
         h = bpy.data.objects.new(me.name, me)
         bpy.context.collection.objects.link(h)
         spoons.append(h)
-drawer_parts[1].append(kept("CabRenge", spoons, ["porcelain"]))
+_others = [o.name for o in spoons[12:]]
+_ren = kept("CardRenge", spoons[:12], ["porcelain"])
+# (the first stack's picture from straight above, its handles toward the picture's foot; the second stack the same picture)
+a_, b_ = DRAWERS[1]
+cx0 = a_ + 0.13
+RW, RL = 0.064, 0.136
+RZ = (0.02 + 0.039 + 0.02 - 0.092 - 0.004) / 2
+_rp = snapshot([_ren], (0, 1, 0.0001), (cx0, IN_Y + 0.02, RZ), RW, RL, CARD_PX, CARD_PX * 2)
+parts.remove(_ren)
+bpy.data.objects.remove(_ren)
+for nm in _others:
+    bpy.data.objects.remove(bpy.data.objects[nm])
+ATLAS[0:512, 512:768] = _rp
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+for i in range(2):
+    cx = a_ + 0.13 + i * 0.2
+    yr = IN_Y + 5 * 0.006 + 0.0145
+    # (the picture's foot (the handles' ends) to the back: the bowls toward the drawer's front, the handles back under the top, as they lay)
+    card(bm, uvl, ((cx + RW / 2, yr, RZ - RL / 2), (cx - RW / 2, yr, RZ - RL / 2), (cx - RW / 2, yr, RZ + RL / 2), (cx + RW / 2, yr, RZ + RL / 2)),
+         cell_uv(512, 0, 256, 512))
+me = bpy.data.meshes.new("CabRengeCards")
+bm.to_mesh(me)
+bm.free()
+_rc = bpy.data.objects.new("CabRengeCards", me)
+bpy.context.collection.objects.link(_rc)
+parts.append(_rc)
+drawer_parts[1].append(_rc)
+# (the atlas made a picture, the cards given it: one material for all six stacks and both renge)
+M["cards"] = pbr("CabCards", (1, 1, 1), tex=image("cabcards", ATLAS[..., :3] / np.maximum(ATLAS[..., 3:4], 1e-4) * (ATLAS[..., 3:4] > 0), alpha=ATLAS[..., 3]), rough=0.4, blend=True)
+for o in (_bc, _rc):
+    o.data.materials.append(M["cards"])
 root = bpy.data.objects.new("PlateCabinet", None)
 bpy.context.collection.objects.link(root)
 for o in parts:
