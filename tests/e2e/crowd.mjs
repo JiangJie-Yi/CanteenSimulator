@@ -4,7 +4,7 @@
 //   - frames a customer moved quicker than FAST (bar units a second, default 2.6: the quickest walk is 1.32 x 1.35 = 1.8), and the quickest;
 //   - frames one moved more than JUMP (default 0.2) in a frame (LIST=1 prints each with everyone near it, the frame before and this one);
 //   - frames two stood in each other (nearer than IN, default 0.22; one of them a customer on their feet, the other a customer, a server
-//     or the stock keeper), and who with whom;
+//     or the stock keeper), and who with whom; two customers in each other by what each was doing and where (the bar's frame);
 //   - a customer's time in a phase going back (their entry swapped for an older copy).
 // Before item 45, 200 s of it: 225 frames too quick (7.55 a second at most), 15 over 0.2, 942 in each other, 18 times back; after it: 40
 // (3.28), 3, 253, 0.
@@ -16,7 +16,7 @@ const { browser, page: p } = await boot({ width: 1280, height: 800 })
 await openShop(p, { x2: true, at: +(process.env.AT ?? 17 * 60) })
 if (!process.env.CALM) await rush(p)
 await p.evaluate(([JUMP, FAST, IN]) => {
-  const A = window.__pj = { jumps: [], frames: 0, max: 0, top: 0, fast: 0, steps: 0, inside: 0, insideBy: {}, back: [] }
+  const A = window.__pj = { jumps: [], frames: 0, max: 0, top: 0, fast: 0, steps: 0, inside: 0, insideBy: {}, guestPairs: {}, back: [] }
   let prev = new Map()
   // (a customer's time in a phase going back: their entry swapped for a copy made a few frames before)
   const lastT = new Map()
@@ -55,6 +55,8 @@ await p.evaluate(([JUMP, FAST, IN]) => {
         A.inside++
         const kind = `${ka[0] === 'g' ? 'guest' : a.ph}-${kb[0] === 'g' ? 'guest' : b.ph}`.replace(/ t[0-9.]+/g, '')
         A.insideBy[kind] = (A.insideBy[kind] ?? 0) + 1
+        // (two customers: what each was doing, and where (the bar's frame, to a tenth))
+        if (ka[0] === 'g' && kb[0] === 'g') { const w = [a.ph, b.ph].map((x) => x.replace(/ t[0-9.]+/g, '')).sort().join(' + ') + ` @${((a.x + b.x) / 2).toFixed(1)},${((a.z + b.z) / 2).toFixed(1)}`; A.guestPairs[w] = (A.guestPairs[w] ?? 0) + 1 }
       }
     }
     for (const [k, v] of now) {
@@ -82,6 +84,8 @@ while (Date.now() < until) {
 }
 const r = await sum()
 console.log('in each other, by who:', JSON.stringify(r.by))
+const gp = await p.evaluate(() => window.__pj.guestPairs)
+for (const [k, n] of Object.entries(gp).sort((a, b) => b[1] - a[1]).slice(0, 12)) console.log(`  ${n}x ${k}`)
 for (const x of await p.evaluate(() => window.__pj.back)) console.log('  back:', x)
 if (process.env.LIST) for (const j of await p.evaluate(() => window.__pj.jumps)) {
   console.log(`\n${j.k} ${j.d}: ${j.from}  ->  ${j.to}`)
