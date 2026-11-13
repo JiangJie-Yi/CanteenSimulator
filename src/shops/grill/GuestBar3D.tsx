@@ -3376,7 +3376,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
         if (guest) s.items = guest.items
-        if (fridges && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * flowerBuffs(SHRINE_FLOWERS).drinks * Math.min(dt, 0.1)) {
+        // (not once the shop's shut for the day (the owner's item 40: a customer helped themselves to a drink, and paid for it, past closing
+        // time); what they've got they drink up)
+        if (fridges && !SHOP.closing && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * flowerBuffs(SHRINE_FLOWERS).drinks * Math.min(dt, 0.1)) {
           // (they choose what they want, and go to the fridge it's in)
           const pick = drinkFor(kindOf(s.id).kind, s.id)
           const fr = fridges[fridgeUnitOf(pick)]
