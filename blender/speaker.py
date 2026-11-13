@@ -174,20 +174,13 @@ cab_parts = []
 # =====================================================================
 # The cabinet: rounded all round, the driver openings cut into its front
 # =====================================================================
+# (low-poly (item 75, the owner's, 2026-11-13: "far too many faces; one sheet will do"; it was 9,258 triangles): its edges rounded in three steps, not six; no pocket for the grille (the grille a flat sheet just
+# in front of its face now); the woofer's opening sixteen round, the horn's a plain box; the port, behind the grille, not cut)
 cab = box("SpeakerCabinet", (W, D, H), (0, 0, 0), M["abs"])
-bevel(cab, 0.03, 6, angle=False)
+bevel(cab, 0.03, 3, angle=False)
 apply_mods(cab)
-# (the front's recessed baffle: a shallow pocket the grille sits in, 4 mm deep, inside a 10 mm lip)
-pocket = box("pocket", (W - 0.02, 0.02, H - 0.02), (0, FRONT - 0.006, 0), M["abs"], bev=0.012)
-apply_mods(pocket)
-cut(cab, pocket)
-cut(cab, cyl("wcut", WOOF_R + 0.002, 0.12, (0, FRONT, WOOF_Z), M["abs"], rot=(math.pi / 2, 0, 0), verts=64))
-horn_cut = box("hcut", (0.15, 0.1, 0.066), (0, FRONT, HORN_Z), M["abs"], bev=0.01)
-apply_mods(horn_cut)
-cut(cab, horn_cut)
-port_cut = box("pcut", (0.17, 0.12, 0.02), (0, FRONT, -0.19), M["abs"], bev=0.008)
-apply_mods(port_cut)
-cut(cab, port_cut)
+cut(cab, cyl("wcut", WOOF_R + 0.002, 0.12, (0, FRONT, WOOF_Z), M["abs"], rot=(math.pi / 2, 0, 0), verts=16))
+cut(cab, box("hcut", (0.15, 0.1, 0.066), (0, FRONT, HORN_Z), M["abs"]))
 # (smooth over the rounded edges, sharp where the openings were cut)
 bpy.ops.object.select_all(action="DESELECT")
 cab.select_set(True)
@@ -198,60 +191,45 @@ cab_parts.append(cab)
 BAFFLE = FRONT + 0.004
 # the inside, seen through the openings: a black back wall (no daylight through the box)
 cab_parts.append(box("SpeakerInside", (W - 0.03, 0.004, H - 0.03), (0, FRONT + 0.06, 0), M["baffle"]))
-# the port's tunnel
-cab_parts.append(box("SpeakerPort", (0.168, 0.05, 0.018), (0, BAFFLE + 0.025, -0.19), M["baffle"]))
 
 # ---- the woofer: cast frame and its screws, the rubber surround, the paper cone, the dust cap
-fr = lathe("SpeakerWooferFrame", [(WOOF_R + 0.006, 0.0), (WOOF_R + 0.006, 0.002), (WOOF_R - 0.006, 0.002), (WOOF_R - 0.008, -0.001)], M["frame"])
+fr = lathe("SpeakerWooferFrame", [(WOOF_R + 0.006, 0.0), (WOOF_R + 0.006, 0.002), (WOOF_R - 0.006, 0.002), (WOOF_R - 0.008, -0.001)], M["frame"], 16)
 cab_parts.append(to_front(fr, BAFFLE, WOOF_Z))
-sur = [(0.086 + 0.006 * (1 - math.cos(math.pi * k / 12)), 0.0005 + 0.0065 * math.sin(math.pi * k / 12)) for k in range(13)]
-cab_parts.append(to_front(lathe("SpeakerSurround", sur, M["rubber"]), BAFFLE - 0.0015, WOOF_Z))
-cone = [(0.086 - 0.054 * t, -0.042 * t ** 1.4) for t in np.linspace(0, 1, 10)]
-cab_parts.append(to_front(lathe("SpeakerCone", cone, M["cone"]), BAFFLE - 0.001, WOOF_Z))
-cap = [(0.032 * math.cos(a), -0.042 + 0.013 * math.sin(a)) for a in np.linspace(0, math.pi / 2, 8)]
-cab_parts.append(to_front(lathe("SpeakerDustCap", cap, M["cap"]), BAFFLE - 0.001, WOOF_Z))
-for k in range(4):
-    a = math.pi / 4 + k * math.pi / 2
-    s = cyl(f"SpeakerWooferScrew{k}", 0.0035, 0.002, (0, 0, 0), M["screw"], verts=12)
-    to_front(s, BAFFLE - 0.003, WOOF_Z + (WOOF_R + 0.001) * math.sin(a), (WOOF_R + 0.001) * math.cos(a))
-    cab_parts.append(s)
+sur = [(0.086 + 0.006 * (1 - math.cos(math.pi * k / 3)), 0.0005 + 0.0065 * math.sin(math.pi * k / 3)) for k in range(4)]
+cab_parts.append(to_front(lathe("SpeakerSurround", sur, M["rubber"], 16), BAFFLE - 0.0015, WOOF_Z))
+cone = [(0.086 - 0.054 * t, -0.042 * t ** 1.4) for t in np.linspace(0, 1, 5)]
+cab_parts.append(to_front(lathe("SpeakerCone", cone, M["cone"], 16), BAFFLE - 0.001, WOOF_Z))
+cap = [(0.032 * math.cos(a), -0.042 + 0.013 * math.sin(a)) for a in np.linspace(0, math.pi / 2, 5)]
+cab_parts.append(to_front(lathe("SpeakerDustCap", cap, M["cap"], 16), BAFFLE - 0.001, WOOF_Z))
 
 # ---- the tweeter: a constant-directivity horn flaring from a small throat to a wide mouth, a phase plug in the throat
 bm = bmesh.new()
 loops = []
 for depth, w_, h_, r_ in ((0.0, 0.145, 0.062, 0.012), (-0.012, 0.11, 0.046, 0.01), (-0.028, 0.06, 0.03, 0.008), (-0.042, 0.024, 0.02, 0.006)):
-    loops.append([bm.verts.new((x, z, depth)) for x, z in rounded_rect(w_, h_, r_)])
-lip = [bm.verts.new((x, z, 0.0)) for x, z in rounded_rect(0.16, 0.074, 0.016)]
+    loops.append([bm.verts.new((x, z, depth)) for x, z in rounded_rect(w_, h_, r_, 1)])
+lip = [bm.verts.new((x, z, 0.0)) for x, z in rounded_rect(0.16, 0.074, 0.016, 1)]
 for a, b in zip([lip] + loops[:-1], loops):
     for i in range(len(a)):
         bm.faces.new((a[i], a[(i + 1) % len(a)], b[(i + 1) % len(b)], b[i]))
 bm.faces.new(list(reversed(loops[-1])))
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 horn = mesh_obj("SpeakerHorn", bm, M["frame"])
-s = horn.modifiers.new("Solidify", "SOLIDIFY")
-s.thickness = 0.002
 cab_parts.append(to_front(horn, BAFFLE - 0.001, HORN_Z))
-cab_parts.append(to_front(lathe("SpeakerPhasePlug", [(0.007, 0.0), (0.006, 0.004), (0.0, 0.007)], M["cap"], 20), BAFFLE + 0.04, HORN_Z))
 
-# ---- the grille: a sheet domed a little outward, its edge turned back into the pocket
-bpy.ops.mesh.primitive_grid_add(x_subdivisions=36, y_subdivisions=54, size=1)
+# ---- the grille: one flat sheet over the front, a few millimetres proud of it, its holes cut by its picture's alpha (it was a domed sheet
+# 36 by 54 with its edge turned back, 1,608 triangles)
+bpy.ops.mesh.primitive_grid_add(x_subdivisions=1, y_subdivisions=1, size=1)
 g = active()
 GWm, GHm = W - 0.026, H - 0.026
 for v in g.data.vertices:
-    u, w_ = v.co.x * 2, v.co.y * 2   # -1..1
-    edge = max(abs(u), abs(w_))
-    bulge = 0.005 * (1 - u * u) * (1 - w_ * w_)
     v.co.x *= GWm
     v.co.y *= GHm
-    v.co.z = bulge - (0.006 if edge > 0.999 else 0.0)
 grille = finish(g, "SpeakerGrille", M["grille"])
-s = grille.modifiers.new("Solidify", "SOLIDIFY")
-s.thickness = 0.0012
-cab_parts.append(to_front(grille, FRONT - 0.001, 0))
-GRILLE_FACE = FRONT - 0.001 - 0.0012
+cab_parts.append(to_front(grille, FRONT - 0.004, 0))
+GRILLE_FACE = FRONT - 0.004
 
 # ---- the badge on the grille's foot (brushed aluminium, the word inked in) and the power light
-badge = box("SpeakerBadge", (0.072, 0.0015, 0.018), (-0.06, GRILLE_FACE - 0.001, -H / 2 + 0.036), M["badge"], bev=0.002)
+badge = box("SpeakerBadge", (0.072, 0.0015, 0.018), (-0.06, GRILLE_FACE - 0.001, -H / 2 + 0.036), M["badge"])
 cab_parts.append(badge)
 # (the word drawn into a little picture on a quad a hair proud of the badge (BADGE_PRINT), not kept as a mesh of letters: five of them
 # were 1,400 triangles)
@@ -271,15 +249,13 @@ t.location = (-0.06, GRILLE_FACE - 0.00175, -H / 2 + 0.036)
 BADGE_PRINT = DecalAtlas("SpeakerBadgePrint", ppm=4000, size=(256, 64))
 cab_parts.append(BADGE_PRINT.add(t))
 BADGE_PRINT.finish()
-led = cyl("SpeakerLED", 0.0045, 0.004, (0, 0, 0), M["led"], verts=16)
+led = cyl("SpeakerLED", 0.0045, 0.004, (0, 0, 0), M["led"], verts=8)
 to_front(led, GRILLE_FACE - 0.0015, -H / 2 + 0.036, 0.105)
 cab_parts.append(led)
 
 # ---- the back: a recessed terminal cup with two spring clips; the knob inserts on the sides (the yoke's bolts go in there)
 BACK = D / 2
-cab_parts.append(box("SpeakerTerminal", (0.07, 0.006, 0.05), (0, BACK + 0.001, -0.09), M["baffle"], bev=0.004))
-for x, mat in ((-0.015, M["red"]), (0.015, M["baffle"])):
-    cab_parts.append(box(f"SpeakerClip{x}", (0.012, 0.012, 0.02), (x, BACK + 0.006, -0.09), mat, bev=0.002))
+cab_parts.append(box("SpeakerTerminal", (0.07, 0.006, 0.05), (0, BACK + 0.001, -0.09), M["baffle"]))
 
 # the cabinet hangs tilted in the yoke, pivoting on the knobs a little behind and above its middle; made 1.25 times as big on its own (the
 # owner's, 2026-11-11), and the yoke's arms drawn out forward to hold it clear of the yoke's back, the arm behind as it was
@@ -323,17 +299,15 @@ YX = W * CAB_S / 2 + 0.014
 YB = 0.19
 R = 0.035
 path = [(-YX, PIVOT.y - 0.03)]
-path += [(-YX + R - R * math.cos(a), YB - R + R * math.sin(a)) for a in np.linspace(0, math.pi / 2, 7)]
-path += [(YX - R + R * math.sin(a), YB - R + R * math.cos(a)) for a in np.linspace(0, math.pi / 2, 7)]
+path += [(-YX + R - R * math.cos(a), YB - R + R * math.sin(a)) for a in np.linspace(0, math.pi / 2, 3)]
+path += [(YX - R + R * math.sin(a), YB - R + R * math.cos(a)) for a in np.linspace(0, math.pi / 2, 3)]
 path += [(YX, PIVOT.y - 0.03)]
 yoke = strip("SpeakerYoke", path, 0.042, 0.006, M["steel"])
-bevel(yoke, 0.0015, 2)
 parts.append(yoke)
 # (the yoke's arms end round, past the pivot, under the knobs)
 for sx in (-1, 1):
-    parts.append(cyl(f"SpeakerYokeEnd{sx}", 0.021, 0.006, (sx * YX, PIVOT.y - 0.03, PIVOT.z), M["steel"], rot=(0, math.pi / 2, 0), verts=32))
-    # the clamping knob: fluted, a washer under it
-    parts.append(cyl(f"SpeakerWasher{sx}", 0.016, 0.002, (sx * (YX + 0.004), PIVOT.y, PIVOT.z), M["screw"], rot=(0, math.pi / 2, 0)))
+    parts.append(cyl(f"SpeakerYokeEnd{sx}", 0.021, 0.006, (sx * YX, PIVOT.y - 0.03, PIVOT.z), M["steel"], rot=(0, math.pi / 2, 0), verts=12))
+    # the clamping knob: fluted
     # (16 round, every other point drawn in for its flutes, one bevel: it was 32 round with two, 892 triangles a knob)
     bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.021, depth=0.016, location=(sx * (YX + 0.013), PIVOT.y, PIVOT.z), rotation=(0, math.pi / 2, 0))
     k = active()
@@ -345,7 +319,6 @@ for sx in (-1, 1):
             v.co.x *= f
             v.co.y *= f
     finish(k, f"SpeakerKnob{sx}", M["rubber"])
-    bevel(k, 0.002, 1)
     parts.append(k)
 # the arm back to the corner, a ball joint where it meets the yoke, and the corner bracket: an angle of steel whose two flanges lie flat on the
 # two walls, the arm screwed into its spine. The game stretches the arm (its own node, SpeakerArmReach, along +Y from the joint) and sets the
@@ -354,7 +327,7 @@ WALL = 0.38
 reach = bpy.data.objects.new("SpeakerArmReach", None)
 bpy.context.collection.objects.link(reach)
 reach.location = (0, YB, PIVOT.z)
-arm = cyl("SpeakerArm", 0.014, WALL - YB, (0, (WALL - YB) / 2, 0), M["steel"], rot=(math.pi / 2, 0, 0))
+arm = cyl("SpeakerArm", 0.014, WALL - YB, (0, (WALL - YB) / 2, 0), M["steel"], rot=(math.pi / 2, 0, 0), verts=8)
 arm.parent = reach
 parts += [reach, arm]
 # (an icosphere: round without poles, 80 faces (it was a 24 x 12 globe, 24 triangles into each pole))
@@ -372,7 +345,7 @@ for sx in (-1, 1):
     d = Vector((math.sin(a_), -math.cos(a_), 0))
     n = Vector((d.y, -d.x, 0)) * sx
     c = d * (FL / 2) + n * (FT / 2)
-    f = box(f"SpeakerMountFlange{sx}", (FT, FL, FH), tuple(c), M["steel"], bev=0.002)
+    f = box(f"SpeakerMountFlange{sx}", (FT, FL, FH), tuple(c), M["steel"])
     f.rotation_euler = (0, 0, a_)
     mp.append(f)
     for sz in (-1, 1):
@@ -381,8 +354,8 @@ for sx in (-1, 1):
         # (eight round and no bevel: 1.2 cm across, they were 188 triangles each, 28 now (item 25); nothing of the difference shows)
         mp.append(cyl(f"SpeakerMountScrew{sx}{sz}", 0.006, 0.003, tuple(at), M["screw"], rot=(math.pi / 2, 0, a_ + math.pi / 2), verts=8))
 # (the spine where the flanges meet, rounded, and a boss on it the arm screws into)
-mp.append(cyl("SpeakerMountSpine", 0.008, FH, (0, -0.004, 0), M["steel"], verts=16))
-mp.append(cyl("SpeakerMountBoss", 0.02, 0.024, (0, -0.016, 0), M["steel"], rot=(math.pi / 2, 0, 0), verts=24))
+mp.append(cyl("SpeakerMountSpine", 0.008, FH, (0, -0.004, 0), M["steel"], verts=8))
+mp.append(cyl("SpeakerMountBoss", 0.02, 0.024, (0, -0.016, 0), M["steel"], rot=(math.pi / 2, 0, 0), verts=12))
 for o in mp:
     o.parent = mount
 parts += [mount] + mp
@@ -396,8 +369,8 @@ cd = bpy.data.curves.new("SpeakerCable", "CURVE")
 cd.dimensions = "3D"
 cd.bevel_depth = 0.0042
 # (eight round, five steps a span: a cord 8 mm thick, it was 800 triangles at twelve and ten)
-cd.bevel_resolution = 1
-cd.resolution_u = 5
+cd.bevel_resolution = 0
+cd.resolution_u = 3
 sp = cd.splines.new("BEZIER")
 sp.bezier_points.add(len(pts) - 1)
 for bp, p in zip(sp.bezier_points, pts):
