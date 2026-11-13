@@ -27,7 +27,7 @@ const ZH = {
     return `${map[k] ?? k}見底了！這份只能原味直上了！`
   },
   done: (n: string) => `${n}烤得外酥內嫩，滋滋作響！起鍋！`,
-  seasoned: (n: string, k: string) => {
+  seasoned: (n: string, k: string | string[]) => {
     const map: Record<string, string> = {
       salt: '均勻撒上一層薄薄的岩鹽提味',
       soy: '刷上濃郁發亮的甘醇醬油',
@@ -41,7 +41,8 @@ const ZH = {
     }
     // (said as each seasoning goes on: not "done" (完成), which it isn't till it comes off the fire (`done`, after); a dish with two had it
     // said done twice before it was (the owner's item 38, found in a whole day's log))
-    return `${n}${map[k] ?? ''}！`
+    // (those going on together said together (item 46): one by one only the first was heard, a miso and soy glaze as the soy alone)
+    return `${n}${[k].flat().map((x) => map[x] ?? '').join('、')}！`
   },
   onFire: (n: string) => `${n}下爐！油脂滴下去的香氣太誘人了！`,
   fanned: (n: string) => `${n}火力全開！啪嗒啪嗒搧起炭香！`,
@@ -166,7 +167,7 @@ const JA: typeof ZH = {
     return `${map[k] ?? k}が切れた！これは素材の味で勝負だ！`
   },
   done: (n: string) => `${n}、皮はパリッと身はふっくら焼き上がり！`,
-  seasoned: (n: string, k: string) => {
+  seasoned: (n: string, k: string | string[]) => {
     const map: Record<string, string> = {
       salt: '塩をサッと振って旨味を引き立てる',
       soy: '香ばしい秘伝の醤油ダレをひと塗り',
@@ -178,7 +179,7 @@ const JA: typeof ZH = {
       yuzu: '爽やかな柚子胡椒をちょこんと添えて',
       lemon: '新鮮なレモンをキュッと搾って',
     }
-    return `${n}に${map[k] ?? ''}！`
+    return `${n}に${[k].flat().map((x) => map[x] ?? '').join('、')}！`
   },
   onFire: (n: string) => `${n}、火入れ開始！脂の落ちるいい香りがしてきた！`,
   fanned: (n: string) => `${n}、パタパタ扇いで炭火の火力を引き上げる！`,
@@ -297,7 +298,7 @@ const EN: typeof ZH = {
     return `Out of ${map[k] ?? k}! We will have to serve this one unseasoned!`
   },
   done: (n: string) => `${n} is sizzling to perfection with crisp skin! Plating up!`,
-  seasoned: (n: string, k: string) => {
+  seasoned: (n: string, k: string | string[]) => {
     const map: Record<string, string> = {
       salt: 'sprinkled with fine rock salt',
       soy: 'glazed with rich, glossy soy sauce',
@@ -309,7 +310,8 @@ const EN: typeof ZH = {
       yuzu: 'topped with a dab of aromatic yuzu kosho',
       lemon: 'squeezed with a burst of tart lemon',
     }
-    return `${n} seasoned: ${map[k] ?? ''}!`
+    const all = [k].flat().map((x) => map[x] ?? '')
+    return `${n} seasoned: ${all.length > 1 ? `${all.slice(0, -1).join(', ')} and ${all[all.length - 1]}` : all[0] ?? ''}!`
   },
   onFire: (n: string) => `${n} hits the grill! Listen to that mouthwatering sizzle!`,
   fanned: (n: string) => `Fanning the embers for ${n}! Fanning up the aroma!`,

@@ -5553,9 +5553,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const at = bestStage(k)
       return at === 'before' || at === 'early' ? r < 0.6 : at === 'late' ? r >= 0.85 : false
     }
-    const dab = (p: Piece, k: Exclude<Seasoning, 'water'>) => {
+    const dab = (p: Piece, k: Exclude<Seasoning, 'water'>, quiet = false) => {
       // (none left in stock: it goes without, and the cook says so)
-      if (!season(p, k)) { say(L().outOf(k)); return }
+      if (!season(p, k)) { say(L().outOf(k)); return false }
       emit(k, p.node.position.clone().add(new THREE.Vector3(0, 0.25, 0)), 30)
       // (heard as by hand: its own sound, and over the coals the fire's sizzle (it was silent, the owner's))
       seasonSound(k)
@@ -5566,7 +5566,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         OWNER_GRILL.dabUntil = performance.now() + 900
         OWNER_GRILL.dab = k === 'salt' ? 'pinch' : k === 'soy' || k === 'milk' || k === 'miso' ? 'brush' : 'spoon'
       }
-      say(L().seasoned(nameOfP(p), k))
+      if (!quiet) say(L().seasoned(nameOfP(p), k))
+      return true
     }
     if (ready && !busy()) {
       collect(ready)
@@ -5593,7 +5594,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       planOf(p).some((k) => !p.dabs[k] && dueOnFire(k, p.progress / roast.times[p.id])))
     if (toSeason) {
       const r = toSeason.progress / roast.times[toSeason.id]
-      for (const k of planOf(toSeason)) if (!toSeason.dabs[k] && dueOnFire(k, r)) dab(toSeason, k)
+      // (those due together, put on together and said in one breath (item 46): one by one only the first was heard, the chef's words coming
+      // no more than one each 2.5 s, and a miso dish glazed with soy too read as 味噌烤鰤魚 刷上甘醇醬油, the miso never said)
+      const went = planOf(toSeason).filter((k) => !toSeason.dabs[k] && dueOnFire(k, r)).filter((k) => dab(toSeason, k, true))
+      if (went.length) say(L().seasoned(nameOfP(toSeason), went))
       return
     }
     const wrapped = live.find((p) => p.collected && inBasket(p) && !p.unwrapped && p.flight >= 1)
