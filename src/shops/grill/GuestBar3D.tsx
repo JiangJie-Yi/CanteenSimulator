@@ -5583,7 +5583,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               <FolkFigure id={v.id} eating={false} walking still={() => visitors.current.get(v.id)?.phase === 'wait'} clock={clock}
                 fade={() => visitors.current.get(v.id)?.fade ?? 0} fit={FOLK_FIT} held={v.has ? <TakeoutBag /> : undefined} />
             </Suspense>
-            {v.rider && <RiderGear size={folkSpec(v.id).size} fade={() => visitors.current.get(v.id)?.fade ?? 0} />}
+            {v.rider && <RiderGear id={v.id} size={folkSpec(v.id).size} fade={() => visitors.current.get(v.id)?.fade ?? 0} />}
           </group>
         </group>
       ))}
@@ -5612,6 +5612,44 @@ const ownLooks = () => Object.fromEntries(Object.entries(TO_LOOKS).map(([k, c]) 
 if (typeof document !== 'undefined') {
   const warm = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), fading('#ffffff'))
   warmLater(warm)
+  // (and the rider's box, its picture on it: a program of its own, made at loading too)
+  const pic = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1)
+  pic.needsUpdate = true
+  const withPic = fading('#ffffff')
+  withPic.map = pic
+  warmLater(new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), withPic))
+}
+/** the rider's insulated box (blender/deliverybag.py, item 77, the owner's: like Japan's delivery platforms' bags): four made-up platforms'
+ * looks in the four quarters of its picture (Torutto teal, モグゴー black, パクッと便 pink, とどけ丸 red); the model's on the first, each rider's
+ * own copy of the picture shifted to theirs (picked by the rider), its material their own to fade with them */
+const BAG_URL = import.meta.env.BASE_URL + 'models/deliverybag.glb'
+useGLTF.preload(BAG_URL)
+const BAG_LOOKS: [number, number][] = [[0, 0], [0.5, 0], [0, -0.5], [0.5, -0.5]]
+function useRiderBag(id: number, strap: THREE.Material) {
+  const gltf = useGLTF(BAG_URL) as unknown as { scene: THREE.Group }
+  const made = useMemo(() => {
+    const root = (gltf.scene.getObjectByName('DeliveryBag') ?? gltf.scene).clone(true)
+    root.position.set(0, 0, 0)
+    let mat: THREE.MeshToonMaterial | null = null
+    let pic: THREE.Texture | null = null
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (src.map) {
+        pic = src.map.clone()
+        const [u, v] = BAG_LOOKS[((id % 4) + 4) % 4]
+        pic.offset.set(u, v)
+        pic.needsUpdate = true
+        mat = fading('#ffffff')
+        mat.map = pic
+        m.material = mat
+      } else m.material = strap
+    })
+    return { root, mat: mat as THREE.MeshToonMaterial | null, pic: pic as THREE.Texture | null }
+  }, [gltf, id, strap])
+  useEffect(() => () => { made.mat?.dispose(); made.pic?.dispose() }, [made])
+  return made
 }
 function useOwnLooks() {
   const mats = useMemo(ownLooks, [])
@@ -5755,23 +5793,21 @@ function TakeoutBag() {
   )
 }
 /** (beside the figure, not in it: faded here with them) */
-function RiderGear({ size, fade }: { size: number; fade: () => number }) {
+function RiderGear({ id, size, fade }: { id: number; size: number; fade: () => number }) {
   // (blender/folk.py's measure: the head a ball of 0.27 about 0.8 up, the body 0.26 round at its widest; all as the figure's scaled)
   const k = FOLK_FIT * size
   const m = useOwnLooks()
-  useFrame(() => { const f = fade(); for (const x of Object.values(m)) x.opacity = f })
+  const bag = useRiderBag(id, m.strap)
+  useFrame(() => { const f = fade(); for (const x of Object.values(m)) x.opacity = f; if (bag.mat) bag.mat.opacity = f })
   return (
     <group scale={k}>
       {/* (the helmet over the crown of the head, clear of the hair, down to the brow; a band round its rim) */}
       <mesh position-y={0.8} material={m.helmet}><sphereGeometry args={[0.34, 16, 6, 0, Math.PI * 2, 0, Math.PI * 0.4]} /></mesh>
       <mesh position-y={0.8 + 0.34 * Math.cos(Math.PI * 0.4) - 0.01} material={m.band}><cylinderGeometry args={[0.326, 0.328, 0.035, 16, 1, true]} /></mesh>
       {/* (the insulated box of a delivery on their back, worn as a backpack (the owner's, 2026-11-12: a strange brown bag floating behind
-          them): its two straps over the shoulders and down the chest, a white reflective stripe round it, the seam of its lid, a dark label
-          on its back) */}
-      <mesh position={[0, 0.36, -0.42]} material={m.band}><boxGeometry args={[0.46, 0.44, 0.3]} /></mesh>
-      <mesh position={[0, 0.3, -0.42]} material={m.stripe}><boxGeometry args={[0.47, 0.035, 0.31]} /></mesh>
-      <mesh position={[0, 0.535, -0.42]} material={m.dark}><boxGeometry args={[0.465, 0.012, 0.305]} /></mesh>
-      <mesh position={[0, 0.4, -0.572]} material={m.dark}><boxGeometry args={[0.28, 0.1, 0.004]} /></mesh>
+          them): its two straps over the shoulders and down the chest; the box itself the platform's, its mark facing away behind them
+          (useRiderBag)) */}
+      <group position={[0, 0.36, -0.42]} rotation-y={Math.PI}><primitive object={bag.root} /></group>
       {[-1, 1].map((sd) => (
         <group key={sd}>
           <mesh position={[sd * 0.11, 0.56, -0.1]} rotation-x={-0.25} material={m.strap}><boxGeometry args={[0.05, 0.02, 0.36]} /></mesh>
