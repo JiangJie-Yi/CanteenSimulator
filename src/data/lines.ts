@@ -7,6 +7,13 @@ const pick = <T,>(k: number, ways: T[]) => ways[Math.abs(Math.trunc(k)) % ways.l
 /** the part of the day an hour (0..23) is in, for what's said at the till: morning 6 to 13, afternoon 14 to 17, night the rest */
 export const partOfDay = (hour: number): 'morning' | 'afternoon' | 'night' => (hour >= 6 && hour < 14 ? 'morning' : hour >= 14 && hour < 18 ? 'afternoon' : 'night')
 
+/** an order's dishes, each said once: one ordered twice or more with how many after it (item 52, from a whole day's log: 「外帶一份：
+ * 味噌烤白蘿蔔、味噌烤白蘿蔔」 read as the same said twice), in the order they first come */
+export const tallyNames = (items: string[], times = '×') => {
+  const n = new Map<string, number>()
+  for (const x of items) n.set(x, (n.get(x) ?? 0) + 1)
+  return [...n].map(([x, k]) => (k > 1 ? `${x}${times}${k}` : x))
+}
 const ZH = {
   // 炭火與料理動作
   addCharcoal: '炭火有點弱了，補兩塊備長炭！',
@@ -55,7 +62,7 @@ const ZH = {
   orphanMeal: (n: string) => `客人先走了…已經打烊囉，這份${n}就當員工餐吧！`,
   staffMeal: (n: number) => `打烊了，大碗裡剩下的 ${n} 份當大家的員工餐！`,
   // (takeout, the owner's: someone at the till for a takeaway, a delivery rider for an order; the last half hour, only these)
-  takeoutOrder: (items: string[], rider: boolean) => rider ? `外送單進來了：${items.join('、')}，外送員在收銀台等！` : `外帶一份：${items.join('、')}，客人在收銀台等！`,
+  takeoutOrder: (items: string[], rider: boolean) => rider ? `外送單進來了：${tallyNames(items).join('、')}，外送員在收銀台等！` : `外帶一份：${tallyNames(items).join('、')}，客人在收銀台等！`,
   takeoutHand: (rider: boolean): string => rider ? '外送的餐好了，路上小心！' : '久等了！您的外帶，請慢用～',
   lastCall: '再半小時打烊，接下來只收外帶囉！' as string,
   orphanAgain: (n: string) => `運氣太好了！這份熱騰騰的${n}剛好有客人點，直接送上！`,
@@ -190,7 +197,7 @@ const JA: typeof ZH = {
   orphanAway: 'お客さん帰っちゃったか…大鉢で保温して、次の注文に回そう！',
   orphanMeal: (n: string) => `お客さん帰っちゃったか…もう閉店だし、この${n}はまかないにしよう！`,
   staffMeal: (n: number) => `閉店だ、大鉢に残った ${n} 人前はみんなのまかないに！`,
-  takeoutOrder: (items: string[], rider: boolean) => rider ? `デリバリー注文：${items.join('、')}、配達員さんがレジで待ってます！` : `お持ち帰り：${items.join('、')}、お客さんがレジでお待ちです！`,
+  takeoutOrder: (items: string[], rider: boolean) => rider ? `デリバリー注文：${tallyNames(items).join('、')}、配達員さんがレジで待ってます！` : `お持ち帰り：${tallyNames(items).join('、')}、お客さんがレジでお待ちです！`,
   takeoutHand: (rider: boolean) => rider ? 'お待たせしました、配達お気をつけて！' : 'お待たせしました！お持ち帰りです、どうぞ～',
   lastCall: 'あと三十分で閉店、ここからはお持ち帰りだけです！',
   orphanAgain: (n: string) => `ツイてる！${n}の注文がちょうど入った、出来立てをそのまま出そう！`,
@@ -322,7 +329,7 @@ const EN: typeof ZH = {
   orphanAway: 'The patron left... Into the big bowl to keep warm for the next order!',
   orphanMeal: (n: string) => `They've gone, and we're closed: this ${n} is the staff's supper!`,
   staffMeal: (n: number) => `Closing time: the ${n} left in the big bowl make the staff's supper!`,
-  takeoutOrder: (items: string[], rider: boolean) => rider ? `Delivery order: ${items.join(', ')}. The rider's waiting at the till!` : `Takeaway: ${items.join(', ')}. They're waiting at the till!`,
+  takeoutOrder: (items: string[], rider: boolean) => rider ? `Delivery order: ${tallyNames(items, ' ×').join(', ')}. The rider's waiting at the till!` : `Takeaway: ${tallyNames(items, ' ×').join(', ')}. They're waiting at the till!`,
   takeoutHand: (rider: boolean) => rider ? 'Here you go. Ride safe!' : 'Thanks for waiting! Your takeaway, enjoy~',
   lastCall: 'Half an hour to closing: takeaway only from now!',
   orphanAgain: (n: string) => `What luck! An order just rolled in for ${n}—send it out piping hot!`,
