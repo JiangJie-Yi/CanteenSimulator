@@ -6174,7 +6174,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const pickFood = (seasoning = false) => {
       if (!byHandRef.current) return null
       const candidates = pieces.current.filter((p) => present(p) && !p.eaten &&
-        !(roast.net?.includes(p.id) && !p.collected && p.netSpot === null) &&
+        // (not one on the fire still waiting for its place on the net (it isn't drawn); one waiting on the tray or the rice balls' dish is
+        // there to be clicked onto the fire: it holds no place on the net till then)
+        !(roast.net?.includes(p.id) && !p.collected && !p.staged && p.netSpot === null) &&
         (!p.collected || (p.flight >= 1 && (p.eat === 0 || p.stickOnly))) && !(seasoning && p.stickOnly))
       const hits = raycaster.intersectObjects(candidates.map((p) => p.node), true)
       if (!hits.length) return seasoning ? null : nearStick()
