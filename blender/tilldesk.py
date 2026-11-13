@@ -620,31 +620,47 @@ apply_mods(outer)
 bpy.data.objects.remove(well)
 smooth_angle(outer, 50)
 tr.append(outer)
-# (the ribs: a diamond lattice standing a millimetre off the floor, inside the well)
+# (the ribs: a diamond lattice standing a millimetre off the floor, inside the well: each rib its top, one strip of a quad, those one way a
+# hair over those the other (no two faces in one plane where they cross), its ends drawn in short of the well's rounded corners. Fifty thin
+# boxes crossed and cut to the well with a boolean were 1,172 triangles, sixteen meeting at each crossing (item 25; their sides, a
+# millimetre, never seen))
 FW, FD = TW2 - 0.05, TD2 - 0.05
-ribs = []
-for k in range(-12, 13):
-    for sgn in (-1, 1):
-        L = 0.3
-        r_ = box(f"rib{k}{sgn}", S(0.0012, 0.001, L), P(k * 0.012, 0.0029, 0), M["resinRib"], rot=(0, 0, sgn * math.radians(45)))
-        ribs.append(r_)
-bpy.ops.object.select_all(action="DESELECT")
-for r_ in ribs:
-    r_.select_set(True)
-bpy.context.view_layer.objects.active = ribs[0]
-bpy.ops.object.join()
-lattice = active()
-lattice.name = "TillTrayRibs"
-clip = box("clip", S(FW, 0.02, FD), P(0, 0.0029, 0), M["resinRib"], bev=0.01)
-m_ = lattice.modifiers.new("clip", "BOOLEAN"); m_.operation = "INTERSECT"; m_.object = clip; m_.solver = "EXACT"
-apply_mods(lattice)
-bpy.data.objects.remove(clip)
-# (the ribs' undersides, lying on the floor, never seen)
+RIB_W, RIB_Y, RIB_R = 0.0018, 0.0034, 0.01      # (a little wider than the boxes were, 1.2 mm: their sides and ink read bolder)
+
+
+def _inside(x, z):
+    # (in the well's floor: its rectangle, the corners rounded RIB_R)
+    ax, az = abs(x) - (FW / 2 - RIB_R), abs(z) - (FD / 2 - RIB_R)
+    if abs(x) > FW / 2 or abs(z) > FD / 2:
+        return False
+    return not (ax > 0 and az > 0 and ax * ax + az * az > RIB_R * RIB_R)
+
+
 lb = bmesh.new()
-lb.from_mesh(lattice.data)
-bmesh.ops.delete(lb, geom=[f for f in lb.faces if f.normal.z < -0.9], context="FACES")
-lb.to_mesh(lattice.data)
+for sgn in (-1, 1):
+    for k in range(-12, 13):
+        # (the rib's middle line, x - sgn z = k 0.012 (as the boxes stood, turned 45 degrees about their middles on the floor's line): walked
+        # across, kept from where it comes into the floor to where it leaves it)
+        c = k * 0.012
+        d = (math.sqrt(0.5), sgn * math.sqrt(0.5))
+        pts = [(c + d[0] * t, d[1] * t) for t in [i * 0.0005 - 0.2 for i in range(801)]]
+        ins = [q for q in pts if _inside(*q)]
+        if len(ins) < 3:
+            continue
+        (x0, z0), (x1, z1) = ins[0], ins[-1]
+        nx, nz = -d[1] * RIB_W / 2, d[0] * RIB_W / 2
+        y = RIB_Y + (0.0002 if sgn > 0 else 0)
+        vs = [lb.verts.new(P(x0 + nx, y, z0 + nz)), lb.verts.new(P(x1 + nx, y, z1 + nz)), lb.verts.new(P(x1 - nx, y, z1 - nz)), lb.verts.new(P(x0 - nx, y, z0 - nz))]
+        f = lb.faces.new(vs)
+        f.normal_update()
+        if f.normal.z < 0:
+            f.normal_flip()
+lmesh = bpy.data.meshes.new("TillTrayRibs")
+lb.to_mesh(lmesh)
 lb.free()
+lattice = bpy.data.objects.new("TillTrayRibs", lmesh)
+bpy.context.collection.objects.link(lattice)
+lattice.data.materials.append(M["resinRib"])
 tr.append(lattice)
 # (its thanks drawn into a little picture on a quad a hair proud of the tray (THANKS_PRINT), not kept as a mesh of letters: 1,400 triangles)
 THANKS_PRINT = DecalAtlas("TrayThanksPrint", ppm=5000, size=(1024, 64))
