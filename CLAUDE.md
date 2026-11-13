@@ -81,7 +81,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `node tests/e2e/views.mjs` | 從乾淨的瀏覽器把 9 個視角各截一張（`OUT=<資料夾>`、`Q=low`），檢查每個視角的構圖 |
 | `node tests/e2e/look.mjs` | 開店後近拍吧台客人（`OUT=<資料夾>`），看人物造型用 |
 | `node tests/e2e/paths.mjs [url]` | 客人動線檢查：開店後每 0.3 秒量每位走動中的客人四周（膝、胸高度），報告撞到的擺設；坐上自己的椅子不算（`WATCH=<ms>` 觀察時間） |
-| `node tests/e2e/dayaudit.mjs` | 一整天巡檢（約 7 分鐘）：×2 從開店跑到員工下班，每格量每個人物有沒有一格跳太遠或上下一個台階（瞬移），記下跳出的提示與營業日誌（`AT`、`END`、`SHOT`、`JSON`）；開頭共用 `tests/e2e/shop.mjs`（`boot`、`openShop`、`rush`）。整套測試流程與探針清單在 `docs/DETAILS.md`「測試流程」 |
+| `node tests/e2e/dayaudit.mjs` | 一整天巡檢（約 7 分鐘）：×2 從開店跑到員工下班，每格量每個人物有沒有一格跳太遠或上下一個台階（瞬移），記下跳出的提示與營業日誌，以及料理台禁區推過誰（幾次、最遠、推到的位置一格換邊幾次）（`AT`、`END`、`SHOT`、`JSON`）；開頭共用 `tests/e2e/shop.mjs`（`boot`、`openShop`、`rush`）。整套測試流程與探針清單在 `docs/DETAILS.md`「測試流程」 |
 | `node tests/e2e/crowd.mjs` | 客人走路的跳動與互相穿過：開店搶客 ×2，每格量比走路快的格數、一格跳超過 0.2 的、兩人疊在一起的（誰跟誰）、同一階段時間倒退（`WATCH`、`CALM=1`、`LIST=1`） |
 | `node tests/e2e/flowhealth.mjs` | 流程有沒有卡住：開店 ×2，每 2 秒記客人、盤子、外帶單各在一個狀態多久，水槽、碗盤架、裝盤處、鐵串的數量；印最長的、平均每一刻有幾個髒盤佔著座位、幾盤菜等人端、幾人在長凳等、幾位等菜（改誰先做什麼時用平均、各跑兩次比；`CALM=1` 一般人潮） |
 | `node tests/e2e/guardlog.mjs` | 誰被料理台的禁區推過、當時在做什麼（`Roasting.tsx` 的 `HearthGuard` 每格把站進料理台、爐床的人推出最近的一邊，只改畫出來的位置）：開店 ×2（`RUSH=1` 搶客），列出每個人、每個階段被推幾次、最遠多遠、推到的位置一格換邊超過 `LEAP`（0.45）幾次（畫面上的跳）；`COAL=1` 每 `COAL_EVERY` 毫秒叫三廚去搬炭袋，`LIST=40` 逐筆列出 |

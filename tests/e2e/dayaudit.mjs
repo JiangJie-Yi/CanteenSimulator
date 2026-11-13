@@ -4,7 +4,9 @@
 //     further in a frame than a walk could (JUMP, the world's units) or
 //     up or down in one (a step's more than half of it) noted with what it was doing: a customer's phase (GuestBar3D's shown), a staff
 //     member's role, every server's phase, how many frames the scene ran in it;
-//   - every notice put up (the bar along the bottom), and every line of the day's log, with the shop's clock.
+//   - every notice put up (the bar along the bottom), and every line of the day's log, with the shop's clock;
+//   - everyone the cook table's guard put out of the table (Roasting's HearthGuard; tests/e2e/guardlog.mjs for what they were doing): how
+//     often, how far, and how often the place it put them at changed sides in a frame (a flip: a leap on the screen; item 54's third cook).
 // The figures are gathered afresh every frame (gathered once a second, React handing a customer's group on to the next customer read as a
 // leap from one to the other: item 32's first day of "teleports" was that). An overview shot every SHOT ms (0: none).
 //
@@ -21,7 +23,8 @@ await openShop(p, { x2: true, at: +(process.env.AT ?? 16 * 60 + 35) })
 if (process.env.RUSH) await rush(p)
 await p.evaluate((JUMP) => {
   const T = window.__THREE
-  const A = window.__audit = { jumps: [], notices: [], chat: [], seen: new Map(), maxStep: {}, frames: 0 }
+  const GUARD_LEAP = 0.45
+  const A = window.__audit = { jumps: [], notices: [], chat: [], seen: new Map(), maxStep: {}, frames: 0, guard: {}, pushSeen: new WeakSet(), lastPush: {} }
   const figures = () => {
     const out = []
     window.__scene.traverse((o) => {
@@ -84,6 +87,19 @@ await p.evaluate((JUMP) => {
       }
       A.seen.set(k, { x: v.x, y: v.y, z: v.z, vis, o, phase: phaseOf(o, k), n: A.frames })
     }
+    // (the cook table's guard: each push it's logged since the last look, by who; a flip when where it put them moved more than GUARD_LEAP
+    // from where it had put them the frame before)
+    for (const e of window.__hearthPushes ?? []) {
+      if (A.pushSeen.has(e)) continue
+      A.pushSeen.add(e)
+      const g = A.guard[`${e.who} (${e.role})`] ??= { n: 0, most: 0, flips: 0, first: clock(), last: '' }
+      g.n++
+      g.most = Math.max(g.most, Math.hypot(e.to[0] - e.from[0], e.to[1] - e.from[1]))
+      g.last = clock()
+      const l = A.lastPush[e.who]
+      if (l && l.f === A.frames - 1 && Math.hypot(e.to[0] - l.to[0], e.to[1] - l.to[1]) > GUARD_LEAP) g.flips++
+      A.lastPush[e.who] = { f: A.frames, to: e.to }
+    }
     R.calls = 0; R.maxDelta = 0
     requestAnimationFrame(tick)
   }
@@ -96,6 +112,8 @@ await p.evaluate((JUMP) => {
     for (const li of document.querySelectorAll('.ai-chat .ai-line')) if (!seenLines.has(li)) { seenLines.add(li); A.chat.push({ at: clock(), t: li.textContent }) }
   }, 500)
 }, +(process.env.JUMP ?? 0.6))
+// (a walk's frame at x2 is up to about 0.3: the guard's place for someone moving more than this in a frame is a leap)
+const GUARD_LEAP = 0.45
 // (the overview: view 1)
 await p.keyboard.press('1')
 const END = +(process.env.END ?? 5 * 60 + 25), LIMIT = +(process.env.LIMIT ?? 12 * 60000), SHOT = +(process.env.SHOT ?? 60000)
@@ -114,11 +132,14 @@ for (;;) {
   const after = m >= 24 * 60 ? m - 24 * 60 : m < 12 * 60 ? m : -1
   if (after >= END || Date.now() - t0 > LIMIT) break
 }
-const A = await p.evaluate(() => { const a = window.__audit; return { jumps: a.jumps, notices: a.notices, chat: a.chat, maxStep: a.maxStep, frames: a.frames } })
+const A = await p.evaluate(() => { const a = window.__audit; return { jumps: a.jumps, notices: a.notices, chat: a.chat, maxStep: a.maxStep, frames: a.frames, guard: a.guard } })
 fs.writeFileSync(process.env.JSON ?? 'dayaudit.json', JSON.stringify(A, null, 1))
 console.log(`${A.frames} frames; the most a figure moved in one, by kind: ${JSON.stringify(Object.fromEntries(Object.entries(A.maxStep).map(([k, d]) => [k, +d.toFixed(2)])))}`)
 console.log(`${A.jumps.length} jumps (over ${process.env.JUMP ?? 0.6} across, or half that up or down, in a frame)`)
 for (const j of A.jumps) console.log(`  ${j.at} ${j.k}${j.role ? ` (${j.role})` : ''} ${j.d} across ${j.dy} up/down: ${j.from.join(',')} -> ${j.to.join(',')} | ${j.prevPhase ?? ''} => ${j.phase ?? ''} | servers ${j.waiters} | scene ${j.frames}`)
+const guard = Object.entries(A.guard).sort((a, b) => b[1].n - a[1].n)
+console.log(`${guard.reduce((t, [, g]) => t + g.n, 0)} pushes out of the cook table (who, how many, the farthest, flips over ${GUARD_LEAP}, first and last seen):`)
+for (const [k, g] of guard) console.log(`  ${k}: ${g.n}, most ${g.most.toFixed(2)}, flips ${g.flips}, ${g.first}-${g.last}`)
 console.log(`${A.notices.length} notices`)
 for (const x of A.notices) console.log(`  ${x.at} ${x.t}`)
 console.log(`${A.chat.length} lines in the day's log (all in ${process.env.JSON ?? 'dayaudit.json'})`)
