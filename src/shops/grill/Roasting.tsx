@@ -965,8 +965,27 @@ const STORE_PIECE: Record<Exclude<Store, 'cubby'>, string> = { freezer: 'freezer
 // (the warmer's: the two counters are one, its body all the warmer's model (blender/warmer.py), the rice-ball counter's only what's on it)
 const STORE_COUNTER: Partial<Record<Store, string>> = { ricetub: 'warmer' }
 /**
+ * A spot (in `frame`) put out of the cook table and its hearth where the table's guard (HearthGuard) would put whoever stood there, before
+ * anyone sets off for it: walked to as it was, they'd been held at the table's edge every frame of the way in and all the while they stood
+ * there, drawn up to 0.75 off where they were, sliding along the edge (item 55: the second cook's spot at the vegetables' stand was in the
+ * table, past his own place at the board, the stand's box being long and its middle far off).
+ */
+function clearOfTable(spot: THREE.Vector3, frame: THREE.Object3D, scene: THREE.Object3D) {
+  const t = scene.getObjectByName('cook-table-c0')?.parent
+  if (!t) return spot
+  t.updateWorldMatrix(true, false)
+  frame.updateWorldMatrix(true, false)
+  const q = t.worldToLocal(frame.localToWorld(spot.clone()))
+  const al = q.dot(ALONG), la = q.dot(LAY)
+  const [a2, l2] = keepOut(al, la, 'other', HEARTH_ZONES)
+  if (a2 === al && l2 === la) return spot
+  q.addScaledVector(ALONG, a2 - al).addScaledVector(LAY, l2 - la)
+  return frame.worldToLocal(t.localToWorld(q))
+}
+/**
  * Where the chef stands to take something out of a store (Roasting's frame): before the fridge under the cook table on the left, its
- * doors' swing clear; else just off the side of the store (as it stands, wherever it's been moved) nearest his place, facing it.
+ * doors' swing clear; else just off the side of the store (as it stands, wherever it's been moved) nearest his place, facing it; never in
+ * the cook table (clearOfTable).
  */
 function storeSpot(store: Store, scene: THREE.Object3D, frame: THREE.Object3D, home: THREE.Vector3) {
   if (store === 'cubby') {
@@ -991,7 +1010,7 @@ function storeSpot(store: Store, scene: THREE.Object3D, frame: THREE.Object3D, h
   if (d.lengthSq() < 1e-6) d.set(1, 0, 0)
   d.normalize()
   const out = Math.min(Math.abs(d.x) > 1e-4 ? half.x / Math.abs(d.x) : 1e9, Math.abs(d.z) > 1e-4 ? half.z / Math.abs(d.z) : 1e9)
-  const spot = face.clone().addScaledVector(d, out + 0.45)
+  const spot = clearOfTable(face.clone().addScaledVector(d, out + 0.45), frame, scene)
   return { spot: spot.setY(floorAt(spot)), face }
 }
 /** the warming counter's front (Decor's Warmer: its own +z the kitchen's side) across from a piece on it, a step out (the chef's frame); null

@@ -45,6 +45,13 @@ feature('灶台與圍爐裏是禁區', () => {
     and('走進火爐的被推出火爐', (w) => { expect(inPit(w.b, PIT_ROOM)).toBe(false) })
   })
 
+  scenario('取料的站位落在桌面裡（二廚去蔬菜架）：出發前就移到桌邊外，走到那裡、站在那裡都不會再被推', ({ given, when, then, and }) => {
+    given('二廚去蔬菜架的站位算在砧板那裡，桌面裡 0.75', (w) => { w.spot = [-0.779, 1.603] })
+    when('出發前照禁區的規則移出桌面', (w) => { w.at = keepOut(w.spot[0], w.spot[1], 'other', Z) })
+    then('站位在桌邊外（留半個身體）', (w) => { expect(onTable(w.at)).toBe(false); expect(w.at[1]).toBeCloseTo(Z.table.lay[1] + BODY) })
+    and('他站在那裡，每一格都不會再被推', (w) => { expect(keepOut(w.at[0], w.at[1], 'other', Z)).toEqual(w.at) })
+  })
+
   scenario('站在灶台外的人不受影響', ({ given, when, then }) => {
     given('一位外場站在桌子前的走道上', (w) => { w.at = [0.2, 3.0] })
     when('這一格畫出來之前', (w) => { w.now = keepOut(w.at[0], w.at[1], 'other', Z) })
