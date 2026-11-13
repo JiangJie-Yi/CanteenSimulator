@@ -263,23 +263,25 @@ def stool(name, M, seat_top=0.29, R=0.128, rings_at=(0.1,), splay=0.05):
     s0 = seat_top - th
     # (the seat: a bun of oak, its top a touch domed, its edge rolled round, its underside chamfered in)
     # (its ends a small ring closed in a ladder, not drawn into one point: the owner's low-poly rule)
-    prof = [(R * 0.12, seat_top + 0.004), (R * 0.55, seat_top + 0.003), (R - 0.022, seat_top), (R - 0.007, seat_top - 0.006), (R, seat_top - 0.018),
-            (R - 0.002, s0 + 0.016), (R - 0.012, s0 + 0.003), (R - 0.03, s0), (R * 0.12, s0)]
-    fin(lathe(f"{name}Seat", list(reversed(prof)), 24, "flat"), M["oak"], parts)
+    # (low-poly, item 76 (the owner's, 2026-11-13: "the stools' faces are far too many"): 16 round, its outline in seven points (24 and nine
+    # before); the roll at its edge kept, it's its outline)
+    prof = [(R * 0.12, seat_top + 0.004), (R - 0.022, seat_top), (R - 0.006, seat_top - 0.007), (R, seat_top - 0.018),
+            (R - 0.008, s0 + 0.006), (R - 0.03, s0), (R * 0.12, s0)]
+    fin(lathe(f"{name}Seat", list(reversed(prof)), 16, "flat"), M["oak"], parts)
     # (the cushion: plump, domed, its middle drawn down by the button; piped round its rim)
     top = seat_top + 0.002
     cr = R - 0.02
     cp = [(cr * 0.08, top + 0.03)]
     # (six steps out to its rim (eight before), smooth shaded)
-    for i in range(1, 7):
-        t = i / 6
+    for i in range(1, 5):
+        t = i / 4
         h = 0.046 * math.sqrt(max(0.0, 1 - t ** 3)) - 0.011 * math.exp(-(t / 0.16) ** 2)
         cp.append((cr * t, top + max(0.004, h)))
     cp.append((cr + 0.004, top + 0.006))
     cp.append((cr, top))
     # (two cushions, blue and red (the owner's): the game keeps one on each stool; no piping round the rim, its button covered in the cloth)
     for tag, mat in (("", "cloth"), ("Red", "clothRed")):
-        cush = lathe(f"{name}Cushion{tag}", list(reversed(cp)), 24, "flat")
+        cush = lathe(f"{name}Cushion{tag}", list(reversed(cp)), 16, "flat")
         fin(cush, M[mat], parts)
         bpy.ops.mesh.primitive_ico_sphere_add(radius=0.008, subdivisions=1, location=P(0, top + 0.033, 0))
         b = bpy.context.view_layer.objects.active
@@ -295,11 +297,11 @@ def stool(name, M, seat_top=0.29, R=0.128, rings_at=(0.1,), splay=0.05):
         t_ = (math.cos(a) * r_top, s0 + 0.004, math.sin(a) * r_top)
         f_ = (math.cos(a) * r_foot, 0.018, math.sin(a) * r_foot)
         legs.append((t_, f_))
-        fin(leg(f"{name}Leg{k}", t_, f_, 0.026, 0.021), M["oakl"], parts)
+        fin(leg(f"{name}Leg{k}", t_, f_, 0.026, 0.021, segs=8, rings=1), M["oakl"], parts)
     # (each ring through the legs where they are at its height)
     for n, y in enumerate(rings_at):
         t = (s0 - y) / (s0 - 0.018)
-        fin(ring(f"{name}Ring{n}", y, r_top + (r_foot - r_top) * t, 0.011), M["oakl"], parts)
+        fin(ring(f"{name}Ring{n}", y, r_top + (r_foot - r_top) * t, 0.011, segs=20, tube=4), M["oakl"], parts)
     root = bpy.data.objects.new(name, None)
     bpy.context.collection.objects.link(root)
     for o in parts:
