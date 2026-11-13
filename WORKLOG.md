@@ -275,3 +275,11 @@
 - 改：分成「炭床」與「火力」兩個數字。炭床照舊（加炭立刻加、燒、搧、澆都在它上面；三廚、炭床滿不滿看它），火力每秒往炭床升 `FIRE_CATCH` 4%、到了就停、炭床少了立刻跟著降（純函式 `heatStep`，BDD `fire` 加四個情境：冷爐加炭不會一下跳上去、一路升到炭床就停、燒掉或澆水立刻降、×2 快一倍）。烤的速度、火聲、紅光、煙、太熱都改看火力；搧風是本來就在燒的炭變旺，火力跟著一起加。火力表深橘色是火力、淡橘色到炭床；數字放在 `FireControl` 自己的小 store，App 不跟著每 0.2 秒重畫。
 - 驗證（遊戲裡，`_firerise.mjs`：研製、從炭箱拖 6 根炭上火，每 0.25 秒記火力表）：放完 6 根（3.7 秒）時炭床 30%、火力 13%；之後 0.5 秒一格：14、17、18、21、22、25、26、29、30%，4.5 秒到 30% 停住（改前放下去那一刻就是 30%）。截圖 `firerise-0.png`（火力表深橘 13%、淡橘到 30%）、`firerise-3.png`、`firerise-8.png`。
 - `npx tsc -b`、`npm test`（523 項）、`npm run e2e`（all passed）通過；提交（feat: the fire catches like water filling）。**完成**。
+
+## 第 30 項　飲料櫃後排卡片太暗
+
+- 11-13 08:04 開始。店主的圖是晚上：前兩排紙盒很亮，後排卡片是暗灰褐色方塊。
+- 找：後排卡片（DiningRoom 的 `BACK_CARD`）是普通的 `MeshStandardMaterial`；前排標籤用 `LABEL_LIT`：自發光、自發光貼圖就是標籤圖、強度 0.3，像冰箱燈照著，所以晚上前排亮、後排灰。另外後排紙盒只畫了標籤的兩個顏色（兩條色帶），沒有蘋果、蔬菜那些圖。
+- 改：卡片的標籤改從前排同一張標籤圖 `LABEL_ATLAS` 取（紙盒取正面那一片 u 0.107～0.393、罐子與小瓶取正面那一半、瓶子把正面那一半貼在標籤帶上）；邊緣陰影從 35% 減到 16%（瓶身兩側的深灰改淺）；材質加自發光 `BACK_GLOW` 0.26（比前排的 0.3 略暗，表示在後面）。
+- 驗證（同一個鏡頭，`_fridgeclose.mjs` 加了 `CLOCK`）：晚上 22:07 紙盒那台 `fridgeback-night-before.png`（後排暗灰方塊）→ `fridgeback-night-after.png`（後排看得到「りんご」等標籤、米白色）；清酒那台 `fridgeback1-night-before/after.png`（後排從暗灰變成看得到清酒瓶的紅綁帶與梅酒的琥珀色）；白天 `fridgeback-day-after.png` 不會過亮。白天同鏡頭繪製數 111、三角面 74,564，跟改前一樣（晚上那張 403 是陰影更新那一格）。
+- `npx tsc -b`、`npm test` 通過（只動材質與貼圖，沒動流程，沒跑 e2e）；提交（fix: the drinks fridges' back ranks lit and labelled like the front）。**完成**。

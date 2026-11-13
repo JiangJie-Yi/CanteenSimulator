@@ -6254,9 +6254,15 @@ function liteBodyColour(id: DrinkId) {
 /**
  * The pictures of the drinks for the ranks deep in the fridges (DrinkBottleLite's `deep`): each drink's side as it stands (its outline from
  * the shelf bottle's own profile, its glass, its label's band and its cap; a can's print; a pack's paper), one slot each of one picture, and
- * for each drink two cards crossed upright, its width and height, mapped to its slot; one material, so a fridge's are one draw
+ * for each drink two cards crossed upright, its width and height, mapped to its slot; one material, so a fridge's are one draw.
+ * (the owner's, 2026-11-13: "good, but a bit dark; adjust it, and more real": at night they stood grey-brown blocks behind the bright front
+ * ones. Their labels now the front ones' own print (LABEL_ATLAS: a pack's front panel, a can's or a bottle's front half), where they were two
+ * bands of its colours; the shading at their edges lighter; and lit from within a touch as the front ones' labels are (BACK_CARD's emissive),
+ * the fridge's own light in them)
  */
 const BACK_SLOT_W = 64, BACK_SLOT_H = 256
+/** how much the deep ranks' pictures glow (the front labels' 0.3; a touch under it, being further in) */
+const BACK_GLOW = 0.26
 const BACK_IDS = DRINKS.map((x) => x.id as DrinkId)
 const BACK_ATLAS = typeof document === 'undefined' ? null : (() => {
   const c = document.createElement('canvas')
@@ -6274,6 +6280,16 @@ function drawBackAtlas() {
   BACK_ATLAS.drawn = true
   const g = BACK_ATLAS.c.getContext('2d')!
   g.clearRect(0, 0, BACK_ATLAS.c.width, BACK_SLOT_H)
+  // (the front ones' labels, every one drawn round its bottle in a cell of LABEL_ATLAS: `u0`..`u1` of its way round, its front, put into the
+  // rectangle given; none there (no page), its two colours as bands)
+  const labels = (LABEL_ATLAS as THREE.CanvasTexture | null)?.image as HTMLCanvasElement | undefined
+  const print = (id: DrinkId, u0: number, u1: number, dx: number, dy: number, dw: number, dh: number) => {
+    if (!labels) return false
+    const { c, r } = cellOf(id)
+    const k = labels.width / (CELL_W * ATLAS_COLS)
+    g.drawImage(labels, (c * CELL_W + 8 + u0 * LABEL_W) * k, (r * CELL_H + 8) * k, (u1 - u0) * LABEL_W * k, LABEL_H * k, dx, dy, dw, dh)
+    return true
+  }
   BACK_IDS.forEach((id, i) => {
     const d = DRINKS.find((x) => x.id === id)!
     const kind = KIND_OF[id], shaped = shapeOf(id), { w, h } = backDims(id)
@@ -6289,30 +6305,41 @@ function drawBackAtlas() {
       g.closePath()
       const gr = g.createLinearGradient(X(-w / 2), 0, X(w / 2), 0)
       const body = liteBodyColour(id)
-      gr.addColorStop(0, '#202020'); gr.addColorStop(0.3, body); gr.addColorStop(0.55, '#ffffff'); gr.addColorStop(0.62, body); gr.addColorStop(1, '#303030')
-      g.fillStyle = body; g.fill(); g.globalAlpha = 0.35; g.fillStyle = gr; g.fill(); g.globalAlpha = 1
+      gr.addColorStop(0, '#5a5a5a'); gr.addColorStop(0.3, body); gr.addColorStop(0.55, '#ffffff'); gr.addColorStop(0.62, body); gr.addColorStop(1, '#606060')
+      g.fillStyle = body; g.fill(); g.globalAlpha = 0.3; g.fillStyle = gr; g.fill(); g.globalAlpha = 1
       g.clip()
       const lg = LITE_GEO[shaped], lh = (lg.label as THREE.CylinderGeometry).parameters.height
-      g.fillStyle = l0; g.fillRect(x0, Y(lg.labelY + lh / 2), BACK_SLOT_W, Y(lg.labelY - lh / 2) - Y(lg.labelY + lh / 2))
-      g.fillStyle = l1; g.fillRect(x0, Y(lg.labelY + lh * 0.12), BACK_SLOT_W, Y(lg.labelY - lh * 0.12) - Y(lg.labelY + lh * 0.12))
+      const ly0 = Y(lg.labelY + lh / 2), ly1 = Y(lg.labelY - lh / 2)
+      // (its label's front half round it, across the bottle's width)
+      if (!print(id, 0, 0.5, x0, ly0, BACK_SLOT_W, ly1 - ly0)) {
+        g.fillStyle = l0; g.fillRect(x0, ly0, BACK_SLOT_W, ly1 - ly0)
+        g.fillStyle = l1; g.fillRect(x0, Y(lg.labelY + lh * 0.12), BACK_SLOT_W, Y(lg.labelY - lh * 0.12) - Y(lg.labelY + lh * 0.12))
+      }
       g.restore(); g.save()
       g.fillStyle = d.cap; g.fillRect(X(-0.013 * lg.capR), Y(lg.capY + 0.005 * lg.capR), X(0.013 * lg.capR) - X(-0.013 * lg.capR), Y(lg.capY - 0.005 * lg.capR) - Y(lg.capY + 0.005 * lg.capR))
     } else {
       // (a can: its print all round, a silver lid; a pack: its paper, a band; a little bottle: its shape, its foil lid)
       const r = w / 2
-      g.fillStyle = l0; g.fillRect(X(-r), Y(h * (kind === 'can' ? 0.95 : 1)), X(r) - X(-r), Y(0) - Y(h * (kind === 'can' ? 0.95 : 1)))
-      g.fillStyle = l1; g.fillRect(X(-r), Y(h * 0.62), X(r) - X(-r), Y(h * 0.42) - Y(h * 0.62))
+      // (its print up its body: a pack's front panel (a seventh past a quarter of the way round either side of its middle, the wide face) under
+      // its sealed top; a can's or a little bottle's front half under its lid)
+      const top = kind === 'can' ? h * 0.95 : kind === 'pack' ? Math.min(h, PACK.h) : kind === 'small' ? h * 0.93 : h
+      g.fillStyle = l0; g.fillRect(X(-r), Y(h), X(r) - X(-r), Y(0) - Y(h))
+      if (!print(id, kind === 'pack' ? 0.107 : 0, kind === 'pack' ? 0.393 : 0.5, X(-r), Y(top), X(r) - X(-r), Y(0) - Y(top))) {
+        g.fillStyle = l1; g.fillRect(X(-r), Y(h * 0.62), X(r) - X(-r), Y(h * 0.42) - Y(h * 0.62))
+      }
       if (kind === 'can') { g.fillStyle = '#c8ccd2'; g.fillRect(X(-r * 0.9), Y(h), X(r * 0.9) - X(-r * 0.9), Y(h * 0.95) - Y(h)) }
       if (kind === 'small') { g.fillStyle = d.cap; g.fillRect(X(-r * 0.9), Y(h), X(r * 0.9) - X(-r * 0.9), Y(h * 0.93) - Y(h)) }
       const gr = g.createLinearGradient(X(-r), 0, X(r), 0)
-      gr.addColorStop(0, 'rgba(0,0,0,0.35)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.15)'); gr.addColorStop(1, 'rgba(0,0,0,0.35)')
+      gr.addColorStop(0, 'rgba(0,0,0,0.16)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.12)'); gr.addColorStop(1, 'rgba(0,0,0,0.16)')
       g.fillStyle = gr; g.fillRect(X(-r), Y(h), X(r) - X(-r), Y(0) - Y(h))
     }
     g.restore()
   })
   BACK_ATLAS.t.needsUpdate = true
 }
-const BACK_CARD = new THREE.MeshStandardMaterial({ color: '#ffffff', map: BACK_ATLAS?.t ?? null, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.45 })
+const BACK_CARD = new THREE.MeshStandardMaterial({ color: '#ffffff', map: BACK_ATLAS?.t ?? null, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.45,
+  // (lit from within a touch, as the front ones' labels are (LABEL_LIT): the fridge's light in them, not grey in the dark at night)
+  emissive: '#ffffff', emissiveMap: BACK_ATLAS?.t ?? null, emissiveIntensity: BACK_GLOW })
 const BACK_CARDS = new Map<DrinkId, THREE.BufferGeometry>()
 function backCard(id: DrinkId) {
   const hit = BACK_CARDS.get(id)
