@@ -74,7 +74,7 @@ import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, type Visit } 
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
 import { SOAP, SOAP_FULL, SOAP_REFILL_AT, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT, washroomOrder } from '@/game/washroom'
 import { RECEIPT, receiptOrder } from '@/game/receipts'
-import { LINES } from '@/data/lines'
+import { LINES, tallyNames } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
@@ -118,6 +118,7 @@ import { GameClock } from '@/ui/GameClock'
 import { ageFresh } from '@/game/freshness'
 import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, type Lot } from '@/game/lots'
 import { RING_SLOTS } from '@/game/fireSlots'
+import { orderSaid, saidAgain, withOrder, type OrderSaid } from '@/game/orderTally'
 import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
 
 // distance between dishes on the carousel
@@ -2008,7 +2009,9 @@ export default function App() {
   const chatId = useRef(0)
   // (a guest's order in the log, each language's way round: 點了 X, Xを注文, ordered X)
   const ordered = (name: string) => (lang === 'ja' ? `${name}を注文` : lang === 'en' ? `ordered ${name}` : `點了 ${name}`)
-  const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner', raw: string, guest?: number) => {
+  /** (the last line written in the log, and when: the same words again at once aren't written twice (item 56)) */
+  const lastSaid = useRef<{ text: string; at: number; line: number } | null>(null)
+  const talk = useCallback((who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner', raw: string, guest?: number, replace?: number): number | undefined => {
     // what a customer says is shown in a bubble over their head, where there's a 3D bar to show it on: whose it is passed with it (their
     // words carry no number now: the bubble's yellow tag says who)
     if (who === 'guest' && guest !== undefined && !phoneRef.current) {
@@ -2018,16 +2021,45 @@ export default function App() {
       const ms = Math.max(4500, sayChunks(raw).length * SAY_EACH * 1000 + 1500)
       sayOver(gid, { key, text: raw, ms })
       window.setTimeout(() => unsayOver(gid, key), ms)
-      return
+      return undefined
     }
     // customers are named by how they look (上班族, 老奶奶…), not by number: their name before their words in the log
     const lg = langRef.current
     const text = guest !== undefined ? `${guestLabel(guest, lg)}${lg === 'ja' ? '「' : lg === 'en' ? ': ' : '：'}${raw}${lg === 'ja' ? '」' : ''}` : raw
     // (kept the day's business long (the owner's, as an online game's chat: a day's worth, the oldest written over past LOG_MAX), not gone
     // after six seconds)
+    // (one put in place of the line `replace`, while it's still in the log: the same customer's same dish again at once, the count up (item 56))
+    if (replace !== undefined) {
+      setChat((all) => (all.some((x) => x.id === replace) ? all.map((x) => (x.id === replace ? { ...x, text } : x)) : [...all.slice(-(LOG_MAX - 1)), { id: replace, who, text }]))
+      return replace
+    }
+    // (the same words as the last line, at once (the chef putting two of a dish on the fire together): written once (item 56). Not an order:
+    // two customers who look alike (two 中年大叔) ordering the same dish at once are two orders, each its line; one customer's two of a dish
+    // are one line with how many (sayOrder))
+    const at = performance.now()
+    if (who !== 'order' && saidAgain(lastSaid.current, text, at)) return lastSaid.current!.line
     const id = ++chatId.current
     setChat((all) => [...all.slice(-(LOG_MAX - 1)), { id, who, text }])
+    lastSaid.current = { text, at, line: id }
+    return id
   }, [])
+  /** (the orders said in the log just now: the same customer's same dish again at once (two of it ordered together, next to each other or
+   * not) is its line with how many, 點了 味噌烤香菇×2, as a takeaway's order is called (item 56: two lines the same, one after the other,
+   * in a busy evening's log)) */
+  const recentOrders = useRef<OrderSaid[]>([])
+  const sayOrder = (guest: number, dish: string, name: string) => {
+    const o = orderSaid(recentOrders.current, guest, dish, performance.now())
+    const shown = o.n > 1 ? tallyNames(Array(o.n).fill(name), lang === 'en' ? ' ×' : '×')[0] : name
+    const line = talk('order', ordered(shown), guest, o.again ? o.line : undefined)
+    recentOrders.current = withOrder(recentOrders.current, { ...o, line: line ?? -1 })
+    // (in development, the last few hundred orders said: whose (and how they're called), which dish, how many, merged or not, its line
+    // (tests/e2e/_56orders.mjs))
+    if (import.meta.env.DEV) {
+      const w = window as unknown as { __orders?: { guest: number; who: string; dish: string; n: number; again: boolean; at: number; line: number }[] }
+      ;(w.__orders ??= []).push({ guest, who: guestLabel(guest, lang), dish, n: o.n, again: o.again, at: Math.round(o.at), line: line ?? -1 })
+      if (w.__orders.length > 600) w.__orders.splice(0, 200)
+    }
+  }
   const [sky, setSky] = useSky()
   const theme = themeOf(sky)
   /**
@@ -2219,7 +2251,7 @@ export default function App() {
       const key = ++feedSeq.current
       setFeed((f) => [...f.slice(-2), { key, id, guest }])
       const it = findItem(dish, id)
-      talk('order', ordered(it ? nameIn(lang, it) : id), guest)
+      sayOrder(guest, id, it ? nameIn(lang, it) : id)
       window.setTimeout(() => setFeed((f) => f.filter((x) => x.key !== key)), 3200)
     }
     return ok
@@ -2831,7 +2863,7 @@ export default function App() {
     setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
     // (in English, its name made the menu's way, from its parts: the entry carries only the Chinese and the Japanese)
     const en = e.parts.map((pt) => partEn(findItem(d, pt.id)?.en, pt.dabs, d.roast ? 'grill' : 'plain') ?? pt.name).join(' & ')
-    talk('order', ordered(nameIn(lang, { ...e, en })), guest)
+    sayOrder(guest, e.key, nameIn(lang, { ...e, en }))
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }
