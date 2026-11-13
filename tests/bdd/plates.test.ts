@@ -3,7 +3,7 @@ import { feature, scenario } from './bdd'
 import { CARRY, CLEAR_LATE, DRYER_CAP, ON_THE_WAY, onTheWay, DRY_S, STACK_CAP, STACK_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
   putBack, unload, washNow, washOne, type Dryer, canOpen, dryerPhase, playerLoad, shutStarts, DRAIN_CAP, DRAIN_S, drainTick, handNow, handOne,
   unbasket, washerBusy } from '@/game/plates'
-import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
+import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 
 const idle: Dryer = { n: 0, left: null }
 
@@ -204,6 +204,36 @@ feature('服務生在廚房裡走去碗盤櫃，繞開擺設', () => {
     and('往最近的那一邊（右邊）移，只移一點點', (w) => { expect(w.at[0]).toBeGreaterThan(3.6); expect(w.at[0]).toBeLessThan(3.7); expect(w.at[1]).toBe(1.3) })
     when('待命點本來就在空處', (w) => { w.at = standClear([1, 1], [w.pot]) })
     then('不動', (w) => { expect(w.at).toEqual([1, 1]) })
+  })
+
+  scenario('要拿的東西緊靠著灶台尾端（地上的炭袋）：站到走得到、走最少路的那一邊，不站進灶台側面和吧台之間的窄縫', ({ given, when, then, and }) => {
+    given('廚房地板從吧台後面 0.3 開始；灶台（含旁邊留的走道寬度）一直到吧台邊；炭袋貼著灶台尾端的角落，三廚站在灶台尾端的凹槽裡', (w) => {
+      w.room = { x0: 0, z0: 0.3, x1: 6, z1: 4 }
+      w.table = { x0: 1, z0: 0.2, x1: 3, z1: 2.6 }
+      w.sack = { x0: 2.7, z0: 0.15, x1: 3.2, z1: 0.62 }
+      // (as the shop lists them: what stands on the floor first, the cook table last)
+      w.blocks = [w.sack, w.table]
+      w.home = [2.7, 1.2]
+      w.mid = [2.95, 0.38]
+    })
+    when('照最近的空處站', (w) => { w.near = standClear(w.mid, w.blocks) })
+    then('那裡在廚房地板外（灶台和吧台之間），沒有路走得到', (w) => {
+      expect(w.near[1]).toBeLessThan(w.room.z0)
+      expect(kitchenPath(w.home, w.near, w.room, w.blocks)).toBeNull()
+    })
+    when('照走得到、走最少路的那一邊站', (w) => { w.at = reachSpot(w.mid, w.home, w.room, w.blocks); w.p = kitchenPath(w.home, w.at, w.room, w.blocks) })
+    then('站在廚房地板上，不在灶台也不在炭袋上', (w) => {
+      expect(w.at[1]).toBeGreaterThanOrEqual(w.room.z0)
+      for (const r of w.blocks) expect(w.at[0] > r.x0 && w.at[0] < r.x1 && w.at[1] > r.z0 && w.at[1] < r.z1).toBe(false)
+    })
+    and('在灶台尾端外、炭袋靠廚房的那一邊（從凹槽出來就到）', (w) => { expect(w.at[0]).toBeGreaterThan(w.table.x1); expect(w.at[1]).toBeGreaterThan(w.sack.z1) })
+    and('找得到路：先走出凹槽，之後每一段都不穿過灶台和炭袋', (w) => {
+      expect(w.p).not.toBeNull()
+      expect(crosses(w.p.slice(1), w.table)).toBe(false)
+      expect(crosses(w.p.slice(1), w.sack)).toBe(false)
+    })
+    when('要拿的東西本來就在空處', (w) => { w.at = reachSpot([5, 3], w.home, w.room, w.blocks) })
+    then('就站在那裡', (w) => { expect(w.at).toEqual([5, 3]) })
   })
 
   scenario('完全被擋住時沒有路', ({ when, then }) => {

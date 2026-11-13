@@ -35,6 +35,34 @@ function stepOut(p: P, blocks: Rect[], cell: number): P {
  * back there (the owner saw her standing in it) */
 export const standClear = (p: P, blocks: Rect[], cell = 0.1): P => stepOut(p, blocks, cell)
 
+const wayLength = (w: P[]) => w.reduce((s, v, i) => (i ? s + Math.hypot(v[0] - w[i - 1][0], v[1] - w[i - 1][1]) : 0), 0)
+
+/**
+ * Where to stand to reach something whose middle is `p`, coming from `from`: just past a side of a block it's in (and on out of any block
+ * that comes into), inside the room, with a way to it from `from`; of those, the one the shortest way off. `p` itself if it's clear;
+ * standClear's if no side will do. The nearest side alone (standClear) can be a slot no way reaches: the coal sack by the cook table's end,
+ * stepped out of the sack into the table and out of the table toward the counter, stood off the kitchen's floor between the table's side
+ * and the counter; no way found there, the third cook walked the straight line through the table's end (item 54).
+ */
+export function reachSpot(p: P, from: P, room: Rect, blocks: Rect[], cell = 0.1): P {
+  const ins = blocks.filter((r) => inside(r, p[0], p[1]))
+  if (!ins.length) return p
+  const e = cell * 0.25
+  const inRoom = (q: P) => q[0] >= room.x0 && q[0] <= room.x1 && q[1] >= room.z0 && q[1] <= room.z1
+  let best: P | null = null, bestLen = Infinity
+  for (const r of ins) {
+    for (const side of [[r.x0 - e, p[1]], [r.x1 + e, p[1]], [p[0], r.z0 - e], [p[0], r.z1 + e]] as P[]) {
+      const q = stepOut(side, blocks, cell)
+      if (!inRoom(q) || blocks.some((b) => inside(b, q[0], q[1]))) continue
+      const way = kitchenPath(from, q, room, blocks, cell)
+      if (!way) continue
+      const len = wayLength(way)
+      if (len < bestLen) { bestLen = len; best = q }
+    }
+  }
+  return best ?? stepOut(p, blocks, cell)
+}
+
 /**
  * The way from `from` to `to` inside `room`, round the `blocks` (each already grown by how much room a person walking by needs): the
  * corners along it, from and to included; the straight line if nothing's in the way; null if there's no way at all. (`from` and `to`

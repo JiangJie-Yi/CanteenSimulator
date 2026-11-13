@@ -64,7 +64,7 @@ import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
-import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
+import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
 import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
@@ -4016,6 +4016,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const hearthSpot = () => home()
       /** the sack of binchotan on the floor past the table's far end, where the crate's filled from */
       const coalSackAt = () => middleOf('coal-sack')
+      /** where he stands to lift an armful out of it: the side of it a way reaches from where he is, the shortest walk (game/kitchenPath's
+       * reachSpot): out of his bay past the table's end, on the sack's kitchen side. (Its nearest clear spot was between the table's side and
+       * the counter, off the kitchen's floor: no way found there, he walked the straight line through the table's end, and the table's guard
+       * put him out of it a frame at a time, to one side and then the other, four leaps a trip (item 54).) */
+      const sackReach = () => {
+        const blocks = kitchenBlocks()
+        if (!blocks.length) return coalSackAt().setY(0)
+        const c0 = counters[0], k = kitchenOf(counters)
+        const [a, l] = reachSpot(flat(coalSackAt()), flat(pl.pos), { x0: k.along[0], z0: k.lay[0], x1: k.along[1], z1: k.lay[1] }, blocks)
+        return c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
+      }
       /** turned to face something where they stand, quickly but not at once, for `dur` seconds; then on */
       const turnTo = (v: THREE.Vector3, dur: number, then: () => void) => {
         const want = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z)
@@ -4055,7 +4066,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               // (in his bay the crate's at his right hand: turned to it, a handful taken, turned back and tipped in, none of it walked (the
               // owner's); with too little in it for a handful, first out to the sack on the floor for an armful to fill it)
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
-              else setOff(reachOf(coalSackAt()), 'toCoalSack')
+              else setOff(sackReach(), 'toCoalSack')
             } else { const near = dipFrom(); if (near) stepTo(near, 'toBucket'); else setOff(reachOf(bucketAt()), 'toBucket') }
           } else if (open && !SHOP.leaving && !waiters.current.length && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
             // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server to wash them (theirs, the owner's): to the used
