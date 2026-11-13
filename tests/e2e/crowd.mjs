@@ -35,7 +35,9 @@ await p.evaluate(([JUMP, FAST, IN]) => {
     let floor = null
     window.__scene.traverse((o) => {
       const u = o.userData
-      if (u?.guest !== undefined && u.shown !== undefined) {
+      // (a customer's group by its `guest` alone: React hands it a new userData whenever the bar's drawn again, `shown` back only with the
+      // next frame (dayaudit.mjs missed customers by it))
+      if (u?.guest !== undefined) {
         const s = shown.find((x) => x.id === u.guest)
         floor = o.parent
         now.set('g' + u.guest, { x: o.position.x, z: o.position.z, o, up: !!s && s.phase !== 'sit' && o.visible, ph: s ? `${s.phase} t${s.t.toFixed(2)}${s.wc ? ' ' + s.wc.who : ''}` : '?' })
