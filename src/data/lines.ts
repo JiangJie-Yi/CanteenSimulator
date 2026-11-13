@@ -39,7 +39,9 @@ const ZH = {
       yuzu: '抹上一抹清香提鮮的柚子胡椒',
       lemon: '擠上兩滴新鮮爽口的檸檬汁',
     }
-    return `${n}完成！${map[k] ?? ''}！`
+    // (said as each seasoning goes on: not "done" (完成), which it isn't till it comes off the fire (`done`, after); a dish with two had it
+    // said done twice before it was (the owner's item 38, found in a whole day's log))
+    return `${n}${map[k] ?? ''}！`
   },
   onFire: (n: string) => `${n}下爐！油脂滴下去的香氣太誘人了！`,
   fanned: (n: string) => `${n}火力全開！啪嗒啪嗒搧起炭香！`,
@@ -174,7 +176,7 @@ const JA: typeof ZH = {
       yuzu: '爽やかな柚子胡椒をちょこんと添えて',
       lemon: '新鮮なレモンをキュッと搾って',
     }
-    return `${n}に${map[k] ?? ''}！完成！`
+    return `${n}に${map[k] ?? ''}！`
   },
   onFire: (n: string) => `${n}、火入れ開始！脂の落ちるいい香りがしてきた！`,
   fanned: (n: string) => `${n}、パタパタ扇いで炭火の火力を引き上げる！`,
@@ -304,7 +306,7 @@ const EN: typeof ZH = {
       yuzu: 'topped with a dab of aromatic yuzu kosho',
       lemon: 'squeezed with a burst of tart lemon',
     }
-    return `${n} seasoned: ${map[k] ?? ''}! Ready!`
+    return `${n} seasoned: ${map[k] ?? ''}!`
   },
   onFire: (n: string) => `${n} hits the grill! Listen to that mouthwatering sizzle!`,
   fanned: (n: string) => `Fanning the embers for ${n}! Fanning up the aroma!`,
