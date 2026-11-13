@@ -24,6 +24,15 @@ if (process.env.RUSH) await rush(p)
 await p.evaluate((JUMP) => {
   const T = window.__THREE
   const GUARD_LEAP = 0.45
+  // (a member of the staff pushed, named by their id alone (a server, the stock keeper): their job, from their figure's staffRole)
+  const jobs = {}
+  const jobOf = (who) => {
+    if (jobs[who] !== undefined) return jobs[who]
+    let o = window.__scene.getObjectByName(who), r = null
+    if (!o) window.__scene.traverse((q) => { if (!o && q.userData?.staffId === who) o = q })
+    o?.traverse((m) => { if (!r && m.userData?.staffRole) r = m.userData.staffRole })
+    return (jobs[who] = r ?? '')
+  }
   const A = window.__audit = { jumps: [], notices: [], chat: [], seen: new Map(), maxStep: {}, frames: 0, guard: {}, pushSeen: new WeakSet(), lastPush: {} }
   const figures = () => {
     const out = []
@@ -92,7 +101,8 @@ await p.evaluate((JUMP) => {
     for (const e of window.__hearthPushes ?? []) {
       if (A.pushSeen.has(e)) continue
       A.pushSeen.add(e)
-      const g = A.guard[`${e.who} (${e.role})`] ??= { n: 0, most: 0, flips: 0, first: clock(), last: '' }
+      const job = jobOf(e.who)
+      const g = A.guard[`${e.who} (${e.role}${job ? `, ${job}` : ''})`] ??= { n: 0, most: 0, flips: 0, first: clock(), last: '' }
       g.n++
       g.most = Math.max(g.most, Math.hypot(e.to[0] - e.from[0], e.to[1] - e.from[1]))
       g.last = clock()

@@ -27,6 +27,15 @@ await p.evaluate(async () => {
     const q = fr.worldToLocal(o.parent.localToWorld(v.clone()))
     return [+q.dot(bar.ALONG).toFixed(3), +q.dot(bar.LAY).toFixed(3)]
   }
+  // (a member of the staff pushed, named by their id alone (a server, the stock keeper): their job, from their figure's staffRole)
+  const jobs = {}
+  const jobOf = (who) => {
+    if (jobs[who] !== undefined) return jobs[who]
+    let o = window.__scene.getObjectByName(who), r = null
+    if (!o) window.__scene.traverse((q) => { if (!o && q.userData?.staffId === who) o = q })
+    o?.traverse((m) => { if (!r && m.userData?.staffRole) r = m.userData.staffRole })
+    return (jobs[who] = r ?? '')
+  }
   const G = window.__guard = { frames: 0, pushes: [], seen: new WeakSet(), step: { max: 0, at: null }, prev: null, coal: 0 }
   const tick = () => {
     G.frames++
@@ -40,7 +49,8 @@ await p.evaluate(async () => {
       let shown = true
       const fig = window.__scene.getObjectByName(e.who)
       for (let q = fig; q; q = q.parent) if (!q.visible) { shown = false; break }
-      G.pushes.push({ f: G.frames, who: e.who, role: e.role, from: e.from.map((n) => +n.toFixed(3)), to: e.to.map((n) => +n.toFixed(3)),
+      const job = jobOf(e.who)
+      G.pushes.push({ f: G.frames, who: e.who, role: job ? `${e.role}, ${job}` : e.role, from: e.from.map((n) => +n.toFixed(3)), to: e.to.map((n) => +n.toFixed(3)),
         d: +Math.hypot(e.to[0] - e.from[0], e.to[1] - e.from[1]).toFixed(3), phase: `${shown ? '' : '(unseen) '}${phase ?? ''}` || null,
         spot: e.who.startsWith('crew-') && c?.spot ? tableAt(fig, c.spot) : null })
     }
