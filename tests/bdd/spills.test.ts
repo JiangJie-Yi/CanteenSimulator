@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { landingOf, SHATTER_H, shardsOf, sweeps } from '@/game/spills'
+import { GO_SPAN, landingOf, pieceLeft, SHATTER_H, shardsOf, sweepOrder, sweeps } from '@/game/spills'
 
 feature('飲料摔到地上', () => {
   scenario('玻璃瓶從 0.4 公尺以上摔下會破', ({ given, then, and }) => {
@@ -33,5 +33,27 @@ feature('飲料摔到地上', () => {
     and('只有一位外場（或老闆自己端）也會去', () => { expect(sweeps('all', false)).toBe(true) })
     and('有兩位時管洗碗的不去', () => { expect(sweeps('dish', false)).toBe(false) })
     and('有裝好的菜要端時先端菜', () => { expect(sweeps('floor', true)).toBe(false) })
+  })
+})
+
+feature('掃碎玻璃：一塊一塊掃掉，不是整堆一起縮小', () => {
+  let n = 0
+  const rnd = () => ((n = (n * 9301 + 49297) % 233280) / 233280)
+  scenario('掃到一半：大約一半的碎片已經不見，其餘還是原本大小', ({ given, when, then, and }) => {
+    given('一攤 10 片碎玻璃，各自分到掃走的時刻', (w) => { w.at = sweepOrder(10, rnd) })
+    when('掃到剩一半', (w) => { w.now = w.at.map((a: number) => pieceLeft(0.5, a)) })
+    then('不見的有 4 到 6 片', (w) => { const gone = w.now.filter((k: number) => k === 0).length; expect(gone).toBeGreaterThanOrEqual(4); expect(gone).toBeLessThanOrEqual(6) })
+    and('其餘的大都還是原本大小，正在被掃走的最多一片', (w) => { expect(w.now.filter((k: number) => k > 0 && k < 1).length).toBeLessThanOrEqual(1) })
+  })
+  scenario('還沒開始掃：每一片都在；掃完：一片都不剩', ({ given, then, and }) => {
+    given('一攤 8 片碎玻璃', (w) => { w.at = sweepOrder(8, rnd) })
+    then('還沒掃時每一片都在', (w) => { expect(w.at.every((a: number) => pieceLeft(1, a) === 1)).toBe(true) })
+    and('掃完時一片都不剩', (w) => { expect(w.at.every((a: number) => pieceLeft(0, a) === 0)).toBe(true) })
+  })
+  scenario(`一片被掃走只花掃的過程的 ${GO_SPAN * 100}%`, ({ then }) => {
+    then('輪到它之前在原地、輪到之後很快不見', () => {
+      expect(pieceLeft(0.6, 0.5)).toBe(1)
+      expect(pieceLeft(0.5 - GO_SPAN, 0.5)).toBe(0)
+    })
   })
 })

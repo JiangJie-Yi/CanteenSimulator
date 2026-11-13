@@ -2,7 +2,7 @@
 // shards slid out a little from where it hit and lying flat on the boards (6 to 10, each its own size and turn, slivers of the bottle's glass
 // catching the light); the drink run out round them in a glossy puddle, to its full size in a moment (milk white and all but opaque, sake or
 // ramune water-clear), a few drops thrown further; and a puff of glass dust up off it, gone in a third of a second. Swept up (`left` going to
-// nothing), the shards are drawn in together and the puddle shrinks away. Drawn in the scene's own frame, each spill a few meshes made as it
+// nothing), the shards, crumbs, neck and base go a piece at a time, each brushed in and gone at its own moment, and the puddle shrinks away. Drawn in the scene's own frame, each spill a few meshes made as it
 // comes and let go as it's swept; their materials one for each colour, kept (a handful: the drinks' and the glasses' colours).
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -10,7 +10,7 @@ import * as THREE from 'three'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { warmLater } from '@/scene/Prewarm'
 import { NO_RAY } from '@/scene/pickable'
-import { shardsOf } from '@/game/spills'
+import { pieceLeft, shardsOf, sweepOrder } from '@/game/spills'
 import { SPILLS } from './bar'
 
 /** a shard: a piece of the bottle's curved wall (the owner's, 2026-11-11: the flat chips didn't look like broken glass), its edges broken
@@ -111,6 +111,8 @@ type Made = {
   neck: THREE.Mesh; base: THREE.Mesh; big: { x: number; z: number; yaw: number }[]; crumbs: THREE.InstancedMesh; bits: { x: number; z: number; s: number }[]
   /** each shard's resting place (from where it hit), turn, size and lean; each mote's way out */
   rest: { x: number; z: number; yaw: number; sx: number; sz: number; tilt: number }[]; motes: THREE.Vector3[]
+  /** when in the sweep each piece goes (game/spills' sweepOrder): the shards', the neck's and the base's, the crumbs' */
+  goes: { shards: number[]; big: number[]; bits: number[] }
 }
 const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), S = new THREE.Vector3()
 
@@ -172,31 +174,41 @@ export function Spills() {
         puddle.receiveShadow = true
         group.add(puddle, shards, dust, neck, base, crumbs)
         g.add(group)
-        m = { group, shards, puddle, dust, rest, motes, neck, base, big, crumbs, bits }
+        // (swept up a piece at a time, in an order all their own (item 63): not all drawn in and shrunk together)
+        const order = sweepOrder(n + 2 + CRUMB_N, rnd)
+        const goes = { shards: order.slice(0, n), big: order.slice(n, n + 2), bits: order.slice(n + 2) }
+        m = { group, shards, puddle, dust, rest, motes, neck, base, big, crumbs, bits, goes }
         made.current.set(s.key, m)
       }
       const t = (now - s.t0) / 1000
       const left = Math.max(0, Math.min(1, s.left))
-      // (the shards: out from where it hit with a little hop; as it's swept, drawn in together and gone)
-      const k = Math.min(1, t / SLIDE_S), ease = 1 - (1 - k) ** 3, gather = (1 - left) ** 0.7, shrink = left > 0.18 ? 1 : left / 0.18
+      // (the shards: out from where it hit with a little hop; swept, each where it lies till the broom comes to it, then brushed in toward
+      // the middle and gone in a moment, one after another (item 63))
+      const k = Math.min(1, t / SLIDE_S), ease = 1 - (1 - k) ** 3
+      // (a piece's place as the broom takes it: drawn in part way as it goes; and its size, nothing once gone)
+      const inward = (q: number) => ease * (0.45 + 0.55 * q)
+      const goes = m.goes
       m.rest.forEach((r, i) => {
-        P.set(r.x * ease * (1 - gather), 0.0008 + Math.sin(Math.PI * k) * 0.025, r.z * ease * (1 - gather))
+        const q = pieceLeft(left, goes.shards[i])
+        P.set(r.x * inward(q), 0.0008 + Math.sin(Math.PI * k) * 0.025, r.z * inward(q))
         Q.setFromEuler(E.set(r.tilt, r.yaw + (1 - ease) * 2, r.tilt * 0.5))
-        S.set(r.sx * shrink, 1, r.sz * shrink)
+        S.set(Math.max(0.001, r.sx * q), 1, Math.max(0.001, r.sz * q))
         m!.shards.setMatrixAt(i, M.compose(P, Q, S))
       })
       m.shards.instanceMatrix.needsUpdate = true
       // (the neck on its side, the base standing; the crumbs: all of them drawn in with the rest as it's swept)
       const [nk, bs] = m.big
-      m.neck.position.set(nk.x * ease * (1 - gather), 0.0125, nk.z * ease * (1 - gather))
+      const qn = pieceLeft(left, goes.big[0]), qb = pieceLeft(left, goes.big[1])
+      m.neck.position.set(nk.x * inward(qn), 0.0125, nk.z * inward(qn))
       m.neck.rotation.set(0, nk.yaw, 0)
-      m.neck.scale.setScalar(Math.max(0.001, shrink))
-      m.base.position.set(bs.x * ease * (1 - gather), 0, bs.z * ease * (1 - gather))
+      m.neck.scale.setScalar(Math.max(0.001, qn))
+      m.base.position.set(bs.x * inward(qb), 0, bs.z * inward(qb))
       m.base.rotation.set(0, bs.yaw, 0)
-      m.base.scale.setScalar(Math.max(0.001, shrink))
+      m.base.scale.setScalar(Math.max(0.001, qb))
       m.bits.forEach((b, i) => {
-        P.set(b.x * ease * (1 - gather), 0.0015, b.z * ease * (1 - gather))
-        S.setScalar(b.s * shrink)
+        const q = pieceLeft(left, goes.bits[i])
+        P.set(b.x * inward(q), 0.0015, b.z * inward(q))
+        S.setScalar(Math.max(0.001, b.s * q))
         m!.crumbs.setMatrixAt(i, M.compose(P, Q.identity(), S))
       })
       m.crumbs.instanceMatrix.needsUpdate = true

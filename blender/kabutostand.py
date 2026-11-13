@@ -1,6 +1,6 @@
 """The little wooden stand by the staff's door that the samurai helmet sits on (kabutostand.glb; the owner's, 2026-11-12: "a small wooden
 stand beside the staff-only door, and the helmet on it"): a joiner's plant stand of the bench's hinoki, its top a board with its edges eased,
-four square legs, a shelf low between them a little in from their outer faces. About 56 faces (top 26, legs 6 each, shelf 6).
+solid under it (item 67: a block set in under the top's overhang, on a plinth a little wider). About 50 faces.
 
 The game's frame: y up from the floor, x along the wall, z out from it; its foot's middle at the origin; in the wall's own units (DiningRoom's
 wall frame: the wainscot 0.85 high), drawn as it is.
@@ -88,14 +88,13 @@ def join(objs, name):
 
 # (the top: one board, its edges eased, overhanging the legs a little all round)
 top = box("StandTop", -W / 2, W / 2, H - TOP_T, H, -D / 2, D / 2, "top", bev=0.006)
-legs = []
-LX, LZ = W / 2 - 0.03, D / 2 - 0.03         # (each leg's middle, set in from the top's edges)
-for sx in (-1, 1):
-    for sz in (-1, 1):
-        # (up a hair into the top's underside: no two faces in one plane)
-        legs.append(box(f"leg{sx}{sz}", sx * LX - LEG / 2, sx * LX + LEG / 2, 0, H - TOP_T + 0.003, sz * LZ - LEG / 2, sz * LZ + LEG / 2, "leg"))
-# (the shelf low between the legs, through them, its edges short of their outer faces)
-legs.append(box("shelf", -LX - LEG / 2 + 0.006, LX + LEG / 2 - 0.006, SHELF_Y, SHELF_Y + SHELF_T, -LZ - LEG / 2 + 0.006, LZ + LEG / 2 - 0.006, "leg"))
+# (solid under the top, not legs with a shelf (the owner's, 2026-11-13, item 67: "solid below"): a block of the darker hinoki set in
+# under the top's overhang, up a hair into its underside (no two faces in one plane), on a plinth a little wider than it and lower than the
+# top's edges)
+IN, PL_H, PL_OUT = 0.02, 0.04, 0.006
+# (the block the top's paler hinoki: in the dark corner by the door the darker one read as a black pillar)
+legs = [box("body", -W / 2 + IN, W / 2 - IN, PL_H - 0.002, H - TOP_T + 0.003, -D / 2 + IN, D / 2 - IN, "top"),
+        box("plinth", -W / 2 + IN - PL_OUT, W / 2 - IN + PL_OUT, 0, PL_H, -D / 2 + IN - PL_OUT, D / 2 - IN + PL_OUT, "leg", bev=0.003)]
 frame = join(legs, "StandLegs")
 
 root = bpy.data.objects.new("KabutoStand", None)

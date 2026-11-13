@@ -836,24 +836,28 @@ const ART = {
       const HX = 57, HY = 295, TX = 78, TY = 306.5
       g.save(); g.translate(HX, HY); g.rotate(Math.atan2(TY - HY, TX - HX)); g.scale(1.5, 1.5)
       // (in here: +x down the plectrum toward its blade, +y to the side her fingers curl round)
+      // (its handle low in her fist, under the knuckles, where her curled fingers close round it in front of it (item 62: it lay hidden behind
+      // the back of her hand, the fingers hanging under it like pegs, holding nothing))
+      const GY = 4.2
       const bachi = new Path2D()
-      bachi.moveTo(-10, -1.25); bachi.lineTo(4, -1.5)
-      bachi.bezierCurveTo(8, -1.8, 10.5, -4.8, 13.2, -7.6)
-      bachi.lineTo(14.6, 6.4)
-      bachi.bezierCurveTo(11, 4.2, 8, 1.8, 4, 1.5)
-      bachi.lineTo(-10, 1.25); bachi.closePath()
+      bachi.moveTo(-10, GY - 1.25); bachi.lineTo(4, GY - 1.5)
+      bachi.bezierCurveTo(8, GY - 1.8, 10.5, GY - 4.8, 13.2, GY - 7.6)
+      bachi.lineTo(14.6, GY + 6.4)
+      bachi.bezierCurveTo(11, GY + 4.2, 8, GY + 1.8, 4, GY + 1.5)
+      bachi.lineTo(-10, GY + 1.25); bachi.closePath()
       g.save(); g.translate(1.8, 2.6); g.fillStyle = 'rgba(80,46,18,0.3)'; g.fill(bachi); g.restore()
-      const ivory = g.createLinearGradient(0, -7.6, 0, 6.4)
+      const ivory = g.createLinearGradient(0, GY - 7.6, 0, GY + 6.4)
       ivory.addColorStop(0, '#fbf5e4'); ivory.addColorStop(0.5, '#ede1c0'); ivory.addColorStop(1, '#c9b385')
       g.fillStyle = ivory; g.fill(bachi); line(0.45, 'rgba(110,84,48,0.95)'); g.stroke(bachi)
-      line(0.55, 'rgba(255,255,255,0.9)'); g.beginPath(); g.moveTo(13.3, -7); g.lineTo(14.5, 5.8); g.stroke()
-      line(0.5, 'rgba(150,118,70,0.75)'); g.beginPath(); g.moveTo(4.4, 1.4); g.bezierCurveTo(8.2, 1.9, 11.2, 4, 14.3, 6.1); g.stroke()
+      line(0.55, 'rgba(255,255,255,0.9)'); g.beginPath(); g.moveTo(13.3, GY - 7); g.lineTo(14.5, GY + 5.8); g.stroke()
+      line(0.5, 'rgba(150,118,70,0.75)'); g.beginPath(); g.moveTo(4.4, GY + 1.4); g.bezierCurveTo(8.2, GY + 1.9, 11.2, GY + 4, 14.3, GY + 6.1); g.stroke()
       const SKIN = '#faf3e8'
       // (four slim fingers curled round under the handle, first: each down out of the knuckles' line and curling back under, its tip tucked
       // in, only the middle joint's turn showing; their roots hidden under the back of the hand, no seam)
+      // (drawn over the handle: they close round it, their tips tucked back under it)
       for (let k = 0; k < 4; k++) {
-        const x = -7.9 + k * 2.45, len = 3.6 - Math.abs(k - 1.4) * 0.35
-        handFinger(g, x, 2.4, x + 0.9, 2.4 + len, 2.45 - k * 0.08, 2.25 - k * 0.08, 0.3, SKIN, true)
+        const x = -7.9 + k * 2.45, len = 3.4 - Math.abs(k - 1.4) * 0.3
+        handFinger(g, x, 2.4, x + 1.3, 2.4 + len, 2.5 - k * 0.08, 2.3 - k * 0.08, 0.5, SKIN, true)
       }
       // (the back of the hand and the wrist, one shape: the wrist slender out of the sleeve, widening to the hand, round its first knuckle onto
       // the handle, along the knuckles' line to the heel of the hand)
@@ -876,9 +880,10 @@ const ART = {
       for (let k = 3; k >= 0; k--) { const x = -7.9 + k * 2.45; g.quadraticCurveTo(x + 1.2, 3.1, x - 0.1, 3.75) }
       g.stroke()
       // (her thumb along the handle's top toward the blade, tapering, its nail at the tip, a soft fold where it leaves the hand)
-      handFinger(g, -2.6, -3.3, 4.6, -2.2, 2.4, 1.5, -0.4, SKIN, false, true)
+      // (her thumb short along the handle's top, its tip on it at the fist's front, not out over the blade (it read as pointing at it))
+      handFinger(g, -2.2, 1.0, 2.6, 2.1, 2.3, 1.6, -0.25, SKIN, false, true)
       line(0.25, 'rgba(176,128,108,0.5)')
-      g.beginPath(); g.moveTo(-3.6, -2.1); g.quadraticCurveTo(-5.2, -2.6, -6.2, -3.6); g.stroke()
+      g.beginPath(); g.moveTo(-3.2, 0.9); g.quadraticCurveTo(-4.8, 0.2, -5.8, -0.8); g.stroke()
       g.beginPath(); g.moveTo(-14, -0.6); g.quadraticCurveTo(-11, -1.2, -8.2, -2.0); g.stroke()
       const cuff = new Path2D(); cuff.moveTo(-15.5, -7); cuff.quadraticCurveTo(-13, 0, -15.5, 7.4); cuff.lineTo(-25, 8.4); cuff.lineTo(-25, -7.6); cuff.closePath()
       g.fillStyle = NAVY; g.fill(cuff)
@@ -4644,7 +4649,8 @@ const TABLE_DEEP = 0.39 / ALTAR_D
  * its front at 0.065), between it and the vases (from 0.325 across), behind the flask and the book */
 // (forward of where they stood and in a little, either side of the cups' shortened stand, and a little smaller (the owner's, 2026-11-11):
 // they stood at 0.07, 0.288, full size)
-const SHRINE_LAMP_X = 0.0, SHRINE_LAMP_Z = 0.25, SHRINE_LAMP_SC = 0.85
+// (a touch smaller (the owner's, 2026-11-13, item 68): 0.85 before)
+const SHRINE_LAMP_X = 0.0, SHRINE_LAMP_Z = 0.25, SHRINE_LAMP_SC = 0.75
 /** where the flask stands, by the cups' stand (back 0.02 with them) */
 const FLASK_X = -0.04
 /** and its height: up over the beckoning cats' stand below it, by the door */

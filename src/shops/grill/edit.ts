@@ -235,6 +235,9 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-19', ['shrinecups', 'oranges', 'oranges2', 'shrinelamp-1', 'shrinelamp1', 'vase-1', 'vase1', 'flask', 'sutra']],
   // (the supplies where the owner's X -0.38, Z -0.095 meant in its own axes (item 26))
   ['jgs-edit-relaid-20', ['supplies']],
+  // (the helmet back on its stand by the staff's door (item 66, the owner's: gone from it in their browser, a place kept for it from before
+  // taking it elsewhere; on a fresh one it stood on the stand): what was kept for the helmet, its stand and their group dropped once)
+  ['jgs-edit-relaid-21', ['kabuto', 'kabutostand', 'grp-kabuto']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length

@@ -1456,8 +1456,16 @@ _lp[_line, :] = (0.42, 0.28, 0.16)
 _lp[:, _line] = (0.42, 0.28, 0.16)
 M["lanternPaper"] = pbr("KamiLanternPaper", (1, 1, 1), tex=image("T_KamiLanternPaper", _lp), emit=(1.0, 0.75, 0.42), emit_strength=2.0, rough=0.9)
 lx_ = []
-lx_.append(box("KamiLanternFoot", S(0.045, 0.012, 0.045), P(0, 0.006, 0), wood(), uv=0.1))
-lx_.append(box("KamiLanternPost", S(0.014, 0.046, 0.014), P(0, 0.035, 0), wood(), uv=0.1))
+# (its foot thinner, a slab with a low slope up to the post on it, as a stone lantern's (the owner's, 2026-11-13, item 68: "the foot a little
+# thinner, and some lines": the slope's hips the lines, toward the post's corners); it was one block 1.2 cm thick)
+lx_.append(box("KamiLanternFoot", S(0.045, 0.004, 0.045), P(0, 0.002, 0), wood(), uv=0.1))
+_slope = box("KamiLanternFootSlope", S(0.043, 0.004, 0.043), P(0, 0.006, 0), wood(), uv=0.1)
+for _v in _slope.data.vertices:
+    if _v.co.z > 0:
+        _v.co.x *= 0.5; _v.co.y *= 0.5
+_slope.data.update()
+lx_.append(_slope)
+lx_.append(box("KamiLanternPost", S(0.014, 0.05, 0.014), P(0, 0.033, 0), wood(), uv=0.1))
 lx_.append(box("KamiLanternTable", S(0.036, 0.008, 0.036), P(0, 0.062, 0), wood(), uv=0.1))
 _paper = box("KamiLanternBox", S(0.028, 0.034, 0.028), P(0, 0.083, 0), M["lanternPaper"], uv=0)
 # (each of its sides the whole picture, its lattice)
