@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { CARRY, DRYER_CAP, DRY_S, STACK_CAP, STACK_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
+import { CARRY, CLEAR_LATE, DRYER_CAP, ON_THE_WAY, onTheWay, DRY_S, STACK_CAP, STACK_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
   putBack, unload, washNow, washOne, type Dryer, canOpen, dryerPhase, playerLoad, shutStarts, DRAIN_CAP, DRAIN_S, drainTick, handNow, handOne,
   unbasket, washerBusy } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
@@ -38,7 +38,27 @@ feature('外場分工：一個端菜收盤，另一個洗碗、烘碗、搬回�
   })
   scenario('座位上的髒盤子由管外場的收', ({ then, but }) => {
     then('管外場的去收', () => { expect(nextChore({ ...base, duty: 'floor', dirty: 2 })).toBe('clear') })
-    but('管洗碗的不收', () => { expect(nextChore({ ...base, duty: 'dish', dirty: 2 })).toBeNull() })
+    but('剛吃完的，管洗碗的不收', () => { expect(nextChore({ ...base, duty: 'dish', dirty: 2, dirtyAge: 3 })).toBeNull() })
+  })
+  // (item 53: in a busy evening, and an ordinary one, a plate was left dirty at a seat up to 180 and 88 of the shop's minutes, the seat not
+  // to be sat at till it's cleared, while customers waited on the bench)
+  scenario(`髒盤子在座位上放了 ${CLEAR_LATE} 分鐘以上：座位空不出來，閒著的也來收`, ({ then, and, but }) => {
+    then('有菜要端：還是先端（試過先收，菜在裝盤處多等三倍久）', () => {
+      expect(nextChore({ ...base, duty: 'floor', serve: true, dirty: 1, dirtyAge: CLEAR_LATE })).toBe('serve')
+    })
+    and('管洗碗的自己沒事做時，也幫忙收（就像有空也幫忙端）', () => {
+      expect(nextChore({ ...base, duty: 'dish', dirty: 1, dirtyAge: CLEAR_LATE })).toBe('clear')
+    })
+    but('管洗碗的有碗要洗：先洗碗', () => {
+      expect(nextChore({ ...base, duty: 'dish', dirty: 1, dirtyAge: CLEAR_LATE, sink: WASH_AT })).toBe('wash')
+    })
+  })
+  // (item 53: whoever's set a plate down takes up the dirty ones along that counter on the way back, as a server going by does)
+  scenario('上完菜回去的路上，順手收同一條吧台的髒盤子', ({ then, and, but }) => {
+    const dirty = [{ seat: 2, counter: 0, far: 1.6 }, { seat: 4, counter: 1, far: 0.5 }, { seat: 1, counter: 0, far: 0.8 }, { seat: 0, counter: 0, far: 2.4 }, { seat: 3, counter: 0, far: 3.2 }]
+    then('只收同一條吧台的，近的先收', () => { expect(onTheWay(0, dirty).map((d) => d.seat)).toEqual([1, 2, 0]) })
+    and(`一次最多 ${ON_THE_WAY} 個（托盤疊得下的）`, () => { expect(onTheWay(0, dirty)).toHaveLength(ON_THE_WAY) })
+    but('另一條吧台沒有髒盤：不繞過去', () => { expect(onTheWay(1, dirty.filter((d) => d.counter === 0))).toEqual([]) })
   })
   scenario('流理台的髒盤子由管洗碗的洗', ({ then, but }) => {
     then(`流理台有 ${WASH_AT} 個：管洗碗的去洗`, () => { expect(nextChore({ ...base, duty: 'dish', sink: WASH_AT })).toBe('wash') })

@@ -4,7 +4,7 @@
 // the low rack, the plating place's stack, the dryer, the clean skewers. Printed: the longest of each, the counts' lowest and highest, and
 // on average at a look how many dirty plates are left at seats, how many plates ready wait for a server, how many wait on the bench, how
 // many customers wait for their food: weigh a change to who does what first by these averages, two runs or more each (a run's longest is
-// one plate's luck). Item 53, an ordinary evening at x2 for 240 s: before, about 2.9 dirty plates at seats at any moment.
+// one plate's luck). Item 53, an ordinary evening at x2 for 240 s, two runs each: dirty plates at seats at any moment 3.92 before, 0.92 after.
 //
 //   npm run dev     (in another terminal)
 //   node tests/e2e/flowhealth.mjs     (WATCH=<ms> default 240000; CALM=1 the usual crowd; AT=<min>; STUCK=<shop minutes> listed over)

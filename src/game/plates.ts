@@ -127,6 +127,9 @@ export const playerLoad = (dirty: number, d: Dryer) => (d.left === null ? Math.m
 /** shut by the player with plates in it, not yet started: it starts */
 export const shutStarts = (d: Dryer) => d.left === null && d.n > 0
 
+/** how long a plate's been left dirty at a seat (the frame clock's seconds, as the shop's minutes) before it can't wait: the seat isn't sat
+ * at again till it's cleared (Roasting's `used`) */
+export const CLEAR_LATE = 20
 /** a server's part of the work (the owner's: one clears, the other washes; a lone server does it all) */
 export type Duty = 'floor' | 'dish' | 'all'
 /** what a free server does next */
@@ -141,10 +144,15 @@ export type Chore = 'serve' | 'clear' | 'wash' | 'handwash' | 'unload' | 'unbask
  * washUrgent), before anything but a plate to carry or the bare racks (item 47: the floor's server alone took them, and a busy evening never
  * left them idle: none washed all evening, and late at night the cooks stood an hour and a half with none).
  */
-export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DRAIN, skewers = false }: { duty: Duty; serve: boolean; dirty: number; sink: number; rack: number; dryer: Dryer
-  drain?: Drain; skewers?: boolean | 'urgent' }): Chore {
-  if (serve) return 'serve'
+export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DRAIN, skewers = false, dirtyAge = 0 }: { duty: Duty; serve: boolean
+  dirty: number; sink: number; rack: number; dryer: Dryer; drain?: Drain; skewers?: boolean | 'urgent'
+  /** how long the longest left of the dirty plates at the seats has been there */
+  dirtyAge?: number }): Chore {
   const dish = duty !== 'floor', floor = duty !== 'dish'
+  const late = dirty > 0 && dirtyAge >= CLEAR_LATE
+  // (not before a plate's carried out, though someone's waiting on the bench for the seat: tried (item 53), the plates ready at the plating
+  // place waited 72 of the shop's minutes for a server, not 20, and those waiting for their food 128, not 96; the seat freed little sooner)
+  if (serve) return 'serve'
   const dried = dryer.left === 0 && dryer.n > 0, drained = drain.left === 0 && drain.n > 0
   if (dish && dried && rack === 0) return 'unload'
   if (dish && drained && rack === 0) return 'unbasket'
@@ -154,8 +162,18 @@ export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DR
   if (floor && dirty > 0) return 'clear'
   if (dish && dried) return 'unload'
   if (dish && drained) return 'unbasket'
+  // (the dishes' server with nothing of their own to do: helps clear one left a while, as they help carry plates out (item 53))
+  if (dish && late) return 'clear'
   if (skewers) return 'skewers'
   return null
+}
+/**
+ * The dirty plates a server takes up on the way back from setting a plate down, as a server going by does (item 53): those at seats along the
+ * same counter (`dirty`: each one's seat's counter and how far along from here; nobody gone for yet), the nearest first, up to a tray's three.
+ */
+export const ON_THE_WAY = 3
+export function onTheWay<T extends { counter: number; far: number }>(counter: number, dirty: T[]): T[] {
+  return dirty.filter((d) => d.counter === counter).sort((a, b) => a.far - b.far).slice(0, ON_THE_WAY)
 }
 /** each server's duty: two or more, the first on the floor and the second at the dishes (any more on the floor); one alone does both */
 export const dutyOf = (k: number, servers: number): Duty => (servers < 2 ? 'all' : k === 1 ? 'dish' : 'floor')

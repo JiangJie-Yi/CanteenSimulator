@@ -63,7 +63,7 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
-import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
+import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
@@ -2449,6 +2449,9 @@ const RAG_GEO = new RoundedBoxGeometry(0.085, 0.007, 0.05, 1, 0.003)
 const PASS_STACK_SHOWN = STACK_CAP + 3
 /** a plate's size in the sink, against its own */
 const IN_SINK = 0.78
+/** the most of the sink's dirty plates drawn stacked in it: as many as stand clear under the tap's spout (cleared on the way back (item 53),
+ * the sink took up to twenty-five on an ordinary evening, a stack up through the tap); the rest are counted and washed, the stack no higher */
+const SINK_SHOWN = 12
 /** a plate standing in the draining basket: its size, a third of its depth */
 const IN_DRAIN: [number, number, number] = [IN_SINK, IN_SINK * 0.3, IN_SINK]
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
@@ -2976,7 +2979,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const rackNow = (n = PLATE_RACK.n) => (n > PER_RACK ? 1 : 0)
   /** the k-th plate up the dirty stack in the sink's basin (they're stacked there a little smaller: the customers' plates are drawn big, the
    * basin's a real sink's size) */
-  const dirtyAt = (k: number) => inBar('SinkBasinFloor', endOf(1)).add(new THREE.Vector3(0, 0.004 + k * STACK_GAP * IN_SINK, 0))
+  const dirtyAt = (k: number) => inBar('SinkBasinFloor', endOf(1)).add(new THREE.Vector3(0, 0.004 + Math.min(k, SINK_SHOWN - 1) * STACK_GAP * IN_SINK, 0))
   /** a place in the bar's frame as the first counter's (along it, across it): the kitchen's floor and all that stands on it lie square there */
   const flat = (v: THREE.Vector3): [number, number] => { const c0 = counters[0], d = v.clone().sub(c0.at); return [d.dot(c0.along), d.dot(c0.lay)] }
   /** what stands on the kitchen's floor, as rectangles in that frame, each grown by room to pass: the cook's table, the rice tub, the freezer,
@@ -4696,7 +4699,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const skewersDue = washGoes(SKEWERS.s) && !atSink && !waiters.current.some((x) => SK_PHASES.has(x.phase)) && !['toSkTray', 'takeSk', 'toSkSink', 'washSk', 'toHolder', 'putSk'].includes(platerRun.current.phase)
           // (the shop shut and going home: nothing new taken on; what's left is put away overnight with the closing)
           const chore = SHOP.leaving ? null : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : dirty.current, rack: PLATE_RACK.n,
-            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink ? { n: 0, left: null } : DRAIN, skewers: skewersDue && (washUrgent(SKEWERS.s) ? 'urgent' : true) })
+            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink ? { n: 0, left: null } : DRAIN, skewers: skewersDue && (washUrgent(SKEWERS.s) ? 'urgent' : true),
+            dirtyAge: dirtyNow.reduce((m, r) => Math.max(m, r.t), 0) })
           if (chore === 'serve') {
             // (across the kitchen to the chef for it)
             w.slot = slot
@@ -4704,9 +4708,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             go(fetchPath(wi), 'fetch')
           } else if (chore === 'clear') {
             // (out through their gate to the dirty plates, the longest waiting first and up to two more at that counter, nearest first)
-            const first = dirtyNow[0]
+            // (the longest left first: the list is in the order they were set, not left)
+            const first = dirtyNow.reduce((a, r) => (r.t > a.t ? r : a), dirtyNow[0])
             const c = seats[first.seat].counter
-            const more = dirtyNow.slice(1).filter((r) => seats[r.seat].counter === c)
+            const more = dirtyNow.filter((r) => r !== first && seats[r.seat].counter === c)
               .sort((a, b) => seats[a.seat].mid.distanceTo(seats[first.seat].mid) - seats[b.seat].mid.distanceTo(seats[first.seat].mid)).slice(0, 2)
             w.carry = [first.key, ...more.map((r) => r.key)]
             w.seat = first.seat
@@ -4842,8 +4847,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
         w.keys = []
         w.run = null
+        // (on the way back, the dirty plates left along this counter that nobody's gone for, the nearest first, a tray's three: taken up as
+        // they go by, to the sink with them (item 53: only the floor's server cleared, and only with nothing to carry, and on an ordinary
+        // evening nearly three of the eight seats stood with a dirty plate on them at any time, not to be sat at till it's cleared))
+        const spoken = new Set(waiters.current.flatMap((x) => x.carry ?? []))
+        const here = seats[w.seat]
+        const by = SHOP.leaving ? [] : onTheWay(here.counter, runs.current.filter((x) => x.phase === 'dirty' && !spoken.has(x.key))
+          .map((x) => ({ run: x, counter: seats[x.seat].counter, far: seats[x.seat].mid.distanceTo(here.mid) })))
+        if (by.length) {
+          w.carry = by.map((x) => x.run.key)
+          w.seat = by[0].run.seat
+          go([w.pos.clone(), here.aisle.clone(), seats[by[0].run.seat].aisle.clone(), besideSeat(by[0].run.seat)], 'clearGo')
+        }
         // (back the shortest way to their place, in through their gate)
-        go(backPath(wi, w.seat).slice(0, -1).concat(w.pos.clone()), 'back')
+        else go(backPath(wi, w.seat).slice(0, -1).concat(w.pos.clone()), 'back')
       } else if (w.phase === 'back') {
         const d = Math.min(w.len, w.t * SERVER_SPEED)
         const { p, dir } = alongPath(w.path, w.len - d)
@@ -5292,7 +5309,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ))}
       {/* (each seated customer's soy in the little dish at their place, a dab of grated daikon in it: drawn with the shoes, SeatBits) */}
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
-      {Array.from({ length: dirty.current }, (_, i) => (
+      {Array.from({ length: Math.min(dirty.current, SINK_SHOWN) }, (_, i) => (
         <group key={`d${i}`} ref={(o) => { sinkPlates.current[i] = o }} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}><Plate dirty sticks={0} design={i} /></group>
       ))}
       {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
