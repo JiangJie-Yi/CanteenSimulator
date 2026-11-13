@@ -378,6 +378,17 @@ const servings = (dish: DishInfo, order: Record<string, number>) => {
   return all
 }
 
+/**
+ * What's drawn on the cook's table of it: what `servings` says, but with the shop open not the miso soup or the sake (the soup's ladled from
+ * its pot to each customer's place; the count of them ordered only grows through the night, and every bowl of it was drawn here, all on the
+ * one spot at the seasoning ledge's end: the owner's "a stack of unknown dishes by the salt", 2026-11-13).
+ */
+const onTable = (dish: DishInfo, order: Record<string, number>, open: boolean) => {
+  const all = servings(dish, order)
+  if (open) for (const id of dish.roast?.drinks ?? []) delete all[id]
+  return all
+}
+
 /** The first set meal that's been ordered, if any. */
 const orderedBase = (dish: DishInfo, order: Record<string, number>) => dish.bases.find((b) => (order[b.id] ?? 0) > 0)
 
@@ -1065,7 +1076,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
         // everything drawn from the dish's model (the full one, or its light version)
         const models = (url: string) => (
           <group position={dish.roast ? FIRE_SHIFT : undefined}>
-              <Dish url={url} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
+              <Dish url={url} itemIds={ITEM_IDS[dish.id]} quantities={onTable(dish, orders[dish.id], ai)}
                 hidden={hidden} layout={dish.layout}
                 instant={reducedMotion} />
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
@@ -2747,9 +2758,10 @@ export default function App() {
       say(UI[lang].basketFull(basket.capacity))
       return false
     }
-    // some things only fit so many at once
+    // some things only fit so many at once (on the table, tried by hand; the shop open, a customer's miso soup on the side is ladled from its
+    // pot, as many as are ordered: held to two, every one after the second all night was refused, and "Miso soup: two at most" put up)
     const item = dish.items.find((i) => i.id === id)
-    const max = item?.max ?? MAX_PORTIONS
+    const max = ai ? Infinity : item?.max ?? MAX_PORTIONS
     if (delta > 0 && !reuse && (orders[dish.id][id] ?? 0) >= max) {
       say(UI[lang].itemFull(item ? nameIn(lang, item) : id, max))
       return false

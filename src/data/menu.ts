@@ -41,6 +41,8 @@ export type CopyLayout = {
   spread?: Record<string, number>
   /** per-item spots (x, z in the dish) for the 2nd, 3rd… portion, e.g. side by side on the grill net */
   slots?: Record<string, [number, number][]>
+  /** per-item spot (x, z in the dish) for the first portion, where the model has it somewhere else */
+  first?: Record<string, [number, number]>
 }
 
 /** Lighting tweaks for one dish; anything left out uses the scene defaults in App.tsx. */
@@ -272,8 +274,14 @@ export const DISHES: Dish[] = [
       // skewers on the fire ring)
       slots: { NetMochi: [[0.1, 0.07], [0.06, -0.11]], Onigiri: [[0.06, -0.11], [-0.11, 0.0]], Onion: [[0.06, -0.11], [-0.11, 0.0]],
         Daikon: [[0.06, -0.11], [0.1, 0.07]],
-        // a second bowl of soup beside the first
-        MisoSoup: [[0.0, 1.61]] },
+        // a second bowl of soup behind the first
+        MisoSoup: [[2.201, 0.009]] },
+      // the miso soup and the sake taken out to try (the shop shut; open, the soup's ladled from the pot to each customer's place): at the
+      // table's right end by the tasting bowl, where what's tried is eaten, the first bowl in the front row between the tasting bowl and the
+      // rice balls' dish, the second and the sake behind (the model has them on the seasoning ledge's end by the fan, over the raw tray's
+      // corner: the owner's, 2026-11-13, "miso soup on the seasoning ledge"). In the table's frame (bar.ts's ALONG, LAY) the bowls at
+      // (2.32, 1.80) and (2.42, 1.30), the sake at (2.78, 1.05); here less FIRE_SHIFT, in the dish's x and z
+      first: { MisoSoup: [2.415, 0.473], Sake: [2.345, -0.406] },
       // potatoes and sweet potatoes sit in the ash at the front: extra ones line up beside the first,
       // potatoes toward the right, sweet potatoes toward the left
       spread: { Potato: 0.3, SweetPotato: -0.3 },

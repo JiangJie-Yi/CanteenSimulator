@@ -138,14 +138,22 @@ export function nextChore({ duty, serve, dirty, sink, rack, dryer, drain = NO_DR
 /** each server's duty: two or more, the first on the floor and the second at the dishes (any more on the floor); one alone does both */
 export const dutyOf = (k: number, servers: number): Duty => (servers < 2 ? 'all' : k === 1 ? 'dish' : 'floor')
 
-/** the big bowl on the cook's table keeps warm the food cooked for customers who've gone, till the next to order it has it (the owner's, 2026-11-12:
- * a mountain of fish piled in it): at most this many, and how many of the oldest the staff eat up to keep to it */
-export const BOWL_WARM_MAX = 8
+/**
+ * The big bowl on the cook's table (the tasting bowl): what's tried by hand goes in it (the shop shut), and with the shop open the food cooked
+ * for customers who've gone, kept warm till the next to order it has it. Its pieces lie in one row across it, so many side by side this far
+ * apart (the broadest piece, a fish lying flat, under 0.2; the row inside the bowl's 0.8 across), never a second layer on them: with the row
+ * full the oldest is eaten up to make room for the next (the owner's, 2026-11-12 and again 2026-11-13: "the tasting bowl's fish heaped like a
+ * mountain", at twenty, then still at two layers of five).
+ */
+export const BOWL_ROW = 4
+export const BOWL_GAP = 0.19
+/** where the `slot`th piece in the bowl lies: how far across from its middle, and on which layer (the first, while the bowl's held to its row) */
+export const bowlPlace = (slot: number) => ({ across: ((slot % BOWL_ROW) - (BOWL_ROW - 1) / 2) * BOWL_GAP, layer: Math.floor(slot / BOWL_ROW) })
+/** at most this many kept warm in it with the shop open, and how many of the oldest the staff eat up to keep to it */
+export const BOWL_WARM_MAX = BOWL_ROW
 export const warmToEat = (kept: number, max = BOWL_WARM_MAX) => Math.max(0, kept - max)
-
-/** the tasting bowl by hand (researching, the shop shut): at most this many in it, two layers (the owner's, 2026-11-12: a mountain of fish piled
- * in it, the twenty-first on the first); the oldest eaten up to make room for the next (warmToEat counts how many) */
-export const BOWL_HAND_MAX = 10
+/** the tasting bowl by hand (researching, the shop shut): at most this many in it; the oldest eaten up to make room for the next */
+export const BOWL_HAND_MAX = BOWL_ROW
 
 /**
  * The player washing up by hand (the owner's, 2026-11-12: "the player can wash by hand too, make it a flow"): pointed at the sink, what it

@@ -1,7 +1,7 @@
 import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
-import { BOWL_HAND_MAX, BOWL_WARM_MAX, warmToEat } from '@/game/plates'
+import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -16,7 +16,7 @@ import { keepOut, type HearthZones } from '@/game/hearthGuard'
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
-import { bakeable, homeCopy, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
+import { bakeable, colourVertices, homeCopy, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
 import { atlasModel } from '@/scene/atlasMerge'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
@@ -482,6 +482,8 @@ useGLTF.preload(FOOD_WASTE_URL)
 const TRAY_ROWS = BOARD_SLOTS
 const TRAY_CAP = TRAY_ROWS
 const LOOSE_CAP = 7
+/** the rice balls waiting raw on their little dish at once (the rest in the fridge till there's room) */
+const RAW_DISH_CAP = 3
 const TRAY_W = 1.6
 const TRAY_D = 0.9
 /** the seasoning box, as a round footprint for bumping into things */
@@ -3121,14 +3123,24 @@ function SideDishImpl({ position, container }: { position: [number, number, numb
 
 /** The tasting bowl (試食碗): a deep round bowl of the same plum-blossom ware, where whatever's cooked by hand to try is put. */
 /**
- * The takeaway box (game/takeout; the owner's): at the plating place's second slot while an order's being packed, open, a kraft card tray its
- * food is laid in; all of it in, its lid on and a red seal across it; gone as a server takes it out to the till. One draw for each part.
+ * The takeaway box (game/takeout; the owner's): at the plating place's second slot while an order's being packed, open, its food laid in; all of
+ * it in, its lid on and wrapped; gone as a server takes it out to the till.
+ * (the owner's, 2026-11-13: "an unknown little brown block on the table". It was a kraft card tray, the table's own brown: open, its food in it
+ * read as a little tray; shut, only its white paper band showed, a white card on the table. Now a takeaway bento as they're sold in Japan and
+ * Taiwan: a black box, red inside, its rice in its own end (white, a pickled plum on it) and the food beside it; shut, a black lid wrapped in
+ * the shop's printed paper (掛け紙: 聞野, 焼魚, its red seal), a red cord round it, the chopsticks in their sleeve under it. Named when
+ * pointed at.) One draw for the box, two for the lid.
  */
 // (a bento's size: a fish at the plate's size lies in it, its length across the table, three side by side along it)
-const BOX_W = 0.4, BOX_D = 0.26, BOX_H = 0.07
+// (long enough for a whole saury, the longest (0.545 at the plate's size): 0.4 long, a saury's tail and a squid hung out over its end)
+const BOX_W = 0.58, BOX_D = 0.26, BOX_H = 0.07
+/** the rice's end of the box, past the food's on the fire's side along the table (the food where it always lay, over the box's middle before) */
+const RICE_D = 0.1
+/** the box's two ends along the table (its own z: the table's ALONG), from the food's middle (TAKEOUT_SPOT) */
+const BOX_Z0 = -BOX_D / 2 - RICE_D, BOX_Z1 = BOX_D / 2
 /** how high each box stands over the one under it (its lid's top): a second order's box set on the first's while that waits to be taken
  * (the owner's, 2026-11-11: a second order's fish were laid on the first's shut lid, "a strange little board with a fish on it") */
-const BOX_TIER = BOX_H + 0.03  // (over the lid's band and the chopsticks on it)
+const BOX_TIER = BOX_H + 0.03  // (over the lid's paper, its cord and the chopsticks on it)
 /** the takeaways' boxes that can stand stacked at once */
 const BOX_TIERS = 3
 /** which box an order's food goes in: the one it has, or the lowest no other order waiting holds */
@@ -3143,14 +3155,101 @@ const tierOf = (id: number) => {
   }
   return o.tier
 }
-const KRAFT = new THREE.MeshToonMaterial({ color: '#b8875a' })
-const KRAFT_IN = new THREE.MeshToonMaterial({ color: '#9c6f45' })
-const SEAL = new THREE.MeshToonMaterial({ color: '#b3241c' })
-const BAND = new THREE.MeshToonMaterial({ color: '#f3ede0' })
-const SLEEVE = new THREE.MeshToonMaterial({ color: '#e8dcc4' })
+/** one plain block of the box, its points coloured (the box's parts are one draw between them: scene/StaticBatch's colourVertices) */
+const bentoBlock = (w: number, h: number, d: number, x: number, y: number, z: number, c: THREE.Color) => {
+  const g = new THREE.BoxGeometry(w, h, d).translate(x, y, z)
+  colourVertices(g, c)
+  return g
+}
+const BENTO_BLACK = new THREE.Color('#1d1a18'), BENTO_RED = new THREE.Color('#9b231b'), BENTO_RICE = new THREE.Color('#f2eee4')
+const BENTO_PLUM = new THREE.Color('#9e1d29'), CORD_RED = new THREE.Color('#c0262a'), SLEEVE_WHITE = new THREE.Color('#f4efe4')
+/** the box and its lid's black, red and white, coloured on their points: one material for both */
+const BENTO_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
+let bentoGeo: THREE.BufferGeometry | null = null
+/** the open box, made once: black outside and red within (each wall and the floor lined), a red divider before the rice's end, the rice in it
+ * level and white, a pickled plum on it. The walls' ends fitted between the long sides and each lining a hair in from its wall: no two faces
+ * on one plane */
+function bentoBox() {
+  if (bentoGeo) return bentoGeo
+  const T = 0.008, D = BOX_Z1 - BOX_Z0, zc = (BOX_Z0 + BOX_Z1) / 2, L = 0.002, gap = 0.0005
+  const riceZ = (BOX_Z0 + T - BOX_D / 2) / 2, riceD = -BOX_D / 2 - (BOX_Z0 + T) - 0.006
+  const parts = [
+    bentoBlock(BOX_W, 0.005, D, 0, 0.0025, zc, BENTO_BLACK),
+    bentoBlock(BOX_W - 2 * T - 2 * gap, L, D - 2 * T - 2 * gap, 0, 0.005 + gap + L / 2, zc, BENTO_RED),
+    ...[BOX_Z0, BOX_Z1].flatMap((z, i) => {
+      const s = i === 0 ? 1 : -1
+      return [
+        bentoBlock(BOX_W, BOX_H, T, 0, BOX_H / 2, z + s * T / 2, BENTO_BLACK),
+        bentoBlock(BOX_W - 2 * T - 2 * gap, BOX_H - 0.012, L, 0, BOX_H / 2, z + s * (T + gap + L / 2), BENTO_RED),
+      ]
+    }),
+    ...[-1, 1].flatMap((sx) => [
+      bentoBlock(T, BOX_H, D - 2 * T, sx * (BOX_W / 2 - T / 2), BOX_H / 2, zc, BENTO_BLACK),
+      bentoBlock(L, BOX_H - 0.012, D - 2 * T - 2 * gap - 2 * L, sx * (BOX_W / 2 - T - gap - L / 2), BOX_H / 2, zc, BENTO_RED),
+    ]),
+    bentoBlock(BOX_W - 2 * T - 2 * gap - 2 * L - 0.002, BOX_H * 0.8, 0.006, 0, 0.0075 + BOX_H * 0.4, -BOX_D / 2, BENTO_RED),
+    bentoBlock(BOX_W - 2 * T - 2 * gap - 2 * L - 0.006, 0.042, riceD, 0, 0.0075 + 0.021, riceZ, BENTO_RICE),
+  ]
+  const plum = new THREE.SphereGeometry(0.022, 10, 6).scale(1, 0.7, 1).translate(0.06, 0.0075 + 0.042 + 0.012, riceZ)
+  colourVertices(plum, BENTO_PLUM)
+  bentoGeo = mergeGeometries([...parts.map((g) => g.toNonIndexed()), plum.toNonIndexed()])!
+  return bentoGeo
+}
+let lidGeo: THREE.BufferGeometry | null = null
+/** the lid, made once: black, over the box's rim; a red cord round it across the table (down both its long sides), the chopsticks in their
+ * white sleeve (a red band at its top) along the cook's edge, under the cord */
+function bentoLid() {
+  if (lidGeo) return lidGeo
+  const D = BOX_Z1 - BOX_Z0, zc = (BOX_Z0 + BOX_Z1) / 2, top = BOX_H + 0.012
+  // (the cord near the box's far end, clear of the print; the sleeve long enough to go under it)
+  const cordZ = BOX_Z1 - 0.03, cw = 0.006
+  const parts = [
+    bentoBlock(BOX_W + 0.012, 0.012, D + 0.012, 0, BOX_H + 0.006, zc, BENTO_BLACK),
+    // (the cord: over the top (above the paper) and down both sides, a hair out from the lid's)
+    bentoBlock(BOX_W + 0.018, 0.004, cw, 0, top + 0.004, cordZ, CORD_RED),
+    ...[-1, 1].map((sx) => bentoBlock(0.003, 0.03, cw, sx * (BOX_W / 2 + 0.0075), top - 0.012, cordZ, CORD_RED)),
+    // (the chopsticks' sleeve: lying along the table, under the cord, toward the cook's side (its own -x is away from the cook))
+    bentoBlock(0.026, 0.006, 0.26, -BOX_W / 2 + 0.075, top + 0.0045, zc + 0.05, SLEEVE_WHITE),
+    bentoBlock(0.0265, 0.0065, 0.035, -BOX_W / 2 + 0.075, top + 0.0046, zc + 0.05 - 0.09, CORD_RED),
+  ]
+  lidGeo = mergeGeometries(parts.map((g) => g.toNonIndexed()))!
+  return lidGeo
+}
+/** the wrapping paper's print (掛け紙): cream paper, a red double rule round it, the shop's name down it in black, 焼魚 beside it in red, the
+ * shop's square seal under */
+const KAKEGAMI = signTexture(256, Math.round(256 * (BOX_W - 0.03) / (BOX_Z1 - BOX_Z0 - 0.03)), (g, w, h) => {
+  g.fillStyle = '#efe5cf'
+  g.fillRect(0, 0, w, h)
+  g.strokeStyle = '#b3241c'
+  g.lineWidth = 5
+  g.strokeRect(12, 12, w - 24, h - 24)
+  g.lineWidth = 2
+  g.strokeRect(22, 22, w - 44, h - 44)
+  brushText(g, '聞', w * 0.38, h * 0.3, 104, { fill: '#1d1712' })
+  brushText(g, '野', w * 0.38, h * 0.56, 104, { fill: '#1d1712' })
+  brushText(g, '焼', w * 0.74, h * 0.3, 46, { fill: '#b3241c' })
+  brushText(g, '魚', w * 0.74, h * 0.42, 46, { fill: '#b3241c' })
+  g.fillStyle = '#b3241c'
+  g.fillRect(w * 0.64, h * 0.72, 40, 40)
+  g.fillStyle = '#efe5cf'
+  g.fillRect(w * 0.64 + 8, h * 0.72 + 8, 24, 24)
+  g.fillStyle = '#b3241c'
+  g.fillRect(w * 0.64 + 13, h * 0.72 + 13, 14, 14)
+})
+const KAKEGAMI_MAT = new THREE.MeshToonMaterial({ map: KAKEGAMI })
+let paperGeo: THREE.BufferGeometry | null = null
+/** the paper on the lid's top, read from the cook's side: the print's right along the table (its own z), its top away from the cook (its +x) */
+const kakegami = () => paperGeo ??= new THREE.PlaneGeometry(BOX_Z1 - BOX_Z0 - 0.03, BOX_W - 0.03).rotateX(-Math.PI / 2).rotateY(-Math.PI / 2)
+  .translate(0, BOX_H + 0.0135, (BOX_Z0 + BOX_Z1) / 2)
+/** hit by the pointer's ray only while it's drawn (three's ray goes through what's hidden: an empty tier's name came up over the bare table) */
+function raycastShown(this: THREE.Mesh, ray: THREE.Raycaster, hits: THREE.Intersection[]) {
+  for (let q: THREE.Object3D | null = this; q; q = q.parent) if (!q.visible) return
+  THREE.Mesh.prototype.raycast.call(this, ray, hits)
+}
 const TakeoutBox = memo(function TakeoutBox({ position }: { position: [number, number, number] }) {
   return (
-    <group name="takeout-boxes" position={position} rotation-y={Math.atan2(ALONG.x, ALONG.z)}>
+    <group name="takeout-boxes" position={position} rotation-y={Math.atan2(ALONG.x, ALONG.z)}
+      {...nameOver('外帶便當', '外帶與外送的菜裝在這裡｜裝好蓋上蓋子、綁上繩子，外場拿去收銀台交給客人')}>
       {Array.from({ length: BOX_TIERS }, (_, k) => <OneBox key={k} tier={k} />)}
     </group>
   )
@@ -3160,24 +3259,16 @@ function OneBox({ tier }: { tier: number }) {
   const g = useRef<THREE.Group>(null)
   const lid = useRef<THREE.Group>(null)
   useFrame(() => {
-    const o = TAKEOUT.orders.find((x) => !x.taken && x.packed > 0 && x.tier === tier)
+    const o = TAKEOUT.orders.find((x) => !x.taken && (x.packed > 0 || !!x.opened) && x.tier === tier)
     if (g.current) g.current.visible = !!o
     if (lid.current) lid.current.visible = !!o?.ready
   })
   return (
     <group ref={g} position-y={tier * BOX_TIER} visible={false}>
-      <mesh position-y={0.004} material={KRAFT_IN}><boxGeometry args={[BOX_W, 0.008, BOX_D]} /></mesh>
-      {[-1, 1].map((sd) => <mesh key={`l${sd}`} position={[0, BOX_H / 2, sd * BOX_D / 2]} material={KRAFT}><boxGeometry args={[BOX_W, BOX_H, 0.008]} /></mesh>)}
-      {[-1, 1].map((sd) => <mesh key={`e${sd}`} position={[sd * BOX_W / 2, BOX_H / 2, 0]} material={KRAFT}><boxGeometry args={[0.008, BOX_H, BOX_D]} /></mesh>)}
+      <mesh geometry={bentoBox()} material={BENTO_MAT} castShadow receiveShadow raycast={raycastShown} />
       <group ref={lid} visible={false}>
-        <mesh position-y={BOX_H + 0.006} material={KRAFT}><boxGeometry args={[BOX_W + 0.012, 0.012, BOX_D + 0.012]} /></mesh>
-        {/* (a takeaway bento's, not a plain board (the owner's, 2026-11-11: "what is this?"): a white paper band (掛け紙) round the lid and
-            down its sides, the shop's red seal on it, and a pair of disposable chopsticks in their paper sleeve tucked under it) */}
-        <mesh position-y={BOX_H + 0.0135} material={BAND}><boxGeometry args={[0.11, 0.003, BOX_D + 0.016]} /></mesh>
-        {[-1, 1].map((sd) => <mesh key={`b${sd}`} position={[0, BOX_H - 0.012, sd * (BOX_D / 2 + 0.0075)]} material={BAND}><boxGeometry args={[0.11, 0.05, 0.003]} /></mesh>)}
-        <mesh position={[0, BOX_H + 0.0155, -0.05]} material={SEAL}><boxGeometry args={[0.036, 0.002, 0.036]} /></mesh>
-        <mesh position={[0.075, BOX_H + 0.019, 0.01]} rotation-y={0.08} material={SLEEVE}><boxGeometry args={[0.024, 0.008, 0.22]} /></mesh>
-        <mesh position={[0.075, BOX_H + 0.0235, 0.06]} rotation-y={0.08} material={SEAL}><boxGeometry args={[0.025, 0.002, 0.03]} /></mesh>
+        <mesh geometry={bentoLid()} material={BENTO_MAT} castShadow receiveShadow raycast={raycastShown} />
+        <mesh geometry={kakegami()} material={KAKEGAMI_MAT} receiveShadow raycast={raycastShown} />
       </group>
     </group>
   )
@@ -4319,6 +4410,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       ...(roast.basket ? Array.from({ length: basketCount }, (_, n) => `basket-${n}`) : [])]
     for (const k of keys) out.push(...circlesOf(k, containerAt(k)))
     out.push({ p: new THREE.Vector3(DECOR.crate.at[0], 0, DECOR.crate.at[1]), r: DECOR.crate.r })
+    // (and the miso soup and the sake taken out to try, at the table's right end (menu.ts's layout.first))
+    root.traverse((o) => {
+      const id = o.userData.itemId as string | undefined
+      if (id && roast.drinks?.includes(id) && o.visible && o.scale.x > 0.01) out.push({ p: o.position.clone(), r: id === 'Sake' ? 0.22 : 0.19 })
+    })
     return out
   }
   const boxPlaced = useRef(false)
@@ -4736,6 +4832,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // lay out over the box's sides and the tasting bowl beside it)
       p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, sideOf(row) * 0.075)
         .add(new THREE.Vector3(0, 0.05 + Math.floor(row / 3) * 0.035 + tierOf(owner.id) * BOX_TIER, 0))
+      // (its box set out now, for it to land in)
+      const order = TAKEOUT.orders.find((o) => o.id === owner.id)
+      if (order) order.opened = true
       flatQ(p, p.toQ, LAY)
       p.local.copy(p.toP).sub(containerAt('takeout'))
       return
@@ -4774,8 +4873,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const bowl = inBowl(p)
     const basket = inBasket(p)
     const dish = onDish(p)
-    // (the bowl kept to two layers: with it full, what went in first is eaten up, its place the new one's (the owner's: a mountain piled up in
-    // it, the twenty-first laid on the first))
+    // (the bowl kept to its one row: with it full, what went in first is eaten up, its place the new one's (the owner's: a mountain piled up in
+    // it, the twenty-first laid on the first; then still two layers of five))
     if (bowl) {
       const inIt = pieces.current.filter((q) => q !== p && q.collected && !q.eaten && q.slot !== null && q.container?.startsWith('bowl'))
         .sort((a, b) => (a.bowlAt ?? 0) - (b.bowlAt ?? 0))
@@ -4808,11 +4907,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     if (bowl) {
-      // laid side by side across the bowl like on a plate, the skewers' sticks resting across its rim; a full row starts a layer on top
-      const within = slot % PER_PLATE
-      const col = within % PER_LAYER
-      const layer = Math.floor(within / PER_LAYER)
-      const across = (col - (PER_LAYER - 1) / 2) * SLOT_GAP + (layer % 2) * (SLOT_GAP / 2)
+      // laid side by side across the bowl, the skewers' sticks resting across its rim: one row, kept to it (game/plates' bowlPlace)
+      const { across, layer } = bowlPlace(slot)
       p.toP.copy(bowlAt()).addScaledVector(STACK_DIR, across)
       p.toP.y += (p.loose ? 0.07 : BOWL_RIM + 0.02) + layer * LAYER_HEIGHT
       p.container = 'bowl-0'
@@ -7070,7 +7166,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const spots = roast.netSpots ?? []
     if (spots.length) {
       const onNet = (p: Piece) => roast.net?.includes(p.id) && present(p) && !p.collected && !p.staged
-      const taken = new Set(pieces.current.filter((p) => onNet(p) && p.netSpot !== null).map((p) => p.netSpot))
+      // (one spot, one piece: should two hold the same, the one that's been on longest keeps it and the other waits its turn off the net)
+      const taken = new Set<number>()
+      for (const p of pieces.current.filter((q) => onNet(q) && q.netSpot !== null).sort((a, b) => b.progress - a.progress)) {
+        if (taken.has(p.netSpot!)) p.netSpot = null
+        else taken.add(p.netSpot!)
+      }
       for (const p of pieces.current.filter((q) => onNet(q) && q.netSpot === null).sort((a, b) => a.copy - b.copy)) {
         const free = spots.findIndex((_, i) => !taken.has(i))
         if (free < 0) break
@@ -7100,7 +7201,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const onBoard = onTray.filter((p) => !roast.rawDish?.items.includes(p.id))
     // (the tray takes so many: the rest wait in the fridge, unseen, until there's room)
     const boardSticks = onBoard.filter((q) => !q.loose), boardLoose = onBoard.filter((q) => q.loose)
-    const inFridge = new Set([...boardSticks.slice(TRAY_CAP), ...boardLoose.slice(LOOSE_CAP)])
+    // (and the rice balls' little dish takes three, round it: the rest wait in the fridge too (the fourth and after stood in a column over
+    // its middle, one on another: the owner's "heaped like a mountain", 2026-11-13))
+    const onRawDish = onTray.filter((p) => !!roast.rawDish?.items.includes(p.id))
+    const inFridge = new Set([...boardSticks.slice(TRAY_CAP), ...boardLoose.slice(LOOSE_CAP), ...onRawDish.slice(RAW_DISH_CAP)])
 
     // ---- the places round the fire (game/fireSlots): each given up as what holds it leaves it, in his hands to the plating place, flying off
     // by itself, done with, or back on the board; every piece, a fish's rod its own or not (held by those without one, a rush's fire was
@@ -7194,6 +7298,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (menuIds.has(p.id) && roast.tray) {
           p.staged = true
           p.fresh = true
+          // (no place on the grill net while it's on the tray: the net's spots were handed out above, this same frame, to whatever wasn't
+          // on the tray or off the fire, this one too the moment it was put out; it kept that spot on the tray, the spot went to the next
+          // one (on the tray it holds none), and it went on the net with it, on top of that one: four mochi on one spot in a rush, rice
+          // balls one on another (the owner's, 2026-11-13, "heaped like a mountain"))
+          p.netSpot = null
           p.stagedAt = ++stageSeq.current
           p.tended = false
           p.prepUntil = undefined
@@ -7306,14 +7415,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.userData.shrink = undefined
           flatQ(p, p.node.quaternion, ON_BOARD)
         } else p.node.userData.shrink = 0.0001
-      } else if (p.staged && roast.rawDish?.items.includes(p.id)) {
-        // rice balls wait raw on their own little dish, sitting the way they'll go on the net
-        const mine = onTray.filter((q) => roast.rawDish!.items.includes(q.id))
-        const k = Math.max(0, mine.indexOf(p))
-        const a = (k / 3) * Math.PI * 2 + 0.4
-        const at = containerAt('rawdish').add(new THREE.Vector3(Math.cos(a) * (k < 3 ? 0.1 : 0), 0.05 + Math.floor(k / 3) * 0.08,
-          Math.sin(a) * (k < 3 ? 0.1 : 0)))
-        p.node.position.lerp(at, Math.min(1, dt * 10))
+      } else if (p.staged && roast.rawDish?.items.includes(p.id) && !inFridge.has(p)) {
+        // rice balls wait raw on their own little dish, sitting the way they'll go on the net, three round it
+        const k = Math.max(0, onRawDish.indexOf(p))
+        const a = (k / RAW_DISH_CAP) * Math.PI * 2 + 0.4
+        const at = containerAt('rawdish').add(new THREE.Vector3(Math.cos(a) * 0.1, 0.05, Math.sin(a) * 0.1))
+        // (out of the fridge (or just ordered), set straight down in its place, as on the tray)
+        if (p.fresh) { p.node.position.copy(at); p.fresh = false } else p.node.position.lerp(at, Math.min(1, dt * 10))
         p.node.quaternion.copy(p.homeQ)
       } else if (p.staged && inFridge.has(p)) {
         // (still in the fridge: set straight down in its spot when it's brought out)

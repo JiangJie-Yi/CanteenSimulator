@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { BOWL_HAND_MAX, BOWL_WARM_MAX, warmToEat } from '@/game/plates'
+import { BOWL_GAP, BOWL_HAND_MAX, BOWL_ROW, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 
 feature('保溫大碗的上限', () => {
   scenario('大碗裡的魚不會堆積如山', ({ given, when, then }) => {
@@ -14,8 +14,18 @@ feature('保溫大碗的上限', () => {
     then('一份都不吃', (w) => { expect(w.eat).toBe(0) })
   })
   scenario('手動研製時試吃碗也不會疊成山', ({ given, when, then }) => {
-    given('碗裡已有 10 份（兩層滿了）', (w) => { w.kept = BOWL_HAND_MAX })
+    given('碗裡那一排已經放滿', (w) => { w.kept = BOWL_HAND_MAX })
     when('再放一份進去', (w) => { w.eat = warmToEat(w.kept + 1, BOWL_HAND_MAX) })
-    then('最早放進去的那份被吃掉，碗裡仍是 10 份', (w) => { expect(w.kept + 1 - w.eat).toBe(BOWL_HAND_MAX) })
+    then('最早放進去的那份被吃掉，碗裡仍是滿滿一排', (w) => { expect(w.kept + 1 - w.eat).toBe(BOWL_HAND_MAX) })
+  })
+  scenario('碗裡的菜只排一排，不會疊第二層', ({ given, when, then, and }) => {
+    given('研製時與營業時，碗裡最多能放的份數', (w) => { w.most = Math.max(BOWL_HAND_MAX, BOWL_WARM_MAX) })
+    when('每一份照放進去的位置排好', (w) => { w.places = Array.from({ length: w.most }, (_, k) => bowlPlace(k)) })
+    then('全部都在第一層', (w) => { for (const p of w.places) expect(p.layer).toBe(0) })
+    and('一排的寬度在碗裡（碗口 0.8，最寬的一份 0.2）', (w) => {
+      const far = Math.max(...w.places.map((p: { across: number }) => Math.abs(p.across)))
+      expect(far + 0.1).toBeLessThanOrEqual(0.4)
+      expect(BOWL_GAP * (BOWL_ROW - 1)).toBeLessThan(0.8 - 0.2)
+    })
   })
 })

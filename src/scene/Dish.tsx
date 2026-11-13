@@ -267,7 +267,10 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
       // tray, shrunk away): its extra portions, cloned from it, stand where they should
       if (!obj.userData.home) {
         obj.userData.authoredScale = obj.scale.clone()
-        jitter(obj, isSkewer(id), !!layout?.slots?.[id])
+        // (or at its own spot, where the layout puts the first portion: the model has it somewhere else)
+        const first = copy === 0 ? layout?.first?.[id] : undefined
+        if (first) obj.position.set(first[0], obj.position.y, first[1])
+        jitter(obj, isSkewer(id), placed(id))
         obj.userData.home = { p: obj.position.clone(), q: obj.quaternion.clone(), s: obj.scale.clone() }
       }
       const home = obj.userData.home as { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }
@@ -278,10 +281,16 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
     return groups
   }, [scene, ids])
 
+  /** whether the layout gives an item spots of its own (its later portions', or its first's): set down there level, not on the fire's ring */
+  // (a hoisted declaration, as isSkewer)
+  function placed(id: string) {
+    return !!(layout?.slots?.[id] || layout?.first?.[id])
+  }
+
   /** Skewers around a fire get spun about their own stick; everything else turns about the vertical. */
   // (a hoisted declaration: the items memo above calls it during the first render)
   function isSkewer(id: string) {
-    return layout?.mode === 'ring' && layout.spread?.[id] === undefined && !layout.slots?.[id]
+    return layout?.mode === 'ring' && layout.spread?.[id] === undefined && !placed(id)
   }
 
   /** Every portion's pieces currently placed in the dish (for finding free spots on the fire ring). */
@@ -290,7 +299,7 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
     // along in the ash (layout.spread) aren't on the ring
     const out: number[] = []
     for (const [id, pieces] of items) {
-      if (layout?.spread?.[id] !== undefined || layout?.slots?.[id]) continue
+      if (layout?.spread?.[id] !== undefined || placed(id)) continue
       for (const p of pieces) out.push(Math.atan2(p.homeP.z, p.homeP.x))
     }
     // the base fish isn't a menu item, but it takes up a spot too
@@ -361,7 +370,7 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
       }
       // every portion is a little different: its own size and turn
       node.scale.copy(src.node.userData.authoredScale as THREE.Vector3 ?? src.baseScale)
-      jitter(node, isSkewer(id), !!layout?.slots?.[id])
+      jitter(node, isSkewer(id), placed(id))
       const baseScale = node.scale.clone()
       node.userData.home = { p: node.position.clone(), q: node.quaternion.clone(), s: baseScale.clone() }
       node.scale.setScalar(0.0001)
