@@ -3429,6 +3429,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (out of a toilet they wait a moment first, for its door to slide open in front of them)
         const wait = s.phase === 'wcBack' && w.who !== 'drink' ? 0.6 : 0
         const d = Math.min(w.len, Math.max(0, s.t - wait) * SPEED * walkSpeedOf(kindOf(s.id).kind))
+        // (stood while it does, not treading on the spot (item 50))
+        s.still = s.t < wait
         const { p, dir } = alongPath(w.path, s.phase === 'wcGo' ? d : w.len - d)
         g?.position.copy(p)
         if (g) g.rotation.y = turnToward(g.rotation.y, s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z), dt * 1.5)
@@ -3486,6 +3488,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (s.wc?.who === 'drink' && g && fridges) {
           g.rotation.y = fridges[s.wc.unit ?? 0].yaw + Math.PI
           g.position.copy(s.wc.path[s.wc.path.length - 1])
+          // (stood there choosing, their feet still: left walking, they trod on the spot the whole while, a hand in the fridge (item 50))
+          s.still = true
         }
         if (toiletDone && (s.wc?.who === 'drink' ? s.t > DRINK_STAY : s.wcOut?.t === 0)) {
           // (out of the toilet: it flushes behind them, and they say what they thought of it, if it's worth saying)
@@ -3521,6 +3525,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           } else {
             s.phase = 'wcBack'
             s.t = 0
+            s.still = false
           }
         }
       } else if (s.phase === 'wcWash') {
@@ -3701,20 +3706,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     {
       const step = Math.min(dt, 0.1)
       const stamp = ++asideTick.current
-      const walkers: { p: THREE.Vector3; give: boolean; id: number; vx: number; vz: number; ax: number; az: number }[] = []
-      const add = (p: THREE.Vector3, give: boolean, id: number) => {
+      const walkers: { p: THREE.Vector3; give: boolean; id: number; vx: number; vz: number; ax: number; az: number; s?: Shown }[] = []
+      const add = (p: THREE.Vector3, give: boolean, id: number, s?: Shown) => {
         // (how they're going: from where their way had them the frame before; a leap (a phase begun somewhere else) is no walk)
         const was = lastAt.current.get(id)
         let vx = 0, vz = 0
         if (was && step > 0) { vx = (p.x - was.x) / step; vz = (p.z - was.z) / step }
         if (vx * vx + vz * vz > WALK_MOST * WALK_MOST) { vx = 0; vz = 0 }
-        walkers.push({ p, give, id, vx, vz, ax: 0, az: 0 })
+        walkers.push({ p, give, id, vx, vz, ax: 0, az: 0, s })
       }
       for (const x of shown) {
         if (x.phase === 'wcIn' && x.wc?.who !== 'drink') continue
         const gp = groups.current.get(x.id)?.position
         // (those sitting don't move aside, but nobody walks through them either: the ones going by step round them)
-        if (gp) add(gp, x.phase !== 'sit', x.id)
+        if (gp) add(gp, x.phase !== 'sit', x.id, x)
       }
       waiters.current.forEach((w, wi) => add(waiterObjs.current[wi]?.position ?? w.pos, false, -1 - wi))
       if (STOCKER_FIG.o?.visible) add(STOCKER_FIG.o.position, false, STOCKER_KEY)
@@ -3768,6 +3773,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const k = t > most ? most / t : 1
         off.x += tx * k; off.z += tz * k
         w.p.x += off.x; w.p.z += off.z
+        // (a step aside is a step: stood in a queue or at the genkan's step, eased aside they slid across the floor, their feet still (item 50))
+        if (w.s && w.give && t * k > 0.002) w.s.still = false
         if (w.ax === 0 && w.az === 0 && Math.abs(off.x) + Math.abs(off.z) < 1e-4) aside.current.delete(w.id)
       }
       // (those gone, or into a toilet's stall, forgotten: out of it, they're stood where they come out and set off from there)
