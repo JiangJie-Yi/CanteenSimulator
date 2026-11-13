@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { SKEWER_POOL, pickUpDirty, putBackClean, skewerTotal, startSkewers, takeSkewer, usedSkewer, washAll, washGoes } from '@/game/skewers'
+import { SKEWER_POOL, pickUpDirty, putBackClean, skewerTotal, startSkewers, takeSkewer, usedSkewer, washAll, washGoes, washUrgent } from '@/game/skewers'
 
 feature('50 支鐵串循環', () => {
   scenario('一支鐵串從筒裡到食物、到髒盤、洗好回筒，總數一直是 50', ({ given, when, then, and }) => {
@@ -20,6 +20,11 @@ feature('50 支鐵串循環', () => {
   scenario('筒裡快沒了，髒的不到 10 支也去洗', ({ given, then }) => {
     given('筒裡 4 支、髒盤 3 支', (w) => { w.s = { clean: 4, dirty: 3, carrying: 0 } })
     then('去洗', (w) => { expect(washGoes(w.s)).toBe(true) })
+  })
+  scenario('筒裡剩 5 支以下是急的（廚師快穿不了串）', ({ then, but }) => {
+    then('筒裡 5 支、髒盤 12 支：急', () => { expect(washUrgent({ clean: 5, dirty: 12, carrying: 0 })).toBe(true) })
+    but('筒裡 20 支、髒盤 12 支：該洗但不急', () => { expect(washGoes({ clean: 20, dirty: 12, carrying: 0 })).toBe(true); expect(washUrgent({ clean: 20, dirty: 12, carrying: 0 })).toBe(false) })
+    but('已經有人拿去洗了：不急', () => { expect(washUrgent({ clean: 2, dirty: 0, carrying: 10 })).toBe(false) })
   })
   scenario('打烊時全部洗好', ({ given, then }) => {
     given('髒盤 7、手上 5、筒裡 38', (w) => { w.s = { clean: 38, dirty: 7, carrying: 5 } })

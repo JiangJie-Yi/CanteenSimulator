@@ -57,7 +57,18 @@ feature('外場分工：一個端菜收盤，另一個洗碗、烘碗、搬回�
       expect(nextChore({ ...base, duty: 'floor', skewers: true, serve: true })).toBe('serve')
       expect(nextChore({ ...base, duty: 'floor', skewers: true, dirty: 1 })).toBe('clear')
     })
-    and('管洗碗的不去洗鐵籤', () => { expect(nextChore({ ...base, duty: 'dish', skewers: true })).toBeNull() })
+    // (item 47: only the floor's server took them, and on a busy evening they're never without plates to carry or clear: none washed in
+    // 200 s, the clean ones down from 47 to 6, and late at night the cooks stood without for an hour and a half)
+    and('管洗碗的閒著也去洗（在水槽洗東西本來就是他的事）', () => { expect(nextChore({ ...base, duty: 'dish', skewers: true })).toBe('skewers') })
+    but('管洗碗的有碗要洗：先洗碗', () => { expect(nextChore({ ...base, duty: 'dish', skewers: true, sink: WASH_AT })).toBe('wash') })
+  })
+  scenario('筒裡的乾淨鐵籤快沒了（廚師要穿不了串）：除了端菜，先去洗鐵籤', ({ then, and, but }) => {
+    then('管外場的有盤子要收：先洗鐵籤', () => { expect(nextChore({ ...base, duty: 'floor', skewers: 'urgent', dirty: 3 })).toBe('skewers') })
+    and('管洗碗的有碗要洗：也先洗鐵籤', () => { expect(nextChore({ ...base, duty: 'dish', skewers: 'urgent', sink: WASH_AT })).toBe('skewers') })
+    but('有菜要端：先端', () => { expect(nextChore({ ...base, duty: 'floor', skewers: 'urgent', serve: true })).toBe('serve') })
+    and('碗盤架空了、烘好的等著搬：先搬（沒盤子也出不了菜）', () => {
+      expect(nextChore({ ...base, duty: 'dish', skewers: 'urgent', rack: 0, dryer: { n: 6, left: 0 } })).toBe('unload')
+    })
   })
   scenario('一個人時：端菜、洗碗、收盤、搬盤都做', ({ then, and }) => {
     then('有髒盤子：收', () => { expect(nextChore({ ...base, duty: 'all', dirty: 1 })).toBe('clear') })

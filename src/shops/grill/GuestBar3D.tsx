@@ -1,5 +1,5 @@
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
-import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes } from '@/game/skewers'
+import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes, washUrgent } from '@/game/skewers'
 import { rattleSound } from './skewerSound'
 import { useSaid } from '@/ui/speechStore'
 import { getClock } from '@/ui/clockStore'
@@ -4687,7 +4687,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const skewersDue = washGoes(SKEWERS.s) && !atSink && !waiters.current.some((x) => SK_PHASES.has(x.phase)) && !['toSkTray', 'takeSk', 'toSkSink', 'washSk', 'toHolder', 'putSk'].includes(platerRun.current.phase)
           // (the shop shut and going home: nothing new taken on; what's left is put away overnight with the closing)
           const chore = SHOP.leaving ? null : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : dirty.current, rack: PLATE_RACK.n,
-            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink ? { n: 0, left: null } : DRAIN, skewers: skewersDue })
+            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink ? { n: 0, left: null } : DRAIN, skewers: skewersDue && (washUrgent(SKEWERS.s) ? 'urgent' : true) })
           if (chore === 'serve') {
             // (across the kitchen to the chef for it)
             w.slot = slot

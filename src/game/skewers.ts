@@ -19,6 +19,9 @@ export const takeSkewer = (s: Skewers): Skewers | null => (s.clean > 0 ? { ...s,
 export const usedSkewer = (s: Skewers): Skewers => ({ ...s, dirty: s.dirty + 1 })
 /** whether the used ones should go to be washed now */
 export const washGoes = (s: Skewers) => s.carrying === 0 && s.dirty > 0 && (s.dirty >= WASH_AT || s.clean <= WASH_LOW)
+/** and whether it can't wait: the holder down to its last few, the cooks about to have none to skewer the next order on (item 47: then the
+ * servers go to them before anything but a plate to carry) */
+export const washUrgent = (s: Skewers) => washGoes(s) && s.clean <= WASH_LOW
 /** the used skewers' tray emptied into someone's hands */
 export const pickUpDirty = (s: Skewers): Skewers => ({ ...s, dirty: 0, carrying: s.carrying + s.dirty })
 /** washed and put back in the holder */
