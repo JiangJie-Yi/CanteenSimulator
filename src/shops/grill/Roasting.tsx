@@ -5494,6 +5494,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           return
         }
         stray.guest = was
+        // (the shop shut for the day: there's no next customer to keep it for (the owner's item 41: past closing the chef put it in the bowl
+        // "for the next customer"); the staff have it, and say so)
+        if (SHOP.closing && !stray.container?.startsWith('bowl')) {
+          SERVICE.waiting.delete(stray.key)
+          stray.via = undefined
+          stray.readyAt = undefined
+          stray.keepWarm = false
+          stray.slot = null
+          stray.eaten = true
+          say(L().orphanMeal(nameOfP(stray)))
+          return
+        }
         // (nobody's: kept warm in the big bowl (out of the plating place, which the next seat needs), never binned)
         if (!stray.container?.startsWith('bowl')) {
           SERVICE.waiting.delete(stray.key)
