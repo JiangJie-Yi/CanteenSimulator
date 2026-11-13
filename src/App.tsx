@@ -1333,7 +1333,9 @@ export default function App() {
   useEffect(() => { if (!ai) SHOP.counted = false }, [ai])
   /** the last half hour begun: said in the kitchen's log (the current language and shop: the clock's timer is made once) */
   const lastCallSay = useRef(() => {})
-  lastCallSay.current = () => addTalk(DISHES[active].id, 'chef', LINES[lang].lastCall)
+  // (into the day's log, where the shop's going on is told (talk): it went into the chat with the second cook (addTalk), unseen while the shop's
+  // open, and the last half hour began without a word (the owner's item 39, a whole day's log: only the owner's closing words at 04:30))
+  lastCallSay.current = () => talk('chef', LINES[lang].lastCall)
   /** a new day by the game's clock: the applicants' new lot, the dice back */
   const newDay = useRef<(day: number) => void>(() => {})
   /** the hours over: shut up as by hand (the button's way: no auto-run reopening it till they come round again) */

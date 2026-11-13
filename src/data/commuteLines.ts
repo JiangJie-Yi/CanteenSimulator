@@ -15,11 +15,13 @@ export const CLOSE_DORM: Lines = {
   ja: ['お疲れさん！帰り道気をつけて、早く休めよ。', 'ありがとな。明日の仕入れは確認しとくから、俺も上で寝るわ。', '炉の火を落としたら上がろう。今日はみんなよくやった！'],
   en: ['Good work! Mind how you go, and get some rest.', "Thanks. I'll check tomorrow's stock, then I'm off upstairs to bed.", "Bank the fire and we'll head up. Great work today, everyone!"],
 }
-/** the owner as the shop's shut for the day: no one more comes in, those here finish */
+/** the owner as the shop's shut for the day (closing time, 04:30): no one more comes in, those here finish. Said as it's shut, after the last
+ * orders were called (04:00, the chef's): it said "nearly last orders" then, the other way round (the owner's item 39); the door's lanterns
+ * are in by then (they go out at the last orders) */
 export const LAST_ORDER: Lines = {
-  zh: ['差不多到最後點餐時間囉～', '各位，最後點餐時間到囉，慢慢吃不用急！', '今天的最後點餐囉～門口的燈籠要收了。'],
-  ja: ['そろそろラストオーダーの時間です～', 'ラストオーダーになります、ごゆっくりどうぞ！', '本日のラストオーダーです～提灯もそろそろ下ろします。'],
-  en: ["It's nearly last orders~", "Last orders, everyone! No rush, take your time.", "Last orders for today~ the lanterns are coming in soon."],
+  zh: ['今天打烊囉～慢慢吃，不用急！', '各位，今天就到這裡，謝謝光臨！慢慢吃不用急。', '打烊囉～門口的燈籠已經收了，大家慢慢吃。'],
+  ja: ['本日はこれで閉店です～ごゆっくりどうぞ！', '閉店のお時間です、ありがとうございました！お食事はごゆっくり。', '閉店です～提灯ももう下ろしました、ごゆっくり。'],
+  en: ["We're closed for today~ take your time, no rush!", "That's closing time, everyone. Thank you for coming! No rush finishing up.", "We're closed~ the lanterns are already in, take your time."],
 }
 /** the owner, or one coming down the stair, in the morning */
 export const OPEN_DORM: Lines = {
