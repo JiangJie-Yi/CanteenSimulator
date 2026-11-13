@@ -1026,14 +1026,32 @@ function chefWay(home: THREE.Vector3, to: THREE.Vector3) {
   const mid = across ? across.slice(1, -1).map(fromBar).map((v) => v.setY(floorAt(v))) : []
   return [home.clone(), out, ...mid, to.clone()]
 }
+/** how long sitting down onto a seat (or getting up off it) takes (the shop's seconds), and how high over the straight way up they step */
+const SIT_S = 0.7
+const SIT_HOP = 0.08
 function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { id: string; role: Role; at: THREE.Vector3; yaw: number; way: THREE.Vector3[]; seat?: string; round?: boolean
   fetcher?: boolean; children: React.ReactNode }) {
   const g = useRef<THREE.Group>(null)
   const trip = useRef<{ way: THREE.Vector3[]; len: number; gone: number } | null>(null)
+  /** (one who sits (the cashier): how far they're sat down on their seat from their place on the floor beside it, 0 stood there .. 1 sat; and
+   * the seat's place and turn in their frame, where it was last measured) */
+  const sat = useRef(0)
+  const seatAt = useRef<{ p: THREE.Vector3; yaw: number } | null>(null)
   /** where they stand: their place (the third cook's is his own bay in the cook table now (SOUS_AT): it was out on the kitchen's floor and
    * moved off anything stood there each day (KITCHEN_ROUTE.clear: the warming counter was put where he stood); that moved him out of
    * his bay, it being the table's) */
   const placeOf = () => at
+  /** where they are `k` of the way from their place (stood, facing their work) onto their seat (sat, facing as it does): eased, a little up
+   * over the step onto it */
+  const sitBetween = (o: THREE.Group, k: number) => {
+    const s = seatAt.current
+    if (!s) return
+    const e = k * k * (3 - 2 * k)
+    o.position.lerpVectors(placeOf(), s.p, e)
+    o.position.y += Math.sin(e * Math.PI) * SIT_HOP
+    const d = Math.atan2(Math.sin(s.yaw - yaw), Math.cos(s.yaw - yaw))
+    o.rotation.y = yaw + d * e
+  }
   /** the second cook's round (fetcher): walking to a store or back, taking it out there, preparing and skewering it at the board, his
    * place; whether he's away (what's on the fire, and off it, is the owner's: Boss.tsx) */
   const walkTrip = (o: THREE.Group, dt: number) => {
@@ -1188,9 +1206,12 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
         m?.updateWorldMatrix(true, false)
         if (m && m.matrixWorld.elements[12] ** 2 + m.matrixWorld.elements[14] ** 2 > 0.01) {
           const inv = o.parent.matrixWorld.clone().invert()
-          o.position.setFromMatrixPosition(m.matrixWorld).applyMatrix4(inv)
           const dir = new THREE.Vector3(0, 0, -1).transformDirection(m.matrixWorld).transformDirection(inv)
-          o.rotation.y = Math.atan2(dir.x, dir.z)
+          seatAt.current = { p: new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).applyMatrix4(inv), yaw: Math.atan2(dir.x, dir.z) }
+          // (sat down from their place beside it over a moment, up and onto it (the owner's item 37: from the floor onto the seat, half a metre
+          // up, in a frame), as the customers get onto their stools)
+          sat.current = Math.min(1, sat.current + Math.min(dt, 0.1) / SIT_S)
+          sitBetween(o, sat.current)
           // (the cashier at the till: turned round in the chair to the takeaway stand behind them, hands out with a bag (bar.ts's TAKEOUT_STAND))
           if (seat === 'cashier-seat') {
             TAKEOUT_STAND.cashierAt = performance.now()
@@ -1208,6 +1229,15 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     // (still out with plates, the coal or the rice (GuestBar3D walks them): home first, what's in hand put down, and only then out; set off
     // from their place meanwhile, what they carried floated on alone along their way (the owner's ghost plates))
     if (PLATER_OUT.id === id && !commute.current) { o.visible = false; SHOP.walking.add(id); return }
+    // (sat (the cashier): up off the seat and down onto the floor by their place first, over a moment, as they sat down: they dropped from
+    // the seat to the floor in a frame and set off)
+    if (seat && sat.current > 0 && seatAt.current && !commute.current) {
+      sat.current = Math.max(0, sat.current - Math.min(dt, 0.1) / SIT_S)
+      sitBetween(o, sat.current)
+      // (still on their way out, for the shop's shutting: everyone out of the door first)
+      SHOP.walking.add(id)
+      return
+    }
     // (on their way: from where they are, down off a seat onto the floor, finishing up first, then home or upstairs)
     if (fetcher) { CHEF_TRIP.phase = 'idle'; CHEF_TRIP.keys = []; trip.current = null; o.userData.carry = o.userData.prep = false; FETCHER.busy = false }
     if (!commute.current || commute.current.dir !== 'out') {
