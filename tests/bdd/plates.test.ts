@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { CARRY, CLEAR_LATE, DRYER_CAP, ON_THE_WAY, onTheWay, DRY_S, STACK_CAP, STACK_LOW, RACK_FULL, WASH_AT, dryerStarts, dryerTick, dutyOf, nextChore, platerGoes, platesToBring,
   putBack, unload, washNow, washOne, type Dryer, canOpen, dryerPhase, playerLoad, shutStarts, DRAIN_CAP, DRAIN_S, drainTick, handNow, handOne,
-  unbasket, washerBusy } from '@/game/plates'
+  unbasket, washerBusy, START_DIRTY, START_DRAIN, rackAtStart, LOW_FULL, PLATES_ALL } from '@/game/plates'
 import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 
 const idle: Dryer = { n: 0, left: null }
@@ -262,5 +262,13 @@ feature('洗碗機：玩家自己操作', () => {
     when(`過了 ${DRY_S} 秒`, (w) => { w.d = dryerTick(w.d, DRY_S) })
     then('洗好了', (w) => { expect(dryerPhase(w.d)).toBe('clean') })
     and('空的關門不會開始', () => { expect(shutStarts({ n: 0, left: null })).toBe(false) })
+  })
+})
+
+feature('開店時的洗碗（店主要測試的，第 82 項）', () => {
+  scenario(`每天開始時水槽旁的檯面有 ${START_DIRTY} 個髒盤子、瀝水籃有 ${START_DRAIN} 個乾淨的`, ({ then, and }) => {
+    then(`髒盤子 ${START_DIRTY} 個、瀝水籃 ${START_DRAIN} 個`, () => { expect([START_DIRTY, START_DRAIN]).toEqual([6, 4]) })
+    and('它們都是碗盤櫃的盤子：店裡的盤子總數不變', () => { expect(rackAtStart() + LOW_FULL + START_DIRTY + START_DRAIN).toBe(PLATES_ALL) })
+    and('瀝水籃的已經乾了，馬上可以搬回碗盤櫃', () => { expect(unbasket({ n: START_DRAIN, left: 0 }).take).toBeGreaterThan(0) })
   })
 })

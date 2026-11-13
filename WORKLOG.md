@@ -576,3 +576,9 @@
 - 遊戲端（`DiningRoom.tsx` 的 `SakeStack`）：保留法線貼圖；`Cards` 雙面、alphaTest 0.5、不縮圖、不投影、不描線；整疊照寬度縮到 1.13（桶變矮胖，照舊的 1.1 高去縮會變寬，碰到白米袋與柳樹），指標範圍 `SAKE_HIT` 高 1.1 → 0.98。
 - 驗證：模型 9,600 → 1,092 面（`KOMODARU_TRIS`），檔案 854 → 756 KB；`scripts/mesh-audit.mjs` 0 個問題；總覽場景 37,654 → 20,772 面、繪製 32 → 30（`tests/e2e/_72komo.mjs`，改前用 HEAD 的程式加舊模型）。同一鏡頭三張：`report-1113/72-before-0..2.png`、`72-after-0..2.png`。`npx tsc -b`、`npm test`（548）通過；提交。**完成**。
 - 期間店主追加第 73～75 項（料理台的酒台、碗盤櫃的杯碗、牆上喇叭），排在後面。
+
+## 第 82 項　開局的髒盤子與瀝水籃（店主 11-13 晚上）
+
+- 店主附水槽圖：檯面（紅圈）開局固定 6 個髒盤子、瀝水籃 4 個乾淨的，要測洗碗流程。問過擺檯面還是算在水槽裡，店主說「照做」：擺在紅圈的檯面上。
+- `game/plates.ts`：`START_DIRTY` 6、`START_DRAIN` 4、`rackAtStart()`（碗盤櫃 200 → 190，總數不變）。`GuestBar3D.tsx`：關店（含開網頁）的重設把髒盤子設成 6、`onCounter` 6、瀝水籃 4 個已乾（`left` 0）；`dirtyAt` 前 `onCounter` 個畫在 `counterAt`（瀝水籃往檯面前緣 0.52、往遠離水槽那邊 0.25、檯面的高度，照 `SinkBasket`、`SinkFront`、`SinkTop` 算，每 2 秒重找一次），其餘照舊在水槽；檯面上的不泡水；洗的時候從最上面拿，所以先洗水槽裡的。
+- 驗證：開頁後每 0.5 秒記（`tests/e2e/_82flow.mjs`）：2 秒時水槽 6、籃子 4；外場 2.5～6.5 秒把 6 個放進烘碗機，7.5～10.5 秒把籃子的 4 個搬回碗盤櫃，14 秒起烘好搬回。截圖 `report-1113/82-start.png`（`_82start.mjs`）。`npx tsc -b`、`npm test`（549，BDD `plates` 加一個情境）、`npm run e2e` 通過；提交。**完成**。

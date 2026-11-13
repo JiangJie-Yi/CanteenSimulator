@@ -63,7 +63,7 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
-import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
+import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
 import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
@@ -2979,7 +2979,27 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const rackNow = (n = PLATE_RACK.n) => (n > PER_RACK ? 1 : 0)
   /** the k-th plate up the dirty stack in the sink's basin (they're stacked there a little smaller: the customers' plates are drawn big, the
    * basin's a real sink's size) */
-  const dirtyAt = (k: number) => inBar('SinkBasinFloor', endOf(1)).add(new THREE.Vector3(0, 0.004 + Math.min(k, SINK_SHOWN - 1) * STACK_GAP * IN_SINK, 0))
+  const dirtyAt = (k: number) => {
+    const c = onCounter.current
+    if (k < c) return counterAt(k)
+    return inBar('SinkBasinFloor', endOf(1)).add(new THREE.Vector3(0, 0.004 + Math.min(k - c, SINK_SHOWN - 1) * STACK_GAP * IN_SINK, 0))
+  }
+  /** the k-th plate up the stack waiting on the counter (item 82, the owner's circle): in front of the draining basket toward the counter's
+   * front, a little toward its far end from the basin, on the counter's top (found from the sink's own marks, again now and then: it's moved
+   * by hand in edit mode) */
+  const counterAt = (k: number) => {
+    const now = performance.now()
+    if (!counterSpot.current || now - counterSpot.current.t > 2000) {
+      const b = markOf('SinkBasket'), fr = markOf('SinkFront'), top = markOf('SinkTop'), f = frame.current
+      if (!b || !fr || !top || !f) return inBar('SinkBasinFloor', endOf(1))
+      const bw = b.getWorldPosition(new THREE.Vector3()), front = fr.getWorldPosition(new THREE.Vector3()).sub(bw).setY(0).normalize()
+      const side = new THREE.Vector3(front.z, 0, -front.x)
+      const y = new THREE.Box3().setFromObject(top).max.y
+      f.updateWorldMatrix(true, false)
+      counterSpot.current = { at: f.worldToLocal(bw.addScaledVector(front, 0.52).addScaledVector(side, 0.25).setY(y)), t: now }
+    }
+    return counterSpot.current.at.clone().add(new THREE.Vector3(0, 0.002 + Math.min(k, SINK_SHOWN - 1) * STACK_GAP * IN_SINK, 0))
+  }
   /** a place in the bar's frame as the first counter's (along it, across it): the kitchen's floor and all that stands on it lie square there */
   const flat = (v: THREE.Vector3): [number, number] => { const c0 = counters[0], d = v.clone().sub(c0.at); return [d.dot(c0.along), d.dot(c0.lay)] }
   /** what stands on the kitchen's floor, as rectangles in that frame, each grown by room to pass: the cook's table, the rice tub, the freezer,
@@ -3045,6 +3065,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const runObjs = useRef(new Map<number, THREE.Group>())
   /** the dirty plates in the sink, and the washing (time since the last plate came out; null while the tap's off) */
   const dirty = useRef(0)
+  /** how many of those are waiting on the counter in front of the draining basket, not in the basin (the day's first, item 82): the bottom of
+   * the dirty stack, so the basin's are washed first */
+  const onCounter = useRef(0)
+  const counterSpot = useRef<{ at: THREE.Vector3; t: number } | null>(null)
   /** each sink plate's group, the bottom one first (its smear faded as it soaks) */
   const sinkPlates = useRef<(THREE.Group | null)[]>([])
   const wash = useRef<number | null>(null)
@@ -3162,11 +3186,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (the kitchen's floor looked at again tomorrow: things may be moved about in the meantime; the servers' places with it)
     blocksMade.current = null
     clearHomes.current.clear()
-    // (every plate washed and back on the racks for the next day, the racks full and the low rack by the table full besides)
-    PLATE_RACK.n = RACK_FULL
+    // (the racks full for the next day but for the day's first washing up (game/plates START_DIRTY, START_DRAIN: the owner's, item 82), the
+    // low rack by the table full besides; the dirty ones waiting on the counter by the sink)
+    PLATE_RACK.n = rackAtStart()
     LOW_RACK.n = LOW_FULL
     LOW_RACK.coming = 0
-    dirty.current = 0
+    dirty.current = START_DIRTY
+    onCounter.current = START_DIRTY
     SINK.dirt.length = 0
     wash.current = null
     SINK.washing = false
@@ -3178,7 +3204,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SEAT_STICKS.clear()
     SEAT_BONES.clear()
     Object.assign(DRYER, { n: 0, left: null, open: 0 })
-    Object.assign(DRAIN, { n: 0, left: null })
+    // (the basket with the day's first washed plates in it, dry already: taken back to the racks as any dry ones are)
+    Object.assign(DRAIN, { n: START_DRAIN, left: START_DRAIN ? 0 : null })
     SINK_BIN.sticks = 0
     platerRun.current = { phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 }
     PLATER_OUT.id = null
@@ -5179,6 +5206,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
     }
     SINK.dirty = dirty.current
+    // (the counter's stack only ever the bottom of the dirty plates: those washed off the top come from the basin first, then from it)
+    if (onCounter.current > dirty.current) onCounter.current = dirty.current
     // (the sink's plates, each as dirty as it came: as many as there are (any come by another way counted dirty as the first dish leaves one;
     // those washed off the top gone); under water each comes clean a little at a time, the top one under the running tap the faster, and
     // rinsed by it with no water standing (game/plates' soakStep); their smears faded with it)
@@ -5189,7 +5218,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const standing = SINK.water > 0.12, running = SINK.tap || SINK.washing
       for (let i = 0; i < D.length; i++) {
         const top = i === D.length - 1
-        D[i] = soakStep(D[i], step, standing || (top && running), top && running)
+        // (those waiting on the counter (item 82) out of the water: they don't soak)
+        if (i >= onCounter.current) D[i] = soakStep(D[i], step, standing || (top && running), top && running)
         const smear = sinkPlates.current[i]?.getObjectByName('plate-smear') as THREE.Mesh | undefined
         if (smear) { (smear.material as THREE.MeshBasicMaterial).opacity = smearOpacity(D[i]); smear.visible = D[i] > CLEAN_AT }
       }
