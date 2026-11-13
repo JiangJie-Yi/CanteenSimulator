@@ -1250,6 +1250,56 @@ function PrepCounter() {
     </group>
   )
 }
+/**
+ * The sake stand on the cook table (blender/sakestand.py, item 73, the owner's: "a sake stand in the red box, a few bottles of sake on it"):
+ * a two-stepped hinoki stand with three 1.8-litre bottles up at the back and two 720 ml ones at the front, on the table's wood between the
+ * lantern and the coal crate, its front to the bar. Low-poly, all in its pictures: the bottles' glass shiny with the studio's reflection
+ * (standard, not toon: glass that didn't shine read as painted wood), the stand toon; the hang tag a card drawn both sides.
+ */
+const SAKESTAND_URL = import.meta.env.BASE_URL + 'models/sakestand.glb'
+useGLTF.preload(SAKESTAND_URL)
+/** where it stands on the cook table (the scene's frame: the strip between the lantern and the crate, half way, as far from the bar's lip
+ * as from the hearth's frame (measured, item 73)), its turn (along that strip, its front to the bar) and its size (a 1.8 l bottle as tall as
+ * the lantern's shade: the room's things are drawn larger than life) */
+// (Decor's frame is the world's moved by (0.53, -0.38): the strip's middle measured at (-0.35, -1.79) in the world)
+const SAKESTAND_AT: [number, number, number] = [-0.88, 0, -1.41]
+const SAKESTAND_TURN = 3.75
+const SAKESTAND_SCALE = 2.0
+function SakeStand() {
+  useStudio()
+  const gltf = useGLTF(SAKESTAND_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('SakeStand') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        if (/SakeBottles/.test(src.name)) {
+          const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, roughness: 0.22, metalness: 0.05, envMapIntensity: 0.9, side: THREE.DoubleSide })
+          reflectStudio(g)
+          t = g
+        } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        made.set(src, t)
+      }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.0012, weld: true })
+    mergeByMaterial(r)
+    return r
+  }, [gltf])
+  return (
+    <group position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '店裡的日本酒：雪嶺錦、朝霞川、鶴汀、月汀桜')}>
+      <primitive object={obj} />
+    </group>
+  )
+}
+
 function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternAt: [number, number, number]; fanAt: [number, number, number] }) {
   return (
     <>
@@ -1258,6 +1308,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <HeldStick held={held} />
       <HeldRod held={held} />
       <Movable id="lantern" label="行燈" baseTurn={[0, -12, 0]}><Lantern at={lanternAt} /></Movable>
+      <Movable id="sakestand" label="酒台"><SakeStand /></Movable>
       <Movable id="warmer" label="料理台（保溫座）"><Warmer /></Movable>
       <Movable id="prepcounter" label="料理台（飯糰）"><PrepCounter /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>

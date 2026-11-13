@@ -186,7 +186,7 @@ export const EDIT_TEXT = {
 const PIECES_JA: Record<string, string> = {
   小判金幣: '小判', 頭盔木台: '兜の飾り台', 頭盔與木台: '兜と飾り台', 候位長凳: '待合ベンチ', '候位長凳（二）': '待合ベンチ（二）',
   木台階: '踏み台', 三廚木台階: '三番手の踏み台',
-  刀具組: '包丁セット', 切魚砧板: '魚をさばくまな板',
+  刀具組: '包丁セット', 切魚砧板: '魚をさばくまな板', 酒台: '酒の飾り台',
   備長炭籃: '備長炭のかご', 團扇: 'うちわ', 行燈: '行灯', 飯桶: '飯びつ', 味噌湯鍋: '味噌汁の鍋', 冷藏櫃: '冷蔵庫', 碗盤櫃架: '食器棚', '碗盤架 1': '食器ラック 1', '碗盤架 2': '食器ラック 2', 矮碗盤架: '低い食器ラック', '三方（橘子）': '三方（みかん）', '三方（糯米糰子）': '三方（団子）', 大砧板: '大まな板', 流理台: '流し台', 常溫蔬菜: '常温の野菜',
   調味架: '調味料の棚', 水桶: '水桶', 竹簍: '竹ざる', 試吃碗: '味見の椀', 廚餘桶: '生ごみ入れ', 飯糰小碟: 'おにぎりの小皿', 櫃檯尾閘門門板: 'カウンター端の扉', 水槽旁閘門門板: '流し横の扉', 供桌: '供え台', 神龕: '神棚',
   '神前廊燈（左）': '神前の廊灯（左）', '神前廊燈（右）': '神前の廊灯（右）',
@@ -204,7 +204,7 @@ const PIECES_JA: Record<string, string> = {
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
 const PIECES_EN: Record<string, string> = {
-  小判金幣: 'Koban coin', 頭盔木台: 'Helmet stand', 頭盔與木台: 'Helmet and stand (group)', 候位長凳: 'Waiting bench', '候位長凳（二）': 'Waiting bench (2)', 刀具組: 'Knife rack', 切魚砧板: 'Fish board', 櫃檯尾閘門門板: 'Till-end gate', 水槽旁閘門門板: 'Sink-side gate',
+  小判金幣: 'Koban coin', 頭盔木台: 'Helmet stand', 頭盔與木台: 'Helmet and stand (group)', 候位長凳: 'Waiting bench', '候位長凳（二）': 'Waiting bench (2)', 刀具組: 'Knife rack', 切魚砧板: 'Fish board', 酒台: 'Sake stand', 櫃檯尾閘門門板: 'Till-end gate', 水槽旁閘門門板: 'Sink-side gate',
   神龕旁花瓶與杯: 'Shrine vases and cups', 供桌上的供品: 'Offerings on the altar', 結帳牌: 'Pay sign', 逃生出口燈: 'Exit sign',
   收銀高腳凳: 'Cashier stool (high)', 收銀矮凳: 'Cashier stool (low)', 餐盤堆: 'Plate stack', '攝影機 1（研製視角）': 'Camera 1 (cooking view)',
   備長炭籃: 'Charcoal crate', 團扇: 'Fan', 行燈: 'Paper lantern', 飯桶: 'Rice tub', 味噌湯鍋: 'Miso soup pot', 冷藏櫃: 'Fridge', 碗盤櫃架: 'Dish rack', '碗盤架 1': 'Dish rack 1', '碗盤架 2': 'Dish rack 2', 矮碗盤架: 'Low dish rack', '三方（橘子）': 'Offering stand (oranges)', '三方（糯米糰子）': 'Offering stand (rice dumplings)', 大砧板: 'Cutting board', 流理台: 'Sink', 常溫蔬菜: 'Room-temp vegetables',

@@ -48,6 +48,21 @@ FRONT_U = 0.75                # (where round the picture its front is (toward -y
 PROFILE = ((0.0, 0.93), (0.05, 0.975), (0.35, 1.0), (0.7, 1.0), (0.92, 0.975), (1.0, 0.9))
 
 
+def r_at(t):
+    """the body's radius at a share t of its height (at its vertices)"""
+    for (t0, r0), (t1, r1) in zip(PROFILE, PROFILE[1:]):
+        if t <= t1:
+            return R * (r0 + (r1 - r0) * (t - t0) / (t1 - t0))
+    return R * PROFILE[-1][1]
+
+
+# (the ropes, modelled (item 72): a thin one round near the head and the foot (as a share of HT up it), pairs of thick ones up the sides and
+# the back (as u round it), clear of the print; the lid's ring (as a share of its radius); their radii)
+BAND_T, BAND_R = (0.08, 0.83), 0.007
+CORD_U, CORD_R = tuple(FRONT_U + q + d for q in (0.25, 0.5, 0.75) for d in (-0.012, 0.012)), 0.0085
+RING_F, RING_R = 0.72, 0.011
+
+
 def cdist(du):
     """a distance round the barrel in u, the short way"""
     return np.abs(((du + 0.5) % 1.0) - 0.5)
@@ -180,7 +195,7 @@ class Print:
             y0, y1, x0, x1 = max(0, ys.min() - pad), ys.max() + pad, max(0, xs.min() - pad), xs.max() + pad
             sub = m[y0:y1, x0:x1]
             out = sub.copy()
-            rx, ry = int(size * PPM_X * SS * 0.045), int(size * PPM_Y * SS * 0.03)
+            rx, ry = int(size * PPM_X * SS * 0.022), int(size * PPM_Y * SS * 0.014)
             for dy in range(-ry, ry + 1):
                 for dx in range(-rx, rx + 1):
                     if (dx / max(rx, 1)) ** 2 + (dy / max(ry, 1)) ** 2 <= 1:
@@ -270,31 +285,30 @@ def design(k):
     pr = Print()
     pr.text("登録商標", -0.07, HT * 0.9, 0.024, RED, vertical=False, gap=1.6)
     if k == 0:
-        # (the shop's own: 聞野 big and brushed, a chrysanthemum either side, its grade in red at the left, its seal at the right)
-        pr.text("聞野", 0.0, HT * 0.64, 0.12, INK, brush=True, gap=1.02)
+        # (霧ノ松 big and brushed, a chrysanthemum either side, its grade in red at the left, its maker's seal at the right)
+        pr.text("霧ノ松", 0.0, HT * 0.7, 0.085, INK, brush=True, gap=1.0)
         chrysanthemum(pr, -0.13, HT * 0.62, 0.034, stem_to=HT * 0.2)
         chrysanthemum(pr, 0.13, HT * 0.62, 0.034, stem_to=HT * 0.2)
         pr.text("特撰清酒", -0.205, HT * 0.7, 0.02, RED)
-        seal(pr, 0.205, HT * 0.32, 0.024, "聞野酒造")
-        pr.text("キキノ", -0.028, HT * 0.13, 0.022, RED, vertical=False, gap=1.1)
+        seal(pr, 0.205, HT * 0.32, 0.024, "霧松酒造")
+        pr.text("キリノマツ", -0.044, HT * 0.13, 0.02, RED, vertical=False, gap=1.1)
     elif k == 1:
-        # (福壽 in a ruled frame under a pine's crown, its grade either side in ink, a seal low at the right)
+        # (瑞雲錦 in a ruled frame under a pine's crown, its grade either side in ink, a seal low at the right)
         pine(pr, 0.0, HT * 0.73, 0.24)
         pr.shape(lambda x, y: (((np.abs(np.abs(x) - 0.095) < 0.0025) & (y > HT * 0.12) & (y < HT * 0.63))
                                | (((np.abs(y - HT * 0.63) < 0.0025) | (np.abs(y - HT * 0.12) < 0.0025)) & (np.abs(x) < 0.0975))), INK)
-        pr.text("福", 0.0, HT * 0.5, 0.09, INK, brush=True)
-        pr.text("壽", 0.0, HT * 0.26, 0.09, INK, brush=True)
+        pr.text("瑞雲錦", 0.0, HT * 0.53, 0.066, INK, brush=True, gap=0.98)
         pr.text("本醸造", -0.15, HT * 0.62, 0.022, INK)
         pr.text("生一本", 0.15, HT * 0.62, 0.022, INK)
-        seal(pr, 0.15, HT * 0.2, 0.02, "福壽")
+        seal(pr, 0.15, HT * 0.2, 0.02, "瑞雲")
     else:
-        # (玉泉 big and brushed down the middle, its maker in red down the left in a ring, its grade at the right, a seal under it)
-        pr.text("玉泉", 0.01, HT * 0.65, 0.125, INK, brush=True)
+        # (八雲泉 big and brushed down the middle, its maker in red down the left in a ring, its grade at the right, a seal under it)
+        pr.text("八雲泉", 0.01, HT * 0.72, 0.088, INK, brush=True)
         pr.text("吟醸", -0.12, HT * 0.68, 0.026, RED)
         pr.text("酒造", -0.155, HT * 0.68, 0.026, RED)
-        seal(pr, -0.137, HT * 0.3, 0.03, "玉泉")
+        seal(pr, -0.137, HT * 0.3, 0.03, "八雲")
         pr.text("御酒", 0.15, HT * 0.68, 0.026, RED)
-        seal(pr, 0.15, HT * 0.3, 0.02, "玉泉")
+        seal(pr, 0.15, HT * 0.3, 0.02, "雲泉")
     return pr
 
 
@@ -303,11 +317,11 @@ for k in range(3):
     u, v, col, height, weave = straw_row(k)
     design(k).onto(col, weave, 0.92 - 0.2 * smooth(0.5, 0.8, fbm(SW, 8, 8, 3)[:RH, :]))
     # (the cords: a thin one round near the head and near the foot; pairs of thick ones up the sides and the back, clear of the print)
-    for vb in (0.08, 0.83):
-        cord(np.abs(v - vb) * RH, u * SW, 0.007 * PPM_Y, col, height)
-    for uc in (FRONT_U + 0.25, FRONT_U + 0.5, FRONT_U + 0.75):
-        for du in (-0.012, 0.012):
-            cord(cdist(u - (uc + du)) * SW, v * RH, 0.009 * PPM_X, col, height)
+    for vb in BAND_T:
+        col *= (1 - 0.45 * smooth(1.9, 0.6, np.abs(v - vb) * RH / (BAND_R * PPM_Y)))[..., None]
+    for uc in CORD_U:
+        on = (v > BAND_T[0]) & (v < BAND_T[1])
+        col[on] *= (1 - 0.45 * smooth(1.9, 0.6, cdist(u - uc) * SW / (CORD_R * PPM_X)))[on][:, None]
     # (weathered: grubby toward the foot and at the rim, stains, the whole a little uneven)
     g = fbm(SW, 6, 3, 4)[:RH, :]
     col = mix(col, (0.55, 0.52, 0.42), np.clip(smooth(0.2, 0.0, v) * 0.4 + smooth(0.9, 1.0, v) * 0.25, 0, 1))
@@ -332,13 +346,18 @@ lcol = lcol * (0.84 + 0.16 * np.abs(np.sin(la * 80)))[..., None]
 lcol = lcol * (0.72 + 0.28 * smooth(0.0, 0.55, lr))[..., None]
 lcol = mix(lcol, (0.5, 0.47, 0.38), smooth(0.6, 0.85, fbm(LN, 5, 5, 3)) * 0.4)
 lht = (np.abs(np.sin(la * 80)) * 0.2).astype(np.float32)
-cord(np.abs(lr - 0.72) * LN / 2, la * LN / 2 * 0.72, 0.012 / R * LN / 2, lcol, lht)
-kx, ky = 0.0, -0.72
-for cx_, cy_, rr in ((kx, ky, 0.08), (kx - 0.11, ky + 0.04, 0.05), (kx + 0.11, ky + 0.04, 0.05)):
-    dd = np.sqrt((lx - cx_) ** 2 + (ly - cy_) ** 2)
-    cord(np.abs(dd - rr * 0.55) * LN / 2, np.arctan2(ly - cy_, lx - cx_) * 60, rr * 0.45 * LN / 2, lcol, lht)
-lid_col = np.clip(lcol, 0, 1).astype(np.float32)
-lid_nrm = to_normal(lht, 2.5).astype(np.float32)
+lcol *= (1 - 0.45 * smooth(1.9, 0.6, np.abs(lr - RING_F) * R / RING_R))[..., None]
+# (the strip of rope: straw twisted in three strands, lit across it, its heights for the normal map; four twists along it, so it tiles)
+RS = 128
+ra, rx_ = np.meshgrid((np.arange(RS) + 0.5) / RS, (np.arange(LN) + 0.5) / LN, indexing="ij")
+acr = np.abs(ra - 0.5) * 2
+tw = np.sin(2 * math.pi * (rx_ * 12 + ra * 1.6))
+rcol = mix((0.6, 0.57, 0.48), (0.92, 0.9, 0.82), smooth(-0.6, 0.9, tw)) * (0.62 + 0.38 * np.sqrt(np.clip(1 - acr ** 2, 0, 1)))[..., None]
+rcol *= (0.92 + 0.08 * np.sin(rx_ * 900 + ra * 30))[..., None]
+rht = (0.6 * np.sqrt(np.clip(1 - acr ** 2, 0, 1)) + 0.25 * tw).astype(np.float32)
+lid_col = np.clip(np.concatenate([lcol, rcol], 0), 0, 1).astype(np.float32)
+lid_nrm = to_normal(np.concatenate([lht, rht], 0), 2.5).astype(np.float32)
+LID_V = LN / (LN + RS)          # (the lid's circle is the picture's lower part up to here; the rope's strip above)
 
 # =====================================================================
 # The cards' picture, cut out by its alpha: the straw ends frayed over a rim (the top quarter, the rim along its top) and a cord's end with
@@ -434,7 +453,43 @@ def barrel(at, turn, k):
     for f in faces:
         for l in f.loops:
             co = l.vert.co
-            l[uvl].uv = (0.5 + co.x / rt * 0.5, 0.5 + co.y / rt * 0.5)
+            l[uvl].uv = (0.5 + co.x / rt * 0.5, (0.5 + co.y / rt * 0.5) * LID_V)
+    def rope(pts, ups, r, closed):
+        """a half-round rope through `pts`, its round side toward `ups` (the surface's normal at each), radius r"""
+        m_ = len(pts)
+        rows = []
+        for i in range(m_):
+            a, b = pts[i - 1] if (closed or i) else pts[i], pts[(i + 1) % m_] if (closed or i < m_ - 1) else pts[i]
+            t_ = (b - a).normalized()
+            up = ups[i].normalized()
+            side = t_.cross(up).normalized()
+            up = side.cross(t_).normalized()
+            rows.append([bm.verts.new(pts[i] + (side * math.cos(q) + up * math.sin(q)) * r) for q in (math.radians(10), math.radians(62), math.radians(118), math.radians(170))])
+        run = [0.0]
+        for i in range(1, m_ + (1 if closed else 0)):
+            run.append(run[-1] + (pts[i % m_] - pts[i - 1]).length)
+        for i in range(m_ if closed else m_ - 1):
+            j = (i + 1) % m_
+            for q in range(3):
+                f = bm.faces.new((rows[i][q], rows[j][q], rows[j][q + 1], rows[i][q + 1]))
+                ua, ub = run[i] / (r * 30), run[i + 1] / (r * 30)
+                for l, (uq, aq) in zip(f.loops, ((ua, q), (ub, q), (ub, q + 1), (ua, q + 1))):
+                    l[uvl].uv = (uq, LID_V + (1 - LID_V) * (0.04 + 0.92 * aq / 3))
+    ang = [2 * math.pi * i / NA for i in range(NA)]
+    # (the bands round the body at its vertices' angles, the lid's ring)
+    for tb in BAND_T:
+        rr = r_at(tb)
+        rope([Vector((math.cos(a) * rr, math.sin(a) * rr, tb * HT)) for a in ang], [Vector((math.cos(a), math.sin(a), 0)) for a in ang], BAND_R, True)
+    rz = HT + 0.016 + (0.012 - 0.016) * (0.82 - RING_F) / 0.32
+    rope([Vector((math.cos(a) * rt * RING_F, math.sin(a) * rt * RING_F, rz)) for a in ang], [Vector((0, 0, 1))] * NA, RING_R, True)
+    # (the cords up the sides, from band to band, over the body's bulge, and over the rim's roll onto the lid toward its ring)
+    for uc in CORD_U:
+        a = 2 * math.pi * uc
+        cs, sn = math.cos(a), math.sin(a)
+        ts = (BAND_T[0], 0.35, 0.7, 0.92, 1.0)
+        pts = [Vector((cs * r_at(t), sn * r_at(t), t * HT)) for t in ts] + [Vector((cs * rt * 0.86, sn * rt * 0.86, HT + 0.016))]
+        ups = [Vector((cs, sn, 0))] * 3 + [Vector((cs, sn, 0.6)), Vector((cs, sn, 1.5)), Vector((0, 0, 1))]
+        rope(pts, ups, CORD_R, False)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     fin(mesh_obj(f"KomoLid{k}", bm), M["lid"])
     # (the cards: the straw ends frayed over the rim, sixteen leaning out and down round it; the cord's two ends down its side by the side
