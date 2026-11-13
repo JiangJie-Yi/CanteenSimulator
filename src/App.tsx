@@ -20,7 +20,7 @@ import { Brand } from '@/ui/Brand'
 import { Dish } from '@/scene/Dish'
 import { DishSwitcher } from '@/ui/DishSwitcher'
 import { Fire } from '@/shops/grill/Fire'
-import { FireControl } from '@/shops/grill/FireControl'
+import { FireControl, setFireGauge } from '@/shops/grill/FireControl'
 import { Fullness } from '@/ui/Fullness'
 import { bestOf, Notebook } from '@/ui/Notebook'
 import { findItem, MENU_MAX, MENU_MIN, partEn, partName, recipeKey, SEASON_NAME, signature, type Entry, type Seasoning } from '@/data/recipes'
@@ -29,7 +29,7 @@ import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
-import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
+import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
 import { MoodFace } from '@/ui/MoodFace'
 import { GuestCounter } from '@/ui/GuestCounter'
@@ -412,8 +412,10 @@ type SceneProps = {
   /** the part of the day (the room's light: its key light, its sky's colours) */
   sky: Sky
   reducedMotion: boolean
-  /** 0..1 charcoal fire strength for the grill */
+  /** 0..1 the charcoal on the grill's bed (what's put on, burning down) */
   fire: RefObject<number>
+  /** 0..1 the fire's heat, rising to the bed as fresh charcoal catches: what the food's cooked by */
+  heat: RefObject<number>
   /** the stage's box inside the full-window canvas: the dish is framed in it */
   frame: Frame
   onOffFire: (count: number, loose: number) => void
@@ -599,7 +601,7 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
  * the GPU process died); never drawn finer than the screen either */
 const DPR_MAX = 1.25
 const HOLD_POSE = { next: false }
-function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -1082,7 +1084,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, frame, 
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}
-                  active={i === active} instant={reducedMotion} fire={fire} onOffFire={onOffFire} onEat={onEat}
+                  active={i === active} instant={reducedMotion} fire={fire} heat={heat} onOffFire={onOffFire} onEat={onEat}
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} research={research} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed} onDrink={onDrink}
                   crew={crewOf(dish.id)} bar={!phone}
@@ -2158,22 +2160,28 @@ export default function App() {
   // charcoal grill: burns down by itself at about the pace of real binchotan on a grill (a full bed lasts about an
   // hour and a half; a handful of fresh charcoal, 添炭, about a quarter of an hour more)
   // the charcoal isn't lit to begin with: add charcoal to start the fire
+  // (`fire`: what's on the bed, 0..1 (fanned, up to 1.2): charcoal put on goes straight on it, it burns down, it's doused; `heat`: the fire's
+  // heat, rising toward it as fresh charcoal catches (game/economy's heatStep), what the food's cooked by, the gauge shows, the coals glow by)
   const fire = useRef(0)
-  const [fireLevel, setFireLevel] = useState(0)
+  const heat = useRef(0)
   // each table has its own fire: the player's test fire and the shop's
   const fireBy = useRef<Record<string, number>>({})
+  const heatBy = useRef<Record<string, number>>({})
   const lastSpace = useRef(space)
   useLayoutEffect(() => {
     if (lastSpace.current === space) return
     fireBy.current[lastSpace.current] = fire.current
+    heatBy.current[lastSpace.current] = heat.current
     fire.current = fireBy.current[space] ?? 0
-    setFireLevel(Math.round(fire.current * 100))
+    heat.current = heatBy.current[space] ?? 0
+    setFireGauge(heat.current, fire.current)
     lastSpace.current = space
   }, [space])
   useEffect(() => {
     const id = window.setInterval(() => {
       fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK * GAME_SPEED.value)
-      setFireLevel(Math.round(fire.current * 100))
+      heat.current = heatStep(heat.current, fire.current, 0.2 * GAME_SPEED.value)
+      setFireGauge(heat.current, fire.current)
     }, 200)
     return () => window.clearInterval(id)
   }, [])
@@ -2192,7 +2200,7 @@ export default function App() {
     }
     const { boost } = coalCharge(sticks ?? STICKS_PER_PORTION, byHand)
     fire.current = afterCharcoal(fire.current, boost)
-    setFireLevel(Math.round(fire.current * 100))
+    setFireGauge(heat.current, fire.current)
     return true
   }
   const dish = DISHES[active]
@@ -2914,7 +2922,7 @@ export default function App() {
           {!NO_SCENE && <Spills />}
           <FpsMeter />
           {!NO_SCENE && <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
-            fire={fire} frame={frame} onOffFire={sceneOffFire}
+            fire={fire} heat={heat} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
             resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
@@ -2928,7 +2936,7 @@ export default function App() {
       <div className="stage" ref={stageRef}>
         {flatGrill && !PHONE_2D_OPEN && <PhoneClosed lang={lang} />}
         {flatGrill && PHONE_2D_OPEN && dish.roast && (
-          <Grill2D roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])} active fire={fire}
+          <Grill2D roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])} active fire={fire} heat={heat}
             onOffFire={sceneOffFire} onEat={onEat} onNotice={sceneNotice} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal}
             onSay={talk} chef={chefOf(dish.id)} onGuests={(g) => setShopGuests(dish.id, g)}
             crowd={(staffOf(dish.id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed} onDrink={onDrink}
@@ -2945,7 +2953,7 @@ export default function App() {
         {!editOn && <Reputation open={showRating} lang={lang} rating={shopRating} visits={shopVisits} today={clockDay} cash={cash} onBuy={onBuyReviews} onClose={closeRating} />}
         {/* (the fire is the grill's own (research, at the grill's view); how full is the owner's own, on his view: the rest of the time they're
             out of the way, and the buttons under them move up into the room left) */}
-        {showFire && <FireControl level={fireLevel} onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
+        {showFire && <FireControl onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
         {showFull && <Fullness kcal={kcal} full={FULL_KCAL} lang={lang} rating={rating.n ? rating.sum / rating.n : null} lastTry={lastTry} />}
         {/* (on a wide screen 經營 and 自動營運 are round buttons in the row top right, and the cash stands on its own here, where 經營 was:
             a click on it opens the books) */}

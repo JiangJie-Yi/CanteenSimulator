@@ -66,6 +66,8 @@ export type Grill2DProps = {
   quantities: Record<string, number>
   active: boolean
   fire?: RefObject<number>
+  /** the fire's heat, rising to the bed as fresh charcoal catches (App's) */
+  heat?: RefObject<number>
   onOffFire?: (count: number, loose: number) => void
   onEat?: (id: string, taste: number, how?: { doneness?: number; dabs?: Record<string, number>; steps?: Step[] }) => void
   notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
@@ -90,7 +92,7 @@ export type Grill2DProps = {
   top?: React.ReactNode
 }
 
-export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, onEat, notes = {}, onNotice, ai = false, research = false, onOrder,
+export function Grill2D({ roast, itemIds, quantities, active, fire, heat, onOffFire, onEat, notes = {}, onNotice, ai = false, research = false, onOrder,
   onAddCharcoal, onSay, space = 'closed', lang = 'zh', names = {}, onWalkOut, entries,
   onOrderEntry, crowd = 1, blessed = false, onDrink, chef = CHEFS[1], onGuests, top }: Grill2DProps) {
   const L = () => LINES[lang]
@@ -446,7 +448,7 @@ export function Grill2D({ roast, itemIds, quantities, active, fire, onOffFire, o
 
   // ---- drawing (the pictures are in Grill2DArt)
   const list = pieces().filter((p) => present(p) && !p.eaten)
-  const fireLv = fire?.current ?? 0.55
+  const fireLv = (heat ?? fire)?.current ?? 0.55
   const ring = list.filter((p) => p.onFire && !p.collected && !p.net && !p.loose)
   const ash = list.filter((p) => p.onFire && !p.collected && p.loose && !p.net)
   const net = list.filter((p) => p.onFire && !p.collected && p.net)

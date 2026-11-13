@@ -3959,8 +3959,10 @@ type RoastingProps = {
   /** only the dish on stage roasts and shows its tags */
   active: boolean
   instant?: boolean
-  /** 0..1 how fierce the charcoal is, read every frame: food roasts faster on a hotter fire */
+  /** 0..1 the charcoal on the bed, read every frame (what's put on goes straight on it; it burns down, is fanned up, doused) */
   fire?: RefObject<number>
+  /** 0..1 the fire's heat, rising to the bed as fresh charcoal catches (App's): food roasts faster on a hotter fire */
+  heat?: RefObject<number>
   /** told how many pieces are off the fire (on a plate, in a pile or eaten), for the fire's capacity limit */
   onOffFire?: (count: number, loose: number) => void
   /** a piece has been eaten up (for 飽足) */
@@ -4030,7 +4032,7 @@ const OPENINGS = { n: 0 }
 /** a session of trade, on the shop's clock (runGuests counts 0.8 a beat): what the day's pattern is laid over */
 const SESSION_LEN = 420
 
-export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, onOffFire, onEat,
+export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, heat, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, research = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
   locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, onVisit, lang = 'zh', names = {}, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {
@@ -4267,6 +4269,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
 
   const present = (p: Piece) => !menuIds.has(p.id) || p.copy < (quantities[p.id] ?? 0)
+  /** the fire's heat now (what's cooked by, heard, glowing, too hot): App's, rising as fresh charcoal catches; with none given, the bed's */
+  const heatOf = () => (heat ?? fire)?.current ?? 0.55
 
   /**
    * 美味 (0..100): how good it is to eat right now. Doneness first — raw is poor, done is best (a touch past done
@@ -5390,7 +5394,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (!tend && FIRE_TEND.want) FIRE_TEND.want = null
     // (what to do about the fire: game/fireTend's call; how long it's run too hot, how long since it asked for charcoal)
     const nowS = performance.now() / 1000
-    if (fire && fire.current > HOT_AT) { if (hotSince.current === null) hotSince.current = nowS }
+    if (fire && heatOf() > HOT_AT) { if (hotSince.current === null) hotSince.current = nowS }
     else hotSince.current = null
     const call = fire ? fireCall({ fire: fire.current, tender: tend, want: FIRE_TEND.want, hotFor: hotSince.current === null ? 0 : nowS - hotSince.current,
       askedFor: FIRE_TEND.want === 'coal' ? nowS - coalAsked.current : 0 }) : 'none'
@@ -6792,7 +6796,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // burns down the coals are used up and slowly turn to pale grey ash (fresh charcoal brings the black back)
   const embers = useRef<{ mat: THREE.MeshToonMaterial; base: number; color: THREE.Color }[] | null>(null)
   // (starts at the fire's own level, so a cold pit is ash from the first frame, not charcoal easing down to it)
-  const fuel = useRef(fire?.current ?? 0.55)
+  const fuel = useRef((heat ?? fire)?.current ?? 0.55)
 
   useFrame(({ clock: clk, camera: frameCam }, delta) => {
     const clock = clk.elapsedTime
@@ -6949,7 +6953,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         root.userData.shadowsFixed = true
       }
     }
-    const target = fire?.current ?? 0.55
+    const target = heatOf()
     // (the fire's sound: its crackle by how hot, its sizzle by what's over it; loud with the camera near the fire, faint across the room)
     if (active) {
       const over = pieces.current.filter((p) => present(p) && !p.collected && !p.staged && !p.carried).length
@@ -6988,6 +6992,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (fan.pending > 0 && fire) {
       const rise = Math.min(fan.pending, dt * FAN_RISE, Math.max(0, FIRE_FANNED_MAX - fire.current))
       fire.current += rise
+      // (fanned, the bed's coals flare at once: the heat with it, not catching like fresh charcoal)
+      if (heat) heat.current += rise
       fan.extra += rise
       fan.pending -= rise
       if (rise <= 0) fan.pending = 0
@@ -7438,7 +7444,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         if (p.fresh) { p.node.position.copy(at); p.fresh = false } else p.node.position.lerp(at, Math.min(1, dt * 10))
       } else if (!p.collected) {
-        if (active && !waiting(p) && !p.carried && p.homeFlight >= 1) p.progress += dt * roastRate(fire?.current ?? 0.55)
+        if (active && !waiting(p) && !p.carried && p.homeFlight >= 1) p.progress += dt * roastRate(heatOf())
         p.node.quaternion.copy(p.homeQ)
         p.node.position.x = p.homeP.x
         p.node.position.z = p.homeP.z
@@ -7821,9 +7827,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // food left to burn sends up thick black smoke
         b += THREE.MathUtils.smoothstep(r, 2.0, 2.8) * 0.45
       }
-      const heat = Math.min(1, (fire?.current ?? 0.55) * 1.5)
-      smoke.current += (Math.min(1, s) * heat - smoke.current) * Math.min(1, dt * 0.8)
-      if (blackSmoke) blackSmoke.current += (Math.min(1, b) * heat - blackSmoke.current) * Math.min(1, dt * 0.6)
+      const glow = Math.min(1, heatOf() * 1.5)
+      smoke.current += (Math.min(1, s) * glow - smoke.current) * Math.min(1, dt * 0.8)
+      if (blackSmoke) blackSmoke.current += (Math.min(1, b) * glow - blackSmoke.current) * Math.min(1, dt * 0.6)
     }
 
     since.current += delta

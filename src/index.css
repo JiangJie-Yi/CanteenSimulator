@@ -1001,7 +1001,9 @@ button {
 .fire-meter {
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(90deg, #8a2b12, #ff7a2e var(--heat), var(--washi-shade) var(--heat));
+  /* (the heat in orange; past it, faint, the charcoal on the bed still catching that it's rising to (--bed); then the empty bar) */
+  background: linear-gradient(90deg, #8a2b12, #ff7a2e var(--heat), rgb(255 122 46 / 0.32) var(--heat), rgb(255 122 46 / 0.32) var(--bed, var(--heat)),
+    var(--washi-shade) var(--bed, var(--heat)));
 }
 /* fanned past full (up to 120%): the whole bar white-hot and glowing */
 .fire-meter.fire-over {

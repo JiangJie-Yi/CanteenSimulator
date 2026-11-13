@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { afterCharcoal, canAddCharcoal, CHARCOAL_BOOST, CHARCOAL_COST, coalCharge, STICK_BOOST, STICK_COST, STICKS_PER_PORTION } from '@/game/economy'
+import { afterCharcoal, canAddCharcoal, CHARCOAL_BOOST, CHARCOAL_COST, coalCharge, FIRE_CATCH, heatStep, STICK_BOOST, STICK_COST, STICKS_PER_PORTION } from '@/game/economy'
 
 feature('火力與加炭', () => {
   scenario('火力還沒滿時可以加炭，火力會升高', ({ given, when, then }) => {
@@ -57,5 +57,32 @@ feature('炭床滿了不會白花錢', () => {
 
   scenario('手拿一根放上去照一根的價錢', ({ then }) => {
     then('一根 = STICK_COST，火力 + STICK_BOOST', () => { expect(coalCharge(1, true)).toEqual({ cost: STICK_COST, boost: STICK_BOOST }) })
+  })
+})
+
+feature('火力像蓄水一樣慢慢升', () => {
+  scenario('冷爐加一份炭，火力不會一下跳上去', ({ given, when, then, and }) => {
+    given('爐子是冷的，火力 0', (w) => { w.heat = 0; w.bed = 0 })
+    when('加一份炭，過 1 秒', (w) => { w.bed = afterCharcoal(w.bed); w.heat = heatStep(w.heat, w.bed, 1) })
+    then('火力只升了一點點', (w) => { expect(w.heat).toBeCloseTo(FIRE_CATCH, 6) })
+    and('還沒到炭床上的量', (w) => { expect(w.heat).toBeLessThan(w.bed) })
+  })
+  scenario('等著，火力一格一格升到炭床上的量就停', ({ given, when, then }) => {
+    given('冷爐加了一份炭', (w) => { w.heat = 0; w.bed = afterCharcoal(0); w.seen = [] })
+    when('每 0.2 秒看一次，看 10 秒', (w) => { for (let k = 0; k < 50; k++) { w.heat = heatStep(w.heat, w.bed, 0.2); w.seen.push(w.heat) } })
+    then('一路往上、從不超過，最後停在炭床的量', (w) => {
+      for (let k = 1; k < w.seen.length; k++) expect(w.seen[k]).toBeGreaterThanOrEqual(w.seen[k - 1])
+      expect(Math.max(...w.seen)).toBeLessThanOrEqual(w.bed)
+      expect(w.heat).toBeCloseTo(w.bed, 6)
+    })
+  })
+  scenario('炭燒掉或被水澆熄一些，火力立刻跟著降', ({ given, when, then }) => {
+    given('火力 80%', (w) => { w.heat = 0.8 })
+    when('炭床只剩 50%', (w) => { w.heat = heatStep(w.heat, 0.5, 0.2) })
+    then('火力馬上是 50%', (w) => { expect(w.heat).toBe(0.5) })
+  })
+  scenario('兩倍速時升得快一倍', ({ when, then }) => {
+    when('同樣過 1 秒，一次照常、一次兩倍速', (w) => { w.one = heatStep(0, 1, 1); w.two = heatStep(0, 1, 2) })
+    then('兩倍速升的是兩倍', (w) => { expect(w.two).toBeCloseTo(w.one * 2, 6) })
   })
 })

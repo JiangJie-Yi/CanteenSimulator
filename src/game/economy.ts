@@ -23,6 +23,16 @@ export const canAddCharcoal = (level: number) => level < 1 - 1e-6
 export const STICK_COST = 3
 export const STICK_BOOST = 0.05
 export const afterCharcoal = (level: number, boost = CHARCOAL_BOOST) => (canAddCharcoal(level) ? Math.min(1, level + boost) : level)
+/**
+ * Fresh charcoal doesn't burn at once: put on the bed (the level above, what's on it) it catches a little at a time, and the fire's heat
+ * rises to it like water filling a tank (the owner's, 2026-11-13: "the fire should go up from 0 step by step, like filling with water: more
+ * real"; it jumped, a stick dragged on and the gauge at 30% that moment). FIRE_CATCH of the gauge a second (the shop's: twice as fast at x2):
+ * a handful on a cold pit (18%) catches in four and a half seconds, a full bed from nothing in twenty-five.
+ */
+export const FIRE_CATCH = 0.04
+/** the fire's heat `dt` seconds (the shop's) on: up toward what's on the bed (`bed`) at FIRE_CATCH a second, never past it; down with it at
+ * once as it burns away or is doused */
+export const heatStep = (heat: number, bed: number, dt: number) => (heat < bed ? Math.min(bed, heat + FIRE_CATCH * dt) : bed)
 /** how many sticks make one portion (the fire bar's button, the chef's handful) */
 export const STICKS_PER_PORTION = 6.5
 /**
