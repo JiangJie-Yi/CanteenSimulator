@@ -4657,6 +4657,8 @@ function Sutra() {
     <group position={[-0.073, 0.001, -0.371]} rotation-y={-Math.PI / 2} scale={0.85}><KamidanaModel part="sutra" /></group>
   )
 }
+/** (where the flask pours from, worked out in the cups' frame and taken into the flask's own: kept, not made each frame) */
+const POUR_AT = new THREE.Vector3(), REST_AT = new THREE.Vector3()
 function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => void } }) {
   // (the offering: one flask pours clear sake into the three cups in turn, the stream and the cups filling; then it's set back)
   const flaskRef = useRef<THREE.Group>(null)
@@ -4859,7 +4861,13 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       const hop = which > 0 ? Math.sin(Math.PI * glide) * (side(which) !== side(which - 1) ? 0.16 : 0.025) : 0
       // (held well above the cups and their stand, and arcing up as it's lifted across, so it never passes through them or the oranges)
       const arc = Math.sin(Math.PI * k) * 0.06
-      f.position.set(THREE.MathUtils.lerp(rest.x, CUP_X, k), THREE.MathUtils.lerp(rest.y, POUR_Y, k) + hop * k + arc, THREE.MathUtils.lerp(rest.z, z, k))
+      // (where it pours is the cups' frame's (the shelf's); the flask's own frame is its piece's, moved as the owner set it (item 21: X 0.0425,
+      // Z -0.15): set there as it was, it poured that far off the cups, out of sight behind the shrine, nothing in them (item 58). So taken
+      // through the world into its own frame)
+      POUR_AT.set(CUP_X, POUR_Y + hop, z)
+      if (host && f.parent) { host.updateWorldMatrix(true, false); f.parent.updateWorldMatrix(true, false); f.parent.worldToLocal(host.localToWorld(POUR_AT)) }
+      f.position.lerpVectors(REST_AT.set(rest.x, rest.y, rest.z), POUR_AT, k)
+      f.position.y += arc
       f.rotation.x = -tipSide * (k * (0.85 + 0.25 * pourK) + Math.sin(since * 9) * 0.01 * pourK)
     }
     const sh = flaskShadow.current

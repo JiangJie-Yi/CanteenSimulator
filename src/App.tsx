@@ -1391,7 +1391,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ai])
   const offerOmiki = () => {
-    if (omikiAt !== null && performance.now() - omikiAt < OMIKI_MS) return
+    // (offered already and its blessing on: said so, how long it has left (item 58: a click then did nothing at all, and read as the sake
+    // gone from the shrine))
+    if (omikiAt !== null && performance.now() - omikiAt < OMIKI_MS) {
+      const s = Math.ceil((OMIKI_MS - (performance.now() - omikiAt)) / 1000)
+      say(tl(lang, `御神酒已經供上了：加持還有 ${s} 秒`, `お神酒はお供え済みです：ご加護はあと ${s} 秒`, `The sake's offered already: its blessing has ${s} s left`))
+      return
+    }
     if (cash < OFFERING_COST) {
       say(tl(lang, '現金不足：供清酒需要 NT$1,000', 'お金が足りません：お神酒をお供えするには NT$1,000 かかります', 'Not enough cash: offering sake costs NT$1,000'))
       return
