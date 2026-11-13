@@ -24,8 +24,10 @@ PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(_
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-# (its top 0.70 up, the helmet on it reaching to about the wainscot's rail; 0.30 along the wall, 0.28 out from it)
-H, W, D, TOP_T = 0.70, 0.30, 0.28, 0.032
+# (its top 0.70 up, the helmet on it reaching to about the wainscot's rail; 0.30 along the wall, 0.20 out from it (it was 0.28: the way
+# along the wall into the side counter's aisle passes just in front of it, and everyone going by brushed its front, the staff door's panel
+# sliding open behind it keeping it off the wall: item 48))
+H, W, D, TOP_T = 0.70, 0.30, 0.20, 0.032
 LEG, SHELF_Y, SHELF_T = 0.036, 0.13, 0.02
 
 

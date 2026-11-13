@@ -3472,7 +3472,10 @@ const STAFF_SPILL_MAT = new THREE.MeshBasicMaterial({ map: STAFF_SPILL ?? undefi
  */
 const KSTAND_URL = import.meta.env.BASE_URL + 'models/kabutostand.glb'
 useGLTF.preload(KSTAND_URL)
-const KSTAND_H = 0.7, KSTAND_OFF = 0.28, KSTAND_ALONG = 0.68
+// (its back 6 mm clear of the panel slid open (out 0.065, its face 0.109 off the wall), its front 0.315 out: 0.28 deep and 0.28 out, its
+// front was 0.42 out, and all who went along the wall into the side counter's aisle (the servers to their gate, the stock keeper, the staff
+// coming in) brushed it, their middles 2 cm off it (item 48, tests/e2e/_nearpiece.mjs))
+const KSTAND_H = 0.7, KSTAND_OFF = 0.215, KSTAND_ALONG = 0.68
 function KabutoStandModel() {
   const gltf = useGLTF(KSTAND_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
