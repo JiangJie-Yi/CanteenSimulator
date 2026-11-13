@@ -13,7 +13,7 @@ import { inkModel } from '@/scene/inkHull'
 import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { Steam } from '@/scene/Steam'
-import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, HAND_EACH, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
+import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, handTime, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
 import { DRAIN, DRYER, HAND_WASH, POINTER_HINT, SINK, SINK_BIN, tipOver } from './bar'
 import { basinSays, waterTick } from '@/game/sinkWater'
 import { aimTip, setTip } from '@/scene/hoverTip'
@@ -357,7 +357,7 @@ export function SinkModel() {
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
       <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }) }}
         onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null) }}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const now = performance.now(); if (now < HAND_WASH.until || SINK.dirty <= 0) return; HAND_WASH.ask = 'wash'; HAND_WASH.until = now + HAND_EACH * 1000; window.setTimeout(() => setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }), 80) }}>
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const now = performance.now(); if (now < HAND_WASH.until || SINK.dirty <= 0) return; HAND_WASH.ask = 'wash'; HAND_WASH.until = now + handTime(SINK.dirt.at(-1) ?? 1) * 1000; window.setTimeout(() => setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }), 80) }}>
         <primitive object={root} />
       </group>
       <primitive object={pool} />

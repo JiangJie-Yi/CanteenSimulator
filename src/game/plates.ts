@@ -34,6 +34,25 @@ export const DRAIN_CAP = 30
 export const DRAIN_MIN = 10
 export const DRAIN_S = DRAIN_MIN / MINUTES_PER_SECOND
 export const HAND_EACH = 1.2
+
+/**
+ * How dirty each plate is (0 clean .. 1), the owner's (2026-11-13: "a plate soaking should come clean; one eaten off should be dirty"): a plate
+ * done with is left dirty by what was eaten off it, the more the dirtier (DIRT_BASE for the first, DIRT_EACH for each after: a smear of glaze,
+ * crumbs, a skewer's char); in the sink under water it comes clean a little at a time by itself (the dirtiest in SOAK_S of the shop's seconds),
+ * TAP_FASTER times as fast under the running tap; scrubbed by hand it takes the longer the dirtier it is (a soaked one quicker); through the
+ * washer it comes out clean, however dirty it went in.
+ */
+export const DIRT_BASE = 0.45
+export const DIRT_EACH = 0.12
+export const plateDirt = (eaten: number) => (eaten <= 0 ? 0 : Math.min(1, DIRT_BASE + DIRT_EACH * (eaten - 1)))
+export const SOAK_S = 90
+export const TAP_FASTER = 3
+/** a plate's dirt `dt` seconds on: in the water (`wet`) coming clean, the more under the running tap (`tap`); out of it, as it was */
+export const soakStep = (dirt: number, dt: number, wet: boolean, tap = false) => (wet ? Math.max(0, dirt - (dt / SOAK_S) * (tap ? TAP_FASTER : 1)) : dirt)
+/** how long a plate takes to scrub by hand (seconds): the dirtier, the longer; one soaked clean, a rinse */
+export const handTime = (dirt: number) => HAND_EACH * (0.35 + 0.65 * Math.min(1, Math.max(0, dirt)))
+/** clean enough to see none on it */
+export const CLEAN_AT = 0.03
 /** the draining basket: how many plates stand in it, and how long till they're dry (null: empty; 0: dry, to be taken to the racks) */
 export type Drain = { n: number; left: number | null }
 const NO_DRAIN: Drain = { n: 0, left: null }

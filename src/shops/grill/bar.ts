@@ -658,7 +658,9 @@ export const LOW_RACK = { n: LOW_FULL, coming: 0 }
 /** the sink: someone's washing at it, its tap's on, how many dirty plates are in it (GuestBar3D keeps them; told here for the washer's
  * label) */
 /** the sink: being washed at, its tap turned on by hand, its dirty plates; its plug in, and the water in its basin (game/sinkWater's level) */
-export const SINK = { washing: false, tap: false, dirty: 0, plug: false, water: 0 }
+/** (`dirt`: each dirty plate in the sink, how dirty (game/plates), the bottom one first: GuestBar3D keeps it, soaking them; Sink reads the
+ * top one's for how long a scrub by hand takes) */
+export const SINK = { washing: false, tap: false, dirty: 0, plug: false, water: 0, dirt: [] as number[] }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __lowRack: LOW_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */

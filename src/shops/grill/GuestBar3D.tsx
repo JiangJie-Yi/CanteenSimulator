@@ -63,7 +63,7 @@ import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
-import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, HAND_EACH, handOne, unbasket } from '@/game/plates'
+import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, plateSource, platerGoes, platesToBring, playerLoad, putBack, RACK_FULL, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
 import { kitchenPath, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
@@ -2397,7 +2397,9 @@ type PlateRun = { key: number; seat: number; guest: number; phase: 'ready' | 'se
   /** (done with) the whole fish eaten off it, their bones left on it; and the customer's emptied glass beside it, cleared with it */
   bones?: number; glass?: [number, number, number]
   /** (done with) what they drank, its bottle or can left where it stood (and a sake's cup), and how much was left in it */
-  drink?: DrinkId; level?: number }
+  drink?: DrinkId; level?: number
+  /** (done with) how dirty it's been left (game/plates' plateDirt: by how much was eaten off it) */
+  dirt?: number }
 const STACK_GAP = 0.026
 const UP_Y = new THREE.Vector3(0, 1, 0)
 /** how many used sticks the bin by the sink shows at most (a bundle standing up out of it) */
@@ -2454,6 +2456,9 @@ const PLATE_R = 0.13
 const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
   [0.3, 0.01], [0, 0.01]] as [number, number][]).map(([x, y]) => [x * PLATE_R * 2, y] as [number, number]), PLATE_R)
 const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
+/** a smear's opacity by how dirty the plate is: as dark as it ever was (0.6) from a plate of two dishes on, a plate of one a little lighter,
+ * fading smoothly to nothing as it soaks clean */
+const smearOpacity = (dirt: number) => 0.62 * Math.min(1, dirt * 1.6)
 const USED_STICK_GEO = new THREE.CylinderGeometry(0.004, 0.003, 0.18, 5)
 /** where on a done-with plate its used sticks lie, criss-cross (as many as were eaten off it, up to four drawn) */
 const STICKS_ON = [[-0.02, 0.6], [0.015, -0.4], [-0.035, 1.3], [0.03, 0.15]] as const
@@ -2491,7 +2496,7 @@ const SIPS = 4
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and the sticks left on it, of what was eaten off it,
  * thrown away with it at the sink (the owner's)); drawn again only when it gets dirty */
 const Plate = memo(PlateImpl)
-function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass, tissue, drink, level = 0 }: { dirty?: boolean; design?: number; sticks?: number; bones?: number
+function PlateImpl({ dirty = false, dirt = 1, design = 0, sticks = 1, bones = 0, glass, tissue, drink, level = 0 }: { dirty?: boolean; dirt?: number; design?: number; sticks?: number; bones?: number
   /** where what they drank was left, from the plate's middle (on the bar where it was drunk, or on the plate being cleared): its own bottle or
    * can (the owner's, 2026-11-10: a glass from nowhere stood there), as much left in it as they left, and a sake's cup by it */
   glass?: readonly [number, number, number]
@@ -2509,8 +2514,11 @@ function PlateImpl({ dirty = false, design = 0, sticks = 1, bones = 0, glass, ti
       </mesh>
       {dirty && (
         <>
-          <mesh geometry={SMEAR_GEO} position={[0.03, 0.013, -0.02]} rotation-x={-Math.PI / 2} scale={[1.2, 0.8, 1]}>
-            <meshBasicMaterial color="#8a5a32" transparent opacity={0.55} depthWrite={false} />
+          {/* (its smear, as dirty as it was left (game/plates' plateDirt): the more eaten off it, the bigger and the darker; in the sink it
+              fades as it soaks, GuestBar3D setting its opacity frame by frame) */}
+          <mesh name="plate-smear" geometry={SMEAR_GEO} position={[0.03, 0.013, -0.02]} rotation-x={-Math.PI / 2}
+            scale={[1.2 * (0.7 + 0.4 * dirt), 0.8 * (0.7 + 0.4 * dirt), 1]} visible={dirt > CLEAN_AT}>
+            <meshBasicMaterial color="#8a5a32" transparent opacity={smearOpacity(dirt)} depthWrite={false} />
           </mesh>
           {STICKS_ON.slice(0, Math.min(4, sticks)).map(([x, yaw], i) => (
             <mesh key={i} geometry={USED_STICK_GEO} position={[x, 0.018 + i * 0.006, 0.03 - i * 0.012]} rotation={[0, yaw, Math.PI / 2]}>
@@ -3023,6 +3031,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const runObjs = useRef(new Map<number, THREE.Group>())
   /** the dirty plates in the sink, and the washing (time since the last plate came out; null while the tap's off) */
   const dirty = useRef(0)
+  /** each sink plate's group, the bottom one first (its smear faded as it soaks) */
+  const sinkPlates = useRef<(THREE.Group | null)[]>([])
   const wash = useRef<number | null>(null)
   /** customers sat down waiting for a plate: the racks were bare (they're being washed) */
   const waiting = useRef<{ seat: number; guest: number }[]>([])
@@ -3061,6 +3071,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SEAT_STICKS.delete(r.seat)
     r.bones = SEAT_BONES.get(r.seat) ?? 0
     SEAT_BONES.delete(r.seat)
+    // (dirty by what was eaten off it: a skewer's stick or a fish's bones for each, at least the one dish)
+    r.dirt = plateDirt(Math.max(1, r.sticks + r.bones))
     // (where their drink stood, from the plate: the glass is left there till the plate's taken, then rides on it)
     if (shownRef.current.find((x) => x.id === r.guest)?.drink) {
       const st = seats[r.seat], c = counters[st.counter]
@@ -3141,6 +3153,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     LOW_RACK.n = LOW_FULL
     LOW_RACK.coming = 0
     dirty.current = 0
+    SINK.dirt.length = 0
     wash.current = null
     SINK.washing = false
     // (the plating place bare, the dryer empty and shut, the bin by the sink emptied, the plater at their place)
@@ -4813,6 +4826,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const keys = new Set(w.carry ?? [])
         const taken = runs.current.filter((x) => keys.has(x.key) && x.phase === 'taken')
         SINK_BIN.sticks += taken.reduce((n, x) => n + (x.sticks ?? 0), 0)
+        for (const x of taken) SINK.dirt.push(x.dirt ?? DIRT_BASE)
         runs.current = runs.current.filter((x) => !keys.has(x.key))
         dirty.current += taken.length
         w.carry = []
@@ -4824,7 +4838,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if ((w.phase === 'washGo' || w.phase === 'handGo') && servers[wi]?.id && Math.random() < 0.6) STAFF_TALK.push({ key: performance.now() + wi, id: servers[wi].id, text: LINES[lang].washSay(Math.floor(Math.random() * 3)), until: performance.now() + 2600 })
         w.phase = w.phase === 'washGo' ? 'wash' : w.phase === 'handGo' ? 'handwash' : w.phase === 'basketGo' ? 'basketTake' : 'unloadTake'
       })
-      else if (w.phase === 'handwash' && w.t >= HAND_EACH) {
+      // (the dirtier the plate on top, the longer it's scrubbed: one soaked, a rinse (game/plates' handTime))
+      else if (w.phase === 'handwash' && w.t >= handTime(SINK.dirt.at(-1) ?? 1)) {
         // (the washer busy: a plate scrubbed by hand under the running tap and stood in the draining basket beside the sink, one at a time; the
         // sink washed empty or the basket full, back to their place)
         w.t = 0
@@ -5007,6 +5022,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (r.phase === 'set' || r.phase === 'carry') PLATES_OUT.add(r.seat)
     }
     if (finished || homed) {
+      // (those come to the sink by themselves (no one on the floor), each as dirty as it was left)
+      for (const r of runs.current) if (r.t === Infinity && r.phase !== 'home') SINK.dirt.push(r.dirt ?? DIRT_BASE)
       runs.current = runs.current.filter((r) => r.t !== Infinity)
       dirty.current += finished
       redraw()
@@ -5072,6 +5089,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
     }
     SINK.dirty = dirty.current
+    // (the sink's plates, each as dirty as it came: as many as there are (any come by another way counted dirty as the first dish leaves one;
+    // those washed off the top gone); under water each comes clean a little at a time, the top one under the running tap the faster, and
+    // rinsed by it with no water standing (game/plates' soakStep); their smears faded with it)
+    {
+      const D = SINK.dirt
+      while (D.length < dirty.current) D.push(DIRT_BASE)
+      if (D.length > dirty.current) D.length = dirty.current
+      const standing = SINK.water > 0.12, running = SINK.tap || SINK.washing
+      for (let i = 0; i < D.length; i++) {
+        const top = i === D.length - 1
+        D[i] = soakStep(D[i], step, standing || (top && running), top && running)
+        const smear = sinkPlates.current[i]?.getObjectByName('plate-smear') as THREE.Mesh | undefined
+        if (smear) { (smear.material as THREE.MeshBasicMaterial).opacity = smearOpacity(D[i]); smear.visible = D[i] > CLEAN_AT }
+      }
+    }
     DRYER.open = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'unloadTake') ? 1 : 0
     SINK.washing = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'handwash' || x.phase === 'skWash') || wash.current !== null || RICE.washing
     // (every plate told over: the racks', the sink's, the washer's, the basket's, and the rest out (at the plating place, on their way, at the
@@ -5199,7 +5231,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (each seated customer's soy in the little dish at their place, a dab of grated daikon in it: drawn with the shoes, SeatBits) */}
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
       {Array.from({ length: dirty.current }, (_, i) => (
-        <group key={`d${i}`} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}><Plate dirty design={i} /></group>
+        <group key={`d${i}`} ref={(o) => { sinkPlates.current[i] = o }} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}><Plate dirty sticks={0} design={i} /></group>
       ))}
       {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
           of the shop's plates, it goes with the food) */}
@@ -5315,7 +5347,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.position.copy(r.from)
           }
         }}>
-          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} drink={r.drink} level={r.level}
+          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} dirt={r.dirt ?? 1} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} drink={r.drink} level={r.level}
             tissue={r.tissue && (r.phase === 'taken' ? TISSUE_ON : r.tissue)} />
         </group>
       ))}
