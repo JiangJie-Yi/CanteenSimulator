@@ -5014,8 +5014,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           o.rotation.y = w.look + Math.atan2(Math.sin(wipeAt.yaw - w.look), Math.cos(wipeAt.yaw - w.look)) * wipeAt.k
         }
       }
-      // (up on the kitchen's dais while they're over it)
-      if (o && KITCHEN_DROP < 0) {
+      // (up on the kitchen's dais while they're over it; not again for one on their way home: walkCommute has put them up on it (twice up, they
+      // stood a step's height over the dais as they finished up to go, and dropped to the floor as they set off: the owner's item 42))
+      if (o && KITCHEN_DROP < 0 && !w.out) {
         const d = w.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
         if (a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1]) o.position.y += -KITCHEN_DROP / scale
       }
