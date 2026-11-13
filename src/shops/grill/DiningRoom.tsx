@@ -7311,7 +7311,10 @@ const DEW = (() => {
 
 const BARRELS_URL = import.meta.env.BASE_URL + 'models/komodaru.glb'
 /** a stack of straw-wrapped sake barrels (菰樽, blender/komodaru.py: two on the floor, one on them), toon-shaded and inked, stood on the
- * floor, ~1.1 tall; `part` turns each stack its own way so two never look alike */
+ * floor, 1.13 across as it always was (item 72: the barrels squatter now, as real ones, so it's the width kept, not the height); `part`
+ * turns each stack its own way so two never look alike. Low-poly, its straw, cords and print all in its pictures: the normal map kept
+ * (the weave's rows and the cords stand proud in the light), the frayed straw over the rims and the cords' ends on cards cut out by their
+ * alpha (double-sided, no ink: a line round each card would draw its edges) */
 function SakeStack({ part }: { part: number }) {
   const gltf = useGLTF(BARRELS_URL) as unknown as { scene: THREE.Group }
   const stack = useMemo(() => {
@@ -7320,15 +7323,21 @@ function SakeStack({ part }: { part: number }) {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
-      m.material = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
-      m.castShadow = true
+      const card = /Cards/.test(m.name)
+      m.material = new THREE.MeshToonMaterial({
+        color: src.color.clone(), map: src.map ?? null, normalMap: src.normalMap ?? null,
+        ...(card ? { alphaTest: 0.5, side: THREE.DoubleSide } : {}),
+      })
+      // (the cards' picture not mipmapped: far off, its thin straws would blur into the alpha and vanish)
+      if (card && src.map) { src.map.generateMipmaps = false; src.map.minFilter = THREE.LinearFilter }
+      m.castShadow = !card
       m.receiveShadow = true
     })
-    // (no ink round the straw's frayed ends over the lids: a line round every blade drew a black zigzag along each rim)
-    inkModel(root, (m) => /Ink|Red|Label|Fringe/.test(m.name), { width: 0.0018, weld: true })
+    // (no ink round the cards (the straw frayed over the lids, the cords' ends): a line round each drew a black zigzag along each rim)
+    inkModel(root, (m) => /Cards/.test(m.name), { width: 0.0018, weld: true })
     const box = new THREE.Box3().setFromObject(root)
     const size = box.getSize(new THREE.Vector3())
-    const k = 1.1 / (size.y || 1)
+    const k = 1.13 / (size.x || 1)
     const c = box.getCenter(new THREE.Vector3())
     const out = new THREE.Group()
     root.position.set(-c.x, -box.min.y, -c.z)
@@ -7504,7 +7513,7 @@ function SakeHit({ lit }: { lit: () => THREE.Object3D | null }) {
   )
 }
 /** the stack's size (in the frame it's turned in): the box pointed at over it */
-const SAKE_HIT: [number, number, number] = [0.9, 1.1, 0.76]
+const SAKE_HIT: [number, number, number] = [0.9, 0.98, 0.76]
 /** how far along from the crates the cartons stand (the crates' own frame) */
 /** where the cartons stand by the crates (the crates' own frame): turned end on, close beside them and running out from the wall, so they
  * keep to the floor (laid along the wall they ran on past the wall's end and the floor's edge) */
