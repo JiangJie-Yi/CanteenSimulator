@@ -3714,7 +3714,12 @@ function Bouquet({ variant = 0, spray = [1, 1, 1] }: { variant?: number; spray?:
       const src = m.material as THREE.MeshStandardMaterial
       let t = mats.get(src)
       if (!t) {
-        t = src.name === 'VasePorcelain'
+        // (the flowers and leaves: pictures on crossed cards, as the willow's (item 57): double-sided, cut out by their alpha, the picture
+        // not made smaller for the distance (averaged into the gaps round them, the leaves fell under the cut-off and the vase stood bare))
+        if (src.name === 'VaseCards' && src.map) { src.map.minFilter = THREE.LinearFilter; src.map.generateMipmaps = false; src.map.needsUpdate = true }
+        t = src.name === 'VaseCards'
+          ? new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, side: THREE.DoubleSide, alphaTest: 0.5 })
+          : src.name === 'VasePorcelain'
           ? new THREE.MeshPhysicalMaterial({ map: src.map, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08 })
           : src.name === 'VaseLeaf'
             ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.DoubleSide })
@@ -3725,7 +3730,8 @@ function Bouquet({ variant = 0, spray = [1, 1, 1] }: { variant?: number; spray?:
       m.material = t
       m.castShadow = true
     })
-    inkModel(r, (m) => /Leaves|Mum|Stems|Stalk|Bud|Breath|Flower/.test(m.name), { width: 0.0008, weld: true })
+    // (the porcelain alone inked: the flowers' cards are cut out by their picture, a hull round each card drew a black square (item 57))
+    inkModel(r, (m) => /Cards|Leaves|Mum|Stems|Stalk|Bud|Breath|Flower/.test(m.name), { width: 0.0008, weld: true })
     plainColours(r)
     mergeByMaterial(r)
     // (its foot measured, the vase stood on it: at 0 here is the table's top (the owner's: the vases sat 3 mm up, and leaning, one side of
