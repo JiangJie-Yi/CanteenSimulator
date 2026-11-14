@@ -1459,9 +1459,10 @@ _lp[:, _line] = (0.42, 0.28, 0.16)
 M["lanternPaper"] = pbr("KamiLanternPaper", (1, 1, 1), tex=image("T_KamiLanternPaper", _lp), emit=(1.0, 0.75, 0.42), emit_strength=2.0, rough=0.9)
 lx_ = []
 # (its foot thinner, a slab with a low slope up to the post on it, as a stone lantern's (the owner's, 2026-11-13, item 68: "the foot a little
-# thinner, and some lines": the slope's hips the lines, toward the post's corners); it was one block 1.2 cm thick)
-lx_.append(box("KamiLanternFoot", S(0.045, 0.004, 0.045), P(0, 0.002, 0), wood(), uv=0.1))
-_slope = box("KamiLanternFootSlope", S(0.043, 0.004, 0.043), P(0, 0.006, 0), wood(), uv=0.1)
+# thinner, and some lines": the slope's hips the lines, toward the post's corners); it was one block 1.2 cm thick; then thicker again (the
+# owner's, 2026-11-14, item 86: "the lamp's foot thicker"): the slab 0.4 -> 0.8 cm, the slope 0.4 -> 0.6 cm, its lines kept)
+lx_.append(box("KamiLanternFoot", S(0.045, 0.008, 0.045), P(0, 0.004, 0), wood(), uv=0.1))
+_slope = box("KamiLanternFootSlope", S(0.043, 0.006, 0.043), P(0, 0.011, 0), wood(), uv=0.1)
 for _v in _slope.data.vertices:
     if _v.co.z > 0:
         _v.co.x *= 0.5; _v.co.y *= 0.5
