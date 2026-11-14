@@ -4,6 +4,7 @@ import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
 import { emptyKama, type Kama } from '@/game/rice'
 import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
+import { fullStand } from '@/game/sakeStand'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -832,6 +833,16 @@ export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat } = 
  * each change, for the drawing to see) */
 export const SOUP_SEATS = new Set<number>()
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __soup: SOUP })
+/**
+ * The sake stand's bottles (game/sakeStand, item 89): how full each is, and the pours asked of it (`pours` counts them; `from`, the bottle
+ * the last came from; `was`, its level before): Roasting pours one for each customer's tokkuri, a click on a bottle pours one; Decor draws
+ * the bottle lifted and tipped, and its sake going down
+ */
+export const SAKE: { levels: number[]; pours: number; from: number; was: number; served: number } = { levels: fullStand(), pours: 0, from: -1, was: 1, served: 0 }
+/** the seats with a tokkuri of sake and its cup set at them (Roasting pours it for those who ordered it; GuestBar3D draws it; `SAKE.served`
+ * counts each change, for the drawing to see) */
+export const SAKE_SEATS = new Set<number>()
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __sake: SAKE, __sakeSeats: SAKE_SEATS })
 /**
  * The fire kept by the third cook (三廚, the plater: the owner's, a robata's kitchen split three ways): the grill (Roasting) asks for charcoal
  * when the fire's low or for water when it's run too hot (`want`); the third cook, walking (GuestBar3D's platerRun), takes it from the crate

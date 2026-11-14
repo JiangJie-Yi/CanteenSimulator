@@ -41,6 +41,7 @@ import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type 
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { SHAPE_S, takeRice } from '@/game/rice'
 import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
+import { SAKE_SERVE_S, SAKE_SIDE, pour, pourFrom } from '@/game/sakeStand'
 import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
@@ -57,7 +58,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SAKE, SAKE_SEATS, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -5749,7 +5750,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     /** what someone (number `id`) orders, `want` dishes at most: off the menu as listed (each charged and its stock taken), a portion kept
      * warm in the bowl or one cleared away made again where there is (the dine-in's and the takeaway's alike) */
-    const placeOrders = (id: number, want: number) => {
+    const placeOrders = (id: number, want: number, seated = true) => {
       const orders: string[] = []
       const said: string[] = []
       for (let j = 0; j < (entries ? Math.min(want, blessed ? 3 : 2) : want); j++) {
@@ -5798,6 +5799,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (orders.length && !orders.includes('MisoSoup') && Math.random() < SOUP_SIDE && onOrder?.('MisoSoup', id, false)) {
         orders.push('MisoSoup')
         said.push(nameOf('MisoSoup'))
+      }
+      // (and some a tokkuri of sake, sat at the bar (item 89, the owner's: "it's on the menu, the customers order it"; they never did): charged
+      // and taken from the stock as any order is, poured from the stand)
+      if (seated && orders.length && Math.random() < SAKE_SIDE && onOrder?.('Sake', id, false)) {
+        orders.push('Sake')
+        said.push(nameOf('Sake'))
       }
       return { orders, said }
     }
@@ -5906,7 +5913,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       let id = guestSeq.current + 1
       while (rider && !canRide(id) && id < guestSeq.current + 400) id++
       guestSeq.current = id
-      const { orders, said } = placeOrders(id, takeoutSize(rider, Math.random()))
+      const { orders, said } = placeOrders(id, takeoutSize(rider, Math.random()), false)
       if (orders.length) {
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat: -1, takeout: true })
         // (its soup in a cup of its own, not in the box: only what's grilled is packed there)
@@ -5959,6 +5966,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       g.cleared = true
       // (their soup bowl cleared with their plate)
       if (SOUP_SEATS.delete(g.seat)) SOUP.served++
+      if (SAKE_SEATS.delete(g.seat)) SAKE.served++
       // (their visit, scored: the food, the wait for it, what put them out (the tissues, the toilet, the dark, their stomach))
       const gr = GRIPES.get(g.id) ?? new Set<Gripe>()
       if (SICK.has(g.id)) gr.add('sick')
@@ -6008,6 +6016,24 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         g.lastAte = now
         g.eaten.push(Math.max(0, SOUP_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
         g.ate.push('MisoSoup')
+        g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
+        report()
+        return
+      }
+      // (their sake: a tokkuri poured from the stand a little after they've ordered (the bottle lifted and tipped there: SAKE, Decor), set at
+      // their place with its cup)
+      if (space === 'open' && owed.includes('Sake') && now - g.since > SAKE_SERVE_S) {
+        const r = pour(SAKE.levels, pourFrom(SAKE.levels))
+        SAKE.levels = r.levels
+        SAKE.from = r.k
+        SAKE.was = r.was
+        SAKE.pours++
+        SAKE_SEATS.add(g.seat)
+        SAKE.served++
+        g.firstAte ??= now
+        g.lastAte = now
+        g.eaten.push(Math.max(0, SOUP_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
+        g.ate.push('Sake')
         g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
         report()
         return

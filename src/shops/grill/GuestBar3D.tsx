@@ -47,6 +47,7 @@ import { wareGeometry } from './ware'
 import { designOf, wareDesign } from './wareDesigns'
 import { HAND_MS } from './Restroom'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps, SakeCup, cupped } from './DiningRoom'
+import { Tokkuri } from './Tokkuri'
 import { Koban } from './Koban'
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
@@ -77,7 +78,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -3158,6 +3159,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SOUP.left = 0
     SOUP_SEATS.clear()
     SOUP.served++
+    SAKE_SEATS.clear()
+    SAKE.served++
   }, [open])
   /** each shown guest's name tag, faded with them as they go out of the door */
   const labels = useRef(new Map<number, HTMLElement>())
@@ -5280,6 +5283,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]).setY(top + 0.002)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [soupVer, seats, counters, top])
+  // (the tokkuri of sake and its cup set at their places (bar.ts's SAKE_SEATS: Roasting pours them, item 89): past the soup, further out
+  // along the bar from their plate)
+  const [sakeVer, setSakeVer] = useState(SAKE.served)
+  useFrame(() => { if (SAKE.served !== sakeVer) setSakeVer(SAKE.served) })
+  const seatSakes = useMemo(() => [...SAKE_SEATS].filter((n) => seats[n]).map((n) => {
+    const st = seats[n], c = counters[st.counter]
+    const x = st.mid.clone().sub(c.at).dot(c.along)
+    const side = -sauceSide(c, BAR_GATES[st.counter], x)
+    return { at: st.mid.clone().addScaledVector(c.along, side * 1.55).addScaledVector(c.lay, PLACE.sauce[1] - 0.02).setY(top + 0.002),
+      cup: c.along.clone().multiplyScalar(-Math.sign(side) * 0.07).addScaledVector(c.lay, 0.06) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [sakeVer, seats, counters, top])
 
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
@@ -5335,6 +5350,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       <Stools seats={seats} />
       {/* their shoes, left in pairs on the genkan's stone by the step, a pair for each of them inside (all of them one draw: SeatBits) */}
       {given && <SeatBits shoes={NO_SHOES} soys={seatSoys} soups={seatSoups} />}
+      {given && seatSakes.map((k, i) => (
+        <group key={i} position={k.at}><Tokkuri /><group position={k.cup}><SakeCup level={0.8} /></group></group>
+      ))}
       {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
           for the pair, between them, and here from the first, not with the fridges as they come in later: a light added to the scene has every
           material in it made again, a stall) */}
