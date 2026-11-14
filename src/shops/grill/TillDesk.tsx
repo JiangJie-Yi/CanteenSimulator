@@ -86,9 +86,12 @@ function piecesOf(scene: THREE.Group) {
           // (the service bell: nickel plate, a cool grey, satin rather than mirror)
           ? new THREE.MeshPhysicalMaterial({ color: '#cfd4d9', metalness: 1, roughness: 0.26, clearcoat: 0.4, clearcoatRoughness: 0.25, envMapIntensity: 0.95 })
           : new THREE.MeshPhysicalMaterial({ color: src.color.clone(), metalness: 0.9, roughness: src.name === 'DeskChrome' ? 0.12 : 0.3, envMapIntensity: 0.8 })
+        : /Cutout/.test(src.name)
+        // (the money tree's leaflets: flat cards, each one's oval its picture's alpha, seen from both sides (item 99))
+        ? new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })
         : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
       // (the tray's thanks: a little picture (TrayThanksPrint) on a quad a hair proud of it, its letters the picture's alpha)
-      if (src.transparent) Object.assign(t, { transparent: true, depthWrite: false, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })
+      if (src.transparent && !/Cutout/.test(src.name)) Object.assign(t, { transparent: true, depthWrite: false, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })
       mats.set(src, t)
     }
     if (METAL.has(src.name)) reflectStudio(t as THREE.MeshPhysicalMaterial)
@@ -96,7 +99,8 @@ function piecesOf(scene: THREE.Group) {
     m.castShadow = !UNINKED.test(m.name)
     m.receiveShadow = true
   })
-  inkModel(root, (m) => UNINKED.test(m.name), { width: 0.0012, weld: true })
+  // (not the leaflets' cards: an outline round a card is its square (item 99); their edge is darkened in their picture)
+  inkModel(root, (m) => UNINKED.test(m.name) || /^TreeLeaf/.test(m.name), { width: 0.0012, weld: true })
   const get = (n: DeskPiece) => { const o = root.getObjectByName(n)!; o.removeFromParent(); return o }
   // (their plain colours one material, the colour on the points; then each piece drawn in as few meshes as its materials allow, all but
   // what moves on its own (the bell's plunger; the stand's drawers, merged round in TillMat): the pens were fifteen draws, the card reader

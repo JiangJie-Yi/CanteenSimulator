@@ -108,7 +108,13 @@ _leaf = mix((0.06, 0.36, 0.04), (0.14, 0.52, 0.08), smooth(0.3, 1.0, _ac) * 0.6 
 _rib = smooth(0.06, 0.0, _ac)
 _veins = smooth(0.84, 1.0, np.cos((u * 14 - _ac * 3.2) * np.pi) * 0.5 + 0.5) * (1 - _rib) * (_ac < 0.85)
 _leaf = mix(_leaf, (0.42, 0.68, 0.22), np.maximum(_rib * 0.9, _veins * 0.35))
-leaf_tex = image("pachiraLeaf", _leaf)
+# (its outline the picture's alpha, the leaflet a flat card (item 99, the owner's, 2026-11-14: 'the leaves one piece each'): the long pointed
+# oval its mesh had, as wide across v as the profile says at u, a darker edge a few texels in where the ink line went round it before)
+_prof = np.sin(np.pi * np.clip(u, 0, 1) ** 0.8) * (1 - 0.15 * u)
+_prof = _prof / _prof.max() * 0.96
+_in = _prof - _ac
+_leaf = mix(_leaf, (0.03, 0.17, 0.03), smooth(0.07, 0.0, _in) * 0.85)
+leaf_tex = image("pachiraLeaf", _leaf, alpha=smooth(-0.01, 0.015, _in))
 # (the bark: grey-green, fine streaks up it, a few darker rings where leaves once were)
 _bk = mix((0.42, 0.42, 0.3), (0.56, 0.55, 0.4), fbm(N, 60, 4, 3))
 _bk = _bk * (1 - 0.25 * smooth(0.82, 0.95, np.sin(v * np.pi * 2 * 9 + fbm(N, 4, 4, 2) * 3) * 0.5 + 0.5))[..., None]
@@ -148,7 +154,7 @@ M = {
     "rubber": mat("TrayFoot", "#202020", 0.9),
     "potGlaze": mat("TreePotGlaze", "#9c2a1e", 0.2), "potFoot": mat("TreePotFoot", "#5a3a28", 0.8), "soil": mat("TreeSoil", "#3a2a1c", 0.95),
     "pebble": mat("TreePebble", "#e8e2d4", 0.35), "pebble2": mat("TreePebble2", "#c9c3b6", 0.35), "pebble3": mat("TreePebble3", "#a8a296", 0.35), "bark": mat("TreeBark", "#8a7a52", 0.8, tex=bark_tex), "stem": mat("TreeStem", "#6f8a3a", 0.6),
-    "leaf": mat("TreeLeaf", "#2f7a2e", 0.3, tex=leaf_tex), "leaf2": mat("TreeLeaf2", "#3f9238", 0.3, tex=leaf_tex), "ribbonRed": mat("TreeRibbon", "#c8221a", 0.5),
+    "leaf": pbr("TreeLeafCutout", tex=leaf_tex, rough=0.3, blend=True), "leaf2": pbr("TreeLeaf2Cutout", lin("#d8f0c8"), tex=leaf_tex, rough=0.3, blend=True), "ribbonRed": mat("TreeRibbon", "#c8221a", 0.5),
     "coinGold": mat("IngotGold", "#e0b24a", 0.15, 1.0), "lacquer": mat("IngotLacquer", "#141012", 0.2), "zabuton": mat("IngotZabuton", "#8a1410", 0.65, tex=brocade_tex),
     "lcd": mat("ReaderLcd", "#aab3a6", 0.3), "lcdInk": mat("ReaderLcdInk", "#1c2420", 0.5), "card": mat("ReaderCardFace", "#2f7fd0", 0.3),
     "cardBand": mat("ReaderCardBand", "#7fb6ea", 0.3), "keyRubber": mat("ReaderKeyRubber", "#3a3d42", 0.6),
@@ -727,45 +733,29 @@ mtree.append(text("TreePotChar", "發", 0.034, M["coinGold"], P(0, PH2 * 0.45, P
 
 
 def leaflet(name, at, ang, L, W, droop, mat_):
-    """one pachira leaflet: a long pointed oval, fanned out at `ang` from where it joins, arching down along its length, its UVs along it"""
+    """one pachira leaflet: a flat card, its pointed oval the picture's alpha (item 99: it was a 4 x 2 grid of the oval, cupped and given a
+    thickness, some forty triangles; two quads now, four), fanned out at `ang` from where it joins, arching down along its length, its UVs along it"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    # (the midrib's fold and an edge each side across it; six along its arch, its base and tip one point each (eight rows, those two rows
-    # three points all in one place: a pole of degenerate triangles at either end))
-    NU, NV = 4, 2   # (four along its arch (six before), smooth shaded: a leaflet five centimetres long)
+    NU = 2   # (two along its arch: bent once, smooth shaded)
     vs = []
     for i in range(NU + 1):
         t = i / NU
-        half = W / 2 * math.sin(math.pi * t ** 0.8) * (1 - 0.15 * t)
+        y = -droop * t * t
         row = []
-        for j in range(NV + 1):
-            q = j / NV * 2 - 1
-            x, z = t * L, q * half
-            # (arched down along it, and cupped a little across it, folded up along the midrib)
-            y = -droop * t * t + abs(q) * half * 0.25
-            if i in (0, NU) and j > 0:
-                row.append((row[0][0], (t, j / NV)))
-                continue
-            row.append((bm.verts.new((x * math.cos(ang) - z * math.sin(ang) + at[0], -(x * math.sin(ang) + z * math.cos(ang)) - at[2], y + at[1])), (t, j / NV)))
+        for j in (0, 1):
+            x, z = t * L, (j * 2 - 1) * W / 2
+            row.append(bm.verts.new((x * math.cos(ang) - z * math.sin(ang) + at[0], -(x * math.sin(ang) + z * math.cos(ang)) - at[2], y + at[1])))
         vs.append(row)
     for i in range(NU):
-        for j in range(NV):
-            quad = [vs[i][j], vs[i + 1][j], vs[i + 1][j + 1], vs[i][j + 1]]
-            # (at the base and the tip, a triangle)
-            seen = []
-            for q in quad:
-                if all(q[0] is not s_[0] for s_ in seen):
-                    seen.append(q)
-            f = bm.faces.new([q[0] for q in seen])
-            for lp, q in zip(f.loops, seen):
-                lp[uvl].uv = q[1]
+        f = bm.faces.new([vs[i][0], vs[i + 1][0], vs[i + 1][1], vs[i][1]])
+        for lp, uv in zip(f.loops, [(i / NU, 0), ((i + 1) / NU, 0), ((i + 1) / NU, 1), (i / NU, 1)]):
+            lp[uvl].uv = uv
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
-    sol = o.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.0006
-    apply_mods(o)
     finish(o, name, mat_)
     for poly in o.data.polygons:
         poly.use_smooth = True
