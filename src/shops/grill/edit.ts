@@ -238,6 +238,8 @@ const RELAIDS: [string, string[]][] = [
   // (the helmet back on its stand by the staff's door (item 66, the owner's: gone from it in their browser, a place kept for it from before
   // taking it elsewhere; on a fresh one it stood on the stand): what was kept for the helmet, its stand and their group dropped once)
   ['jgs-edit-relaid-21', ['kabuto', 'kabutostand', 'grp-kabuto']],
+  // (the two under the round window (item 92, the owner's: the helmet gone again in their browser): what was kept for them dropped again)
+  ['jgs-edit-relaid-22', ['kabuto', 'kabutostand', 'grp-kabuto']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -307,6 +309,11 @@ export const useListHot = (id: string) =>
  * offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
  */
 export const BASES: Record<string, V3> = {
+  // (the helmet's stand and the helmet on it moved along the wall from beside the staff's door to under the round window's left half, just
+  // left of the lucky cats' red stand, 4 cm clear of it (item 92, the owner's, 2026-11-14, its arrow's end): 2.83 m along the wall, measured;
+  // both their parents count two to one)
+  kabutostand: [0, 0, 1.413],
+  kabuto: [0, 0, 1.413],
   // (the shrine's oranges and its cups' stand set by hand at X 0.027 and X 0.050 in the room's frame)
   // (the sutra moved Z -0.030 and both vases X 0.07 along their own axes (the shelf's: X back toward the wall, Z along it), as the owner set them)
   // (and then, the owner's, 2026-11-13, each as the panel reads it (its own axes: X along the shelf, Z out from the wall), then all reset:
