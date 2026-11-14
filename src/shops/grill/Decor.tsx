@@ -1183,6 +1183,9 @@ function Warmer() {
   /** each door: whether it's to be open, and how far it is (0 shut .. 1 open) */
   const open = useRef<boolean[]>([])
   const swing = useRef<number[]>([])
+  /** the door under the pointer (-1: none): its own drawn while it is, so its hover glow is seen (the owner, 2026-11-15: the doors drawn as
+   * one copy while shut, the glow went on the hidden door) */
+  const hovered = useRef(-1)
   // (its glow and pilot lamp as its heat is (game/soup's heatNow): dark off, a dull red low, bright high; eased, as a ring warms and cools)
   useFrame((_, dt) => {
     const n = heatNow(SOUP.heat, SOUP.pot), k = Math.min(1, dt * 1.5)
@@ -1198,7 +1201,7 @@ function Warmer() {
       if (open.current[i] || k > 0) still = false
       d.rotation.y = (i % 2 === 0 ? -1 : 1) * DOOR_OPEN * k * k * (3 - 2 * k)
     })
-    model.shut.home(still)
+    model.shut.home(still && hovered.current < 0)
   })
   const doorOf = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) { const m = /^WarmerDoor(\d)$/.exec(q.name); if (m) return +m[1] } return -1 }
   const doorSays = (i: number) => (open.current[i] ? '點一下關上' : '點一下打開')
@@ -1223,10 +1226,13 @@ function Warmer() {
           const i = doorOf(e.object)
           if (i < 0 || getEdit().on) return
           e.stopPropagation()
+          hovered.current = i
           document.body.style.cursor = 'pointer'
+          // (lit as everything that can be clicked is (the owner, 2026-11-15: "it should light when pointed at"))
+          glowOnly(model.doors[i])
           setTip({ title: '櫃門', hint: doorSays(i) })
         }}
-        onPointerOut={() => { document.body.style.cursor = '' }} />
+        onPointerOut={() => { if (hovered.current >= 0) glowLeave(model.doors[hovered.current]); hovered.current = -1; document.body.style.cursor = '' }} />
       {/* (the warming well's knob, its dial and pilot lamp under the top's front: clicked, its heat turned on round (the owner's)) */}
       <mesh position={[0, 1.091, 0.49]} visible={false}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SOUP.heat = nextHeat(SOUP.heat); setTip({ title: '加熱座旋鈕', hint: heatSays() }) }}
