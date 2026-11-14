@@ -254,6 +254,8 @@ const RELAIDS: [string, string[]][] = [
   // (and the vases (item 111))
   ['jgs-edit-relaid-24', ['vase-1', 'vase1']],
   ['jgs-edit-relaid-25', ['vase-1', 'vase1']],
+  // (the sake barrel and the lantern where the owner set them made their defaults, what was kept for them reset (2026-11-15))
+  ['jgs-edit-relaid-26', ['sake', 'lantern']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -372,11 +374,13 @@ export const BASES: Record<string, V3> = {
   supplies: [0.015, 0, -0.012],
   chochin: [0, 0.25, 0],
   chochin2: [0, 0.25, 0],
-  sake: [0.084, 0, 0.118],
+  // (then X -0.2, Z 0.16 as the owner set it in the panel's object axes (2026-11-15), taken into the parent's (turned 20.25°))
+  sake: [-0.0483, 0, 0.3373],
   // (the charcoal basket: moved by [0.273, 0.125, 0.082] in the room's frame, taken into the parent's units; its 1.75 size and 44° turn are Decor's)
   crate: [-0.0941, 0.125, -0.2691],
   // (the lantern: moved by [-0.083, 0, -0.651] in the room's frame, taken into this parent's units; its 12° turn is Decor's)
-  lantern: [-0.478, 0, 0.4497],
+  // (then X -0.65 as the owner set it in the panel's object axes (2026-11-15), taken into the parent's (turned 10.92°))
+  lantern: [-1.1162, 0, 0.5728],
   // (the dish rack: moved by [-0.871, 0, -2.135] in the room's frame, taken into this parent's units; its 1.03 size is Decor's)
   platerack: [-1.2158, 0, 1.9593],
   // (the second of the two low racks: where the first is set, beside it)
