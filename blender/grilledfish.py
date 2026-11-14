@@ -1313,7 +1313,8 @@ def fish(species="ayu"):
     uvl = bm.loops.layers.uv.new()
     # (16 round, 18 along, smooth shaded: a fish's body is flat-sided and its scales are the normal map's (24 by 24 before, 56 by 40 before
     # that, some 4,500 triangles a fish); the shishamo's three to a stick were 6,000 triangles a skewer)
-    bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=18, radius=1, calc_uvs=True)
+    # (12 round and 14 along (item 85, the owner's, 2026-11-14: "far too many faces round the fire"): its outline still smooth, the scales and the shine in its pictures)
+    bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=14, radius=1, calc_uvs=True)
     # (each end, the snout's tip and the tail's root, closed across the ring beside it in a ladder, not a fan into the pole)
     ladder_poles(bm, uvl)
     for vtx in bm.verts:
@@ -1378,10 +1379,10 @@ def fish(species="ayu"):
     ez = wave(ex) + depth_at(ex) * 0.22
     for side in (-1, 1):
         ey = bend(ex) + side * (width_at(ex) * 0.86)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=12, ring_count=7, location=(ex, ey, ez))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er, segments=8, ring_count=5, location=(ex, ey, ez))
         active().scale = (1, 0.38, 1)
         parts.append(finish(active(), "Eye", M["eye"]))
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.42, segments=10, ring_count=5, location=(ex, ey + side * er * 0.3, ez))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=er * 0.42, segments=8, ring_count=4, location=(ex, ey + side * er * 0.3, ez))
         active().scale = (1, 0.3, 1)
         parts.append(finish(active(), "Pupil", M["pupil"]))
         # (the gill cover's edge: a dark arc from the nape down behind the eye to the throat)
@@ -1389,17 +1390,17 @@ def fish(species="ayu"):
         # (laid on the head's own curve: as wide there as the body is at that height)
         arc = [(gx + L * 0.06 * math.cos(t), bend(gx) + side * (width_at(gx + L * 0.06 * math.cos(t)) * math.sqrt(max(0.0, 1 - (0.8 * math.sin(t)) ** 2)) + 0.0012),
                 wave(gx) + depth_at(gx) * 0.8 * math.sin(t)) for t in (1.15, 0.8, 0.4, 0.0, -0.4, -0.8, -1.1)]
-        parts.append(tube(arc, 0.0022 + D * 0.012, (0.0022 + D * 0.012) * 0.6, M["pupil"], "Gill", 6))
+        parts.append(tube(arc, 0.0022 + D * 0.012, (0.0022 + D * 0.012) * 0.6, M["pupil"], "Gill", 4))
     # the mouth, open toward the coals: a dark gape at the snout's tip, its lower jaw jutting a little
     mx = L * 0.97
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=D * 0.16, segments=12, ring_count=6, location=(mx, bend(mx), wave(mx) - depth_at(L * 0.9) * 0.15))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=D * 0.16, segments=8, ring_count=4, location=(mx, bend(mx), wave(mx) - depth_at(L * 0.9) * 0.15))
     active().scale = (0.7, max(0.4, W / D * 1.1), 1)
     parts.append(finish(active(), "Mouth", M["pupil"]))
 
     # the horse mackerel's scutes: a row of small hard plates along the rear half of the lateral line, both sides, lying flat on it
     if sp.get("scutes"):
-        for k in range(13):
-            sx = -L * 0.82 + k * L * 0.055
+        for k in range(9):
+            sx = -L * 0.82 + k * L * 0.08
             for side in (-1, 1):
                 # (an icosphere, 20 triangles: uv spheres 8 by 6 were 80 each, 2,080 for the row)
                 bpy.ops.mesh.primitive_ico_sphere_add(radius=0.006, subdivisions=1,
@@ -1515,7 +1516,8 @@ def corn_cob():
     around a stalk stub at the base. Built along local Z with the tip at +Z, then laid along X (tip up the stick)."""
     # (two points round a kernel, three along it: the kernels' rows still stand in ridges, their roundness the normal map's; 72 by 64 was
     # some ten thousand triangles for one cob)
-    rings, seg = 36, 32
+    # (30 along and 24 round (item 85, the owner's, 2026-11-14: "far too many faces round the fire"): its kernels are the bumps in these rows, so only a little fewer; 36 by 32 before)
+    rings, seg = 30, 24
     bm = bmesh.new()
     grid = []
     for i in range(rings + 1):
@@ -1644,7 +1646,8 @@ def okra():
         bm = bmesh.new()
         uvl = bm.loops.layers.uv.new()
         # (four points a ridge round it: 30 by 22 made the four pods 5,300 triangles)
-        rings, seg = 14, 20
+        # (ten along and ten round, its five ridges two points each (item 85, the owner's, 2026-11-14: "far too many faces round the fire"); 14 by 20 before)
+        rings, seg = 10, 10
         grid = []
         for k in range(rings + 1):
             t = k / rings
@@ -1720,10 +1723,11 @@ def asparagus():
         length = random.uniform(0.23, 0.28)
         y0 = -0.11 + random.uniform(-0.015, 0.015)
         bow = random.uniform(-0.01, 0.01)
-        pts = [(x + bow * math.sin(math.pi * s), y0 + s * length, 0.0) for s in (k / 12 for k in range(13))]
-        parts.append(tube(pts, r * 1.15, r * 0.82, M["asparagus"], "Asparagus", seg=12))
+        # (eight round, seven points along (item 85, the owner's, 2026-11-14: "far too many faces round the fire"); twelve and thirteen before)
+        pts = [(x + bow * math.sin(math.pi * s), y0 + s * length, 0.0) for s in (k / 6 for k in range(7))]
+        parts.append(tube(pts, r * 1.15, r * 0.82, M["asparagus"], "Asparagus", seg=8))
         # the cut end, pale and woody
-        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=r * 1.16, depth=0.004, location=(x, y0, 0),
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=r * 1.16, depth=0.004, location=(x, y0, 0),
                                             rotation=(math.radians(90), 0, 0))
         parts.append(finish(active(), "AsparagusCut", M["asparagus_cut"]))
         # little triangular bracts climbing the stalk, alternating sides, pointing up toward the tip
@@ -1745,7 +1749,7 @@ def asparagus():
                                             location=(x + math.cos(a) * r * 0.35, tip_y + lift, math.sin(a) * r * 0.35),
                                             rotation=(math.radians(-90) + math.sin(a) * 0.3, 0, math.cos(a) * 0.3))
             parts.append(finish(active(), "AsparagusScale", M["asparagus_tip"]))
-        bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=2, location=(x, tip_y + r * 0.9, 0))
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=1, subdivisions=1, location=(x, tip_y + r * 0.9, 0))
         bud = active()
         bud.scale = (r * 0.7, r * 2.0, r * 0.7)
         parts.append(finish(bud, "AsparagusTip", M["asparagus_tip"]))
@@ -1805,7 +1809,8 @@ def shrimp_body(cx, R, size, name, flip=1, straight=0.0):
     parts = []
     th0, th1 = math.pi, 2 * math.pi + 0.18                     # head end .. tail end, round the bottom of the U
     # (44 along, about four to each of its six tail segments' rims, and 12 round: 64 and 16 were 2,000 triangles a shell)
-    rings, seg = 44, 12
+    # (30 along, five to each tail segment's rim, and 8 round (item 85, the owner's, 2026-11-14: "far too many faces round the fire"); 44 by 12 before)
+    rings, seg = 30, 8
     centre = Vector((cx, 0, 0))
 
     def frame(s):
@@ -2118,7 +2123,8 @@ def squid():
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     # (20 round, 16 along, its ends laddered: 32 by 24 with a fan of 32 into each)
-    bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=16, radius=1, calc_uvs=True)
+    # (14 round, 10 along (item 85, the owner's, 2026-11-14: "far too many faces round the fire"); 20 by 16 before)
+    bmesh.ops.create_uvsphere(bm, u_segments=14, v_segments=10, radius=1, calc_uvs=True)
     ladder_poles(bm, uvl)
     for vtx in bm.verts:
         ox, oy, oz = vtx.co
@@ -2138,12 +2144,12 @@ def squid():
     parts.append(flat_fin("SquidFin", [(0.04, 0.0), (-0.035, 0.085), (-0.1, 0.0), (-0.035, -0.085)], 0.007,
                           M["squid"], at=(0.2, 0, 0)))
     # the head, a little narrower than the mantle's open end, with an eye on each side
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=7, location=(-0.115, 0, 0))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=8, ring_count=5, location=(-0.115, 0, 0))
     head = active()
     head.scale = (0.03, 0.026, 0.032)
     parts.append(finish(head, "SquidHead", M["squid"]))
     for side in (-1, 1):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=8, ring_count=5, location=(-0.11, side * 0.024, 0.008))
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.008, segments=6, ring_count=4, location=(-0.11, side * 0.024, 0.008))
         parts.append(finish(active(), "SquidEye", M["pupil"]))
     # arms fanning down from the head, curling at the ends; the two long feeding tentacles reach further
     for i in range(10):
@@ -2157,7 +2163,7 @@ def squid():
             pts.append((-0.13 - s * length,
                         spread * 0.02 + random.uniform(-0.002, 0.002),
                         spread * (0.02 + s * length * 0.45) + math.sin(s * math.pi * curl) * 0.02 * s))
-        parts.append(tube(pts, 0.0075 if not long_ else 0.006, 0.0015, M["squid"], "SquidArm", seg=6))
+        parts.append(tube(pts[::2] + ([pts[-1]] if len(pts) % 2 == 0 else []), 0.0075 if not long_ else 0.006, 0.0015, M["squid"], "SquidArm", seg=4))
     # a good-sized squid, half as big again as it's drawn above
     for o in parts:
         o.location *= 1.5
