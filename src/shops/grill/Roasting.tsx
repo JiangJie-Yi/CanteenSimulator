@@ -1691,6 +1691,29 @@ function tableTopGeometry(grow: number, thick: number) {
 }
 const TABLE_TOP = tableTopGeometry(0, 0.015)
 const TABLE_TOP_INK = tableTopGeometry(0.012, 0.022)
+/** (item 79, the owner's, 2026-11-13: "the cook table could be finer"): a black-lacquered band (縁) under the top's edge, all round its
+ * outline a hair out from it, as a finished counter's; and brass caps wrapping its four outer rounded corners, as the hearth's frame has at
+ * its own */
+const TABLE_BAND = (() => {
+  const g = tableTopGeometry(0.004, 0.004)
+  // (the top's outline, grown a hair, cut down to a band 2.2 cm deep just under the top: the extrusion's own depth scaled)
+  g.computeBoundingBox()
+  const b = g.boundingBox!
+  g.translate(0, -b.max.y, 0)
+  g.scale(1, 0.022 / (b.max.y - b.min.y), 1)
+  g.translate(0, -0.082, 0)
+  return g
+})()
+const TABLE_CORNERS = (() => {
+  const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
+  // (a hair out from the corner's own curve, which is drawn in six straight steps: at its own radius the cap's middle sank behind them)
+  const i = 0.025, r = 0.16, R = r + 0.025 + 0.009
+  // (each corner's middle, and the quarter round it faces: three's cylinder runs from +z toward +x)
+  const at: [number, number, number][] = [[a0 + i + r, l0 + i + r, Math.PI], [a1 - i - r, l0 + i + r, Math.PI / 2], [a1 - i - r, l1 - i - r, 0],
+    [a0 + i + r, l1 - i - r, Math.PI * 1.5]]
+  const parts = at.map(([x, z, t]) => new THREE.CylinderGeometry(R, R, 0.06, 8, 1, true, t + 0.05, Math.PI / 2 - 0.1).translate(x, -0.042, z))
+  return mergeGeometries(parts)!
+})()
 function CookTableTop() {
   return (
     <group rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
@@ -1700,6 +1723,10 @@ function CookTableTop() {
       <mesh geometry={TABLE_TOP_INK}>
         <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
       </mesh>
+      <mesh geometry={TABLE_BAND}>
+        <meshToonMaterial color="#17110d" />
+      </mesh>
+      <mesh geometry={TABLE_CORNERS} material={barBrassOf()} />
     </group>
   )
 }
