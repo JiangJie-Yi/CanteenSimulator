@@ -4942,7 +4942,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const skewersDue = washGoes(SKEWERS.s) && !atSink && !waiters.current.some((x) => SK_PHASES.has(x.phase)) && !['toSkTray', 'takeSk', 'toSkSink', 'washSk', 'toHolder', 'putSk'].includes(platerRun.current.phase)
           // (the shop shut and going home: nothing new taken on; what's left is put away overnight with the closing)
           const chore = SHOP.leaving ? null : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : staffSink(dirty.current, PILE.n), rack: PLATE_RACK.n,
-            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink ? { n: 0, left: null } : DRAIN, skewers: skewersDue && (washUrgent(SKEWERS.s) ? 'urgent' : true),
+            // (the draining basket left as it is till the shop opens (the owner, 2026-11-15: "four clean ones in the basket to start, right?":
+            // the day's first four, dry already, were carried off to the racks the moment the page came up, the basket bare); the player may)
+            dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink || !open ? { n: 0, left: null } : DRAIN, skewers: skewersDue && (washUrgent(SKEWERS.s) ? 'urgent' : true),
             dirtyAge: dirtyNow.reduce((m, r) => Math.max(m, r.t), 0) })
           if (chore === 'serve') {
             // (across the kitchen to the chef for it)
