@@ -249,6 +249,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-21', ['kabuto', 'kabutostand', 'grp-kabuto']],
   // (the two under the round window (item 92, the owner's: the helmet gone again in their browser): what was kept for them dropped again)
   ['jgs-edit-relaid-22', ['kabuto', 'kabutostand', 'grp-kabuto']],
+  // (the shrine's lamps where the owner set them made their defaults, what was kept for them reset (item 110, 2026-11-14))
+  ['jgs-edit-relaid-23', ['shrinelamp-1', 'shrinelamp1']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -332,8 +334,10 @@ export const BASES: Record<string, V3> = {
   oranges: [0.0275 + 0.08, 0, 0.025],
   oranges2: [0.14, 0, 0.08],
   shrinecups: [0.0502, 0, 0.115],
-  'shrinelamp-1': [0.03, 0, -0.03],
-  shrinelamp1: [0.03, 0, 0.03],
+  // (each 2 cm in toward the middle and 2 cm down, as the owner set them in the room's frame (item 110, 2026-11-14: left X 0.02, Y -0.02; right
+  // X -0.02, Y -0.02), taken into their parents' (turned -90°: fromRoom))
+  'shrinelamp-1': [0.03, -0.02, -0.01],
+  shrinelamp1: [0.03, -0.02, 0.01],
   flask: [0.15, 0, 0.0425],
   sutra: [0.142, 0, -0.03 + 0.035],
   'vase-1': [0.07 + 0.03, 0, 0],
