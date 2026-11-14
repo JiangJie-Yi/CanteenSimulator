@@ -6293,7 +6293,10 @@ function liteBodyColour(id: DrinkId) {
 const BACK_SLOT_W = 64, BACK_SLOT_H = 256
 /** under the sides, each drink's top as seen from above, a square BACK_SLOT_W across (item 65: a card laid over each picture's top, so from
  * above they're a cap or a lid, not an X of two cards) */
-const BACK_TOP = BACK_SLOT_W, BACK_TALL = BACK_SLOT_H + BACK_TOP
+const BACK_TOP = BACK_SLOT_W, BACK_TALL = BACK_SLOT_H + 2 * BACK_TOP
+/** and under those, its top as the ranks in front show it (item 65b): a cap's top with its ribbed edge, a can's lid and its pull, a pack's top
+ * with its seam and its straw hole's foil; laid on them as one flat card each where they were turned rings and a little cylinder */
+const FRONT_TOP_Y = BACK_SLOT_H + BACK_TOP
 /** how much the deep ranks' pictures glow (the front labels' 0.3; a touch under it, being further in) */
 const BACK_GLOW = 0.26
 const BACK_IDS = DRINKS.map((x) => x.id as DrinkId)
@@ -6390,6 +6393,47 @@ function drawBackAtlas() {
       disc(R, l0); disc(R * 0.8, d.cap); disc(R * 0.8, sheen(R * 0.8))
     }
     g.restore()
+    // (its top for the ranks in front, in the square under that: the card is laid over just the cap, the can's lid inside its rim, the
+    // pack's whole top (its picture stretched 3 : 4 across it, so the hole drawn as an ellipse here is round there))
+    const fx = x0 + BACK_TOP / 2, fy = FRONT_TOP_Y + BACK_TOP / 2
+    g.save()
+    const fdisc = (rr: number, fill: string | CanvasGradient) => { g.beginPath(); g.arc(fx, fy, rr, 0, Math.PI * 2); g.fillStyle = fill; g.fill() }
+    const fsheen = (rr: number) => { const s_ = g.createRadialGradient(fx - rr * 0.35, fy - rr * 0.35, rr * 0.05, fx, fy, rr); s_.addColorStop(0, 'rgba(255,255,255,0.4)'); s_.addColorStop(0.7, 'rgba(255,255,255,0)'); s_.addColorStop(1, 'rgba(0,0,0,0.22)'); return s_ }
+    if (kind === 'pack') {
+      g.fillStyle = l0; g.fillRect(x0, FRONT_TOP_Y, BACK_TOP, BACK_TOP)
+      // (the light falling on one slope of the gable, the seam's shadow down the middle, its fin's top a thin light line)
+      g.fillStyle = 'rgba(255,255,255,0.2)'; g.fillRect(x0, FRONT_TOP_Y, BACK_TOP / 2 - 3, BACK_TOP)
+      g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(fx - 3, FRONT_TOP_Y, 6, BACK_TOP)
+      g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(fx - 0.5, FRONT_TOP_Y, 1, BACK_TOP)
+      // (the straw hole near a corner, where the pack's had it (PACK.holeAt: a quarter across each way): silver foil, its scored ring, a dent)
+      const hx = x0 + BACK_TOP * 0.75, hy = FRONT_TOP_Y + BACK_TOP * 0.75, rx = BACK_TOP * 0.0034 / 0.03, ry = BACK_TOP * 0.0034 / 0.04
+      const foil = g.createRadialGradient(hx - rx * 0.3, hy - ry * 0.3, 0.5, hx, hy, rx)
+      foil.addColorStop(0, '#f4f6f8'); foil.addColorStop(1, '#a9afb6')
+      g.fillStyle = foil; g.beginPath(); g.ellipse(hx, hy, rx, ry, 0, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = 'rgba(60,64,70,0.7)'; g.lineWidth = 1; g.beginPath(); g.ellipse(hx, hy, rx * 0.62, ry * 0.62, 0, 0, Math.PI * 2); g.stroke()
+    } else if (kind === 'can') {
+      // (the rim's roll, the lid sunk inside it, its scored ring, the pull lying on it, its finger hole and rivet)
+      fdisc(R, '#c3c8cf'); fdisc(R * 0.9, '#8f959d'); fdisc(R * 0.86, '#d2d6dc')
+      g.strokeStyle = 'rgba(80,85,92,0.55)'; g.lineWidth = 1; g.beginPath(); g.arc(fx, fy, R * 0.72, 0, Math.PI * 2); g.stroke()
+      // (no dark spots on it: the pull's hole and the opening only a shade off the lid, or from above it reads as a face)
+      g.strokeStyle = 'rgba(90,96,104,0.6)'; g.beginPath(); g.ellipse(fx, fy - R * 0.4, R * 0.24, R * 0.13, 0, 0, Math.PI * 2); g.stroke()
+      g.fillStyle = '#e2e5e9'; g.beginPath(); g.ellipse(fx, fy + R * 0.16, R * 0.17, R * 0.34, 0, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = 'rgba(90,96,104,0.55)'; g.stroke()
+      g.fillStyle = '#a7adb5'; g.beginPath(); g.ellipse(fx, fy + R * 0.3, R * 0.08, R * 0.11, 0, 0, Math.PI * 2); g.fill()
+      fdisc(R, fsheen(R))
+    } else {
+      // (a cap: its colour, the fine ribs round its edge, the ring pressed into its top, the light on it)
+      fdisc(R, d.cap)
+      g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 1
+      for (let k = 0; k < 40; k++) {
+        const a = (k / 40) * Math.PI * 2
+        g.beginPath(); g.moveTo(fx + Math.cos(a) * R * 0.86, fy + Math.sin(a) * R * 0.86); g.lineTo(fx + Math.cos(a) * R, fy + Math.sin(a) * R); g.stroke()
+      }
+      g.strokeStyle = 'rgba(0,0,0,0.2)'; g.beginPath(); g.arc(fx, fy, R * 0.66, 0, Math.PI * 2); g.stroke()
+      g.strokeStyle = 'rgba(255,255,255,0.3)'; g.beginPath(); g.arc(fx, fy, R * 0.62, 0, Math.PI * 2); g.stroke()
+      fdisc(R, fsheen(R))
+    }
+    g.restore()
   })
   BACK_ATLAS.t.needsUpdate = true
 }
@@ -6397,6 +6441,22 @@ const BACK_CARD = new THREE.MeshStandardMaterial({ color: '#ffffff', map: BACK_A
   // (lit from within a touch, as the front ones' labels are (LABEL_LIT): the fridge's light in them, not grey in the dark at night)
   emissive: '#ffffff', emissiveMap: BACK_ATLAS?.t ?? null, emissiveIntensity: BACK_GLOW })
 const BACK_CARDS = new Map<DrinkId, THREE.BufferGeometry>()
+/** a front rank's top (item 65b, the owner's: "the caps, the cans' rims, the packs' straw holes one flat piece, the detail in the picture"):
+ * one card `sx` by `sz` lying flat at `y`, its picture the drink's square in the strip under the back ones', in the same material as theirs
+ * (merged with them in the shelf's batch: no draw more, no program more) */
+const FRONT_TOPS = new Map<string, THREE.BufferGeometry>()
+function frontTop(id: DrinkId, sx: number, sz: number, y: number) {
+  const key = `${id}|${sx}|${sz}|${y}`
+  const hit = FRONT_TOPS.get(key)
+  if (hit) return hit
+  drawBackAtlas()
+  const i = BACK_IDS.indexOf(id), u0 = i / BACK_IDS.length, u1 = (i + 1) / BACK_IDS.length, topV = BACK_TOP / BACK_TALL
+  const g = new THREE.PlaneGeometry(sx, sz).rotateX(-Math.PI / 2).translate(0, y, 0)
+  const uv = g.attributes.uv
+  for (let k = 0; k < uv.count; k++) { uv.setX(k, u0 + uv.getX(k) * (u1 - u0)); uv.setY(k, uv.getY(k) * topV) }
+  FRONT_TOPS.set(key, g)
+  return g
+}
 function backCard(id: DrinkId) {
   const hit = BACK_CARDS.get(id)
   if (hit) return hit
@@ -6404,7 +6464,7 @@ function backCard(id: DrinkId) {
   const { w, h } = backDims(id), i = BACK_IDS.indexOf(id)
   const u0 = i / BACK_IDS.length, u1 = (i + 1) / BACK_IDS.length
   // (the picture's sides above, its tops in the strip under them: v from the canvas's top (three's flipY))
-  const sideV = BACK_TOP / BACK_TALL
+  const sideV = 2 * BACK_TOP / BACK_TALL, topV = BACK_TOP / BACK_TALL
   const card = (turn: number) => {
     const p = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0).rotateY(turn)
     const uv = p.attributes.uv
@@ -6415,7 +6475,7 @@ function backCard(id: DrinkId) {
   // top of the drinks, the picture pressed on it"): from above they read as caps and lids, not as the X of the two cards)
   const lid = new THREE.PlaneGeometry(w, w).rotateX(-Math.PI / 2).translate(0, h * 0.995, 0)
   const luv = lid.attributes.uv
-  for (let k = 0; k < luv.count; k++) { luv.setX(k, u0 + luv.getX(k) * (u1 - u0)); luv.setY(k, luv.getY(k) * sideV) }
+  for (let k = 0; k < luv.count; k++) { luv.setX(k, u0 + luv.getX(k) * (u1 - u0)); luv.setY(k, topV + luv.getY(k) * topV) }
   const g = mergeGeometries([card(0), card(Math.PI / 2), lid])!
   BACK_CARDS.set(id, g)
   return g
@@ -6437,13 +6497,15 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false, deep =
           {/* (a paper pack: its printed body, the seam sealed across its top, the silver of its straw hole) */}
           <mesh geometry={shadedLabel(PACK.body, id, true)} material={SHELF_LABEL} />
           <mesh geometry={shaded(PACK.seam, d.label[0], true)} position-y={PACK.h} material={SHELF_PARTS} />
-          <mesh geometry={PACK.hole} position={PACK.holeAt} material={SHELF_METAL} />
+          <mesh geometry={frontTop(id, PACK.d - 0.001, PACK.w - 0.001, PACK.h + 0.0004)} material={BACK_CARD} />
         </> : kind === 'can' && id !== 'cola' && id !== 'greenTea' ? <>
           <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO.canLabel) : LITE_GEO.canLabel, id)} position-y={0.045} material={SHELF_LABEL} />
           <mesh geometry={back ? LITE_CAN_LID_FAR : LITE_CAN_LID} material={SHELF_METAL} />
+          <mesh geometry={frontTop(id, 0.0366, 0.0366, 0.0929)} material={BACK_CARD} />
         </> : kind === 'small' ? <>
           <mesh geometry={shadedLabel(back ? SMALL_FAR : BOTTLE_GEO.small, id)} position-y={0.036} material={SHELF_LABEL} />
           <mesh geometry={shaded(back ? SMALL_LID_FAR : SMALL_LID, d.cap)} position-y={0.074} material={SHELF_PARTS} />
+          <mesh geometry={frontTop(id, 0.031, 0.031, 0.0759)} material={BACK_CARD} />
         </> : shaped && <>
           {/* (the drink in it seen through its glass (the owner's: they were solid plastic colours), the neck above it only glass: the drink
               first, so the glass is laid over it; the ramune's marble in its neck) */}
@@ -6453,6 +6515,7 @@ const DrinkBottleLite = memo(function DrinkBottleLite({ id, back = false, deep =
           {!back && shaped === 'ramune' && <mesh geometry={shadedGlass(LITE_GEO.marble, '#d8f2f8', 0.6)} position-y={0.1402} material={SHELF_GLASS} />}
           <mesh geometry={shadedLabel(back ? farLabel(LITE_GEO[shaped].label) : LITE_GEO[shaped].label, id)} position-y={LITE_GEO[shaped].labelY} material={SHELF_LABEL} />
           <mesh geometry={shaded(back ? LITE_GEO.capFar : LITE_GEO.cap, d.cap)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={SHELF_PARTS} />
+          <mesh geometry={frontTop(id, 0.026, 0.026, 0.0049)} position-y={LITE_GEO[shaped].capY} scale={LITE_GEO[shaped].capR} material={BACK_CARD} />
           {/* (the beer's gold foil round its neck, the sake's paper collar under its cap (the plum wine's red), as the full bottles have them) */}
           {!back && LITE_GEO[shaped].collar && !soju(id) && (
             <mesh geometry={shaded(LITE_GEO[shaped].collar!.geo, f === 'beer' ? '#d4b04a' : id === 'umeshu' ? '#b8261c' : '#f4efe2')}
@@ -6623,7 +6686,8 @@ const LITE_PTS: Record<'beer' | 'sake' | 'pet500' | 'pet' | 'milk' | 'ramune', [
 const liteCollar = (rb: number, rt: number, h: number) => new THREE.CylinderGeometry(rt, rb, h, 7, 1, true)
 /** a shelf bottle's cap: its side and its top turned in to a small ring (no fan of triangles into its middle (the owner's, 2026-11-12: the
  * caps showed spokes); open underneath, where it sits on the neck), `seg` round */
-const liteCap = (seg: number) => new THREE.LatheGeometry([new THREE.Vector2(0.013, -0.005), new THREE.Vector2(0.013, 0.005), new THREE.Vector2(0.0035, 0.005)], seg)
+// (its side alone, its top the card laid in it (item 65b): it was turned in to a little ring over the top)
+const liteCap = (seg: number) => new THREE.LatheGeometry([new THREE.Vector2(0.013, -0.005), new THREE.Vector2(0.013, 0.005)], seg)
 /** the bottles behind the front one in each place, all but hidden by it (the owner's, 2026-11-12: no more faces than need be): six round,
  * their bodies in fewer rings (the foot, the body's top, the shoulder, the lip), their labels and caps six round too; a third of the faces */
 const LITE_FAR_PTS: Record<keyof typeof LITE_PTS, [number, number][]> = {
@@ -7250,16 +7314,17 @@ const CAN_LID = new THREE.LatheGeometry([[0.018, 0.0895], [0.0186, 0.0905], [0.0
   [0.0164, 0.0909], [0.0045, 0.0911]].map(([r, y]) => new THREE.Vector2(r, y)), 12)
 CAN_LID.computeVertexNormals()
 /** the shelf's cans' top, 8 round: the same, its shoulder run down to the edge of their print, which is their whole body */
-const LITE_CAN_LID = new THREE.LatheGeometry([[0.0214, 0.0884], [0.0203, 0.0897], [0.0189, 0.0912], [0.0187, 0.0928], [0.0181, 0.0935], [0.0174, 0.0929],
-  [0.0168, 0.0915], [0.0164, 0.0909], [0.0045, 0.0911]].map(([r, y]) => new THREE.Vector2(r, y)), 8)
+// (its shoulder and its rim's roll only, the lid inside it the card laid in it, its pull and scored ring in the picture (item 65b): 3 rings
+// round, 48 faces, where it was 8 down into the lid and in to the rivet, 128)
+const LITE_CAN_LID = new THREE.LatheGeometry([[0.0214, 0.0884], [0.0189, 0.0912], [0.0187, 0.0928], [0.0181, 0.0935]].map(([r, y]) => new THREE.Vector2(r, y)), 8)
 LITE_CAN_LID.computeVertexNormals()
 /** a can behind the front one: its lid in four rings, six round (36 faces against 128) */
-const LITE_CAN_LID_FAR = new THREE.LatheGeometry([[0.0214, 0.0884], [0.0187, 0.0928], [0.0168, 0.0915], [0.0045, 0.0911]].map(([r, y]) => new THREE.Vector2(r, y)), 6)
+const LITE_CAN_LID_FAR = new THREE.LatheGeometry([[0.0214, 0.0884], [0.0187, 0.0928], [0.0181, 0.0935]].map(([r, y]) => new THREE.Vector2(r, y)), 6)
 LITE_CAN_LID_FAR.computeVertexNormals()
 /** a little bottle behind the front one: its body six round in five rings; and every little bottle's lid, its side and its top turned in to
  * a small ring (it was a cylinder whose top was a fan of triangles into its middle) */
 const SMALL_FAR = new THREE.LatheGeometry([[0, 0], [0.016, 0], [0.017, 0.02], [0.013, 0.036], [0.015, 0.072], [0, 0.072]].map(([x, y]) => new THREE.Vector2(x, y - 0.036)), 6)
-const smallLid = (seg: number) => new THREE.LatheGeometry([new THREE.Vector2(0.0155, -0.002), new THREE.Vector2(0.0155, 0.002), new THREE.Vector2(0.004, 0.002)], seg)
+const smallLid = (seg: number) => new THREE.LatheGeometry([new THREE.Vector2(0.0155, -0.002), new THREE.Vector2(0.0155, 0.002)], seg)
 const SMALL_LID = smallLid(8), SMALL_LID_FAR = smallLid(6)
 const CAN_TAB = (() => {
   // (the ring pull: a rounded tongue with its finger hole, lying flat, its rivet end over the lid's middle)
@@ -7312,7 +7377,7 @@ function packBody(w: number, d: number, h: number, c: number) {
 const PACK = (() => {
   const w = 0.04, d = 0.03, h = 0.08
   return {
-    h, body: packBody(w, d, h, 0.0022),
+    h, w, d, body: packBody(w, d, h, 0.0022),
     seam: new THREE.BoxGeometry(0.0013, 0.0034, w - 0.002).translate(0, 0.0017, 0),
     hole: new THREE.CylinderGeometry(0.0034, 0.0034, 0.0006, 10), holeAt: [d / 4, h + 0.0003, w / 4] as [number, number, number],
     straw: new THREE.CylinderGeometry(0.0013, 0.0013, 0.064, 6), wrap: new THREE.BoxGeometry(0.0028, 0.07, 0.0062),
