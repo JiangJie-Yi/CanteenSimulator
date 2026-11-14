@@ -439,7 +439,7 @@ type SceneProps = {
   view: ViewId
   /** a view chosen from its numbered marker in edit mode */
   onView: (v: ViewId) => void
-  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer') => void
+  onNotice: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer' | 'binBurnt') => void
   lang: Lang
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
@@ -2258,7 +2258,7 @@ export default function App() {
   // (by the screen's size: a tablet, touch screen or not, keeps the 3D grill)
   const flatGrill = phone && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
-  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
+  const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer' | 'binBurnt') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
   const sceneOrder = (id: string, guest?: number, reuse = false) => {
     const ok = changeQty(id, 1, reuse)
     // a customer's order is written onto the menu below, so you see it come in

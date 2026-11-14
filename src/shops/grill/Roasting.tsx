@@ -258,7 +258,7 @@ const BASKET_TOP: [number, number, number] = [2.0, 0, 0.4]
 const CONTAINER_TIP = (key: string) => {
   const kind = key.split('-')[0]
   const name = ({ plate: '餐盤', dish: '小碟', basket: '竹籃', box: '調味盒', bin: '水桶', tray: '大砧板', trash: '廚餘桶', rawdish: '生食碟', lantern: '行燈', bowl: '試吃碗' } as Record<string, string>)[kind] ?? '擺設'
-  return { title: name, hint: '拖曳移動' }
+  return { title: name, hint: kind === 'trash' ? '專放烤焦的食物｜拖曳移動' : '拖曳移動' }
 }
 /** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates), and how big: clear of the notch the chef
  * stands in and inside the table's front edge (the owner's: at 0.52 across from 1.95, 1.0 it ran half into the notch, the chef's belly in it,
@@ -307,7 +307,8 @@ const BUCKET_SCALE = 1
 const BIN_R = 0.27 * BUCKET_SCALE
 /** (scratch: a piece's size in the world, for its rod) */
 const ROD_WS = new THREE.Vector3()
-/** the trash bin for bare sticks, burnt scraps and the like (the water bucket is only for water), on the floor by the cook's right foot */
+/** the food waste bin (廚餘桶) for burnt food only (item 114, the owner's, 2026-11-14: "for the burnt food"; and the fish bones left
+ * on the plates), on the floor by the cook's right foot */
 const TRASH_R = 0.15
 const TRASH_H = 0.3
 /** where the bucket stands: on the floor past the table's end, beside the low dish rack toward the table's front corner, its back by the
@@ -4104,7 +4105,7 @@ type RoastingProps = {
   /** the player's best way with each food, from the tasting notes: the chef may cook to it */
   notes?: Record<string, { doneness?: number; dabs?: Record<string, number> }>
   /** something to tell the diner (it isn't cooked yet, it's burnt) */
-  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer') => void
+  onNotice?: (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer' | 'binBurnt') => void
   /** written every frame: how much smoke is coming off the fire (0..1), from food that's cooked and still on it */
   smoke?: RefObject<number>
   /** likewise for black smoke, from food left on until it burns */
@@ -6853,13 +6854,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const rim = raycaster.ray.intersectPlane(new THREE.Plane(UP, -root.localToWorld(new THREE.Vector3(0, TRASH_H, 0)).y),
         new THREE.Vector3())
       const atRim = rim ? root.worldToLocal(rim) : pos
-      if (roast.trash && Math.hypot(atRim.x - bin.x, atRim.z - bin.z) < TRASH_R + 0.12) {
-        // let go over the trash bin: it drops in — and throwing away good food draws a word
-        const stage = stageOf(q.p.progress / roast.times[q.p.id]).key
-        if (!q.p.stickOnly && stage === 'done') onNotice?.('waste')
+      const overBin = roast.trash && Math.hypot(atRim.x - bin.x, atRim.z - bin.z) < TRASH_R + 0.12
+      const burnt = stageOf(q.p.progress / roast.times[q.p.id]).key === 'burnt'
+      if (overBin && burnt) {
+        // let go over the food waste bin: what's burnt drops in (only that: item 114)
         q.p.trash = 0
         q.p.trashFrom.copy(pos)
         q.p.staged = false
+      } else if (overBin) {
+        // (anything that can still be eaten isn't thrown away: it goes back where it was, with a word why)
+        onNotice?.(stageOf(q.p.progress / roast.times[q.p.id]).key === 'done' ? 'waste' : 'binBurnt')
+        if (!q.p.collected && !q.p.staged) q.p.node.userData.onPlate = false
       } else if (q.p.staged && Math.hypot(pos.x, pos.z) < RING_CLEAR) {
         // raw food from the tray, let go over the fire: onto its skewer spot (or the net, or the ash)
         putOnFire(q.p)
