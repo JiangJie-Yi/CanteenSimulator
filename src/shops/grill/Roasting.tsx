@@ -7464,7 +7464,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (what the chef has brought back to his place: onto the board, from his hands, and prepared there a moment before it can go on;
     // with no chef walking the orders (the shop shut, a phone), what's waiting comes out as it used to)
     const T = CHEF_TRIP
-    const fetchLive = space === 'open' && bar && performance.now() - T.seenAt < 1000
+    // (not as the shop's closing, the staff going home: what's taken out of the freezer then would wait for a second cook who never comes for it,
+    // and never show (item 124, the owner's, 2026-11-15: "I clicked the fish and it didn't come onto the board"); out on the board at once)
+    const fetchLive = space === 'open' && bar && !SHOP.leaving && !SHOP.closing && performance.now() - T.seenAt < 1000
     if (T.phase === 'prepping' && T.keys.length) {
       for (const p of pieces.current) if (p.fetching && T.keys.includes(p.key)) {
         p.fetching = false
