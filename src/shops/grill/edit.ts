@@ -70,7 +70,7 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
   // (the rice sacks in the kitchen's corner, and the old rice tub and stove set aside by them)
   // (the old rice tub gone from it: it's the warming tub on the takeaway table now)
-  'grp-ricecorner': { zh: '米袋與舊飯桶', ja: '米袋と飯桶', members: ['ricesacks', 'hagama'] },
+  'grp-ricecorner': { zh: '米袋與舊飯桶', ja: '米袋と飯桶', members: ['ricesacks'] },   // (the old rice pot and stove taken away: item 134, the owner's)
   'grp-wc-m': { zh: '男廁組', ja: '男子トイレ一式', members: ['wc2-m-noren', 'wc2-m-basin', 'wc2-m-moss', 'wc2-m-dryer', 'wc2-m-towelbox', 'wc2-m-duck', 'wc2-m-lamp', 'wc2-m-toilet', 'wc2-m-remote3', 'wc2-m-paper', 'wc2-m-brush', 'wc2-m-lamp2', 'wc-m-slippers'] },
   'grp-wc-f': { zh: '女廁組', ja: '女子トイレ一式', members: ['wc2-f-noren', 'wc2-f-basin', 'wc2-f-vase', 'wc2-f-dryer', 'wc2-f-towelbox', 'wc2-f-duck', 'wc2-f-lamp', 'wc2-f-toilet', 'wc2-f-remote3', 'wc2-f-oto', 'wc2-f-brush', 'wc2-f-paper', 'wc2-f-bin', 'wc2-f-pads', 'wc2-f-lamp2', 'wc-f-slippers'] },
 }

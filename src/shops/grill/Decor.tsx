@@ -999,48 +999,6 @@ function MisoPot() {
   )
 }
 /**
- * The rice pot on its little stove (blender/hagama.py: a plastered clay stove, its fire mouth at the front, an iron 羽釜 under a wooden lid),
- * beside the miso soup, on the side away from the rice tub (the owner's: the rice cooked in the shop for the rice balls, game/rice). While it
- * cooks (bar.ts's RICE.kama) the coals glow in the mouth, it steams and its lid rattles as it boils; cooked, a last wisp till it's scooped
- * into the tub. Pointed at, it says how it's getting on.
- */
-const HAGAMA_URL = import.meta.env.BASE_URL + 'models/hagama.glb'
-useGLTF.preload(HAGAMA_URL)
-// (on the warming counter's third well (WARMER), smaller: it stood on the floor, in the middle of the kitchen's way)
-// (out of use (the owner's, 2026-11-11): put by on the dining room's floor beside the old rice tub)
-const HAGAMA_AT = { along: 6.05, lay: 4.55 }
-const HAGAMA_SCALE = 0.6
-const GLOW_OFF = new THREE.Color('#2a1a12')
-function Hagama() {
-  const gltf = useGLTF(HAGAMA_URL) as unknown as { scene: THREE.Group }
-  const model = useMemo(() => {
-    const r = gltf.scene.getObjectByName('Hagama')!.clone(true)
-    r.position.set(0, 0, 0)
-    const made = new Map<THREE.Material, THREE.Material>()
-    r.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      let t = made.get(src)
-      // (its fire out: the coals' glow in the mouth dark (the rice is cooked in the electric cooker now, the owner's))
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.name === 'KamaGlow' ? GLOW_OFF.clone() : src.color.clone(), map: src.map ?? null }); made.set(src, t) }
-      m.material = t
-      m.castShadow = src.name !== 'KamaGlow'
-      m.receiveShadow = true
-    })
-    inkModel(r, (m) => m.name === 'KamaGlow', { width: 0.0016, weld: true })
-    plainColours(r)
-    mergeByMaterial(r)
-    return { root: r }
-  }, [gltf])
-  const p = new THREE.Vector3().addScaledVector(ALONG, HAGAMA_AT.along).addScaledVector(LAY, HAGAMA_AT.lay)
-  return (
-    <group position={[p.x, ROOM_FLOOR, p.z]} rotation-y={WARMER_FACE} scale={HAGAMA_SCALE} {...nameOver('羽釜與爐灶', '老式的炊飯爐灶（已不用，現在用電鍋煮飯）')}>
-      <primitive object={model.root} />
-    </group>
-  )
-}
-/**
  * The electric rice cooker (blender/denkinabe.py: a classic Taiwanese 電鍋, pastel green, stainless lid, its switch lever and lamp at the
  * front), on a small stand beside the iron pot (the owner's: the rice for the rice balls is cooked in it, scooped from the open sack and
  * washed at the sink first, game/rice). While it cooks (bar.ts's RICE.kama) its lever is down and its lamp red, it steams from under its
@@ -1664,7 +1622,6 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="warmer" label="料理台（保溫座）"><Warmer /></Movable>
       <Movable id="prepcounter" label="料理台（飯糰）"><PrepCounter /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
-      <Movable id="hagama" label="羽釜與爐灶"><Hagama /></Movable>
       <Movable id="denkinabe" label="電鍋"><DenkiNabe /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><CharcoalSackAt /></group>
