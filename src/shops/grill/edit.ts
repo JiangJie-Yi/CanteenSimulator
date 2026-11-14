@@ -91,14 +91,14 @@ const loadGroups = (): Record<string, Group> => {
   let g: Record<string, Group> = {}
   try { g = JSON.parse(localStorage.getItem(KEY_G) ?? '{}') } catch { /* storage blocked */ }
   for (const [k, x] of Object.entries(g)) if (x.members.some(RETIRED)) g[k] = { ...x, members: x.members.filter((m) => !RETIRED(m)) }
-  // (the helmet off the cats' stand, onto its own stand by the staff's door (the owner's, 2026-11-12): out of whatever kept group held it, once;
-  // it and its stand are a group of their own then (DEFAULT_GROUPS' grp-kabuto))
-  try {
-    if (!localStorage.getItem('jgs-edit-kabuto-out-1')) {
-      for (const [k, x] of Object.entries(g)) if (k !== 'grp-kabuto' && x.members.includes('kabuto')) g[k] = { ...x, members: x.members.filter((m) => m !== 'kabuto') }
-      localStorage.setItem('jgs-edit-kabuto-out-1', '1')
-    }
-  } catch { /* storage blocked */ }
+  // (the helmet off the cats' stand, onto its own stand (the owner's, 2026-11-12): it and its stand out of whatever other kept group holds them,
+  // on every load, not once (item 98, the owner's, 2026-11-14: 'the helmet's gone': a page left open from before wrote its old groups back
+  // over the once-done fix, the helmet in the cats' group again and carried 4 m off with its shift, out of the room); a view's area may hold
+  // the stand; they're a group of their own then (DEFAULT_GROUPS' grp-kabuto))
+  for (const [k, x] of Object.entries(g)) {
+    if (k === 'grp-kabuto' || !x.members.some((m) => m === 'kabuto' || (m === 'kabutostand' && !isArea(k)))) continue
+    g[k] = { ...x, members: x.members.filter((m) => m !== 'kabuto' && (m !== 'kabutostand' || isArea(k))) }
+  }
   // (the views' areas planned again from where everything is now, once (the owner's, 2026-11-12: after the pieces were moved about): the old
   // areas broken up (their pieces and groups loose again, nothing else changed) and what they'd been made with forgotten, so the next time edit
   // mode opens each view's area is made afresh (groupByViews))
@@ -129,14 +129,15 @@ const loadGroups = (): Record<string, Group> => {
     unsettled.add(id)
     made.add(id)
   }
-  // (the shop's own beckoning cat into the cats' group a browser kept (item 97): it moves with the stand as the others do, once)
-  try {
-    if (!localStorage.getItem('jgs-edit-owncat-in-1')) {
-      const k = g['grp-doorcats']
-      if (k && !k.members.includes('owncat')) g['grp-doorcats'] = { ...k, members: [...k.members, 'owncat'] }
-      localStorage.setItem('jgs-edit-owncat-in-1', '1')
+  // (the shop's own beckoning cat into the cats' group a browser kept (item 97): it moves with the stand as the others do; on every load, as the
+  // helmet's above (item 98: the once-done key was set, then an open page's old groups written back without it, the cat 3 m off its stand))
+  {
+    const k = g['grp-doorcats']
+    if (k && !k.members.includes('owncat')) {
+      for (const [n, x] of Object.entries(g)) if (n !== 'grp-doorcats' && x.members.includes('owncat')) g[n] = { ...x, members: x.members.filter((m) => m !== 'owncat') }
+      g['grp-doorcats'] = { ...g['grp-doorcats'], members: [...k.members, 'owncat'] }
     }
-  } catch { /* storage blocked */ }
+  }
   // (groups a browser kept from before their default place was moved: moved on by as much, once (its key marks it done))
   for (const [key, id] of GENKAN_SHIFT) {
     try { if (localStorage.getItem(key)) continue } catch { continue }
