@@ -13,8 +13,12 @@
 export const RING_SLOTS = 8
 /** how many raw skewers wait on the board at most */
 export const BOARD_SLOTS = 4
-/** the bearings kept clear round the fire (the camera's line onto it, the plate's old place), and by how much each side */
-export const AVOID = [54, -40]
+/** the bearings kept clear round the fire (the camera's line onto it, the plate's old place; and the uchiwa fan stood by the hearth's edge
+ * (item 104, the owner's, 2026-11-14: two corn skewers stood right in front of it, at 80° and 116°, as the camera sees it)), and by how much
+ * each side */
+export const AVOID = [54, -40, 85]
+/** the fan's bearing (in AVOID) */
+export const FAN_AZ = 85
 export const AVOID_BY = 26
 
 /** the gap between two bearings, in degrees, 0..180 */
@@ -29,8 +33,9 @@ export const RING_AZ: readonly number[] = (() => {
   const edges = [...AVOID].sort((a, b) => a - b)
   const runs: [number, number][] = edges.map((a, i) => {
     const b = edges[(i + 1) % edges.length] + (i + 1 === edges.length ? 360 : 0)
-    return [a + AVOID_BY, b - AVOID_BY]
-  })
+    return [a + AVOID_BY, b - AVOID_BY] as [number, number]
+    // (kept-clear bearings near together leave no stretch between them: none goes there)
+  }).filter(([a, b]) => b > a)
   const total = runs.reduce((s, [a, b]) => s + Math.max(0, b - a), 0)
   // (shared out by length, each at least one; the rest by the largest leftover)
   const want = runs.map(([a, b]) => (Math.max(0, b - a) / total) * RING_SLOTS)
