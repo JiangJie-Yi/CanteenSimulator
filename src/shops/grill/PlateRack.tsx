@@ -229,6 +229,23 @@ function Plates({ design, list, geo = GEO, ink: inked = true, map }: { design: n
   )
 }
 type Matrix4List = THREE.Matrix4[]
+/** the ink line round every plate on a rack, whatever its design, as one draw (item 135: each design's own, a dozen draws a rack); the plates'
+ * own shape, a hair larger, its back faces */
+const PLATE_INK = new THREE.MeshBasicMaterial({ color: '#3b2a20', side: THREE.BackSide })
+function PlatesInk({ lists, geo = GEO }: { lists: Matrix4List[]; geo?: THREE.BufferGeometry }) {
+  const all = useMemo(() => lists.flat(), [lists])
+  const ref = useRef<THREE.InstancedMesh>(null)
+  const grow = useMemo(() => new THREE.Vector3(1.012, 1.012, 1.012), [])
+  useLayoutEffect(() => {
+    const r = ref.current
+    if (!r) return
+    all.forEach((m, i) => r.setMatrixAt(i, m.clone().scale(grow)))
+    r.count = all.length
+    r.instanceMatrix.needsUpdate = true
+  }, [all, grow])
+  if (!all.length) return null
+  return <instancedMesh key={all.length} ref={ref} args={[geo, PLATE_INK, all.length]} />
+}
 
 /** a wood's face with its grain running along u (a canvas, once per tone): streaks, the odd knot, a satin sheen */
 function grain(base: string, line: string) {
@@ -336,7 +353,8 @@ export function PlateRack({ part = 0 }: { part?: number }) {
       </group>
       </StaticBatch>
       <group position-y={CAB}>
-        {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+        {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} ink={false} />)}
+        <PlatesInk lists={whole} />
         {cols.map((c, i) => <PileColumn key={`c${i}-${c.n}`} col={c} />)}
       </group>
     </group>
@@ -397,7 +415,8 @@ export function LowPlateRack() {
       <group name="lowrack-front" position={[0, 0, LOW_D / 2 + 0.45]} />
       <group name="lowrack-top" position={[0, LOW_SHELVES[1] + 0.08, 0.02]} />
       <primitive object={body} />
-      {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} />)}
+      {whole.map((list, i) => <Plates key={`${i}-${list.length}`} design={i} list={list} ink={false} />)}
+      <PlatesInk lists={whole} />
       {cols.map((c, i) => <PileColumn key={`c${i}-${c.n}`} col={c} />)}
     </group>
   )
