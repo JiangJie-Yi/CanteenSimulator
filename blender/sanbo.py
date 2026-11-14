@@ -39,22 +39,49 @@ def P(x, y, z):
     return Vector((x, -z, y))
 
 
-N = 256
+N = 512
 u, v = grid01(N)
-# (pale hinoki, its grain fine along u)
-hin = mix((0.93, 0.85, 0.7), (0.85, 0.74, 0.57), smooth(0.6, 1.0, np.sin((u * 26 + fbm(N, 2, 4, 3)) * 2 * math.pi) * 0.5 + 0.5) * 0.5)
-# (a base side: the hinoki, and its opening painted in its middle: a rounded window, its top cusped in three, dark within, a thin pale line
-# round it as the cut edge's)
+# (pale hinoki, its grain fine along u: close straight lines, now and then a darker late-wood line, the colour wandering a little warmer and
+# cooler, fine pores; item 61 (the owner's, 2026-11-13: "the offering stand's look isn't real"): it was a flat pale wash)
+_f = fbm(N, 2, 4, 3)
+_g = np.sin((u * 60 + _f * 1.5) * 2 * math.pi) * 0.5 + 0.5
+_late = smooth(0.82, 0.97, np.sin((u * 13 + _f * 0.8) * 2 * math.pi) * 0.5 + 0.5)
+hin = mix((0.94, 0.86, 0.71), (0.86, 0.75, 0.58), smooth(0.55, 1.0, _g) * 0.45 + _late * 0.35)
+hin = hin * (0.96 + 0.06 * fbm(N, 6, 3, 3))[..., None]
+hin = hin * (0.985 + 0.015 * np.sin(v * 900 + u * 40))[..., None]
+hin_h = (smooth(0.55, 1.0, _g) * 0.15 + _late * 0.25).astype(np.float32)
+# (a base side: the hinoki, and its opening cut through it in its middle (眼象: a rounded window, its top cusped in three), drawn as a cut: the
+# board's thickness showing round its inside, its lower wall facing up and catching the light (pale end grain), its upper wall and sides in
+# shadow, the dark of the hollow behind, a hair of shadow on the face just under its top edge; its heights into a normal map, the cut's
+# edges standing in the light. It was a flat dark patch, which read as a sticker)
 x, y = (u - 0.5) * 2, (v - 0.42) * 2
 cusp = 0.62 + 0.1 * np.cos(np.clip(x / 0.62, -1, 1) * math.pi * 1.5)
-inside = (np.abs(x) < 0.62) & (y > -0.45) & (y < cusp) & ((x / 0.62) ** 2 + ((y + 0.45) / 1.0) ** 2 < 1.6)
-edge = (np.abs(x) < 0.68) & (y > -0.52) & (y < cusp + 0.07) & ~inside
+
+
+def window(grow):
+    return (np.abs(x) < 0.62 + grow) & (y > -0.45 - grow) & (y < cusp + grow) & ((x / (0.62 + grow)) ** 2 + ((y + 0.45) / (1.0 + grow)) ** 2 < 1.6)
+
+
+hole = window(-0.07)                     # (the dark of the hollow, seen through)
+cut = window(0.0) & ~hole               # (the board's thickness round it: its cut walls)
 side = hin.copy()
-side[edge] = side[edge] * 0.93
-side[inside] = np.array((0.16, 0.11, 0.07))
+low = cut & (y < -0.2)                  # (the lower wall, facing up)
+side[cut] = (hin * 0.62)[cut]
+side[low] = (mix(hin, (0.98, 0.9, 0.74), np.full(x.shape, 0.5)) * 1.0)[low]
+side[low] = side[low] * (0.92 + 0.08 * np.sin(x * 140))[low][:, None]     # (end grain's rings)
+dark = mix(np.zeros_like(hin) + np.array((0.05, 0.035, 0.025)), np.zeros_like(hin) + np.array((0.17, 0.12, 0.08)), smooth(0.6, -0.4, y))
+side[hole] = dark[hole]
+under = window(0.035) & ~window(0.0) & (y > 0.0)
+side[under] = side[under] * 0.82
+side_h = hin_h.copy()
+side_h[cut] = 0.55
+side_h[hole] = 0.0
+side_h[window(0.012) & ~window(0.0)] = 1.0
 M = {
-    "hinoki": pbr("SanboHinoki", (1, 1, 1), tex=image("sanbo_hinoki", np.clip(hin, 0, 1).astype(np.float32)), rough=0.6),
-    "side": pbr("SanboSide", (1, 1, 1), tex=image("sanbo_side", np.clip(side, 0, 1).astype(np.float32)), rough=0.6),
+    "hinoki": pbr("SanboHinoki", (1, 1, 1), tex=image("sanbo_hinoki", np.clip(hin, 0, 1).astype(np.float32)),
+                  nrm=image("sanbo_hinoki_n", to_normal(hin_h, 1.5).astype(np.float32), data=True), nrm_strength=1.0, rough=0.6),
+    "side": pbr("SanboSide", (1, 1, 1), tex=image("sanbo_side", np.clip(side, 0, 1).astype(np.float32)),
+                nrm=image("sanbo_side_n", to_normal(side_h.astype(np.float32), 4.0).astype(np.float32), data=True), nrm_strength=1.0, rough=0.6),
     "line": pbr("SanboLine", lin("#5a4632") if False else (0.09, 0.06, 0.04), rough=0.6),
     "mochi": pbr("SanboMochi", (0.93, 0.92, 0.88), rough=0.75),
     "paper": pbr("SanboPaper", (0.95, 0.94, 0.9), rough=0.9),
@@ -81,7 +108,9 @@ def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0, uv_side=False):
             if uv_side and abs(n.z) < 0.5:
                 # (each side's picture laid over the whole of it once: its opening in its middle)
                 a = c.x if abs(n.y) > abs(n.x) else c.y
-                uvl.data[li].uv = ((a - (x0 if abs(n.y) > abs(n.x) else -z1)) / (x1 - x0), (c.z - y0) / (y1 - y0))
+                # (the box's own points are about its middle: its height from -h/2 (item 61: taken from the floor's y0, the picture slid half a
+                # face down, its window's cusped top showing at its foot and its foot at the top, two dark smudges)
+                uvl.data[li].uv = ((a - (x0 if abs(n.y) > abs(n.x) else -z1)) / (x1 - x0), (c.z + (y1 - y0) / 2) / (y1 - y0))
             else:
                 uvl.data[li].uv = (c.x / 0.1 + 0.5, (c.y if abs(n.z) > 0.5 else c.z) / 0.1 + 0.5)
     finish(o, name, M[mat], smooth_shade=False)

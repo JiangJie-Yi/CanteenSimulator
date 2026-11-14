@@ -3909,7 +3909,8 @@ function SanboPart({ name }: { name: 'Sanbo' | 'Dango' }) {
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      // (its normal map kept: the hinoki's grain and the openings' cut edges stand in the light (item 61))
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, normalMap: src.normalMap ?? null }); t.name = src.name; made.set(src, t) }
       m.material = t
       m.castShadow = true
       m.receiveShadow = true
