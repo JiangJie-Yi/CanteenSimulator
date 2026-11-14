@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
-import { emptyKama, type Kama } from '@/game/rice'
+import { TRAY_MAX, emptyKama, type Kama } from '@/game/rice'
 import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
 import { fullStand, pour, pourFrom } from '@/game/sakeStand'
 import type { Gripe } from '@/game/reputation'
@@ -838,6 +838,10 @@ export const SEAT_BONES = new Map<number, number>()
  */
 // (empty when the day starts, the third cook to cook it (the owner's, 2026-11-11): it opened with a pot's worth cooked)
 export const RICE: { rice: number; kama: Kama; washing: boolean } = { rice: 0, kama: emptyKama(), washing: false }
+/** the finished rice balls on the bamboo tray at the rice-ball counter's end (game/rice, item 129): the third cook shapes them ahead
+ * (GuestBar3D's plater), the head chef's fetcher takes an order's off it first (Roasting); Decor shows as many. Full as the shop's first set out */
+export const ONIGIRI_TRAY = { n: TRAY_MAX }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __onigiri?: typeof ONIGIRI_TRAY }).__onigiri = ONIGIRI_TRAY
 /** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
  * plater; Decor draws it) */
 export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat } = { pot: emptyPot(), left: 0, served: 0, heat: 'auto' }

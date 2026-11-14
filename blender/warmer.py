@@ -285,25 +285,63 @@ for o in list(bpy.data.objects):
     bpy.data.objects.remove(o, do_unlink=True)
 parts = []
 set_ = []
+def rice_ball(name, x, y0, z, r, t):
+    """a rice ball as it's shaped by hand (item 129, the owner's, 2026-11-15: the counter too plain; they were three-sided cylinders with
+    their edges rounded): a rounded triangle, a corner up, 4 points round each corner, its faces puffed out (four rings front to back, the
+    outer two drawn in), its flat foot at y0; and its band of nori wrapped up from under its foot onto its front and back faces. Returns
+    (rice, nori)."""
+    bm = bmesh.new()
+    rc = r * 0.42
+    sec = []
+    for i, a0 in enumerate((math.pi / 2, math.pi / 2 + 2 * math.pi / 3, math.pi / 2 + 4 * math.pi / 3)):
+        cx, cy = (r - rc) * math.cos(a0), (r - rc) * math.sin(a0)
+        for k in range(4):
+            a = a0 - math.pi / 3 + (2 * math.pi / 3) * k / 3
+            sec.append((cx + rc * math.cos(a), cy + rc * math.sin(a)))
+    ybot = min(p[1] for p in sec)
+    rings = [(-t / 2, 0.8), (-t * 0.3, 0.97), (t * 0.3, 0.97), (t / 2, 0.8)]
+    g = 0.0015
+    # (its middle rings' foot a nori's thickness and a hair over y0, the nori under it; the outer rings drawn in, their foot a little up)
+    lift = y0 + g + 0.0005 - ybot * 0.97
+    vs = [[bm.verts.new(P(x + px * s, lift + py * s, z + dz)) for px, py in sec] for dz, s in rings]
+    n = len(sec)
+    for k in range(len(rings) - 1):
+        for j in range(n):
+            j2 = (j + 1) % n
+            bm.faces.new((vs[k][j], vs[k][j2], vs[k + 1][j2], vs[k + 1][j]))
+    bm.faces.new(vs[0][::-1])
+    bm.faces.new(vs[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    finish(o, name, M["rice"])
+    parts.append(o)
+    # (the nori: up the back face, under the foot along the puffed rings, up the front face; a hair off the rice all the way)
+    w, hb = r * 0.62, r * 0.75
+    yo = lift + ybot * 0.8 - y0              # (the outer rings' foot, over y0)
+    path = [(-t / 2 - g, yo + hb), (-t / 2 - g, yo), (-t * 0.3, 0.0005), (t * 0.3, 0.0005), (t / 2 + g, yo), (t / 2 + g, yo + hb)]
+    bm = bmesh.new()
+    row = [[bm.verts.new(P(x + sx * w / 2, y0 + yy, z + zz)) for sx in (-1, 1)] for zz, yy in path]
+    for k in range(len(row) - 1):
+        bm.faces.new((row[k][0], row[k][1], row[k + 1][1], row[k + 1][0]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name + "nori")
+    bm.to_mesh(me)
+    bm.free()
+    nori = bpy.data.objects.new(name + "nori", me)
+    bpy.context.collection.objects.link(nori)
+    finish(nori, name + "nori", M["nori"], smooth_shade=False)
+    parts.append(nori)
+    return o, nori
+
 # (the hinoki board, its rice balls on it: rounded triangles stood up, a band of nori round each one's foot)
 set_.append(box("board", BOARD_X - 0.36, BOARD_X + 0.36, H, H + 0.035, -0.2, 0.22, "hinoki", bev=0.008))
-for i, dx in enumerate((-0.18, 0.0, 0.18)):
-    x = BOARD_X + dx
-    bpy.ops.mesh.primitive_cylinder_add(vertices=3, radius=0.075, depth=0.055, location=P(x, H + 0.035 + 0.062, 0.04))
-    o = active()
-    # (a corner up, its flat faces to the front and back: turned a quarter about its own axis, then stood on its side facing the front)
-    o.rotation_euler = (0, 0, math.pi / 2)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    o.rotation_euler = (math.pi / 2, 0, 0)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    b = bevel(o, 0.03, 2)
-    b.limit_method = "NONE"
-    bpy.context.view_layer.objects.active = o
-    bpy.ops.object.modifier_apply(modifier=b.name)
-    finish(o, f"onigiri{i}", M["rice"])
-    parts.append(o)
-    set_.append(o)
-    set_.append(box(f"nori{i}", x - 0.045, x + 0.045, H + 0.036, H + 0.09, 0.04 + 0.0285, 0.04 + 0.0325, "nori"))
+# (two on it now, shaped, and the third cook's one in the making between them is the game's (item 129))
+for i, dx in enumerate((-0.2, 0.2)):
+    set_.extend(rice_ball(f"onigiri{i}", BOARD_X + dx, H + 0.035, 0.04, 0.072, 0.056))
 # (the bowl of hand water: lacquered red without, black within, the water in it)
 set_.append(disc("bowl", BOARD_X - 0.62, H + 0.045, 0.02, 0.1, 0.09, "lacquer", segs=16, r1=0.13))
 set_.append(disc("bowlin", BOARD_X - 0.62, H + 0.088, 0.02, 0.115, 0.004, "lacquerin", segs=16))
@@ -330,22 +368,14 @@ M.update({
 })
 
 
+done_ = []
+
+
 def onigiri_at(name, x, y0, z):
-    """a rice ball stood in place (the same make as the three on the board), its nori band at its foot"""
-    bpy.ops.mesh.primitive_cylinder_add(vertices=3, radius=0.06, depth=0.045, location=P(x, y0 + 0.05, z))
-    o = active()
-    o.rotation_euler = (0, 0, math.pi / 2)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    o.rotation_euler = (math.pi / 2, 0, 0)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    b = bevel(o, 0.024, 2)
-    b.limit_method = "NONE"
-    bpy.context.view_layer.objects.active = o
-    bpy.ops.object.modifier_apply(modifier=b.name)
-    finish(o, name, M["rice"])
-    parts.append(o)
-    set_.append(o)
-    set_.append(box(name + "nori", x - 0.036, x + 0.036, y0 + 0.002, y0 + 0.05, z + 0.0225 + 0.0005, z + 0.0265, "nori"))
+    """a finished rice ball on the tray: its own node (the game shows as many as the tray holds, game/rice's TRAY_MAX: item 129), its rice
+    and its nori one mesh"""
+    o, nori = rice_ball(name, x, y0, z, 0.06, 0.046)
+    done_.append(join([o, nori], name))
 
 
 # (the fillings, each in a small white dish before the board: a pickled plum, flaked salmon, kombu)
@@ -375,10 +405,30 @@ set_.append(box("traywallb", TX0, TX1, H, H + 0.05, TZ0, TZ0 + 0.012, "bamboo"))
 set_.append(box("traywallf", TX0, TX1, H, H + 0.05, TZ1 - 0.012, TZ1, "bamboo"))
 set_.append(box("traywalll", TX0, TX0 + 0.012, H, H + 0.05, TZ0, TZ1, "bamboo"))
 set_.append(box("traywallr", TX1 - 0.012, TX1, H, H + 0.05, TZ0, TZ1, "bamboo"))
+# (bamboo leaves laid under them, as rice balls are set out (item 129): long pointed blades, a little apart, a hair over the tray's floor)
+M["sasa"] = pbr("PrepSasa", lin("#3f7a32"), rough=0.5)
 for k in range(3):
-    onigiri_at(f"done{k}", TX0 + 0.075 + k * 0.14, H + 0.008, (TZ0 + TZ1) / 2 - 0.02)
+    bm_ = bmesh.new()
+    lx, lz, L_, W_ = TX0 + 0.075 + k * 0.14, (TZ0 + TZ1) / 2 - 0.02, 0.24, 0.07
+    pts = [(-L_ / 2, 0), (-L_ / 4, -W_ / 2), (L_ / 4, -W_ / 2 * 0.9), (L_ / 2, 0), (L_ / 4, W_ / 2 * 0.9), (-L_ / 4, W_ / 2)]
+    ang = math.pi / 2 + (k - 1) * 0.18
+    vs_ = [bm_.verts.new(P(lx + px * math.cos(ang) - pz * math.sin(ang), H + 0.0095 + 0.0004 * k, lz + px * math.sin(ang) + pz * math.cos(ang))) for px, pz in pts]
+    bm_.faces.new((vs_[0], vs_[1], vs_[5]))
+    bm_.faces.new((vs_[1], vs_[2], vs_[4], vs_[5]))
+    bm_.faces.new((vs_[2], vs_[3], vs_[4]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me_ = bpy.data.meshes.new(f"sasa{k}")
+    bm_.to_mesh(me_)
+    bm_.free()
+    lf = bpy.data.objects.new(f"sasa{k}", me_)
+    bpy.context.collection.objects.link(lf)
+    finish(lf, f"sasa{k}", M["sasa"], smooth_shade=False)
+    parts.append(lf)
+    set_.append(lf)
+for k in range(3):
+    onigiri_at(f"PrepDone{k}", TX0 + 0.075 + k * 0.14, H + 0.0105, (TZ0 + TZ1) / 2 - 0.02)
 prep_set = join(set_, "PrepSet")
-root = root_of("PrepCounter", [prep_set])
+root = root_of("PrepCounter", [prep_set] + done_)
 if PREVIEW:
     preview_cam()
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "prepcounter.glb"), os.path.join(PROJECT, "blender", "prepcounter.blend"),

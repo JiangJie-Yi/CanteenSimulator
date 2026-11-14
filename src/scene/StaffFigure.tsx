@@ -197,6 +197,9 @@ export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
 /** the hand wiping the bar down: up on the cloth, out in front (GuestBar3D lays the cloth under it, from the same reach) */
 export const WIPE_HAND = { y: 0.83, z: 0.44 }
+/** the hands shaping a rice ball at the rice-ball counter: out over its board (GuestBar3D holds the ball between them, from the same reach) */
+// (the counter's top is up at the chest: the board's at 0.98 of a figure's height units, a step out before them)
+export const SHAPE_HAND = { y: 0.96, z: 0.55 }
 /** a handheld game (the owner's: what one of the staff slacking has out, their thumbs at it): a dark body with its screen lit, a red grip on its
  * left and a blue one on its right, made once (its colours in its points, one draw), in the figure's frame where it's held up before the
  * chest, its screen tipped up toward the face (the owner's, 2026-11-10: it was held down at the belly, its screen to the ceiling, and they
@@ -459,7 +462,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
     const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number
-      sweep?: number; broom?: boolean; scrub?: number } | undefined
+      sweep?: number; broom?: boolean; scrub?: number; shape?: number } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -571,6 +574,14 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
           if (sd < 0) hand.position.set(-0.06, 0.28, 0.32)
           else hand.position.set(0.3 - 0.2 * shove, 0.3, 0.3)
         }
+      }
+      if (job?.shape !== undefined) {
+        // (shaping a rice ball at the counter (item 129): the hands cupped round it out over the board, the right on top pressing down on it and
+        // the left under it, coming together and easing apart three times over, the ball turned a little each time)
+        const k = job.shape * Math.PI * 2 * 3, press = 0.5 - 0.5 * Math.cos(k)
+        if (sd > 0) hand.position.set(0.02 + 0.015 * Math.sin(k * 0.5), SHAPE_HAND.y + 0.075 - 0.03 * press, SHAPE_HAND.z)
+        else hand.position.set(-0.03, SHAPE_HAND.y - 0.01, SHAPE_HAND.z + 0.01)
+        hand.rotation.x = sd > 0 ? -1.5 : -0.3
       }
       if (job?.scrub !== undefined) {
         // (washing up at the sink (the owner's, 2026-11-12: the servers had no washing motion): both hands down in front into the basin, the

@@ -13,7 +13,7 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
+import { ONIGIRI_TRAY, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
@@ -1244,6 +1244,8 @@ const PREP_URL = import.meta.env.BASE_URL + 'models/prepcounter.glb'
 useGLTF.preload(PREP_URL)
 // (up against the warmer's right end, in line with it (the owner's, 2026-11-11: 併桌): their tops' ends 2 mm apart (each 0.02 proud of its
 // cabinet); it stood back in the kitchen at along 5.19, lay 3.4)
+/** the board's middle along the counter and the counter's top, in its own frame (blender/warmer.py's BOARD_X, H + the board) */
+const PREP_BOARD_X = 0.35, PREP_TOP = 1.236 + 0.035
 const PREP_AT = { along: 4.3, lay: -0.5 + 0.7 + 0.02 + 0.002 + 0.02 + 1.5 - 0.937 }
 function PrepCounter() {
   const gltf = useGLTF(PREP_URL) as unknown as { scene: THREE.Group }
@@ -1268,14 +1270,26 @@ function PrepCounter() {
     })
     // (no ink: only the counter's body had it, and that's the warmer's model now)
     plainColours(r)
-    mergeByMaterial(r)
+    // (the finished rice balls on the tray left whole, shown as many as it holds (item 129))
+    mergeByMaterial(r, (o) => /^PrepDone/.test(o.name))
     return r
   }, [gltf])
+  const done = useMemo(() => [0, 1, 2].map((k) => model.getObjectByName(`PrepDone${k}`)).filter((o): o is THREE.Object3D => !!o), [model])
+  const shown = useRef(-1)
+  useFrame(() => {
+    if (ONIGIRI_TRAY.n === shown.current) return
+    shown.current = ONIGIRI_TRAY.n
+    done.forEach((o, k) => { o.visible = k < ONIGIRI_TRAY.n })
+  })
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, PREP_AT.along).addScaledVector(LAY, PREP_AT.lay)
   return (
-    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '味噌湯在加熱座上保溫；白飯從電鍋取，在砧板上捏飯糰')}>
+    <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE}
+      {...nameOver('料理台', '味噌湯在加熱座上保溫；白飯從電鍋取，三廚在砧板上捏飯糰，捏好的放竹盤')}>
       <primitive object={model} />
+      {/* (where the third cook shapes the rice balls: the board's middle, and a step out from the counter's front before it (item 129)) */}
+      <group name="prep-board" position={[PREP_BOARD_X, PREP_TOP + 0.06, 0.04]} />
+      <group name="prep-front" position={[PREP_BOARD_X, 0, WARMER_D / 2 + 0.35]} />
     </group>
   )
 }

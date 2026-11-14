@@ -30,7 +30,7 @@ import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
 import { unlitShade } from '@/game/roomLights'
-import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom, ownerSweepPose, OWNER_BEND } from '@/scene/StaffFigure'
+import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SHAPE_HAND, SweepBroom, ownerSweepPose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
 import { BossModel, drawnCentre } from './Boss'
@@ -70,7 +70,7 @@ import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
 import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
-import { RICE_FULL, SCOOP_S, WASH_S, emptyKama, kamaTick, riceGoes, setOn } from '@/game/rice'
+import { RICE_FULL, SCOOP_S, SHAPE_EACH, TRAY_MAX, WASH_S, emptyKama, kamaTick, riceGoes, setOn, takeRice, trayWants } from '@/game/rice'
 import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
 import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes } from '@/game/soup'
 import { bottleClink, lightSwitchSound, plateClink, stoolSound, washSplash } from './restroomSound'
@@ -81,7 +81,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -133,6 +133,9 @@ const PEOPLE_SCALE = 1.3
 /** the staff (the servers) drawn the boss's height, a head shorter than the customers: the boss (Roasting's BOSS_SCALE) is 0.95 tall at 1.68,
  * a figure here 0.97 tall at this and the shop's own scale of 2 */
 const STAFF_SCALE = (1.05 * 0.8 * 2 * 0.95) / (0.97 * 2)
+/** the rice ball in the third cook's hands (item 129): a squashed icosphere (no pole), and a band of nori round its foot */
+const BALL_GEO = new THREE.IcosahedronGeometry(0.03, 1).scale(1, 0.95, 0.68)
+const BALL_NORI_GEO = new THREE.BoxGeometry(0.034, 0.022, 0.044)
 /** the owner's figure out serving, inside a server's frame (STAFF_SCALE): his own height (Roasting's BOSS_SCALE in the shop's frame) */
 const OWNER_IN_STAFF = (1.05 * 0.8) / STAFF_SCALE
 const OWNER_HAND = new THREE.Vector3()
@@ -2921,7 +2924,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'toRackLow' | 'takeLow' | 'toLow' | 'putLow'
     | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
     | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir' | 'rake'
-    | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate' | 'toSake' | 'pourSake'
+    | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate' | 'toSake' | 'pourSake' | 'toShape' | 'shape'
     t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number
     /** what they've gone for for the fire: the charcoal or the water (what's in their hands to the hearth, whatever the grill asks meanwhile) */
@@ -2937,6 +2940,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const platerStack = useRef<THREE.Group>(null)
   /** the bowl of rice in the plater's hands (washing it, carrying it to the pot, and the cooked rice to the tub) */
   const platerBowl = useRef<THREE.Group>(null)
+  /** the rice ball in the third cook's hands as they shape it (item 129) */
+  const platerBall = useRef<THREE.Group>(null)
   /** the bundle of iron skewers the plater carries to the sink and back to the holder */
   const platerSkewers = useRef<THREE.Group>(null)
   /** the same in a server's hands (one at a time washes them) */
@@ -4107,6 +4112,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       /** where they stand at the cooker; its top, where the rice goes in */
       const kamaSpot = () => { marks.current.delete('cooker-front'); return inBar('cooker-front', home()).setY(0) }
       const kamaTop = () => { marks.current.delete('cooker-top'); return inBar('cooker-top', home()) }
+      /** where they stand at the rice-ball counter's board, and the board (Decor's PrepCounter, item 129) */
+      const prepSpot = () => { marks.current.delete('prep-front'); return inBar('prep-front', home()).setY(0) }
+      const prepBoard = () => { marks.current.delete('prep-board'); return inBar('prep-board', home()) }
       /** the open sack of rice (by the sake, just past the kitchen's edge): its middle, the kitchen's edge nearest it (the route there), and
        * where they stand at it, stepped down off the kitchen's floor to it */
       const sackSpots = () => {
@@ -4257,6 +4265,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             pl.len = pathLength(pl.path)
             pl.phase = 'toRackLow'
             pl.t = 0
+            away(true)
+          } else if (open && !SHOP.leaving && trayWants(ONIGIRI_TRAY.n, RICE.rice, RICE.kama)) {
+            // (nothing else wanting and the rice cooked: to the rice-ball counter to shape rice balls onto its tray, up to its three (item
+            // 129, the owner's, 2026-11-15: the third cook shaping them, seen))
+            pl.pos.copy(home())
+            setOff(prepSpot(), 'toShape')
             away(true)
           } else if (open && !SHOP.leaving && performance.now() / 1000 - soupAt.current > SOUP_EVERY) {
             // (nothing else wanting: to the miso soup now and then, to stir it as it's kept warm)
@@ -4411,9 +4425,20 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         RICE.kama = setOn()
         setOff(home(), 'home')
       }
+      else if (pl.phase === 'toShape') walk(() => { pl.phase = 'shape'; faceTo(prepBoard()) })
+      else if (pl.phase === 'shape' && pl.t > SHAPE_EACH) {
+        // (one shaped, its rice out of the cooker, set on the tray; another while it wants more and nothing's called them, else back)
+        const r = takeRice(RICE.rice, RICE.kama)
+        RICE.rice = r.rice
+        RICE.kama = r.kama
+        ONIGIRI_TRAY.n = Math.min(TRAY_MAX, ONIGIRI_TRAY.n + 1)
+        if (open && !SHOP.leaving && trayWants(ONIGIRI_TRAY.n, RICE.rice, RICE.kama) && !(FIRE_TEND.want && !FIRE_TEND.done) && !SAKE.want.length) pl.t = 0
+        else setOff(home(), 'home')
+      }
       const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'toRackLow' || pl.phase === 'toLow' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama'
         || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder'
         || pl.phase === 'toCrate' || pl.phase === 'toBucket' || pl.phase === 'toHearth' || pl.phase === 'toSoup' || pl.phase === 'toCoalSack' || pl.phase === 'toFill'
+        || pl.phase === 'toShape'
       if (mv !== platerMoving) setPlaterMoving(mv)
       const o = platerObj.current
       if (o) {
@@ -4428,7 +4453,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const bend = (k: number) => Math.sin(Math.PI * Math.min(1, pl.t / k))
         o.userData.lean = pl.phase === 'liftSack' ? 0.5 * bend(0.8) : pl.phase === 'feedCoal' || pl.phase === 'sprinkle' || pl.phase === 'scoopWater' ? 0.32 * bend(0.8)
           : pl.phase === 'rake' ? 0.26 * bend(RAKE_S)
-          : pl.phase === 'takeCoal' ? 0.18 * bend(0.6) : pl.phase === 'fillCrate' ? 0.22 * Math.sin(Math.PI * Math.max(0, Math.min(1, (pl.t - 0.2) / 0.7))) : pl.phase === 'stir' ? 0.14 : 0
+          : pl.phase === 'takeCoal' ? 0.18 * bend(0.6) : pl.phase === 'fillCrate' ? 0.22 * Math.sin(Math.PI * Math.max(0, Math.min(1, (pl.t - 0.2) / 0.7))) : pl.phase === 'stir' ? 0.14
+          : pl.phase === 'shape' ? 0.12 : 0
+        // (shaping a rice ball: both hands cupped round it before them, pressed together and turned, three presses to one (StaffFigure))
+        o.userData.shape = pl.phase === 'shape' ? pl.t / SHAPE_EACH : undefined
         // (up on the kitchen's dais)
         // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)
         if (KITCHEN_DROP < 0) {
@@ -4460,6 +4488,19 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           pb.rotation.z = pl.phase === 'load' ? Math.sin(Math.PI * k) * 1.1 : 0
           const rice = pb.getObjectByName('bowl-rice')
           if (rice) rice.scale.setScalar(pl.phase === 'load' ? Math.max(0.01, 1 - k) : pl.phase === 'scoopRaw' ? Math.max(0.01, k) : 1)
+        }
+      }
+      // (the rice ball between their hands as they shape it, turned a little with each press; its nori wrapped on at the last)
+      const ball = platerBall.current
+      if (ball && o) {
+        const on = pl.phase === 'shape'
+        ball.visible = on
+        if (on) {
+          const k = pl.t / SHAPE_EACH
+          ball.position.copy(heldBase()).add(new THREE.Vector3(0, (SHAPE_HAND.y + 0.03) * STAFF_SCALE, (SHAPE_HAND.z + 0.01) * STAFF_SCALE).applyAxisAngle(UP_Y, pl.yaw))
+          ball.rotation.set(0, pl.yaw + Math.sin(k * Math.PI * 6) * 0.25, 0)
+          const nori = ball.getObjectByName('ball-nori')
+          if (nori) nori.visible = k > 0.75
         }
       }
       // (the bundle of skewers in their hands, from the tray to the holder; scrubbed to and fro at the sink)
@@ -5627,6 +5668,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           ))}
         </group>
       ))}
+      {given && (
+        <group ref={platerBall} visible={false}>
+          {/* (a rice ball in the making, and its band of nori) */}
+          <mesh geometry={BALL_GEO}><meshToonMaterial color="#f6f3ea" /></mesh>
+          <mesh name="ball-nori" geometry={BALL_NORI_GEO} position={[0, -0.012, 0]}><meshToonMaterial color="#1d2a1e" /></mesh>
+        </group>
+      )}
       {given && (
         <group ref={platerBowl} name="plater-bowl" visible={false}>
           {/* (a wooden rice-washing bowl, the rice in it) */}

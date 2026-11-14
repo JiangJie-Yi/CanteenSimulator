@@ -36,3 +36,20 @@ export function takeRice(rice: number, kama: Kama): { rice: number; kama: Kama }
   const left = Math.max(0, rice - 1)
   return { rice: left, kama: left === 0 && kama.state === 'done' ? emptyKama() : kama }
 }
+
+// ---- the rice balls made ahead (item 129, the owner's, 2026-11-15: the third cook shaping rice balls at the rice-ball counter): when the
+// third cook has nothing else to do and the cooker's rice is cooked, they shape rice balls one by one onto the bamboo tray at the counter's
+// end, up to its three; the head chef's fetcher takes an order's rice balls off the tray first, and shapes only what it's short of himself
+
+/** how many finished rice balls the tray holds; seconds the third cook takes to shape one */
+export const TRAY_MAX = 3
+export const SHAPE_EACH = 2.4
+
+/** whether the third cook goes to shape one: the tray not full, rice left in a cooked pot */
+export const trayWants = (n: number, rice: number, kama: Kama) => n < TRAY_MAX && rice > 0 && kama.state === 'done'
+
+/** an order of `want` rice balls fetched: as many as the tray has taken off it, the rest to be shaped there and then */
+export function fromTray(n: number, want: number): { use: number; left: number; shape: number } {
+  const use = Math.max(0, Math.min(n, want))
+  return { use, left: n - use, shape: want - use }
+}

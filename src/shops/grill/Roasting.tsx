@@ -39,7 +39,7 @@ import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from '.
 import { fireCall, HOT_AT } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
-import { SHAPE_S, takeRice } from '@/game/rice'
+import { SHAPE_S, fromTray, takeRice } from '@/game/rice'
 import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
 import { SAKE_SERVE_S, SAKE_SIDE, SAKE_WAIT_S } from '@/game/sakeStand'
 import { CubbyStock } from './KitchenStores'
@@ -77,7 +77,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
-import { AISLE, aisleCornerOf, FIGURES, FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
+import { AISLE, aisleCornerOf, FIGURES, FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -882,6 +882,8 @@ export const CHEF_TRIP = {
   /** when he last pushed a skewer through what's on the board (his hand drawn pushing it in, for the 0.6 s the rod takes to go in) */
   pierceAt: -1e9,
   phase: 'idle' as ChefPhase, store: 'freezer' as Store, keys: [] as string[], t: 0, seenAt: -1e9, fanUntil: 0,
+  /** of an order of rice balls, how many he's to shape himself, the rest taken off the third cook's tray (item 129; -1: not looked yet) */
+  shape: -1,
   /** where he stands to take it out, and what he faces there (Roasting's frame) */
   spot: new THREE.Vector3(), face: new THREE.Vector3(),
   /** where what he carries is held, in the world */
@@ -891,7 +893,8 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 /** how long what he's brought is prepared on the board: a rice ball shaped in his hands (game/rice's SHAPE_S), else salted, scored, skewered */
 // (the rice balls are shaped at the rice-ball counter, by the cooker, as the rice is taken (TAKE_S + SHAPE_S there): a moment at the board)
 const prepOf = (store: Store) => (store === 'ricetub' ? 0.3 : PREP_S)
-const takeOf = (store: Store) => (store === 'ricetub' ? TAKE_S + SHAPE_S : TAKE_S)
+// (none to shape, all off the third cook's tray (item 129): only the taking)
+const takeOf = (store: Store, shape = 1) => (store === 'ricetub' && shape > 0 ? TAKE_S + SHAPE_S : TAKE_S)
 /**
  * What the head chef has in his hands (the owner's: nothing flies across the kitchen by itself): a piece taken off the board to the fire,
  * or off the fire to the plating place. Its steps: reaching for it where it is, carrying it in his hands as he turns and steps to where
@@ -1091,7 +1094,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     o.userData.lean = 0
     o.userData.carry = T.phase === 'toBoard' || (T.phase === 'taking' && T.t > TAKE_S * 0.5)
     // (and shaping the rice balls at the counter as he takes the rice)
-    o.userData.prep = T.phase === 'prepping' || (T.phase === 'taking' && T.store === 'ricetub' && T.t > TAKE_S)
+    o.userData.prep = T.phase === 'prepping' || (T.phase === 'taking' && T.store === 'ricetub' && T.shape > 0 && T.t > TAKE_S)
     const pierced = performance.now() - T.pierceAt
     o.userData.pierce = T.phase === 'prepping' && pierced < 600 ? pierced / 600 : undefined
     o.userData.fanNow = false
@@ -1130,10 +1133,13 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     if (T.phase === 'taking') {
       o.position.copy(T.spot)
       o.rotation.y = turnToward(o.rotation.y, Math.atan2(T.face.x - T.spot.x, T.face.z - T.spot.z), dt)
+      // (rice balls: what the third cook's tray has taken off it as he comes to it, only the rest shaped there (item 129))
+      if (T.store === 'ricetub' && T.shape < 0) { const f = fromTray(ONIGIRI_TRAY.n, T.keys.length); ONIGIRI_TRAY.n = f.left; T.shape = f.shape }
       T.t += dt * paceOfStaff(id)
-      if (T.t >= takeOf(T.store)) {
+      if (T.t >= takeOf(T.store, T.shape)) {
         // (a rice ball's rice out of the cooker, for each one he's making (game/rice))
-        if (T.store === 'ricetub') for (let i = 0; i < T.keys.length; i++) { const r = takeRice(RICE.rice, RICE.kama); RICE.rice = r.rice; RICE.kama = r.kama }
+        if (T.store === 'ricetub') for (let i = 0; i < Math.max(0, T.shape); i++) { const r = takeRice(RICE.rice, RICE.kama); RICE.rice = r.rice; RICE.kama = r.kama }
+        T.shape = -1
         T.phase = afterPhase(T.phase); T.t = 0
       }
       hand()
@@ -1269,7 +1275,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       return
     }
     // (on their way: from where they are, down off a seat onto the floor, finishing up first, then home or upstairs)
-    if (fetcher) { CHEF_TRIP.phase = 'idle'; CHEF_TRIP.keys = []; trip.current = null; o.userData.carry = o.userData.prep = false; FETCHER.busy = false }
+    if (fetcher) { CHEF_TRIP.phase = 'idle'; CHEF_TRIP.keys = []; CHEF_TRIP.shape = -1; trip.current = null; o.userData.carry = o.userData.prep = false; FETCHER.busy = false }
     if (!commute.current || commute.current.dir !== 'out') {
       commute.current = makeTrip(id, 'out', wayOf(o.position.clone().setY(way[0].y), o), delayOf(id, SHOP.day), paceOf(id))
       SHOP.walking.add(id)
