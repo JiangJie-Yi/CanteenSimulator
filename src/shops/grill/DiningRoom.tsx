@@ -2449,19 +2449,36 @@ const WC_WINDOW_FALL = (() => {
 })()
 function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number, number, number][] }) {
   const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0, depthWrite: false }), [])
-  useEffect(() => () => mat.dispose(), [mat])
+  /** and the other way: its light on after dark, its rooms warmly lit within (item 126, the owner's, 2026-11-15: "the toilets' light at night
+   * isn't right: shut it's fine, open the door and it gives itself away": the floor outside the door bright with its spill, the room inside
+   * as dim as the shop's night), laid on once over what's in them */
+  const warm = useMemo(() => new THREE.MeshBasicMaterial({ color: WC_ROOM_WARM, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    toneMapped: false }), [])
+  useEffect(() => () => { mat.dispose(); warm.dispose() }, [mat, warm])
   const group = useRef<THREE.Group>(null)
+  const lit = useRef<THREE.Group>(null)
   useFrame(() => {
-    const want = wcDarkness(getLights().wc[who], skyNow())
+    const on = getLights().wc[who], sky = skyNow()
+    const want = wcDarkness(on, sky)
     mat.opacity += (want - mat.opacity) * 0.08
     if (group.current) group.current.visible = mat.opacity > 0.01
+    const glow = on ? (sky === 'night' ? 1 : sky === 'day' ? 0 : 0.5) : 0
+    warm.opacity += (glow - warm.opacity) * 0.08
+    if (lit.current) lit.current.visible = warm.opacity > 0.01
   })
   return (
-    <group ref={group} visible={false}>
-      {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={mat} position={[x, sy / 2, z]} scale={[sx, sy, sz]} renderOrder={4} />)}
-    </group>
+    <>
+      <group ref={group} visible={false}>
+        {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={mat} position={[x, sy / 2, z]} scale={[sx, sy, sz]} renderOrder={4} />)}
+      </group>
+      <group ref={lit} visible={false}>
+        {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={warm} position={[x, sy / 2, z]} scale={[sx, sy, sz]} renderOrder={4} raycast={() => {}} />)}
+      </group>
+    </>
   )
 }
+/** how much warm light a lit toilet's rooms are given after dark (added, item 126) */
+const WC_ROOM_WARM = new THREE.Color('#3a2a16')
 /** a wall of the toilet's rooms, facing into them: charred cedar to the waist with a rail along it, cream plaster over; `len` along it, its
  * middle at `at`, turned `yaw` (unturned, it faces +z); the cedar's boards their own width whatever its length. `cut`: the wall that's cut
  * away for the view from outside (seen from behind, its faces aren't drawn), its rail a strip on its face, not a bar left floating */
@@ -2950,7 +2967,8 @@ function ToiletPanel({ who }: { who: 'm' | 'f' }) {
     const shut = 1 - k.current
     // (the light off, no glow at all: plain paper in the room's light (the owner's: it still showed a little))
     paper.emissiveIntensity += ((on ? 0.5 * dark * shut : 0) - paper.emissiveIntensity) * ease
-    if (spill.current) spill.current.opacity += ((on ? 0.32 * dark * (1 + 0.8 * k.current) : 0) - spill.current.opacity) * ease
+    // (less of it brightening as the door opens than before: the room's own warm light within now shows through it (item 126))
+    if (spill.current) spill.current.opacity += ((on ? 0.32 * dark * (1 + 0.4 * k.current) : 0) - spill.current.opacity) * ease
     const want = d.passing > 0 || d.open ? 1 : 0
     // (heard as it starts to move, opening or shutting, as loud as it's near (the owner's))
     if (want !== was.current) {
