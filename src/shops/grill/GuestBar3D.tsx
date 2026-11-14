@@ -3045,7 +3045,30 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const side = new THREE.Vector3(front.z, 0, -front.x)
       const y = new THREE.Box3().setFromObject(top).max.y
       f.updateWorldMatrix(true, false)
-      counterSpot.current = { at: f.worldToLocal(bw.addScaledVector(front, 0.52).addScaledVector(side, 0.25).setY(y)), t: now }
+      let at = bw.addScaledVector(front, 0.52).addScaledVector(side, 0.25).setY(y)
+      // (worked out in the counter top's own frame (the owner's, 2026-11-15: the stack hung half off the counter's corner, over the palm
+      // brush's dish, the sink moved since those offsets were measured): in the clear space in front of the draining basket, between its
+      // front edge and the counter's, toward the end away from the basin, a plate's width and a centimetre in from every edge)
+      const tm = top as THREE.Mesh
+      if (tm.isMesh) {
+        if (!tm.geometry.boundingBox) tm.geometry.computeBoundingBox()
+        const tb = tm.geometry.boundingBox!, ts = tm.getWorldScale(new THREE.Vector3()).x, fs = f.getWorldScale(new THREE.Vector3()).x
+        // (a plate's own reach measured off one of the drawn ones (its rim reaches past PLATE_R), and a centimetre)
+        const one = sinkPlates.current.find((q) => q)
+        const reach = one ? (() => { const sz = new THREE.Box3().setFromObject(one).getSize(new THREE.Vector3()); return Math.max(sz.x, sz.z) / 2 })() : PLATE_R * IN_SINK * fs * 1.2
+        const r = (reach + 0.01) / ts
+        const bb = new THREE.Box3()
+        const wb = new THREE.Box3().setFromObject(b)
+        for (const cx of [wb.min.x, wb.max.x]) for (const cy of [wb.min.y, wb.max.y]) for (const cz of [wb.min.z, wb.max.z]) bb.expandByPoint(tm.worldToLocal(new THREE.Vector3(cx, cy, cz)))
+        // (the basket against the back (-z) or the front: the clear strip on the other side of it; along it, its far end's half)
+        const back = (bb.min.z + bb.max.z) / 2 < (tb.min.z + tb.max.z) / 2
+        const z = back ? (bb.max.z + tb.max.z) / 2 : (bb.min.z + tb.min.z) / 2
+        const farX = (bb.min.x + bb.max.x) / 2 > (tb.min.x + tb.max.x) / 2
+        const x = farX ? (bb.min.x + bb.max.x) / 2 + (bb.max.x - bb.min.x) / 4 : (bb.min.x + bb.max.x) / 2 - (bb.max.x - bb.min.x) / 4
+        const l = new THREE.Vector3(THREE.MathUtils.clamp(x, tb.min.x + r, tb.max.x - r), 0, THREE.MathUtils.clamp(z, tb.min.z + r, tb.max.z - r))
+        at = tm.localToWorld(l).setY(y)
+      }
+      counterSpot.current = { at: f.worldToLocal(at), t: now }
     }
     return counterSpot.current.at.clone().add(new THREE.Vector3(0, 0.002 + Math.min(k, SINK_SHOWN - 1) * STACK_GAP * IN_SINK, 0))
   }
