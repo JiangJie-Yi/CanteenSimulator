@@ -1350,8 +1350,9 @@ function SakeStand() {
         } else if (/ShochuGlass|ShochuCupGlass/.test(src.name)) {
           // (the shochu's green glass and the shot glasses: see-through, shining, a little lit by their own colour; no transmission)
           const green = /ShochuGlass/.test(src.name)
-          const g = new THREE.MeshStandardMaterial({ color: green ? '#3f9a5e' : '#eef6f6', transparent: true, opacity: green ? 0.62 : 0.3,
-            depthWrite: false, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.5, emissive: green ? '#1f5a34' : '#3a4444' })
+          // (the cups a pale blue-white, thicker and lit a little more within (item 131): over the black tray they read as dark grey stubs)
+          const g = new THREE.MeshStandardMaterial({ color: green ? '#3f9a5e' : '#e4f2f8', transparent: true, opacity: green ? 0.62 : 0.5,
+            depthWrite: false, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.5, emissive: green ? '#1f5a34' : '#6a8088' })
           reflectStudio(g)
           t = g
         } else if (/SakeLiquid|ShochuLiquid/.test(src.name)) {

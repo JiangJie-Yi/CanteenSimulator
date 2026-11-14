@@ -473,6 +473,8 @@ M = {
     "liquid": pbr("SakeLiquid", (0.96, 0.92, 0.74), rough=0.05),
     "wood": pbr("SakeStandWood", (1, 1, 1), tex=image("sake_stand_wood", stand_col), rough=0.6),
     "lacquer": pbr("SakeStandLacquer", (0.04, 0.03, 0.03), rough=0.3),
+    # (the end boards' wood: the stand's own grain stained a deep chestnut (item 131))
+    "dark": pbr("SakeStandEnd", (1, 1, 1), tex=image("sake_stand_end", (stand_col * np.array([0.42, 0.27, 0.17], np.float32)).astype(np.float32)), rough=0.45),
 }
 parts = []
 
@@ -607,6 +609,44 @@ block("SakeStandBand0", -L / 2 - 0.002, L / 2 + 0.002, -D / 2 - 0.003, -D / 2 + 
 block("SakeStandBand1", -L / 2 - 0.002, L / 2 + 0.002, -D / 2 + FRONT_D - 0.003, -D / 2 + FRONT_D + 0.006, BACK_H - 0.008, BACK_H + 0.003, M["lacquer"])
 for xs in (-1, 1):
     block(f"SakeStandFoot{xs}", xs * L / 2 - (0.05 if xs > 0 else -0.05) - 0.03, xs * L / 2 - (0.05 if xs > 0 else -0.05) + 0.03, -D / 2 + 0.01, D / 2 - 0.01, 0.0, 0.0125, M["lacquer"])
+
+# ---- a frame round it for the customers to look at (item 131, the owner's, 2026-11-15: "designed, mostly for the customers to see, as
+# good-looking as it can be"): an end board each side in chestnut-stained wood, rising from the front step's height at the front to over
+# the back step behind, its top drawn along in a soft curve and its corners eased; a lacquered rail across the back between them, the
+# bottles stood in a little display case
+def end_board(name, x0, x1):
+    pts = [(-D / 2 - 0.004, 0.0)]
+    for k in range(9):
+        t = k / 8
+        # (a soft rise: low at the front, up over the back step, flat along the top behind)
+        y = -D / 2 - 0.004 + t * (D + 0.008)
+        z = FRONT_H + 0.03 + (BACK_H + 0.07 - FRONT_H - 0.03) * (0.5 - 0.5 * math.cos(math.pi * min(1.0, t / 0.75)))
+        pts.append((y, z))
+    pts.append((D / 2 + 0.004, 0.0))
+    bm_ = bmesh.new()
+    uv_ = bm_.loops.layers.uv.new()
+    a = [bm_.verts.new((x0, y, z)) for y, z in pts]
+    b = [bm_.verts.new((x1, y, z)) for y, z in pts]
+    n = len(pts)
+    for j in range(n):
+        j2 = (j + 1) % n
+        f = bm_.faces.new((a[j], a[j2], b[j2], b[j]))
+        for l in f.loops:
+            l[uv_].uv = (0.5 + l.vert.co.y / D * 0.45, 0.5 + l.vert.co.z * 2.5)
+    for side in (a[::-1], b):
+        f = bm_.faces.new(side)
+        for l in f.loops:
+            l[uv_].uv = (0.5 + l.vert.co.y / D * 0.45, 0.5 + l.vert.co.z * 2.5)
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    bmesh.ops.bevel(bm_, geom=[e for e in bm_.edges if abs(e.verts[0].co.x - e.verts[1].co.x) < 1e-6 and (e.verts[0].co.z > 0.002 or e.verts[1].co.z > 0.002)],
+                    offset=0.003, segments=1, affect="EDGES")
+    return mesh_obj(name, bm_, M["dark"], smooth_=False)
+
+
+end_board("SakeStandEndL", -L / 2 - 0.021, -L / 2 - 0.003)
+end_board("SakeStandEndR", L / 2 + 0.003, L / 2 + 0.021)
+# (the rail: a slim lacquered bar across the back on the boards' tops, its ends let into them)
+block("SakeStandRail", -L / 2 - 0.01, L / 2 + 0.01, D / 2 - 0.012, D / 2 - 0.002, BACK_H + 0.052, BACK_H + 0.064, M["lacquer"])
 
 # ---- the bottles: three tall at the back, two short at the front, each turned a touch its own way, a hair over the step
 ys_back = -D / 2 + FRONT_D + (D - FRONT_D) / 2
