@@ -270,14 +270,70 @@ nodes = []
 bd = []
 H = TOP - 0.05
 bd.append(box("TillFace", S(W - 0.04, H, 0.08), P(0, H / 2, -D / 2 + 0.06), M["body"], bev=0.006, uv=0.6))
+def holed_end(name, x0, x1, y0, y1, z0, z1, cy, cz, r, segs=24):
+    """an end board (x0..x1 thick, y0..y1 tall, z0..z1 long; the game's frame) with a round hole through it at (cy, cz), radius r, made in
+    clean quads (item 71, the owner's, 2026-11-13: "its wiring like a shuriken, too many faces"; it was a 48-round cylinder cut out of a box,
+    the faces left drawn out from its corners to the circle in long thin triangles): each of `segs` points round the hole joined to the
+    point straight out on the board's edge, the board's corners set into the sectors they fall in, the hole's wall, the board's rim"""
+    bm_ = bmesh.new()
+    ang = [2 * math.pi * k / segs for k in range(segs)]
+
+    def edge_pt(a):
+        # (where a ray from the hole's middle meets the board's edge)
+        dy, dz = math.sin(a), math.cos(a)
+        ts = []
+        if abs(dz) > 1e-9:
+            ts += [(z1 - cz) / dz, (z0 - cz) / dz]
+        if abs(dy) > 1e-9:
+            ts += [(y1 - cy) / dy, (y0 - cy) / dy]
+        t = min(t for t in ts if t > 0)
+        return cy + dy * t, cz + dz * t
+
+    corners = [(y1, z1), (y1, z0), (y0, z0), (y0, z1)]
+    cang = [math.atan2(y - cy, z - cz) % (2 * math.pi) for y, z in corners]
+    faces_ = {}
+    for xi, x in enumerate((x0, x1)):
+        circ = [bm_.verts.new(P(x, cy + r * math.sin(a), cz + r * math.cos(a))) for a in ang]
+        rim = [bm_.verts.new(P(x, *edge_pt(a))) for a in ang]
+        cvs = {k: bm_.verts.new(P(x, y, z)) for k, (y, z) in enumerate(corners)}
+        loop = []
+        for k in range(segs):
+            k2 = (k + 1) % segs
+            a0, a1 = ang[k], ang[k] + 2 * math.pi / segs
+            mids = [cvs[c] for c in sorted(range(4), key=lambda c: (cang[c] - a0) % (2 * math.pi)) if (cang[c] - a0) % (2 * math.pi) < (a1 - a0)]
+            ring_ = [circ[k], circ[k2], rim[k2]] + mids[::-1] + [rim[k]]
+            bm_.faces.new(ring_ if xi == 1 else ring_[::-1])
+            loop += [rim[k]] + mids
+        faces_[xi] = (circ, loop)
+    # (the hole's wall, and the board's rim round its edge)
+    (c0, l0), (c1, l1) = faces_[0], faces_[1]
+    for k in range(segs):
+        k2 = (k + 1) % segs
+        bm_.faces.new((c0[k], c0[k2], c1[k2], c1[k]))
+    for k in range(len(l0)):
+        k2 = (k + 1) % len(l0)
+        bm_.faces.new((l0[k2], l0[k], l1[k], l1[k2]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me_ = bpy.data.meshes.new(name)
+    bm_.to_mesh(me_)
+    bm_.free()
+    o = bpy.data.objects.new(name, me_)
+    bpy.context.collection.objects.link(o)
+    finish(o, name, M["body"], smooth_shade=False)
+    # (its edges eased in one step as the other boards' are, the hole's lip with them)
+    bevel(o, 0.004, 1, angle=True)
+    apply_mods(o)
+    uv_box(o, 0.6)
+    return o
+
+
 for sx in (-1, 1):
-    end = box(f"TillEnd{sx}", S(0.06, H, D - 0.06), P(sx * (W / 2 - 0.05), H / 2, 0.02), M["body"], bev=0.006, uv=0.6)
     if sx == 1:
         # (the round window: a hole through the end, its ring and lattice and lit paper set in it)
-        hole_ = cyl("win", 0.2, 0.2, P(W / 2 - 0.05, H / 2 + 0.03, 0.02), M["body"], rot=(0, math.pi / 2, 0), verts=48)
-        m_ = end.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = hole_; m_.solver = "EXACT"
-        apply_mods(end)
-        bpy.data.objects.remove(hole_)
+        xc, zl = W / 2 - 0.05, D - 0.06
+        end = holed_end(f"TillEnd{sx}", xc - 0.03, xc + 0.03, 0.0, H, 0.02 - zl / 2, 0.02 + zl / 2, H / 2 + 0.03, 0.02, 0.2, segs=32)
+    else:
+        end = box(f"TillEnd{sx}", S(0.06, H, D - 0.06), P(sx * (W / 2 - 0.05), H / 2, 0.02), M["body"], bev=0.006, uv=0.6)
     bd.append(end)
 WX = W / 2 - 0.05
 WY = H / 2 + 0.03
@@ -286,16 +342,26 @@ bpy.ops.mesh.primitive_torus_add(major_radius=0.213, minor_radius=0.017, major_s
 ring = active()
 finish(ring, "TillWindowRing", M["ring"])
 bd.append(ring)
-sleeve = cyl("TillWindowSleeve", 0.201, 0.05, P(W / 2 - 0.045, WY, 0.02), M["ring"], rot=(0, math.pi / 2, 0), verts=64)
-inner_ = cyl("sl", 0.193, 0.06, P(W / 2 - 0.045, WY, 0.02), M["ring"], rot=(0, math.pi / 2, 0), verts=64)
-m_ = sleeve.modifiers.new("cut", "BOOLEAN"); m_.operation = "DIFFERENCE"; m_.object = inner_; m_.solver = "EXACT"
-apply_mods(sleeve)
-bpy.data.objects.remove(inner_)
+# (the sleeve a plain ring 32 round, as round as the frame's ring before it (24 showed its corners from the stool, item 71), its outside, inside and two faces, made so (64 round cut by another before, item 71))
+_bm = bmesh.new()
+_rings = [[_bm.verts.new(P(W / 2 - 0.045 + dx, WY + rr * math.sin(2 * math.pi * k / 32), 0.02 + rr * math.cos(2 * math.pi * k / 32))) for k in range(32)]
+          for dx, rr in ((-0.025, 0.201), (0.025, 0.201), (0.025, 0.193), (-0.025, 0.193))]
+for _a, _b in zip(_rings, _rings[1:] + _rings[:1]):
+    for k in range(32):
+        _bm.faces.new((_a[k], _a[(k + 1) % 32], _b[(k + 1) % 32], _b[k]))
+bmesh.ops.recalc_face_normals(_bm, faces=_bm.faces)
+_me = bpy.data.meshes.new("TillWindowSleeve")
+_bm.to_mesh(_me)
+_bm.free()
+sleeve = bpy.data.objects.new("TillWindowSleeve", _me)
+bpy.context.collection.objects.link(sleeve)
+finish(sleeve, "TillWindowSleeve", M["ring"])
 bpy.ops.object.select_all(action="DESELECT"); sleeve.select_set(True); bpy.context.view_layer.objects.active = sleeve
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cylinder_project(); bpy.ops.object.mode_set(mode="OBJECT")
 bd.append(sleeve)
 # (the paper, set back near the inside face of the end: lit from within, a lantern's glow, not a light thrown outward)
-paper = cyl("TillWindowPaper", 0.196, 0.003, P(W / 2 - 0.066, WY, 0.02), M["paper"], rot=(0, math.pi / 2, 0), verts=64)
+# (32 round, as the ring, its faces laddered on export, not fanned into its middle (64 round, item 71))
+paper = cyl("TillWindowPaper", 0.196, 0.003, P(W / 2 - 0.066, WY, 0.02), M["paper"], rot=(0, math.pi / 2, 0), verts=32)
 bpy.ops.object.select_all(action="DESELECT"); paper.select_set(True); bpy.context.view_layer.objects.active = paper
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.uv.cube_project(cube_size=0.4); bpy.ops.object.mode_set(mode="OBJECT")
 bd.append(paper)
