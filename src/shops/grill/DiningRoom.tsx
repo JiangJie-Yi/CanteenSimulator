@@ -5287,9 +5287,15 @@ const fridgeTagTex = (n: number) => {
       const shelf = FRIDGE_UNITS[n]?.shelves[k]
       if (!shelf) continue
       const lay = shelfLayout(n, k)
-      shelf.ids.forEach((id, j) => {
+      // (one card under each run of the same drink side by side, across the run and in its middle (the owner's, 2026-11-13, item 64: "the
+      // same name twice, put the label in the middle"): 牛奶 牛奶 was two cards)
+      const runs: { id: (typeof shelf.ids)[number]; j0: number; j1: number }[] = []
+      shelf.ids.forEach((id, j) => { const r = runs[runs.length - 1]; if (r && r.id === id) r.j1 = j; else runs.push({ id, j0: j, j1: j }) })
+      runs.forEach(({ id, j0, j1 }) => {
         const d = DRINKS.find((x) => x.id === id)
-        const cx = (lay.xs[j] / 0.742 + 0.5) * 1024, w = Math.max(30, (shelfSize(id)[0] + lay.gap * 0.7) / 0.742 * 1024 - 4)
+        const half = (shelfSize(id)[0] + lay.gap * 0.7) / 2
+        const left = lay.xs[j0] - half, right = lay.xs[j1] + half
+        const cx = ((left + right) / 2 / 0.742 + 0.5) * 1024, w = Math.max(30, (right - left) / 0.742 * 1024 - 4)
         g.fillStyle = '#fbf8f0'; g.fillRect(cx - w / 2, y0 + 8, w, 48)
         g.fillStyle = d?.label[0] ?? '#888'; g.fillRect(cx - w / 2, y0 + 8, w, 7)
         g.strokeStyle = '#3a3530'; g.lineWidth = 1.2; g.strokeRect(cx - w / 2 + 0.5, y0 + 8.5, w - 1, 47)
