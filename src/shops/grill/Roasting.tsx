@@ -1497,7 +1497,10 @@ function HearthGuard() {
  * along its one edge and a catch of light along the other as a cut's are; a warm strip of light up its middle; its warm light on the wall
  * either side of it, fading out over GLOW_W (no light of its own: drawn as light, added to the wall). The wall's one solid face: the groove's
  * drawn on it, 2 mm off */
-const GROOVE = 0.036, GROOVE_IN = 0.07, GLOW_W = 0.2
+// (right in the inner corner, the groove's edge 3 mm off the back wall (item 123, the owner's, 2026-11-15: "in the groove, the inner wall the
+// arrows point at": it stood 7 cm out along the side wall, a strip of bare wall between it and the corner); its light on the back wall's end
+// too (BACK_GLOW))
+const GROOVE = 0.036, GROOVE_IN = GROOVE / 2 + 0.003, GLOW_W = 0.2
 const RECESS_COVE = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false })
 const GROOVE_FLOOR = new THREE.MeshBasicMaterial({ color: '#3a3028', polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })
 const GROOVE_SHADE = new THREE.MeshBasicMaterial({ color: '#1e1814', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })
@@ -1538,6 +1541,16 @@ function glowGeo(h: number) {
   g.setAttribute('color', new THREE.BufferAttribute(col, 3))
   return g
 }
+let backGlow: { h: number; g: THREE.BufferGeometry } | null = null
+/** the slot light's glow on the back wall by its corner: the side walls' (glowGeo), a little fainter, the lights being round the corner */
+function backGlowGeo(h: number) {
+  if (backGlow?.h === h) return backGlow.g
+  const g = glowGeo(h)
+  const col = g.attributes.color as THREE.BufferAttribute
+  for (let i = 0; i < col.count; i++) col.setXYZ(i, col.getX(i) * 0.6, col.getY(i) * 0.6, col.getZ(i) * 0.6)
+  backGlow = { h, g }
+  return g
+}
 const RecessShade = memo(function RecessShade() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP + KICK_H, top = -0.08, h = top - floor
   const IN = 0.06, OFF = 0.002
@@ -1565,6 +1578,9 @@ const RecessShade = memo(function RecessShade() {
         const side = i % 3 !== 0
         return <group key={i} position={p} rotation-y={Math.atan2(n.x, n.z)}>
           {!side && <mesh material={SHADE_MAT} geometry={washGeo(len, h, BACK_WASH)} raycast={() => {}} renderOrder={1} />}
+          {/* (the slot lights' warm light on the back wall at its two ends, by the corners they're in: the half past each end is in the side
+              wall, hidden) */}
+          {!side && [-1, 1].map((e) => <mesh key={e} position={[e * len / 2, 0, 0.001]} material={GLOW_MAT} geometry={backGlowGeo(h - 0.004)} raycast={() => {}} renderOrder={2} />)}
           {side && (() => {
             // (in the recess, near the wall's inner end by the back wall (the owner's, 2026-11-11: inside it; at the open end it stood on the
             // corner, its glow reaching on past the wall's end into the air): along the wall its +x is toward the a-range's high end (the open
