@@ -38,8 +38,11 @@ export function OwnLuckyCat() {
       m.castShadow = true
       m.receiveShadow = true
     })
-    inkModel(r, () => false, { width: 0.0016, weld: true })
+    // (not round the beckoning hand: its outline and the body's met in a dark line where it's cut from the arm (item 128))
+    inkModel(r, (m) => m.name === 'OwnCatPaw', { width: 0.0016, weld: true })
     const paw = r.getObjectByName('OwnCatPaw') ?? null
+    // (a touch bigger than the cut it came from, so the arm's cut face is under it)
+    paw?.scale.setScalar(1.04)
     mergeByMaterial(r, (o) => o.name === 'OwnCatPaw')
     return { obj: r, paw }
   }, [gltf])
@@ -50,7 +53,8 @@ export function OwnLuckyCat() {
     // (down toward the front and back up: an eased swing, held a moment at the top)
     const ph = (t.current % 1.5) / 1.5
     const k = ph < 0.7 ? Math.sin((ph / 0.7) * Math.PI) : 0
-    paw.quaternion.setFromAxisAngle(X, 0.75 * k * k * (3 - 2 * k))
+    // (a small beckon (item 128): swung far, the cut where the hand meets the arm opened)
+    paw.quaternion.setFromAxisAngle(X, 0.4 * k * k * (3 - 2 * k))
   })
   return <primitive object={obj} />
 }

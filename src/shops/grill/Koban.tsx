@@ -4,7 +4,8 @@
 // paulownia in its fan-shaped frame stamped at top and foot, 壹両 and 光次 with the mint's mark down the middle, the little stamps on the
 // back; and the same painted again in greys for how high each part stands, made into a normal map, so the stamps stand up and the lines
 // sink in the light. Real gold: it shines with the studio's reflections, as the shrine's metal does.
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
@@ -175,6 +176,29 @@ function paint(g: CanvasRenderingContext2D, mode: Mode) {
   face(g, CELL.w, true, mode)
 }
 
+/**
+ * A glint of light on the gold (item 128, the owner's, 2026-11-15: "now and then a little sparkle on the coin", a four-pointed star): a soft
+ * round glow with a long thin cross through it, drawn once; added to what's behind (no light of its own), not tone-mapped
+ */
+const SPARK_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const r = g.createRadialGradient(64, 64, 0, 64, 64, 30)
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.25, 'rgba(255,246,214,0.55)'); r.addColorStop(1, 'rgba(255,230,170,0)')
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128)
+  // (the cross: two thin rays, brightest at the middle, gone at the ends)
+  for (const [w, h] of [[128, 3], [3, 128]]) {
+    const lg = w > h ? g.createLinearGradient(0, 0, 128, 0) : g.createLinearGradient(0, 0, 0, 128)
+    lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,1)'); lg.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = lg
+    g.fillRect(64 - w / 2, 64 - h / 2, w, h)
+  }
+  return new THREE.CanvasTexture(c)
+})()
+/** how long a glint lasts, and the wait between them (s, a range) */
+const SPARK_S = 0.6, SPARK_GAP: [number, number] = [3, 7]
 /** the koban on its stand (its foot's middle at the origin, its front toward +z): pointed at, it says what it is */
 export function Koban() {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
@@ -212,9 +236,36 @@ export function Koban() {
     mergeByMaterial(r)
     return r
   }, [gltf])
+  // (where a glint can be: over the coin's face, its upper part (the stand under it), just in front of it)
+  const face = useMemo(() => {
+    const b = new THREE.Box3().setFromObject(obj), sz = b.getSize(new THREE.Vector3())
+    return { x: [b.min.x + sz.x * 0.2, b.max.x - sz.x * 0.2], y: [b.min.y + sz.y * 0.42, b.max.y - sz.y * 0.08], z: b.max.z + 0.004, size: Math.max(sz.x, sz.y) * 0.45 }
+  }, [obj])
+  const spark = useRef<THREE.Sprite>(null)
+  const next = useRef(1 + Math.random() * 3)
+  const at = useRef(-1)
+  useFrame((st) => {
+    const sp = spark.current
+    if (!sp) return
+    const t = st.clock.elapsedTime
+    if (at.current < 0 && t > next.current) {
+      at.current = t
+      sp.position.set(face.x[0] + Math.random() * (face.x[1] - face.x[0]), face.y[0] + Math.random() * (face.y[1] - face.y[0]), face.z)
+    }
+    const k = at.current < 0 ? 0 : (t - at.current) / SPARK_S
+    if (k >= 1) { at.current = -1; next.current = t + SPARK_GAP[0] + Math.random() * (SPARK_GAP[1] - SPARK_GAP[0]) }
+    // (up quick and away slower, turning a little as it shines)
+    const v = k <= 0 || k >= 1 ? 0 : Math.sin(Math.PI * Math.min(1, k * 1.6)) * (1 - k * 0.3)
+    sp.material.opacity = v
+    sp.material.rotation = k * 0.6
+    sp.scale.setScalar(face.size * (0.3 + 0.7 * v))
+  })
   return (
-    <group {...nameOver('小判金幣', '招財納福的金幣')}>
+    <group {...nameOver('小判金幣', '招財納福的金幣，據說能招引財富')}>
       <primitive object={obj} />
+      <sprite ref={spark} name="koban-spark" raycast={() => {}} renderOrder={6}>
+        <spriteMaterial map={SPARK_TEX} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </sprite>
     </group>
   )
 }

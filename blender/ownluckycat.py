@@ -80,7 +80,10 @@ ring = np.hypot((ku - 0.5) / 0.47, (kv - 0.5) / 0.47)
 kob = mix(kob, (0.62, 0.44, 0.1), (np.abs(ring - 0.88) < 0.03).astype(np.float32))
 km = np.zeros((KN * 2, KN * 2), bool)
 for i_, ch in enumerate("千萬兩"):
-    fill_tris(km, glyph(ch), KN, (0.78 - i_ * 0.28) * KN * 2, 0.34 * KN, 0.25 * KN * 2)
+    fill_tris(km, glyph(ch), KN, (0.78 - i_ * 0.28) * KN * 2, 0.62 * KN, 0.27 * KN * 2)
+# (bold, as the door cat's coin is lettered: each stroke thickened a few texels)
+for _ in range(3):
+    km = km | np.roll(km, 1, 0) | np.roll(km, 1, 1)
 kob = mix(kob, (0.1, 0.07, 0.04), km.reshape(KN, 2, KN, 2).mean(axis=(1, 3)))
 koban_img = image("ownluckycat_koban", np.clip(kob, 0, 1))
 
@@ -203,8 +206,19 @@ for o in (lp, hand):
     bm.from_mesh(o.data)
     edges = [e for e in bm.edges if e.is_boundary]
     if edges:
+        uvl = bm.loops.layers.uv.active
+        old = set(bm.faces)
         bmesh.ops.holes_fill(bm, edges=edges, sides=0)
         bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+        # (the cut's closing faces painted as the fur round their edge (item 128: they read the picture's corner, a dark gash where the
+        # hand meets the arm): each corner's colour where its point already had one)
+        for f in bm.faces:
+            if f in old:
+                continue
+            for l in f.loops:
+                had = [l2 for l2 in l.vert.link_loops if l2.face in old]
+                if had:
+                    l[uvl].uv = had[0][uvl].uv
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(o.data)
     bm.free()
@@ -219,7 +233,7 @@ kh = (max(c.z for c in dark_at) - min(c.z for c in dark_at)) if dark_at else 0.0
 front = min(c.y for c in dark_at) if dark_at else kc.y
 bm = bmesh.new()
 uvk = bm.loops.layers.uv.new()
-KR = (kh * 0.36, 0.005, kh * 0.52)
+KR = (kh * 0.3, 0.005, kh * 0.55)   # (a tall narrow oval, as the door cat's (item 128))
 for f in qsphere(bm, (0.0, 0.0, 0.0), KR, 2):
     for l in f.loops:
         l[uvk].uv = (0.5 + l.vert.co.x / (2 * KR[0]), 0.5 + l.vert.co.z / (2 * KR[2]))
