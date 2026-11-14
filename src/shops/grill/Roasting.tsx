@@ -41,7 +41,7 @@ import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type 
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { SHAPE_S, takeRice } from '@/game/rice'
 import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
-import { SAKE_SERVE_S, SAKE_SIDE, pour, pourFrom } from '@/game/sakeStand'
+import { SAKE_SERVE_S, SAKE_SIDE, SAKE_WAIT_S } from '@/game/sakeStand'
 import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
@@ -58,7 +58,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SAKE, SAKE_SEATS, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { COAL_BRIDGE, DRAWER_HELD, SAKE, SAKE_SEATS, pourSake, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -5439,6 +5439,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return w.name
   }
   const guestSeq = useRef(0)
+  /** when each customer's tokkuri was asked of the third cook (the shop's clock): it's poured by them, or by the stand itself if nobody's
+   * taken it in SAKE_WAIT_S */
+  const sakeAsked = useRef(new Map<number, number>())
   const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner })))
   const chefSaid = useRef(0)
@@ -5967,6 +5970,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (their soup bowl cleared with their plate)
       if (SOUP_SEATS.delete(g.seat)) SOUP.served++
       if (SAKE_SEATS.delete(g.seat)) SAKE.served++
+      // (a tokkuri asked for them and not brought: not to be poured now)
+      const wi = SAKE.want.indexOf(g.id)
+      if (wi >= 0) SAKE.want.splice(wi, 1)
+      SAKE.ready.delete(g.id)
+      sakeAsked.current.delete(g.id)
       // (their visit, scored: the food, the wait for it, what put them out (the tissues, the toilet, the dark, their stomach))
       const gr = GRIPES.get(g.id) ?? new Set<Gripe>()
       if (SICK.has(g.id)) gr.add('sick')
@@ -5984,6 +5992,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (who has food before them: drawn eating only then (bar.ts's FED))
     FED.clear()
     for (const p of pieces.current) if (p.container === 'bar' && p.guest >= 0 && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly && p.via !== 'plated' && present(p)) FED.add(p.guest)
+    /** a customer's tokkuri: asked of the third cook the first time (SAKE.want; they go to the stand and pour it, GuestBar3D); whether it's
+     * poured now (SAKE.ready); still not taken up after SAKE_WAIT_S (no third cook in), poured by the stand as it is */
+    const sakePoured = (id: number, now: number) => {
+      const asked = sakeAsked.current.get(id)
+      if (asked === undefined) { sakeAsked.current.set(id, now); SAKE.want.push(id); return false }
+      const done = SAKE.ready.delete(id)
+      const queued = SAKE.want.indexOf(id)
+      if (!done && !(queued >= 0 && now - asked > SAKE_WAIT_S)) return false
+      if (!done) { SAKE.want.splice(queued, 1); pourSake() }
+      sakeAsked.current.delete(id)
+      return true
+    }
     // a guest eats a piece of what they ordered, if it's ready (each one piece at a time: the whole shop waited on one mouthful at a time
     // before, and with the room full everyone sat on and on)
     for (const g of guests.current) {
@@ -6020,14 +6040,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         report()
         return
       }
-      // (their sake: a tokkuri poured from the stand a little after they've ordered (the bottle lifted and tipped there: SAKE, Decor), set at
-      // their place with its cup)
-      if (space === 'open' && owed.includes('Sake') && now - g.since > SAKE_SERVE_S) {
-        const r = pour(SAKE.levels, pourFrom(SAKE.levels))
-        SAKE.levels = r.levels
-        SAKE.from = r.k
-        SAKE.was = r.was
-        SAKE.pours++
+      // (their sake: a little after they've ordered, asked of the third cook, who goes to the stand and pours it (SAKE.want, GuestBar3D); poured
+      // (SAKE.ready), set at their place with its cup. Nobody's taken it in SAKE_WAIT_S (no third cook in, the shop's own staff short): the
+      // stand pours it as it is)
+      if (space === 'open' && owed.includes('Sake') && now - g.since > SAKE_SERVE_S && sakePoured(g.id, now)) {
         SAKE_SEATS.add(g.seat)
         SAKE.served++
         g.firstAte ??= now

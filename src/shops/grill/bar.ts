@@ -4,7 +4,7 @@ import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
 import { emptyKama, type Kama } from '@/game/rice'
 import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
-import { fullStand } from '@/game/sakeStand'
+import { fullStand, pour, pourFrom } from '@/game/sakeStand'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -835,10 +835,20 @@ export const SOUP_SEATS = new Set<number>()
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __soup: SOUP })
 /**
  * The sake stand's bottles (game/sakeStand, item 89): how full each is, and the pours asked of it (`pours` counts them; `from`, the bottle
- * the last came from; `was`, its level before): Roasting pours one for each customer's tokkuri, a click on a bottle pours one; Decor draws
- * the bottle lifted and tipped, and its sake going down
+ * the last came from; `was`, its level before); a click on a bottle pours one; Decor draws the bottle lifted and tipped, and its sake going
+ * down. A customer's tokkuri (the owner's, 2026-11-14: someone to go and pour it): Roasting puts the customer on `want`; the third cook takes
+ * it, walks to the stand and pours (GuestBar3D), and puts them on `ready`; Roasting sets it at their place then
  */
-export const SAKE: { levels: number[]; pours: number; from: number; was: number; served: number } = { levels: fullStand(), pours: 0, from: -1, was: 1, served: 0 }
+export const SAKE: { levels: number[]; pours: number; from: number; was: number; served: number; want: number[]; ready: Set<number> } =
+  { levels: fullStand(), pours: 0, from: -1, was: 1, served: 0, want: [], ready: new Set() }
+/** a tokkuri poured from the stand now: the bottle the stand pours from next, its level down, the stand told to draw it (Decor) */
+export function pourSake() {
+  const r = pour(SAKE.levels, pourFrom(SAKE.levels))
+  SAKE.levels = r.levels
+  SAKE.from = r.k
+  SAKE.was = r.was
+  SAKE.pours++
+}
 /** the seats with a tokkuri of sake and its cup set at them (Roasting pours it for those who ordered it; GuestBar3D draws it; `SAKE.served`
  * counts each change, for the drawing to see) */
 export const SAKE_SEATS = new Set<number>()

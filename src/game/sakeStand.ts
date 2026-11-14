@@ -11,6 +11,9 @@ export const TOKKURI_ML = 180
  * and set at their place (seconds of the shop's clock) */
 export const SAKE_SIDE = 0.12
 export const SAKE_SERVE_S = 8
+/** how long a customer's tokkuri waits for the third cook to take it up (seconds of the shop's clock): nobody has (none in), the stand
+ * pours it itself */
+export const SAKE_WAIT_S = 25
 
 /** every bottle full (the day's start, a new shop) */
 export const fullStand = () => SAKE_BOTTLE_ML.map(() => 1)

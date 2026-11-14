@@ -78,7 +78,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2880,7 +2880,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'toRackLow' | 'takeLow' | 'toLow' | 'putLow'
     | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
     | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir'
-    | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate'
+    | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate' | 'toSake' | 'pourSake'
     t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number
     /** what they've gone for for the fire: the charcoal or the water (what's in their hands to the hearth, whatever the grill asks meanwhile) */
@@ -2888,7 +2888,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** at the soup's pot to make it (the pot empty), not just to stir it */
     making?: boolean
     /** where the plating place's plates are taken from this time: the low rack by the table, or the dish racks (game/plates' plateSource) */
-    src?: 'low' | 'rack' }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
+    src?: 'low' | 'rack'
+    /** the customer whose tokkuri they've gone to the sake stand to pour (SAKE.want) */
+    sake?: number }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   const platerObj = useRef<THREE.Group | null>(null)
   const [platerMoving, setPlaterMoving] = useState(false)
   const platerStack = useRef<THREE.Group>(null)
@@ -3161,6 +3163,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SOUP.served++
     SAKE_SEATS.clear()
     SAKE.served++
+    SAKE.want = []
+    SAKE.ready.clear()
   }, [open])
   /** each shown guest's name tag, faded with them as they go out of the door */
   const labels = useRef(new Map<number, HTMLElement>())
@@ -4030,6 +4034,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         return f.worldToLocal(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()))
       }
       const crateAt = () => middleOf('coal-crate')
+      /** the sake stand on the cook table (Decor's SakeStand) */
+      const sakeAt = () => middleOf('SakeStand')
       const bucketAt = () => middleOf('WaterBucket')
       /** where the bucket's dipped from: a step toward it in his own place when it's by it (the third cook's bay), or null: from further off
        * (the second cook plating from the board, the bucket moved in edit mode), the floor by it, as for anything on the table */
@@ -4098,6 +4104,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
               else setOff(sackReach(), 'toCoalSack')
             } else { const near = dipFrom(); if (near) stepTo(near, 'toBucket'); else setOff(reachOf(bucketAt()), 'toBucket') }
+          } else if (open && !SHOP.leaving && SAKE.want.length) {
+            // (a customer's tokkuri of sake (item 89, the owner's, 2026-11-14: someone to go and pour it): to the sake stand on the table, a
+            // bottle lifted and poured there (Decor draws it), then it's set at their place (Roasting))
+            pl.sake = SAKE.want.shift()
+            pl.pos.copy(home())
+            setOff(reachOf(sakeAt()), 'toSake')
+            away(true)
           } else if (open && !SHOP.leaving && !waiters.current.length && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
             // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server to wash them (theirs, the owner's): to the used
             // bucket by the plating place for all of them)
@@ -4174,7 +4187,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.path = []; pl.len = 0
         pl.phase = 'settle'
         pl.t = 0
-      } else if (pl.phase === 'toSoup') walk(() => { pl.phase = 'stir'; faceTo(soupPot()) })
+      } else if (pl.phase === 'toSake') walk(() => { pl.phase = 'pourSake'; faceTo(sakeAt()); pourSake() })
+      // (stood at it while the bottle's lifted, poured and set back (Decor's pour, 2.6 s); poured, theirs to be set at their place)
+      else if (pl.phase === 'pourSake' && pl.t > 2.7) {
+        if (pl.sake !== undefined) SAKE.ready.add(pl.sake)
+        pl.sake = undefined
+        setOff(home(), 'home')
+      }
+      else if (pl.phase === 'toSoup') walk(() => { pl.phase = 'stir'; faceTo(soupPot()) })
       else if (pl.phase === 'stir' && pl.t > (pl.making ? MAKE_S : STIR_S)) {
         // (made: in its well heating up (the water for it metered as the rice's is))
         if (pl.making) { SOUP.pot = setSoup(); meterWater('cooking', 10); pl.making = false; soupAt.current = performance.now() / 1000 }
