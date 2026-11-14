@@ -33,6 +33,8 @@ export const paceOfStaff = (id: string | null | undefined) =>
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }
 export const STAFF_TALK: StaffWord[] = []
+/** a word from one of the staff or the owner from inside the scene, over their head and in the day's log (App sets it to its own sayStaff) */
+export const STAFF_SAY: { say: (id: string, pool: { zh: readonly string[]; ja: readonly string[]; en: readonly string[] }) => void } = { say: () => {} }
 /** the room's light switch by the way in (DiningRoom's, the world's: where it is and the way its face looks out into the room), and who's
  * gone to switch the lights on (one coming in at the opening, the room dark: commuteWalk), since when */
 export const SWITCH_SPOT = { at: null as { x: number; y: number; z: number } | null, front: { x: 0, y: 0, z: 1 }, by: '', since: 0 }

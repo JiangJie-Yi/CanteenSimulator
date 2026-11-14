@@ -16,6 +16,7 @@ import { Steam } from '@/scene/Steam'
 import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, handTime, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
 import { DRAIN, DRYER, HAND_WASH, POINTER_HINT, SINK, SINK_BIN, tipOver } from './bar'
 import { basinSays, waterTick } from '@/game/sinkWater'
+import { HAND_STEP_SAYS, handStep, pumpSoap, scrubbed, soapWith } from '@/game/handWash'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { getEdit } from './edit'
@@ -262,10 +263,12 @@ export function SinkModel() {
   useFrame(({ clock, camera }, dt) => {
     if (hov.current === 'door') setTip({ title: '洗碗機', hint: doorSays() })
     else if (hov.current === 'rack') setTip({ title: '洗碗籃', hint: rackSays() })
-    else if (hov.current === 'basin') setTip({ title: '流理台', hint: basinSays(SINK.water, SINK.plug) })
+    else if (hov.current === 'basin') setTip({ title: '流理台', hint: basinHint() })
     const on = SINK.washing || SINK.tap
     // (the basin's water: filled by the tap with the plug in, let out by the drain without it, never over the overflow (game/sinkWater))
     SINK.water = waterTick(SINK.water, on, SINK.plug, Math.min(dt, 0.1))
+    // (the washing-up liquid goes with the water: the basin emptied, none left in it)
+    SINK.soap = soapWith(SINK.soap, SINK.water)
     pool.position.y = poolY + rise * SINK.water
     POOL.opacity = SINK.water > 0.002 ? 0.38 : 0
     // (the plug lifted out and laid by the drain, or back in: up out of the hole first, then over)
@@ -355,9 +358,9 @@ export function SinkModel() {
   return (
     <group>
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
-      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }) }}
+      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: basinHint() }) }}
         onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null) }}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const now = performance.now(); if (now < HAND_WASH.until || SINK.dirty <= 0) return; HAND_WASH.ask = 'wash'; HAND_WASH.until = now + handTime(SINK.dirt.at(-1) ?? 1) * 1000; window.setTimeout(() => setTip({ title: '流理台', hint: `${basinSays(SINK.water, SINK.plug)}｜${handWashSays(SINK.dirty, DRAIN)}` }), 80) }}>
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const now = performance.now(); if (now < HAND_WASH.until || handStep(handSink()) !== 'scrub') { setTip({ title: '流理台', hint: basinHint() }); return } HAND_WASH.ask = 'wash'; SINK.soap = scrubbed(SINK.soap); HAND_WASH.until = now + handTime(SINK.dirt.at(-1) ?? 1) * 1000; window.setTimeout(() => setTip({ title: '流理台', hint: basinHint() }), 80) }}>
         <primitive object={root} />
       </group>
       <primitive object={pool} />
@@ -401,6 +404,15 @@ export function SinkModel() {
     </group>
   )
 }
+/** the sink as washing up by hand sees it (game/handWash) */
+const handSink = () => ({ dirty: SINK.dirty, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: SINK.sponge })
+/** what the basin says pointed at: its water and plug, then the next step of washing up by hand (item 103), how many plates are waiting */
+const basinHint = () => {
+  const st = handStep(handSink())
+  return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}`
+}
+/** the sponge taken up: lifted off its dish this far */
+const SPONGE_UP = 0.05
 /** one of what stands on the sink (SINK_SETS' node), in the sink's own frame: Decor's SinkAt sets it where the sink is, in a Movable of its own */
 export function SinkPart({ node }: { node: string }) {
   useStudio()
@@ -422,6 +434,21 @@ export function SinkPart({ node }: { node: string }) {
   }, [gltf, node])
   // (the draining basket says how many plates stand in it and whether they're dry (the owner's: every plate counted))
   const name = SINK_SETS.find((s) => s.node === node)?.label ?? ''
+  // (the sponge, taken up to wash with (item 103): lifted off its dish while it's held)
+  const lift = useRef<THREE.Group>(null)
+  useFrame(() => { if (lift.current) lift.current.position.y += ((node === 'SinkSpongeSet' && SINK.sponge ? SPONGE_UP : 0) - lift.current.position.y) * 0.25 })
+  // (the washing-up liquid squeezed into the water, the sponge taken up or put down: steps of washing up by hand (item 103), clicked)
+  if (node === 'SinkDetergentSet' || node === 'SinkSpongeSet') return (
+    <group ref={lift} onPointerOver={(e) => { if (getEdit().on) return; tipOver(name, partSays(node)).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver(name, '').onPointerOut(e) }}
+      onClick={(e) => {
+        e.stopPropagation(); if (getEdit().on) return
+        if (node === 'SinkDetergentSet') { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } else SINK.sponge = !SINK.sponge
+        window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
+      }}>
+      <primitive object={obj} />
+    </group>
+  )
   if (node !== 'SinkBasketSet') return (
     // (the rest name themselves pointed at (the owner's, 2026-11-11: every one of them), the bin with how many sticks are in it)
     <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: name, hint: partSays(node) }) }}
@@ -445,8 +472,8 @@ function partSays(node: string) {
     case 'SinkSoapSet': return '洗手用的肥皂'
     case 'SinkTowelSet': return '擦乾碗盤的布巾'
     case 'SinkBinSet': return SINK_BIN.sticks > 0 ? `垃圾桶裡有用過的竹籤 ${SINK_BIN.sticks} 根；後面是資源回收桶` : '用過的竹籤丟垃圾桶，現在是空的；後面是資源回收桶'
-    case 'SinkDetergentSet': return '洗碗精，按一下出一點'
-    case 'SinkSpongeSet': return '菜瓜布，黃的那面軟，綠的那面刷'
+    case 'SinkDetergentSet': return SINK.water <= 0 ? '洗碗精｜水槽沒有水，先放水再擠' : `洗碗精｜點一下擠一點到水裡（水裡的夠洗 ${SINK.soap} 個）`
+    case 'SinkSpongeSet': return SINK.sponge ? '菜瓜布｜拿著，點水槽刷盤子；點一下放回去' : '菜瓜布，黃的那面軟，綠的那面刷｜點一下拿起來洗碗'
     default: return ''
   }
 }

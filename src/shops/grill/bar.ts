@@ -13,6 +13,7 @@ import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { openingFloat, startingRolls, type DrawerCash, type Rolls } from '@/game/till'
 import { LOW_FULL, RACK_FULL, type Dryer, type Drain } from '@/game/plates'
+import { PILE_START } from '@/game/sinkPile'
 import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyBasin } from '@/game/basin'
@@ -661,7 +662,12 @@ export const LOW_RACK = { n: LOW_FULL, coming: 0 }
 /** the sink: being washed at, its tap turned on by hand, its dirty plates; its plug in, and the water in its basin (game/sinkWater's level) */
 /** (`dirt`: each dirty plate in the sink, how dirty (game/plates), the bottom one first: GuestBar3D keeps it, soaking them; Sink reads the
  * top one's for how long a scrub by hand takes) */
-export const SINK = { washing: false, tap: false, dirty: 0, plug: false, water: 0, dirt: [] as number[] }
+export const SINK = { washing: false, tap: false, dirty: 0, plug: false, water: 0, dirt: [] as number[],
+  /** washing by hand (game/handWash, item 103): the plates' worth of washing-up liquid in the water, and the sponge taken up */
+  soap: 0, sponge: false }
+/** the stack of dirty plates on the sink's counter as the shop's taken over (game/sinkPile, item 103): how many are left of it (a new game
+ * starts with it; it isn't put back each day), and the last day the owner spoke of it */
+export const PILE = { n: PILE_START, saidDay: -1 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __lowRack: LOW_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */
@@ -815,6 +821,7 @@ export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __drain: DRAIN, __plateCount: PLATE_COUNT })
 /** the bin by the sink: how many used sticks are in it (cleared off the customers' plates with them; the owner's: thrown away there) */
 export const SINK_BIN = { sticks: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pile: PILE })
 /** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */
 export const SEAT_STICKS = new Map<number, number>()
 /** the whole fish each seat's eaten (their bones left on the plate, the owner's), and which of the foods are a whole fish to leave them */
@@ -870,7 +877,11 @@ export const OWNER_GRILL = { on: false, stand: new THREE.Vector3(), face: new TH
   dabUntil: 0, dab: 'pinch' as 'pinch' | 'brush' | 'spoon',
   /** the cook table's top, in the world (his hands at the fire work at its height: he stands on the kitchen's floor, it at his chest), and
    * where his hands are to be, up and down, while he carries (NaN: his own pose's) */
-  top: 0, handY: NaN }
+  top: 0, handY: NaN,
+  /** the player's just pushed a skewer through something on the board by hand (Roasting, item 105, the owner's, 2026-11-14: "he should
+   * move as I skewer"): he does it with them, turned to it, the left hand holding it down and the right pushing the rod in, till then
+   * (performance.now()); `pierceAt`, where it is (the world) */
+  pierceUntil: 0, pierceAt: new THREE.Vector3() }
 /** the second cook (二廚), fetching the orders out of the stores and skewering them at the board (Roasting's CrewWalk): who he is, and
  * whether he's on a round now (with no third cook he plates and keeps the fire too: GuestBar3D sends him only between rounds) */
 export const FETCHER: { id: string | null; busy: boolean } = { id: null, busy: false }

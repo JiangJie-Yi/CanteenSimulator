@@ -48,7 +48,7 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { dutyDay, idleTick, LAST_CALL, LATE, RATING_FLOW, SHOP, STAFF_IDLE, SPEAKERS, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { dutyDay, idleTick, LAST_CALL, LATE, RATING_FLOW, SHOP, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -1356,6 +1356,7 @@ export default function App() {
   }
   /** a word from one of the staff (or the owner): over their head, and in the log with their name */
   const sayStaff = useRef<(id: string, pool: Record<Lang, readonly string[]>, day: number, k?: number) => void>(() => {})
+  STAFF_SAY.say = (id, pool) => sayStaff.current(id, pool, SHOP.day)
   sayStaff.current = (id, pool, day, k = 0) => {
     const text = lineOf(pool[lang], k, day)
     STAFF_TALK.push({ key: ++chatId.current, id, text, until: performance.now() + 4800 })
