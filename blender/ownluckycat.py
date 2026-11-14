@@ -1,13 +1,11 @@
-"""A beckoning cat of the shop's own (ownluckycat.glb; the owner's, 2026-11-14, item 97: "can you make a lucky cat of your own? and it should
-move", "on the first step"): a white calico sat up, its left paw raised and beckoning (its own node, its origin at the shoulder, for the game
-to swing), its right holding a gold koban to its chest, a red collar with a gold bell; its face drawn on its head (closed smiling eyes, a pink
-nose, the ω mouth, blushing cheeks, whiskers), its calico patches whole faces of the head and the body in orange and black.
+"""The shop's own beckoning cat (ownluckycat.glb, node "OwnLuckyCat"; items 97, 118, 121, the owner's): made after the big cat at the door
+(luckycat3.glb, the one the owner circled, 2026-11-15: "the shape's still far off"), as the owner wants the shop's figures made: a clean
+low-poly mesh of quads over its shape, its colour baked into a picture (as the beckoning cats and the Ebisu are), not built up of balls.
 
-Low-poly, built of shapes (docs/MODELING.md): the head and the body quad spheres (a cube's faces cut 4 by 4 and 3 by 3, pushed out round:
-no pole of triangles anywhere), the ears pyramids, the collar a ring 16 round, the koban a quad sphere pressed flat. About 650
-triangles: the shop's mascot, its outline kept round.
-
-Blender frame: z up, the cat's front toward -y (the game's +z), its foot's middle at the origin; real size, 0.30 tall.
+How: the door cat's mesh, turned to face -y and brought to 0.30 tall, is fused whole (a voxel remesh), retopologised into an even grid of quads
+(a coarse voxel remesh) and the quads shrunk back onto its surface; unwrapped, and its colours baked from the original into a 1024 picture (Cycles,
+selected to active). The raised paw (its hand, out past the head's side) cut off into a node of its own, its origin at the wrist, the game
+swinging it about x to beckon; both cuts closed.
 
 Run:
     blender -b --factory-startup --python blender/ownluckycat.py -- <project path> [preview.png]
@@ -18,66 +16,23 @@ import sys
 
 import bmesh
 import bpy
-import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import export_dish, grid01, image, ladder_fill, mix, pbr, smooth  # noqa: E402
+import numpy as np
+from common import export_dish, grid01, image, mix, pbr, smooth  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-
-def lin(h):
-    h = h.lstrip('#')
-    c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
-    return tuple(x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c)
-
-
-# =====================================================================
-# The face's picture: on the head's front, projected straight on (u across, v up), white elsewhere
-# =====================================================================
-N = 512
-u, v = grid01(N)
-face = np.ones((N, N, 3), np.float32) * np.asarray((0.97, 0.96, 0.93), np.float32)
-INK = np.asarray((0.12, 0.09, 0.08), np.float32)
+TALL = 0.30
+VOXEL = 0.018
+# (the raised hand: past the head's side, between these heights (shares of TALL))
+PAW_X, PAW_Z0, PAW_Z1 = 0.086, 0.4, 0.9
 
 
-def stroke(mask, colour, k=1.0):
-    global face
-    face = face * (1 - mask[..., None] * k) + np.asarray(colour, np.float32) * mask[..., None] * k
-
-
-# (the face's middle at u 0.5, v 0.42 of the head's front; the picture spans the head's width and height)
-# (as the shop's big cat at the door has it (item 118, the owner's, 2026-11-15: "not much like one: go by the one in the red circle"): small
-# narrow eyes closed in a smile, set wide and low, fine ink lines; a little pink nose, a fine ω mouth, whiskers drawn thin)
-CX, CY = 0.5, 0.42
-for sx in (-1, 1):
-    ex, ey, r = CX + sx * 0.2, CY + 0.07, 0.06
-    d = np.hypot(u - ex, (v - ey) * 1.6)
-    ang = np.arctan2(v - ey, u - ex)
-    arc = (np.abs(d - r) < 0.008 * (0.35 + 0.65 * np.sin(np.clip(ang, 0, math.pi)))) & (v > ey + 0.008)
-    stroke(arc.astype(np.float32), INK)
-for sx in (-1, 1):
-    d = np.hypot(u - (CX + sx * 0.25), (v - (CY - 0.02)) * 1.5)
-    stroke(smooth(0.06, 0.0, d) * 0.45, (0.96, 0.6, 0.6))
-d = np.hypot(u - CX, (v - (CY - 0.005)) * 1.7)
-stroke((d < 0.022).astype(np.float32), (0.92, 0.48, 0.55))
-for sx in (-1, 1):
-    mx, my = CX + sx * 0.03, CY - 0.045
-    d = np.hypot(u - mx, v - my)
-    stroke(((np.abs(d - 0.03) < 0.005) & (v < my)).astype(np.float32), INK)
-for sx in (-1, 1):
-    for k, tilt in enumerate((0.14, 0.0, -0.14)):
-        x0, y0 = CX + sx * 0.3, CY - 0.0 + 0.025 * (1 - k)
-        t = (u - x0) * sx
-        line = (t > 0) & (t < 0.15) & (np.abs((v - y0) - t * tilt) < 0.003)
-        stroke(line.astype(np.float32), INK, 0.75)
-# (inside the ears' fronts, the pink: the ears' own material)
-face_img = image("ownluckycat_face", np.clip(face, 0, 1))
-# (the koban's face: gold, a raised rim, 千萬兩 written down it in black (the reference's coin), straight on)
 FONTS = ("C:/Windows/Fonts/YuMinB.ttf", "C:/Windows/Fonts/msmincho.ttc", "C:/Windows/Fonts/YuGothB.ttc")
 
 
@@ -129,36 +84,6 @@ for i_, ch in enumerate("千萬兩"):
 kob = mix(kob, (0.1, 0.07, 0.04), km.reshape(KN, 2, KN, 2).mean(axis=(1, 3)))
 koban_img = image("ownluckycat_koban", np.clip(kob, 0, 1))
 
-M = {
-    "skin": pbr("OwnCatFace", (1, 1, 1), tex=face_img, rough=0.55),
-    "white": pbr("OwnCatWhite", lin("#f6f4ee"), rough=0.55),
-    "orange": pbr("OwnCatOrange", lin("#e89a3c"), rough=0.55),
-    "black": pbr("OwnCatBlack", lin("#2a2522"), rough=0.55),
-    "pink": pbr("OwnCatPink", lin("#f2a3ac"), rough=0.6),
-    "red": pbr("OwnCatCollar", lin("#c8241c"), rough=0.5),
-    "gold": pbr("OwnCatGold", lin("#e0b23a"), rough=0.3, metal=0.8),
-    "earIn": pbr("OwnCatEarIn", lin("#d23a2a"), rough=0.6),
-    "koban": pbr("OwnCatKoban", (1, 1, 1), tex=koban_img, rough=0.35),
-}
-MATS = list(M.values())
-MI = {k: i for i, k in enumerate(M)}
-parts = []
-
-
-def obj_of(name, bm, mats=None, origin=(0, 0, 0)):
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    o = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(o)
-    for m in (mats or MATS):
-        o.data.materials.append(m)
-    for p in o.data.polygons:
-        p.use_smooth = True
-    o.location = origin
-    parts.append(o)
-    return o
-
 
 def qsphere(bm, centre, radii, cuts):
     """a quad sphere into bm: a cube's faces cut `cuts`+1 by `cuts`+1, its points pushed out onto the ellipsoid; returns its faces"""
@@ -178,135 +103,139 @@ def qsphere(bm, centre, radii, cuts):
     return [f for f in bm.faces if f not in before]
 
 
-def mid(f):
-    return f.calc_center_median()
+
+def select_only(*objs, active=None):
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = active or objs[0]
 
 
-# ---- the head and the body, one mesh: white, the face's picture on the head's front, calico patches
+# ---- the door cat, whole, facing -y, its foot's middle at the origin, TALL high
+bpy.ops.import_scene.gltf(filepath=os.path.join(PROJECT, "public", "models", "luckycat3.glb"))
+src = [o for o in bpy.data.objects if o.type == "MESH"][0]
+select_only(src)
+bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
+bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+# (it faces +x, its raised paw toward +y: turned a quarter round, it faces -y, the game's front, the paw toward +x (the import turns it by a
+# quaternion: an euler set without its mode changed did nothing, and it sat side on))
+src.rotation_mode = "XYZ"
+src.rotation_euler = (0, 0, -math.pi / 2)
+bpy.ops.object.transform_apply(rotation=True)
+vs = [v.co for v in src.data.vertices]
+lo = Vector((min(v.x for v in vs), min(v.y for v in vs), min(v.z for v in vs)))
+hi = Vector((max(v.x for v in vs), max(v.y for v in vs), max(v.z for v in vs)))
+k = TALL / (hi.z - lo.z)
+for v in src.data.vertices:
+    v.co = Vector(((v.co.x - (lo.x + hi.x) / 2) * k, (v.co.y - (lo.y + hi.y) / 2) * k, (v.co.z - lo.z) * k))
+src.data.update()
+
+# ---- the new mesh: fused, quads over it, shrunk back onto its surface
+lp = src.copy()
+lp.data = src.data.copy()
+lp.name = "OwnCatBody"
+bpy.context.collection.objects.link(lp)
+lp.data.materials.clear()
+select_only(lp)
+# (a coarse voxel remesh: whole, and quads already, an even grid of them over it (QuadriFlow does nothing run in the background))
+m_ = lp.modifiers.new("fuse", "REMESH"); m_.mode = "VOXEL"; m_.voxel_size = VOXEL
+bpy.ops.object.modifier_apply(modifier="fuse")
+m_ = lp.modifiers.new("onto", "SHRINKWRAP"); m_.target = src; m_.wrap_method = "NEAREST_SURFACEPOINT"
+bpy.ops.object.modifier_apply(modifier="onto")
+print('QUADS', len(lp.data.polygons))
+for p in lp.data.polygons:
+    p.use_smooth = True
+
+# ---- unwrapped, its colours baked from the door cat's
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.01)
+bpy.ops.object.mode_set(mode="OBJECT")
+img = bpy.data.images.new("ownluckycat_baked", 1024, 1024)
+mat = bpy.data.materials.new("OwnCatBaked")
+mat.use_nodes = True
+nt = mat.node_tree
+tex = nt.nodes.new("ShaderNodeTexImage"); tex.image = img
+nt.nodes.active = tex
+lp.data.materials.append(mat)
+sc = bpy.context.scene
+sc.render.engine = "CYCLES"
+sc.cycles.samples = 4
+sc.cycles.device = "CPU"
+select_only(src, lp, active=lp)
+bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, cage_extrusion=0.012, max_ray_distance=0.06, margin=8)
+# (the koban: a thin plate, too thin for the grid of quads to keep, its baked rays found nothing and it came out black. Where the picture
+# baked dark: gold; and which faces those are, for where the koban goes)
+px = np.array(img.pixels[:], dtype=np.float32).reshape(1024, 1024, 4)
+dark = px[..., :3].max(axis=2) < 0.015   # (no colour found at all: the black ear's black is lighter than this)
+px[dark, :3] = (0.86, 0.66, 0.22)
+img.pixels.foreach_set(px.ravel())
+uvl_ = lp.data.uv_layers.active.data
+dark_at = []
+for poly in lp.data.polygons:
+    uu = sum(uvl_[li].uv.x for li in poly.loop_indices) / poly.loop_total
+    vv = sum(uvl_[li].uv.y for li in poly.loop_indices) / poly.loop_total
+    if dark[min(1023, int(vv * 1024)), min(1023, int(uu * 1024))] and poly.center.y < -0.03 and poly.center.z < 0.16:
+        dark_at.append(poly.center.copy())
+img.pack()
+# (the picture into the colour only once it's baked: wired in before, it was read while it was being written)
+nt.links.new(tex.outputs["Color"], nt.nodes["Principled BSDF"].inputs["Base Color"])
+bpy.data.objects.remove(src)
+
+# ---- the raised hand cut off, its own node, its origin at the wrist; the cuts closed
 bm = bmesh.new()
-uvl = bm.loops.layers.uv.new()
-HEAD_C, HEAD_R = (0.0, -0.004, 0.212), (0.108, 0.084, 0.07)
-head = qsphere(bm, HEAD_C, HEAD_R, 3)
-body = qsphere(bm, (0.0, 0.006, 0.094), (0.088, 0.078, 0.1), 2)
-# (the body broad at its foot, drawn in toward the head: as the reference cat sits, a bell shape)
-for f in body:
-    for vv in f.verts:
-        k_ = 1 + 0.22 * max(0.0, 1 - vv.co.z / 0.16)
-        vv.co.x *= k_; vv.co.y = 0.006 + (vv.co.y - 0.006) * k_
-for vv in bm.verts:
-    if vv.co.z < 0.004:
-        vv.co.z = 0.004 if vv.co.z > -0.001 else 0.0
-for f in head:
-    c = mid(f)
-    rel = c - Vector(HEAD_C)
-    if rel.y < -0.02:
-        # (its front: the face's picture, projected straight on across the head's width and height)
-        f.material_index = MI["skin"]
-        for l in f.loops:
-            p = l.vert.co
-            l[uvl].uv = (0.5 + (p.x - HEAD_C[0]) / (2 * HEAD_R[0]), 0.5 + (p.z - HEAD_C[2]) / (2 * HEAD_R[2]))
-    elif rel.x > 0.03 and rel.z > 0.01:
-        # (an orange patch over its right brow and back over the crown, a black one over the left ear's root)
-        f.material_index = MI["orange"]
-    elif rel.x < -0.045 and rel.z > 0.02:
-        f.material_index = MI["black"]
-    else:
-        f.material_index = MI["white"]
-for f in body:
-    c = mid(f)
-    if c.y > -0.01 and c.x > 0.0 and c.z > 0.06:
-        f.material_index = MI["orange"]
-    elif c.y > 0.0 and c.x < -0.02 and c.z < 0.09:
-        f.material_index = MI["black"]
-    else:
-        f.material_index = MI["white"]
-# (the ears: bigger pyramids set out at the head's top corners, leaning out; their fronts red inside (the reference's); the left black, the
-# right white)
-for sx in (-1, 1):
-    base = [bm.verts.new((sx * 0.045, -0.034, 0.262)), bm.verts.new((sx * 0.104, -0.014, 0.236)), bm.verts.new((sx * 0.078, 0.034, 0.25))]
-    tip = bm.verts.new((sx * 0.098, -0.01, 0.318))
-    fr = bm.faces.new((base[0], base[1], tip) if sx > 0 else (base[1], base[0], tip))
-    fr.material_index = MI["earIn"]
-    for a, b in ((base[1], base[2]), (base[2], base[0])):
-        f = bm.faces.new((a, b, tip) if sx > 0 else (b, a, tip))
-        f.material_index = MI["white"] if sx > 0 else MI["black"]
-# (the tail: a short oval curled round its back at the foot)
-for f in qsphere(bm, (0.05, 0.075, 0.03), (0.055, 0.022, 0.018), 1):
-    f.material_index = MI["orange"]
-# (the right paw at its chest, holding the koban: behind the coin, its edge showing past the coin's left (it went through the coin's face))
-for f in qsphere(bm, (-0.056, -0.07, 0.1), (0.03, 0.026, 0.028), 1):
-    f.material_index = MI["white"]
-# (its hind feet in front at the foot)
-for sx in (-1, 1):
-    for f in qsphere(bm, (sx * 0.052, -0.084, 0.018), (0.032, 0.03, 0.018), 1):
-        f.material_index = MI["white"]
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-obj_of("OwnCatBody", bm)
+bm.from_mesh(lp.data)
+paw = [f for f in bm.faces if f.calc_center_median().x > PAW_X and PAW_Z0 * TALL < f.calc_center_median().z < PAW_Z1 * TALL]
+pv = {v for f in paw for v in f.verts}
+wrist = Vector((PAW_X, sum(v.co.y for v in pv) / len(pv), min(v.co.z for v in pv) + 0.012))
+for f in bm.faces:
+    f.select = f in paw
+bm.to_mesh(lp.data)
+bm.free()
+select_only(lp)
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.separate(type="SELECTED")
+bpy.ops.object.mode_set(mode="OBJECT")
+hand = [o for o in bpy.data.objects if o.type == "MESH" and o is not lp][0]
+hand.name = "OwnCatPaw"
+for o in (lp, hand):
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    edges = [e for e in bm.edges if e.is_boundary]
+    if edges:
+        bmesh.ops.holes_fill(bm, edges=edges, sides=0)
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(o.data)
+    bm.free()
+sc.cursor.location = wrist
+select_only(hand)
+bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
 
-# ---- the collar: a ring round the neck 16 round, 3 across; the bell under its front
-bm = bmesh.new()
-RING, SEG, R0, RT = 16, 3, 0.084, 0.007
-rows = []
-for j in range(SEG):
-    a = 2 * math.pi * j / SEG
-    rows.append([bm.verts.new((math.cos(2 * math.pi * i / RING) * (R0 + RT * math.cos(a)), math.sin(2 * math.pi * i / RING) * (R0 * 0.9 + RT * math.cos(a)),
-                               0.15 + RT * math.sin(a))) for i in range(RING)])
-for j in range(SEG):
-    for i in range(RING):
-        f = bm.faces.new((rows[j][i], rows[j][(i + 1) % RING], rows[(j + 1) % SEG][(i + 1) % RING], rows[(j + 1) % SEG][i]))
-        f.material_index = MI["red"]
-for f in qsphere(bm, (0.0, -0.086, 0.134), (0.019, 0.017, 0.019), 1):
-    f.material_index = MI["gold"]
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-obj_of("OwnCatCollar", bm)
-
-# ---- the koban held to its chest: a flat lens of an oval (a quad sphere pressed thin: closed, no seam), gold, tipped back a little
+# ---- the koban, made: a flat lens of an oval, 千萬兩 written down it, set where the dark blob was, just in front of it
+kmat = pbr("OwnCatKoban", (1, 1, 1), tex=koban_img, rough=0.35)
+kc = Vector((sum(c.x for c in dark_at), sum(c.y for c in dark_at), sum(c.z for c in dark_at))) / max(1, len(dark_at))
+kh = (max(c.z for c in dark_at) - min(c.z for c in dark_at)) if dark_at else 0.06
+front = min(c.y for c in dark_at) if dark_at else kc.y
 bm = bmesh.new()
 uvk = bm.loops.layers.uv.new()
-for f in qsphere(bm, (0.0, 0.0, 0.0), (0.034, 0.0055, 0.048), 2):
-    f.material_index = MI["koban"]
+KR = (kh * 0.36, 0.005, kh * 0.52)
+for f in qsphere(bm, (0.0, 0.0, 0.0), KR, 2):
     for l in f.loops:
-        l[uvk].uv = (0.5 + l.vert.co.x / 0.068, 0.5 + l.vert.co.z / 0.096)
-bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=__import__("mathutils").Matrix.Rotation(0.25, 3, "X"))
-bmesh.ops.translate(bm, verts=bm.verts, vec=(-0.03, -0.108, 0.092))
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-obj_of("OwnCatKoban", bm)
-
-# ---- the beckoning paw: its own node, its origin at the shoulder (the game swings it about x); the arm up beside the head, its paw's pad pink
-SHOULDER = (0.08, -0.03, 0.15)
-bm = bmesh.new()
-arm = qsphere(bm, (0.006, -0.004, 0.058), (0.034, 0.031, 0.074), 1)
-for f in arm:
-    c = mid(f)
-    f.material_index = MI["white"]
-# (the palm's pad: a pink oval just under the toe beans, not the paw's whole front)
-for f in qsphere(bm, (0.006, -0.031, 0.094), (0.015, 0.004, 0.012), 1):
-    f.material_index = MI["pink"]
-for k_ in range(3):
-    for f in qsphere(bm, (0.006 + (k_ - 1) * 0.016, -0.032, 0.118 + (0.005 if k_ == 1 else 0)), (0.0068, 0.0045, 0.0068), 1):
-        f.material_index = MI["pink"]
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-obj_of("OwnCatPaw", bm, origin=SHOULDER)
+        l[uvk].uv = (0.5 + l.vert.co.x / (2 * KR[0]), 0.5 + l.vert.co.z / (2 * KR[2]))
+bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=__import__("mathutils").Matrix.Rotation(0.2, 3, "X"))
+bmesh.ops.translate(bm, verts=bm.verts, vec=(kc.x, front - 0.004, kc.z))
+me = bpy.data.meshes.new("OwnCatKoban"); bm.to_mesh(me); bm.free()
+koban = bpy.data.objects.new("OwnCatKoban", me); bpy.context.collection.objects.link(koban)
+koban.data.materials.append(kmat)
+for p_ in koban.data.polygons:
+    p_.use_smooth = True
+print("KOBAN", len(dark_at), tuple(round(c, 3) for c in kc), round(kh, 3))
 
 root = bpy.data.objects.new("OwnLuckyCat", None)
 bpy.context.collection.objects.link(root)
-for o in parts:
+for o in (lp, hand, koban):
     o.parent = root
-print("OWNCAT_TRIS", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))
-if PREVIEW:
-    cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
-    bpy.context.collection.objects.link(cam)
-    cam.location = (0.25, -0.75, 0.3)
-    cam.rotation_mode = "QUATERNION"
-    cam.rotation_quaternion = (Vector((0, 0, 0.16)) - cam.location).to_track_quat("-Z", "Y")
-    cam.data.lens = 60
-    bpy.context.scene.camera = cam
-    sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
-    sun.data.energy = 4
-    sun.rotation_euler = (0.8, 0.2, 0.6)
-    bpy.context.collection.objects.link(sun)
-    w = bpy.data.worlds.new("W"); w.use_nodes = True
-    w.node_tree.nodes["Background"].inputs[0].default_value = (0.5, 0.5, 0.52, 1)
-    bpy.context.scene.world = w
-export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW)
+print("OWNCAT_TRIS", sum(len(p.vertices) - 2 for o in (lp, hand) for p in o.data.polygons), "WRIST", tuple(round(c, 3) for c in wrist))
+export_dish(root, [lp, hand, koban, root], os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW, ladder=False)
 print("OWNCAT_DONE")
