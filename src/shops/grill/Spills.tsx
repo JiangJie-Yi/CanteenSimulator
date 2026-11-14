@@ -212,9 +212,10 @@ export function Spills() {
         m!.crumbs.setMatrixAt(i, M.compose(P, Q.identity(), S))
       })
       m.crumbs.instanceMatrix.needsUpdate = true
-      // (the puddle, run out to its size, shrinking away as it's wiped up)
+      // (the puddle, run out to its size; left as it is while the glass is swept, then shrinking away as it's wiped up with a cloth (item 116))
       const run = Math.min(1, t / RUN_S)
-      m.puddle.scale.setScalar(Math.max(0.001, (0.25 + 0.75 * Math.sqrt(run)) * (left > 0.05 ? 0.35 + 0.65 * left : left / 0.05 * 0.37)))
+      const wet = Math.max(0, Math.min(1, s.wet ?? left))
+      m.puddle.scale.setScalar(Math.max(0.001, (0.25 + 0.75 * Math.sqrt(run)) * (wet > 0.05 ? 0.35 + 0.65 * wet : wet / 0.05 * 0.37)))
       // (the dust: up and out, falling back, gone)
       if (m.dust) {
         if (t >= DUST_S) { m.group.remove(m.dust); m.dust.dispose(); m.dust = null }

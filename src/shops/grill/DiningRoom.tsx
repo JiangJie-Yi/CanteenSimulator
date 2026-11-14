@@ -6269,7 +6269,7 @@ function breakBottle(id: DrinkId, at: THREE.Vector3, unit: number) {
   const f = formOf(id)
   const glass = f === 'beer' ? (id === 'darkBeer' ? '#4a2c12' : '#7a4a1c') : id === 'ramune' ? '#a8dcea' : soju(id) ? '#4f9a58' : '#eef4f2'
   const clear = id === 'milk' ? 0 : id === 'darkBeer' ? 0.15 : f === 'beer' ? 0.35 : id === 'umeshu' ? 0.4 : 0.8
-  SPILLS.list.push({ key: SPILLS.next++, at: [at.x, at.y, at.z], unit, drink: d.color, clear, glass, seed: Math.random() * 1000, t0: performance.now(), by: null, left: 1 })
+  SPILLS.list.push({ key: SPILLS.next++, at: [at.x, at.y, at.z], unit, drink: d.color, clear, glass, seed: Math.random() * 1000, t0: performance.now(), by: null, left: 1, wet: 1 })
   glassShatter(at)
 }
 /** (`lit`: standing in a fridge, in its cove lights' wash: lifted by a soft glow of its own, which can't leak out through the cabinet as a lamp's light would) */

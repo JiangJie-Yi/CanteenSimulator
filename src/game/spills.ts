@@ -21,6 +21,11 @@ export function landingOf(vessel: Vessel, height: number): Landing {
 export const shardsOf = (seed: number) => 6 + (Math.abs(Math.floor(seed)) % 5)
 /** how long sweeping a mess up takes (seconds, at an ordinary pace) */
 export const SWEEP_S = 4
+/** and wiping its drink up off the floor with a cloth after, the glass swept (item 116, the owner's, 2026-11-14: "clean it properly: sweep
+ * the broken glass first, then wipe it dry with a cloth"; the drink had been left lying there as the glass went) */
+export const WIPE_S = 3
+/** what's to be done about a mess next: the glass swept up while any's left (`left`), then the drink wiped up while it's wet (`wet`) */
+export const nextClean = (left: number, wet: number): 'sweep' | 'wipe' | 'done' => (left > 0 ? 'sweep' : wet > 0 ? 'wipe' : 'done')
 /** whether a server goes to sweep a mess up: on the floor (or the one server, or the owner serving), not with a plate ready to carry out */
 export const sweeps = (duty: Duty, serving: boolean) => duty !== 'dish' && !serving
 /**

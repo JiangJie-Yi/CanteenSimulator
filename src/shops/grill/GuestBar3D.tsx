@@ -4,7 +4,7 @@ import { rattleSound } from './skewerSound'
 import { useSaid } from '@/ui/speechStore'
 import { getClock } from '@/ui/clockStore'
 import { NO_RAY } from '@/scene/pickable'
-import { sweeps, SWEEP_S } from '@/game/spills'
+import { nextClean, sweeps, SWEEP_S, WIPE_S as FLOOR_WIPE_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
@@ -2851,7 +2851,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'washGo' | 'wash' | 'unloadGo' | 'unloadTake' | 'unloadCarry' | 'unloadPut' | 'handGo' | 'handwash' | 'basketGo' | 'basketTake'
     | 'toBox' | 'boxTake' | 'toTill' | 'hand' | 'toStand' | 'standPut'
     | 'skTrayGo' | 'skTake' | 'skSinkGo' | 'skWash' | 'skHolderGo' | 'skPut'
-    | 'sweepGo' | 'sweep'
+    | 'sweepGo' | 'sweep' | 'wipeFloor'
   const waiters = useRef<{ phase: WaiterPhase
     t: number; seat: number; keys: string[]; run: number | null
     /** the way they're drawn facing, turned toward `yaw` a frame at a time (set at once, they spun round at each corner of their way, by as
@@ -4733,7 +4733,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (glass broken on the floor whose sweeper's no longer on it (gone home, let go): free for the next)
     for (const sp of SPILLS.list) {
       const by = sp.by === null ? null : waiters.current[sp.by]
-      if (sp.by !== null && (!by || by.spill !== sp.key || (by.phase !== 'sweepGo' && by.phase !== 'sweep'))) sp.by = null
+      if (sp.by !== null && (!by || by.spill !== sp.key || (by.phase !== 'sweepGo' && by.phase !== 'sweep' && by.phase !== 'wipeFloor'))) sp.by = null
     }
     waiters.current.forEach((w, wi) => {
       const home = homeOf(wi)
@@ -4897,10 +4897,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].sweepSay(wi + (w.spill ?? 0)), until: performance.now() + 2800 })
       })
       else if (w.phase === 'sweep') {
-        // (swept up as they go (the shards drawn in, the puddle shrinking: Spills); done, gone, and back the way they came, the broom in hand)
+        // (the glass swept up as they go (the shards drawn in: Spills), the drink left on the floor; swept, the broom put by and the cloth out
+        // to wipe it dry (item 116: the glass first, then the wet))
         const sp = SPILLS.list.find((x) => x.key === w.spill)
         if (sp) sp.left = Math.max(0, 1 - w.t / SWEEP_S)
-        if (!sp || w.t >= SWEEP_S) {
+        if (sp && nextClean(sp.left, sp.wet) === 'wipe') { w.phase = 'wipeFloor'; w.t = 0; w.broom = false }
+        else if (!sp) w.phase = 'wipeFloor'
+      }
+      else if (w.phase === 'wipeFloor') {
+        // (down on the floor with the cloth, wiping round and round over the drink till it's dry; done, gone, and back the way they came)
+        const sp = SPILLS.list.find((x) => x.key === w.spill)
+        if (sp) sp.wet = Math.max(0, 1 - w.t / FLOOR_WIPE_S)
+        if (!sp || nextClean(sp.left, sp.wet) === 'done') {
           SPILLS.list = SPILLS.list.filter((x) => x.key !== w.spill)
           w.spill = undefined
           // (any more glass broken that no one's on: straight on to it along the aisle, and only then back (the owner's, 2026-11-11: he went
@@ -4911,6 +4919,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (next && to && to.length >= 2) {
             next.by = wi
             w.spill = next.key
+            w.broom = true
             const there = nearestSeat(to[to.length - 2])
             const turn = seats[here].counter === seats[there].counter ? [] : [aisleCorner(counters[seats[here].counter === 0 ? seats[there].counter : seats[here].counter])]
             go([w.pos.clone(), seats[here].aisle.clone(), ...turn, ...to.slice(-2)], 'sweepGo')
@@ -5187,14 +5196,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const wiping = w.phase === 'clearTake' && w.t > 0.45 && w.t < 0.45 + WIPE_S && w.seat >= 0
       if (o) o.userData.wipe = wiping ? (w.t - 0.45) / WIPE_S : undefined
       // (sweeping up broken glass: how long into it; the broom in hand there and back (StaffFigure, the owner's SweepBroom))
-      if (o) { o.userData.sweep = w.phase === 'sweep' ? w.t : undefined; o.userData.broom = !!w.broom }
+      // (wiping the floor after: stooped as they sweep, the broom put by, the cloth in their hand on the floor (item 116))
+      if (o) { o.userData.sweep = w.phase === 'sweep' || w.phase === 'wipeFloor' ? w.t : undefined; o.userData.broom = !!w.broom }
       // (washing up at the sink, by hand or into the washer: the scrubbing motion (StaffFigure's scrub))
       if (o) o.userData.scrub = w.phase === 'wash' || w.phase === 'handwash' ? w.t : undefined
       // (they step in to the bar's edge between the stools for it, facing it, and back out: the cloth's under their hand (StaffFigure's
       // wipe: the right hand out on the top, along and back), on the near edge of the top where the plate was)
       let wipeAt: { p: THREE.Vector3; yaw: number; k: number } | null = null
       const rag = ragObjs.current[wi]
-      if (rag) rag.visible = wiping
+      if (rag) rag.visible = wiping || w.phase === 'wipeFloor'
+      // (the cloth on the floor over the drink, wiped round and round in front of them (item 116))
+      if (rag && w.phase === 'wipeFloor' && frame.current) {
+        const sp = SPILLS.list.find((x) => x.key === w.spill)
+        if (sp) {
+          const at = frame.current.worldToLocal(new THREE.Vector3(sp.at[0], sp.at[1], sp.at[2]))
+          const a = w.t * 7
+          rag.position.set(at.x + Math.cos(a) * 0.07, at.y + 0.004, at.z + Math.sin(a) * 0.07)
+          rag.rotation.y = a
+        }
+      }
       if (wiping) {
         const st = seats[w.seat], c = counters[st.counter], p = (w.t - 0.45) / WIPE_S
         const stand = st.mid.clone().addScaledVector(c.lay, -WIPE_STAND[1]).addScaledVector(c.along, WIPE_STAND[0]).setY(w.pos.y)

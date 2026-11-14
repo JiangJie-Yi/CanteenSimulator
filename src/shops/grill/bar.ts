@@ -451,7 +451,9 @@ if (typeof window !== 'undefined') {
  * server's on it (their index) and how much of it's left (1, swept away to 0 as they work); `unit`, the scene's units to a metre there; Spills
  * draws it
  */
-export type Spill = { key: number; at: [number, number, number]; unit: number; drink: string; clear: number; glass: string; seed: number; t0: number; by: number | null; left: number }
+export type Spill = { key: number; at: [number, number, number]; unit: number; drink: string; clear: number; glass: string; seed: number; t0: number; by: number | null; left: number
+  /** the drink still on the floor, 1 to 0 as it's wiped up after the glass is swept (item 116) */
+  wet: number }
 export const SPILLS: { list: Spill[]; next: number } = { list: [], next: 1 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __spills?: typeof SPILLS }).__spills = SPILLS
 /** the drinks' stock panel (shops/grill/DrinkStockPanel), opened from the back stock by the fridges: open or not, and who's watching */
