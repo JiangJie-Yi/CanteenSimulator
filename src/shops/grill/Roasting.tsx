@@ -7843,10 +7843,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.position.y += 0.06 * lift
           p.node.rotateOnWorldAxis(STACK_DIR, -0.12 * lift)
         }
-        // (the boss's: up out of the bowl into his hand, held at his mouth while he eats it)
-        const hand = p.byBoss ? room.getObjectByName('BossHandR') : null
-        if (hand && p.node.parent) {
-          const to = p.node.parent.worldToLocal(hand.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0)))
+        // (the boss's: up out of the bowl to his chopsticks' tips, held there as he eats it (item 112: he tastes with a bowl and chopsticks);
+        // his hand till he's got them out)
+        const hand = p.byBoss && !BOSS_TASTE.tipOn ? room.getObjectByName('BossHandR') : null
+        if (p.byBoss && p.node.parent && (BOSS_TASTE.tipOn || hand)) {
+          const to = p.node.parent.worldToLocal(BOSS_TASTE.tipOn ? BOSS_TASTE.tip.clone() : hand!.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0)))
           p.node.position.lerp(to, THREE.MathUtils.smoothstep(p.eat, 0, 0.15))
         }
         if (p.eat >= 1) {

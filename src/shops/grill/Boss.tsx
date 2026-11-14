@@ -67,7 +67,9 @@ export const BOSS_TASTE = { at: null as THREE.Vector3 | null, arrived: false, si
   /** he's biting into it now (Roasting, from the first bite): he says so, munching */
   chewing: false,
   /** its 美味 once he's swallowed it (Roasting): he says what he thinks of it, and it's cleared */
-  verdict: null as number | null }
+  verdict: null as number | null,
+  /** where his chopsticks' tips are (the world), while he tastes: what he's tasting is held there (Roasting; item 112) */
+  tip: new THREE.Vector3(), tipOn: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossTaste?: typeof BOSS_TASTE }).__bossTaste = BOSS_TASTE
 /** a drink set down on a table near him (DiningRoom's FridgeStock, as it's let go there): where it stands (world) and which it is (the drink out of the
  * fridge, taken off the table as he picks it up); he goes over, drinks it and says so; cleared when it's drunk */
@@ -79,8 +81,28 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export const BOSS_FX = { hover: false, glowAt: -1e9, joyAt: -1e9 }
 const GLOW = new THREE.Color('#ffb648')
 const GLOW_LINE = new THREE.Color('#ffd24a')
+/**
+ * What he tastes with (item 112, the owner's, 2026-11-14: "tasting, he should hold a bowl and chopsticks"): a small rice bowl in his left
+ * hand, under his chin, and a pair of chopsticks in his right, what he tastes held at their tips. Drawn from the start (shrunk to nothing
+ * when he isn't tasting: nothing new for the renderer to make as he starts), toon-shaded as he is.
+ */
+const TASTE_BOWL_GEO = new THREE.LatheGeometry([[0.001, 0], [0.032, 0.002], [0.034, 0.008], [0.05, 0.02], [0.066, 0.048], [0.07, 0.056], [0.064, 0.056],
+  [0.06, 0.048], [0.045, 0.024], [0.001, 0.016]].map(([r, y]) => new THREE.Vector2(r, y)), 16)
+const TASTE_BOWL_MAT = new THREE.MeshToonMaterial({ color: '#f1ece2', side: THREE.DoubleSide })
+const TASTE_BAND_GEO = new THREE.CylinderGeometry(0.0672, 0.0662, 0.008, 16, 1, true).translate(0, 0.044, 0)
+const TASTE_BAND_MAT = new THREE.MeshToonMaterial({ color: '#2d4f86', side: THREE.DoubleSide })
+/** a chopstick: 0.22 long, square, tapering to its tip, the tip at +z */
+const CHOP_LEN = 0.22
+const CHOP_GEO = new THREE.CylinderGeometry(0.0022, 0.0042, CHOP_LEN, 4, 1).rotateX(Math.PI / 2).translate(0, 0, CHOP_LEN / 2)
+const CHOP_MAT = new THREE.MeshToonMaterial({ color: '#7a4a26' })
+const TIP_LOCAL = new THREE.Vector3(0, 0, CHOP_LEN)
+const SHRUNK = 0.0001
 /** the drink in his hand: its foot a little under his fist, a touch forward of it (the body's frame); and a scratch vector for the hand */
 const DRINK_IN_PALM = new THREE.Vector3(0, -0.05, 0.015)
+/** the tasting bowl in his left palm: its foot a little under it */
+const BOWL_IN_PALM = new THREE.Vector3(0, -0.03, 0.02)
+/** the chopsticks held in his right fist: from its middle, up through it */
+const CHOPS_IN_PALM = new THREE.Vector3(0, 0.035, 0)
 const HAND_AT = new THREE.Vector3()
 const PALM_A = new THREE.Vector3()
 /** where to put a hand's bone, up and down in its own parent's frame, for its palm (drawn some way off it: drawnCentre) to come to `wy` in
@@ -235,6 +257,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   // (a drink he's been handed, in his hand while he drinks it)
   const [drinkId, setDrinkId] = useState<DrinkId | null>(null)
   const drinkRef = useRef<THREE.Group>(null)
+  const bowlRef = useRef<THREE.Group>(null)
+  const chopsRef = useRef<THREE.Group>(null)
   useEffect(() => {
     let last: { s: BossSituation; i: number } | null = null
     let n = 0
@@ -598,10 +622,10 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       R.set(-0.06, 0, 0.3); wantR = at(0.25)
       L.set(0.08, 0, 0.2); wantL = at(0.12) + Math.sin(T * 1.6) * 0.016
     } else if (act === 'taste') {
-      // (a piece held up to his mouth in the right hand, bitten and chewed, the left on his belly)
+      // (the bowl held up under his chin in the left hand; the right with the chopsticks bringing a bite up from it to his mouth, chewing)
       const chew = Math.max(0, Math.sin((T - BOSS_TASTE.since) * 7))
-      R.set(-0.04, 0.3 + chew * 0.03, 0.18)
-      L.set(0.04, 0.02, 0.1)
+      R.set(-0.06, 0.24 + chew * 0.03, 0.2)
+      L.set(0.05, 0.16, 0.22)
     } else if (act === 'drink') {
       // (the bottle up to his mouth in the right hand, tipped up as he drinks, then down with a sigh; the left on his belly)
       const u = T - BOSS_DRINK.since
@@ -667,6 +691,29 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         } else dr.position.copy(hand).add(DRINK_IN_PALM)
         dr.rotation.x = -up * 0.95
       }
+    }
+    // (tasting: the bowl in his left palm, the chopsticks in his right, their tips up toward his mouth; where the tips are, for what's held)
+    {
+      const tasting = act === 'taste' && !!parts.handR && !!parts.handL
+      const bw = bowlRef.current, ch = chopsRef.current
+      if (bw && ch) {
+        bw.scale.setScalar(tasting ? 1 : SHRUNK)
+        ch.scale.setScalar(tasting ? 1 : SHRUNK)
+        if (tasting && bw.parent && ch.parent) {
+          parts.handR!.updateWorldMatrix(true, false); parts.handL!.updateWorldMatrix(true, false)
+          palm.current ??= drawnCentre(root, parts.handR!)
+          palmL.current ??= drawnCentre(root, parts.handL!)
+          bw.position.copy(bw.parent.worldToLocal(parts.handL!.localToWorld(HAND_AT.copy(palmL.current)))).add(BOWL_IN_PALM)
+          ch.position.copy(ch.parent.worldToLocal(parts.handR!.localToWorld(HAND_AT.copy(palm.current)))).add(CHOPS_IN_PALM)
+          // (pointing forward and in across him toward the bowl, their tips a little up; lifted toward his mouth on each bite: turned about the
+          // vertical first, then tipped (his model stands turned half round in the body's frame: its front is the frame's -z))
+          const chew = Math.max(0, Math.sin((T - BOSS_TASTE.since) * 7))
+          ch.rotation.set(-0.25 - chew * 0.45, Math.PI + 0.55, 0, 'YXZ')
+          ch.updateWorldMatrix(true, false)
+          ch.localToWorld(BOSS_TASTE.tip.copy(TIP_LOCAL))
+        }
+      }
+      BOSS_TASTE.tipOn = tasting
     }
     if (parts.tongs) {
       parts.tongs.scale.setScalar(act === 'tongs' ? 1 : 0)
@@ -734,6 +781,12 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       )}
       <group ref={body}><primitive object={root} />
         <group ref={drinkRef} name="boss-drink-held" visible={false}>{drinkId && <DrinkBottle id={drinkId} wet />}</group>
+        <group ref={bowlRef} name="boss-taste-bowl" scale={SHRUNK}>
+          <mesh geometry={TASTE_BOWL_GEO} material={TASTE_BOWL_MAT} /><mesh geometry={TASTE_BAND_GEO} material={TASTE_BAND_MAT} />
+        </group>
+        <group ref={chopsRef} name="boss-chopsticks" scale={SHRUNK}>
+          <mesh geometry={CHOP_GEO} material={CHOP_MAT} position-x={-0.006} /><mesh geometry={CHOP_GEO} material={CHOP_MAT} position-x={0.006} rotation-y={-0.04} />
+        </group>
       </group>
     </group>
   )
