@@ -29,6 +29,7 @@ import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWal
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
+import { unlitShade } from '@/game/roomLights'
 import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SweepBroom, ownerSweepPose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
@@ -792,15 +793,20 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
       : { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
 })
 /**
- * A door lantern's paper (item 120, the owner's, 2026-11-15: "this lantern's light and dark are odd; the 炭火 one should give a yellow-white
- * light"): lit by the room as anything is while its flame's out (it was unlit paper whose brightness followed the page's light or dark theme,
- * not the hour: at night, out, the cream one and the fish's round one stood half bright beside the red one gone dark), and lit from within by
- * its own picture as the flame's up (`glow`, set every frame), in `tint`: warm white for the cream papers
+ * A door lantern's paper (items 120, 125, the owner's, 2026-11-15): drawn as the room's own lamps are (lampShades): not shaded by the room's
+ * lights (lit by them, put out it stood dark and heavily shadowed, the owner saw), its flame's light when lit, in `tint` (warm white for the
+ * cream papers: "the 炭火 one a yellow-white light"); put out, the plain grey-white the room's lamps are by day, a dim grey by night
+ * (game/roomLights' unlitShade, by the hour: the page's data-theme)
  */
-const paperMat = (map: THREE.Texture | null, tint = '#ffffff', fin = false) => new THREE.MeshStandardMaterial({ map, emissiveMap: map, emissive: tint,
-  emissiveIntensity: 0, roughness: 0.9, metalness: 0, side: fin ? THREE.DoubleSide : THREE.FrontSide, alphaTest: fin ? 0.5 : 0 })
-/** how bright a lit lantern's paper is from within */
-const PAPER_GLOW = 1.25
+const paperMat = (map: THREE.Texture | null, fin = false) => new THREE.MeshBasicMaterial({ map, toneMapped: false, side: fin ? THREE.DoubleSide : THREE.FrontSide,
+  alphaTest: fin ? 0.5 : 0 })
+const PAPER_OFF = new THREE.Color(), PAPER_ON = new THREE.Color()
+/** a paper's colour, lit `k` of the way (0 out .. 1 lit), its flame `flame`, in `tint` */
+const paperColour = (m: THREE.MeshBasicMaterial, k: number, flame: number, tint: string) => {
+  PAPER_OFF.set(unlitShade(typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'))
+  PAPER_ON.set(tint).multiplyScalar(flame)
+  m.color.copy(PAPER_OFF).lerp(PAPER_ON, k)
+}
 /** how far apart the two lanterns by the doorway hang, the red and the grill's beside it (middle to middle) */
 const CHOCHIN_PAIR = 0.32  // (0.3: their paper just touched, clips.mjs)
 const chochinGlow = (inner: string, mid: string, outer: string) => {
@@ -837,19 +843,19 @@ function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream
   const gltf = useGLTF(CHOCHIN_URL) as unknown as { scene: THREE.Group }
   const { model, skin } = useMemo(() => {
     const r = gltf.scene.clone(true)
-    let paper: THREE.MeshStandardMaterial | null = null
+    let paper: THREE.MeshBasicMaterial | null = null
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       if (src.name === 'ChochinPaper') {
-        paper = paperMat(tex, style === 'cream' ? '#fff1cc' : '#ffffff')
+        paper = paperMat(tex)
         m.material = paper
       } else m.material = src.name === 'ChochinGold' ? new THREE.MeshStandardMaterial({ color: '#d6a84a', metalness: 1, roughness: 0.3 })
         : new THREE.MeshToonMaterial({ color: src.color.clone() })
     })
     inkModel(r, (m) => /Band|Bail|Tassel/.test(m.name), { width: 0.0015, weld: true })
-    return { model: r, skin: paper as THREE.MeshStandardMaterial | null }
+    return { model: r, skin: paper as THREE.MeshBasicMaterial | null }
   }, [gltf, tex])
   const halo = useRef<THREE.Sprite>(null)
   /** how lit it is (0 out .. 1 lit), going to its switch's way over some 0.4 s, as a flame's lit or put out */
@@ -861,7 +867,7 @@ function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream
     lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
     const k = lit.current, flame = 0.9 + 0.06 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 7.3 + 1.1)
     if (hang.current) hang.current.rotation.z = Math.sin(t * 0.9) * 0.04
-    if (skin) skin.emissiveIntensity = flame * k * PAPER_GLOW
+    if (skin) paperColour(skin, k, flame, style === 'cream' ? '#fff1cc' : '#ffffff')
     if (halo.current) halo.current.material.opacity = k * (0.5 + (flame - 0.9) * 2)
   })
   return (
@@ -1066,9 +1072,9 @@ function FishLantern() {
   const lit = useRef(getLights().door ? 1 : 0)
   const { model, fish, papers } = useMemo(() => {
     const r = gltf.scene.clone(true)
-    const papers: THREE.MeshStandardMaterial[] = []
+    const papers: THREE.MeshBasicMaterial[] = []
     const lit = (map: THREE.Texture | null, fin = false) => {
-      const m = paperMat(map, '#fff4dc', fin)
+      const m = paperMat(map, fin)
       papers.push(m)
       return m
     }
@@ -1103,7 +1109,7 @@ function FishLantern() {
     const t = clock.elapsedTime
     lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
     const k = lit.current, flame = 0.92 + 0.05 * Math.sin(t * 2.3) + 0.03 * Math.sin(t * 6.1 + 0.7)
-    for (const m of papers) m.emissiveIntensity = flame * k * PAPER_GLOW
+    for (const m of papers) paperColour(m, k, flame, '#fff4dc')
     if (fishGlow.current) fishGlow.current.material.opacity = 0.55 * k
     if (fishUnder.current) fishUnder.current.material.opacity = 0.35 * k
     if (hang.current) { hang.current.rotation.z = Math.sin(t * 0.8) * 0.025; hang.current.rotation.x = Math.sin(t * 0.55 + 1) * 0.015 }
