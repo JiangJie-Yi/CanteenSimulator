@@ -499,6 +499,45 @@ export function setPivot(id: string, v: V3, shift: V3 = [0, 0, 0]) {
   state.offsets = { ...state.offsets, [id]: [o[0] + shift[0], o[1] + shift[1], o[2] + shift[2]] }
   emit()
 }
+/**
+ * The pivot put at the middle of a box round it (the owner's, 2026-11-13, item 70: "AABB, OBB to reset the pivot, for editing"): the box
+ * squared to the shop (AABB) or along the piece's own way (OBB), at its middle in height too; the piece not moved. A piece does it itself
+ * (Movable registers how: its own frame, its own turn and size); a group here, over all its pieces' boxes
+ */
+const pivotResets = new Map<string, (kind: 'aabb' | 'obb') => void>()
+export const registerPivotReset = (id: string, f: (kind: 'aabb' | 'obb') => void) => { pivotResets.set(id, f); return () => { pivotResets.delete(id) } }
+export function resetPivot(kind: 'aabb' | 'obb') {
+  const id = state.selected
+  if (!id) { toast(T().pivotNone); return }
+  beginChange()
+  const g = state.groups[id]
+  if (g) {
+    const boxes = leavesOf(state.groups, id).map((m) => registry.get(m)?.corners?.() ?? null).filter((v): v is V3[] => !!v && v.length > 0)
+    if (!boxes.length) return
+    const world = boxes.flat()
+    const ra = ROOM_TURN * Math.PI / 180, ax = Math.cos(ra), az = -Math.sin(ra)
+    // (the middle of points squared to the room's axes in whatever frame they're in: across, and half way up)
+    const mid = (pts: V3[]): V3 => {
+      let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity, y0 = Infinity, y1 = -Infinity
+      for (const v of pts) {
+        const u = v[0] * ax + v[2] * az, w = -v[0] * az + v[2] * ax
+        u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); y0 = Math.min(y0, v[1]); y1 = Math.max(y1, v[1])
+      }
+      const um = (u0 + u1) / 2, wm = (w0 + w1) / 2
+      return [um * ax - wm * az, (y0 + y1) / 2, um * az + wm * ax]
+    }
+    // (OBB: squared to the group's own axes (its pieces taken into its frame, its turn undone); AABB: squared to the shop's in the world, then
+    // taken into the group's frame)
+    const at = kind === 'obb' ? mid(world.map((v) => intoGroup(id, v))) : intoGroup(id, mid(world))
+    const d: V3 = [at[0] - g.pivot[0], at[1] - g.pivot[1], at[2] - g.pivot[2]]
+    const ad = applyGroup({ ...g, pivot: [0, 0, 0], t: [0, 0, 0] }, d)
+    state.groups = { ...state.groups, [id]: { ...g, pivot: at, t: [g.t[0] + ad[0] - d[0], g.t[1] + ad[1] - d[1], g.t[2] + ad[2] - d[2]] } }
+    groupFootDone.add(id)
+    keepFeet()
+  } else pivotResets.get(id)?.(kind)
+  save(); emit()
+  toast(T().pivotReset(kind === 'obb' ? 'OBB' : 'AABB'), 'edit')
+}
 /** D: the arrows move the pivot instead of the piece (as Maya's D), again to move the piece */
 export function togglePivotMode() { state.pivotMode = !state.pivotMode; emit() }
 /** the axes gone by: the room's or the piece's own */
@@ -1218,7 +1257,14 @@ function panel() {
     spaceButton.onclick = () => setSpace(state.space === 'local' ? 'world' : 'local')
     pivotButton = h('button', 'be-tool be-tool-text') as HTMLButtonElement
     pivotButton.onclick = togglePivotMode
-    bar.append(spaceButton, pivotButton)
+    // (and the pivot put back at the middle of a box round it: AB the box squared to the shop, OB the one along the piece itself (item 70))
+    const aabbButton = h('button', 'be-tool be-tool-text', 'AB') as HTMLButtonElement
+    aabbButton.title = T().pivotAabb
+    aabbButton.onclick = () => resetPivot('aabb')
+    const obbButton = h('button', 'be-tool be-tool-text', 'OB') as HTMLButtonElement
+    obbButton.title = T().pivotObb
+    obbButton.onclick = () => resetPivot('obb')
+    bar.append(spaceButton, pivotButton, aabbButton, obbButton)
     const main = h('div', 'be-main')
     const head = h('div', 'be-head', T().title)
     head.appendChild(h('small', '', T().keys))

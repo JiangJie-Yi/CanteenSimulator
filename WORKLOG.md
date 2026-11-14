@@ -692,3 +692,9 @@
 - 場景列表（`edit.ts` 的 `panel()` 裡的 `addRow`）：群組以前用 `::before` 畫一個 6 px 的圓框，跟擺設的方框差不多、又被摺疊箭頭擋到；改成摺疊箭頭後面一個 8 px 的橘色實心圓點（`be-dot`），擺設照舊方框。
 - 拖曳：擺設的列 `draggable`；拖到群組（或分區）的列上：那一列虛線框起來，放下就 `moveIntoGroup(piece, gid)`：從原本的群組拿掉、加到新群組最後；拖到列表空白處：移出所有群組。換群組會讓它吃到新群組的位移與轉向，所以放下前先量它的中心，兩格之後再量一次，差多少就用 `fromRoom` 轉成它父層的方向、補進它自己的位移：位置不變。可以 Ctrl+Z 復原（`beginChange`）。提示文字（中、日、英）補在 `data/editText.ts`。
 - 驗證：`_69drag.mjs`：開發者模式有 11 個群組圓點；把「收銀櫃檯」拖到「米袋與舊飯桶」：群組 `grp-till` → `grp-ricecorner`、中心移動 0.0000。用真的滑鼠拖時測試的版面裡目標群組在列表可見範圍外（列表 320 px 高），用派送拖曳事件的方式測；`report-1113/69-list.png`。`npx tsc -b`、`npm test` 通過；提交。**完成**。
+
+## 第 70 項　開發者模式：用 AABB、OBB 重設中心點（店主 11-13 晚上）
+
+- 中心點（D 模式移的）存成相對腳底中心的位移（`state.pivots`，擺設自己的座標）；群組的在 `group.pivot`。
+- `edit.ts`：`resetPivot(kind)`：選的是群組時，取所有成員的框角（`corners`），OBB＝在群組自己的座標裡對齊店裡的軸取中間（群組自己的轉向已經去掉，就是沿群組方向的框）、AABB＝在世界裡對齊店裡的軸取中間再換進群組座標；高度取上下的中間；跟 `settleGroupFeet` 一樣補群組自己的位移，所以成員不動。選的是擺設時交給 `Movable` 登記的函式（`registerPivotReset`）：AABB 用 `measure('inner')`（對齊店裡的框）、OBB 用 `measure('inner', facing())`（沿自己方向、跟黃框同一個），目標＝框的中心 − 腳底中心，位移照 `turnAndSize()` 補（跟 `poseFrom`、D 模式拖中心點同一個算法），物件不動。工具列在 D 下面多「AB」「OB」兩顆（`be-tool-text`），提示三語（`data/editText.ts`），可以 Ctrl+Z。
+- 驗證（`_70pivot.mjs`）：柳樹（轉過的）AB → (0.036, 0.522, 0.082)、OB → (0, 0.522, 0)，兩次中心位置差 0.0000；收銀櫃組 OB、AB：中心點高度 −1.16 → 0.097／0.094，群組位移不變。`npx tsc -b`、`npm test` 通過；提交。**完成**。

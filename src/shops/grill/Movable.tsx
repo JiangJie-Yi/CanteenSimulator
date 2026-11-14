@@ -13,7 +13,7 @@ import { ROOM_TURN } from '@/game/editGroups'
 import { holdVeil } from '@/scene/Later'
 import { warmLater } from '@/scene/Prewarm'
 import { solidHit, pieceOf } from '@/scene/pickable'
-import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
+import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, registerPivotReset, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -753,6 +753,19 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     if (!footXzSettled(id)) settle(dxz, settleFootXz)
   }
 
+  // (its pivot put at the middle of a box round it, from the editor (item 70): squared to the shop (AABB) or to its own way (OBB), half way up;
+  // counted from its foot's middle as its pivot is, and its place moved by what its turn and size about the new pivot would shift it, so it
+  // stays put)
+  useEffect(() => registerPivotReset(id, (kind) => {
+    const m = kind === 'obb' ? measure('inner', facing()) : measure('inner')
+    const now = turnAndSize()
+    if (!m || m.empty || !now) return
+    const pv = pivotOf(id)
+    const want: V3 = [m.c[0] - mid[0], m.c[1] - mid[1], m.c[2] - mid[2]]
+    const d = new THREE.Vector3(want[0] - pv[0], want[1] - pv[1], want[2] - pv[2])
+    const shift = d.clone().applyMatrix4(now).sub(d)
+    setPivot(id, want, [shift.x, shift.y, shift.z])
+  }))
   /** the turn about the vertical its contents carry: down the chain of single groups inside it to where it branches or a mesh is */
   const contentYaw = () => {
     const inn = inner.current
