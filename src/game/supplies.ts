@@ -4,6 +4,7 @@
 import { TISSUE, TISSUE_START } from './tissues'
 import { ROLL, SOAP, TOWEL, WASHROOM_START } from './washroom'
 import { RECEIPT, RECEIPT_START } from './receipts'
+import { householdName, householdStart, isHousehold } from './household'
 import { SEASONINGS, SEASON_COST, SEASON_NAME, type Seasoning } from '@/data/recipes'
 import type { Lang } from '@/data/i18n'
 import type { Stock } from './economy'
@@ -53,6 +54,8 @@ export const startingSupplies = (): Stock => ({
   [ROLL]: WASHROOM_START[ROLL],
   [TOWEL]: WASHROOM_START[TOWEL],
   [SOAP]: WASHROOM_START[SOAP],
+  // (and the cleaning things: dish soap, toilet cleaner: game/household)
+  ...householdStart(),
 })
 
 /** a dab of a seasoning taken from stock (null when there's none left: it can't go on) */
@@ -87,5 +90,6 @@ export function supplyName(id: string, lang: Lang): string | null {
   if (id === ROLL) return lang === 'ja' ? 'トイレットペーパー' : lang === 'en' ? 'toilet rolls' : '捲筒衛生紙'
   if (id === TOWEL) return lang === 'ja' ? 'ペーパータオル' : lang === 'en' ? 'paper towels' : '擦手紙'
   if (id === SOAP) return lang === 'ja' ? 'ハンドソープ（詰め替え）' : lang === 'en' ? 'hand soap refills' : '洗手乳補充包'
+  if (isHousehold(id)) return householdName(id, lang)
   return id === CHARCOAL ? (lang === 'ja' ? '備長炭' : lang === 'en' ? 'binchotan' : '備長炭') : null
 }

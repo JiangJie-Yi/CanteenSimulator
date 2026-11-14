@@ -74,6 +74,7 @@ import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, type Visit } 
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
 import { SOAP, SOAP_FULL, SOAP_REFILL_AT, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT, washroomOrder } from '@/game/washroom'
 import { RECEIPT, receiptOrder } from '@/game/receipts'
+import { householdOrder, type Household } from '@/game/household'
 import { LINES, tallyNames } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
@@ -1985,6 +1986,13 @@ export default function App() {
     book('bought', o.cost)
     shiftStock({ [RECEIPT]: o.rolls })
   }
+  /** the cleaning things bought in by the pack (game/household, item 83) */
+  const buyHousehold = (id: Household, packs: number) => {
+    const o = householdOrder(id, packs)
+    if (o.cost > cash) return
+    book('bought', o.cost)
+    shiftStock({ [id]: o.bottles })
+  }
   /** sacks of binchotan bought in (the stock's supplies), paid as fuel */
   const buyCharcoal = (sacks: number) => {
     const o = charcoalOrder(sacks)
@@ -3271,7 +3279,7 @@ export default function App() {
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
           onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}
           restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
-          onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onBuyReceipts={buyReceipts} onBuyWashroom={buyWashroom} onClose={() => setFridgeOpen(false)} />
+          onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onBuyReceipts={buyReceipts} onBuyHousehold={buyHousehold} onBuyWashroom={buyWashroom} onClose={() => setFridgeOpen(false)} />
       )}
       {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
       {ai && (

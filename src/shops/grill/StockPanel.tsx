@@ -3,6 +3,8 @@ import { BOX_LOW, BOX_SHEETS, TISSUE, TISSUE_PACK } from '@/game/tissues'
 import { ROLL, SOAP, SOAP_FULL, SOAP_REFILL_AT, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT, WASHROOM_PACKS } from '@/game/washroom'
 import { ROLL_LOW } from '@/game/stocker'
 import { RECEIPT, RECEIPT_PACK, ROLL_SLIPS } from '@/game/receipts'
+import { HOUSEHOLD, HOUSEHOLD_PACK, householdName, type Household } from '@/game/household'
+import { tablewareList } from '@/game/tableware'
 import { LOADS, USES, POWER_TIERS, WATER_TIERS, WATER_BASE, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
 import { createPortal } from 'react-dom'
 import { nameIn, tl, type Lang } from '@/data/i18n'
@@ -19,18 +21,19 @@ import { Glyph } from '@/ui/GameIcons'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
-import { GRILL_SEATS, onPrinter, PRINTER, tissuesAt, TOILETS } from './bar'
+import { GRILL_SEATS, onPrinter, PLATE_COUNT, PRINTER, tissuesAt, TOILETS } from './bar'
 import { DrinkStockBody } from './DrinkStockPanel'
 import { frostSound, usePanelSound } from '@/ui/uiSound'
 
 /** the stock panel's tabs: the freezer, the fridge (the cupboards' under the cook table), the larder at room temperature, the drinks, and what
  * isn't food (the charcoal) */
-export type StockTab = Storage | 'drinks' | 'supplies'
+export type StockTab = Storage | 'drinks' | 'tableware' | 'supplies'
 const TABS: { id: StockTab; zh: string; ja: string; en: string }[] = [
   { id: 'frozen', zh: '冷凍櫃', ja: '冷凍庫', en: 'Freezer' },
   { id: 'chilled', zh: '冷藏櫃', ja: '冷蔵庫', en: 'Fridge' },
   { id: 'ambient', zh: '常溫區', ja: '常温', en: 'Larder' },
   { id: 'drinks', zh: '飲料', ja: 'ドリンク', en: 'Drinks' },
+  { id: 'tableware', zh: '餐具', ja: '食器', en: 'Tableware' },
   { id: 'supplies', zh: '耗材', ja: '消耗品', en: 'Supplies' },
 ]
 
@@ -84,6 +87,8 @@ type Props = {
   onBuyTissues: (packs: number) => void
   /** packs of receipt paper bought (game/receipts) */
   onBuyReceipts: (packs: number) => void
+  /** the cleaning things (game/household) bought by the pack */
+  onBuyHousehold: (id: Household, packs: number) => void
   /** packs of the washrooms' spares bought (game/washroom: toilet rolls, paper towels, hand soap refills) */
   onBuyWashroom: (id: string, packs: number) => void
   onClose: () => void
@@ -122,7 +127,8 @@ export function StockPanel(p: Props) {
   const warn = (t: StockTab) => {
     if (t === 'supplies') return ((p.stock[CHARCOAL] ?? 0) + CRATE.left <= 0 ? 1 : 0) + ((p.stock[RECEIPT] ?? 0) <= 0 && PRINTER.slips < ROLL_SLIPS / 5 ? 1 : 0)
       + WASHROOM_CARDS.filter((c) => (p.stock[c.id] ?? 0) <= 0 && c.low()).length
-    if (t === 'drinks') return 0
+      + HOUSEHOLD.filter((id) => (p.stock[id] ?? 0) <= 0).length
+    if (t === 'drinks' || t === 'tableware') return 0
     const zone = foods.filter((x) => storageOf(x.id) === t).filter((x) => (p.stock[x.id] ?? 0) <= 0 || freshGrade(p.fresh[x.id] ?? 100) === 'spoiled').length
     const seas = SEASONINGS.filter((k) => storageOf(seasonId(k)) === t && (p.stock[seasonId(k)] ?? 0) <= 0).length
     return zone + seas
@@ -170,7 +176,7 @@ export function StockPanel(p: Props) {
             )
           })}
         </nav>
-        {tab === 'drinks' ? <DrinkStockBody lang={lang} /> : tab === 'supplies' ? <Supplies {...p} /> : <Foods {...p} zone={tab} foods={foods} />}
+        {tab === 'drinks' ? <DrinkStockBody lang={lang} /> : tab === 'supplies' ? <Supplies {...p} /> : tab === 'tableware' ? <Tableware lang={lang} /> : <Foods {...p} zone={tab} foods={foods} />}
       </section>
     </>,
     document.body,
@@ -385,8 +391,125 @@ function Supplies(p: Props) {
         </section>
         <TissueZone {...p} />
         <ReceiptZone {...p} />
+        <HouseholdZone {...p} />
       </div>
     </>
+  )
+}
+
+/** the cleaning things (game/household, item 83): the dish soap by the sink and the toilet cleaner for the washrooms, bottles in stock, bought
+ * by the pack */
+function HouseholdZone(p: Props) {
+  const { lang, stock, cash } = p
+  return (
+    <section className="chiller-zone is-supplies">
+      <h3 className="chiller-zone-head"><span>{tl(lang, '清潔用品', '掃除用品', 'Cleaning')}</span><i aria-hidden="true">{tl(lang, '耗材', '消耗品', 'consumable')}</i></h3>
+      <div className="chiller-bins">
+        {HOUSEHOLD.map((id) => {
+          const have = stock[id] ?? 0, pk = HOUSEHOLD_PACK[id], out = have <= 0
+          return (
+            <div key={id} className={`chiller-bin season-bin supply-bin is-still${out ? ' is-out' : ''}`}>
+              <span className="chiller-bin-head"><BottleIcon kind={id} /><FitLine className="chiller-bin-name">{householdName(id, lang)}</FitLine></span>
+              <FitLine className="drink-bin-sub" min={9}>{tl(lang, `一組 ${pk.bottles} 瓶・NT$${pk.cost}`, `1組 ${pk.bottles}本・NT$${pk.cost}`, `${pk.bottles} bottles, NT$${pk.cost}`)}</FitLine>
+              <span className={`chiller-level${out ? ' is-zero' : have < pk.bottles ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / (2 * pk.bottles)) * 100)}%` }} /></span>
+              <span className="chiller-bin-info" aria-hidden="true">
+                <b className={out ? 'is-zero' : ''}>{tl(lang, '備品', '予備', 'Spare')} <em>{have}</em></b>
+                <small>{tl(lang, '瓶', '本', 'bottles')}</small>
+              </span>
+              <span className="chiller-buy season-buy">
+                <span role="button" tabIndex={0} className={`chiller-btn${cash >= pk.cost ? '' : ' is-off'}`} onClick={() => cash >= pk.cost && p.onBuyHousehold(id, 1)}
+                  title={tl(lang, `訂一組（${pk.bottles} 瓶，NT$${pk.cost}）`, '1組注文', 'Order a pack')}>{tl(lang, '訂一組', '1組', '+1 pack')}</span>
+                <span role="button" tabIndex={0} className={`chiller-btn chiller-fill${cash >= 2 * pk.cost ? '' : ' is-off'}`} onClick={() => cash >= 2 * pk.cost && p.onBuyHousehold(id, 2)}
+                  title={tl(lang, `訂兩組（NT$${2 * pk.cost}）`, '2組注文', 'Order two packs')}>{tl(lang, '兩組', '2組', '+2')}</span>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <p className="stock-note">{tl(lang, '洗碗精放在水槽邊，廁所清潔劑給兩間廁所打掃用。', '食器用洗剤はシンク脇、トイレ用洗剤は2つのトイレの掃除に。', 'The dish soap stands by the sink; the toilet cleaner is for cleaning the two washrooms.')}</p>
+    </section>
+  )
+}
+/** a bottle's picture: the dish soap's pump bottle (green), the toilet cleaner's bent-necked one (blue) */
+function BottleIcon({ kind }: { kind: Household }) {
+  const soap = kind === HOUSEHOLD[0]
+  return (
+    <svg className="season-icon" viewBox="0 0 32 32" aria-hidden="true">
+      <ellipse cx="16" cy="29.2" rx="9" ry="1.5" fill="#1d2a36" opacity="0.2" />
+      {soap ? <>
+        <rect x="14.6" y="3" width="2.8" height="6" fill="#e8e8e8" stroke="#555" strokeWidth="0.6" />
+        <path d="M13 3 h7 v2 h-7 z" fill="#f2f2f2" stroke="#555" strokeWidth="0.6" />
+        <path d="M11 11 Q11 9 13 9 h6 Q21 9 21 11 L22 27 Q22 28.5 20.5 28.5 h-9 Q10 28.5 10 27 Z" fill="#7cc46a" stroke="#2f5a26" strokeWidth="1" />
+        <rect x="12.5" y="15" width="7" height="7" rx="1" fill="#f6f3e6" stroke="#2f5a26" strokeWidth="0.5" />
+      </> : <>
+        <path d="M17 3 l5 3 -1.4 2.2 -4-2.2 Z" fill="#e94b3c" stroke="#7a1f16" strokeWidth="0.6" />
+        <path d="M15 6 h4 v4 h-4 Z" fill="#dfe6ee" stroke="#4a5a6a" strokeWidth="0.6" />
+        <path d="M11 12 Q11 10 13.5 10 h7 Q23 10 23 12 L23.5 27 Q23.5 28.5 22 28.5 h-10 Q10.5 28.5 10.5 27 Z" fill="#5aa2e0" stroke="#24507a" strokeWidth="1" />
+        <rect x="13" y="16" width="8" height="7" rx="1" fill="#f3f7fb" stroke="#24507a" strokeWidth="0.5" />
+      </>}
+    </svg>
+  )
+}
+
+/**
+ * The tableware the shop owns (game/tableware's list, item 83): what it is, how many, where it's kept; the plates told over live, where
+ * they are just now (on the racks, in the sink, the washer and the basket, out at the seats). Nothing here's bought or used up: it's the
+ * shop's own.
+ */
+function Tableware({ lang }: { lang: Lang }) {
+  const [, tick] = useState(0)
+  useEffect(() => { const t = window.setInterval(() => tick((n) => n + 1), 500); return () => window.clearInterval(t) }, [])
+  const L = lang === 'ja' ? 1 : lang === 'en' ? 2 : 0
+  const c = PLATE_COUNT
+  const live: [string, number][] = [
+    [tl(lang, '架上', '棚', 'Racks'), c.rack + c.low], [tl(lang, '水槽', 'シンク', 'Sink'), c.sink], [tl(lang, '烘碗機', '乾燥機', 'Washer'), c.washer],
+    [tl(lang, '瀝水籃', '水切り', 'Basket'), c.basket], [tl(lang, '使用中', '使用中', 'Out'), c.out],
+  ]
+  return (
+    <div className="chiller-scroll">
+      <section className="chiller-zone is-supplies">
+        <h3 className="chiller-zone-head"><span>{tl(lang, '餐具', '食器', 'Tableware')}</span><i aria-hidden="true">{tl(lang, '店裡的', '店の備品', 'the shop’s own')}</i></h3>
+        <div className="chiller-bins">
+          {tablewareList(GRILL_SEATS.length).map((w) => (
+            <div key={w.id} className="chiller-bin season-bin supply-bin is-still">
+              <span className="chiller-bin-head"><WareIcon id={w.id} /><FitLine className="chiller-bin-name">{[w.zh, w.ja, w.en][L]}</FitLine></span>
+              <FitLine className="drink-bin-sub" min={9}>{w.where[L]}</FitLine>
+              <span className="chiller-bin-info" aria-hidden="true">
+                <b>{tl(lang, '共', '計', 'In all')} <em>{w.n}</em>{w.unit[L]}</b>
+              </span>
+              {/* (where the plates are now, in two short lines that each shrink to fit: never broken inside a line) */}
+              {w.id === 'plates' && <>
+                <FitLine className="drink-bin-sub" min={8}>{[live[0], live[4]].map(([k, n]) => `${k} ${n}`).join('・')}</FitLine>
+                <FitLine className="drink-bin-sub" min={8}>{live.slice(1, 4).map(([k, n]) => `${k} ${n}`).join('・')}</FitLine>
+              </>}
+            </div>
+          ))}
+        </div>
+        <p className="stock-note">{tl(lang, '餐具是店裡自己的，不會用完；盤子的數字是現在各在哪裡。', '食器は店の備品で、なくならない。皿の数は今どこにあるか。', 'The tableware is the shop’s own and isn’t used up; the plates’ numbers say where they are just now.')}</p>
+      </section>
+    </div>
+  )
+}
+/** each piece's little picture */
+function WareIcon({ id }: { id: string }) {
+  const s = { fill: '#f4f1ea', stroke: '#3b4a5c', strokeWidth: 1 }
+  const blue = '#2f4f86'
+  const cup = id === 'riceBowls' || id === 'soupBowls' || id === 'teacups' || id === 'sakeCups'
+  const cupPath = id === 'teacups' ? 'M9 9 h14 l-1.5 16 q-0.2 2 -2 2 h-7 q-1.8 0 -2 -2 Z' : id === 'sakeCups' ? 'M10 14 h12 l-2 10 q-0.3 1.5 -2 1.5 h-4 q-1.7 0 -2 -1.5 Z' : 'M5 12 h22 q-1 13 -11 13 q-10 0 -11 -13 Z'
+  return (
+    <svg className="season-icon" viewBox="0 0 32 32" aria-hidden="true">
+      {id === 'plates' && <><ellipse cx="16" cy="18" rx="13" ry="6" {...s} /><ellipse cx="16" cy="17" rx="8" ry="3.4" fill="none" stroke={blue} strokeWidth="1" /></>}
+      {cup && <path d={cupPath} fill={id === 'soupBowls' ? '#2a1a16' : '#f4f1ea'} stroke={id === 'soupBowls' ? '#000' : '#3b4a5c'} strokeWidth="1" />}
+      {id === 'soupBowls' && <path d="M6 12 h20" stroke="#b5372a" strokeWidth="2" />}
+      {id === 'riceBowls' && <path d="M7 15 h18" stroke={blue} strokeWidth="1.4" />}
+      {id === 'spoons' && <path d="M6 22 q0 -6 7 -6 q6 0 6 4 q0 3 -6 3 q-4 0 -7 -1 Z M18 19 L28 10" {...s} />}
+      {id === 'chopsticks' && <><path d="M7 27 L22 4" stroke="#6b2a1e" strokeWidth="2" /><path d="M11 27 L25 5" stroke="#6b2a1e" strokeWidth="2" /></>}
+      {id === 'rests' && <path d="M6 20 q5 -6 10 0 q5 -6 10 0 v3 h-20 Z" fill="#c9a26b" stroke="#5a3e22" strokeWidth="1" />}
+      {id === 'soyDishes' && <><ellipse cx="16" cy="18" rx="10" ry="5" {...s} /><ellipse cx="16" cy="18" rx="6" ry="2.6" fill="#4a2410" /></>}
+      {id === 'skewers' && [8, 13, 18, 23].map((x) => <g key={x}><path d={`M${x} 28 L${x + 2} 7`} stroke="#8a8f96" strokeWidth="1.4" /><circle cx={x + 2.2} cy="5.5" r="1.6" fill="none" stroke="#8a8f96" strokeWidth="1" /></g>)}
+      {id === 'tokkuri' && <path d="M13 4 h6 v3 q-1 2 1 5 q5 6 3 12 q-1 4 -7 4 q-6 0 -7 -4 q-2 -6 3 -12 q2 -3 1 -5 Z" {...s} />}
+      {id === 'trays' && <><rect x="4" y="14" width="24" height="8" rx="2" fill="#5a2a1a" stroke="#2a120a" strokeWidth="1" /><rect x="6" y="15.5" width="20" height="4" rx="1" fill="#7a3a24" /></>}
+    </svg>
   )
 }
 
