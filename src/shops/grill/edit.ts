@@ -251,6 +251,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-22', ['kabuto', 'kabutostand', 'grp-kabuto']],
   // (the shrine's lamps where the owner set them made their defaults, what was kept for them reset (item 110, 2026-11-14))
   ['jgs-edit-relaid-23', ['shrinelamp-1', 'shrinelamp1']],
+  // (and the vases (item 111))
+  ['jgs-edit-relaid-24', ['vase-1', 'vase1']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -340,8 +342,10 @@ export const BASES: Record<string, V3> = {
   shrinelamp1: [0.03, -0.02, 0.01],
   flask: [0.15, 0, 0.0425],
   sutra: [0.142, 0, -0.03 + 0.035],
-  'vase-1': [0.07 + 0.03, 0, 0],
-  vase1: [0.07 + 0.03, 0, 0],
+  // (each 4 cm in toward the middle as the owner set them in the room's frame (item 111, 2026-11-14: left X 0.04, right X -0.04), taken into
+  // their parents' (turned -90°))
+  'vase-1': [0.07 + 0.03, 0, 0.04],
+  vase1: [0.07 + 0.03, 0, -0.04],
   // (the picture by the men's toilet: 3 cm along the wall from its door's frame, which its right edge ran 1 cm into (clips.mjs, the owner's
   // item 44); in the wall's own frame (z along it))
   'art-2.2_0.92': [0, 0, -0.03],

@@ -4646,6 +4646,9 @@ const AURA = canvasTex(128, 128, (g) => {
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015), and back 0.02
  * toward the shrine's steps with the shallower table (TABLE_DEEP) */
 const CUPS_SHIFT = 0.005
+/** the two 三方 stands (the shrine's little tables) and what's on them a size smaller (item 111, the owner's, 2026-11-14: "the shrine's little
+ * table smaller"), from their feet */
+const SANBO_SIZE = 0.8
 /** where the owner set the cups' stand by hand (2026-11-11: z -0.05, then on 0.055 along and 0.066 further in), along and across */
 const CUPS_SET = [0.055, -0.05 - 0.066] as const
 /** where the Ebisu's feet are, on his pedestal (the ring of light spreads out from there) */
@@ -5029,12 +5032,12 @@ function Altar({ omiki }: { omiki?: { pouredAt: number | null; onPour: () => voi
       {/* (the offerings on two 三方 stands (the owner's, 2026-11-11, after a photo): the oranges on one in the room the cups' stand leaves
           on its right, glutinous rice dumplings on the other before the left lantern) */}
       <Movable id="oranges" label="三方（橘子）">
-        <group name="look-oranges" position={[-0.08, 0, 0.139]} {...nameOver('椪柑', '供品，圓滿吉祥')}>
+        <group name="look-oranges" position={[-0.08, 0, 0.139]} scale={SANBO_SIZE} {...nameOver('椪柑', '供品，圓滿吉祥')}>
           <Sanbo /><group position-y={SANBO_FLOOR} scale={0.76}><OrangePlate bare /></group><ContactShadow r={0.05} />
         </group>
       </Movable>
       <Movable id="oranges2" label="三方（糯米糰子）">
-        <group position={[-0.11, 0, -0.24]} {...nameOver('糯米糰子', '供品，白糰子疊成小山')}>
+        <group position={[-0.11, 0, -0.24]} scale={SANBO_SIZE} {...nameOver('糯米糰子', '供品，白糰子疊成小山')}>
           <Sanbo /><group position-y={SANBO_FLOOR}><SanboPart name="Dango" /></group><ContactShadow r={0.05} />
         </group>
       </Movable>
