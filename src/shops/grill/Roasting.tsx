@@ -3214,8 +3214,18 @@ const bentoBlock = (w: number, h: number, d: number, x: number, y: number, z: nu
   colourVertices(g, c)
   return g
 }
+/** the same, turned about its own middle (x, then y) before it's set in place */
+const bentoTurned = (w: number, h: number, d: number, x: number, y: number, z: number, c: THREE.Color, rx: number, ry: number) => {
+  const g = new THREE.BoxGeometry(w, h, d).rotateX(rx).rotateY(ry).translate(x, y, z)
+  colourVertices(g, c)
+  return g
+}
 const BENTO_BLACK = new THREE.Color('#1d1a18'), BENTO_RED = new THREE.Color('#9b231b'), BENTO_RICE = new THREE.Color('#f2eee4')
 const BENTO_PLUM = new THREE.Color('#9e1d29'), CORD_RED = new THREE.Color('#c0262a'), SLEEVE_WHITE = new THREE.Color('#f4efe4')
+/** the bento's sides' colours (item 78): the leaf, the omelette and its browned top, takuan, the baran, shibazuke, lemon, broccoli and its stalk */
+const BENTO_LEAF = new THREE.Color('#8cc152'), BENTO_LEAF_DEEP = new THREE.Color('#5f9a3a'), BENTO_EGG = new THREE.Color('#f2c94c'), BENTO_EGG_TOP = new THREE.Color('#d9a03a')
+const BENTO_TAKUAN = new THREE.Color('#f3d43a'), BENTO_BARAN = new THREE.Color('#2f8f3a'), BENTO_SHIBA = new THREE.Color('#7a2a56')
+const BENTO_LEMON = new THREE.Color('#f5e15a'), BENTO_GREEN = new THREE.Color('#3f7d2c'), BENTO_STALK = new THREE.Color('#9cc46a')
 /** the box and its lid's black, red and white, coloured on their points: one material for both */
 const BENTO_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 let bentoGeo: THREE.BufferGeometry | null = null
@@ -3245,7 +3255,48 @@ function bentoBox() {
   ]
   const plum = new THREE.SphereGeometry(0.022, 10, 6).scale(1, 0.7, 1).translate(0.06, 0.0075 + 0.042 + 0.012, riceZ)
   colourVertices(plum, BENTO_PLUM)
-  bentoGeo = mergeGeometries([...parts.map((g) => g.toNonIndexed()), plum.toNonIndexed()])!
+  // (a bento's own sides round the dishes (the owner's, 2026-11-13, item 78: "a whole bento and only one rice cake in it?"): the dishes laid
+  // on a bed of green leaf over the box's middle; at one end two slices of rolled omelette and three of takuan; at the other a green baran
+  // divider, a little heap of shibazuke, a floret of broccoli and a wedge of lemon. Low and in the box's own colours on its points (one draw
+  // with it), under where a long fish's head and tail lie)
+  const F = 0.0075
+  // (three lettuce leaves overlapping, their edges ragged and ruffled up and down, two greens)
+  const leaves = ([[-0.08, -0.035, 0.1, 0.4, BENTO_LEAF], [0.075, 0.03, 0.095, 2.1, BENTO_LEAF_DEEP], [0.0, 0.0, 0.085, 4.0, BENTO_LEAF]] as const)
+    .map(([x, z, r, turn, c], k) => {
+      const g = new THREE.CircleGeometry(r, 12, turn).rotateX(-Math.PI / 2)
+      const lp = g.attributes.position
+      for (let i = 0; i < lp.count; i++) {
+        const lx = lp.getX(i), lz = lp.getZ(i), d = Math.hypot(lx, lz) / r, a = Math.atan2(lz, lx)
+        const ragged = 1 - 0.18 * Math.abs(Math.sin(a * 3 + k))
+        lp.setX(i, lx * ragged * 1.25)
+        lp.setZ(i, lz * ragged * 0.95)
+        lp.setY(i, 0.004 + k * 0.002 + d * d * (0.006 + 0.005 * Math.sin(a * 7 + k * 2)))
+      }
+      g.translate(x, F, z)
+      colourVertices(g, c)
+      return g
+    })
+  const sides = [
+    ...leaves,
+    // (the omelette: two thick slices, their cut faces up, a browner skin on top)
+    bentoBlock(0.06, 0.036, 0.04, -0.232, F + 0.018, -0.085, BENTO_EGG),
+    bentoBlock(0.06, 0.004, 0.04, -0.232, F + 0.038, -0.085, BENTO_EGG_TOP),
+    bentoBlock(0.06, 0.034, 0.038, -0.229, F + 0.017, -0.042, BENTO_EGG),
+    bentoBlock(0.06, 0.004, 0.038, -0.229, F + 0.036, -0.042, BENTO_EGG_TOP),
+    // (the takuan: three thin half-moons leaning on each other)
+    ...[0.02, 0.05, 0.08].map((z) => bentoTurned(0.055, 0.03, 0.009, -0.235, F + 0.015, z, BENTO_TAKUAN, -0.35, 0)),
+    // (the baran: a green divider standing across the box)
+    bentoBlock(0.003, 0.03, 0.2, 0.2, F + 0.015, 0.0, BENTO_BARAN),
+    // (shibazuke: a little heap of purple pickles)
+    ...[[0.235, -0.085], [0.25, -0.07], [0.228, -0.065], [0.245, -0.092]].map(([x, z], i) => bentoTurned(0.016, 0.01 + 0.004 * (i % 2), 0.012, x, F + 0.006 + 0.004 * (i % 2), z, BENTO_SHIBA, 0, i * 0.7)),
+    // (the lemon wedge)
+    bentoBlock(0.04, 0.018, 0.016, 0.24, F + 0.009, 0.075, BENTO_LEMON),
+  ]
+  // (the broccoli: a floret on a short stalk)
+  const floret = new THREE.IcosahedronGeometry(0.026, 0).scale(1, 0.75, 1).translate(0.242, F + 0.034, 0.02)
+  colourVertices(floret, BENTO_GREEN)
+  const stalk = bentoBlock(0.012, 0.018, 0.012, 0.242, F + 0.01, 0.02, BENTO_STALK)
+  bentoGeo = mergeGeometries([...parts.map((g) => g.toNonIndexed()), plum.toNonIndexed(), ...sides.map((g) => g.toNonIndexed()), floret.toNonIndexed(), stalk.toNonIndexed()])!
   return bentoGeo
 }
 let lidGeo: THREE.BufferGeometry | null = null
