@@ -888,7 +888,9 @@ bake("AO", img_a)
 # (the colour darkened where the shadows gather in the cuts and hollows, so they read as carved even under flat light)
 col = np.array(img_c.pixels[:], np.float32).reshape(BK, BK, 4)
 ao = np.array(img_a.pixels[:], np.float32).reshape(BK, BK, 4)[..., :1]
-col[..., :3] *= 0.35 + 0.65 * np.clip(ao, 0, 1) ** 1.4
+# (no darker than 60% (item 60, 2026-11-14): down to 35% the groove where the chest's ball meets the belly's baked into a dark band across
+# him, the owner saw it; the carved hollows still read at 60%)
+col[..., :3] *= 0.6 + 0.4 * np.clip(ao, 0, 1) ** 1.4
 img_c.pixels = col.ravel()
 img_c.pack(); img_n.pack()
 M["ebisuStone"] = pbr("KamiEbisuStone", (1, 1, 1), tex=img_c, nrm=img_n, nrm_strength=1.0, rough=0.85)
