@@ -22,7 +22,7 @@ import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
 import { HEAT_S, heatNow, nextHeat } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
-import { CharcoalSack, ProduceSacks } from './KitchenStores'
+import { CharcoalSack, ProduceSacks, VegBasket } from './KitchenStores'
 import { coolerDoorSound, lightSwitchSound } from './restroomSound'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
@@ -869,6 +869,24 @@ function SacksAt() {
   // (1.4 times the size they were modelled (the owner's), sized about their foot)
   return <Movable id="produce" label="常溫蔬菜" baseScale={1.4} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><ProduceSacks /></group></Movable>
 }
+/** the two baskets of vegetables on the floor in front of the potatoes' and sweet potatoes' sacks (item 133, the owner's, 2026-11-15: in the
+ * circle drawn there), in the sacks' own frame (x along the row, +z out toward the room, the model's units, 1.4 times in the room): the crate
+ * in front of the potatoes, the wicker basket in front of the sweet potatoes, each turned a little */
+const VEG_AT: { id: string, label: string, node: 'VegCrate' | 'VegBasket', x: number, z: number, turn: number }[] = [
+  { id: 'vegcrate', label: '蔬菜木箱', node: 'VegCrate', x: -0.27, z: 0.37, turn: 0.12 },
+  { id: 'vegbasket', label: '蔬菜提籃', node: 'VegBasket', x: 0.19, z: 0.41, turn: -0.22 },
+]
+function VegAt() {
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP
+  const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)
+  return <>{VEG_AT.map((v) => (
+    <Movable key={v.id} id={v.id} label={v.label} baseScale={1.4} ground={floor}>
+      <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}>
+        <group position={[v.x * 1.4, 0, v.z * 1.4]} rotation-y={v.turn}><VegBasket node={v.node} /></group>
+      </group>
+    </Movable>
+  ))}</>
+}
 /** where the sack of binchotan stands (the owner's: on the floor by the cook table's right-hand end, toward the cook's side, the rice tub
  * beyond it): along and across, in the fire's frame */
 // (on the floor in the corner under the charcoal crate, past the cook table's end against the bar (the owner's, 2026-11-11): it stood by the
@@ -1625,7 +1643,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="denkinabe" label="電鍋"><DenkiNabe /></Movable>
       <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
-      <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><CharcoalSackAt /></group>
+      <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><VegAt /><CharcoalSackAt /></group>
     </>
   )
 }

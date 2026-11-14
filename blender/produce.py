@@ -927,7 +927,120 @@ for k, (dx, dz, dy, mat) in enumerate(((-0.022, -0.012, 0, "paprika_r"), (0.024,
 for k in range(4):
     # (short enough, and stood up enough, to keep clear of the counter's face behind)
     gobo(f"ProduceGobo{k}", CX + BX[2] - 0.02 + 0.012 * k, y1 + 0.11, z1 - 0.01 + 0.015 * k, 0.26, rot=(0.08 * (k - 1.5), 0.3, 0.0))
-sack_parts = list(parts)
+
+# ---- two baskets of vegetables on the floor in front of the potatoes' and sweet potatoes' sacks (item 133, the owner's, 2026-11-15: "two
+# vegetable baskets like the reference pictures, in the red circle"): a slatted wooden crate heaped with cabbages, peppers and a pumpkin, and a
+# wicker basket with a handle, a cabbage, broccoli, radishes, cucumbers and a courgette in it. Each its own node (VegCrate, VegBasket), its foot's
+# middle at its origin, for the game to stand them where it likes ----
+veg_from = len(parts)
+
+
+def wicker(n=512):
+    """a wicker basket's weave: willow weavers running round it (along u) over and under upright stakes, each weaver rounded (lit along its
+    middle, a dark gap between rows), every other crossing raised; golden brown, a shade darker inside (v past 0.55: basket() lays the outside
+    up v 0..0.5, the inside from 0.5 down)"""
+    u, v = grid01(n)
+    ROWS, STAKES = 30, 28
+    ry = (v * ROWS) % 1
+    rk = np.floor(v * ROWS)
+    sk = np.floor(u * STAKES + rk * 0.5)
+    over = ((sk + rk) % 2).astype(np.float32)
+    sx = (u * STAKES + rk * 0.5) % 1
+    # (a weaver bulges where it passes over a stake, dips where it goes under)
+    bulge = 0.75 + 0.25 * np.where(over > 0, np.sin(sx * np.pi), 1 - np.sin(sx * np.pi))
+    round_ = np.sin(ry * np.pi) ** 0.6
+    tone = vnoise(n, 6, 40)
+    col = mix(lin("#b07a3a"), lin("#eab872"), np.clip(tone * 0.5 + 0.35, 0, 1))
+    col = col * (0.55 + 0.45 * round_ * bulge)[..., None]
+    col = np.where((v > 0.55)[..., None], col * 0.75, col)
+    return col
+
+
+M["wicker"] = pbr("VegWicker", (1, 1, 1), tex=image("veg_wicker", wicker()), rough=0.8)
+M["wicker_cane"] = pbr("VegWickerCane", tuple(lin("#c4884a")), rough=0.7)
+M["cabbage"] = pbr("VegCabbage", (1, 1, 1), tex=skin_picture("veg_cabbage", "#a6cf6c", "#5f9a3c", 16, 0.45), rough=0.6)
+M["cabbage_pale"] = pbr("VegCabbagePale", (1, 1, 1), tex=skin_picture("veg_cabbage_pale", "#c8e08a", "#8cbc5a", 14, 0.4), rough=0.6)
+M["broccoli"] = pbr("VegBroccoli", tuple(lin("#3f6e2a")), rough=0.85)
+M["broccoli_stem"] = pbr("VegBroccoliStem", tuple(lin("#8cb85a")), rough=0.6)
+M["pumpkin"] = pbr("VegPumpkin", (1, 1, 1), tex=skin_picture("veg_pumpkin", "#e88a2a", "#c0601a", 10, 0.6), rough=0.5)
+M["radish"] = pbr("VegRadish", tuple(lin("#a8183a")), rough=0.35, coat=0.4)
+M["courgette"] = pbr("VegCourgette", (1, 1, 1), tex=skin_picture("veg_courgette", "#b6d27a", "#7ea84c", 12, 0.5), rough=0.45)
+
+
+def broccoli(name, x, y, z, s=1.0):
+    """a head of broccoli: a short pale stalk, five dark florets bunched on it (a squashed icosphere each)"""
+    stem(name + "Stalk", x, y, z, 0.05 * s, mat="broccoli_stem", r=0.013 * s)
+    for k, (dx, dy, dz, r) in enumerate(((0, 0.062, 0, 0.03), (0.026, 0.05, 0.012, 0.022), (-0.024, 0.05, 0.014, 0.022),
+                                         (0.004, 0.052, -0.026, 0.022), (0.0, 0.05, 0.03, 0.02))):
+        ball(f"{name}Floret{k}", x + dx * s, y + dy * s, z + dz * s, r * s, "broccoli", squash=(1, 1, 0.8))
+
+
+# -- the crate: two long boards each side, two each end, three across its floor, a square post inside each corner
+CW_, CD_, CH_, T_ = 0.3, 0.21, 0.13, 0.012
+SL = (CH_ - 0.012) / 2           # (each side board's height, a 12 mm gap between the two)
+for sd in (-1, 1):
+    for k in range(2):
+        y_ = 0.004 + k * (SL + 0.012) + SL / 2
+        board(f"VegCrateSide{sd}{k}", 0.0, y_, sd * (CD_ / 2 - T_ / 2), CW_, SL, T_)
+        board(f"VegCrateEnd{sd}{k}", sd * (CW_ / 2 - T_ / 2), y_, 0.0, T_, SL, CD_ - 2 * T_ - 0.002)
+    for sz in (-1, 1):
+        board(f"VegCratePost{sd}{sz}", sd * (CW_ / 2 - T_ - 0.0135), CH_ / 2 + 0.002, sz * (CD_ / 2 - T_ - 0.0135), 0.025, CH_ - 0.004, 0.025)
+for k in range(3):
+    board(f"VegCrateFloor{k}", 0.0, 0.009, (k - 1) * 0.06, CW_ - 2 * T_ - 0.004, 0.01, 0.05)
+F_ = 0.014                       # (its floor's top)
+# (heaped up over its rim, as a full crate is (the reference): a layer under them, a pumpkin and a cabbage, filling it from the floor)
+ball("VegCrateUnder0", -0.05, F_ + 0.04, 0.02, 0.04, "pumpkin", squash=(1, 1, 0.8))
+ball("VegCrateUnder1", 0.06, F_ + 0.042, 0.025, 0.042, "cabbage", squash=(1, 1, 0.85))
+F_ += 0.035
+ball("VegCrateCabbage0", -0.068, F_ + 0.052, -0.03, 0.058, "cabbage", squash=(1, 1, 0.9), rot=(0.3, 0.2, 0.5))
+ball("VegCrateCabbage1", 0.072, F_ + 0.05, -0.034, 0.054, "cabbage", squash=(1, 1, 0.9), rot=(0.1, 0.6, 1.2))
+ball("VegCratePumpkin", -0.088, F_ + 0.04, 0.045, 0.042, "pumpkin", squash=(1, 1, 0.78))
+stem("VegCratePumpkinStem", -0.088, F_ + 0.072, 0.045, 0.012, r=0.005)
+for k, (x_, z_, mat) in enumerate(((-0.022, 0.05, "paprika_r"), (0.03, 0.052, "paprika_r"), (0.095, 0.05, "paprika_y"))):
+    ball(f"VegCratePaprika{k}", x_, F_ + 0.05, z_, 0.033, mat, squash=(1, 1, 1.05), rot=(0.2 * k, 0.3, k))
+    stem(f"VegCratePaprikaStem{k}", x_, F_ + 0.082, z_, 0.012, r=0.005)
+broccoli("VegCrateBroccoli", 0.0, F_ + 0.06, -0.045, 0.9)
+crate_parts = parts[veg_from:]
+
+# -- the wicker basket: oval, flared, its weave seen inside and out; a cane rim rolled round it and a handle arched over
+basket_from = len(parts)
+EX = 1.3                          # (how much longer than wide it is)
+seg = 20
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+prof = [(0.072, 0.0), (0.086, 0.03), (0.096, 0.068), (0.1, 0.1)]
+inner = [(rr - 0.006, yy + (0.006 if k == 0 else 0)) for k, (rr, yy) in enumerate(prof)][::-1]
+allp = prof + inner
+rows = [[bm.verts.new((rr * EX * math.cos(2 * math.pi * j / seg), rr * math.sin(2 * math.pi * j / seg), yy)) for j in range(seg)] for rr, yy in allp]
+vs = [0.0, 0.17, 0.35, 0.5, 0.55, 0.72, 0.86, 1.0]
+for k in range(len(rows) - 1):
+    for j in range(seg):
+        j2 = (j + 1) % seg
+        f = bm.faces.new((rows[k][j], rows[k][j2], rows[k + 1][j2], rows[k + 1][j]))
+        for l, (uu, vv) in zip(f.loops, ((j, vs[k]), (j + 1, vs[k]), (j + 1, vs[k + 1]), (j, vs[k + 1]))):
+            l[uvl].uv = (uu / seg, vv)
+bm.faces.new(list(reversed(rows[0])))
+bm.faces.new(rows[-1])
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+mesh_object("VegBasketBody", bm, "wicker")
+RIM_Y = 0.1
+tube_obj("VegBasketRim", [(0.103 * EX * math.cos(2 * math.pi * j / 16), RIM_Y, 0.103 * math.sin(2 * math.pi * j / 16)) for j in range(16)], 0.0065,
+         "wicker_cane", cyclic=True)
+tube_obj("VegBasketHandle", [(-0.124 * math.cos(math.pi * t / 10), RIM_Y + 0.17 * math.sin(math.pi * t / 10), 0.0) for t in range(11)], 0.0075,
+         "wicker_cane")
+B_ = 0.012                        # (its floor's top)
+ball("VegBasketCabbage", -0.025, B_ + 0.075, -0.03, 0.056, "cabbage_pale", squash=(1, 1, 0.92), rot=(0.4, 0.1, 0.8))
+broccoli("VegBasketBroccoli", -0.07, B_ + 0.04, 0.035, 1.05)
+for k, (x_, z_, y_) in enumerate(((0.0, 0.05, 0.075), (0.028, 0.03, 0.08), (0.012, 0.072, 0.07), (-0.02, 0.07, 0.085))):
+    ball(f"VegBasketRadish{k}", x_, B_ + y_, z_, 0.021, "radish", rot=(k, 0.5, 0.2 * k))
+    stem(f"VegBasketRadishStem{k}", x_, B_ + y_ + 0.018, z_, 0.03, r=0.0025)
+for k in range(2):
+    long_veg(f"VegBasketCucumber{k}", 0.05 + 0.024 * k, B_ + 0.07 + 0.012 * k, -0.005, 0.15, 0.016, "cucumber",
+             rot=(math.pi / 2 - 0.45, 0.0, 0.12 * (k - 0.5)), tip=0.7)
+long_veg("VegBasketCourgette", 0.092, B_ + 0.06, 0.0, 0.14, 0.021, "courgette", rot=(math.pi / 2 - 0.3, 0.0, -0.08), tip=0.8)
+basket_parts = parts[basket_from:]
+veg_parts = crate_parts + basket_parts
+sack_parts = [o for o in parts if o not in veg_parts]
 for lo in LOWS.values():
     bpy.data.objects.remove(lo, do_unlink=True)
 
@@ -974,7 +1087,7 @@ for k in range(14):
     lean_ = 0.12 if k >= 5 else 0.05
     coal.append(stick(f"CharcoalStick{k}", x, CH_H - 0.16, z, 0.24 + 0.05 * rnd.random(), 0.016 + 0.004 * rnd.random(),
                       (-math.sin(a) * lean_, math.cos(a) * lean_), rnd.random() * 6))
-charcoal_parts = [o for o in parts if o not in sack_parts]
+charcoal_parts = [o for o in parts if o not in sack_parts and o not in veg_parts]
 
 # ---- under their roots ----
 root = bpy.data.objects.new("ProduceSacks", None)
@@ -990,10 +1103,21 @@ for o in charcoal_parts:
     if o.parent is None:
         o.parent = croot
 croot.location = P(1.2, 0, 0)
+veg_roots = []
+for nm, ps, at in (("VegCrate", crate_parts, 2.0), ("VegBasket", basket_parts, 2.6)):
+    vr = bpy.data.objects.new(nm, None)
+    bpy.context.collection.objects.link(vr)
+    for o in ps:
+        if o.parent is None:
+            o.parent = vr
+    vr.location = P(at, 0, 0)
+    veg_roots.append(vr)
 top = bpy.data.objects.new("Produce", None)
 bpy.context.collection.objects.link(top)
 root.parent = top
 croot.parent = top
+for vr in veg_roots:
+    vr.parent = top
 print("PRODUCE_TRIS", sum(len(p.vertices) - 2 for o in parts for p in o.data.polygons))
 if PREVIEW:
     # (from in front, a little above, as the kitchen's floor sees them)
@@ -1011,5 +1135,5 @@ if PREVIEW:
     world = bpy.data.worlds.new("PreviewWorld")
     world.color = (0.45, 0.43, 0.4)
     bpy.context.scene.world = world
-export_dish(top, parts + [root, croot, top], os.path.join(PROJECT, "public", "models", "produce.glb"), os.path.join(PROJECT, "blender", "produce.blend"), PREVIEW)
+export_dish(top, parts + [root, croot, top] + veg_roots, os.path.join(PROJECT, "public", "models", "produce.glb"), os.path.join(PROJECT, "blender", "produce.blend"), PREVIEW)
 print("PRODUCE_DONE")

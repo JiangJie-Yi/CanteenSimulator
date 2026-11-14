@@ -231,6 +231,32 @@ export function ProduceSacks() {
     </group>
   )
 }
+/** what's in each of the two baskets of vegetables in front of the sacks (item 133) */
+const VEG_SAYS: Record<string, [string, string]> = {
+  VegCrate: ['蔬菜木箱', '高麗菜、甜椒、南瓜、青花菜｜點一下看常溫區的庫存'],
+  VegBasket: ['蔬菜提籃', '高麗菜、青花菜、櫻桃蘿蔔、小黃瓜、櫛瓜｜點一下看常溫區的庫存'],
+}
+/**
+ * One of the two baskets of vegetables on the floor in front of the sacks (blender/produce.py's VegCrate, a slatted wooden crate, or
+ * VegBasket, a wicker basket with a handle; item 133, the owner's): inked, folded by material; pointed at, what's in it; clicked, the stock
+ * opens on the room-temperature tab, as the sacks' does.
+ */
+export function VegBasket({ node }: { node: 'VegCrate' | 'VegBasket' }) {
+  const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = partOf(gltf.scene, node, 0.004)
+    r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
+    return r
+  }, [gltf, node])
+  const [title, hint] = VEG_SAYS[node]
+  return (
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver(title, hint).onPointerOver(e) }}
+      onPointerOut={(e) => { if (getEdit().on) return; tipOver(title, '').onPointerOut(e) }}
+      onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('ambient', 'sack') }}>
+      <primitive object={obj} />
+    </group>
+  )
+}
 /** how many sticks the sack shows full (two sacks' worth and over: all of them) */
 const STICKS_SHOWN = 14
 /**
