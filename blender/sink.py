@@ -106,6 +106,10 @@ for row in range(3):
             wv = np.maximum(wv, smooth(0.004, 0.0, np.abs(dist - rr)) * (v > cy))
 indigo = mix(indigo, (0.93, 0.93, 0.9), wv * 0.92)
 indigo = mix(indigo, (0.93, 0.93, 0.9), smooth(0.006, 0.0, np.abs(v - 0.24)) * 0.9)
+# (its folds hanging down it (item 95, its mesh one row now): soft light and shade in vertical bands, three folds to a panel's width (u 0.75),
+# deeper toward its foot where the cloth swings out, the bands a little uneven)
+NOREN_FOLDS = 0.86 + 0.14 * np.cos(u * 2 * math.pi / 0.25 + 0.6 * fbm(N, 3, 1, 2)) * (0.5 + 0.5 * (1 - v))
+indigo = indigo * NOREN_FOLDS[..., None]
 # (woven bamboo, a twill (網代) as a draining basket's is (the owner's, 2026-11-11: finer made): flat strips two over and two under, each row
 # stepped one along, so the weave runs in diagonals; each strip rounded across (lit along its middle, shaded at its edges), its own shade, a
 # dark gap between them, the skin's fine fibres along it)
@@ -472,7 +476,9 @@ tube("SinkNorenRod", [(-W / 2 + 0.03, rod_y, FRONT + 0.02), (MID + 0.0, rod_y, F
 for k, (a, b) in enumerate(((-W / 2 + 0.06, -0.39), (-0.375, MID - 0.03))):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    NX, NY = 12, 6
+    # (6 across, one down: its sway across kept, its hang straight (item 95, the owner's, 2026-11-14: "too many faces, do it with the
+    # picture"; 12 by 6, 144 faces a panel, before): the folds' light and shade in its picture (NOREN_FOLDS))
+    NX, NY = 6, 1
     top_, bot_ = rod_y - 0.004, 0.14
     grid = [[bm.verts.new(P(a + (b - a) * i / NX, top_ + (bot_ - top_) * j / NY, FRONT + 0.022 + 0.008 * math.sin(i / NX * math.pi * 3 + k) * (j / NY)))
              for i in range(NX + 1)] for j in range(NY + 1)]
@@ -763,8 +769,11 @@ box("SinkSpongeScour", SGX - 0.05, SGX + 0.05, H + 0.022, H + 0.032, SPZ - 0.035
 # the customers' plates thrown in it, a black liner folded over its rim; beside it, out from the cabinet's end, a blue recycling bin, its lid
 # with a round hole in it for bottles and cans, both facing the room (one behind the other, the recycling bin's front was hidden). Square, a little narrower at the foot; each labelled on its front (一般垃圾 / 資源回收, the Japanese
 # under it, the recycling mark), the words drawn into one picture (BIN_PRINT), not made of triangles. About 40 faces a bin and a quad a label)
-BX, BW, BH = -W / 2 - 0.15, 0.2, 0.42
-BZ = 0.24                   # both bins' middles, toward the front
+# (bigger, and close to the cabinet's side, a centimetre off it (item 94, the owner's, 2026-11-14: "the bins bigger, close against the
+# edge"; 0.2 wide, 0.42 tall and 5 cm off it before); their fronts where they were (BZ: their middles back by their growth))
+BW, BH = 0.26, 0.52
+BX = -W / 2 - BW / 2 - 0.01
+BZ = 0.34 - BW / 2          # both bins' middles, toward the front
 RX = BX - BW - 0.03         # the recycling bin's, out beside the rubbish bin
 M["bin_char"] = pbr("SinkBinCharcoal", lin("#3b3e44"), rough=0.55)
 M["bin_blue"] = pbr("SinkBinBlue", lin("#2f6db5"), rough=0.5)
@@ -874,11 +883,13 @@ def print_on(name, body, size, x, y, z, font, lift=0.004):
     return q
 
 
-print_on("SinkBinLabelZh", "一般垃圾", 0.044, BX, 0.30, BZ, ZH)
-print_on("SinkBinLabelJa", "燃えるゴミ", 0.026, BX, 0.245, BZ, JA)
-print_on("SinkBinRecMark", "\u267b", 0.09, RX, 0.315, BZ, SYM)
-print_on("SinkBinRecLabelZh", "資源回收", 0.044, RX, 0.235, BZ, ZH)
-print_on("SinkBinRecLabelJa", "びん・かん", 0.026, RX, 0.18, BZ, JA)
+# (as high up them and as big as they were, the bins grown (item 94): their heights and sizes by the bins' growth)
+KB = BH / 0.42
+print_on("SinkBinLabelZh", "一般垃圾", 0.044 * KB, BX, 0.30 * KB, BZ, ZH)
+print_on("SinkBinLabelJa", "燃えるゴミ", 0.026 * KB, BX, 0.245 * KB, BZ, JA)
+print_on("SinkBinRecMark", "\u267b", 0.09 * KB, RX, 0.315 * KB, BZ, SYM)
+print_on("SinkBinRecLabelZh", "資源回收", 0.044 * KB, RX, 0.235 * KB, BZ, ZH)
+print_on("SinkBinRecLabelJa", "びん・かん", 0.026 * KB, RX, 0.18 * KB, BZ, JA)
 # (the lid's hole: a dark disc a hair over the lid's top, toward its front)
 bpy.ops.mesh.primitive_circle_add(vertices=24, radius=0.045, fill_type="NGON", location=P(RX, BH + 0.0015, BZ + 0.02))
 hole = active()
