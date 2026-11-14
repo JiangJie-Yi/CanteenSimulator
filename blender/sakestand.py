@@ -235,9 +235,10 @@ def peaks(c, m, x0, x1, base, top, colour, seed):
 
 def neck_label(c, y0, y1, w, base, ink, big, small=None):
     """the shoulder label (肩貼り): a band of paper round the neck, its grade big, a romanised line under it"""
-    m = c.rect(-w, w, y0, y1)
+    # (round the neck all the way (item 87, the owner's: "it should go all the way round"): `w` only how wide its writing is)
+    m = c.rect(-c.circ / 2, c.circ / 2, y0, y1)
     washi(c, m, base)
-    border(c, -w, w, y0, y1, 0.0009, ink)
+    border(c, -c.circ / 2, c.circ / 2, y0, y1, 0.0009, ink)
     hh = y1 - y0
     sz = min(hh * (0.48 if small else 0.62), 2 * w * 0.85 / (len(big) * 1.05))
     c.text(big, 0.0, y0 + hh * (0.62 if small else 0.5), sz, ink, vertical=False, gap=1.05, x_centre=True, brush=True)
@@ -258,12 +259,24 @@ def screw_cap(c, top, skirt, colour):
 ADDR = "株式会社　{0}酒造　新潟県南魚沼市"
 INFO = ("原材料名　米（国産）米麹（国産米）", "精米歩合　五〇％　アルコール分十五度", "内容量　{1}", "製造年月　令和七年十月")
 
+# (each bottle's opaque bands, (from, to) up it: its label, its shoulder label, its cap; the rest of it glass the light comes through (item
+# 88); the mesh is cut into rings at each band's edges)
+OPAQUE = {}
+
+
+def back_label(c, y1, name, size, colour):
+    """the back of a label that goes all the way round (item 87): its fine print (the brewer, the rice, its strength, how much) in
+    columns at its back, as a 裏ラベル carries"""
+    fine_print(c, c.circ / 2 - 0.018, y1 - 0.018, [ADDR.format(name)] + [s_.format(name, size) for s_ in INFO], 0.0042, colour)
+
+
 # (the makes made up after the way real brewers name theirs (the owner's: "made up, after real brewers'"), each looked for and none found)
 H = ISSHO[-1][1]
 # 0: 雪嶺錦 (1.8 l), 特別純米: brown glass; a tall cream label, gold leaf flecks over it, snowy peaks in grey wash across its foot, the name
 # brushed big down its middle, 特別純米 in red beside it, the romanised name and the brewer small at its foot; a cream shoulder label
 c = Col(2 * math.pi * 0.052, H, (0.2, 0.09, 0.03))
-X0, X1, Y0, Y1 = -0.052, 0.052, 0.045, 0.218
+# (its label all the way round (item 87): the front's drawing as it was, the paper and its wash on round the back)
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.045, 0.218
 lab = c.rect(X0, X1, Y0, Y1)
 washi(c, lab, (0.93, 0.91, 0.84))
 peaks(c, lab, X0, X1, Y0 + 0.012, Y0 + 0.06, (0.45, 0.47, 0.5), 3)
@@ -274,7 +287,9 @@ disc(c, -0.033, 0.198, 0.0085, GOLD, ring=0.0012, rough=0.35)
 c.text("雪", -0.033, 0.198, 0.009, GOLD, brush=True)
 fine_print(c, -0.03, 0.17, [s.format("雪嶺", "一八〇〇ml") for s in INFO[:3]], 0.0042, INK)
 c.text("SETSUREI-NISHIKI", 0.0, Y0 + 0.008, 0.0042, INK, vertical=False, gap=0.62, x_centre=True)
+back_label(c, Y1, "雪嶺", "一八〇〇ml", INK)
 worn(c, lab)
+OPAQUE[0] = [(Y0, Y1), (0.258, 0.284), (ISSHO[CAP_FROM][1] - 0.004, H)]
 neck_label(c, 0.258, 0.284, 0.024, (0.92, 0.88, 0.76), RED, "特撰", "TOKUSEN")
 cap(c, H, ISSHO[CAP_FROM][1] - 0.004, (0.93, 0.9, 0.84), RED)
 cols.append(c)
@@ -282,11 +297,11 @@ cols.append(c)
 # 1: 朝霞川 (1.8 l), 純米吟醸: green glass; a white label, the name brushed big at its right, the grade small brushed over it, a red seal
 # under it, columns of small print down its left, a pale blue wash of waves along its foot, the brewer's mark; a silver screw cap
 c = Col(2 * math.pi * 0.052, H, (0.1, 0.32, 0.12))
-X0, X1, Y0, Y1 = -0.05, 0.05, 0.05, 0.2
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.05, 0.2
 lab = c.rect(X0, X1, Y0, Y1)
 washi(c, lab, (0.97, 0.96, 0.93), fibre=0.03)
 wave = lab & (c.y < Y0 + 0.022)
-for k_ in range(8):
+for k_ in range(int(c.circ / 0.014) + 1):
     for j in range(3):
         cx, cy = X0 + (k_ + 0.5 * (j % 2)) * 0.014, Y0 + 0.003 + j * 0.008
         d = np.sqrt((c.x - cx) ** 2 + (c.y - cy) ** 2)
@@ -299,13 +314,15 @@ c.text("霞", 0.041, 0.063, 0.0075, (0.97, 0.94, 0.88))
 fine_print(c, -0.022, 0.185, ["清酒", "原材料名　米・米麹", "アルコール分十五度", "精米歩合五五％", "内容量一八〇〇ml", "朝霞川酒造株式会社"], 0.0042, INK)
 c.paint(c.rect(-0.046, -0.036, 0.06, 0.07), (0.25, 0.3, 0.6), 0.6)
 c.text("A", -0.041, 0.065, 0.0075, (0.97, 0.97, 0.97))
+back_label(c, Y1, "朝霞", "一八〇〇ml", INK)
 screw_cap(c, H, ISSHO[CAP_FROM][1] - 0.006, (0.72, 0.74, 0.76))
+OPAQUE[1] = [(Y0, Y1), (ISSHO[CAP_FROM][1] - 0.006, H)]
 cols.append(c)
 
 # 2: 鶴汀 (1.8 l), 純米大吟醸: dark green glass; a black label, the name brushed big in gold, a red ring seal of 大吟醸 on it, 酒の元祖-like
 # lines in gold small, a cream shoulder label 純米大吟醸 with its romanised name; a gold paper cap
 c = Col(2 * math.pi * 0.052, H, (0.05, 0.13, 0.08))
-X0, X1, Y0, Y1 = -0.046, 0.046, 0.05, 0.2
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.05, 0.2
 lab = c.rect(X0, X1, Y0, Y1)
 c.paint(lab, (0.08, 0.08, 0.08), 0.5)
 c.col[lab] *= (0.85 + 0.15 * fbm(CWID, 80, 160, 2)[:CH // 2].repeat(2, 0)[:CH])[lab][:, None]
@@ -318,7 +335,9 @@ fine_print(c, -0.03, 0.185, ["登録商標", "酒の元祖", "創業二百年"],
 c.text("清酒", 0.038, 0.19, 0.0055, GOLD)
 c.text("鶴汀酒造謹製", -0.024, 0.07, 0.0042, GOLD, vertical=False, gap=1.05)
 neck_label(c, 0.252, 0.285, 0.028, (0.95, 0.9, 0.62), INK, "純米大吟醸", "TSURUNAGISA  JUNMAI DAIGINJO")
+back_label(c, Y1, "鶴汀", "一八〇〇ml", GOLD)
 cap(c, H, ISSHO[CAP_FROM][1] - 0.004, (0.86, 0.72, 0.4), (0.5, 0.1, 0.08))
+OPAQUE[2] = [(Y0, Y1), (0.252, 0.285), (ISSHO[CAP_FROM][1] - 0.004, H)]
 cols.append(c)
 
 # 3: 月汀桜 (720 ml), 純米吟醸: green glass; a yellow label, a brushed ensō round the name, cherry blossoms in its corner, the grade
@@ -326,7 +345,7 @@ cols.append(c)
 # neck, a prize's (金賞), on a card of its own
 H4 = YONGO[-1][1]
 c = Col(2 * math.pi * 0.04, H4, (0.12, 0.25, 0.1))
-X0, X1, Y0, Y1 = -0.038, 0.038, 0.035, 0.155
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.035, 0.155
 lab = c.rect(X0, X1, Y0, Y1)
 washi(c, lab, (0.93, 0.74, 0.18), fibre=0.05)
 border(c, X0 + 0.002, X1 - 0.002, Y0 + 0.002, Y1 - 0.002, 0.0007, (0.55, 0.32, 0.08))
@@ -340,13 +359,15 @@ for k_, (bx, by) in enumerate(((-0.03, 0.142), (-0.025, 0.133), (-0.032, 0.126))
 c.text("GETTEIZAKURA  since 1873", 0.0, Y0 + 0.007, 0.0034, INK, vertical=False, gap=0.6, x_centre=True)
 c.text("酒魂", 0.0, Y0 + 0.017, 0.006, INK, vertical=False, gap=1.1, x_centre=True)
 neck_label(c, 0.205, 0.228, 0.022, (0.93, 0.74, 0.18), INK, "純米吟醸", "JUNMAI GINJO")
+back_label(c, Y1, "月汀", "七二〇ml", INK)
 screw_cap(c, H4, YONGO[CAP_FROM][1] - 0.006, (0.85, 0.7, 0.36))
+OPAQUE[3] = [(Y0, Y1), (0.205, 0.228), (YONGO[CAP_FROM][1] - 0.006, H4)]
 cols.append(c)
 
 # 4: 鶴汀 (720 ml), 純米: the same brewer's small bottle, black matte glass; an off-white label, a gold crest at its top corner, grey peaks
 # and gold flecks behind, the name and grade brushed big, a red 純米 small, its maker in English
 c = Col(2 * math.pi * 0.04, H4, (0.06, 0.06, 0.065))
-X0, X1, Y0, Y1 = -0.034, 0.034, 0.04, 0.16
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.04, 0.16
 lab = c.rect(X0, X1, Y0, Y1)
 washi(c, lab, (0.92, 0.91, 0.87), fibre=0.04)
 peaks(c, lab, X0, X1, Y0 + 0.008, Y0 + 0.05, (0.55, 0.56, 0.58), 9)
@@ -357,7 +378,9 @@ disc(c, -0.024, 0.148, 0.007, GOLD, rough=0.3)
 disc(c, -0.024, 0.148, 0.0045, (0.92, 0.91, 0.87), ring=0.001)
 c.text("JAPANESE SAKE", -0.012, 0.058, 0.0032, INK, vertical=False, gap=0.62, x_centre=True)
 c.text("Tsurunagisa", -0.012, 0.052, 0.0045, INK, vertical=False, gap=0.55, x_centre=True)
+back_label(c, Y1, "鶴汀", "七二〇ml", INK)
 cap(c, H4, YONGO[CAP_FROM][1] - 0.003, (0.1, 0.1, 0.1), GOLD)
+OPAQUE[4] = [(Y0, Y1), (YONGO[CAP_FROM][1] - 0.003, H4)]
 cols.append(c)
 
 # ---- the hang tag's picture (its own column): yellow card, a black-edged red title, 最高金賞 brushed big, a gold medal
@@ -394,20 +417,30 @@ stand_col = wood.astype(np.float32)
 
 M = {
     "glass": pbr("SakeBottles", (1, 1, 1), tex=image("sake_bottles", atlas), rough=0.18),
+    # (the same picture: the game draws this one see-through, the light through it (item 88))
+    "clear": pbr("SakeGlass", (1, 1, 1), tex=bpy.data.images["sake_bottles"], rough=0.08),
+    "liquid": pbr("SakeLiquid", (0.96, 0.92, 0.74), rough=0.05),
     "wood": pbr("SakeStandWood", (1, 1, 1), tex=image("sake_stand_wood", stand_col), rough=0.6),
     "lacquer": pbr("SakeStandLacquer", (0.04, 0.03, 0.03), rough=0.3),
 }
 parts = []
 
 
-def mesh_obj(name, bm, mat, smooth_=True):
+def mesh_obj(name, bm, mat, smooth_=True, join=True):
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o)
-    o.data.materials.append(mat)
+    for m_ in (mat if isinstance(mat, (list, tuple)) else (mat,)):
+        o.data.materials.append(m_)
     for p in o.data.polygons:
         p.use_smooth = smooth_
-    parts.append(o)
+    if join:
+        parts.append(o)
     return o
+
+
+bottles = []
+# (how full each is: up into its shoulder, a little lower in the open ones)
+FILL = {0: 0.262, 1: 0.248, 2: 0.255, 3: 0.196, 4: 0.19}
 
 
 def bottle(k, prof, at, turn):
@@ -415,6 +448,15 @@ def bottle(k, prof, at, turn):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     H_ = prof[-1][1]
+    # (cut at each opaque band's edges (item 88): a ring there, its radius between the two it falls between)
+    cuts = sorted({z for band in OPAQUE[k] for z in band if prof[0][1] < z < H_ - 1e-6} - {z for _, z in prof})
+    prof0 = prof
+    prof = list(prof)
+    for z in cuts:
+        j = next(i for i in range(len(prof) - 1) if prof[i][1] < z < prof[i + 1][1])
+        (r0, z0), (r1, z1) = prof[j], prof[j + 1]
+        prof.insert(j + 1, (r0 + (r1 - r0) * (z - z0) / (z1 - z0), z))
+    opaque = lambda z: any(lo - 1e-6 <= z <= hi + 1e-6 for lo, hi in OPAQUE[k])
     rings = [[bm.verts.new((r * math.cos(-math.pi / 2 + 2 * math.pi * (i / NA - 0.5)), r * math.sin(-math.pi / 2 + 2 * math.pi * (i / NA - 0.5)), z))
               for i in range(NA)] for r, z in prof]
     u0, uw = k / NB, 1 / NB
@@ -422,11 +464,13 @@ def bottle(k, prof, at, turn):
         for i in range(NA):
             i2 = (i + 1) % NA
             f = bm.faces.new((rings[j][i], rings[j][i2], rings[j + 1][i2], rings[j + 1][i]))
+            f.material_index = 0 if opaque((prof[j][1] + prof[j + 1][1]) / 2) else 1
             ua, ub = u0 + uw * i / NA, u0 + uw * (i + 1) / NA
             va, vb = prof[j][1] / H_, prof[j + 1][1] / H_
             for l, uvq in zip(f.loops, ((ua, va), (ub, va), (ub, vb), (ua, vb))):
                 l[uvl].uv = uvq
     for f in ladder_fill(bm, rings[0][::-1]):
+        f.material_index = 1
         for l in f.loops:
             l[uvl].uv = (u0 + uw * 0.5, 0.002)
     for f in ladder_fill(bm, rings[-1]):
@@ -434,11 +478,11 @@ def bottle(k, prof, at, turn):
             l[uvl].uv = (u0 + uw * 0.5, 0.998)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     if k == 3:
-        # (the hang tag: a card on a cord round the neck, hanging down the bottle's shoulder, a little turned out; its picture the last column)
+        # (the hang tag (by the outline as given: the bands' cuts put into `prof` move its points' numbers): a card on a cord round the neck, hanging down the bottle's shoulder, a little turned out; its picture the last column)
         # (hung from the neck's foot, flat down over the shoulder, its foot clear of the body (the shoulder's radius there and a little))
-        z0, w_, h_ = prof[4][1] - 0.004, 0.035, 0.07
-        y0 = -prof[4][0] - 0.003
-        y1 = -prof[2][0] - 0.007
+        z0, w_, h_ = prof0[4][1] - 0.004, 0.035, 0.07
+        y0 = -prof0[4][0] - 0.003
+        y1 = -prof0[2][0] - 0.007
         q = [Vector((-w_ / 2 + 0.006, y1, z0 - h_)), Vector((w_ / 2 + 0.006, y1, z0 - h_)), Vector((w_ / 2, y0, z0)), Vector((-w_ / 2, y0, z0))]
         sw = Matrix.Rotation(-0.55, 4, "Z")
         q = [sw @ p_ for p_ in q]
@@ -446,8 +490,33 @@ def bottle(k, prof, at, turn):
         tu0 = 5 / NB
         for l, uvq in zip(f.loops, ((tu0, 0.0), (tu0 + 1 / NB, 0.0), (tu0 + 1 / NB, 1.0), (tu0, 1.0))):
             l[uvl].uv = uvq
-    bmesh.ops.transform(bm, matrix=Matrix.Translation(at) @ Matrix.Rotation(turn, 4, "Z"), verts=bm.verts)
-    mesh_obj(f"SakeBottle{k}", bm, M["glass"])
+    bmesh.ops.transform(bm, matrix=Matrix.Rotation(turn, 4, "Z"), verts=bm.verts)
+    o = mesh_obj(f"SakeBottle{k}", bm, [M["glass"], M["clear"]], join=False)
+    o.location = at
+    bottles.append(o)
+    # (the sake in it: its glass's inside (9/10 of it, a little in from the wall) from just over its foot up to how full it is, 12 round,
+    # laddered top and bottom; its own object under the bottle, so it can go down as it's poured)
+    fill = FILL[k]
+    pts = [(prof[0][0] * 0.88, 0.004)]
+    for (r0, z0), (r1, z1) in zip(prof, prof[1:]):
+        if z1 <= 0.004:
+            continue
+        if z1 >= fill:
+            pts.append(((r0 + (r1 - r0) * (fill - z0) / (z1 - z0)) * 0.9 - 0.001, fill))
+            break
+        pts.append((r1 * 0.9 - 0.001, z1))
+    bl = bmesh.new()
+    LN = 12
+    lr = [[bl.verts.new((r * math.cos(2 * math.pi * i / LN), r * math.sin(2 * math.pi * i / LN), z)) for i in range(LN)] for r, z in pts]
+    for a_, b_ in zip(lr, lr[1:]):
+        for i in range(LN):
+            bl.faces.new((a_[i], a_[(i + 1) % LN], b_[(i + 1) % LN], b_[i]))
+    ladder_fill(bl, lr[0][::-1])
+    ladder_fill(bl, lr[-1])
+    bmesh.ops.recalc_face_normals(bl, faces=bl.faces)
+    lo = mesh_obj(f"SakeLiquid{k}", bl, M["liquid"], join=False)
+    lo.parent = o
+    bottles.append(lo)
 
 
 # ---- the stand: two steps, hinoki, a black-lacquered band round each step's front edge, on two low feet
@@ -514,7 +583,10 @@ root = bpy.data.objects.new("SakeStand", None)
 bpy.context.collection.objects.link(root)
 for o in joined:
     o.parent = root
-print("SAKESTAND_TRIS", sum(len(p.vertices) - 2 for o in joined for p in o.data.polygons))
+for o in bottles:
+    if o.parent is None:
+        o.parent = root
+print("SAKESTAND_TRIS", sum(len(p.vertices) - 2 for o in joined + bottles for p in o.data.polygons))
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
@@ -530,5 +602,5 @@ if PREVIEW:
     w = bpy.data.worlds.new("W"); w.use_nodes = True
     w.node_tree.nodes["Background"].inputs[0].default_value = (0.5, 0.5, 0.52, 1)
     bpy.context.scene.world = w
-export_dish(root, joined + [root], os.path.join(PROJECT, "public", "models", "sakestand.glb"), os.path.join(PROJECT, "blender", "sakestand.blend"), PREVIEW)
+export_dish(root, joined + bottles + [root], os.path.join(PROJECT, "public", "models", "sakestand.glb"), os.path.join(PROJECT, "blender", "sakestand.blend"), PREVIEW)
 print("SAKESTAND_DONE")

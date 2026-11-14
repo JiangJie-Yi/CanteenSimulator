@@ -1281,18 +1281,49 @@ function SakeStand() {
       let t = made.get(src)
       if (!t) {
         if (/SakeBottles/.test(src.name)) {
-          const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, roughness: 0.22, metalness: 0.05, envMapIntensity: 0.9, side: THREE.DoubleSide })
+          // (the labels, the shoulder labels and the caps: paper and foil, opaque, a soft sheen)
+          const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, roughness: 0.42, metalness: 0.02, envMapIntensity: 0.6, side: THREE.DoubleSide })
+          reflectStudio(g)
+          t = g
+        } else if (/SakeGlass/.test(src.name)) {
+          // (the glass between them (item 88, the owner's: "glass the light comes through, real"): its colour from the picture, seen through
+          // (the sake in it and what's behind), the studio's gleams sharp on it, and lit a little from within by its own colour: the light
+          // through coloured glass; no transmission (it draws the whole shop again every frame))
+          const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, transparent: true, opacity: 0.72, depthWrite: false, roughness: 0.05,
+            metalness: 0.1, envMapIntensity: 1.5, emissive: '#ffffff', emissiveMap: src.map ?? null, emissiveIntensity: 0.9 })
+          // (see-through fades its gleams with it, and glass is not evenly clear: where it shines it's the shine that's seen, and toward its
+          // edges, looked through at a slant, the glass is thick and its colour deep; so there less see-through)
+          g.onBeforeCompile = (sh) => {
+            sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `{
+              float rim = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.5);
+              float glint = smoothstep(0.55, 1.0, max(max(outgoingLight.r, outgoingLight.g), outgoingLight.b));
+              diffuseColor.a = clamp(max(diffuseColor.a + rim * 0.3, glint), diffuseColor.a, 1.0);
+            }
+            #include <opaque_fragment>`)
+          }
+          g.customProgramCacheKey = () => 'sake-glass'
+          reflectStudio(g)
+          t = g
+        } else if (/SakeLiquid/.test(src.name)) {
+          // (the sake: near clear, a pale straw gold, its top catching the light)
+          // (not bright: the glass already carries the light; its part of the bottle only a little richer, its level a line)
+          const g = new THREE.MeshStandardMaterial({ color: '#b89a52', transparent: true, opacity: 0.32, depthWrite: false, roughness: 0.04 })
           reflectStudio(g)
           t = g
         } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
         made.set(src, t)
       }
       m.material = t
-      m.castShadow = true
-      m.receiveShadow = true
+      const see = /SakeGlass|SakeLiquid/.test(src.name)
+      // (the sake drawn before its glass, the glass over it)
+      if (see) m.renderOrder = /SakeLiquid/.test(src.name) ? 1 : 2
+      m.castShadow = !see
+      m.receiveShadow = !see
     })
-    inkModel(r, () => false, { width: 0.0012, weld: true })
-    mergeByMaterial(r)
+    // (no ink round the sake inside: its outline would show through the glass)
+    inkModel(r, (m) => /SakeLiquid/.test((m.material as THREE.Material).name) || /SakeLiquid/.test(m.name), { width: 0.0012, weld: true })
+    // (the stand merged; each bottle kept its own, to be lifted and poured (item 89))
+    mergeByMaterial(r, (o) => /^SakeBottle\d$/.test(o.name))
     return r
   }, [gltf])
   return (
