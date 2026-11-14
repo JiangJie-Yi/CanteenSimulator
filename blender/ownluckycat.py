@@ -75,14 +75,16 @@ def fill_tris(mask, tris, cx, cy, sx, sy):
 
 KN = 256
 ku, kv = grid01(KN)
-kob = mix((0.86, 0.66, 0.2), (0.98, 0.82, 0.36), smooth(0.9, 0.2, np.hypot((ku - 0.5) * 1.4, kv - 0.5) * 2))
+# (a clear lemon gold, as the 招財 cats' coins are (the owner's, 2026-11-15: "the coin's too far off": it was an orange-brown with a heavy
+# dark ring), a shade lighter in its middle; a fine engraved line a little in from its edge)
+kob = mix((0.9, 0.7, 0.14), (0.99, 0.86, 0.3), smooth(0.95, 0.3, np.hypot((ku - 0.5) * 1.4, kv - 0.5) * 2))
 ring = np.hypot((ku - 0.5) / 0.47, (kv - 0.5) / 0.47)
-kob = mix(kob, (0.62, 0.44, 0.1), (np.abs(ring - 0.88) < 0.03).astype(np.float32))
+kob = mix(kob, (0.78, 0.56, 0.12), (np.abs(ring - 0.9) < 0.012).astype(np.float32))
 km = np.zeros((KN * 2, KN * 2), bool)
 for i_, ch in enumerate("千萬兩"):
     fill_tris(km, glyph(ch), KN, (0.78 - i_ * 0.28) * KN * 2, 0.62 * KN, 0.27 * KN * 2)
 # (bold, as the door cat's coin is lettered: each stroke thickened a few texels)
-for _ in range(3):
+for _ in range(4):
     km = km | np.roll(km, 1, 0) | np.roll(km, 1, 1)
 kob = mix(kob, (0.1, 0.07, 0.04), km.reshape(KN, 2, KN, 2).mean(axis=(1, 3)))
 koban_img = image("ownluckycat_koban", np.clip(kob, 0, 1))
@@ -234,7 +236,8 @@ front = min(c.y for c in dark_at) if dark_at else kc.y
 bm = bmesh.new()
 uvk = bm.loops.layers.uv.new()
 KR = (kh * 0.3, 0.005, kh * 0.55)   # (a tall narrow oval, as the door cat's (item 128))
-for f in qsphere(bm, (0.0, 0.0, 0.0), KR, 2):
+# (3 cuts: 16 round its edge, a smooth oval where 2 gave a twelve-sided plate (the owner's, 2026-11-15); 96 faces)
+for f in qsphere(bm, (0.0, 0.0, 0.0), KR, 3):
     for l in f.loops:
         l[uvk].uv = (0.5 + l.vert.co.x / (2 * KR[0]), 0.5 + l.vert.co.z / (2 * KR[2]))
 bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=__import__("mathutils").Matrix.Rotation(0.2, 3, "X"))

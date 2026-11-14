@@ -55,7 +55,53 @@ function clean(tex: THREE.Texture): THREE.Texture {
   return out
 }
 
-function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.Color | null, tidy: boolean) {
+/** the third cat's koban (the owner's, 2026-11-15: "the coin's too far off", "the writing can be drawn"): its texture's coin (the top right
+ * corner, its 千万両 squeezed and smudged) repainted a clear gold as the 招財 cats' are, a darker edge round it, and 千萬兩 drawn on it
+ * afresh, down its middle (the coin lies turned and mirrored in the picture: the picture's x runs up the coin, its y across it, so the
+ * writing is laid with its axes swapped) */
+const relettered = new WeakMap<THREE.Texture, THREE.Texture>()
+function reletter(tex: THREE.Texture): THREE.Texture {
+  const hit = relettered.get(tex)
+  if (hit) return hit
+  const img = tex.image as CanvasImageSource & { width: number; height: number }
+  if (!img || typeof document === 'undefined' || img.width < 256) return tex
+  const k = img.width / 1024
+  const c = document.createElement('canvas')
+  c.width = img.width
+  c.height = img.height
+  const g = c.getContext('2d')!
+  g.drawImage(img, 0, 0)
+  // (the coin's square: every point in it the gold, lighter toward its middle; outside the coin's own island it's never seen)
+  const [x0, y0, x1, y1] = [750 * k, 0, 925 * k, 188 * k]
+  const grad = g.createRadialGradient(845 * k, 85 * k, 10 * k, 845 * k, 85 * k, 110 * k)
+  grad.addColorStop(0, '#f7d64a')
+  grad.addColorStop(0.7, '#ecbf2a')
+  grad.addColorStop(1, '#c8961a')
+  g.fillStyle = grad
+  g.fillRect(x0, y0, x1 - x0, y1 - y0)
+  g.save()
+  g.translate(860 * k, 98 * k)
+  g.transform(0, -1, -1, 0, 0, 0)
+  g.fillStyle = '#1a120a'
+  g.font = `bold ${30 * k}px "Yu Mincho", "MS Mincho", "Noto Serif CJK TC", serif`
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  // (bold, as the 招財 cats' are: each stroke drawn over with a line of its own colour)
+  g.strokeStyle = '#1a120a'
+  g.lineWidth = 1.6 * k
+  ;['千', '萬', '兩'].forEach((ch, i) => { g.fillText(ch, 0, (i - 1) * 32 * k); g.strokeText(ch, 0, (i - 1) * 32 * k) })
+  g.restore()
+  const out = new THREE.CanvasTexture(c)
+  out.flipY = tex.flipY
+  out.colorSpace = tex.colorSpace
+  out.wrapS = tex.wrapS
+  out.wrapT = tex.wrapT
+  out.anisotropy = tex.anisotropy
+  relettered.set(tex, out)
+  return out
+}
+
+function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.Color | null, tidy: boolean, coin = false) {
   const root = cloneSkinned(gltf.scene) as THREE.Group
   const mixer = new THREE.AnimationMixer(root)
   if (gltf.animations.length) mixer.clipAction(gltf.animations[0]).play()
@@ -84,7 +130,7 @@ function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.
     g.boundingSphere = null
     g.computeBoundingSphere()
     const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial
-    const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? (tidy ? clean(src.map) : src.map) : null, side: THREE.DoubleSide })
+    const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? (tidy ? clean(src.map) : coin ? reletter(src.map) : src.map) : null, side: THREE.DoubleSide })
     // (a differently coloured cat: the body's own material takes the tint)
     if (tint && src.map && !/coin|ring|red/i.test(src.name)) mat.color.lerp(tint, 0.85)
     out.push({ g, mat })
@@ -99,7 +145,7 @@ export function LuckyCat({ kind = 1, height = HEIGHT, still = false }: { kind?: 
     const tint = null
     // (only the first has a wave to play; the others are one pose)
     const times = still || kind !== 1 ? [STILL] : POSES
-    const baked = times.map((t) => bake(gltf, t, tint, kind === 1))
+    const baked = times.map((t) => bake(gltf, t, tint, kind === 1, kind === 3))
     // (its size and where it stands: scaled to HEIGHT tall, centred, its feet on the ground, by a middle pose's extent)
     const box = new THREE.Box3()
     for (const { g } of baked[Math.min(baked.length - 1, 4)]) {
