@@ -281,34 +281,84 @@ def seal(pr, x0, y0, rr, chars):
             pr.text(ch, x0 + (0.5 - i // 2) * rr * 0.8, y0 + (0.5 - i % 2) * rr * 0.85, rr * 0.7, RED)
 
 
+INDIGO, CREAM = (0.1, 0.17, 0.36), (0.95, 0.92, 0.84)
+
+
+def disk(x0, y0, rr):
+    return lambda x, y: (x - x0) ** 2 + (y - y0) ** 2 < rr * rr
+
+
+def ring(x0, y0, rr, w):
+    return lambda x, y: np.abs(np.sqrt((x - x0) ** 2 + (y - y0) ** 2) - rr) < w
+
+
+def seigaiha(x0, x1, y0, y1, w):
+    """blue waves (青海波) filling a box: rows of overlapping half-rounds, each of four arcs, the lower row over the upper"""
+    def fn(x, y):
+        box = (x > x0) & (x < x1) & (y > y0) & (y < y1)
+        out = np.zeros_like(x, bool)
+        h = w / 4
+        for r in range(int(y1 / h) + 2, int(y0 / h) - 2, -1):
+            cy = r * h
+            sh = (r % 2) * w / 2
+            cx = np.round((x - sh) / w) * w + sh
+            d = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+            inside = (d < w * 0.5) & (y >= cy)
+            arc = ((d / (w * 0.5) * 3) % 1.0) > 0.58
+            out = np.where(inside, arc, out)
+        return box & out
+    return fn
+
+
+def cloud(x0, y0, s_, flip=1):
+    """an auspicious cloud (瑞雲) drawn as a line: three rounds on a long flat tail"""
+    lobes = ((x0, y0, s_), (x0 + flip * s_ * 1.2, y0 + s_ * 0.35, s_ * 0.8), (x0 - flip * s_ * 1.05, y0 - s_ * 0.05, s_ * 0.7))
+
+    def fn(x, y):
+        inn = np.zeros_like(x, bool)
+        for lx, ly, lr in lobes:
+            inn |= (x - lx) ** 2 + (y - ly) ** 2 < lr * lr
+        tail = (np.abs(y - (y0 - s_ * 0.75)) < s_ * 0.22) & (flip * (x - x0) > -s_ * 2.2) & (flip * (x - x0) < s_ * 3.4)
+        inn |= tail
+        rim = np.zeros_like(x, bool)
+        for lx, ly, lr in lobes:
+            rim |= (x - lx) ** 2 + (y - ly) ** 2 < (lr * 0.72) ** 2
+        tail2 = (np.abs(y - (y0 - s_ * 0.75)) < s_ * 0.09) & (flip * (x - x0) > -s_ * 1.9) & (flip * (x - x0) < s_ * 3.1)
+        return inn & ~(rim | tail2)
+    return fn
+
+
 def design(k):
+    """each barrel one bold idea, its name and little else (item 100, the owner's, 2026-11-14: 'the words too dense, the pictures not nice:
+    give it some design'): a red sun behind the brushed name; the name reversed out of a red panel between two clouds; a crest over the name
+    between two panels of blue waves. The small print gone (登録商標, the grades, the readings, the second seals)"""
     pr = Print()
-    pr.text("登録商標", -0.07, HT * 0.9, 0.024, RED, vertical=False, gap=1.6)
     if k == 0:
-        # (霧ノ松 big and brushed, a chrysanthemum either side, its grade in red at the left, its maker's seal at the right)
-        pr.text("霧ノ松", 0.0, HT * 0.7, 0.085, INK, brush=True, gap=1.0)
-        chrysanthemum(pr, -0.13, HT * 0.62, 0.034, stem_to=HT * 0.2)
-        chrysanthemum(pr, 0.13, HT * 0.62, 0.034, stem_to=HT * 0.2)
-        pr.text("特撰清酒", -0.205, HT * 0.7, 0.02, RED)
-        seal(pr, 0.205, HT * 0.32, 0.024, "霧松酒造")
-        pr.text("キリノマツ", -0.044, HT * 0.13, 0.02, RED, vertical=False, gap=1.1)
+        # (霧ノ松: a big flat red sun, the name brushed down through it in black, a small square seal low at the right)
+        pr.shape(disk(0.0, HT * 0.56, 0.1), RED)
+        pr.text("霧ノ松", 0.0, HT * 0.74, 0.074, INK, brush=True, gap=1.02)
+        pr.shape(lambda x, y: (np.maximum(np.abs(x - 0.135), np.abs(y - HT * 0.2)) < 0.017)
+                 & (np.maximum(np.abs(x - 0.135), np.abs(y - HT * 0.2)) > 0.0145), RED)
+        pr.text("松", 0.135, HT * 0.2, 0.022, RED)
     elif k == 1:
-        # (瑞雲錦 in a ruled frame under a pine's crown, its grade either side in ink, a seal low at the right)
-        pine(pr, 0.0, HT * 0.73, 0.24)
-        pr.shape(lambda x, y: (((np.abs(np.abs(x) - 0.095) < 0.0025) & (y > HT * 0.12) & (y < HT * 0.63))
-                               | (((np.abs(y - HT * 0.63) < 0.0025) | (np.abs(y - HT * 0.12) < 0.0025)) & (np.abs(x) < 0.0975))), INK)
-        pr.text("瑞雲錦", 0.0, HT * 0.53, 0.066, INK, brush=True, gap=0.98)
-        pr.text("本醸造", -0.15, HT * 0.62, 0.022, INK)
-        pr.text("生一本", 0.15, HT * 0.62, 0.022, INK)
-        seal(pr, 0.15, HT * 0.2, 0.02, "瑞雲")
+        # (瑞雲錦: a tall red panel, a fine black frame round it a little off, the name in the straw's own cream out of it; a cloud either side)
+        x_, y0, y1 = 0.048, HT * 0.16, HT * 0.76
+        pr.shape(lambda x, y: (np.abs(x) < x_ + 0.012) & (y > y0 - 0.012) & (y < y1 + 0.012)
+                 & ~((np.abs(x) < x_ + 0.009) & (y > y0 - 0.009) & (y < y1 + 0.009)), INK)
+        pr.shape(lambda x, y: (np.abs(x) < x_) & (y > y0) & (y < y1), RED)
+        pr.text("瑞雲錦", 0.0, HT * 0.64, 0.062, CREAM, brush=True, gap=1.0)
+        pr.shape(cloud(-0.125, HT * 0.62, 0.022, -1), INDIGO)
+        pr.shape(cloud(0.125, HT * 0.3, 0.022, 1), INDIGO)
     else:
-        # (八雲泉 big and brushed down the middle, its maker in red down the left in a ring, its grade at the right, a seal under it)
-        pr.text("八雲泉", 0.01, HT * 0.72, 0.088, INK, brush=True)
-        pr.text("吟醸", -0.12, HT * 0.68, 0.026, RED)
-        pr.text("酒造", -0.155, HT * 0.68, 0.026, RED)
-        seal(pr, -0.137, HT * 0.3, 0.03, "八雲")
-        pr.text("御酒", 0.15, HT * 0.68, 0.026, RED)
-        seal(pr, 0.15, HT * 0.3, 0.02, "雲泉")
+        # (八雲泉: a crest at the top (a ring, 泉 in it), the name brushed under it, a panel of blue waves either side)
+        pr.shape(ring(0.0, HT * 0.7, 0.036, 0.0035), INK)
+        pr.text("泉", 0.0, HT * 0.7, 0.04, INK)
+        pr.text("八雲泉", 0.0, HT * 0.515, 0.068, INK, brush=True, gap=1.0)
+        for sd in (-1, 1):
+            xa, xb = sorted((sd * 0.075, sd * 0.155))
+            pr.shape(seigaiha(xa, xb, HT * 0.14, HT * 0.76, 0.04), INDIGO)
+            pr.shape(lambda x, y, xa=xa, xb=xb: (((np.abs(x - xa) < 0.0015) | (np.abs(x - xb) < 0.0015)) & (y > HT * 0.14) & (y < HT * 0.76))
+                     | (((np.abs(y - HT * 0.14) < 0.0015) | (np.abs(y - HT * 0.76) < 0.0015)) & (x > xa) & (x < xb)), INDIGO)
     return pr
 
 
@@ -343,9 +393,20 @@ spoke = np.floor((la / (2 * math.pi) + 0.5) * 160)
 ltone = (np.sin(spoke * 7.31) * 9133.7) % 1.0
 lcol = mix((0.76, 0.74, 0.66), (0.9, 0.88, 0.8), ltone)
 lcol = lcol * (0.84 + 0.16 * np.abs(np.sin(la * 80)))[..., None]
-lcol = lcol * (0.72 + 0.28 * smooth(0.0, 0.55, lr))[..., None]
+lht = np.abs(np.sin(la * 80)) * 0.2
+# (inside the rope's ring a flat straw mat, its rows straight across it, not the pleats run in to a point at the middle (item 101, the
+# owner's, 2026-11-14: 'this middle ring wants seeing to': every pleat met at the middle, a star of streaks); the pleats only out on the roll)
+MROWS = 46
+mrow = np.floor((ly + 1) / 2 * MROWS + 0.18 * np.sin(lx * 9.0))
+mtone = (np.sin(mrow * 12.9898) * 43758.5453) % 1.0
+medge = np.abs((((ly + 1) / 2 * MROWS + 0.18 * np.sin(lx * 9.0)) % 1.0) - 0.5) * 2
+mcol = mix((0.8, 0.78, 0.69), (0.92, 0.9, 0.82), mtone) * (0.84 + 0.16 * (1 - medge ** 3))[..., None]
+mcol = mcol * (1 - 0.06 + 0.06 * np.sin(lx * 700 * (0.8 + 0.4 * mtone) + mtone * 40))[..., None]
+inmat = smooth(RING_F - 0.02, RING_F - 0.07, lr)
+lcol = mix(lcol, mcol, inmat)
+lht = (lht * (1 - inmat) + (1 - medge ** 2) * 0.25 * inmat).astype(np.float32)
+lcol = lcol * (0.8 + 0.2 * (1 - smooth(0.9, 1.0, lr)))[..., None]   # (shaded under the roll at the edge)
 lcol = mix(lcol, (0.5, 0.47, 0.38), smooth(0.6, 0.85, fbm(LN, 5, 5, 3)) * 0.4)
-lht = (np.abs(np.sin(la * 80)) * 0.2).astype(np.float32)
 lcol *= (1 - 0.45 * smooth(1.9, 0.6, np.abs(lr - RING_F) * R / RING_R))[..., None]
 # (the strip of rope: straw twisted in three strands, lit across it, its heights for the normal map; four twists along it, so it tiles)
 RS = 128
