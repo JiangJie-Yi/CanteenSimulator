@@ -5,7 +5,7 @@ import { SAKE_BOTTLE_ML, TOKKURI_ML, fullStand, pour, pourFrom, poursLeft } from
 feature('酒台倒酒（店主要的，第 89 項）', () => {
   scenario('一壺德利是一合，從開著的那支倒，倒完才開下一支', ({ given, when, then, and }) => {
     let levels = fullStand()
-    given('五支都是滿的', () => { expect(levels).toEqual([1, 1, 1, 1, 1]) })
+    given('每一支都是滿的（八支，第 132 項）', () => { expect(levels).toEqual(SAKE_BOTTLE_ML.map(() => 1)) })
     when('倒一壺', () => { levels = pour(levels, pourFrom(levels)).levels })
     then('第一支少了一合（1.8 公升的十分之一）', () => {
       expect(levels[0]).toBeCloseTo(1 - TOKKURI_ML / SAKE_BOTTLE_ML[0])
@@ -13,7 +13,7 @@ feature('酒台倒酒（店主要的，第 89 項）', () => {
     and('下一壺還是從同一支倒，不會每支都開', () => {
       expect(pourFrom(levels)).toBe(0)
       levels = pour(levels, pourFrom(levels)).levels
-      expect(levels.slice(1)).toEqual([1, 1, 1, 1])
+      expect(levels.slice(1)).toEqual(SAKE_BOTTLE_ML.slice(1).map(() => 1))
     })
   })
   scenario('倒到不夠一壺的那支，換一支新的上去', ({ given, when, then }) => {

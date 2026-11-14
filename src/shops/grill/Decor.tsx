@@ -28,7 +28,7 @@ import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
-import { pour } from '@/game/sakeStand'
+import { pour, SAKE_BOTTLE_ML } from '@/game/sakeStand'
 import { Tokkuri, TOKKURI_H } from './Tokkuri'
 import { AnchoredLight } from '@/scene/AnchoredLight'
 
@@ -1385,7 +1385,7 @@ function SakeStand() {
       const s = node.parent?.getWorldScale(new THREE.Vector3()).y || 1
       return { node, pos: node.position.clone(), q: node.quaternion.clone(), h: (box.max.y - box.min.y) / s - 0.0005, liquid, off, shochu: shochu_ }
     }
-    const list = Array.from({ length: 5 }, (_, k) => one(obj.getObjectByName(`SakeBottle${k}`)!, obj.getObjectByName(`SakeLiquid${k}`) ?? null, new THREE.Vector3(), false))
+    const list = Array.from({ length: SAKE_BOTTLE_ML.length }, (_, k) => one(obj.getObjectByName(`SakeBottle${k}`)!, obj.getObjectByName(`SakeLiquid${k}`) ?? null, new THREE.Vector3(), false))
     const sb = shochu.getObjectByName('ShochuBottle')
     if (sb) list.push(one(sb, shochu.getObjectByName('ShochuLiquid') ?? null, SHOCHU_AT.clone(), true))
     return list
@@ -1515,7 +1515,7 @@ function SakeStand() {
     for (let q = o; q; q = q.parent) {
       const m = /^SakeBottle(\d)$/.exec(q.name)
       if (m) return +m[1]
-      if (q.name === 'ShochuBottle') return 5
+      if (q.name === 'ShochuBottle') return SAKE_BOTTLE_ML.length
     }
     return -1
   }
@@ -1567,7 +1567,8 @@ function SakeStand() {
     if (k >= 0) {
       e.stopPropagation()
       document.body.style.cursor = 'grab'
-      setTip({ title: k === 5 ? '燒酒' : '清酒', hint: k === 5 ? '按住拖到燒酒杯上方倒酒' : '按住拖到德利或燒酒杯上方倒酒' })
+      const shochu_ = k === SAKE_BOTTLE_ML.length
+      setTip({ title: shochu_ ? '燒酒' : '清酒', hint: shochu_ ? '按住拖到燒酒杯上方倒酒' : '按住拖到德利或燒酒杯上方倒酒' })
     }
   }
   const onOut = () => { if (!drag.current) { document.body.style.cursor = ''; setTip(null) } }
@@ -1590,7 +1591,7 @@ function SakeStand() {
     setTip({ title: '燒酒杯', hint: full.current[i] ? '倒滿了｜點一下喝掉' : '空的｜拖一支酒到上方倒酒' })
   }
   return (
-    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '按住一支酒拖到德利或燒酒杯上方倒酒：雪嶺錦、朝霞川、鶴汀、月汀桜、燒酒')}>
+    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '按住一支酒拖到德利或燒酒杯上方倒酒｜雪嶺錦、朝霞川、鶴汀、瑠璃灘、月汀桜、雲雀谷、楓霞、燒酒')}>
       <primitive object={obj} onPointerDown={onDown} onPointerOver={onOver} onPointerOut={onOut} />
       <primitive object={shochu} onPointerDown={onDown} onPointerOver={(e: { stopPropagation: () => void; object: THREE.Object3D }) => { onOver(e); onCupOver(e) }}
         onPointerOut={onOut} onClick={onCupClick} />

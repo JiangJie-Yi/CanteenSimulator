@@ -41,8 +41,9 @@ CAP_FROM = 5          # (from this point up, the paper cap)
 # The bottles' picture: one column each (u round the bottle once, its front (-y) at the column's middle), v up it (the foot at 0, the
 # cap's top at 1)
 # =====================================================================
-NB = 6                # (five bottles and the hang tag's picture)
-CWID, CH = 512, 1024
+NB = 9                # (eight bottles and the hang tag's picture)
+# (448 wide a column (512 before): nine of them are 4032 across, within the 4096 every GPU takes)
+CWID, CH = 448, 1024
 SS = 2
 FONTS = ("C:/Windows/Fonts/YuMinB.ttf", "C:/Windows/Fonts/msmincho.ttc", "C:/Windows/Fonts/YuGothB.ttc")
 # (the big names brushed: Yuji Boku, an open font (SIL OFL, blender/fonts/OFL-YujiBoku.txt), the owner's: "the labels' big characters
@@ -118,7 +119,7 @@ class Col:
         self.col *= (0.8 + 0.2 * smooth(0.0, 0.05, self.vv))[..., None]
         seam = (np.abs(cdist(self.uu - 0.25)) < 0.003) | (np.abs(cdist(self.uu - 0.75)) < 0.003)
         self.col[seam] *= 1.25
-        self.col *= (0.94 + 0.06 * fbm(CWID, 20, 40, 3)[:CH // 2].repeat(2, 0)[:CH])[..., None]
+        self.col *= (0.94 + 0.06 * fbm(CH // 2, 20, 40, 3)[:CH // 2, :CWID].repeat(2, 0)[:CH])[..., None]
         self.rough = np.full((CH, CWID), 0.12, np.float32)
 
     def rect(self, x0, x1, y0, y1):
@@ -150,7 +151,7 @@ def cdist(du):
 
 def washi(col, m, base, fibre=0.06):
     """washi paper over `m`: its base colour, long fibres through it, a little uneven"""
-    n = fbm(CWID, 60, 120, 2)[:CH // 2].repeat(2, 0)[:CH]
+    n = fbm(CH // 2, 60, 120, 2)[:CH // 2, :CWID].repeat(2, 0)[:CH]
     f = np.abs(np.sin(col.x * 900 + n * 20) * np.sin(col.y * 300 + n * 9))
     c = np.asarray(base, np.float32)[None, None, :] * (1 - fibre + fibre * f)[..., None] * (0.96 + 0.06 * n)[..., None]
     col.col[m] = c[m]
@@ -186,7 +187,7 @@ def disc(c, x0, y0, r, colour, ring=0.0, rough=0.6):
 
 def worn(c, m, k=0.12):
     """the print a little worn where a hand takes the bottle"""
-    n = fbm(CWID, 30, 60, 3)[:CH // 2].repeat(2, 0)[:CH]
+    n = fbm(CH // 2, 30, 60, 3)[:CH // 2, :CWID].repeat(2, 0)[:CH]
     c.col[m] = mix(c.col, np.asarray((0.93, 0.9, 0.82), np.float32), smooth(0.62, 0.9, n) * k)[m]
 
 
@@ -325,7 +326,7 @@ c = Col(2 * math.pi * 0.052, H, (0.05, 0.13, 0.08))
 X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.05, 0.2
 lab = c.rect(X0, X1, Y0, Y1)
 c.paint(lab, (0.08, 0.08, 0.08), 0.5)
-c.col[lab] *= (0.85 + 0.15 * fbm(CWID, 80, 160, 2)[:CH // 2].repeat(2, 0)[:CH])[lab][:, None]
+c.col[lab] *= (0.85 + 0.15 * fbm(CH // 2, 80, 160, 2)[:CH // 2, :CWID].repeat(2, 0)[:CH])[lab][:, None]
 border(c, X0 + 0.002, X1 - 0.002, Y0 + 0.002, Y1 - 0.002, 0.0008, GOLD, 0.35)
 c.text("鶴汀", 0.006, 0.152, 0.05, GOLD, brush=True, gap=0.95)
 d = np.sqrt((c.x - 0.03) ** 2 + (c.y - 0.1) ** 2)
@@ -381,6 +382,56 @@ c.text("Tsurunagisa", -0.012, 0.052, 0.0045, INK, vertical=False, gap=0.55, x_ce
 back_label(c, Y1, "鶴汀", "七二〇ml", INK)
 cap(c, H4, YONGO[CAP_FROM][1] - 0.003, (0.1, 0.1, 0.1), GOLD)
 OPAQUE[4] = [(Y0, Y1), (YONGO[CAP_FROM][1] - 0.003, H4)]
+cols.append(c)
+
+# ---- three more makes (item 132, the owner's, 2026-11-15: "more kinds of sake"), made up as the others are
+# 5: 瑠璃灘 (1.8 l), 本醸造: deep blue glass; a white label, the name brushed big in indigo, a band of waves along its foot, a red seal
+c = Col(2 * math.pi * 0.052, H, (0.06, 0.12, 0.32))
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.05, 0.21
+lab = c.rect(X0, X1, Y0, Y1)
+washi(c, lab, (0.95, 0.95, 0.93))
+peaks(c, lab, X0, X1, Y0 + 0.006, Y0 + 0.03, (0.25, 0.4, 0.62), 5)
+c.text("瑠璃灘", 0.0, 0.175, 0.04, (0.12, 0.2, 0.45), brush=True, gap=0.98)
+c.text("本醸造", 0.032, 0.19, 0.011, INK, brush=True, gap=1.05)
+disc(c, -0.03, 0.1, 0.009, RED, ring=0.0013)
+c.text("瑠", -0.03, 0.1, 0.009, RED, brush=True)
+c.text("RURINADA", 0.0, Y0 + 0.04, 0.0048, (0.12, 0.2, 0.45), vertical=False, gap=0.62, x_centre=True)
+back_label(c, Y1, "瑠璃灘", "一八〇〇ml", INK)
+worn(c, lab)
+OPAQUE[5] = [(Y0, Y1), (ISSHO[CAP_FROM][1] - 0.004, H)]
+cap(c, H, ISSHO[CAP_FROM][1] - 0.004, (0.9, 0.92, 0.95), (0.12, 0.2, 0.45))
+cols.append(c)
+
+# 6: 雲雀谷 (720 ml), 純米大吟醸: pale blue-clear glass; a silver-grey label, the name brushed in black, a scatter of small stars, the grade in red
+c = Col(2 * math.pi * 0.04, H4, (0.62, 0.74, 0.8))
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.04, 0.16
+lab = c.rect(X0, X1, Y0, Y1)
+washi(c, lab, (0.8, 0.82, 0.85), fibre=0.03)
+flecks(c, lab, 60, (0.96, 0.96, 0.98), 0.0011)
+border(c, X0 + 0.002, X1 - 0.002, Y0 + 0.002, Y1 - 0.002, 0.0008, (0.4, 0.42, 0.46))
+c.text("雲雀谷", -0.002, 0.125, 0.024, INK, brush=True, gap=0.98)
+c.text("純米大吟醸", 0.026, 0.14, 0.0072, RED, brush=True, gap=1.05)
+c.text("HIBARIDANI", 0.0, Y0 + 0.01, 0.0036, INK, vertical=False, gap=0.6, x_centre=True)
+back_label(c, Y1, "雲雀谷", "七二〇ml", INK)
+screw_cap(c, H4, YONGO[CAP_FROM][1] - 0.006, (0.78, 0.8, 0.84))
+OPAQUE[6] = [(Y0, Y1), (YONGO[CAP_FROM][1] - 0.006, H4)]
+cols.append(c)
+
+# 7: 楓霞 (720 ml), 特別本醸造: amber glass; a cream label, the name brushed big in deep red, red maple leaves scattered at its foot
+c = Col(2 * math.pi * 0.04, H4, (0.36, 0.18, 0.05))
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.04, 0.155
+lab = c.rect(X0, X1, Y0, Y1)
+washi(c, lab, (0.95, 0.9, 0.78), fibre=0.05)
+for k_, (bx, by) in enumerate(((-0.02, 0.06), (0.012, 0.055), (0.03, 0.07), (-0.032, 0.075))):
+    for j in range(5):
+        a = j * 2 * math.pi / 5 + k_ * 0.7
+        disc(c, bx + 0.003 * math.cos(a), by + 0.003 * math.sin(a), 0.0022, (0.78, 0.2, 0.08))
+c.text("楓霞", 0.0, 0.125, 0.03, (0.55, 0.08, 0.05), brush=True, gap=0.98)
+c.text("特別本醸造", 0.026, 0.142, 0.0068, INK, brush=True, gap=1.05)
+c.text("FUKA", 0.0, Y0 + 0.008, 0.004, INK, vertical=False, gap=0.6, x_centre=True)
+back_label(c, Y1, "楓霞", "七二〇ml", INK)
+cap(c, H4, YONGO[CAP_FROM][1] - 0.003, (0.95, 0.9, 0.78), (0.55, 0.08, 0.05))
+OPAQUE[7] = [(Y0, Y1), (YONGO[CAP_FROM][1] - 0.003, H4)]
 cols.append(c)
 
 # ---- the hang tag's picture (its own column): yellow card, a black-edged red title, 最高金賞 brushed big, a gold medal
@@ -440,7 +491,7 @@ def mesh_obj(name, bm, mat, smooth_=True, join=True):
 
 bottles = []
 # (how full each is: up into its shoulder, a little lower in the open ones)
-FILL = {0: 0.262, 1: 0.248, 2: 0.255, 3: 0.196, 4: 0.19}
+FILL = {0: 0.262, 1: 0.248, 2: 0.255, 3: 0.196, 4: 0.19, 5: 0.25, 6: 0.2, 7: 0.192}
 
 
 def bottle(k, prof, at, turn):
@@ -487,7 +538,7 @@ def bottle(k, prof, at, turn):
         sw = Matrix.Rotation(-0.55, 4, "Z")
         q = [sw @ p_ for p_ in q]
         f = bm.faces.new([bm.verts.new(p_) for p_ in q])
-        tu0 = 5 / NB
+        tu0 = 8 / NB
         for l, uvq in zip(f.loops, ((tu0, 0.0), (tu0 + 1 / NB, 0.0), (tu0 + 1 / NB, 1.0), (tu0, 1.0))):
             l[uvl].uv = uvq
     bmesh.ops.transform(bm, matrix=Matrix.Rotation(turn, 4, "Z"), verts=bm.verts)
@@ -559,12 +610,16 @@ for xs in (-1, 1):
 
 # ---- the bottles: three tall at the back, two short at the front, each turned a touch its own way, a hair over the step
 ys_back = -D / 2 + FRONT_D + (D - FRONT_D) / 2
-bottle(0, ISSHO, Vector((0.0, ys_back, BACK_H + 0.0005)), 0.0)
-bottle(1, ISSHO, Vector((-0.19, ys_back + 0.004, BACK_H + 0.0005)), 0.12)
-bottle(2, ISSHO, Vector((0.19, ys_back - 0.004, BACK_H + 0.0005)), -0.1)
+# (four up at the back and four at the front now (item 132), set closer: the front's right-hand end kept for the tokkuri)
+bottle(1, ISSHO, Vector((-0.24, ys_back + 0.004, BACK_H + 0.0005)), 0.12)
+bottle(0, ISSHO, Vector((-0.08, ys_back, BACK_H + 0.0005)), 0.0)
+bottle(2, ISSHO, Vector((0.08, ys_back - 0.004, BACK_H + 0.0005)), -0.1)
+bottle(5, ISSHO, Vector((0.24, ys_back + 0.002, BACK_H + 0.0005)), -0.06)
 ys_front = -D / 2 + FRONT_D / 2
-bottle(3, YONGO, Vector((-0.1, ys_front, FRONT_H + 0.0005)), 0.08)
-bottle(4, YONGO, Vector((0.11, ys_front + 0.002, FRONT_H + 0.0005)), -0.14)
+bottle(3, YONGO, Vector((-0.24, ys_front, FRONT_H + 0.0005)), 0.08)
+bottle(6, YONGO, Vector((-0.12, ys_front - 0.002, FRONT_H + 0.0005)), 0.04)
+bottle(4, YONGO, Vector((0.0, ys_front + 0.002, FRONT_H + 0.0005)), -0.14)
+bottle(7, YONGO, Vector((0.12, ys_front, FRONT_H + 0.0005)), -0.08)
 
 # (joined by material)
 by = {}

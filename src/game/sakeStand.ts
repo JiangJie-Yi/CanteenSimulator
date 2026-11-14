@@ -4,7 +4,8 @@
 // Decor draws the stand and pours.
 
 /** what each bottle holds (ml), in the stand's order (blender/sakestand.py: the three tall at the back, the two at the front) */
-export const SAKE_BOTTLE_ML = [1800, 1800, 1800, 720, 720] as const
+// (eight bottles: the stand's 1.8 l at the back and 720 ml at the front, three more makes added (item 132): 瑠璃灘, 雲雀谷, 楓霞)
+export const SAKE_BOTTLE_ML = [1800, 1800, 1800, 720, 720, 1800, 720, 720] as const
 /** a tokkuri's worth: one gō */
 export const TOKKURI_ML = 180
 /** how many of those ordering add a tokkuri of sake alongside (sat at the bar, not a takeaway); and how long after their order it's poured
