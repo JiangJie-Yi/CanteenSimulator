@@ -52,7 +52,7 @@ const CATS_SHIFT_3: V3 = [-0.8085, 0, 0.5891]
 const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]; spans?: boolean; t?: V3 }> = {
   // (it and the shrine moved 3.4 along the wall toward the round window (the owner's, 2026-11-11), the waiting bench in their place: GENKAN_SHIFT;
   // the stand a metre further along the same way (the owner's, 2026-11-12, room for a second bench): CATS_SHIFT_3)
-  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban'], t: [-2.749 + CATS_SHIFT_3[0], 0, 2.003 + CATS_SHIFT_3[2]] },
+  'grp-doorcats': { zh: '門口招財貓組', ja: '玄関の招き猫', members: ['doorcats', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3', 'koban', 'owncat'], t: [-2.749 + CATS_SHIFT_3[0], 0, 2.003 + CATS_SHIFT_3[2]] },
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
   // (the samurai helmet on its own little stand by the staff's door (the owner's, 2026-11-12): moved together)
   'grp-kabuto': { zh: '頭盔與木台', ja: '兜と飾り台', members: ['kabutostand', 'kabuto'] },
@@ -129,6 +129,14 @@ const loadGroups = (): Record<string, Group> => {
     unsettled.add(id)
     made.add(id)
   }
+  // (the shop's own beckoning cat into the cats' group a browser kept (item 97): it moves with the stand as the others do, once)
+  try {
+    if (!localStorage.getItem('jgs-edit-owncat-in-1')) {
+      const k = g['grp-doorcats']
+      if (k && !k.members.includes('owncat')) g['grp-doorcats'] = { ...k, members: [...k.members, 'owncat'] }
+      localStorage.setItem('jgs-edit-owncat-in-1', '1')
+    }
+  } catch { /* storage blocked */ }
   // (groups a browser kept from before their default place was moved: moved on by as much, once (its key marks it done))
   for (const [key, id] of GENKAN_SHIFT) {
     try { if (localStorage.getItem(key)) continue } catch { continue }

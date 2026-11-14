@@ -48,6 +48,8 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   常溫蔬菜: ['常温の野菜', 'Room-temp vegetables'],
   椪柑: ['ポンカン', 'Ponkan oranges'],
   '武士頭盔（兜）': ['兜', 'Samurai helmet'],
+  招財貓: ['招き猫', 'Lucky cat'],
+  '本店的招財貓，舉著左手招客人進門': ['店の招き猫、左手を挙げてお客さんを招く', 'The shop’s own lucky cat, its left paw up, beckoning guests in'],
   水龍頭: ['蛇口', 'Tap'],
   洗手台水龍頭: ['手洗いの蛇口', 'Washbasin tap'],
   洗手盆: ['手洗い鉢', 'Washbasin'],

@@ -49,6 +49,7 @@ import { HAND_MS } from './Restroom'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps, SakeCup, cupped } from './DiningRoom'
 import { Tokkuri } from './Tokkuri'
 import { Koban } from './Koban'
+import { OwnLuckyCat } from './OwnLuckyCat'
 import { LuckyCat } from './LuckyCat'
 import { IpadModel } from './Ipad'
 import { TillBoxes } from './TillBoxes'
@@ -580,8 +581,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
         {/* (its back against the wall, 0.1 behind its middle: the lower tier deep, the upper shallow and narrower; and a third, the top, a
             step at the back of the upper one, for the koban (the owner's, 2026-11-12); that step deeper and shorter along the wall (the
             owner's, 2026-11-12: 'the third step thicker, its width shorter, the cats moved to either side of it'): 0.2 deep, 0.26 long, the
-            two big cats either side of it) */}
-        {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7], [0, 0.2, 0.84, 0.26]].map(([x, d, h, l], i) => (
+            two big cats either side of it); and lower, 0.14 over the upper tier where it was 0.24 (the owner's, 2026-11-14, item 96) */}
+        {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7], [0, 0.2, CAT_TOP, 0.26]].map(([x, d, h, l], i) => (
           <group key={i}>
             <Part geo={REG_GEO.round} color={i === 1 ? '#4a2e1c' : i === 2 ? '#3e2616' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
             {/* (a red felt (毛氈) laid over each tier, hanging a little down its front, as under a festival's dolls) */}
@@ -598,8 +599,13 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
             <group position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
           </StaticBatch></Movable>
         ))}
-        {/* (a koban, the old oval gold coin, on its little stand, up on the top step (the owner's, 2026-11-12: a step more, the coin on top)) */}
-        <Movable id="koban" label="小判金幣"><group position={[0, 0.844, 0]} rotation-y={-Math.PI / 2}><Koban /></group></Movable>
+        {/* (a koban, the old oval gold coin, on its little stand, up on the top step (the owner's, 2026-11-12: a step more, the coin on top);
+            bigger, the step lower (item 96)) */}
+        <Movable id="koban" label="小判金幣"><group position={[0, CAT_TOP + 0.0085, 0]} rotation-y={-Math.PI / 2} scale={1.35}><Koban /></group></Movable>
+        {/* (the shop's own beckoning cat, its paw going, in the middle of the first step between the two small ones, facing the way in
+            (item 97, the owner's, 2026-11-14)) */}
+        <Movable id="owncat" label="招財貓（招手）"><group position={[-0.22, 0.328, 0]} rotation-y={-Math.PI / 2} scale={1.15}
+          {...nameOver('招財貓', '本店的招財貓，舉著左手招客人進門')}><OwnLuckyCat /></group></Movable>
       </group>
       {/* (the samurai helmet (兜) that sat on the lower tier between the two small cats is on its own little stand by the staff's door now
           (the owner's, 2026-11-12): DiningRoom's) */}
@@ -1699,6 +1705,8 @@ function ShoeCupboard() {
  * The cats at the door, on their stand just inside it against the wall (the entrance's +x side; the till is on the
  * other), facing across the way in at those coming through
  */
+/** the cats' stand's top step's height, the koban on it (0.84 once: item 96) */
+const CAT_TOP = 0.74
 const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
   // (each its own model and size, in its own colours: two big ones on top, two smaller below)
