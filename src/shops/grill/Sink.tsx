@@ -411,6 +411,9 @@ const basinHint = () => {
   const st = handStep(handSink())
   return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}`
 }
+/** the rubbish bin's lid: asked open (a click), or lifted for a moment till then (sticks thrown in); how far it lifts (rad) */
+const BIN_LID = { open: false, until: 0 }
+const BIN_LID_OPEN = 1.75
 /** the sponge taken up: lifted off its dish this far */
 const SPONGE_UP = 0.05
 /** one of what stands on the sink (SINK_SETS' node), in the sink's own frame: Decor's SinkAt sets it where the sink is, in a Movable of its own */
@@ -429,9 +432,23 @@ export function SinkPart({ node }: { node: string }) {
     }
     dressSink(r)
     plainColours(r)
-    mergeByMaterial(r)
+    // (the rubbish bin's lid left whole, on its hinge, to be lifted (item 136))
+    mergeByMaterial(r, (o) => o.name === 'SinkBinLidR')
     return r
   }, [gltf, node])
+  // (the rubbish bin's lid: lifted while it's asked open, or for a moment as sticks are thrown in; eased up and back down)
+  const lid = useMemo(() => (node === 'SinkBinSet' ? obj.getObjectByName('SinkBinLidR') ?? null : null), [obj, node])
+  const lidK = useRef(0)
+  const sticksWas = useRef(SINK_BIN.sticks)
+  useFrame((_, dt) => {
+    if (!lid) return
+    if (SINK_BIN.sticks > sticksWas.current) BIN_LID.until = performance.now() + 1400
+    sticksWas.current = SINK_BIN.sticks
+    const want = BIN_LID.open || performance.now() < BIN_LID.until ? 1 : 0
+    lidK.current += (want - lidK.current) * Math.min(1, dt * 7)
+    const k = lidK.current
+    lid.rotation.x = -BIN_LID_OPEN * k * k * (3 - 2 * k)
+  })
   // (the draining basket says how many plates stand in it and whether they're dry (the owner's: every plate counted))
   const name = SINK_SETS.find((s) => s.node === node)?.label ?? ''
   // (the sponge, taken up to wash with (item 103): lifted off its dish while it's held)
@@ -444,6 +461,19 @@ export function SinkPart({ node }: { node: string }) {
       onClick={(e) => {
         e.stopPropagation(); if (getEdit().on) return
         if (node === 'SinkDetergentSet') { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } else SINK.sponge = !SINK.sponge
+        window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
+      }}>
+      <primitive object={obj} />
+    </group>
+  )
+  if (node === 'SinkBinSet') return (
+    // (the bins: pointed at, what's in them; clicked, the rubbish bin's lid lifted or shut (item 136))
+    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver(name, partSays(node)).onPointerOver(e) }}
+      onPointerOut={(e) => { tipOver(name, '').onPointerOut(e) }}
+      onClick={(e) => {
+        e.stopPropagation(); if (getEdit().on) return
+        BIN_LID.open = !BIN_LID.open
+        tapTurnSound(BIN_LID.open, 0.3)
         window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
       }}>
       <primitive object={obj} />
@@ -471,7 +501,9 @@ function partSays(node: string) {
     case 'SinkScrubSet': return '棕櫚刷，刷鍋子和烤網'
     case 'SinkSoapSet': return '洗手用的肥皂'
     case 'SinkTowelSet': return '擦乾碗盤的布巾'
-    case 'SinkBinSet': return SINK_BIN.sticks > 0 ? `垃圾桶裡有用過的竹籤 ${SINK_BIN.sticks} 根；後面是資源回收桶` : '用過的竹籤丟垃圾桶，現在是空的；後面是資源回收桶'
+    // (each its own short line: run together it broke onto two)
+    case 'SinkBinSet': return (SINK_BIN.sticks > 0 ? `裡面有用過的竹籤 ${SINK_BIN.sticks} 根` : '用過的竹籤丟這裡，現在是空的') + '｜旁邊是資源回收桶'
+      + (BIN_LID.open ? '｜點一下蓋上' : '｜點一下掀開蓋子')
     case 'SinkDetergentSet': return SINK.water <= 0 ? '洗碗精｜水槽沒有水，先放水再擠' : `洗碗精｜點一下擠一點到水裡（水裡的夠洗 ${SINK.soap} 個）`
     case 'SinkSpongeSet': return SINK.sponge ? '菜瓜布｜拿著，點水槽刷盤子；點一下放回去' : '菜瓜布，黃的那面軟，綠的那面刷｜點一下拿起來洗碗'
     default: return ''

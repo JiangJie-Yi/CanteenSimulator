@@ -773,7 +773,9 @@ box("SinkSpongeScour", SGX - 0.05, SGX + 0.05, H + 0.022, H + 0.032, SPZ - 0.035
 # edge"; 0.2 wide, 0.42 tall and 5 cm off it before); their fronts where they were (BZ: their middles back by their growth))
 BW, BH = 0.26, 0.52
 BX = -W / 2 - BW / 2 - 0.01
-BZ = 0.34 - BW / 2          # both bins' middles, toward the front
+# (both bins' middles: their backs against the wall, as the sink's own back is (item 136, the owner's, 2026-11-15: "against the wall"); they
+# stood out toward the front)
+BZ = -D / 2 + 0.016 + BW / 2
 RX = BX - BW - 0.03         # the recycling bin's, out beside the rubbish bin
 M["bin_char"] = pbr("SinkBinCharcoal", lin("#3b3e44"), rough=0.55)
 M["bin_blue"] = pbr("SinkBinBlue", lin("#2f6db5"), rough=0.5)
@@ -832,16 +834,33 @@ def rim(name, x, z, y, outer, inner, mat):
 
 # ---- the rubbish bin: open, its liner black inside and folded down over its rim
 F0, F1 = BW * 0.9, BW
-tapered("SinkBinBody", BX, BZ, 0.0, BH, F0, F1, "bin_char")
+body_ = tapered("SinkBinBody", BX, BZ, 0.0, BH, F0, F1, "bin_char")
+# (its four corners rounded (item 136: "not refined enough"), as moulded bins' are)
+for o_ in (body_,):
+    b_ = bevel(o_, 0.014, 2)
+    bpy.context.view_layer.objects.active = o_
+    bpy.ops.object.modifier_apply(modifier=b_.name)
 tapered("SinkBinLiner", BX, BZ, 0.03, BH, F0 - 0.016, F1 - 0.016, "liner", inward=True)
 rim("SinkBinRim", BX, BZ, BH + 0.002, F1 + 0.008, F1 - 0.016, "liner")
 # (the liner's fold down the outside, a hair proud of the bin)
 tapered("SinkBinFold", BX, BZ, BH - 0.045, BH + 0.002, F1 + 0.006, F1 + 0.008, "liner", bottom=False)
 empty("SinkBinTop", BX, BH - 0.05, BZ)
+# (and a lid over it, hinged along its back (item 136: "it should open"): a little proud all round, its front edge drawn down into a pull;
+# its origin on its hinge, for the game to lift it)
+lid_ = box("SinkBinLidR", BX - F1 / 2 - 0.005, BX + F1 / 2 + 0.005, BH + 0.004, BH + 0.028, BZ - F1 / 2 - 0.005, BZ + F1 / 2 + 0.005, "bin_char", bev=0.008)
+pull_ = box("SinkBinLidRPull", BX - 0.055, BX + 0.055, BH - 0.006, BH + 0.02, BZ + F1 / 2 + 0.004, BZ + F1 / 2 + 0.018, "bin_char", bev=0.004)
+bpy.ops.object.select_all(action="DESELECT"); lid_.select_set(True); pull_.select_set(True); bpy.context.view_layer.objects.active = lid_
+bpy.ops.object.join()
+parts.remove(pull_)
+bpy.context.scene.cursor.location = P(BX, BH + 0.004, BZ - F1 / 2 - 0.005)
+bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
 
 # ---- the recycling bin: closed, its lid over it a little proud all round, a round hole in its lid
 # (its top a little up into the lid: no face of it in the lid's underside's plane)
-tapered("SinkBinRecBody", RX, BZ, 0.0, BH - 0.028, F0, F1 - 0.006, "bin_blue")
+rec_ = tapered("SinkBinRecBody", RX, BZ, 0.0, BH - 0.028, F0, F1 - 0.006, "bin_blue")
+b_ = bevel(rec_, 0.014, 2)
+bpy.context.view_layer.objects.active = rec_
+bpy.ops.object.modifier_apply(modifier=b_.name)
 box("SinkBinRecLid", RX - F1 / 2 - 0.004, RX + F1 / 2 + 0.004, BH - 0.03, BH, BZ - F1 / 2 - 0.004, BZ + F1 / 2 + 0.004, "bin_lid", bev=0.006, seg=1)
 
 # ---- their labels, on their fronts (+z), a few millimetres proud of the slope of each front
