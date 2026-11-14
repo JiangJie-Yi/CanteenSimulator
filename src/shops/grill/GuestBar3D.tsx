@@ -5794,33 +5794,47 @@ const WARM_PACKS: [number, number, number][] = Array.from({ length: WARM_TUB_HOL
  * liner (保温シート) inside the wall, its top folded out over the rim; and a cotton tenugui laid over the packs, riding on the topmost layer. The
  * tub's own units (blender/ricetub.py: the wall 0.255 round at its foot, 0.27 at its rim, 0.42 tall); drawn from the start, as the tub is */
 const LINER_GEO = new THREE.LatheGeometry([[0.236, 0.03], [0.25, 0.4], [0.252, 0.425], [0.268, 0.43], [0.281, 0.418], [0.284, 0.385]]
-  .map(([r, y]) => new THREE.Vector2(r, y)), 16)
-const crinkle = (paint: (g: CanvasRenderingContext2D, w: number) => void) => {
+  .map(([r, y]) => new THREE.Vector2(r, y)), 24)
+const crinkle = (paint: (g: CanvasRenderingContext2D, w: number) => void, size = 128) => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
-  c.width = c.height = 128
+  c.width = c.height = size
   const g = c.getContext('2d')!
-  paint(g, 128)
+  paint(g, size)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   return t
 }
-// (the liner's foil: silver, crumpled into facets catching the light one way and another)
+// (the liner's foil: smooth silver, broad soft sheens over it, crossed by fine creases, each a bright line with its dark side beside it (item
+// 102, the owner's, 2026-11-14: 'the foil far too rough': it was big hard triangles of grey, like broken stone); it tiles, so the creases wrap)
 const LINER_TEX = crinkle((g, w) => {
   let seed = 7
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
-  g.fillStyle = '#b9bdc2'
+  g.fillStyle = '#c4c8cd'
   g.fillRect(0, 0, w, w)
-  for (let i = 0; i < 160; i++) {
-    const x = rnd() * w, y = rnd() * w, r = 6 + rnd() * 16, v = 150 + Math.floor(rnd() * 100)
-    g.fillStyle = `rgb(${v},${v + 3},${v + 8})`
-    g.beginPath()
-    g.moveTo(x, y); g.lineTo(x + r, y + rnd() * r * 0.6); g.lineTo(x + rnd() * r * 0.4, y + r)
-    g.closePath(); g.fill()
+  for (let i = 0; i < 14; i++) {
+    const x = rnd() * w, y = rnd() * w, r = w * (0.15 + rnd() * 0.25), v = rnd() < 0.5 ? 255 : 150
+    for (const [ox, oy] of [[0, 0], [-w, 0], [w, 0], [0, -w], [0, w]]) {
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r)
+      gr.addColorStop(0, `rgba(${v},${v},${v + 4},0.35)`); gr.addColorStop(1, `rgba(${v},${v},${v + 4},0)`)
+      g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2)
+    }
   }
-})
-if (LINER_TEX) LINER_TEX.repeat.set(6, 3)
+  g.lineCap = 'round'
+  for (let i = 0; i < 90; i++) {
+    let x = rnd() * w, y = rnd() * w, a = rnd() * Math.PI * 2
+    const pts: [number, number][] = [[x, y]]
+    for (let k = 0; k < 2; k++) { a += (rnd() - 0.5) * 0.8; const l = 6 + rnd() * 12; x += Math.cos(a) * l; y += Math.sin(a) * l; pts.push([x, y]) }
+    for (const [dx, col, lw] of [[1.2, 'rgba(120,124,130,0.22)', 2.2], [0, 'rgba(255,255,255,0.4)', 1.4]] as const) {
+      for (const [ox, oy] of [[0, 0], [-w, 0], [w, 0], [0, -w], [0, w]]) {
+        g.strokeStyle = col; g.lineWidth = lw
+        g.beginPath(); pts.forEach(([px, py], k) => (k ? g.lineTo : g.moveTo).call(g, px + ox + dx, py + oy + dx)); g.stroke()
+      }
+    }
+  }
+}, 256)
+if (LINER_TEX) LINER_TEX.repeat.set(4, 2)
 const LINER_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: LINER_TEX, side: THREE.DoubleSide })
 // (the tenugui: cotton, indigo stripes across it, its ends a little frayed)
 const TENUGUI_TEX = crinkle((g, w) => {
@@ -5864,11 +5878,12 @@ const WarmTub = memo(function WarmTub() {
     }
     const n = keptWarm(TAKEOUT.orders)
     packs.current.forEach((g, i) => { if (g) g.scale.setScalar(i < n ? 1 : 0.0001) })
-    // (the cloth over the topmost layer; with none in the tub, folded small on its floor)
+    // (the cloth over the topmost layer; with none in the tub, put away (item 102, the owner's: folded small on its floor it read as nothing
+    // anyone could name, a striped scrap))
     if (cloth.current) {
       const layers = Math.ceil(n / 2)
       cloth.current.position.y = layers ? 0.028 + layers * 0.057 + 0.004 : 0.034
-      cloth.current.scale.setScalar(layers ? 1 : 0.55)
+      cloth.current.scale.setScalar(layers ? 1 : 0.0001)
     }
   })
   return (

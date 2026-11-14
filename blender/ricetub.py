@@ -2,9 +2,9 @@
 open), sized as the game's own (its foot at y 0, 0.42 tall, 0.27 across the rim):
 
 - RiceTubBody: 28 staves of pale sawara cypress, each its own shade and grain, bevelled so a dark line shows between them; three hammered
-  copper hoops (a wide one low, two narrow above) gone a little green at their edges, each lapped and riveted; an ear either side with a
-  loop of cord through it; the inside wall and floor in the same wood.
-- RiceTubLid: the lid, its origin at its underside's middle: a disc of the same wood with its rings turned into it, an eased edge, a
+  copper hoops (a wide one low, two narrow above) gone a little green at their edges, each lapped and riveted; a carved grip either side
+  under the rim; the inside wall and floor in the same wood.
+- RiceTubLid: the lid, its origin at its underside's middle: a disc of three boards of the same wood, their grain straight, an eased edge, a
   bar of darker wood across it to lift it by.
 - RiceTubRice: the rice filled to a little under the rim, gently heaped, every grain painted, and the paddle (しゃもじ) laid in it on the rim.
 
@@ -73,10 +73,14 @@ saw = mix(saw, (0.42, 0.28, 0.15), smooth(0.9, 0.985, _j))
 cop = mix((0.72, 0.4, 0.2), (0.86, 0.52, 0.28), fbm(N, 30, 30, 3))
 cop = cop * (1 - 0.12 * (fbm(N, 60, 60, 2) > 0.6))[..., None]
 cop = mix(cop, (0.36, 0.6, 0.5), smooth(0.85, 1.0, np.abs(v - 0.5) * 2) * 0.45)
-# (the lid's top: rings turned into it)
-rr = np.sqrt((u - 0.5) ** 2 + (v - 0.5) ** 2)
-lidt = mix((0.84, 0.7, 0.48), (0.76, 0.6, 0.38), smooth(0.3, 0.9, fbm(N, 6, 6, 4)))
-lidt = mix(lidt, (0.6, 0.44, 0.26), smooth(0.82, 1.0, np.sin((rr * 40 + fbm(N, 4, 4, 3) * 0.8) * math.pi * 2) * 0.5 + 0.5) * 0.4)
+# (the lid's top: three boards joined edge to edge, their straight grain running across the bar that holds them (item 102, the owner's,
+# 2026-11-14: rings turned into it, round and round, looked odd); each board a touch its own shade, a fine dark line at each join)
+_bd = np.floor(u * 3)
+lidt = mix((0.86, 0.72, 0.5), (0.78, 0.62, 0.4), smooth(0.3, 0.9, fbm(N, 30, 3, 4)))   # (streaked along the boards, fine across them)
+lidt = lidt * (0.95 + 0.08 * ((np.sin((_bd + 2) * 12.9898) * 43758.5453) % 1.0))[..., None]
+_gr = np.sin((u * 26 + _bd * 0.37 + fbm(N, 2, 4, 3) * 0.9 + 0.06 * np.sin(v * 7 + _bd)) * math.pi * 2) * 0.5 + 0.5
+lidt = mix(lidt, (0.62, 0.46, 0.28), smooth(0.84, 1.0, _gr) * 0.35)
+lidt = mix(lidt, (0.42, 0.28, 0.15), smooth(0.93, 0.99, np.abs(((u * 3) % 1.0) - 0.5) * 2))
 # (cooked rice, close up: grain on grain, each a plump little oval lying its own way, lit on top and shaded under, the gaps between them
 # in soft shadow; a pearly white with the faintest warm cast)
 RN = 1024
@@ -154,17 +158,34 @@ for (y, w) in ((0.07, 0.045), (0.2, 0.03), (0.3, 0.03)):
     bpy.context.view_layer.objects.active = hp
     bpy.ops.object.modifier_apply(modifier="s")
     fin(hp, f"RiceHoop{int(y * 100)}", M["copper"], body)
-# (the ears: a block of the wood either side, a hole through it, a loop of cord)
+# (the handles: a grip either side under the rim (item 102, the owner's, 2026-11-14: 'the handle won't do': a block with a loop of cord
+# through it, the cord a ten-sided ring that read as a hook): a bar of the wood standing off the wall on two posts, the fingers going in
+# under it, as an ohitsu's carved grips are; its corners eased)
+HG_W, HG_Y0, HG_Y1, HG_OUT = 0.075, 0.33, 0.39, 0.034
 for sd in (-1, 1):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=P(sd * (R1 + 0.02), 0.355, 0))
-    e = active(); e.scale = (0.045, 0.05, 0.05)
-    bpy.ops.object.transform_apply(scale=True)
-    m_ = e.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 1
-    bpy.context.view_layer.objects.active = e
+    bm = bmesh.new()
+    rw = R0 + (R1 - R0) * ((HG_Y0 + HG_Y1) / 2 / H) - 0.004
+    def bx(x0, x1, y0, y1, z0, z1):
+        vs = [bm.verts.new(P(sd * x, y, z)) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
+        for q in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+            bm.faces.new([vs[i] for i in q])
+    # (the bar along the top, across the front of the posts; the two posts back to the wall)
+    bx(rw + HG_OUT - 0.014, rw + HG_OUT, HG_Y0 + 0.022, HG_Y1, -HG_W / 2 - 0.0015, HG_W / 2 + 0.0015)   # (a hair wider and taller than the posts: no face shared)
+    for zs in (-1, 1):
+        bx(rw, rw + HG_OUT - 0.014 + 0.0005, HG_Y0, HG_Y1 - 0.002, zs * HG_W / 2 - (0.016 if zs > 0 else 0), zs * HG_W / 2 + (0.016 if zs < 0 else 0))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(f"RiceGrip{sd}")
+    bm.to_mesh(me)
+    bm.free()
+    g_ = bpy.data.objects.new(f"RiceGrip{sd}", me)
+    bpy.context.collection.objects.link(g_)
+    m_ = g_.modifiers.new("b", "BEVEL"); m_.width = 0.003; m_.segments = 1
+    bpy.context.view_layer.objects.active = g_
     bpy.ops.object.modifier_apply(modifier="b")
-    fin(e, f"RiceEar{sd}", M["saw"][0], body)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.0045, major_segments=10, minor_segments=4, location=P(sd * (R1 + 0.04), 0.36, 0), rotation=(math.pi / 2, 0, 0))
-    fin(active(), f"RiceCord{sd}", M["cord"], body)
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.cube_project(cube_size=0.3)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    fin(g_, f"RiceGrip{sd}", M["saw"][1], body)
 # (the rim's lip, eased)
 bpy.ops.mesh.primitive_torus_add(major_radius=R1 - 0.007, minor_radius=0.008, major_segments=24, minor_segments=3, location=P(0, H - 0.002, 0))
 fin(active(), "RiceRim", M["saw"][1], body)
