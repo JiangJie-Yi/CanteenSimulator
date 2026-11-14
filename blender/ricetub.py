@@ -63,6 +63,12 @@ u, v = grid01(N)
 # (sawara: pale yellow-cream, fine straight grain up the stave)
 saw = mix((0.86, 0.72, 0.5), (0.78, 0.62, 0.4), smooth(0.3, 0.9, fbm(N, 40, 3, 4)))
 saw = mix(saw, (0.62, 0.46, 0.28), smooth(0.86, 1.0, np.sin((u * 18 + fbm(N, 3, 3, 3) * 2) * math.pi * 2) * 0.5 + 0.5) * 0.35)
+# (low-poly, item 80 (the owner's, 2026-11-13: the tub's faces far too many): its 28 staves one turned wall now, the joins between them drawn,
+# four staves across the picture: a dark line at each join, each stave a touch its own shade, its edges eased darker)
+_st = np.floor(u * 4)
+saw = saw * (0.94 + 0.08 * ((np.sin(_st * 12.9898) * 43758.5453) % 1.0))[..., None]
+_j = np.abs(((u * 4) % 1.0) - 0.5) * 2
+saw = mix(saw, (0.42, 0.28, 0.15), smooth(0.9, 0.985, _j))
 # (hammered copper, a little verdigris at its edges)
 cop = mix((0.72, 0.4, 0.2), (0.86, 0.52, 0.28), fbm(N, 30, 30, 3))
 cop = cop * (1 - 0.12 * (fbm(N, 60, 60, 2) > 0.6))[..., None]
@@ -108,83 +114,65 @@ M = {"saw": [pbr(f"RiceStave{k}", (1 - 0.06 * k, 1 - 0.07 * k, 1 - 0.09 * k), te
 
 H, R0, R1 = 0.42, 0.255, 0.27
 body, lidp, ricep = [], [], []
-# (the staves: each a curved slab of the wall, a hair narrower than its share so a dark line shows between)
-NS = 28
-for k in range(NS):
-    a0, a1 = 2 * math.pi * k / NS + 0.004, 2 * math.pi * (k + 1) / NS - 0.004
-    bm = bmesh.new()
-    uvl = bm.loops.layers.uv.new()
-    cols = 3
-    rows = []
-    for (y, r) in ((0.0, R0), (H, R1)):
-        for side, dr in (("out", 0.0), ("in", -0.014)):
-            pass
-    grid = {}
-    for yi, y in enumerate((0.0, H)):
-        r = R0 + (R1 - R0) * (y / H)
-        for side, dr in ((0, 0.0), (1, -0.014)):
-            for ci in range(cols + 1):
-                a = a0 + (a1 - a0) * ci / cols
-                grid[(yi, side, ci)] = bm.verts.new(P((r + dr) * math.cos(a), y, (r + dr) * math.sin(a)))
-    def face(vs, uvs):
-        f = bm.faces.new(vs)
-        for lp, uv in zip(f.loops, uvs):
+# (the wall: one turned surface 24 round, outside and in, its top between them; the staves and their joins in the picture, seven times round)
+NS = 24
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+ring = {}
+for yi, y in enumerate((0.0, H)):
+    r = R0 + (R1 - R0) * (y / H)
+    for side, dr in ((0, 0.0), (1, -0.014)):
+        ring[(yi, side)] = [bm.verts.new(P((r + dr) * math.cos(2 * math.pi * j / NS), y, (r + dr) * math.sin(2 * math.pi * j / NS))) for j in range(NS)]
+for j in range(NS):
+    jn = (j + 1) % NS
+    u0, u1 = j / NS * 7, (j + 1) / NS * 7
+    for side in (0, 1):
+        vs = [ring[(0, side)][j], ring[(0, side)][jn], ring[(1, side)][jn], ring[(1, side)][j]]
+        f = bm.faces.new(vs if side == 0 else vs[::-1])
+        for lp, uv in zip(f.loops, ([(u0, 0), (u1, 0), (u1, 1), (u0, 1)] if side == 0 else [(u0, 1), (u1, 1), (u1, 0), (u0, 0)])):
             lp[uvl].uv = uv
-    for ci in range(cols):
-        u0, u1 = ci / cols * 0.25 + (k % 4) * 0.25, (ci + 1) / cols * 0.25 + (k % 4) * 0.25
-        face([grid[(0, 0, ci)], grid[(0, 0, ci + 1)], grid[(1, 0, ci + 1)], grid[(1, 0, ci)]], [(u0, 0), (u1, 0), (u1, 1), (u0, 1)])
-        face([grid[(0, 1, ci + 1)], grid[(0, 1, ci)], grid[(1, 1, ci)], grid[(1, 1, ci + 1)]], [(u1, 0), (u0, 0), (u0, 1), (u1, 1)])
-        face([grid[(1, 0, ci)], grid[(1, 0, ci + 1)], grid[(1, 1, ci + 1)], grid[(1, 1, ci)]], [(u0, 0.98), (u1, 0.98), (u1, 1), (u0, 1)])
-    for ci in (0, cols):
-        face([grid[(0, 0, ci)], grid[(1, 0, ci)], grid[(1, 1, ci)], grid[(0, 1, ci)]], [(0, 0), (0, 1), (0.02, 1), (0.02, 0)])
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(f"RiceStave{k}")
-    bm.to_mesh(me)
-    bm.free()
-    o = bpy.data.objects.new(f"RiceStave{k}", me)
-    bpy.context.collection.objects.link(o)
-    m_ = o.modifiers.new("b", "BEVEL"); m_.width = 0.0022; m_.segments = 1
-    bpy.context.view_layer.objects.active = o
-    bpy.ops.object.modifier_apply(modifier="b")
-    fin(o, f"RiceStave{k}", M["saw"][rng.randrange(3)], body)
-# (the dark wall behind the staves' gaps, and the floor)
-bpy.ops.mesh.primitive_cone_add(vertices=28, radius1=R0 - 0.004, radius2=R1 - 0.004, depth=H - 0.004, location=P(0, H / 2, 0), end_fill_type="NOTHING")
-fin(active(), "RiceGapWall", M["gap"], body)
+    f = bm.faces.new([ring[(1, 0)][j], ring[(1, 0)][jn], ring[(1, 1)][jn], ring[(1, 1)][j]])
+    for lp, uv in zip(f.loops, [(u0, 0.98), (u1, 0.98), (u1, 1), (u0, 1)]):
+        lp[uvl].uv = uv
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+me = bpy.data.meshes.new("RiceWall")
+bm.to_mesh(me)
+bm.free()
+o = bpy.data.objects.new("RiceWall", me)
+bpy.context.collection.objects.link(o)
+fin(o, "RiceWall", M["saw"][0], body)
 bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=R0 - 0.014, depth=0.02, location=P(0, 0.018, 0))
 fin(active(), "RiceFloor", M["inside"], body)
 # (the copper hoops: flat bands following the wall's taper, each with a lap and two rivets)
 for (y, w) in ((0.07, 0.045), (0.2, 0.03), (0.3, 0.03)):
     r = R0 + (R1 - R0) * (y / H) + 0.004
-    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=r, depth=w, location=P(0, y, 0), end_fill_type="NOTHING")  # (as many sides as the tub: fewer, its corners fell between the staves' and kinked)
+    # (as many sides as the wall, its corners on the wall's; no rivets (item 80))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=r, depth=w, location=P(0, y, 0), end_fill_type="NOTHING")
     hp = active()
+    # (its thickness kept: without it the band read flat, its lit upper edge gone)
     sol = hp.modifiers.new("s", "SOLIDIFY"); sol.thickness = 0.003; sol.offset = 1
     bpy.context.view_layer.objects.active = hp
     bpy.ops.object.modifier_apply(modifier="s")
     fin(hp, f"RiceHoop{int(y * 100)}", M["copper"], body)
-    a = 0.5
-    for dy in (-w * 0.25, w * 0.25):
-        # (a rivet's head: an icosahedron, no poles)
-        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.004, subdivisions=0, location=P((r + 0.004) * math.cos(a), y + dy, (r + 0.004) * math.sin(a)))
-        fin(active(), f"RiceRivet{int(y * 100)}{dy > 0}", M["rivet"], body)
 # (the ears: a block of the wood either side, a hole through it, a loop of cord)
 for sd in (-1, 1):
     bpy.ops.mesh.primitive_cube_add(size=1, location=P(sd * (R1 + 0.02), 0.355, 0))
     e = active(); e.scale = (0.045, 0.05, 0.05)
     bpy.ops.object.transform_apply(scale=True)
-    m_ = e.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 2
+    m_ = e.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 1
     bpy.context.view_layer.objects.active = e
     bpy.ops.object.modifier_apply(modifier="b")
     fin(e, f"RiceEar{sd}", M["saw"][0], body)
     bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.0045, major_segments=10, minor_segments=4, location=P(sd * (R1 + 0.04), 0.36, 0), rotation=(math.pi / 2, 0, 0))
     fin(active(), f"RiceCord{sd}", M["cord"], body)
 # (the rim's lip, eased)
-bpy.ops.mesh.primitive_torus_add(major_radius=R1 - 0.005, minor_radius=0.008, major_segments=24, minor_segments=4, location=P(0, H - 0.002, 0))
+bpy.ops.mesh.primitive_torus_add(major_radius=R1 - 0.007, minor_radius=0.008, major_segments=24, minor_segments=3, location=P(0, H - 0.002, 0))
 fin(active(), "RiceRim", M["saw"][1], body)
 
 # ---- the lid: its origin at its underside
 bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.285, depth=0.032, location=P(0, 0.016, 0))
 lid = active()
-m_ = lid.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 2
+m_ = lid.modifiers.new("b", "BEVEL"); m_.width = 0.008; m_.segments = 1
 bpy.context.view_layer.objects.active = lid
 bpy.ops.object.modifier_apply(modifier="b")
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")

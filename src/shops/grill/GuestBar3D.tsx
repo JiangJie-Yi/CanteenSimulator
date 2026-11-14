@@ -5744,11 +5744,66 @@ const WARM_BAND_GEO = new THREE.BoxGeometry(0.03, 0.058, 0.128)
 const WARM_PACK_MAT = new THREE.MeshToonMaterial({ color: '#c79d66' })
 const WARM_BAND_MAT = new THREE.MeshToonMaterial({ color: '#b3362c' })
 const WARM_PACKS: [number, number, number][] = Array.from({ length: WARM_TUB_HOLDS }, (_, i) => [(i % 2 ? 1 : -1) * 0.094, 0.028 + 0.0275 + Math.floor(i / 2) * 0.057, (i % 4 < 2 ? 1 : -1) * 0.01])
+/** what keeps them warm in it, as a shop does (item 80, the owner's, 2026-11-13: "put some real warming things in it"): a silver insulating
+ * liner (保温シート) inside the wall, its top folded out over the rim; and a cotton tenugui laid over the packs, riding on the topmost layer. The
+ * tub's own units (blender/ricetub.py: the wall 0.255 round at its foot, 0.27 at its rim, 0.42 tall); drawn from the start, as the tub is */
+const LINER_GEO = new THREE.LatheGeometry([[0.236, 0.03], [0.25, 0.4], [0.252, 0.425], [0.268, 0.43], [0.281, 0.418], [0.284, 0.385]]
+  .map(([r, y]) => new THREE.Vector2(r, y)), 16)
+const crinkle = (paint: (g: CanvasRenderingContext2D, w: number) => void) => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  paint(g, 128)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+}
+// (the liner's foil: silver, crumpled into facets catching the light one way and another)
+const LINER_TEX = crinkle((g, w) => {
+  let seed = 7
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+  g.fillStyle = '#b9bdc2'
+  g.fillRect(0, 0, w, w)
+  for (let i = 0; i < 160; i++) {
+    const x = rnd() * w, y = rnd() * w, r = 6 + rnd() * 16, v = 150 + Math.floor(rnd() * 100)
+    g.fillStyle = `rgb(${v},${v + 3},${v + 8})`
+    g.beginPath()
+    g.moveTo(x, y); g.lineTo(x + r, y + rnd() * r * 0.6); g.lineTo(x + rnd() * r * 0.4, y + r)
+    g.closePath(); g.fill()
+  }
+})
+if (LINER_TEX) LINER_TEX.repeat.set(6, 3)
+const LINER_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: LINER_TEX, side: THREE.DoubleSide })
+// (the tenugui: cotton, indigo stripes across it, its ends a little frayed)
+const TENUGUI_TEX = crinkle((g, w) => {
+  g.fillStyle = '#efe9dc'
+  g.fillRect(0, 0, w, w)
+  g.fillStyle = '#2d4f86'
+  for (let i = 0; i < 6; i++) g.fillRect(0, 8 + i * 21, w, 7)
+  g.fillStyle = '#7d95bd'
+  for (let i = 0; i < 6; i++) g.fillRect(0, 17 + i * 21, w, 2)
+})
+const TENUGUI_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: TENUGUI_TEX, side: THREE.DoubleSide })
+/** the tenugui's cloth: a little over the packs' two-wide layer, its edges drooping over them */
+const TENUGUI_GEO = (() => {
+  const g = new THREE.PlaneGeometry(0.42, 0.3, 8, 6).rotateX(-Math.PI / 2)
+  const p = g.attributes.position
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i)
+    const ex = Math.max(0, Math.abs(x) - 0.17) / 0.04, ez = Math.max(0, Math.abs(z) - 0.06) / 0.09
+    p.setY(i, -0.05 * Math.min(1, ex * ex + ez * ez) + 0.004 * Math.sin(x * 50 + z * 30))
+  }
+  g.computeVertexNormals()
+  return g
+})()
 const WarmTub = memo(function WarmTub() {
   const tub = useRiceTub()
   const [open, setOpen] = useState(false)
   const lid = useRef<THREE.Group>(null)
   const packs = useRef<(THREE.Group | null)[]>([])
+  const cloth = useRef<THREE.Mesh>(null)
   const lidT = useRef(0)
   const says = () => {
     const n = keptWarm(TAKEOUT.orders)
@@ -5763,12 +5818,20 @@ const WarmTub = memo(function WarmTub() {
     }
     const n = keptWarm(TAKEOUT.orders)
     packs.current.forEach((g, i) => { if (g) g.scale.setScalar(i < n ? 1 : 0.0001) })
+    // (the cloth over the topmost layer; with none in the tub, folded small on its floor)
+    if (cloth.current) {
+      const layers = Math.ceil(n / 2)
+      cloth.current.position.y = layers ? 0.028 + layers * 0.057 + 0.004 : 0.034
+      cloth.current.scale.setScalar(layers ? 1 : 0.55)
+    }
   })
   return (
     <group scale={WARM_TUB_SCALE}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setOpen((v) => !v) }}
       onPointerOver={(e) => nameOver('保溫桶', says()).onPointerOver(e)} onPointerOut={() => nameOver('保溫桶', '').onPointerOut()}>
       <primitive object={tub.body} />
+      <mesh geometry={LINER_GEO} material={LINER_MAT} receiveShadow />
+      <mesh ref={cloth} geometry={TENUGUI_GEO} material={TENUGUI_MAT} position={[0, 0.034, 0.005]} rotation-y={0.12} castShadow receiveShadow />
       {WARM_PACKS.map((at, i) => (
         <group key={i} ref={(g) => { packs.current[i] = g }} position={at} scale={0.0001}>
           <mesh geometry={WARM_PACK_GEO} material={WARM_PACK_MAT} castShadow />
