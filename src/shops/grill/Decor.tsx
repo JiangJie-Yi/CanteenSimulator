@@ -8,7 +8,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type React
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { plainColours, StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
+import { homeCopy, plainColours, StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
@@ -1465,7 +1465,21 @@ function SakeStand() {
     s.position.copy(mouth)
     s.scale.set(1, Math.max(0.0001, mouth.y - to.y), 1)
   }
+  // (the eight sake bottles drawn as one while none of them is moving (item 135: the stand was 73 draws, each bottle its glass, its sake,
+  // its label and its line): a copy of them made as they come to rest, with their levels as they are then; let go as one's taken up)
+  const homeAt = useRef<ReturnType<typeof homeCopy> | null>(null)
+  const sakeNodes = useMemo(() => bottles.filter((b) => !b.shochu).map((b) => b.node), [bottles])
+  const dropHome = () => {
+    homeAt.current?.home(false)
+    homeAt.current = null
+    const old = obj.children.find((c) => c.name === 'home-copy')
+    if (old) { old.removeFromParent(); old.traverse((m) => { if ((m as THREE.Mesh).isMesh) (m as THREE.Mesh).geometry.dispose() }) }
+  }
+  useEffect(() => dropHome, [obj])
   useFrame((_, dt) => {
+    const still = !drag.current && !act.current
+    if (!still && homeAt.current) dropHome()
+    else if (still && !homeAt.current) { homeAt.current = homeCopy(obj, sakeNodes); homeAt.current.home(true) }
     const d = drag.current
     if (d) {
       const b = bottles[d.b]
