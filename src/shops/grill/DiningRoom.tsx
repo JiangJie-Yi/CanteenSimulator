@@ -53,6 +53,13 @@ function skyNow(): Sky {
  * it's being worked on): left behind, each kept redrawing the old copy's pictures at every turn of the day, a few more with every edit */
 const UNDO: (() => void)[] = []
 replaces(import.meta.hot, () => { for (const f of UNDO.splice(0)) f() })
+/** pictures with words in them redrawn when the page's language is changed (the fridges' name cards, item 91) */
+const ON_LANG = new Set<() => void>()
+if (typeof document !== 'undefined') {
+  const o = new MutationObserver(() => { for (const f of ON_LANG) f() })
+  o.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
+  UNDO.push(() => o.disconnect())
+}
 /** watch the page for the part of the day turning (either of its two marks) */
 const onSky = (f: () => void) => {
   const o = new MutationObserver(f)
@@ -5269,10 +5276,11 @@ const FRIDGE_LED = (() => {
   if (t) t.flipY = false
   return t
 })()
-/** each shelf's lip (the owner's: no price tags, a convenience store's): brushed steel, and in its middle a small black plaque edged in gold
- * naming what the shelf keeps (a quarter of the picture to a shelf, the lowest at the top) */
+/** each shelf's lip: brushed steel, and under each drink a small card with its name and its price, in the page's language, redrawn when it's
+ * changed (the owner's, 2026-11-14, item 91: "the fridge's names with their prices, the names following the language") (a quarter of the
+ * picture to a shelf, the lowest at the top) */
 const fridgeTagTex = (n: number) => {
-  const t = canvasTex(1024, 256, (g) => {
+  const draw = (g: CanvasRenderingContext2D) => {
     for (let k = 0; k < 4; k++) {
       const y0 = k * 64
       const st = g.createLinearGradient(0, y0, 0, y0 + 64)
@@ -5281,7 +5289,7 @@ const fridgeTagTex = (n: number) => {
       g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1
       for (let y = y0 + 3; y < y0 + 62; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(1024, y + 0.5); g.stroke() }
       // (under each place, the name of what's kept there on a small white card, as clear as can be read through the glass (the owner's,
-      // 2026-11-11: the names marked clearly; no prices, the owner's before), a strip of the drink's own colour along its top; the shelf's
+      // 2026-11-11: the names marked clearly), its price under it (item 91), a strip of the drink's own colour along its top; the shelf's
       // name on a plaque in the middle before it is gone: the cards say it all). The strip's picture runs the lip's length, 0.742 (blender/
       // drinkfridge.py: inside the baffles), its middle the shelf's
       const shelf = FRIDGE_UNITS[n]?.shelves[k]
@@ -5299,16 +5307,29 @@ const fridgeTagTex = (n: number) => {
         g.fillStyle = '#fbf8f0'; g.fillRect(cx - w / 2, y0 + 8, w, 48)
         g.fillStyle = d?.label[0] ?? '#888'; g.fillRect(cx - w / 2, y0 + 8, w, 7)
         g.strokeStyle = '#3a3530'; g.lineWidth = 1.2; g.strokeRect(cx - w / 2 + 0.5, y0 + 8.5, w - 1, 47)
-        const name = drinkName(id)
-        g.font = '700 26px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif'
-        const size = Math.max(12, Math.min(26, (26 * (w - 8)) / Math.max(1, g.measureText(name).width)))
-        g.font = `700 ${size}px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif`
-        g.fillStyle = '#1d1a16'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, cx, y0 + 36)
+        const name = drinkName(id), price = `NT$${d?.price ?? 0}`
+        const FONT = '"Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", sans-serif'
+        // (the name on one line, shrunk to the card's width; the price under it in red, smaller)
+        g.font = `700 22px ${FONT}`
+        const size = Math.max(10, Math.min(22, (22 * (w - 8)) / Math.max(1, g.measureText(name).width)))
+        g.font = `700 ${size}px ${FONT}`
+        g.fillStyle = '#1d1a16'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, cx, y0 + 29)
+        g.font = `700 15px ${FONT}`
+        const ps = Math.max(9, Math.min(15, (15 * (w - 8)) / Math.max(1, g.measureText(price).width)))
+        g.font = `700 ${ps}px ${FONT}`
+        g.fillStyle = '#b8261c'; g.fillText(price, cx, y0 + 47)
       })
     }
-  })
-  if (t) t.flipY = false
-  if (t) t.anisotropy = 4
+  }
+  const t = canvasTex(1024, 256, draw)
+  if (t) {
+    t.flipY = false
+    t.anisotropy = 4
+    // (drawn again in the new language when it's changed; let go with the picture)
+    const again = () => { const c = t.image as HTMLCanvasElement; draw(c.getContext('2d')!); t.needsUpdate = true }
+    ON_LANG.add(again)
+    t.addEventListener('dispose', () => ON_LANG.delete(again))
+  }
   return t
 }
 const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; doors: THREE.Group[]; home: ReturnType<typeof homeCopy> }>()
