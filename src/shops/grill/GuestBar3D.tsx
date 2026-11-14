@@ -3096,6 +3096,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const counterSpot = useRef<{ at: THREE.Vector3; t: number } | null>(null)
   /** each sink plate's group, the bottom one first (its smear faded as it soaks) */
   const sinkPlates = useRef<(THREE.Group | null)[]>([])
+  /** when the sink's plates were last put where the sink is (item 113) */
+  const sinkPlaced = useRef(0)
   const wash = useRef<number | null>(null)
   /** customers sat down waiting for a plate: the racks were bare (they're being washed) */
   const waiting = useRef<{ seat: number; guest: number }[]>([])
@@ -5322,6 +5324,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     PILE.n = pileLeft(PILE.n, dirty.current)
     // (the counter's stack only ever the bottom of the dirty plates: those washed off the top come from the basin first, then from it)
     if (onCounter.current > dirty.current) onCounter.current = dirty.current
+    // (the sink's plates put where the sink is now, once a second (item 113, the owner's, 2026-11-14: six dirty plates stood by the lantern on
+    // the cook table before the shop had opened: drawn before the sink's model was in, its marks not found, they took the bar's end, and
+    // nothing redrew them till the shop opened); moved in edit mode, they follow it too)
+    {
+      const now = performance.now()
+      if (now - sinkPlaced.current > 1000) {
+        sinkPlaced.current = now
+        const n = Math.min(dirty.current, SINK_SHOWN)
+        for (let i = 0; i < n; i++) sinkPlates.current[i]?.position.copy(dirtyAt(i))
+      }
+    }
     // (the sink's plates, each as dirty as it came: as many as there are (any come by another way counted dirty as the first dish leaves one;
     // those washed off the top gone); under water each comes clean a little at a time, the top one under the running tap the faster, and
     // rinsed by it with no water standing (game/plates' soakStep); their smears faded with it)
