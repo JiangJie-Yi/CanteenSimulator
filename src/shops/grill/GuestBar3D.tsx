@@ -148,7 +148,8 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     o.rotation.z = moving ? Math.sin(t * 9) * 0.05 : 0
     o.position.y = moving ? Math.abs(Math.sin(t * 9)) * 0.014 : 0
     // (sweeping up broken glass, or the broom carried: the tray put by)
-    if (tray.current) tray.current.visible = !o.parent?.userData.broom && o.parent?.userData.scrub === undefined
+    // (nor while he's down sweeping or wiping the floor (item 116: the tray showed in his hands as he wiped, a black disc on the floor))
+    if (tray.current) tray.current.visible = !o.parent?.userData.broom && o.parent?.userData.scrub === undefined && o.parent?.userData.sweep === undefined
     // (sweeping: both his hands on the broom's handle, going with it from side to side, as a server's are (the owner's, 2026-11-11: his hands
     // stood still at his sides while the broom swept); back where they rest after)
     if (!hands.current) {

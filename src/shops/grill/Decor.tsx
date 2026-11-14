@@ -1283,20 +1283,36 @@ useGLTF.preload(SAKESTAND_URL)
 const SAKESTAND_AT: [number, number, number] = [-0.88, 0, -1.41]
 const SAKESTAND_TURN = 3.75
 const SAKESTAND_SCALE = 2.0
+const SHOCHU_URL = import.meta.env.BASE_URL + 'models/shochu.glb'
+useGLTF.preload(SHOCHU_URL)
+/** the shochu's tray beside the stand, in the stand's frame: right of it, between it and the lantern (item 107, measured clear of both) */
+const SHOCHU_AT = new THREE.Vector3(0.45, 0, 0)
+/** the tokkuri, set on the stand's front step at its right-hand end, at the bottles' own size (item 107: it stood at half their size down
+ * on the table under where a tipped bottle's mouth came, the stream long and the jug tiny) */
+const JUG_AT = new THREE.Vector3(0.25, 0.045, 0.07)
+/** how long a pour into a cup or the tokkuri takes, held over it (s); how high a bottle's carried, its foot over the table (the stand's
+ * frame); how far it's tipped to pour; a cup's pours out of a bottle of shochu */
+const POUR_S = 1.2
+const CARRY_Y = 0.16
+const TIP_MAX = 1.9
+const SHOCHU_CUPS = 8
+/** the shochu left in its bottle (1 full); a new one put out when it's empty */
+const SHOCHU_LEVEL = { v: 1 }
 function SakeStand() {
   useStudio()
   const gltf = useGLTF(SAKESTAND_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => {
-    const r = (gltf.scene.getObjectByName('SakeStand') ?? gltf.scene).clone(true)
-    r.position.set(0, 0, 0)
-    const made = new Map<THREE.Material, THREE.Material>()
+  const sho = useGLTF(SHOCHU_URL) as unknown as { scene: THREE.Group }
+  const { camera, gl } = useThree()
+  const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
+  /** glass, the drink in it, and the rest, as the stand's own materials are made (shared by the sake and the shochu) */
+  const dress = (r: THREE.Object3D, made: Map<THREE.Material, THREE.Material>) => {
     r.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
       if (!t) {
-        if (/SakeBottles/.test(src.name)) {
+        if (/SakeBottles|ShochuLabel/.test(src.name)) {
           // (the labels, the shoulder labels and the caps: paper and foil, opaque, a soft sheen)
           const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, roughness: 0.42, metalness: 0.02, envMapIntensity: 0.6, side: THREE.DoubleSide })
           reflectStudio(g)
@@ -1320,116 +1336,283 @@ function SakeStand() {
           g.customProgramCacheKey = () => 'sake-glass'
           reflectStudio(g)
           t = g
-        } else if (/SakeLiquid/.test(src.name)) {
-          // (the sake: near clear, a pale straw gold, its top catching the light)
-          // (not bright: the glass already carries the light; its part of the bottle only a little richer, its level a line)
-          const g = new THREE.MeshStandardMaterial({ color: '#b89a52', transparent: true, opacity: 0.32, depthWrite: false, roughness: 0.04 })
+        } else if (/ShochuGlass|ShochuCupGlass/.test(src.name)) {
+          // (the shochu's green glass and the shot glasses: see-through, shining, a little lit by their own colour; no transmission)
+          const green = /ShochuGlass/.test(src.name)
+          const g = new THREE.MeshStandardMaterial({ color: green ? '#3f9a5e' : '#eef6f6', transparent: true, opacity: green ? 0.62 : 0.3,
+            depthWrite: false, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.5, emissive: green ? '#1f5a34' : '#3a4444' })
+          reflectStudio(g)
+          t = g
+        } else if (/SakeLiquid|ShochuLiquid/.test(src.name)) {
+          // (the drink: near clear, sake a pale straw gold, shochu clearer still; its top catching the light)
+          const g = new THREE.MeshStandardMaterial({ color: /Shochu/.test(src.name) ? '#e6efe4' : '#b89a52', transparent: true,
+            opacity: /Shochu/.test(src.name) ? 0.42 : 0.32, depthWrite: false, roughness: 0.04 })
+          reflectStudio(g)
+          t = g
+        } else if (/ShochuCap/.test(src.name)) {
+          const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.9, roughness: 0.3 })
           reflectStudio(g)
           t = g
         } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
         made.set(src, t)
       }
       m.material = t
-      const see = /SakeGlass|SakeLiquid/.test(src.name)
-      // (the sake drawn before its glass, the glass over it)
-      if (see) m.renderOrder = /SakeLiquid/.test(src.name) ? 1 : 2
+      const see = /Glass|Liquid/.test(src.name)
+      // (the drink drawn before its glass, the glass over it)
+      if (see) m.renderOrder = /Liquid/.test(src.name) ? 1 : 2
       m.castShadow = !see
       m.receiveShadow = !see
     })
-    // (no ink round the sake inside: its outline would show through the glass)
-    inkModel(r, (m) => /SakeLiquid/.test((m.material as THREE.Material).name) || /SakeLiquid/.test(m.name), { width: 0.0012, weld: true })
+    // (no ink round the drink inside: its outline would show through the glass)
+    inkModel(r, (m) => /Liquid/.test((m.material as THREE.Material).name) || /Liquid/.test(m.name), { width: 0.0012, weld: true })
+  }
+  const obj = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('SakeStand') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    dress(r, new Map())
     // (the stand merged; each bottle kept its own, to be lifted and poured (item 89))
     mergeByMaterial(r, (o) => /^SakeBottle\d$/.test(o.name))
     return r
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gltf])
-  // (each bottle: where it stands and how it's turned, how tall, its sake inside)
-  const bottles = useMemo(() => Array.from({ length: 5 }, (_, k) => {
-    const node = obj.getObjectByName(`SakeBottle${k}`)!
-    const box = new THREE.Box3().setFromObject(node)
-    return { node, pos: node.position.clone(), q: node.quaternion.clone(), h: box.max.y - box.min.y - 0.0005, liquid: node.getObjectByName(`SakeLiquid${k}`) ?? null }
-  }), [obj])
+  const shochu = useMemo(() => {
+    const r = (sho.scene.getObjectByName('ShochuSet') ?? sho.scene).clone(true)
+    r.position.copy(SHOCHU_AT)
+    dress(r, new Map())
+    // (the tray merged; the bottle and the glasses each their own, the bottle to be carried, the glasses to be filled)
+    mergeByMaterial(r, (o) => /^Shochu(Bottle|Cup\d)$/.test(o.name))
+    return r
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sho])
+  // (every bottle, the five sake and the shochu: where it stands and how it's turned in its own parent, that parent's place in the stand,
+  // how tall, the drink inside)
+  const bottles = useMemo(() => {
+    const one = (node: THREE.Object3D, liquid: THREE.Object3D | null, off: THREE.Vector3, shochu_: boolean) => {
+      const box = new THREE.Box3().setFromObject(node)
+      const s = node.parent?.getWorldScale(new THREE.Vector3()).y || 1
+      return { node, pos: node.position.clone(), q: node.quaternion.clone(), h: (box.max.y - box.min.y) / s - 0.0005, liquid, off, shochu: shochu_ }
+    }
+    const list = Array.from({ length: 5 }, (_, k) => one(obj.getObjectByName(`SakeBottle${k}`)!, obj.getObjectByName(`SakeLiquid${k}`) ?? null, new THREE.Vector3(), false))
+    const sb = shochu.getObjectByName('ShochuBottle')
+    if (sb) list.push(one(sb, shochu.getObjectByName('ShochuLiquid') ?? null, SHOCHU_AT.clone(), true))
+    return list
+  }, [obj, shochu])
+  /** where each can be poured into, in the stand's frame (its lip's middle) and how near its middle the bottle's mouth must come: the
+   * tokkuri, then the three glasses */
+  const targets = useMemo(() => {
+    const t = [{ top: JUG_AT.clone().add(new THREE.Vector3(0, TOKKURI_H, 0)), r: 0.07, cup: -1, liquid: null as THREE.Object3D | null }]
+    for (let k = 0; k < 3; k++) {
+      const c = shochu.getObjectByName(`ShochuCup${k}`)
+      if (c) t.push({ top: SHOCHU_AT.clone().add(c.position).add(new THREE.Vector3(0, 0.05, 0)), r: 0.045, cup: k, liquid: shochu.getObjectByName(`ShochuCupLiquid${k}`) ?? null })
+    }
+    return t
+  }, [shochu])
+  /** what's full of what's been poured: the tokkuri (till it's taken to a customer, or emptied), and each glass (till it's clicked empty) */
+  const full = useRef<boolean[]>([false, false, false, false])
   const stream = useRef<THREE.Mesh>(null)
-  const jug = useRef<THREE.Group>(null)
-  /** the pour being drawn: which bottle, since when, its level from and to, whether a new one's opened after it */
+  const group = useRef<THREE.Group>(null)
+  /** the third cook's pour being drawn: which bottle, since when, its level from and to, whether a new one's opened after it */
   const act = useRef<{ k: number; t: number; from: number; to: number; opened: boolean } | null>(null)
+  /**
+   * The player's pour by hand (item 107, the owner's, 2026-11-14: "not poured like that: the pointer turns into a hand and drags it"): the
+   * bottle taken up and carried at `aim` (its foot, the stand's frame); over the tokkuri or a glass not yet full it tips and pours, POUR_S
+   * to fill it; let go, it goes back to its place
+   */
+  const drag = useRef<{ b: number; aim: THREE.Vector3; ray: THREE.Ray | null; tip: number; over: number; t: number; back: number; from: THREE.Vector3; fromQ: THREE.Quaternion } | null>(null)
   const seen = useRef(SAKE.pours)
-  useEffect(() => { bottles.forEach((b, k) => { if (b.liquid) b.liquid.scale.y = Math.max(0.02, SAKE.levels[k]) }) }, [bottles])
+  useEffect(() => { bottles.forEach((b, k) => { if (b.liquid) b.liquid.scale.y = Math.max(0.02, b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[k]) }) }, [bottles])
+  useEffect(() => { targets.forEach((t) => { if (t.liquid) t.liquid.scale.y = 0.001 }) }, [targets])
+  const TIP_Q = useMemo(() => new THREE.Quaternion(), [])
+  /** a bottle posed: tipped by `tip` (0 upright .. 1 right over), its mouth where `mouth` is (or, upright, its foot at `foot`) */
+  const pose = (b: (typeof bottles)[number], tip: number, foot: THREE.Vector3, mouth: THREE.Vector3 | null) => {
+    const q = b.q.clone().multiply(TIP_Q.setFromAxisAngle(X_AXIS, TIP_MAX * tip))
+    const m = new THREE.Vector3(0, b.h, 0).applyQuaternion(q)
+    const at = mouth ? foot.clone().lerp(mouth.clone().sub(m), tip) : foot.clone()
+    b.node.quaternion.copy(q)
+    b.node.position.copy(at).sub(b.off)
+    return at.add(m)
+  }
+  const showStream = (mouth: THREE.Vector3 | null, to: THREE.Vector3 | null) => {
+    const s = stream.current
+    if (!s) return
+    if (!mouth || !to) { s.scale.set(1, 0.0001, 1); return }
+    s.position.copy(mouth)
+    s.scale.set(1, Math.max(0.0001, mouth.y - to.y), 1)
+  }
   useFrame((_, dt) => {
-    // (a pour asked for (a click, or a customer's tokkuri: Roasting), the last one drawn through first)
+    const d = drag.current
+    if (d) {
+      const b = bottles[d.b]
+      if (d.back >= 0) {
+        // (let go: back to its place, set down upright)
+        d.back = Math.min(1, d.back + Math.min(dt, 0.05) / 0.3)
+        const k = d.back * d.back * (3 - 2 * d.back)
+        b.node.position.lerpVectors(d.from, b.pos, k)
+        b.node.quaternion.slerpQuaternions(d.fromQ, b.q, k)
+        showStream(null, null)
+        if (d.back >= 1) drag.current = null
+        return
+      }
+      // (over the tokkuri (sake only) or a glass not yet full: tipped and poured, the drink in it rising; done, it's full)
+      let over = -1, best = Infinity
+      targets.forEach((t, i) => {
+        if (full.current[i] || (t.cup < 0 && b.shochu)) return
+        // (judged by how near the pointer's ray passes the lip, not where it meets the carrying height: looked at from the side, that was
+        // well off the lip of a low glass)
+        const dd = d.ray ? d.ray.distanceToPoint(t.top) : Math.hypot(d.aim.x - t.top.x, d.aim.z - t.top.z)
+        if (dd < t.r * 1.4 && dd < best) { best = dd; over = i }
+      })
+      if (over !== d.over) { d.over = over; d.t = 0 }
+      d.tip += ((over >= 0 ? 1 : 0) - d.tip) * Math.min(1, dt * 6)
+      const tg = over >= 0 ? targets[over] : null
+      const mouth = pose(b, d.tip, d.aim, tg ? tg.top.clone().add(new THREE.Vector3(0, 0.03, 0)) : null)
+      const pouring = !!tg && d.tip > 0.85
+      showStream(pouring ? mouth : null, pouring ? tg!.top.clone().add(new THREE.Vector3(0, -0.02, 0)) : null)
+      if (pouring) {
+        d.t += Math.min(dt, 0.05)
+        if (tg!.liquid) tg!.liquid.scale.y = Math.max(0.001, Math.min(1, d.t / POUR_S))
+        if (b.liquid) b.liquid.scale.y = Math.max(0.02, (b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[d.b]) - (d.t / POUR_S) * (b.shochu ? 1 / SHOCHU_CUPS : 0.1))
+        if (d.t >= POUR_S) {
+          full.current[over] = true
+          if (b.shochu) SHOCHU_LEVEL.v = SHOCHU_LEVEL.v - 1 / SHOCHU_CUPS > 0.01 ? SHOCHU_LEVEL.v - 1 / SHOCHU_CUPS : 1
+          else {
+            const r = pour(SAKE.levels, d.b)
+            SAKE.levels = r.levels
+          }
+          if (b.liquid) b.liquid.scale.y = Math.max(0.02, b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[d.b])
+          // (the tokkuri poured for a customer waiting on one: theirs, taken to their place (Roasting), and it's empty again)
+          if (tg!.cup < 0 && SAKE.want.length) { SAKE.ready.add(SAKE.want.shift()!); full.current[over] = false }
+          d.over = -1; d.t = 0
+        }
+      }
+      return
+    }
+    // (a pour asked for by the third cook (Roasting, GuestBar3D), the last one drawn through first)
     if (SAKE.pours !== seen.current && !act.current) {
       seen.current = SAKE.pours
       const k = SAKE.from, now = SAKE.levels[k]
       act.current = { k, t: 0, from: SAKE.was, to: now >= 1 - 1e-6 && SAKE.was < 1 ? 0 : now, opened: now >= 1 - 1e-6 && SAKE.was < 1 }
     }
     const a = act.current
-    const s = stream.current, j = jug.current
-    if (!a) { if (s) s.scale.set(1, 0.0001, 1); if (j) j.visible = false; return }
+    if (!a) { showStream(null, null); return }
     a.t += Math.min(dt, 0.05)
     const b = bottles[a.k]
-    // (taken straight up, clear of the bottles in front; brought out past the stand's front toward the bar and tipped there over the tokkuri
-    // set on the table, held as it pours; tipped back, taken back and set down: 2.6 s)
+    // (taken up and over to the tokkuri on the step, tipped right over it, held as it pours; tipped back and set down: 2.6 s)
     const ease = (x: number) => x * x * (3 - 2 * x)
-    const up = a.t < T_LIFT ? ease(a.t / T_LIFT) : a.t < T_DOWN ? 1 : a.t < T_OUT ? 1 - ease((a.t - T_DOWN) / (T_OUT - T_DOWN)) : 0
-    const k = a.t < T_LIFT ? 0 : a.t < T_IN ? ease((a.t - T_LIFT) / (T_IN - T_LIFT)) : a.t < T_POUR ? 1 : a.t < T_DOWN ? 1 - ease((a.t - T_POUR) / (T_DOWN - T_POUR)) : 0
-    const c = b.h * 0.45
-    const at = (up_: number, k_: number) => {
-      const q_ = b.q.clone().multiply(new THREE.Quaternion().setFromAxisAngle(X_AXIS, TIP * k_))
-      const pivot = new THREE.Vector3(0, c, 0)
-      const pos = b.pos.clone().add(new THREE.Vector3(0, LIFT * up_, 0)).add(new THREE.Vector3(0, 0, OUT * k_).applyQuaternion(b.q))
-        .add(pivot.clone().applyQuaternion(b.q)).sub(pivot.applyQuaternion(q_))
-      return { q: q_, pos, mouth: new THREE.Vector3(0, b.h, 0).applyQuaternion(q_).add(pos) }
-    }
-    const now = at(up, k)
-    b.node.quaternion.copy(now.q)
-    b.node.position.copy(now.pos)
-    // (its sake going down as it pours; a finished one stood back up full, a new bottle)
+    const k = a.t < T_LIFT ? ease(a.t / T_LIFT) * 0.3 : a.t < T_IN ? 0.3 + 0.7 * ease((a.t - T_LIFT) / (T_IN - T_LIFT)) : a.t < T_POUR ? 1
+      : a.t < T_OUT ? 1 - ease((a.t - T_POUR) / (T_OUT - T_POUR)) : 0
+    const lifted = b.pos.clone().add(b.off).add(new THREE.Vector3(0, Math.min(1, k * 3) * 0.06, 0))
+    const jug = targets[0].top
+    const mouth = pose(b, k, lifted, jug.clone().add(new THREE.Vector3(0, 0.03, 0)))
+    // (carried up over the others on its way, not through them: an arc that's down again as it's over the tokkuri)
+    const arc = k < 1 ? Math.sin(Math.PI * k) * ARC_H : 0
+    b.node.position.y += arc
+    mouth.y += arc
     const p = a.t < T_IN ? 0 : Math.min(1, (a.t - T_IN) / (T_POUR - T_IN))
     if (b.liquid) b.liquid.scale.y = Math.max(0.02, a.t >= T_OUT && a.opened ? 1 : a.from + (a.to - a.from) * p)
-    // (the stream from its mouth down into the tokkuri set on the table under where its mouth comes to, while it's tipped right over)
-    const mouth = now.mouth
-    if (j) {
-      const full = at(1, 1).mouth
-      j.visible = a.t < T_OUT
-      j.position.set(full.x, 0, full.z)
-    }
-    if (s) {
-      const on = a.t > T_IN - 0.08 && a.t < T_POUR + 0.05
-      const len = Math.max(0.0001, mouth.y - JUG_TOP)
-      s.position.copy(mouth)
-      s.scale.set(1, on ? len : 0.0001, 1)
-    }
+    showStream(a.t > T_IN - 0.05 && a.t < T_POUR + 0.05 ? mouth : null, jug.clone().add(new THREE.Vector3(0, -0.02, 0)))
     if (a.t >= T_OUT) {
       b.node.position.copy(b.pos); b.node.quaternion.copy(b.q)
       if (b.liquid) b.liquid.scale.y = Math.max(0.02, SAKE.levels[a.k])
       act.current = null
     }
   })
-  // (a click on a bottle pours a tokkuri from it (not while the editor's open, nor while one's pouring))
-  const onClick = (e: { stopPropagation: () => void; object: THREE.Object3D }) => {
-    if (getEdit().on || act.current) return
-    let k = -1
-    for (let o: THREE.Object3D | null = e.object; o && k < 0; o = o.parent) { const m = /^SakeBottle(\d)$/.exec(o.name); if (m) k = +m[1] }
-    if (k < 0) return
+  /** which bottle a pointer's on (its node up the tree), or -1 */
+  const bottleOf = (o: THREE.Object3D | null) => {
+    for (let q = o; q; q = q.parent) {
+      const m = /^SakeBottle(\d)$/.exec(q.name)
+      if (m) return +m[1]
+      if (q.name === 'ShochuBottle') return 5
+    }
+    return -1
+  }
+  const RAY = useMemo(() => new THREE.Raycaster(), [])
+  const aimAt = (x: number, y: number, out: THREE.Vector3) => {
+    const g = group.current
+    if (!g) return false
+    const rect = gl.domElement.getBoundingClientRect()
+    RAY.setFromCamera(new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1), camera)
+    g.updateWorldMatrix(true, false)
+    const h = g.localToWorld(new THREE.Vector3(0, CARRY_Y, 0)).y
+    const hit = RAY.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -h), new THREE.Vector3())
+    if (!hit) return false
+    out.copy(g.worldToLocal(hit))
+    const d = drag.current
+    if (d) {
+      const o = g.worldToLocal(RAY.ray.origin.clone())
+      d.ray = new THREE.Ray(o, g.worldToLocal(RAY.ray.origin.clone().add(RAY.ray.direction)).sub(o).normalize())
+    }
+    return true
+  }
+  const onDown = (e: { stopPropagation: () => void; object: THREE.Object3D; nativeEvent: PointerEvent }) => {
+    if (getEdit().on || act.current || drag.current) return
+    const k = bottleOf(e.object)
+    if (k < 0 || !bottles[k]) return
     e.stopPropagation()
-    const r = pour(SAKE.levels, k)
-    SAKE.levels = r.levels; SAKE.from = k; SAKE.was = r.was; SAKE.pours++
+    const b = bottles[k]
+    const aim = b.pos.clone().add(b.off).setY(CARRY_Y)
+    drag.current = { b: k, aim, ray: null, tip: 0, over: -1, t: 0, back: -1, from: new THREE.Vector3(), fromQ: new THREE.Quaternion() }
+    if (controls) controls.enabled = false
+    document.body.style.cursor = 'grabbing'
+    document.body.classList.add('is-carrying')
+    const move = (ev: PointerEvent) => { const d = drag.current; if (d && d.back < 0) aimAt(ev.clientX, ev.clientY, d.aim) }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      const d = drag.current
+      if (d) { d.back = 0; d.from.copy(bottles[d.b].node.position); d.fromQ.copy(bottles[d.b].node.quaternion) }
+      if (controls) controls.enabled = true
+      document.body.style.cursor = ''
+      document.body.classList.remove('is-carrying')
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+  }
+  // (pointed at, a bottle shows the hand that takes it up; a full glass, that it's emptied with a click)
+  const onOver = (e: { stopPropagation: () => void; object: THREE.Object3D }) => {
+    if (getEdit().on || drag.current) return
+    const k = bottleOf(e.object)
+    if (k >= 0) {
+      e.stopPropagation()
+      document.body.style.cursor = 'grab'
+      setTip({ title: k === 5 ? '燒酒' : '清酒', hint: k === 5 ? '按住拖到燒酒杯上方倒酒' : '按住拖到德利或燒酒杯上方倒酒' })
+    }
+  }
+  const onOut = () => { if (!drag.current) { document.body.style.cursor = ''; setTip(null) } }
+  const cupOf = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) { const m = /^ShochuCup(\d)$/.exec(q.name); if (m) return +m[1] } return -1 }
+  const onCupClick = (e: { stopPropagation: () => void; object: THREE.Object3D }) => {
+    const c = cupOf(e.object)
+    if (c < 0 || getEdit().on) return
+    e.stopPropagation()
+    const i = targets.findIndex((t) => t.cup === c)
+    if (i < 0 || !full.current[i]) return
+    full.current[i] = false
+    const l = targets[i].liquid
+    if (l) l.scale.y = 0.001
+    setTip({ title: '燒酒杯', hint: '空的｜拖一支酒到上方倒酒' })
+  }
+  const onCupOver = (e: { stopPropagation: () => void; object: THREE.Object3D }) => {
+    const c = cupOf(e.object)
+    if (c < 0 || getEdit().on || drag.current) return
+    const i = targets.findIndex((t) => t.cup === c)
+    setTip({ title: '燒酒杯', hint: full.current[i] ? '倒滿了｜點一下喝掉' : '空的｜拖一支酒到上方倒酒' })
   }
   return (
-    <group position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '點一支酒倒一壺德利：雪嶺錦、朝霞川、鶴汀、月汀桜')}>
-      <primitive object={obj} onClick={onClick} />
-      {/* (the tokkuri it's poured into, set out under the bottle while it pours; the stand's drawn twice life size, the tokkuri not) */}
-      <group ref={jug} visible={false} scale={1 / SAKESTAND_SCALE}><Tokkuri /></group>
-      <mesh ref={stream} geometry={STREAM_GEO} material={STREAM_MAT} scale={[1, 0.0001, 1]} />
+    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '按住一支酒拖到德利或燒酒杯上方倒酒：雪嶺錦、朝霞川、鶴汀、月汀桜、燒酒')}>
+      <primitive object={obj} onPointerDown={onDown} onPointerOver={onOver} onPointerOut={onOut} />
+      <primitive object={shochu} onPointerDown={onDown} onPointerOver={(e: { stopPropagation: () => void; object: THREE.Object3D }) => { onOver(e); onCupOver(e) }}
+        onPointerOut={onOut} onClick={onCupClick} />
+      {/* (the tokkuri on the front step, poured into by hand or by the third cook (item 107)) */}
+      <group position={JUG_AT}><Tokkuri /></group>
+      <mesh geometry={STREAM_GEO} material={STREAM_MAT} scale={[1, 0.0001, 1]} ref={stream} />
     </group>
   )
 }
 const X_AXIS = new THREE.Vector3(1, 0, 0)
-/** a pour's times (s): lifted by T_LIFT, out and tipped by T_IN, pouring till T_POUR, tipped back by T_DOWN, set down by T_OUT; how high it's
- * lifted (over the front bottles' caps), how far out toward the bar, how far over it's tipped (its mouth down) (the stand's frame) */
-const T_LIFT = 0.35, T_IN = 0.8, T_POUR = 1.9, T_DOWN = 2.3, T_OUT = 2.6
-const LIFT = 0.25, OUT = 0.2, TIP = 1.95
-/** the tokkuri's lip, in the stand's frame (it's drawn at half the stand's scale) */
-const JUG_TOP = TOKKURI_H / SAKESTAND_SCALE
+/** the third cook's pour's times (s): lifted by T_LIFT, over the tokkuri and tipped by T_IN, pouring till T_POUR, back and set down by
+ * T_OUT */
+const T_LIFT = 0.35, T_IN = 0.9, T_POUR = 1.9, T_OUT = 2.6
+/** how high over the others a bottle's carried on its way to the tokkuri and back (the stand's frame) */
+const ARC_H = 0.32
 /** the sake's stream: a thin straw-gold thread, its top at its origin, a unit long downward (scaled to the drop) */
 const STREAM_GEO = new THREE.CylinderGeometry(0.0022, 0.0018, 1, 6, 1, true).translate(0, -0.5, 0)
 const STREAM_MAT = new THREE.MeshStandardMaterial({ color: '#e9dcae', transparent: true, opacity: 0.75, roughness: 0.05, emissive: '#3a3018' })
