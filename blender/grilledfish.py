@@ -1444,7 +1444,10 @@ def fillet(name, length, height, thick, flesh, skin, skin_w=0.012):
     o = active()
     bm = bmesh.new()
     bm.from_mesh(o.data)
-    bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=6, use_grid_fill=True)
+    # (low-poly, item 81 (the owner's, 2026-11-13: "blocky things like the square cod can be far simpler"): two cuts a side, enough for its
+    # taper and its slight curve (six before), its corners eased in one step (three before); the flesh's flakes, its skin and its char are
+    # in its picture)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=2, use_grid_fill=True)
     for v in bm.verts:
         x, y, z = v.co
         zn = (z + 1) / 2                               # 0 belly .. 1 back
@@ -1453,7 +1456,7 @@ def fillet(name, length, height, thick, flesh, skin, skin_w=0.012):
         v.co.z = z * height + 0.04 * height * math.cos(x * 1.6)
     bm.to_mesh(o.data)
     bm.free()
-    bevel(o, min(thick, height) * 0.35, segments=3, angle=False)
+    bevel(o, min(thick, height) * 0.35, segments=1, angle=False)
     planar_uv(o, -length, length, -height, height)
     finish(o, name + "Flesh", M[flesh])
     # the skin, a strip along the back edge
@@ -1461,7 +1464,7 @@ def fillet(name, length, height, thick, flesh, skin, skin_w=0.012):
     s = active()
     s.scale = (length * 0.95, thick * 1.02, skin_w)
     apply_scale(s)
-    bevel(s, skin_w * 0.6, segments=2, angle=False)
+    bevel(s, skin_w * 0.6, segments=1, angle=False)
     finish(s, name + "Skin", M[skin])
     return [o, s]
 
