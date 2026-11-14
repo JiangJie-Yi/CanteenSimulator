@@ -725,6 +725,35 @@ export function dissolveGroup(id: string | null = state.selected) {
   save(); emit()
   toast(T().ungrouped, 'edit')
 }
+/**
+ * A piece dragged in the scene list onto another group (or onto the list's empty space: out of every group) (the owner's, 2026-11-13, item
+ * 69: "objects can be dragged to change group"): taken out of the group it was in and put last in the other; kept where it stood: once the
+ * scene's laid the new groups' moves over it (two frames on), the difference is taken off its own place
+ */
+export function moveIntoGroup(piece: string, target: string | null) {
+  if (!registry.has(piece) || state.groups[piece]) return
+  const home = groupOf(piece)
+  if (home === target || (target && !state.groups[target])) return
+  const before = registry.get(piece)?.center?.() ?? null
+  beginChange()
+  const gs = { ...state.groups }
+  if (home) gs[home] = { ...gs[home], members: gs[home].members.filter((m) => m !== piece) }
+  if (target) gs[target] = { ...gs[target], members: [...gs[target].members, piece] }
+  state.groups = gs
+  state.selected = piece
+  save(); emit()
+  const name = pieceName(registry.get(piece)!.label, lang)
+  toast(target ? T().movedInto(name, pieceName(gs[target].name, lang)) : T().movedOut(name), 'edit')
+  if (!before) return
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const after = registry.get(piece)?.center?.()
+    if (!after) return
+    const d = fromRoom(piece, [before[0] - after[0], before[1] - after[1], before[2] - after[2]])
+    const o = state.offsets[piece] ?? [0, 0, 0]
+    state.offsets = { ...state.offsets, [piece]: [o[0] + d[0], o[1] + d[1], o[2] + d[2]] }
+    save(); emit()
+  }))
+}
 export function renameGroup(id: string, name: string) {
   if (!state.groups[id]) return
   state.groups = { ...state.groups, [id]: { ...state.groups[id], name } }
@@ -1006,6 +1035,8 @@ let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
 let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null
 let rows = new Map<string, HTMLDivElement>()
+/** the piece whose row is being dragged in the scene list (item 69), while it is */
+let dragging: string | null = null
 /** the outliner's two tabs (the scene's pieces, the views' cameras): which one each row is in, the one shown, and the pick it last followed */
 type ListTab = 'scene' | 'camera'
 let rowTab = new Map<string, ListTab>()
@@ -1086,7 +1117,10 @@ const PANEL_CSS = `
 .be-row::before { content:''; position:absolute; left:7px; top:50%; width:6px; height:6px; margin-top:-3px; border:1px solid #e0a030; border-radius:1px }
 .be-row:hover { background:#3a3a3a }
 .be-grow { font-weight:600; color:#ffd37a }
-.be-grow::before { border-radius:50%; }
+.be-grow::before { display:none }
+.be-dot { display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; border:1.5px solid #ffd37a; background:#e0a030; vertical-align:0 }
+.be-row.be-drop { background:#5a4a20; outline:1px dashed #ffd37a }
+.be-list.be-drop { outline:1px dashed #ffd37a }
 .be-fold { display:inline-block; width:14px; margin-left:-4px; color:#bbb; text-align:center; cursor:pointer }
 .be-fold:hover { color:#fff }
 .be-num { display:inline-grid; place-items:center; min-width:15px; height:15px; margin-right:5px; padding:0 3px; border-radius:8px; background:#e0a040; color:#1d1d1d; font:700 10px/1 sans-serif; vertical-align:1px }
@@ -1248,6 +1282,10 @@ function panel() {
     const find = h('input', 'be-find') as HTMLInputElement
     find.placeholder = T().find
     const list = h('div', 'be-list')
+    // (a piece dropped on the list's empty space, not on a group: out of its group)
+    list.ondragover = (e) => { if (dragging && (e.target === list)) { e.preventDefault(); list.classList.add('be-drop') } }
+    list.ondragleave = () => list.classList.remove('be-drop')
+    list.ondrop = (e) => { if (e.target !== list) return; e.preventDefault(); list.classList.remove('be-drop'); if (dragging) moveIntoGroup(dragging, null); dragging = null }
     rows = new Map()
     rowTab = new Map()
     rowUnder = new Map()
@@ -1269,6 +1307,17 @@ function panel() {
           keepOpen(); showRows?.()
         }
         row.appendChild(fold)
+        // (a round dot before every group: a group at a glance (the owner's, item 69))
+        if (kind === 'group') row.appendChild(h('span', 'be-dot'))
+        // (a piece dropped on it is moved into it)
+        row.ondragover = (e) => { if (dragging && dragging !== id) { e.preventDefault(); row.classList.add('be-drop') } }
+        row.ondragleave = () => row.classList.remove('be-drop')
+        row.ondrop = (e) => { e.preventDefault(); e.stopPropagation(); row.classList.remove('be-drop'); if (dragging) moveIntoGroup(dragging, id); dragging = null }
+      } else {
+        // (a piece's row dragged: onto a group's, it goes into that group; onto the list's empty space, out of every group)
+        row.draggable = true
+        row.ondragstart = (e) => { dragging = id; e.dataTransfer?.setData('text/plain', id) }
+        row.ondragend = () => { dragging = null; list.classList.remove('be-drop') }
       }
       const num = kind === 'area' ? VIEW_SPOTS.findIndex((v) => AREA + v.id === id) : -1
       if (num >= 0) row.appendChild(h('b', 'be-num', String(num + 1)))
