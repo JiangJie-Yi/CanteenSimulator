@@ -4645,7 +4645,7 @@ const AURA = canvasTex(128, 128, (g) => {
 })
 /** the cups and their stand set out from where they were worked out: where the owner put them in the edit panel (X −0.015), and back 0.02
  * toward the shrine's steps with the shallower table (TABLE_DEEP) */
-const CUPS_SHIFT = 0.005
+const CUPS_SHIFT = 0.005 + 0.025
 /** the two 三方 stands (the shrine's little tables) and what's on them a size smaller (item 111, the owner's, 2026-11-14: "the shrine's little
  * table smaller"), from their feet */
 const SANBO_SIZE = 0.8
@@ -4665,7 +4665,11 @@ const ALTAR_D = 0.58
 // (its front cut back again (the owner's, 2026-11-11: the table too big), to just before what stands on it: 0.47)
 // (and again (the owner's, 2026-11-13: the empty strip along its front taken away, once what's on it had been set back toward the wall), to
 // 1.5 cm before the front of the cups' stand, the foremost thing on it: 0.39)
-const TABLE_DEEP = 0.39 / ALTAR_D
+// (and again, a little shallower and a little shorter (the owner's, 2026-11-15, item 119), the cups' stand set back 2.5 cm to stay on it, the
+// vases and the book in toward the middle)
+const TABLE_DEEP = 0.36 / ALTAR_D
+/** and shorter along the wall than it was modelled, about its middle */
+const TABLE_LONG = 0.93
 /** where the two little lanterns stand on the shelf, in its frame: beside the shrine's base's front corners (its plinth out to 0.2475 across,
  * its front at 0.065), between it and the vases (from 0.325 across), behind the flask and the book */
 // (forward of where they stood and in a little, either side of the cups' shortened stand, and a little smaller (the owner's, 2026-11-11):
@@ -4681,13 +4685,13 @@ const OMIKI_MS = 180000
 /** the small shrine's offering table (blender/kamidana.py's KamiTable): three keyaki boards, a dark lip with a gold line inside it, gold front
  * corners, the arched apron below; in the altar's own frame (its top's surface at y = 0, its front at x = -D/2) */
 function AltarTable() {
-  return <group position-x={(ALTAR_D / 2) * (1 - TABLE_DEEP)} scale-x={TABLE_DEEP}><KamidanaModel part="table" /></group>
+  return <group position-x={(ALTAR_D / 2) * (1 - TABLE_DEEP)} scale={[TABLE_DEEP, 1, TABLE_LONG]}><KamidanaModel part="table" /></group>
 }
 function Sutra() {
   return (
     // (in from the table's front with it, a little smaller, between the table's side lip and the lantern (it stood at -0.105, -0.34, full
     // size: out along the table it ran into the lip, in it ran into the lantern))
-    <group position={[-0.073, 0.001, -0.371]} rotation-y={-Math.PI / 2} scale={0.85}><KamidanaModel part="sutra" /></group>
+    <group position={[-0.073, 0.001, -0.351]} rotation-y={-Math.PI / 2} scale={0.85}><KamidanaModel part="sutra" /></group>
   )
 }
 /** (where the flask pours from, worked out in the cups' frame and taken into the flask's own: kept, not made each frame) */
