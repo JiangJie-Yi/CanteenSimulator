@@ -6291,12 +6291,11 @@ function liteBodyColour(id: DrinkId) {
  * the fridge's own light in them)
  */
 const BACK_SLOT_W = 64, BACK_SLOT_H = 256
-/** under the sides, each drink's top as seen from above, a square BACK_SLOT_W across (item 65: a card laid over each picture's top, so from
- * above they're a cap or a lid, not an X of two cards) */
-const BACK_TOP = BACK_SLOT_W, BACK_TALL = BACK_SLOT_H + 2 * BACK_TOP
-/** and under those, its top as the ranks in front show it (item 65b): a cap's top with its ribbed edge, a can's lid and its pull, a pack's top
- * with its seam and its straw hole's foil; laid on them as one flat card each where they were turned rings and a little cylinder */
-const FRONT_TOP_Y = BACK_SLOT_H + BACK_TOP
+/** under the sides, each drink's top as seen from above, a square BACK_SLOT_W across (items 65, 65b): a cap's top with its ribbed edge, a
+ * can's lid and its pull, a pack's top with its seam and its straw hole's foil; laid on every rank as one flat card each, as big as the cap
+ * or the lid it is (item 90: a bottle's was as wide as the bottle, a disc floating over its neck from the side) */
+const BACK_TOP = BACK_SLOT_W, BACK_TALL = BACK_SLOT_H + BACK_TOP
+const FRONT_TOP_Y = BACK_SLOT_H
 /** how much the deep ranks' pictures glow (the front labels' 0.3; a touch under it, being further in) */
 const BACK_GLOW = 0.26
 const BACK_IDS = DRINKS.map((x) => x.id as DrinkId)
@@ -6370,32 +6369,9 @@ function drawBackAtlas() {
       g.fillStyle = gr; g.fillRect(X(-r), Y(h), X(r) - X(-r), Y(0) - Y(h))
     }
     g.restore()
-    // (its top from above, in the square under its side: a bottle's shoulder round its cap, a can's silver lid and its tab, a pack's top and
-    // the fold down its middle, a little bottle's foil lid; round ones cut round, a pack square)
-    const cx = x0 + BACK_TOP / 2, cy = BACK_SLOT_H + BACK_TOP / 2, R = BACK_TOP / 2 - 1
-    g.save()
-    const disc = (rr: number, fill: string | CanvasGradient) => { g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fillStyle = fill; g.fill() }
-    const sheen = (rr: number) => { const s_ = g.createRadialGradient(cx - rr * 0.3, cy - rr * 0.3, rr * 0.1, cx, cy, rr); s_.addColorStop(0, 'rgba(255,255,255,0.35)'); s_.addColorStop(1, 'rgba(0,0,0,0.18)'); return s_ }
-    if (shaped) {
-      disc(R, liteBodyColour(id)); disc(R, sheen(R))
-      const capR = Math.min(R * 0.62, R * 0.62 * (LITE_GEO[shaped].capR ?? 1))
-      disc(capR, d.cap); disc(capR, sheen(capR))
-      g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, capR, 0, Math.PI * 2); g.stroke()
-    } else if (kind === 'can') {
-      disc(R, '#b9bec6'); disc(R * 0.82, '#d4d8de'); disc(R, sheen(R))
-      g.fillStyle = '#8c929a'; g.beginPath(); g.ellipse(cx, cy - R * 0.35, R * 0.22, R * 0.12, 0, 0, Math.PI * 2); g.fill()
-      g.fillStyle = '#5a5f66'; g.beginPath(); g.ellipse(cx, cy + R * 0.3, R * 0.25, R * 0.16, 0, 0, Math.PI * 2); g.fill()
-    } else if (kind === 'pack') {
-      g.fillStyle = l0; g.fillRect(x0 + 1, BACK_SLOT_H + 1, BACK_TOP - 2, BACK_TOP - 2)
-      g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(cx - 2, BACK_SLOT_H + 1, 4, BACK_TOP - 2)
-      g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(x0 + 1, BACK_SLOT_H + 1, BACK_TOP / 2 - 3, BACK_TOP - 2)
-    } else {
-      disc(R, l0); disc(R * 0.8, d.cap); disc(R * 0.8, sheen(R * 0.8))
-    }
-    g.restore()
-    // (its top for the ranks in front, in the square under that: the card is laid over just the cap, the can's lid inside its rim, the
+    // (its top, in the square under its side: the card is laid over just the cap, the can's lid inside its rim, the
     // pack's whole top (its picture stretched 3 : 4 across it, so the hole drawn as an ellipse here is round there))
-    const fx = x0 + BACK_TOP / 2, fy = FRONT_TOP_Y + BACK_TOP / 2
+    const fx = x0 + BACK_TOP / 2, fy = FRONT_TOP_Y + BACK_TOP / 2, R = BACK_TOP / 2 - 1
     g.save()
     const fdisc = (rr: number, fill: string | CanvasGradient) => { g.beginPath(); g.arc(fx, fy, rr, 0, Math.PI * 2); g.fillStyle = fill; g.fill() }
     const fsheen = (rr: number) => { const s_ = g.createRadialGradient(fx - rr * 0.35, fy - rr * 0.35, rr * 0.05, fx, fy, rr); s_.addColorStop(0, 'rgba(255,255,255,0.4)'); s_.addColorStop(0.7, 'rgba(255,255,255,0)'); s_.addColorStop(1, 'rgba(0,0,0,0.22)'); return s_ }
@@ -6464,18 +6440,22 @@ function backCard(id: DrinkId) {
   const { w, h } = backDims(id), i = BACK_IDS.indexOf(id)
   const u0 = i / BACK_IDS.length, u1 = (i + 1) / BACK_IDS.length
   // (the picture's sides above, its tops in the strip under them: v from the canvas's top (three's flipY))
-  const sideV = 2 * BACK_TOP / BACK_TALL, topV = BACK_TOP / BACK_TALL
+  const sideV = BACK_TOP / BACK_TALL, topV = sideV
   const card = (turn: number) => {
     const p = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0).rotateY(turn)
     const uv = p.attributes.uv
     for (let k = 0; k < uv.count; k++) { uv.setX(k, u0 + uv.getX(k) * (u1 - u0)); uv.setY(k, sideV + uv.getY(k) * (1 - sideV)) }
     return p
   }
-  // (and its top: a card laid flat a hair under its height, as wide as it is, its top's picture on it (item 65, the owner's: "one piece on
-  // top of the drinks, the picture pressed on it"): from above they read as caps and lids, not as the X of the two cards)
-  const lid = new THREE.PlaneGeometry(w, w).rotateX(-Math.PI / 2).translate(0, h * 0.995, 0)
+  // (and its top: a card laid flat at its height, its top's picture on it (item 65, the owner's: "one piece on top of the drinks,
+  // the picture pressed on it"): from above they read as caps and lids, not as the X of the two cards; as big as the front ones' (item 90):
+  // a bottle's only its cap, a can's its lid, a pack's its whole top)
+  const shaped = shapeOf(id), kind = KIND_OF[id]
+  const lw = shaped ? 0.026 * LITE_GEO[shaped].capR : kind === 'small' ? 0.031 : kind === 'can' ? 0.0366 : w
+  // (a hair over the crossed cards' tops, not under them: under, their edges showed through it as an X)
+  const lid = new THREE.PlaneGeometry(lw, lw).rotateX(-Math.PI / 2).translate(0, h * 1.004, 0)
   const luv = lid.attributes.uv
-  for (let k = 0; k < luv.count; k++) { luv.setX(k, u0 + luv.getX(k) * (u1 - u0)); luv.setY(k, topV + luv.getY(k) * topV) }
+  for (let k = 0; k < luv.count; k++) { luv.setX(k, u0 + luv.getX(k) * (u1 - u0)); luv.setY(k, luv.getY(k) * topV) }
   const g = mergeGeometries([card(0), card(Math.PI / 2), lid])!
   BACK_CARDS.set(id, g)
   return g
