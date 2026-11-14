@@ -6291,12 +6291,15 @@ function liteBodyColour(id: DrinkId) {
  * the fridge's own light in them)
  */
 const BACK_SLOT_W = 64, BACK_SLOT_H = 256
+/** under the sides, each drink's top as seen from above, a square BACK_SLOT_W across (item 65: a card laid over each picture's top, so from
+ * above they're a cap or a lid, not an X of two cards) */
+const BACK_TOP = BACK_SLOT_W, BACK_TALL = BACK_SLOT_H + BACK_TOP
 /** how much the deep ranks' pictures glow (the front labels' 0.3; a touch under it, being further in) */
 const BACK_GLOW = 0.26
 const BACK_IDS = DRINKS.map((x) => x.id as DrinkId)
 const BACK_ATLAS = typeof document === 'undefined' ? null : (() => {
   const c = document.createElement('canvas')
-  c.width = BACK_SLOT_W * BACK_IDS.length; c.height = BACK_SLOT_H
+  c.width = BACK_SLOT_W * BACK_IDS.length; c.height = BACK_TALL
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return { c, t, drawn: false }
@@ -6309,7 +6312,7 @@ function drawBackAtlas() {
   if (!BACK_ATLAS || BACK_ATLAS.drawn) return
   BACK_ATLAS.drawn = true
   const g = BACK_ATLAS.c.getContext('2d')!
-  g.clearRect(0, 0, BACK_ATLAS.c.width, BACK_SLOT_H)
+  g.clearRect(0, 0, BACK_ATLAS.c.width, BACK_TALL)
   // (the front ones' labels, every one drawn round its bottle in a cell of LABEL_ATLAS: `u0`..`u1` of its way round, its front, put into the
   // rectangle given; none there (no page), its two colours as bands)
   const labels = (LABEL_ATLAS as THREE.CanvasTexture | null)?.image as HTMLCanvasElement | undefined
@@ -6364,6 +6367,29 @@ function drawBackAtlas() {
       g.fillStyle = gr; g.fillRect(X(-r), Y(h), X(r) - X(-r), Y(0) - Y(h))
     }
     g.restore()
+    // (its top from above, in the square under its side: a bottle's shoulder round its cap, a can's silver lid and its tab, a pack's top and
+    // the fold down its middle, a little bottle's foil lid; round ones cut round, a pack square)
+    const cx = x0 + BACK_TOP / 2, cy = BACK_SLOT_H + BACK_TOP / 2, R = BACK_TOP / 2 - 1
+    g.save()
+    const disc = (rr: number, fill: string | CanvasGradient) => { g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fillStyle = fill; g.fill() }
+    const sheen = (rr: number) => { const s_ = g.createRadialGradient(cx - rr * 0.3, cy - rr * 0.3, rr * 0.1, cx, cy, rr); s_.addColorStop(0, 'rgba(255,255,255,0.35)'); s_.addColorStop(1, 'rgba(0,0,0,0.18)'); return s_ }
+    if (shaped) {
+      disc(R, liteBodyColour(id)); disc(R, sheen(R))
+      const capR = Math.min(R * 0.62, R * 0.62 * (LITE_GEO[shaped].capR ?? 1))
+      disc(capR, d.cap); disc(capR, sheen(capR))
+      g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, capR, 0, Math.PI * 2); g.stroke()
+    } else if (kind === 'can') {
+      disc(R, '#b9bec6'); disc(R * 0.82, '#d4d8de'); disc(R, sheen(R))
+      g.fillStyle = '#8c929a'; g.beginPath(); g.ellipse(cx, cy - R * 0.35, R * 0.22, R * 0.12, 0, 0, Math.PI * 2); g.fill()
+      g.fillStyle = '#5a5f66'; g.beginPath(); g.ellipse(cx, cy + R * 0.3, R * 0.25, R * 0.16, 0, 0, Math.PI * 2); g.fill()
+    } else if (kind === 'pack') {
+      g.fillStyle = l0; g.fillRect(x0 + 1, BACK_SLOT_H + 1, BACK_TOP - 2, BACK_TOP - 2)
+      g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(cx - 2, BACK_SLOT_H + 1, 4, BACK_TOP - 2)
+      g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(x0 + 1, BACK_SLOT_H + 1, BACK_TOP / 2 - 3, BACK_TOP - 2)
+    } else {
+      disc(R, l0); disc(R * 0.8, d.cap); disc(R * 0.8, sheen(R * 0.8))
+    }
+    g.restore()
   })
   BACK_ATLAS.t.needsUpdate = true
 }
@@ -6377,13 +6403,20 @@ function backCard(id: DrinkId) {
   drawBackAtlas()
   const { w, h } = backDims(id), i = BACK_IDS.indexOf(id)
   const u0 = i / BACK_IDS.length, u1 = (i + 1) / BACK_IDS.length
+  // (the picture's sides above, its tops in the strip under them: v from the canvas's top (three's flipY))
+  const sideV = BACK_TOP / BACK_TALL
   const card = (turn: number) => {
     const p = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0).rotateY(turn)
     const uv = p.attributes.uv
-    for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
+    for (let k = 0; k < uv.count; k++) { uv.setX(k, u0 + uv.getX(k) * (u1 - u0)); uv.setY(k, sideV + uv.getY(k) * (1 - sideV)) }
     return p
   }
-  const g = mergeGeometries([card(0), card(Math.PI / 2)])!
+  // (and its top: a card laid flat a hair under its height, as wide as it is, its top's picture on it (item 65, the owner's: "one piece on
+  // top of the drinks, the picture pressed on it"): from above they read as caps and lids, not as the X of the two cards)
+  const lid = new THREE.PlaneGeometry(w, w).rotateX(-Math.PI / 2).translate(0, h * 0.995, 0)
+  const luv = lid.attributes.uv
+  for (let k = 0; k < luv.count; k++) { luv.setX(k, u0 + luv.getX(k) * (u1 - u0)); luv.setY(k, luv.getY(k) * sideV) }
+  const g = mergeGeometries([card(0), card(Math.PI / 2), lid])!
   BACK_CARDS.set(id, g)
   return g
 }
