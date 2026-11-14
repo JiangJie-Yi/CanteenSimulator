@@ -1191,16 +1191,33 @@ function Warmer() {
     })
     inkModel(r, (m) => m.name !== 'WarmerBody', { width: 0.0016, weld: true })
     plainColours(r)
-    mergeByMaterial(r)
+    // (its cupboards' doors left whole, each on its hinge, to be opened (item 130, the owner's, 2026-11-15: "the doors under the counter all
+    // open"); the rest drawn by material)
+    const isDoor = (o: THREE.Object3D) => /^WarmerDoor\d$/.test(o.name)
+    mergeByMaterial(r, isDoor)
+    const doors: THREE.Object3D[] = []
+    r.traverse((o) => { if (isDoor(o)) doors.push(o) })
+    doors.sort((a, b) => a.name.localeCompare(b.name))
     const mats = [...made.values()] as THREE.MeshBasicMaterial[]
-    return { root: r, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
+    return { root: r, doors, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
   }, [gltf])
+  /** each door: whether it's to be open, and how far it is (0 shut .. 1 open) */
+  const open = useRef<boolean[]>([])
+  const swing = useRef<number[]>([])
   // (its glow and pilot lamp as its heat is (game/soup's heatNow): dark off, a dull red low, bright high; eased, as a ring warms and cools)
   useFrame((_, dt) => {
     const n = heatNow(SOUP.heat, SOUP.pot), k = Math.min(1, dt * 1.5)
     model.glow?.color.lerp(GLOW_AT[n], k)
     model.lamp?.color.lerp(LAMP_AT[n], Math.min(1, dt * 8))
+    // (the doors on their hinges: the even ones hung on their left, the odd on their right, each swinging out toward whoever opened it)
+    model.doors.forEach((d, i) => {
+      const k = (swing.current[i] ?? 0) + (((open.current[i] ? 1 : 0) - (swing.current[i] ?? 0)) * Math.min(1, dt * 6))
+      swing.current[i] = k
+      d.rotation.y = (i % 2 === 0 ? -1 : 1) * DOOR_OPEN * k * k * (3 - 2 * k)
+    })
   })
+  const doorOf = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) { const m = /^WarmerDoor(\d)$/.exec(q.name); if (m) return +m[1] } return -1 }
+  const doorSays = (i: number) => (open.current[i] ? '點一下關上' : '點一下打開')
   const heatSays = () => {
     const h = SOUP.heat, n = heatNow(h, SOUP.pot)
     return `${h === 'auto' ? `自動（${n ? '有湯，弱火' : '鍋子空的，不加熱'}）` : ['關', '弱火', '強火'][h]}｜點一下切換：自動、關、弱、強`
@@ -1209,7 +1226,23 @@ function Warmer() {
   const p = new THREE.Vector3().addScaledVector(ALONG, WARMER_AT.along).addScaledVector(LAY, WARMER_AT.lay)
   return (
     <group position={[p.x, floor, p.z]} rotation-y={WARMER_FACE} {...nameOver('料理台', '味噌湯在加熱座上保溫；白飯從電鍋取，在砧板上捏飯糰')}>
-      <primitive object={model.root} />
+      <primitive object={model.root}
+        onClick={(e: { stopPropagation: () => void; object: THREE.Object3D }) => {
+          const i = doorOf(e.object)
+          if (i < 0 || getEdit().on) return
+          e.stopPropagation()
+          open.current[i] = !open.current[i]
+          coolerDoorSound(open.current[i], 0.35)
+          setTip({ title: '櫃門', hint: doorSays(i) })
+        }}
+        onPointerOver={(e: { stopPropagation: () => void; object: THREE.Object3D }) => {
+          const i = doorOf(e.object)
+          if (i < 0 || getEdit().on) return
+          e.stopPropagation()
+          document.body.style.cursor = 'pointer'
+          setTip({ title: '櫃門', hint: doorSays(i) })
+        }}
+        onPointerOut={() => { document.body.style.cursor = '' }} />
       {/* (the warming well's knob, its dial and pilot lamp under the top's front: clicked, its heat turned on round (the owner's)) */}
       <mesh position={[0, 1.091, 0.49]} visible={false}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SOUP.heat = nextHeat(SOUP.heat); setTip({ title: '加熱座旋鈕', hint: heatSays() }) }}
@@ -1220,6 +1253,8 @@ function Warmer() {
     </group>
   )
 }
+/** how far the counter's cupboard doors swing open (rad) */
+const DOOR_OPEN = 1.45
 /** the warming well's glow and its pilot lamp at each heat (off, low, high) */
 const GLOW_AT = [new THREE.Color('#2e2a28'), new THREE.Color('#6a2814'), new THREE.Color('#b8461e')]
 const LAMP_AT = [new THREE.Color('#3a1a14'), new THREE.Color('#ff7a3a'), new THREE.Color('#ffb060')]

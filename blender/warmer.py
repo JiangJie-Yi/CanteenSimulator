@@ -93,6 +93,8 @@ def mats(pre):
         "terrazzo": pbr(f"{pre}Terrazzo", (1, 1, 1), tex=image(f"{pre.lower()}_terrazzo", np.clip(terr, 0, 1).astype(np.float32)), rough=0.35),
         "sugi": pbr(f"{pre}Sugi", (1, 1, 1), tex=image(f"{pre.lower()}_sugi", np.clip(sugi, 0, 1).astype(np.float32)), rough=0.5),
         "kick": pbr(f"{pre}Kick", lin("#1a120c"), rough=0.6),
+        # (the cupboards' insides, behind their doors (item 130)): dark, under the counter
+        "inside": pbr(f"{pre}Inside", lin("#2a1c12"), rough=0.8),
         "brass": pbr(f"{pre}Brass", lin("#b98a3a"), rough=0.3, metal=0.8),
     }
 
@@ -193,14 +195,32 @@ def counter(L, pre, doors, cx=0.0):
         box("top", x0 - 0.02, x1 + 0.02, H - TT, H, z0, z1, k + "terrazzo", bev=0.008),
     ]
     dw = (L - 0.08) / doors
+    leaves = []
     for i in range(doors):
         a = x0 + 0.04 + i * dw
-        o.append(box(f"door{i}", a + 0.02, a + dw - 0.02, KICK + 0.05, H - TT - 0.16, front, front + 0.018, k + "sugi", bev=0.006))
+        # (behind each door the cupboard's dark inside and a shelf across it, seen as it's opened (item 130, the owner's, 2026-11-15: "the
+        # doors under the counter all open"): a hair in front of the cabinet's face, behind the door)
+        o.append(box(f"inside{i}", a + 0.03, a + dw - 0.03, KICK + 0.06, H - TT - 0.17, front + 0.0005, front + 0.0015, k + "inside"))
+        o.append(box(f"shelf{i}", a + 0.03, a + dw - 0.03, (KICK + H - TT) / 2 - 0.01, (KICK + H - TT) / 2 + 0.008, front + 0.0015, front + 0.003, k + "sugi"))
+        if pre != "Warmer":
+            o.append(box(f"door{i}", a + 0.02, a + dw - 0.02, KICK + 0.05, H - TT - 0.16, front, front + 0.018, k + "sugi", bev=0.006))
+            px = a + (dw - 0.1 if i % 2 == 0 else 0.1)
+            o.append(box(f"pull{i}", px - 0.012, px + 0.012, H - TT - 0.42, H - TT - 0.26, front + 0.018, front + 0.032, k + "brass"))
+            continue
+        # (each door and its pull its own node, its origin on its hinge: the edge away from its pull, at the door's back face)
+        door = box(f"door{i}", a + 0.02, a + dw - 0.02, KICK + 0.05, H - TT - 0.16, front + 0.0035, front + 0.0215, k + "sugi", bev=0.006)
         px = a + (dw - 0.1 if i % 2 == 0 else 0.1)
-        o.append(box(f"pull{i}", px - 0.012, px + 0.012, H - TT - 0.42, H - TT - 0.26, front + 0.018, front + 0.032, k + "brass"))
+        pull = box(f"pull{i}", px - 0.012, px + 0.012, H - TT - 0.42, H - TT - 0.26, front + 0.0215, front + 0.0355, k + "brass")
+        hx = a + 0.02 if i % 2 == 0 else a + dw - 0.02
+        leaf = join([door, pull], f"{pre}Door{i}")
+        bpy.context.scene.cursor.location = P(hx, (KICK + H - TT) / 2, front + 0.0035)
+        bpy.ops.object.select_all(action="DESELECT"); leaf.select_set(True); bpy.context.view_layer.objects.active = leaf
+        bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+        leaves.append(leaf)
     # (a rail along the cabinet's top, under the counter's edge)
     o.append(box("rail", x0 + 0.02, x1 - 0.02, H - TT - 0.13, H - TT - 0.02, front, front + 0.012, k + "sugi"))
-    return join(o, f"{pre}Body")
+    body_ = join(o, f"{pre}Body")
+    return (body_, leaves) if pre == "Warmer" else body_
 
 
 def root_of(name, objs):
@@ -235,7 +255,7 @@ def clear():
 
 # ---------------------------------------------------------------------------------------------------- the soup counter
 JOINED_L = PREP_DX + PREP_L / 2 + WARMER_L / 2
-body = counter(JOINED_L, "Warmer", 6, cx=-WARMER_L / 2 + JOINED_L / 2)
+body, warmer_doors = counter(JOINED_L, "Warmer", 6, cx=-WARMER_L / 2 + JOINED_L / 2)
 wells = [disc("well", WELL_X, H + 0.002, 0.02, WELL_R, 0.006, "well", segs=24),
          disc("glow", WELL_X, H + 0.005, 0.02, WELL_R * 0.8, 0.002, "glow", segs=24)]
 warmer_wells = join(wells, "WarmerWells")
@@ -254,7 +274,7 @@ for o in ctrl:
                 co = me.vertices[me.loops[li].vertex_index].co
                 uvl.data[li].uv = ((co.x - o.location.x) / 0.056 + 0.5, (co.z - o.location.z) / 0.056 + 0.5)
 warmer_ctrl = join(ctrl, "WarmerControls")
-root = root_of("Warmer", [body, warmer_wells, warmer_ctrl])
+root = root_of("Warmer", [body, warmer_wells, warmer_ctrl] + warmer_doors)
 if PREVIEW:
     preview_cam()
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "warmer.glb"), os.path.join(PROJECT, "blender", "warmer.blend"),
