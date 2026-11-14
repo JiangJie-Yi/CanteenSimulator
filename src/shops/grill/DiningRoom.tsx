@@ -3509,6 +3509,16 @@ function KabutoStandModel() {
   }, [gltf])
   return <primitive object={model} />
 }
+/**
+ * Whether what the pointer's on is the first thing it meets (item 106, the owner's, 2026-11-14: the staff's door named itself over the grill:
+ * the pointer's ray goes on through the wall, which takes no pointer, and found the door on the far side of it): the nearest of everything
+ * the ray meets inside the one handling it
+ */
+function inFront(ev: { intersections: { object: THREE.Object3D }[]; eventObject: THREE.Object3D }) {
+  const first = ev.intersections[0]?.object
+  for (let o: THREE.Object3D | null = first ?? null; o; o = o.parent) if (o === ev.eventObject) return true
+  return false
+}
 function StaffDoor() {
   const door = useWcDoor()
   const frame = useMemo(() => door.frame(), [door])
@@ -3584,12 +3594,12 @@ function StaffDoor() {
       </mesh>
       <group ref={g} onClick={(ev) => {
         ev.stopPropagation()
-        if (getEdit().on) return
+        if (getEdit().on || !inFront(ev)) return
         st.current.open = !st.current.open
         slideDoorSound(st.current.open, Math.max(0, 1 - ev.distance / 8))
         setTip({ title: '員工專用門', hint: says() })
       }}
-        onPointerOver={(ev) => { if (getEdit().on) return; tipOver('員工專用門', says()).onPointerOver(ev) }}
+        onPointerOver={(ev) => { if (getEdit().on || !inFront(ev)) return; tipOver('員工專用門', says()).onPointerOver(ev) }}
         onPointerOut={(ev) => { tipOver('員工專用門', '').onPointerOut(ev) }}>
         <group position={[-0.03, 0, 0]} scale={[1, 1, -narrow]}><primitive object={panel} /></group>
         {/* (on the board's face, a little above its middle, just clear of it) */}
