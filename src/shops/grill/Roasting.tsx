@@ -57,7 +57,7 @@ import { tipIn } from '@/data/tipText'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
-import { CRATE, DECOR, Decor, FRIDGE_KICK, takeFromCrate, type Held } from './Decor'
+import { CRATE, DECOR, Decor, FRIDGE_KICK, backToCrate, liftFromCrate, takeFromCrate, type Held } from './Decor'
 import { COAL_BRIDGE, DRAWER_HELD, SAKE, SAKE_SEATS, pourSake, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
@@ -6481,6 +6481,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const dec = pickDecor()
         if (dec) {
           held.current = { kind: dec, at: new THREE.Vector3(), wave: -1 }
+          // (a stick out of the crate: gone from it as it's taken up (item 109))
+          if (dec === 'charcoal') liftFromCrate()
           setDecorTip(null)
           if (controls) controls.enabled = false
           document.body.classList.add('is-carrying')
@@ -6627,10 +6629,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (one stick, from where it's let go; the crate is a stick the fewer)
       if (h?.kind === 'charcoal' && Math.hypot(h.at.x, h.at.z) < RING_CLEAR) {
         // (full, it isn't taken from the crate or paid for: it goes back, with a word why)
-        if (!canPlaceCoal()) onNotice?.('heapFull')
-        else if (fire && fire.current >= 1 - 1e-6) onNotice?.('heapFull')
+        if (!canPlaceCoal()) { onNotice?.('heapFull'); backToCrate() }
+        else if (fire && fire.current >= 1 - 1e-6) { onNotice?.('heapFull'); backToCrate() }
         else if (dropCoals({ x: h.at.x, y: h.at.y, z: h.at.z }, 1, force) > 0) { onAddCharcoal?.(1, true); takeFromCrate() }
-      }
+        else backToCrate()
+      } else if (h?.kind === 'charcoal') backToCrate()
       // (a clean skewer let go over something on the board not yet on one: pushed through it (the owner's: while researching, it's skewered by
       // hand); let go anywhere else, it goes back in the holder)
       if (h?.kind === 'skewer') {

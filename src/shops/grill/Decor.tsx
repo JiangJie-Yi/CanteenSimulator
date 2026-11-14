@@ -175,10 +175,18 @@ export const CRATE_FULL = 36
  * GuestBar3D), so it isn't topped up of itself then */
 export const CRATE = { left: CRATE_FULL, tended: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __crate: CRATE })
-/** a stick taken out of the crate (onto the fire) */
+/** a stick taken up out of the crate in the hand: gone from it at once (item 109, the owner's, 2026-11-14: "picked up, there should be one
+ * fewer"; it went only once it was on the fire), its gap there while it's carried */
+export function liftFromCrate() {
+  CRATE.left = Math.max(0, CRATE.left - 1)
+}
+/** the stick carried put on the fire: the crate, emptied by it, filled again from the sack */
 export function takeFromCrate() {
-  CRATE.left -= 1
   if (CRATE.left <= 0) CRATE.left = SUPPLIES.refillCrate(CRATE_FULL)
+}
+/** the stick carried let go anywhere but the fire (or the heap full): back into the crate */
+export function backToCrate() {
+  CRATE.left = Math.min(CRATE_FULL, CRATE.left + 1)
 }
 
 /** A square plaited basket of white binchotan stood on end, packed full, its tag on the front. Only the sticks are taken hold of (pointed at,
