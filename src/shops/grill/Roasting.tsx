@@ -7097,10 +7097,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (Dish sets every mesh to cast and receive shadows as it loads, so the ground and net are put right here, once it has)
     if (!root.userData.shadowsFixed) {
       const g = root.getObjectByName('FirePit') as THREE.Mesh | undefined
-      const n = root.getObjectByName('GrillNet') as THREE.Mesh | undefined
-      if (g && n && g.receiveShadow && n.castShadow) {
+      const n = root.getObjectByName('GrillNet')
+      // (the net a group of its meshes now (its wires a cut-out card of their own material beside the iron's, item 85): every one of them)
+      let casts = false
+      n?.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.castShadow) casts = true })
+      if (g && n && g.receiveShadow && casts) {
         g.receiveShadow = false
-        n.castShadow = false
+        n.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = false })
         root.userData.shadowsFixed = true
       }
     }

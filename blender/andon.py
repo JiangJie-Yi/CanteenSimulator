@@ -132,6 +132,52 @@ PATTERN = {
 }
 K = 0.0024        # (a kumiko strip's width)
 KD = 0.003        # (and depth)
+# (the kumiko's two patterns drawn once, side by side: 麻の葉 (hemp leaf: spokes from the middle to the corners and to the edges' middles,
+# each leaf's outline from halfway out along a diagonal to the edge middles beside it) on the left, a diagonal lattice (strips both ways at
+# 45°) on the right; a panel's strips at their own width, the wood's colour along them, a little darker where they cross; cut out by alpha)
+_W_, _H_ = HW / 2 - 0.003, HH / 3 - 0.003
+KPX = 256
+KPY = int(round(KPX * _H_ / _W_))
+_kx, _ky = np.meshgrid((np.arange(KPX) + 0.5) / KPX * 2 * _W_ - _W_, (np.arange(KPY) + 0.5) / KPY * 2 * _H_ - _H_)
+
+
+def _seg_d(ax, ay, bx, by):
+    dx, dy = bx - ax, by - ay
+    t = np.clip(((_kx - ax) * dx + (_ky - ay) * dy) / (dx * dx + dy * dy), 0, 1)
+    return np.hypot(_kx - (ax + t * dx), _ky - (ay + t * dy))
+
+
+_cn = [(-_W_, -_H_), (_W_, -_H_), (_W_, _H_), (-_W_, _H_)]
+_md = [((_cn[i][0] + _cn[(i + 1) % 4][0]) / 2, (_cn[i][1] + _cn[(i + 1) % 4][1]) / 2) for i in range(4)]
+_da = np.full(_kx.shape, 9.0)
+for i in range(4):
+    _da = np.minimum(_da, _seg_d(0, 0, *_cn[i]))
+    _da = np.minimum(_da, _seg_d(0, 0, *_md[i]))
+    _h = (_cn[i][0] * 0.5, _cn[i][1] * 0.5)
+    _da = np.minimum(_da, _seg_d(*_h, *_md[i]))
+    _da = np.minimum(_da, _seg_d(*_h, *_md[(i - 1) % 4]))
+_dd = np.full(_kx.shape, 9.0)
+for j in (-2, -1, 0, 1, 2):
+    off = j * _H_ * 0.55
+    for sgn in (1, -1):
+        _dd = np.minimum(_dd, _seg_d(-2 * _W_, sgn * (-2 * _W_) + off, 2 * _W_, sgn * (2 * _W_) + off))
+# (drawn a little wider than the strip's own width: flat, its sides don't show as the solid strips' did, and it read thin)
+_kal = np.concatenate([smooth(K * 0.95, K * 0.7, _da), smooth(K * 0.95, K * 0.7, _dd)], 1).astype(np.float32)
+_kc = np.zeros((KPY, 2 * KPX, 3), np.float32) + np.array((0.7, 0.5, 0.3), np.float32)
+_kc *= (0.88 + 0.12 * np.sin(np.arange(2 * KPX) * 0.9))[None, :, None]
+M["kumiko"] = pbr("AndonKumikoCutout", (1, 1, 1), tex=image("andonKumiko", _kc, alpha=_kal), rough=0.6, blend=True)
+
+
+def kumiko_card(name, corners, u0):
+    me_ = bpy.data.meshes.new(name)
+    me_.from_pydata([P(*p) for p in corners], [], [(0, 1, 2, 3)])
+    me_.update()
+    uvl = me_.uv_layers.new().data
+    for li, q in enumerate(((u0, 0), (u0 + 0.5, 0), (u0 + 0.5, 1), (u0, 1))):
+        uvl[li].uv = q
+    po = bpy.data.objects.new(name, me_)
+    bpy.context.collection.objects.link(po)
+    parts.append(finish(po, name, M["kumiko"], smooth_shade=False))
 for fname, (c, r, up, out) in FACES.items():
     # (the washi, a little in from the posts' outer faces)
     pc = c - out * 0.004
@@ -148,37 +194,10 @@ for fname, (c, r, up, out) in FACES.items():
         pcen = kc + r * (col - 0.5) * HW + up * (-HH + (row + 0.5) * (2 * HH / 3))
         w_, h_ = hw - 0.003, hh - 0.003
         cn = [pcen + r * sx * w_ + up * sy * h_ for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
-        mids = [(cn[i] + cn[(i + 1) % 4]) / 2 for i in range(4)]
-        if kind == "a":
-            # (麻の葉: spokes from the middle to the corners and to the edges' middles, and each leaf's outline from halfway out along a
-            # diagonal to the two edge middles beside it)
-            for i in range(4):
-                bar(f"AndonAsaD_{fname}{col}{row}{i}", pcen, cn[i], K, KD)
-                bar(f"AndonAsaM_{fname}{col}{row}{i}", pcen, mids[i], K, KD)
-                d = pcen + (cn[i] - pcen) * 0.5
-                bar(f"AndonAsaL_{fname}{col}{row}{i}a", d, mids[i], K, KD)
-                bar(f"AndonAsaL_{fname}{col}{row}{i}b", d, mids[(i - 1) % 4], K, KD)
-        else:
-            # (a diagonal lattice: strips both ways at 45°, crossing, clipped to the panel)
-            def clip(p0, p1, pcen=pcen, w_=w_, h_=h_, r=r, up=up):
-                lo, hi = 0.0, 1.0
-                dvec = p1 - p0
-                for ax, lim in ((r, w_), (up, h_)):
-                    pv = (p0 - pcen).dot(ax)
-                    dv_ = dvec.dot(ax)
-                    if abs(dv_) < 1e-9:
-                        if abs(pv) > lim:
-                            return None
-                        continue
-                    t1, t2 = (lim - pv) / dv_, (-lim - pv) / dv_
-                    lo, hi = max(lo, min(t1, t2)), min(hi, max(t1, t2))
-                return (p0 + dvec * lo, p0 + dvec * hi) if hi > lo + 1e-6 else None
-            for j in (-2, -1, 0, 1, 2):
-                off = j * h_ * 0.55
-                for sgn in (1, -1):
-                    seg = clip(pcen + r * (-2 * w_) + up * (sgn * (-2 * w_) + off), pcen + r * (2 * w_) + up * (sgn * (2 * w_) + off))
-                    if seg:
-                        bar(f"AndonHishi_{fname}{col}{row}{j}{sgn}", seg[0], seg[1], K, KD)
+        # (each kumiko panel one card in the strips' plane, its pattern drawn on it and cut out by its alpha (item 85, the owner's,
+        # 2026-11-14: "far too many faces round the fire; one sheet?"): it was dozens of little strips a panel, 1,900 triangles the lantern's)
+        u0 = 0.0 if kind == "a" else 0.5
+        kumiko_card(f"AndonKumiko_{fname}{col}{row}", cn, u0)
 # (and the shade's top: plain paper)
 pc = Vector((0, TOP - 0.004, 0))
 quad("AndonPaper_top", [pc + Vector((sx * S_ / 2, 0, sz * S_ / 2)) for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))], ((0, 0), (1, 0), (1, 1), (0, 1)))

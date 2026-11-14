@@ -3431,14 +3431,35 @@ dw.matrix_parent_inverse = dipper.matrix_world.inverted()
 NET_Z = 0.82          # (set up high over the coals, clear of the charcoal stood under it)
 NET_R = 0.34
 wires = []
-# (the net: fine wires both ways, those one way a hair under the others as they're woven; a thick outer hoop and a finer ring inside it,
-# a little loop handle either side to lift it by)
-for k in range(-8, 9):
-    t = k * NET_R / 8.6
-    half = math.sqrt(max(0.0, NET_R * NET_R - t * t))
-    # (four round (six before: a wire 5 mm across reads as a line), their ends open: they run into the hoop)
-    wires.append(stick_between((-half, t, NET_Z), (half, t, NET_Z), 0.0026, M["net"], "Wire", sides=4, caps=False))
-    wires.append(stick_between((t, -half, NET_Z - 0.004), (t, half, NET_Z - 0.004), 0.0026, M["net"], "Wire", sides=4, caps=False))
+# (the net's woven wires: one flat disc, the wires a picture on it cut out by its alpha (item 85, the owner's, 2026-11-14: "far too many
+# faces round the fire; could they be one sheet?"; it was 34 rods of wire, each its own tube, and a finer ring inside the hoop). The wires
+# both ways, those one way a hair darker as they pass under the others; iron, a dull highlight along each; cut round the hoop's inside.
+# In the game every material named ...Cutout is cut out by its alpha (scene/Dish's toToon))
+NW = 1024
+_u, _v = grid01(NW)
+_x, _y = (_u - 0.5) * 2 * NET_R, (_v - 0.5) * 2 * NET_R
+_pitch, _half = NET_R / 8.6, 0.0028
+_dx = np.abs(((_x / _pitch) + 0.5) % 1.0 - 0.5) * _pitch
+_dy = np.abs(((_y / _pitch) + 0.5) % 1.0 - 0.5) * _pitch
+_wx, _wy = _dx < _half, _dy < _half
+_in = np.sqrt(_x ** 2 + _y ** 2) < NET_R * 0.985
+_net_a = ((_wx | _wy) & _in).astype(np.float32)
+_shade = np.where(_wy, 0.55 + 0.45 * np.sqrt(np.clip(1 - (_dy / _half) ** 2, 0, 1)), 0.4 + 0.4 * np.sqrt(np.clip(1 - (_dx / _half) ** 2, 0, 1)))
+# (the iron's own colour as the hoop's reads in the room's light: a worn grey-brown)
+_net_c = np.stack([0.52 * _shade, 0.48 * _shade, 0.44 * _shade], -1).astype(np.float32)
+M["netcard"] = pbr("GrillNetCutout", (1, 1, 1), tex=image("T_GrillNet", _net_c, alpha=_net_a), rough=0.5, blend=True)
+_bm = bmesh.new()
+_uvl = _bm.loops.layers.uv.new()
+_ring = [_bm.verts.new((NET_R * math.cos(2 * math.pi * k / 24), NET_R * math.sin(2 * math.pi * k / 24), NET_Z - 0.002)) for k in range(24)]
+_f = _bm.faces.new(_ring)
+for _l in _f.loops:
+    _l[_uvl].uv = (0.5 + _l.vert.co.x / (2 * NET_R), 0.5 + _l.vert.co.y / (2 * NET_R))
+_me = bpy.data.meshes.new("NetWires")
+_bm.to_mesh(_me)
+_bm.free()
+_nw = bpy.data.objects.new("NetWires", _me)
+bpy.context.collection.objects.link(_nw)
+wires.append(finish(_nw, "NetWires", M["netcard"], smooth_shade=False))
 
 
 def ring(r, z, thick, n, name):
@@ -3448,13 +3469,12 @@ def ring(r, z, thick, n, name):
     wires.append(finish(active(), name, M["net"]))
 
 
-ring(NET_R, NET_Z, 0.0075, 32, "Hoop")
-ring(NET_R * 0.93, NET_Z + 0.002, 0.0035, 32, "Hoop")
+ring(NET_R, NET_Z, 0.0075, 24, "Hoop")
 for sd in (-1, 1):
     # (a loop handle: a half-hoop standing out past the rim)
-    pts = [(sd * (NET_R + 0.05 * math.sin(math.pi * u)), 0.06 * math.cos(math.pi * u), NET_Z + 0.012 * math.sin(math.pi * u)) for u in [k / 8 for k in range(9)]]
+    pts = [(sd * (NET_R + 0.05 * math.sin(math.pi * u)), 0.06 * math.cos(math.pi * u), NET_Z + 0.012 * math.sin(math.pi * u)) for u in [k / 4 for k in range(5)]]
     for q0, q1 in zip(pts, pts[1:]):
-        wires.append(stick_between(q0, q1, 0.005, M["net"], "Handle"))
+        wires.append(stick_between(q0, q1, 0.005, M["net"], "Handle", sides=4))
 # (the trivet under it: an iron ring a little below the net, three claws up from it holding the net, three legs bowing out from it to the
 # salt, each with a little round foot)
 TRZ = NET_Z - 0.07
@@ -3473,9 +3493,10 @@ for k in range(3):
         pts.append((rr * ca, rr * sa, TRZ * (1 - u) ** 1.3))
     for q0, q1 in zip(pts, pts[1:]):
         wires.append(stick_between(q0, q1, 0.009, M["net"], "Leg"))
-    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.02, depth=0.01, location=(pts[-1][0], pts[-1][1], 0.005))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.02, depth=0.01, location=(pts[-1][0], pts[-1][1], 0.005))
     wires.append(finish(active(), "Foot", M["net"]))
-join(wires, "GrillNet")
+# (its mesh named as it is: the game finds its parts (a group, two materials) by it, to draw no ink line round them nor shadow)
+join(wires, "GrillNet").data.name = "GrillNet"
 
 # the mochi: a flat block of pounded rice, with a "Puffed" shape key the web app turns up as it toasts —
 # the top swells into a dome and bursts out to one side, the way kirimochi balloons on the grill

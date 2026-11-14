@@ -437,9 +437,11 @@ function Lantern({ at }: { at: [number, number, number] }) {
       const src = m.material as THREE.MeshStandardMaterial
       if (src.name === 'AndonPaper') { paperMat.map = src.map; paperOff.map = src.map; m.material = paperMat; return }
       if (!woodMats.has(src)) {
-        const t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map })
+        // (the kumiko panels one card each, their pattern cut out by its alpha (item 85): both sides, tested not blended; lit with the wood)
+        const card = /Cutout/.test(src.name)
+        const t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, ...(card ? { alphaTest: 0.5, side: THREE.DoubleSide } : {}) })
         woodMats.set(src, t)
-        if (src.name === 'AndonWood') kumiko.push(t)
+        if (src.name === 'AndonWood' || card) kumiko.push(t)
       }
       m.material = woodMats.get(src)!
       m.castShadow = true

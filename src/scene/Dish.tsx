@@ -109,6 +109,8 @@ function toToon(src: THREE.MeshStandardMaterial): THREE.MeshToonMaterial {
   })
   // painted steel: a cool grey that reads as metal without needing reflections
   if (src.name === 'BrushedSteel') toon.color.set('#b9c4cc')
+  // (a picture cut out by its alpha (the grill net's wires, item 85): tested, not blended, so it sorts right and shows sharp, both its sides)
+  if (/Cutout/.test(src.name)) Object.assign(toon, { transparent: false, depthWrite: true, alphaTest: 0.5, side: THREE.DoubleSide })
   return toon
 }
 
