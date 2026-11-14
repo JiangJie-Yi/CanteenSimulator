@@ -1175,7 +1175,10 @@ function Warmer() {
     r.traverse((o) => { if (isDoor(o)) doors.push(o) })
     doors.sort((a, b) => a.name.localeCompare(b.name))
     const mats = [...made.values()] as THREE.MeshBasicMaterial[]
-    return { root: r, doors, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
+    // (all shut, the six drawn as one (item 135: two draws and a line each)); let go as one starts to swing
+    const shut = homeCopy(r, doors)
+    shut.home(true)
+    return { root: r, doors, shut, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
   }, [gltf])
   /** each door: whether it's to be open, and how far it is (0 shut .. 1 open) */
   const open = useRef<boolean[]>([])
@@ -1186,11 +1189,16 @@ function Warmer() {
     model.glow?.color.lerp(GLOW_AT[n], k)
     model.lamp?.color.lerp(LAMP_AT[n], Math.min(1, dt * 8))
     // (the doors on their hinges: the even ones hung on their left, the odd on their right, each swinging out toward whoever opened it)
+    let still = true
     model.doors.forEach((d, i) => {
-      const k = (swing.current[i] ?? 0) + (((open.current[i] ? 1 : 0) - (swing.current[i] ?? 0)) * Math.min(1, dt * 6))
+      let k = (swing.current[i] ?? 0) + (((open.current[i] ? 1 : 0) - (swing.current[i] ?? 0)) * Math.min(1, dt * 6))
+      // (settled shut: exactly shut, so the copy drawn for them all fits)
+      if (!open.current[i] && k < 0.002) k = 0
       swing.current[i] = k
+      if (open.current[i] || k > 0) still = false
       d.rotation.y = (i % 2 === 0 ? -1 : 1) * DOOR_OPEN * k * k * (3 - 2 * k)
     })
+    model.shut.home(still)
   })
   const doorOf = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) { const m = /^WarmerDoor(\d)$/.exec(q.name); if (m) return +m[1] } return -1 }
   const doorSays = (i: number) => (open.current[i] ? '點一下關上' : '點一下打開')
