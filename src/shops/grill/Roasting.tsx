@@ -2682,10 +2682,12 @@ const BarTableware = memo(function BarTableware() {
                     </group>
                   </Movable>
                   {/* (the pair of chopsticks: a piece of its own, moved apart from the rest; BarChopsticks, instanced, lays them where this stands, and
-                      picks them up for its customer; the box here is only their reach, to be pointed at and chosen) */}
+                      picks them up for its customer; the box here is only their reach, to be pointed at and chosen: marked the piece's stand-in
+                      (`proxy`), or the edit mode's picking passed it by as unseen and a click on the sticks chose the seat they're drawn with (the
+                      owner, 2026-11-15, said four times)) */}
                   <Movable id={`chopstickpair${seat}`} label={`筷子（座位 ${no}）`}>
                     <group ref={keep(k++)} name={`chop-pair-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷子', '黑漆塗箸，客人開動時拿起來')}>
-                      <mesh visible={false} position={[0, 0.012, 0]}><boxGeometry args={[SETTING.chopL + 0.01, 0.026, 0.04]} /></mesh>
+                      <mesh visible={false} userData={{ proxy: true }} position={[0, 0.012, 0]}><boxGeometry args={[SETTING.chopL + 0.01, 0.026, 0.04]} /></mesh>
                     </group>
                   </Movable>
                   <Movable id={`soydish${seat}`} label={`醬油碟（座位 ${no}）`}>
