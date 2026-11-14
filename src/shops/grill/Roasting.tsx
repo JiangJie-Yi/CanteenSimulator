@@ -57,8 +57,8 @@ import { tipIn } from '@/data/tipText'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
-import { CRATE, DECOR, Decor, FRIDGE_KICK, backToCrate, liftFromCrate, takeFromCrate, type Held } from './Decor'
-import { COAL_BRIDGE, DRAWER_HELD, SAKE, SAKE_SEATS, pourSake, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { CRATE, DECOR, Decor, FREEZER, FRIDGE_KICK, backToCrate, liftFromCrate, takeFromCrate, type Held } from './Decor'
+import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, pourSake, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -483,9 +483,12 @@ useGLTF.preload(FOOD_WASTE_URL)
 /** the tray for raw food waiting to go on the fire: a row of sticks across it, side by side, BOARD_SLOTS of them (the owner's, 2026-11-10:
  * nine, five and four laid on top in the gaps, heaped up in a rush); loose food in a row along its back. It holds no more than that: the
  * rest wait in the fridge until there's room, brought out as the tray's cleared, and the second cook brings no more than there's room for */
-const TRAY_ROWS = BOARD_SLOTS
-const TRAY_CAP = TRAY_ROWS
+// (ten (item 115): in two columns of five side by side across the board, none laid over another)
+const TRAY_ROWS = BOARD_SLOTS / 2
+const TRAY_CAP = BOARD_SLOTS
 const LOOSE_CAP = 7
+/** how far apart the board's two columns are, along it */
+const TRAY_COL = 0.78
 /** the rice balls waiting raw on their little dish at once (the rest in the fridge till there's room) */
 const RAW_DISH_CAP = 3
 const TRAY_W = 1.6
@@ -1646,13 +1649,42 @@ const IRONS_GEO = (() => {
   return mergeGeometries(parts)!
 })()
 const IRONS_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
+/** how many sticks burnt to ash in the bed before it's raked over, and how much the fire comes up for it (item 108) */
+const ASH_TIDY = 3
+const TIDY_GAIN = 0.08
+/** how long the irons are worked over the fire, clicked (item 108) */
+const IRONS_S = 1.4
 function SousIronsImpl() {
   // (on the top at the bay's right-hand side, by its mouth, leant back toward the crate (lay-) a little past upright)
   const at = new THREE.Vector3().addScaledVector(ALONG, SOUS_NOTCH.along[1] - 0.26).addScaledVector(LAY, SOUS_NOTCH.lay[0] - 0.07)
+  const m = useRef<THREE.Mesh>(null)
+  // (taken up and worked over the fire while they're in use (the player's click, or the third cook raking: bar.ts's IRONS): leant right
+  // over toward the hearth, lifted, raked to and fro; back in their place after)
+  useFrame(() => {
+    const o = m.current
+    if (!o) return
+    const left = (IRONS.until - performance.now()) / 1000
+    // (clicked: the fire tidied once they've been worked over it)
+    if (IRONS.ask && left <= 0) { IRONS.ask = false; IRONS.tidy?.() }
+    const k = left > 0 ? Math.min(1, Math.min(left, 1.6 - Math.min(1.6, left)) / 0.3) : 0
+    o.rotation.x = 0.28 + k * 0.75
+    o.rotation.z = 0.05 + k * Math.sin(performance.now() / 90) * 0.18
+    o.position.y = k * 0.06
+  })
+  const says = () => (IRONS.until > performance.now() ? '整理炭火中' : '撥掉燒成灰的炭、把炭撥攏，火會旺一點｜點一下整理炭火')
   return (
     <group position={at} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       {/* (leant over toward the crate: about the table's along, its x here; lay is its -z) */}
-      <mesh geometry={IRONS_GEO} material={IRONS_MAT} rotation-x={0.28} rotation-z={0.05} {...nameOver('火鋏與灰鏟', '三廚添炭、整理炭火用的鐵火鋏與小灰鏟')} />
+      <mesh ref={m} geometry={IRONS_GEO} material={IRONS_MAT} rotation-x={0.28} rotation-z={0.05}
+        onPointerOver={(e) => { if (getEdit().on) return; tipOver('火鋏與灰鏟', says()).onPointerOver(e) }}
+        onPointerOut={(e) => { tipOver('火鋏與灰鏟', '').onPointerOut(e) }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (getEdit().on || IRONS.until > performance.now()) return
+          IRONS.until = performance.now() + IRONS_S * 1000
+          IRONS.ask = true
+          setTip({ title: '火鋏與灰鏟', hint: '整理炭火中' })
+        }} />
     </group>
   )
 }
@@ -3083,8 +3115,19 @@ function TrayImpl({ position, container }: { position: [number, number, number];
   }, [gltf])
   // in front of the fire, its long side running across the screen
   const yaw = Math.atan2(-STACK_DIR.z, STACK_DIR.x)
+  // (pointed at, how many are on it of how many it holds; clicked, the fridge's freezer opened to take more out onto it (item 115, the owner's,
+  // 2026-11-15))
+  const says = () => `食材 ${BOARD.n}/${BOARD_SLOTS}｜點一下打開冷凍區`
   return (
-    <group position={position} rotation-y={yaw} userData={{ container }}>
+    <group position={position} rotation-y={yaw} userData={{ container }}
+      onPointerOver={(e) => { if (getEdit().on) return; tipOver('砧板', says()).onPointerOver(e) }}
+      onPointerOut={(e) => { tipOver('砧板', '').onPointerOut(e) }}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (getEdit().on) return
+        FREEZER.open = true
+        askPantry('frozen', 'freezer', () => { FREEZER.open = false })
+      }}>
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshToonMaterial color="#ffffff" map={map} />
       </mesh>
@@ -4462,12 +4505,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     .addScaledVector(LAY_DIR, -(TRAY_D / 2 - 0.13))
     .add(new THREE.Vector3(0, 0.07, 0))
   const traySpot = (n: number) => {
-    const top = n >= TRAY_ROWS
-    const row = top ? n - TRAY_ROWS + 0.5 : n
+    // (two columns, the left one filled first, five rows each from back to front)
+    const col = n >= TRAY_ROWS ? 1 : 0
+    const row = n % TRAY_ROWS
     return trayAt()
-      .addScaledVector(LAY_DIR, 0.1 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
-      .addScaledVector(STACK_DIR, 0.05)
-      .add(new THREE.Vector3(0, top ? 0.115 : 0.07, 0))
+      .addScaledVector(LAY_DIR, 0.04 + (row - (TRAY_ROWS - 1) / 2) * (TRAY_D - 0.34) / (TRAY_ROWS - 1))
+      .addScaledVector(STACK_DIR, (col - 0.5) * TRAY_COL)
+      .add(new THREE.Vector3(0, 0.07, 0))
   }
 
   /**
@@ -4630,6 +4674,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   /** a stick that has burnt down to ash: the only kind that's cleared to make room (a burning one isn't pushed out by new charcoal) */
   const ashedOut = (c: Coal) => c.age / COAL_LAST_S > 0.72
+  /** the sticks burnt through to ash lying in the bed */
+  const ashCount = () => coals.current.filter((c) => c && !c.gone && !c.dying && ashedOut(c)).length
+  /** the bed tidied with the irons (item 108): the ash knocked off it, the live coals drawn together (the fire a little up for it) */
+  const tidyFire = () => {
+    for (const c of coals.current) if (c && !c.gone && !c.dying && ashedOut(c)) c.dying = true
+    if (fire && fire.current > 0.02) fire.current = Math.min(1, fire.current + TIDY_GAIN)
+  }
+  // (for the irons clicked by the player, shut or open: they tidy it themselves once they've been worked over it)
+  IRONS.tidy = tidyFire
   /** whether there's room on the bed for more: under the most sticks it holds, or some already ash to be cleared */
   const roomForCoal = () => {
     const alive = coals.current.filter((c) => c && !c.gone && !c.dying)
@@ -5524,6 +5577,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       return
     }
+    if (FIRE_TEND.done === 'tidy') {
+      // (raked over by the third cook (item 108))
+      FIRE_TEND.done = null; FIRE_TEND.want = null
+      tidyFire()
+      return
+    }
     if (FIRE_TEND.done === 'water') {
       FIRE_TEND.done = null; FIRE_TEND.want = null
       if (fire) fire.current = Math.max(0, fire.current - 0.3)
@@ -5532,11 +5591,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       return
     }
     if (!tend && FIRE_TEND.want) FIRE_TEND.want = null
+    // (ash gathering in the bed, the shop open: the third cook asked to rake it over; with no one to, it's done at once (item 108))
+    if (space === 'open' && fire && fire.current > 0.02 && !FIRE_TEND.want && ashCount() >= ASH_TIDY) {
+      if (tend) FIRE_TEND.want = 'tidy'
+      else tidyFire()
+    }
     // (what to do about the fire: game/fireTend's call; how long it's run too hot, how long since it asked for charcoal)
     const nowS = performance.now() / 1000
     if (fire && heatOf() > HOT_AT) { if (hotSince.current === null) hotSince.current = nowS }
     else hotSince.current = null
-    const call = fire ? fireCall({ fire: fire.current, tender: tend, want: FIRE_TEND.want, hotFor: hotSince.current === null ? 0 : nowS - hotSince.current,
+    // (a rake asked for is no bar to charcoal or water: they're the more pressing, and take its place)
+    const call = fire ? fireCall({ fire: fire.current, tender: tend, want: FIRE_TEND.want === 'tidy' ? null : FIRE_TEND.want, hotFor: hotSince.current === null ? 0 : nowS - hotSince.current,
       askedFor: FIRE_TEND.want === 'coal' ? nowS - coalAsked.current : 0 }) : 'none'
     if (call === 'ask-water') {
       hotSince.current = null
@@ -7420,6 +7485,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // its middle, one on another: the owner's "heaped like a mountain", 2026-11-13))
     const onRawDish = onTray.filter((p) => !!roast.rawDish?.items.includes(p.id))
     const inFridge = new Set([...boardSticks.slice(TRAY_CAP), ...boardLoose.slice(LOOSE_CAP), ...onRawDish.slice(RAW_DISH_CAP)])
+    // (how many are on the board, for the freezer to hold back more while it's full (item 115) and the board to say)
+    BOARD.n = onBoard.length
 
     // ---- the places round the fire (game/fireSlots): each given up as what holds it leaves it, in his hands to the plating place, flying off
     // by itself, done with, or back on the board; every piece, a fish's rod its own or not (held by those without one, a rush's fire was

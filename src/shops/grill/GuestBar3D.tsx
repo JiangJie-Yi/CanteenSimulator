@@ -80,7 +80,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, type Spill } from './bar'
+import { HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -101,6 +101,8 @@ const SOUND_AT = new THREE.Vector3()
 const LAY = new THREE.Vector3(0.59, 0, 0.81)       // toward the camera (the cook's side)
 const ALONG = new THREE.Vector3(0.81, 0, -0.59)    // along the first counter
 const SPEED = 1.32                                  // how fast they walk in and out (per second: unhurried, the owner's)
+/** how long the third cook rakes the fire over with the irons (item 108) */
+const RAKE_S = 1.6
 const SERVER_SPEED = 2.1                            // and the servers, carrying (brisk)
 // (stepping aside for each other (the owner's item 45): how far ahead they see someone coming (seconds), how quick a step aside is (per
 // second: about a walk), the fastest anyone walks (a quicker move between two frames is a leap, a phase begun elsewhere, not a walk))
@@ -2901,12 +2903,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'settle' | 'toSack' | 'scoopRaw' | 'toSink' | 'wash' | 'toKama' | 'load'
     | 'toRackLow' | 'takeLow' | 'toLow' | 'putLow'
     | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
-    | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir'
+    | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir' | 'rake'
     | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate' | 'toSake' | 'pourSake'
     t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number
     /** what they've gone for for the fire: the charcoal or the water (what's in their hands to the hearth, whatever the grill asks meanwhile) */
-    fire?: 'coal' | 'water'
+    fire?: 'coal' | 'water' | 'tidy'
     /** at the soup's pot to make it (the pot empty), not just to stir it */
     making?: boolean
     /** where the plating place's plates are taken from this time: the low rack by the table, or the dish racks (game/plates' plateSource) */
@@ -4185,7 +4187,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             pl.pos.copy(home())
             pl.fire = FIRE_TEND.want
             away(true)
-            if (pl.fire === 'coal') {
+            if (pl.fire === 'tidy') {
+              // (the irons at his right hand in his bay: taken up and the bed raked over where he stands, none of it walked (item 108))
+              pl.path = []; pl.len = 0; pl.phase = 'rake'; faceTo(hearthAt())
+              IRONS.until = performance.now() + RAKE_S * 1000
+            } else if (pl.fire === 'coal') {
               // (in his bay the crate's at his right hand: turned to it, a handful taken, turned back and tipped in, none of it walked (the
               // owner's); with too little in it for a handful, first out to the sack on the floor for an armful to fill it)
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
@@ -4261,6 +4267,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           pl.phase = 'takeCoal'
           pl.t = 0
         }
+      }
+      else if (pl.phase === 'rake' && pl.t > RAKE_S) {
+        // (raked: the ash knocked off and the coals drawn together (Roasting does it on seeing it done); turned back as he stands)
+        FIRE_TEND.done = 'tidy'
+        FIRE_TEND.want = null
+        pl.phase = 'settle'
+        pl.t = 0
       }
       else if (pl.phase === 'toBucket') walk(() => { pl.phase = 'scoopWater'; faceTo(bucketAt()) })
       // (back from a step in his bay straight to where he stands; from the floor by the table, the way round to it)
@@ -4397,6 +4410,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.userData.fanNow = false
         const bend = (k: number) => Math.sin(Math.PI * Math.min(1, pl.t / k))
         o.userData.lean = pl.phase === 'liftSack' ? 0.5 * bend(0.8) : pl.phase === 'feedCoal' || pl.phase === 'sprinkle' || pl.phase === 'scoopWater' ? 0.32 * bend(0.8)
+          : pl.phase === 'rake' ? 0.26 * bend(RAKE_S)
           : pl.phase === 'takeCoal' ? 0.18 * bend(0.6) : pl.phase === 'fillCrate' ? 0.22 * Math.sin(Math.PI * Math.max(0, Math.min(1, (pl.t - 0.2) / 0.7))) : pl.phase === 'stir' ? 0.14 : 0
         // (up on the kitchen's dais)
         // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)

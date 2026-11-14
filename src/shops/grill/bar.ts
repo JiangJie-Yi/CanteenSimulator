@@ -823,6 +823,9 @@ export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __drain: DRAIN, __plateCount: PLATE_COUNT })
 /** the bin by the sink: how many used sticks are in it (cleared off the customers' plates with them; the owner's: thrown away there) */
 export const SINK_BIN = { sticks: 0 }
+/** how many raw pieces wait on the cook table's board now (Roasting writes it every frame; App won't let more be taken out of the freezer
+ * past its BOARD_SLOTS while researching: item 115) */
+export const BOARD = { n: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pile: PILE })
 /** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */
 export const SEAT_STICKS = new Map<number, number>()
@@ -888,7 +891,12 @@ export const OWNER_GRILL = { on: false, stand: new THREE.Vector3(), face: new TH
  * whether he's on a round now (with no third cook he plates and keeps the fire too: GuestBar3D sends him only between rounds) */
 export const FETCHER: { id: string | null; busy: boolean } = { id: null, busy: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __ownerGrill: OWNER_GRILL, __fetcher: FETCHER })
-export const FIRE_TEND: { want: null | 'coal' | 'water'; done: null | 'coal' | 'water'; tender: boolean } = { want: null, done: null, tender: false }
+export const FIRE_TEND: { want: null | 'coal' | 'water' | 'tidy'; done: null | 'coal' | 'water' | 'tidy'; tender: boolean } = { want: null, done: null, tender: false }
+/** the fire irons by the third cook's bay (item 108, the owner's, 2026-11-15: "something a hand can set off; the third cook tidies with them
+ * too"): taken up and worked over the fire till `until` (performance.now(); Roasting draws it); `ask`, the player's click: the fire tidied once
+ * it's done (the third cook's is FIRE_TEND's 'tidy') */
+export const IRONS: { until: number; ask: boolean; tidy: (() => void) | null } = { until: 0, ask: false, tidy: null }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __irons: IRONS })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __fireTend?: typeof FIRE_TEND }).__fireTend = FIRE_TEND
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __rice: RICE })
 export const WHOLE_FISH = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Hokke', 'Nodoguro'])

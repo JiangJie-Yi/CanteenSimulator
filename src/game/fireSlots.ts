@@ -11,8 +11,9 @@
 
 /** how many skewers stand round the fire at most */
 export const RING_SLOTS = 8
-/** how many raw skewers wait on the board at most */
-export const BOARD_SLOTS = 4
+/** how many raw pieces wait on the board at most (item 115, the owner's, 2026-11-15: "ten at most, 10/10; not queued up one on another":
+ * it was four, the rest waiting unseen in the fridge in a queue) */
+export const BOARD_SLOTS = 10
 /** the bearings kept clear round the fire (the camera's line onto it, the plate's old place; and the uchiwa fan stood by the hearth's edge
  * (item 104, the owner's, 2026-11-14: two corn skewers stood right in front of it, at 80° and 116°, as the camera sees it)), and by how much
  * each side */

@@ -52,7 +52,8 @@ import { dutyDay, idleTick, LAST_CALL, LATE, RATING_FLOW, SHOP, STAFF_IDLE, SPEA
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
-import { COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
+import { BOARD_SLOTS } from '@/game/fireSlots'
+import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
 import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { ROOM_TURN, type ViewCam } from '@/game/editGroups'
@@ -2807,6 +2808,12 @@ export default function App() {
     const addsSkewers = Object.entries(adds).reduce((n, [k, q]) => n + (isSkewer(k) ? q : 0), 0)
     if (delta > 0 && addsSkewers && onTheFire() + addsSkewers > FIRE_CAPACITY) {
       say(UI[lang].fireFull(FIRE_CAPACITY))
+      return false
+    }
+    // (the cook table's board holds so many raw pieces at once (item 115): researching, no more out of the freezer once it's full)
+    const addsBoard = Object.entries(adds).reduce((n, [k, q]) => n + (dish.roast?.rawDish?.items.includes(k) ? 0 : q), 0)
+    if (!ai && delta > 0 && !reuse && addsBoard && BOARD.n + addsBoard > BOARD_SLOTS) {
+      say(UI[lang].boardFull(BOARD_SLOTS))
       return false
     }
     // the bamboo basket only holds so many potatoes and sweet potatoes

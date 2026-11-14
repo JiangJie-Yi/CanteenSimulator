@@ -23,11 +23,11 @@ feature('灶台的固定位置：火邊、砧板（尖峰時段不再疊成一�
     and('拿掉一串就空出那一個', (w) => { w.taken.delete(5); expect(freeRingSlot(w.taken)).toBe(5) })
   })
 
-  scenario('砧板上最多四串生串，滿了二廚就在砧板旁等，不再去拿料', ({ given, when, then, and }) => {
+  scenario('砧板上最多十份生料，滿了二廚就在砧板旁等，不再去拿料（第 115 項）', ({ given, when, then, and }) => {
     given('冷凍櫃裡等著拿的有三份', (w) => { w.q = [{ key: 'a', id: 'Mackerel', at: 1 }, { key: 'b', id: 'Aji', at: 2 }, { key: 'c', id: 'Iwashi', at: 3 }] })
-    when('砧板上已經有四串', (w) => { w.trip = nextTrip(w.q, boardRoom(BOARD_SLOTS)) })
+    when('砧板上已經放滿', (w) => { w.trip = nextTrip(w.q, boardRoom(BOARD_SLOTS)) })
     then('他不走', (w) => { expect(w.trip).toBeNull() })
-    and('砧板上有兩串時，只拿得回兩份', (w) => { expect(nextTrip(w.q, boardRoom(2))!.keys).toEqual(['a', 'b']) })
-    and('路上已經有一份要放上去時，再少一份', (w) => { expect(nextTrip(w.q, boardRoom(2, 1))!.keys).toEqual(['a']) })
+    and('砧板上有八份時，只拿得回兩份', (w) => { expect(nextTrip(w.q, boardRoom(BOARD_SLOTS - 2))!.keys).toEqual(['a', 'b']) })
+    and('路上已經有一份要放上去時，再少一份', (w) => { expect(nextTrip(w.q, boardRoom(BOARD_SLOTS - 2, 1))!.keys).toEqual(['a']) })
   })
 })
