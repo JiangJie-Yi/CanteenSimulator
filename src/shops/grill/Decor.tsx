@@ -804,7 +804,13 @@ function FridgeAt() {
   return <Movable id="freezer" label="冷藏櫃" baseScale={1.6} ground={floor}><group name="look-freezer" position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><IngredientFridge /></group></Movable>
 }
 // (two low racks side by side where the one tall cabinet stood, each half its width: their middles this far either side of where its was)
-const RACK_AT = { along: 1.12, lay: 5.05, apart: 0.62 }
+// (both a size up, 1.12 -> 1.22, taller and wider (item 93, the owner's, 2026-11-14: "the dish racks a little taller, a little bigger"): their
+// middles as much further apart, the gap between them as it was; the pair moved along away from the ingredients' fridge by the second's
+// growth toward it, clear of it as they were)
+const RACK_SCALE = 1.22
+const RACK_AT = { along: 1.12 - 0.11, lay: 5.05, apart: 0.62 * RACK_SCALE / 1.12 }
+// (its size is taken about its middle: grown, its foot went 8 cm down into the floor; set back up on it, its foot where it was, measured)
+const RACK_RISE = 0.078
 /** the low rack by the cook table: its back 3 cm off the table's end (at along 2.52 here), beside the third cook's bay (its edge at lay 0) */
 const LOW_AT = { along: 2.52 + 0.03 + (0.38 / 2) * 1.12, lay: 0.56 }
 function RackAt() {
@@ -816,8 +822,8 @@ function RackAt() {
     <>
       {/* (what the back room's view looks at: between the two, facing out with them) */}
       <group name="look-back" position={[(p.x + q.x) / 2, floor, (p.z + q.z) / 2]} rotation-y={Math.atan2(-LAY.x, -LAY.z)} />
-      <Movable id="platerack" label="碗盤架 1" baseScale={1.12} ground={floor}><group position={[p.x, floor, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={0} /></group></Movable>
-      <Movable id="platerack2" label="碗盤架 2" baseScale={1.12} ground={floor}><group position={[q.x, floor, q.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={1} /></group></Movable>
+      <Movable id="platerack" label="碗盤架 1" baseScale={RACK_SCALE} ground={floor}><group position={[p.x, floor + RACK_RISE, p.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={0} /></group></Movable>
+      <Movable id="platerack2" label="碗盤架 2" baseScale={RACK_SCALE} ground={floor}><group position={[q.x, floor + RACK_RISE, q.z]} rotation-y={Math.atan2(-LAY.x, -LAY.z)}><PlateRack part={1} /></group></Movable>
       {/* (the low rack by the cook table: against the table's end beside the third cook's bay, toward the plating place, its front out to the
           kitchen's floor (the owner's, 2026-11-11)) */}
       <Movable id="lowrack" label="矮碗盤架" baseScale={1.12} ground={floor}><group position={[lo.x, floor, lo.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}><LowPlateRack /></group></Movable>
