@@ -230,6 +230,8 @@ function coalClink(strength: number) {
 }
 
 const FLIGHT_SECONDS = 0.7
+/** how long the owner's pushing a skewer in for, as the player skewers something by hand (item 105) */
+const PIERCE_MS = 900
 // the plate: everything is laid pointing the same way (LAY_DIR), side by side across the plate (STACK_DIR) with
 // enough room that neighbours don't overlap, then in a second layer on top
 // LAY_DIR points at the camera and STACK_DIR runs across the screen, so the row reads left to right
@@ -6648,6 +6650,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           SKEWERS.s = t
           best.skewerAt = performance.now()
           pierceSound()
+          // (the owner does it with the player: turned to it, pushing the rod through (Boss, item 105))
+          OWNER_GRILL.pierceUntil = best.skewerAt + PIERCE_MS
+          new THREE.Box3().setFromObject(best.food[0] ?? best.node).getCenter(OWNER_GRILL.pierceAt)
         }
       }
       held.current = null

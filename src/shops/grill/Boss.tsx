@@ -409,7 +409,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       BOSS_TASTE.verdict = null
       chewSaid.current = false
     }
-    let act: Phase['act'] | 'taste' | 'drink' | 'hold' | 'dab' = ph.act
+    let act: Phase['act'] | 'taste' | 'drink' | 'hold' | 'dab' | 'pierce' = ph.act
     let speed = 0
     // (asked to taste: down his aisle to where it passes nearest the bowl, turned to it, and there he eats it; then back to his round)
     // (or handed a drink: the same, and he drinks it)
@@ -477,6 +477,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       const f = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.face))
       turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt * 10)
       act = 'hold'
+    } else if (!edit && !OWNER_OUT.on && performance.now() < OWNER_GRILL.pierceUntil && m.parent) {
+      // (the player skewering something on the board by hand (item 105): he stops where he is, turns to it and pushes the rod through with them)
+      const f = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.pierceAt))
+      turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt * 10)
+      act = 'pierce'
     } else if (grill && performance.now() < OWNER_GRILL.dabUntil) {
       // (seasoning something on the fire: turned to it, a hand out over it)
       turnTo(s, 0, dt * 6)
@@ -545,7 +550,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // (and Overcooked's squash and stretch, as he starts to say something or his face changes (BOSS_FACE.at))
     const [jw, jh] = jelly((performance.now() - BOSS_FACE.at) / 1000)
     b.scale.set((2 - squash) * jw, squash * jh, (2 - squash) * jw)
-    const lean = moving ? (run ? 0.26 : 0.09) : act === 'hold' ? OWNER_GRILL.lean : act === 'fan' ? 0.06 : act === 'dab' ? 0.12 : 0
+    const lean = moving ? (run ? 0.26 : 0.09) : act === 'hold' ? OWNER_GRILL.lean : act === 'fan' ? 0.06 : act === 'dab' ? 0.12 : act === 'pierce' ? 0.14 : 0
     b.rotation.x += (lean - b.rotation.x) * Math.min(1, dt * 8)
     b.rotation.z = moving ? Math.sin(step * Math.PI) * (run ? 0.13 : 0.09) : Math.sin(T * 0.7) * 0.025
     // (a little hop of joy as he waves)
@@ -582,6 +587,13 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       else if (k === 'brush') { R.set(-0.05 + Math.sin(T * 9) * 0.06, 0, 0.36); wantR = at(0.45) }
       else { R.set(-0.05, 0, 0.34); wantR = at(0.5) + Math.abs(Math.sin(T * 12)) * 0.04 }
       L.set(0.08, 0, 0.16); wantL = at(0.15)
+    } else if (act === 'pierce') {
+      // (the left hand down on what's on the board, holding it; the right out at its side pushing the rod in across it, in two shoves (as the
+      // second cook's at the board: StaffFigure's pierce))
+      const k = 1 - Math.max(0, OWNER_GRILL.pierceUntil - performance.now()) / 900
+      const shove = Math.min(1, k * 2) * 0.5 + Math.max(0, Math.min(1, k * 2 - 1)) * 0.5
+      L.set(0.06, 0, 0.32); wantL = at(0.08)
+      R.set(-0.24 + 0.2 * shove, 0, 0.3); wantR = at(0.1)
     } else if (act === 'fan') {
       R.set(-0.06, 0, 0.3); wantR = at(0.25)
       L.set(0.08, 0, 0.2); wantL = at(0.12) + Math.sin(T * 1.6) * 0.016
