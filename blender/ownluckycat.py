@@ -75,16 +75,14 @@ def fill_tris(mask, tris, cx, cy, sx, sy):
 
 KN = 256
 ku, kv = grid01(KN)
-# (a clear lemon gold, as the 招財 cats' coins are (the owner's, 2026-11-15: "the coin's too far off": it was an orange-brown with a heavy
-# dark ring), a shade lighter in its middle; a fine engraved line a little in from its edge)
-kob = mix((0.9, 0.7, 0.14), (0.99, 0.86, 0.3), smooth(0.95, 0.3, np.hypot((ku - 0.5) * 1.4, kv - 0.5) * 2))
-ring = np.hypot((ku - 0.5) / 0.47, (kv - 0.5) / 0.47)
-kob = mix(kob, (0.78, 0.56, 0.12), (np.abs(ring - 0.9) < 0.012).astype(np.float32))
+# (made as the door cat's (luckycat3) is (the owner's, 2026-11-15: "make it as that one's made"): its warm golden yellow all over, a little
+# lighter in the middle, no engraved ring)
+kob = mix((0.9, 0.62, 0.02), (0.97, 0.74, 0.12), smooth(0.95, 0.25, np.hypot((ku - 0.5) * 1.4, kv - 0.5) * 2))
 km = np.zeros((KN * 2, KN * 2), bool)
 for i_, ch in enumerate("千萬兩"):
-    fill_tris(km, glyph(ch), KN, (0.78 - i_ * 0.28) * KN * 2, 0.62 * KN, 0.27 * KN * 2)
+    fill_tris(km, glyph(ch), KN, (0.78 - i_ * 0.28) * KN * 2, 0.78 * KN, 0.3 * KN * 2)
 # (bold, as the door cat's coin is lettered: each stroke thickened a few texels)
-for _ in range(4):
+for _ in range(6):
     km = km | np.roll(km, 1, 0) | np.roll(km, 1, 1)
 kob = mix(kob, (0.1, 0.07, 0.04), km.reshape(KN, 2, KN, 2).mean(axis=(1, 3)))
 koban_img = image("ownluckycat_koban", np.clip(kob, 0, 1))
@@ -173,7 +171,10 @@ bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_activ
 # baked dark: gold; and which faces those are, for where the koban goes)
 px = np.array(img.pixels[:], dtype=np.float32).reshape(1024, 1024, 4)
 dark = px[..., :3].max(axis=2) < 0.015   # (no colour found at all: the black ear's black is lighter than this)
-px[dark, :3] = (0.86, 0.66, 0.22)
+# (painted the fur's own white, not gold (the owner's, 2026-11-15: the paw that holds it came out a lump of gold round the coin): the made koban
+# below is the only gold there, held in a white paw as the door cat's is)
+lit = px[..., :3].min(axis=2) > 0.5
+px[dark, :3] = np.median(px[lit & ~dark][:, :3], axis=0) if lit.any() else (0.86, 0.83, 0.74)
 img.pixels.foreach_set(px.ravel())
 uvl_ = lp.data.uv_layers.active.data
 dark_at = []
@@ -235,24 +236,40 @@ kh = (max(c.z for c in dark_at) - min(c.z for c in dark_at)) if dark_at else 0.0
 front = min(c.y for c in dark_at) if dark_at else kc.y
 bm = bmesh.new()
 uvk = bm.loops.layers.uv.new()
-KR = (kh * 0.3, 0.005, kh * 0.55)   # (a tall narrow oval, as the door cat's (item 128))
+# (as the door cat's: a tall plump oval held in its paw, a little over a quarter of the cat's height)
+KR = (0.026, 0.009, 0.04)
 # (3 cuts: 16 round its edge, a smooth oval where 2 gave a twelve-sided plate (the owner's, 2026-11-15); 96 faces)
 for f in qsphere(bm, (0.0, 0.0, 0.0), KR, 3):
     for l in f.loops:
         l[uvk].uv = (0.5 + l.vert.co.x / (2 * KR[0]), 0.5 + l.vert.co.z / (2 * KR[2]))
 bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=__import__("mathutils").Matrix.Rotation(0.2, 3, "X"))
-bmesh.ops.translate(bm, verts=bm.verts, vec=(kc.x, front - 0.004, kc.z))
+# (its foot clear of what the cat sits on)
+bmesh.ops.translate(bm, verts=bm.verts, vec=(kc.x, front - 0.004, max(kc.z, KR[2] + 0.006)))
 me = bpy.data.meshes.new("OwnCatKoban"); bm.to_mesh(me); bm.free()
 koban = bpy.data.objects.new("OwnCatKoban", me); bpy.context.collection.objects.link(koban)
 koban.data.materials.append(kmat)
 for p_ in koban.data.polygons:
     p_.use_smooth = True
 print("KOBAN", len(dark_at), tuple(round(c, 3) for c in kc), round(kh, 3))
+# (the bell on its collar: in the same unbaked patch, painted white with it; made, a little gold ball where the patch's top is (54 faces))
+top_ = [c for c in dark_at if c.z > max(d.z for d in dark_at) - 0.02] if dark_at else []
+if top_:
+    bc = Vector((sum(c.x for c in top_), sum(c.y for c in top_), sum(c.z for c in top_))) / len(top_)
+    bm = bmesh.new()
+    qsphere(bm, (bc.x + 0.003, min(c.y for c in top_) + 0.002, bc.z + 0.006), (0.0135, 0.0135, 0.0135), 2)
+    me = bpy.data.meshes.new("OwnCatBell"); bm.to_mesh(me); bm.free()
+    bell = bpy.data.objects.new("OwnCatBell", me); bpy.context.collection.objects.link(bell)
+    bell.data.materials.append(pbr("OwnCatBellGold", (0.9, 0.62, 0.05), rough=0.3, metal=0.6))
+    for p_ in bell.data.polygons:
+        p_.use_smooth = True
+    print("BELL", tuple(round(c, 3) for c in bc))
+else:
+    bell = None
 
 root = bpy.data.objects.new("OwnLuckyCat", None)
 bpy.context.collection.objects.link(root)
-for o in (lp, hand, koban):
+for o in (lp, hand, koban) + ((bell,) if bell else ()):
     o.parent = root
 print("OWNCAT_TRIS", sum(len(p.vertices) - 2 for o in (lp, hand) for p in o.data.polygons), "WRIST", tuple(round(c, 3) for c in wrist))
-export_dish(root, [lp, hand, koban, root], os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW, ladder=False)
+export_dish(root, [lp, hand, koban, root] + ([bell] if bell else []), os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW, ladder=False)
 print("OWNCAT_DONE")
