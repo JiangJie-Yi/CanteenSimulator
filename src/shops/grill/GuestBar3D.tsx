@@ -30,6 +30,8 @@ import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
 import { HAND_WASH_LINES, SPONGE_S, beatLength, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
+import { POUR_TOTAL, SAKE_SET_S, SAKE_UP_S, pourBeat, pouredBy, streaming } from '@/game/sakePour'
+import { pour as pourTokkuri, SAKE_BOTTLE_ML, TOKKURI_ML } from '@/game/sakeStand'
 import { newWashPose, spongePose, washPose, type WashPoints } from '@/scene/washMotion'
 import { PLATE_SCALE } from '@/game/plateSize'
 import { PathMap } from './PathMap'
@@ -56,6 +58,7 @@ import { designOf, wareDesign } from './wareDesigns'
 import { HAND_MS } from './Restroom'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps, SakeCup, cupped } from './DiningRoom'
 import { Tokkuri } from './Tokkuri'
+import { SakeStation, STATION, STATION_OBJ, newStationPose, stationPose, STATION_STREAM_TO } from './SakeStation'
 import { Koban } from './Koban'
 import { OwnLuckyCat } from './OwnLuckyCat'
 import { LuckyCat } from './LuckyCat'
@@ -88,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -146,6 +149,13 @@ const BALL_NORI_GEO = new THREE.BoxGeometry(0.034, 0.022, 0.044)
 /** the owner's figure out serving, inside a server's frame (STAFF_SCALE): his own height (Roasting's BOSS_SCALE in the shop's frame) */
 const OWNER_IN_STAFF = (1.05 * 0.8) / STAFF_SCALE
 const OWNER_HAND = new THREE.Vector3()
+/** the sake station's pour as it's drawn this frame (item 177): the bottle and the tokkuri's poses, and the pourer's hands in the world (on
+ * while the pour's on); where the tokkuri's server holds their tray, and the way they face */
+const STATION_POSE = newStationPose()
+const SAKE_HANDS = { left: new THREE.Vector3(), right: new THREE.Vector3() }
+const SAKE_HANDS_ON = { v: false }
+const SAKE_TRAY = new THREE.Vector3()
+const SAKE_TRAY_YAW = { v: 0 }
 const OWNER_BONE = new THREE.Vector3()
 /** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a black-lacquered tray held in front */
 function OwnerWalker({ moving }: { moving: boolean }) {
@@ -162,7 +172,7 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     // (sweeping up broken glass, or the broom carried: the tray put by)
     // (nor while he's down sweeping or wiping the floor (item 116: the tray showed in his hands as he wiped, a black disc on the floor))
     if (tray.current) tray.current.visible = !o.parent?.userData.broom && o.parent?.userData.scrub === undefined && o.parent?.userData.sweep === undefined
-      && o.parent?.userData.floorWipe === undefined && o.parent?.userData.washHands === undefined
+      && o.parent?.userData.floorWipe === undefined && o.parent?.userData.washHands === undefined && o.parent?.userData.handsAt === undefined
     // (sweeping: both his hands on the broom's handle, going with it from side to side, as a server's are (the owner's, 2026-11-11: his hands
     // stood still at his sides while the broom swept); back where they rest after)
     if (!hands.current) {
@@ -179,7 +189,8 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     // (washing up at the sink (item 103): leant a little over the basin, both hands down in it, the right scrubbing round on the plate)
     const scrub = o.parent?.userData.scrub as number | undefined
     // (washing a plate up by hand (item 174): each hand where the washing has it, in the world: the left on the plate, the right with the sponge)
-    const washHands = o.parent?.userData.washHands as { left: THREE.Vector3; right: THREE.Vector3 } | undefined
+    // (or both at a job's places in the world: the open sake bottle as he pours a customer's tokkuri at the sake station (item 177))
+    const washHands = (o.parent?.userData.washHands ?? o.parent?.userData.handsAt) as { left: THREE.Vector3; right: THREE.Vector3 } | undefined
     // (stooped over the small broom while he sweeps, upright after)
     o.rotation.x += ((sweep !== undefined || floorWipe !== undefined ? OWNER_BEND : scrub !== undefined || washHands ? OWNER_BEND * 0.35 : 0) - o.rotation.x) * 0.2
     const posing = sweep !== undefined || scrub !== undefined || floorWipe !== undefined || !!washHands
@@ -2925,6 +2936,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'toBox' | 'boxTake' | 'toTill' | 'hand' | 'toStand' | 'standPut'
     | 'skTrayGo' | 'skTake' | 'skSinkGo' | 'skWash' | 'skHolderGo' | 'skPut'
     | 'sweepGo' | 'sweep' | 'wipeFloor'
+    | 'toSakePass' | 'sakePour' | 'sakeUp' | 'sakeGo' | 'sakeSet'
   const waiters = useRef<{ phase: WaiterPhase
     t: number; seat: number; keys: string[]; run: number | null
     /** the way they're drawn facing, turned toward `yaw` a frame at a time (set at once, they spun round at each corner of their way, by as
@@ -2987,9 +2999,108 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** at the soup's pot to make it (the pot empty), not just to stir it */
     making?: boolean
     /** where the plating place's plates are taken from this time: the low rack by the table, or the dish racks (game/plates' plateSource) */
-    src?: 'low' | 'rack'
-    /** the customer whose tokkuri they've gone to the sake stand to pour (SAKE.want) */
-    sake?: number }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
+    src?: 'low' | 'rack' }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
+  /**
+   * A customer's tokkuri of sake (item 177, the owner's, 2026-11-15: "that sake stand: the way it goes looks odd, and not professional"): taken
+   * off SAKE.want by the plater (the third cook; with no plater, a server), poured by hand at the sake station on the serving counter
+   * (SakeStation: the open bottle kept there in reach), set down there with its cup; a server comes for it, lifts it onto their tray, carries
+   * it out and sets it down at the customer's place, and only then is it theirs (SAKE.ready, SAKE_SEATS). One at a time: the station has the
+   * one bottle and the one place to pour at.
+   */
+  const sakeJob = useRef<{ guest: number; seat: number
+    /** who pours it: the plater, or a server (their index) */
+    pourer: 'plater' | number
+    /** how far into the pour (s of the shop's clock): -1 not begun, POUR_TOTAL poured */
+    t: number
+    /** the open bottle's level as the pour began; whether its sake's been taken from it */
+    was?: number; poured?: boolean
+    /** the server taking it out (index); lifting it onto their tray (0..1); setting it down at the customer's place (0..1) */
+    server?: number; up?: number; down?: number } | null>(null)
+  /** the tokkuri and the cup as they're poured, wait at the pass and are carried out (the bar's frame) */
+  const sakeJugObj = useRef<THREE.Group>(null)
+  const sakeCupObj = useRef<THREE.Group>(null)
+  /** a customer's seat, by who they are (-1: not sat at the bar); and whether they're still sat at that one (or away at the toilet from it) */
+  const guestSeat = (id: number) => shownRef.current.find((x) => x.id === id)?.seat ?? -1
+  const guestSits = (id: number, seat: number) => shownRef.current.some((x) => x.id === id && x.seat === seat && (x.phase === 'sit' || x.phase.startsWith('wc')))
+  /** a point of the sake station's (the serving counter's own frame) in the bar's; where the one pouring stands, and the way they face there */
+  const stationIn = (v: THREE.Vector3, out = new THREE.Vector3()) => {
+    const g = STATION_OBJ.group, f = frame.current
+    if (!g || !f) return out.copy(v)
+    g.updateWorldMatrix(true, false)
+    return f.worldToLocal(g.localToWorld(out.copy(v)))
+  }
+  const stationSpot = () => stationIn(STATION.front).setY(0)
+  const stationYaw = () => {
+    const a = stationIn(STATION.front), b = stationIn(new THREE.Vector3(STATION.front.x, 0, 0))
+    return Math.atan2(b.x - a.x, b.z - a.z)
+  }
+  /** what stands on the bar's top that a tokkuri mustn't be set into (item 177: at one place of each pair it stood in the soy pot and the
+   * wasabi the two share): the shared condiments, the little baskets, the soy dishes and the chopsticks, each its box on the top (the bar's
+   * frame, x and z), looked at again a second at a time (they're moved in edit mode) */
+  const barThings = useRef<{ at: number; boxes: THREE.Box2[] }>({ at: -1e9, boxes: [] })
+  const thingsOnBar = () => {
+    const now = performance.now(), f = frame.current
+    if (now - barThings.current.at < 1000 || !f) return barThings.current.boxes
+    barThings.current.at = now
+    let root: THREE.Object3D = f
+    while (root.parent) root = root.parent
+    const boxes: THREE.Box2[] = []
+    root.traverse((o) => {
+      const id = o.userData?.editId
+      if (typeof id !== 'string' || !/^(condiments|tablebasket|soydish|chopsticks|chopstickpair)/.test(id)) return
+      const bb = new THREE.Box3().setFromObject(o)
+      if (bb.isEmpty()) return
+      const lo = f.worldToLocal(bb.min.clone()), hi = f.worldToLocal(bb.max.clone())
+      boxes.push(new THREE.Box2(new THREE.Vector2(Math.min(lo.x, hi.x), Math.min(lo.z, hi.z)), new THREE.Vector2(Math.max(lo.x, hi.x), Math.max(lo.z, hi.z))))
+    })
+    barThings.current.boxes = boxes
+    return boxes
+  }
+  /**
+   * Where a seat's tokkuri and its cup are set (item 177; as the server sets them down, and as they're drawn there after): the first of a few
+   * places that's clear of everything at that place and its neighbours': the shared soy pot and wasabi, the little basket, the soy dish, the
+   * chopsticks (as they stand, moved or not), their plate, and where their soup bowl and their drink (bottle and cup) go whether they're there
+   * yet or not; and the next places' tokkuri. Past the soup on the side away from their soy dish (as it was, item 89: at every other place it
+   * stood in the soy pot, and beside the soup bowl and the drink it touched both), the other side past the soy dish, before the plate on
+   * either side, or behind it. Worked out once for each tokkuri (kept in sakeSpots till it's cleared), so it's drawn where it was set
+   */
+  const sakeSpots = useRef(new Map<number, { at: THREE.Vector3; cup: THREE.Vector3 }>())
+  const sakeSpotOf = (n: number) => {
+    const kept = sakeSpots.current.get(n)
+    if (kept) return kept
+    const st = seats[n], c = counters[st.counter]
+    const x = st.mid.clone().sub(c.at).dot(c.along)
+    const side = -sauceSide(c, BAR_GATES[st.counter], x)
+    const boxes = thingsOnBar()
+    // (round things kept clear of: each place's plate, soup bowl and drink, this one's and its neighbours'; the tokkuri already set)
+    const rounds: { p: THREE.Vector3; r: number }[] = []
+    for (const m of [n - 1, n, n + 1]) {
+      const sm = seats[m]
+      if (!sm || sm.counter !== st.counter) continue
+      const cm = counters[sm.counter], xm = sm.mid.clone().sub(cm.at).dot(cm.along)
+      rounds.push({ p: sm.plate.clone(), r: 0.16 })
+      rounds.push({ p: sm.mid.clone().addScaledVector(cm.along, -sauceSide(cm, BAR_GATES[sm.counter], xm) * 1.15).addScaledVector(cm.lay, PLACE.sauce[1]), r: 0.07 })
+      rounds.push({ p: new THREE.Vector3(...drinkSpot(m, false)), r: 0.045 })
+      rounds.push({ p: new THREE.Vector3(...drinkSpot(m, true)), r: 0.032 })
+      const other = m === n ? null : sakeSpots.current.get(m)
+      if (other) { rounds.push({ p: other.at, r: 0.04 }); rounds.push({ p: other.at.clone().add(other.cup), r: 0.03 }) }
+    }
+    const clear = (p: THREE.Vector3, r: number) => !boxes.some((bx) => p.x > bx.min.x - r && p.x < bx.max.x + r && p.z > bx.min.y - r && p.z < bx.max.y + r)
+      && !rounds.some((o) => Math.hypot(p.x - o.p.x, p.z - o.p.z) < o.r + r)
+    // (each try: the tokkuri along and across from the place's middle, its cup from it, along and across)
+    const tries: [number, number, number, number][] = [
+      [side * 1.55, PLACE.sauce[1] - 0.02, -Math.sign(side) * 0.07, 0.06], [-side * 1.55, PLACE.sauce[1] - 0.02, Math.sign(side) * 0.07, 0.06],
+      [-0.25, -0.02, 0.07, -0.06], [0.25, -0.02, -0.07, -0.06], [-0.06, 0.26, 0.085, 0]]
+    let pick: { at: THREE.Vector3; cup: THREE.Vector3 } | null = null
+    for (const [a, l, ca, cl] of tries) {
+      const at = st.mid.clone().addScaledVector(c.along, a).addScaledVector(c.lay, l).setY(top + 0.002)
+      const cup = c.along.clone().multiplyScalar(ca).addScaledVector(c.lay, cl)
+      pick ??= { at, cup }
+      if (clear(at, 0.04) && clear(at.clone().add(cup), 0.03)) { pick = { at, cup }; break }
+    }
+    sakeSpots.current.set(n, pick!)
+    return pick!
+  }
   const platerObj = useRef<THREE.Group | null>(null)
   const [platerMoving, setPlaterMoving] = useState(false)
   const platerStack = useRef<THREE.Group>(null)
@@ -3031,6 +3142,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SERVICE.servers = ownerServes ? 1 : Math.min(homes.length, servers.length)
     return () => {
       SERVICE.servers = 0
+      SAKE.station = false
       OWNER_OUT.on = false
       SEATS_TAKEN.clear()
       CHOPS_UP.clear()
@@ -3707,12 +3819,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SAKE.served++
     SAKE.want = []
     SAKE.ready.clear()
+    sakeJob.current = null
   }, [open])
   /** each shown guest's name tag, faded with them as they go out of the door */
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __sakeJob: sakeJob, __sakeSpot: (n: number) => sakeSpotOf(n), __sakeAround: (n: number) => { const st = seats[n], c = counters[st.counter], x = st.mid.clone().sub(c.at).dot(c.along); return { plate: st.plate.clone(), soup: st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]), drink: new THREE.Vector3(...drinkSpot(n, false)), cup: new THREE.Vector3(...drinkSpot(n, true)) } }, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
 
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
@@ -4585,8 +4698,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         return f.worldToLocal(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()))
       }
       const crateAt = () => middleOf('coal-crate')
-      /** the sake stand on the cook table (Decor's SakeStand) */
-      const sakeAt = () => middleOf('SakeStand')
       const bucketAt = () => middleOf('WaterBucket')
       /** where the bucket's dipped from: a step toward it in his own place when it's by it (the third cook's bay), or null: from further off
        * (the second cook plating from the board, the bucket moved in edit mode), the floor by it, as for anything on the table */
@@ -4624,7 +4735,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.path = kitchenRoute(pl.pos, to)
         // (home: the last step onto just where they stand at their place (the route stops at the nearest clear floor, as much as 0.7 off:
         // the one at their place shown again there, they jumped))
-        if ((phase === 'home' || phase === 'toFill' || phase === 'toHearth') && pl.path.length && pl.path[pl.path.length - 1].distanceTo(to) > 0.02) pl.path.push(to.clone())
+        if ((phase === 'home' || phase === 'toFill' || phase === 'toHearth' || phase === 'toSake') && pl.path.length && pl.path[pl.path.length - 1].distanceTo(to) > 0.02) pl.path.push(to.clone())
         pl.len = pathLength(pl.path)
         pl.phase = phase
         pl.t = 0
@@ -4659,13 +4770,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
               else setOff(sackReach(), 'toCoalSack')
             } else { const near = dipFrom(); if (near) stepTo(near, 'toBucket'); else setOff(reachOf(bucketAt()), 'toBucket') }
-          } else if (open && !SHOP.leaving && SAKE.want.length) {
-            // (a customer's tokkuri of sake (item 89, the owner's, 2026-11-14: someone to go and pour it): to the sake stand on the table, a
-            // bottle lifted and poured there (Decor draws it), then it's set at their place (Roasting))
-            pl.sake = SAKE.want.shift()
-            pl.pos.copy(home())
-            setOff(reachOf(sakeAt()), 'toSake')
-            away(true)
+          } else if (open && !SHOP.leaving && SAKE.want.length && !sakeJob.current && STATION_OBJ.group) {
+            // (a customer's tokkuri of sake (item 177, the owner's: "the way it goes looks odd, and not professional"): over to the sake station
+            // on the serving counter, the open bottle kept there in reach, and poured by hand; left there with its cup for a server to carry out
+            // (the stand on the cook table is out of everyone's reach: its bottle lifted and poured itself, and the tokkuri appeared at the seat))
+            const guest = SAKE.want.shift()!, seat = guestSeat(guest)
+            // (not at the bar to be found just now: back in the queue for a little later)
+            if (seat < 0) SAKE.want.push(guest)
+            else {
+              sakeJob.current = { guest, seat, pourer: 'plater', t: -1 }
+              sakeSpots.current.delete(seat)
+              sakeSpotOf(seat)
+              pl.pos.copy(home())
+              setOff(stationSpot(), 'toSake')
+              away(true)
+            }
           } else if (open && !SHOP.leaving && !waiters.current.length && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
             // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server to wash them (theirs, the owner's): to the used
             // bucket by the plating place for all of them)
@@ -4755,12 +4874,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.path = []; pl.len = 0
         pl.phase = 'settle'
         pl.t = 0
-      } else if (pl.phase === 'toSake') walk(() => { pl.phase = 'pourSake'; faceTo(sakeAt()); pourSake() })
-      // (stood at it while the bottle's lifted, poured and set back (Decor's pour, 2.6 s); poured, theirs to be set at their place)
-      else if (pl.phase === 'pourSake' && pl.t > 2.7) {
-        if (pl.sake !== undefined) SAKE.ready.add(pl.sake)
-        pl.sake = undefined
-        setOff(home(), 'home')
+      } else if (pl.phase === 'toSake') walk(() => { pl.phase = 'pourSake'; pl.yaw = stationYaw() })
+      // (at the station, square on to it: a tokkuri set out, the bottle taken up in both hands, poured, set back, a cup put by it (the
+      // beats, game/sakePour; the bottle and the hands posed from them below); poured, left there for a server, and home)
+      else if (pl.phase === 'pourSake') {
+        const j = sakeJob.current
+        if (j && j.pourer === 'plater') j.t = Math.min(POUR_TOTAL, pl.t)
+        if (!j || j.pourer !== 'plater' || pl.t >= POUR_TOTAL) setOff(home(), 'home')
       }
       else if (pl.phase === 'toSoup') walk(() => { pl.phase = 'stir'; faceTo(soupPot()) })
       else if (pl.phase === 'stir' && pl.t > (pl.making ? MAKE_S : STIR_S)) {
@@ -4891,9 +5011,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.userData.lean = pl.phase === 'liftSack' ? 0.5 * bend(0.8) : pl.phase === 'feedCoal' || pl.phase === 'sprinkle' || pl.phase === 'scoopWater' ? 0.32 * bend(0.8)
           : pl.phase === 'rake' ? 0.26 * bend(RAKE_S)
           : pl.phase === 'takeCoal' ? 0.18 * bend(0.6) : pl.phase === 'fillCrate' ? 0.22 * Math.sin(Math.PI * Math.max(0, Math.min(1, (pl.t - 0.2) / 0.7))) : pl.phase === 'stir' ? 0.14
-          : pl.phase === 'shape' ? 0.12 : 0
+          : pl.phase === 'shape' ? 0.12 : pl.phase === 'pourSake' ? 0.06 : 0
         // (shaping a rice ball: both hands cupped round it before them, pressed together and turned, three presses to one (StaffFigure))
         o.userData.shape = pl.phase === 'shape' ? pl.t / SHAPE_EACH : undefined
+        // (pouring the sake: both hands on the open bottle, a tokkuri, a cup, where the pour has them (item 177))
+        o.userData.handsAt = pl.phase === 'pourSake' && SAKE_HANDS_ON.v ? SAKE_HANDS : undefined
         // (up on the kitchen's dais)
         // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)
         if (KITCHEN_DROP < 0) {
@@ -5350,6 +5472,23 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             go(SERVE_COUNTER.out ? kitchenRoute(homeOf(wi).at, SERVE_COUNTER.out) : fetchPath(wi), 'toBox')
             return
           }
+          // (a customer's tokkuri poured and waiting at the sake station (item 177): over for it, no one else on it, and out to them with it on
+          // the tray; with no plater to pour it, poured by the server themself first)
+          if (STATION_OBJ.group && !SHOP.leaving && (duty !== 'dish' || nServers < 2)) {
+            let j = sakeJob.current
+            if (!j && open && (!given || ownerServes) && SAKE.want.length) {
+              const guest = SAKE.want.shift()!, seat = guestSeat(guest)
+              if (seat < 0) SAKE.want.push(guest)
+              else { j = sakeJob.current = { guest, seat, pourer: wi, t: -1, server: wi }; sakeSpots.current.delete(seat); sakeSpotOf(seat) }
+            }
+            if (j && ((j.pourer === wi && j.t < 0) || (j.server === undefined && j.t >= POUR_TOTAL && guestSits(j.guest, j.seat)))) {
+              j.server = wi
+              const to = stationSpot(), path = kitchenRoute(w.pos, to)
+              if (!path.length || path[path.length - 1].distanceTo(to) > 0.02) path.push(to.clone())
+              go(path, 'toSakePass')
+              return
+            }
+          }
           const slot = readySlot()
           // (glass broken on the floor (game/spills; the owner's): a floor server with no plate ready to carry out goes with a broom and sweeps
           // it up, no one else on it)
@@ -5499,6 +5638,52 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         boxClaimed.current.delete(w.box ?? -1)
         w.box = undefined
         go(tillPath(wi).slice(0, -1).concat(w.pos.clone()), 'back')
+      }
+      // (the sake station (item 177): there, square on to it; their own to pour first (no plater), or lifted onto the tray as it waits)
+      else if (w.phase === 'toSakePass') walk(() => {
+        w.yaw = stationYaw()
+        const j = sakeJob.current
+        if (!j || j.server !== wi) go(kitchenRoute(homeOf(wi).at, w.pos), 'back')
+        else if (j.pourer === wi && j.t < POUR_TOTAL) { w.phase = 'sakePour'; j.t = 0 }
+        else w.phase = 'sakeUp'
+      })
+      else if (w.phase === 'sakePour') {
+        const j = sakeJob.current
+        if (j) j.t = Math.min(POUR_TOTAL, w.t)
+        if (!j) go(kitchenRoute(homeOf(wi).at, w.pos), 'back')
+        else if (w.t >= POUR_TOTAL) { w.phase = 'sakeUp'; w.t = 0 }
+      }
+      else if (w.phase === 'sakeUp') {
+        const j = sakeJob.current
+        if (!j || !guestSits(j.guest, j.seat)) { sakeJob.current = null; go(kitchenRoute(homeOf(wi).at, w.pos), 'back') }
+        else {
+          j.up = Math.min(1, w.t / SAKE_UP_S)
+          if (w.t >= SAKE_UP_S) {
+            // (on the tray: back across the kitchen to their place, out through their gate, along the aisle and in beside the customer)
+            const h = homeOf(wi)
+            const out = h.way.length < 2 ? [seats[j.seat].aisle.clone(), besideSeat(j.seat)] : backPath(wi, j.seat).slice(1)
+            go([...kitchenRoute(w.pos, h.at), ...out], 'sakeGo')
+          }
+        }
+      }
+      else if (w.phase === 'sakeGo') walk(() => {
+        const j = sakeJob.current
+        if (!j) { go(kitchenRoute(homeOf(wi).at, w.pos), 'back'); return }
+        w.phase = 'sakeSet'
+        face(sakeSpotOf(j.seat).at)
+        const id = ownerServes ? 'owner' : servers[wi]?.id
+        if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].sakeServe(j.guest), until: performance.now() + 2600 })
+      })
+      else if (w.phase === 'sakeSet') {
+        const j = sakeJob.current
+        if (j) j.down = Math.min(1, w.t / SAKE_SET_S)
+        if (!j || w.t >= SAKE_SET_S) {
+          // (down at their place, the cup by it: theirs (Roasting has them drink it); they gone meanwhile, it's taken back with the server)
+          if (j && guestSits(j.guest, j.seat)) { SAKE_SEATS.add(j.seat); SAKE.ready.add(j.guest); SAKE.served++ }
+          const seat = j?.seat ?? nearestSeat(w.pos)
+          sakeJob.current = null
+          go(backPath(wi, seat).slice(0, -1).concat(w.pos.clone()), 'back')
+        }
       }
       else if (w.phase === 'pickup' && w.t > 0.4 && !(PLATING.slots[w.slot ?? -1]?.flying)) {
         // (what's set out for the seat taken up off the plating place, once nothing more's flying to it: its plate, if one's laid there, onto the tray,
@@ -5736,6 +5921,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (o) { o.userData.sweep = w.phase === 'sweep' ? w.t : undefined; o.userData.floorWipe = w.phase === 'wipeFloor' ? w.t : undefined; o.userData.broom = !!w.broom }
       // (washing up at the sink, by hand or into the washer: the scrubbing motion (StaffFigure's scrub))
       if (o) o.userData.scrub = w.phase === 'wash' || w.phase === 'handwash' ? w.t : undefined
+      // (pouring a customer's sake themself (no plater): both hands where the pour has them (item 177)); and the tray it's carried out on
+      if (o) o.userData.handsAt = w.phase === 'sakePour' && SAKE_HANDS_ON.v ? SAKE_HANDS : undefined
+      if (sakeJob.current?.server === wi) { SAKE_TRAY.copy(trayAt()); SAKE_TRAY_YAW.v = w.look ?? w.yaw }
       // (they step in to the bar's edge between the stools for it, facing it, and back out: the cloth's under their hand (StaffFigure's
       // wipe: the right hand out on the top, along and back), on the near edge of the top where the plate was)
       let wipeAt: { p: THREE.Vector3; yaw: number; k: number } | null = null
@@ -5871,6 +6059,58 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     // (the owner gone to wash the stack the player left on the counter (item 103): from the third day; washed into the draining basket)
     bossWashTick(step)
+    // (the sake station (item 177): the open bottle posed by the pour, in the pourer's hands; its stream and its level; the tokkuri and the cup
+    // where they are: set out and poured into, waiting at the pass, lifted onto the server's tray, carried, set down at the customer's place)
+    {
+      SAKE.station = !!STATION_OBJ.group && !!given && waiters.current.length > 0
+      const j0 = sakeJob.current
+      // (poured and not yet taken, the customer gone meanwhile: not wanted)
+      if (j0 && j0.server === undefined && j0.t >= POUR_TOTAL && !guestSits(j0.guest, j0.seat)) sakeJob.current = null
+      const j = sakeJob.current
+      if (j && j.t >= 0 && j.was === undefined) j.was = SAKE.open
+      if (j && j.t >= POUR_TOTAL && !j.poured) { j.poured = true; SAKE.open = pourTokkuri([j.was ?? SAKE.open], 0).levels[0] }
+      const pouring = !!j && j.t >= 0 && j.t < POUR_TOTAL
+      const beat = pouring ? pourBeat(j!.t) : null
+      const P = STATION_POSE
+      if (beat) stationPose(beat.beat, beat.k, P)
+      else { P.foot.copy(STATION.bottle); P.q.copy(STATION_OBJ.q0) }
+      if (STATION_OBJ.bottle) { STATION_OBJ.bottle.position.copy(P.foot); STATION_OBJ.bottle.quaternion.copy(P.q) }
+      if (STATION_OBJ.liquid) STATION_OBJ.liquid.scale.y = Math.max(0.02, pouring ? (j!.was ?? SAKE.open) - pouredBy(j!.t) * (TOKKURI_ML / SAKE_BOTTLE_ML[0]) : SAKE.open)
+      const sm = STATION_OBJ.stream
+      if (sm) {
+        if (pouring && streaming(j!.t)) { const to = STATION_STREAM_TO(); sm.position.copy(P.mouth); sm.scale.set(1, Math.max(1e-4, P.mouth.y - to.y), 1) }
+        else sm.scale.set(1, 1e-4, 1)
+      }
+      SAKE_HANDS_ON.v = !!beat && !!STATION_OBJ.group
+      if (SAKE_HANDS_ON.v) { STATION_OBJ.group!.localToWorld(SAKE_HANDS.left.copy(P.left!)); STATION_OBJ.group!.localToWorld(SAKE_HANDS.right.copy(P.right!)) }
+      const jo = sakeJugObj.current, co = sakeCupObj.current
+      if (jo && co) {
+        let jug: THREE.Vector3 | null = null, cup: THREE.Vector3 | null = null
+        if (j && pouring) { jug = P.jug ? stationIn(P.jug) : null; cup = P.cup ? stationIn(P.cup) : null }
+        else if (j && j.t >= POUR_TOTAL) {
+          const e = (x: number) => x * x * (3 - 2 * x)
+          // (on the tray side by side, the tokkuri toward their left hand)
+          const side = new THREE.Vector3(Math.cos(SAKE_TRAY_YAW.v), 0, -Math.sin(SAKE_TRAY_YAW.v))
+          const trayJug = SAKE_TRAY.clone().addScaledVector(side, -0.035).setY(SAKE_TRAY.y + 0.006)
+          const trayCup = SAKE_TRAY.clone().addScaledVector(side, 0.045).setY(SAKE_TRAY.y + 0.006)
+          if ((j.down ?? 0) > 0) {
+            const k = e(j.down!), spot = sakeSpotOf(j.seat)
+            jug = trayJug.lerp(spot.at, k)
+            cup = trayCup.lerp(spot.at.clone().add(spot.cup), k)
+            jug.y += Math.sin(Math.PI * k) * 0.03; cup.y += Math.sin(Math.PI * k) * 0.03
+          } else {
+            const k = e(j.up ?? 0)
+            jug = stationIn(STATION.jug).lerp(trayJug, k)
+            cup = stationIn(STATION.cup).lerp(trayCup, k)
+            jug.y += Math.sin(Math.PI * k) * 0.04; cup.y += Math.sin(Math.PI * k) * 0.04
+          }
+        }
+        jo.visible = !!jug
+        if (jug) jo.position.copy(jug)
+        co.visible = !!cup
+        if (cup) co.position.copy(cup)
+      }
+    }
     // (the serving counter (item 167): placed once the floor's measured; where its top and its front are, read again every second)
     if (given) placeServe()
     if (servePlace && performance.now() - serveRead.current > 1000) {
@@ -6003,14 +6243,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // along the bar from their plate)
   const [sakeVer, setSakeVer] = useState(SAKE.served)
   useFrame(() => { if (SAKE.served !== sakeVer) setSakeVer(SAKE.served) })
-  const seatSakes = useMemo(() => [...SAKE_SEATS].filter((n) => seats[n]).map((n) => {
-    const st = seats[n], c = counters[st.counter]
-    const x = st.mid.clone().sub(c.at).dot(c.along)
-    const side = -sauceSide(c, BAR_GATES[st.counter], x)
-    return { at: st.mid.clone().addScaledVector(c.along, side * 1.55).addScaledVector(c.lay, PLACE.sauce[1] - 0.02).setY(top + 0.002),
-      cup: c.along.clone().multiplyScalar(-Math.sign(side) * 0.07).addScaledVector(c.lay, 0.06) }
+  const seatSakes = useMemo(() => {
+    for (const n of [...sakeSpots.current.keys()]) if (!SAKE_SEATS.has(n) && sakeJob.current?.seat !== n) sakeSpots.current.delete(n)
+    return [...SAKE_SEATS].filter((n) => seats[n]).map((n) => {
+      const { at, cup } = sakeSpotOf(n)
+      return { at, cup }
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [sakeVer, seats, counters, top])
+  }, [sakeVer, seats, counters, top])
 
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
@@ -6021,7 +6261,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (the serving counter, in the corridor between the cook table and the freezer (item 167)) */}
       {servePlace && (
         <Movable id="servecounter" label="備餐檯" ground={0}>
-          <group name="look-servecounter" position={servePlace.at.toArray()} rotation-y={servePlace.yaw}><ServeCounter /></group>
+          <group name="look-servecounter" position={servePlace.at.toArray()} rotation-y={servePlace.yaw}><ServeCounter /><SakeStation /></group>
         </Movable>
       )}
       {/* (one customer made with the page, never shown: their program linked while it loads) */}
@@ -6079,6 +6319,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && seatSakes.map((k, i) => (
         <group key={i} position={k.at}><Tokkuri /><group position={k.cup}><SakeCup level={0.8} /></group></group>
       ))}
+      {/* (a customer's tokkuri and its cup on their way: poured into at the sake station, waiting at the pass, on a server's tray (item 177)) */}
+      {given && <group ref={sakeJugObj} name="sake-going-jug" visible={false}><Tokkuri /></group>}
+      {given && <group ref={sakeCupObj} name="sake-going-cup" visible={false}><SakeCup level={0} /></group>}
       {/* (the fridges' own light inside, always on: it lights the drinks whatever the room's light, and shows the more with the lamps out; one
           for the pair, between them, and here from the first, not with the fridges as they come in later: a light added to the scene has every
           material in it made again, a stall) */}

@@ -59,7 +59,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FREEZER, FRIDGE_KICK, backToCrate, liftFromCrate, takeFromCrate, type Held } from './Decor'
-import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, pourSake, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, SERVE_COUNTER, barToFire, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, SERVE_COUNTER, barToFire, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -5610,8 +5610,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     return w.name
   }
   const guestSeq = useRef(0)
-  /** when each customer's tokkuri was asked of the third cook (the shop's clock): it's poured by them, or by the stand itself if nobody's
-   * taken it in SAKE_WAIT_S */
+  /** when each customer's tokkuri was asked for (the shop's clock): poured at the sake station and carried out to them (GuestBar3D), or with no
+   * station set at their place after SAKE_WAIT_S */
   const sakeAsked = useRef(new Map<number, number>())
   const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner, big: plateFor(g.orders) === 'big' })))
@@ -6175,15 +6175,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // (who has food before them: drawn eating only then (bar.ts's FED))
     FED.clear()
     for (const p of pieces.current) if (p.container === 'bar' && p.guest >= 0 && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly && p.via !== 'plated' && present(p)) FED.add(p.guest)
-    /** a customer's tokkuri: asked of the third cook the first time (SAKE.want; they go to the stand and pour it, GuestBar3D); whether it's
-     * poured now (SAKE.ready); still not taken up after SAKE_WAIT_S (no third cook in), poured by the stand as it is */
+    /** a customer's tokkuri: asked for the first time (SAKE.want: poured by hand at the sake station on the serving counter and carried out to
+     * them on a server's tray, GuestBar3D, item 177); whether it's been set at their place now (SAKE.ready); with no station or nobody to pour
+     * at it (SAKE.station false: a bar on its own), set at their place after SAKE_WAIT_S as it was */
     const sakePoured = (id: number, now: number) => {
       const asked = sakeAsked.current.get(id)
       if (asked === undefined) { sakeAsked.current.set(id, now); SAKE.want.push(id); return false }
       const done = SAKE.ready.delete(id)
       const queued = SAKE.want.indexOf(id)
-      if (!done && !(queued >= 0 && now - asked > SAKE_WAIT_S)) return false
-      if (!done) { SAKE.want.splice(queued, 1); pourSake() }
+      if (!done && !(queued >= 0 && !SAKE.station && now - asked > SAKE_WAIT_S)) return false
+      if (!done) SAKE.want.splice(queued, 1)
       sakeAsked.current.delete(id)
       return true
     }
@@ -6223,9 +6224,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         report()
         return
       }
-      // (their sake: a little after they've ordered, asked of the third cook, who goes to the stand and pours it (SAKE.want, GuestBar3D); poured
-      // (SAKE.ready), set at their place with its cup. Nobody's taken it in SAKE_WAIT_S (no third cook in, the shop's own staff short): the
-      // stand pours it as it is)
+      // (their sake: a little after they've ordered, asked for (SAKE.want): poured at the sake station on the serving counter and carried out on
+      // a server's tray, who sets it at their place (SAKE.ready, SAKE_SEATS: GuestBar3D, item 177); then drunk. With no station (a bar on its
+      // own), set at their place after SAKE_WAIT_S)
       if (space === 'open' && owed.includes('Sake') && now - g.since > SAKE_SERVE_S && sakePoured(g.id, now)) {
         SAKE_SEATS.add(g.seat)
         SAKE.served++

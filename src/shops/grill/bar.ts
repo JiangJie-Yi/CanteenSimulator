@@ -4,7 +4,7 @@ import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
 import { TRAY_MAX, emptyKama, type Kama } from '@/game/rice'
 import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
-import { fullStand, pour, pourFrom } from '@/game/sakeStand'
+import { fullStand } from '@/game/sakeStand'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -875,21 +875,16 @@ export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat } = 
 export const SOUP_SEATS = new Set<number>()
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __soup: SOUP })
 /**
- * The sake stand's bottles (game/sakeStand, item 89): how full each is, and the pours asked of it (`pours` counts them; `from`, the bottle
- * the last came from; `was`, its level before); a click on a bottle pours one; Decor draws the bottle lifted and tipped, and its sake going
- * down. A customer's tokkuri (the owner's, 2026-11-14: someone to go and pour it): Roasting puts the customer on `want`; the third cook takes
- * it, walks to the stand and pours (GuestBar3D), and puts them on `ready`; Roasting sets it at their place then
+ * The sake stand's bottles (game/sakeStand, item 89): how full each is; a bottle dragged by the player over the stand's tokkuri or a glass pours
+ * one (Decor draws it). A customer's tokkuri (the owner's, 2026-11-14: someone to go and pour it; 2026-11-15, item 177: "the way it goes looks
+ * odd, and not professional"): Roasting puts the customer on `want`; at the sake station on the serving counter (GuestBar3D's SakeStation: the
+ * open bottle kept at the pass, in reach; the stand on the cook table is out of everyone's) the third cook, or with none a server, pours it
+ * by hand, and a server carries it out on their tray and sets it at the customer's place; then they're on `ready` and Roasting has them
+ * drink it. `open`: how full the station's open bottle is (a new one opened when it can't give another); `station`: whether there's a
+ * station and someone to pour at it (none, Roasting sets it at their place itself after SAKE_WAIT_S)
  */
-export const SAKE: { levels: number[]; pours: number; from: number; was: number; served: number; want: number[]; ready: Set<number> } =
-  { levels: fullStand(), pours: 0, from: -1, was: 1, served: 0, want: [], ready: new Set() }
-/** a tokkuri poured from the stand now: the bottle the stand pours from next, its level down, the stand told to draw it (Decor) */
-export function pourSake() {
-  const r = pour(SAKE.levels, pourFrom(SAKE.levels))
-  SAKE.levels = r.levels
-  SAKE.from = r.k
-  SAKE.was = r.was
-  SAKE.pours++
-}
+export const SAKE: { levels: number[]; served: number; want: number[]; ready: Set<number>; open: number; station: boolean } =
+  { levels: fullStand(), served: 0, want: [], ready: new Set(), open: 1, station: false }
 /** the seats with a tokkuri of sake and its cup set at them (Roasting pours it for those who ordered it; GuestBar3D draws it; `SAKE.served`
  * counts each change, for the drawing to see) */
 export const SAKE_SEATS = new Set<number>()

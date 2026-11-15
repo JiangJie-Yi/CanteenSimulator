@@ -88,6 +88,12 @@ const ZH = {
 
   // 店員與迎賓
   welcome: 'いらっしゃいませ！歡迎光臨，裡面請坐！',
+  /** a customer's tokkuri of sake set at their place with its cup, by the server who carried it out (item 177) */
+  sakeServe: (k: number) => [
+    '久等了，您的冷酒，請慢用。',
+    '清酒來了，酒杯放這邊，請慢用。',
+    '您點的清酒一合，請慢慢喝。',
+  ][Math.abs(k) % 3],
   serveSay: (k: number) => [
     '讓您久等了！剛出爐的現烤好料，小心鐵網燙口喔！',
     '熱騰騰上桌！香氣正濃，請趁熱慢用！',
@@ -223,6 +229,11 @@ const JA: typeof ZH = {
 
   // スタッフと接客
   welcome: 'いらっしゃいませ！炭火焼きのいい匂い、奥の席へどうぞ！',
+  sakeServe: (k) => [
+    'お待たせしました、冷酒です。ごゆっくりどうぞ。',
+    '日本酒一合お持ちしました。お猪口はこちらに。',
+    'お待たせいたしました、お酒です。どうぞごゆっくり。',
+  ][Math.abs(k) % 3],
   serveSay: (k) => [
     '大変お待たせしました！焼きたてアツアツ、火傷にご注意を！',
     'お待たせしました！一番美味しい焼き加減です、ごゆっくり！',
@@ -355,6 +366,11 @@ const EN: typeof ZH = {
 
   // Staff & Greeting
   welcome: 'Irasshaimase! Welcome in! Mind the smoke and take a seat!',
+  sakeServe: (k) => [
+    'Here is your sake, chilled. Please enjoy.',
+    'Your sake, and the cup right here. Enjoy.',
+    'One go of sake for you. Take your time.',
+  ][Math.abs(k) % 3],
   serveSay: (k) => [
     'Pardon the wait! Piping hot off the charcoal—watch the grill bars!',
     'Hot and fresh! Best enjoyed while sizzling!',

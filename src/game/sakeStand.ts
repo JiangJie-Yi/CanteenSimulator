@@ -12,8 +12,8 @@ export const TOKKURI_ML = 180
  * and set at their place (seconds of the shop's clock) */
 export const SAKE_SIDE = 0.12
 export const SAKE_SERVE_S = 8
-/** how long a customer's tokkuri waits for the third cook to take it up (seconds of the shop's clock): nobody has (none in), the stand
- * pours it itself */
+/** with no sake station to pour it at (a bar on its own; item 177: in a shop it's poured there by hand and carried out), how long a customer's
+ * tokkuri waits before it's set at their place as it is (seconds of the shop's clock) */
 export const SAKE_WAIT_S = 25
 
 /** every bottle full (the day's start, a new shop) */

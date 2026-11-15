@@ -209,6 +209,7 @@ function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: bo
 /** where a server's tray is held, and the stock keeper's clipboard: on the hands, out in front of the belly (the figure's frame) */
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
+const REACH_A = new THREE.Vector3(), REACH_B = new THREE.Vector3()
 /** the hand wiping the bar down: up on the cloth, out in front (GuestBar3D lays the cloth under it, from the same reach) */
 export const WIPE_HAND = { y: 0.83, z: 0.44 }
 /** the hands shaping a rice ball at the rice-ball counter: out over its board (GuestBar3D holds the ball between them, from the same reach) */
@@ -455,6 +456,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   // (a hand broom and a dustpan (the owner's, 2026-11-12: whoever sweeps stoops over a little broom; the long one put their hands, on its
   // handle near the body, inside the round belly, and they looked to hang still at their sides))
   const bend = useRef(0)
+  /** how far their hands are at a job's places (handsAt: eased there and back), and those places in their own frame, each to the hand on its side */
+  const reachK = useRef(0)
+  const reachAt = useRef({ L: new THREE.Vector3(), R: new THREE.Vector3() })
   const broom = useMemo(() => makeHandBroom(), [])
   const pan = useMemo(() => makeDustpan(), [])
   useEffect(() => { fig.root.add(broom, pan); return () => { fig.root.remove(broom, pan) } }, [fig, broom, pan])
@@ -478,7 +482,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number
       sweep?: number; broom?: boolean; scrub?: number; shape?: number
       /** wiping the floor (item 164): how long at it, and where the cloth is in their own upright frame */
-      floorWipe?: number; wipeAt?: [number, number, number] } | undefined
+      floorWipe?: number; wipeAt?: [number, number, number]
+      /** both hands where a job wants them, in the world (item 177: on the open sake bottle as it's poured, a tokkuri, a cup) */
+      handsAt?: { left: THREE.Vector3; right: THREE.Vector3 } } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -545,6 +551,16 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const [jw, jh] = stooped ? [1, 1] : jelly(t - fw.at)
     fig.body.scale.set(jw, (1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008) * jh, jw)
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
+    // (both hands where a job wants them in the world (item 177: the open sake bottle held at its foot and its neck as it's poured, a tokkuri
+    // brought up onto the counter, a cup set down): eased to them and back as it begins and ends; each place to the hand on its side (the one
+    // further along their +x to the +x hand), so the two never cross)
+    const reach = job?.handsAt
+    reachK.current += ((reach ? 1 : 0) - reachK.current) * Math.min(1, dt * 12)
+    if (reach) {
+      fig.root.updateWorldMatrix(true, false)
+      const a = fig.root.worldToLocal(REACH_A.copy(reach.left)), b = fig.root.worldToLocal(REACH_B.copy(reach.right))
+      if (a.x > b.x) { reachAt.current.R.copy(a); reachAt.current.L.copy(b) } else { reachAt.current.R.copy(b); reachAt.current.L.copy(a) }
+    }
     handheld.visible = slack
     if (slack) handheld.position.y = HANDHELD_AT.y + Math.sin(t * 2.2 + seed) * 0.004
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
@@ -627,6 +643,14 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
         hand.rotation.z = Math.sin(t * 7) * 0.4
       } else hand.rotation.z = 0
     }
+    if (reachK.current > 0.002) {
+      for (const [hand, sd] of [[fig.handL, -1], [fig.handR, 1]] as const) {
+        if (!hand) continue
+        hand.position.lerp(sd > 0 ? reachAt.current.R : reachAt.current.L, reachK.current)
+        hand.rotation.x += (-0.9 - hand.rotation.x) * reachK.current
+        hand.rotation.z *= 1 - reachK.current
+      }
+    }
     if (fig.fan && fig.handR) {
       const shown = cook && fanning
       fig.fan.scale.setScalar(shown ? 1 : 0)
@@ -642,7 +666,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     pan.visible = job?.sweep !== undefined
     if (pan.visible) { pan.position.copy(ownerSweepPose(job!.sweep!).pan); pan.rotation.set(-OWNER_BEND, 0, 0) }
     // (nor while they're down wiping the floor)
-    fig.tray?.scale.setScalar(role === 'server' && !job?.broom && job?.floorWipe === undefined ? 1 : 0)
+    // (nor while both hands are at a job (pouring the sake, item 177))
+    fig.tray?.scale.setScalar(role === 'server' && !job?.broom && job?.floorWipe === undefined && reachK.current < 0.5 ? 1 : 0)
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>

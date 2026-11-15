@@ -1314,6 +1314,70 @@ function PrepCounter() {
  * lantern and the coal crate, its front to the bar. Low-poly, all in its pictures: the bottles' glass shiny with the studio's reflection
  * (standard, not toon: glass that didn't shine read as painted wood), the stand toon; the hang tag a card drawn both sides.
  */
+/** glass, the drink in it, and the rest, as the stand's own materials are made (shared by the sake and the shochu; and the open bottle at the
+ * sake station on the serving counter, item 177) */
+export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Material>) {
+  r.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh) return
+    const src = m.material as THREE.MeshStandardMaterial
+    let t = made.get(src)
+    if (!t) {
+      if (/SakeBottles|ShochuLabel/.test(src.name)) {
+        // (the labels, the shoulder labels and the caps: paper and foil, opaque, a soft sheen)
+        const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, roughness: 0.42, metalness: 0.02, envMapIntensity: 0.6, side: THREE.DoubleSide })
+        reflectStudio(g)
+        t = g
+      } else if (/SakeGlass/.test(src.name)) {
+        // (the glass between them (item 88, the owner's: "glass the light comes through, real"): its colour from the picture, seen through
+        // (the sake in it and what's behind), the studio's gleams sharp on it, and lit a little from within by its own colour: the light
+        // through coloured glass; no transmission (it draws the whole shop again every frame))
+        const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, transparent: true, opacity: 0.72, depthWrite: false, roughness: 0.05,
+          metalness: 0.1, envMapIntensity: 1.5, emissive: '#ffffff', emissiveMap: src.map ?? null, emissiveIntensity: 0.9 })
+        // (see-through fades its gleams with it, and glass is not evenly clear: where it shines it's the shine that's seen, and toward its
+        // edges, looked through at a slant, the glass is thick and its colour deep; so there less see-through)
+        g.onBeforeCompile = (sh) => {
+          sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `{
+            float rim = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.5);
+            float glint = smoothstep(0.55, 1.0, max(max(outgoingLight.r, outgoingLight.g), outgoingLight.b));
+            diffuseColor.a = clamp(max(diffuseColor.a + rim * 0.3, glint), diffuseColor.a, 1.0);
+          }
+          #include <opaque_fragment>`)
+        }
+        g.customProgramCacheKey = () => 'sake-glass'
+        reflectStudio(g)
+        t = g
+      } else if (/ShochuGlass|ShochuCupGlass/.test(src.name)) {
+        // (the shochu's green glass and the shot glasses: see-through, shining, a little lit by their own colour; no transmission)
+        const green = /ShochuGlass/.test(src.name)
+        // (the cups a pale blue-white, thicker and lit a little more within (item 131): over the black tray they read as dark grey stubs)
+        const g = new THREE.MeshStandardMaterial({ color: green ? '#3f9a5e' : '#e4f2f8', transparent: true, opacity: green ? 0.62 : 0.5,
+          depthWrite: false, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.5, emissive: green ? '#1f5a34' : '#6a8088' })
+        reflectStudio(g)
+        t = g
+      } else if (/SakeLiquid|ShochuLiquid/.test(src.name)) {
+        // (the drink: near clear, sake a pale straw gold, shochu clearer still; its top catching the light)
+        const g = new THREE.MeshStandardMaterial({ color: /Shochu/.test(src.name) ? '#e6efe4' : '#b89a52', transparent: true,
+          opacity: /Shochu/.test(src.name) ? 0.42 : 0.32, depthWrite: false, roughness: 0.04 })
+        reflectStudio(g)
+        t = g
+      } else if (/ShochuCap/.test(src.name)) {
+        const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.9, roughness: 0.3 })
+        reflectStudio(g)
+        t = g
+      } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+      made.set(src, t)
+    }
+    m.material = t
+    const see = /Glass|Liquid/.test(src.name)
+    // (the drink drawn before its glass, the glass over it)
+    if (see) m.renderOrder = /Liquid/.test(src.name) ? 1 : 2
+    m.castShadow = !see
+    m.receiveShadow = !see
+  })
+  // (no ink round the drink inside: its outline would show through the glass)
+  inkModel(r, (m) => /Liquid/.test((m.material as THREE.Material).name) || /Liquid/.test(m.name), { width: 0.0012, weld: true })
+}
 const SAKESTAND_URL = import.meta.env.BASE_URL + 'models/sakestand.glb'
 useGLTF.preload(SAKESTAND_URL)
 /** where it stands on the cook table (the scene's frame: the strip between the lantern and the crate, half way, as far from the bar's lip
@@ -1344,73 +1408,10 @@ function SakeStand() {
   const sho = useGLTF(SHOCHU_URL) as unknown as { scene: THREE.Group }
   const { camera, gl } = useThree()
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
-  /** glass, the drink in it, and the rest, as the stand's own materials are made (shared by the sake and the shochu) */
-  const dress = (r: THREE.Object3D, made: Map<THREE.Material, THREE.Material>) => {
-    r.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh) return
-      const src = m.material as THREE.MeshStandardMaterial
-      let t = made.get(src)
-      if (!t) {
-        if (/SakeBottles|ShochuLabel/.test(src.name)) {
-          // (the labels, the shoulder labels and the caps: paper and foil, opaque, a soft sheen)
-          const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, roughness: 0.42, metalness: 0.02, envMapIntensity: 0.6, side: THREE.DoubleSide })
-          reflectStudio(g)
-          t = g
-        } else if (/SakeGlass/.test(src.name)) {
-          // (the glass between them (item 88, the owner's: "glass the light comes through, real"): its colour from the picture, seen through
-          // (the sake in it and what's behind), the studio's gleams sharp on it, and lit a little from within by its own colour: the light
-          // through coloured glass; no transmission (it draws the whole shop again every frame))
-          const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, transparent: true, opacity: 0.72, depthWrite: false, roughness: 0.05,
-            metalness: 0.1, envMapIntensity: 1.5, emissive: '#ffffff', emissiveMap: src.map ?? null, emissiveIntensity: 0.9 })
-          // (see-through fades its gleams with it, and glass is not evenly clear: where it shines it's the shine that's seen, and toward its
-          // edges, looked through at a slant, the glass is thick and its colour deep; so there less see-through)
-          g.onBeforeCompile = (sh) => {
-            sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `{
-              float rim = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.5);
-              float glint = smoothstep(0.55, 1.0, max(max(outgoingLight.r, outgoingLight.g), outgoingLight.b));
-              diffuseColor.a = clamp(max(diffuseColor.a + rim * 0.3, glint), diffuseColor.a, 1.0);
-            }
-            #include <opaque_fragment>`)
-          }
-          g.customProgramCacheKey = () => 'sake-glass'
-          reflectStudio(g)
-          t = g
-        } else if (/ShochuGlass|ShochuCupGlass/.test(src.name)) {
-          // (the shochu's green glass and the shot glasses: see-through, shining, a little lit by their own colour; no transmission)
-          const green = /ShochuGlass/.test(src.name)
-          // (the cups a pale blue-white, thicker and lit a little more within (item 131): over the black tray they read as dark grey stubs)
-          const g = new THREE.MeshStandardMaterial({ color: green ? '#3f9a5e' : '#e4f2f8', transparent: true, opacity: green ? 0.62 : 0.5,
-            depthWrite: false, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.5, emissive: green ? '#1f5a34' : '#6a8088' })
-          reflectStudio(g)
-          t = g
-        } else if (/SakeLiquid|ShochuLiquid/.test(src.name)) {
-          // (the drink: near clear, sake a pale straw gold, shochu clearer still; its top catching the light)
-          const g = new THREE.MeshStandardMaterial({ color: /Shochu/.test(src.name) ? '#e6efe4' : '#b89a52', transparent: true,
-            opacity: /Shochu/.test(src.name) ? 0.42 : 0.32, depthWrite: false, roughness: 0.04 })
-          reflectStudio(g)
-          t = g
-        } else if (/ShochuCap/.test(src.name)) {
-          const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.9, roughness: 0.3 })
-          reflectStudio(g)
-          t = g
-        } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
-        made.set(src, t)
-      }
-      m.material = t
-      const see = /Glass|Liquid/.test(src.name)
-      // (the drink drawn before its glass, the glass over it)
-      if (see) m.renderOrder = /Liquid/.test(src.name) ? 1 : 2
-      m.castShadow = !see
-      m.receiveShadow = !see
-    })
-    // (no ink round the drink inside: its outline would show through the glass)
-    inkModel(r, (m) => /Liquid/.test((m.material as THREE.Material).name) || /Liquid/.test(m.name), { width: 0.0012, weld: true })
-  }
   const obj = useMemo(() => {
     const r = (gltf.scene.getObjectByName('SakeStand') ?? gltf.scene).clone(true)
     r.position.set(0, 0, 0)
-    dress(r, new Map())
+    dressSake(r, new Map())
     // (the stand merged; each bottle kept its own, to be lifted and poured (item 89))
     mergeByMaterial(r, (o) => /^SakeBottle\d$/.test(o.name))
     return r
@@ -1419,7 +1420,7 @@ function SakeStand() {
   const shochu = useMemo(() => {
     const r = (sho.scene.getObjectByName('ShochuSet') ?? sho.scene).clone(true)
     r.position.copy(SHOCHU_AT)
-    dress(r, new Map())
+    dressSake(r, new Map())
     // (the tray merged; the bottle and the glasses each their own, the bottle to be carried, the glasses to be filled)
     mergeByMaterial(r, (o) => /^Shochu(Bottle|Cup\d)$/.test(o.name))
     return r
@@ -1452,15 +1453,12 @@ function SakeStand() {
   const full = useRef<boolean[]>([false, false, false, false])
   const stream = useRef<THREE.Mesh>(null)
   const group = useRef<THREE.Group>(null)
-  /** the third cook's pour being drawn: which bottle, since when, its level from and to, whether a new one's opened after it */
-  const act = useRef<{ k: number; t: number; from: number; to: number; opened: boolean } | null>(null)
   /**
    * The player's pour by hand (item 107, the owner's, 2026-11-14: "not poured like that: the pointer turns into a hand and drags it"): the
    * bottle taken up and carried at `aim` (its foot, the stand's frame); over the tokkuri or a glass not yet full it tips and pours, POUR_S
    * to fill it; let go, it goes back to its place
    */
   const drag = useRef<{ b: number; aim: THREE.Vector3; ray: THREE.Ray | null; tip: number; over: number; t: number; back: number; from: THREE.Vector3; fromQ: THREE.Quaternion } | null>(null)
-  const seen = useRef(SAKE.pours)
   useEffect(() => { bottles.forEach((b, k) => { if (b.liquid) b.liquid.scale.y = Math.max(0.02, b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[k]) }) }, [bottles])
   useEffect(() => { targets.forEach((t) => { if (t.liquid) t.liquid.scale.y = 0.001 }) }, [targets])
   const TIP_Q = useMemo(() => new THREE.Quaternion(), [])
@@ -1492,7 +1490,7 @@ function SakeStand() {
   }
   useEffect(() => dropHome, [obj])
   useFrame((_, dt) => {
-    const still = !drag.current && !act.current
+    const still = !drag.current
     if (!still && homeAt.current) dropHome()
     else if (still && !homeAt.current) { homeAt.current = homeCopy(obj, sakeNodes); homeAt.current.home(true) }
     const d = drag.current
@@ -1535,42 +1533,12 @@ function SakeStand() {
             SAKE.levels = r.levels
           }
           if (b.liquid) b.liquid.scale.y = Math.max(0.02, b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[d.b])
-          // (the tokkuri poured for a customer waiting on one: theirs, taken to their place (Roasting), and it's empty again)
-          if (tg!.cup < 0 && SAKE.want.length) { SAKE.ready.add(SAKE.want.shift()!); full.current[over] = false }
           d.over = -1; d.t = 0
         }
       }
       return
     }
-    // (a pour asked for by the third cook (Roasting, GuestBar3D), the last one drawn through first)
-    if (SAKE.pours !== seen.current && !act.current) {
-      seen.current = SAKE.pours
-      const k = SAKE.from, now = SAKE.levels[k]
-      act.current = { k, t: 0, from: SAKE.was, to: now >= 1 - 1e-6 && SAKE.was < 1 ? 0 : now, opened: now >= 1 - 1e-6 && SAKE.was < 1 }
-    }
-    const a = act.current
-    if (!a) { showStream(null, null); return }
-    a.t += Math.min(dt, 0.05)
-    const b = bottles[a.k]
-    // (taken up and over to the tokkuri on the step, tipped right over it, held as it pours; tipped back and set down: 2.6 s)
-    const ease = (x: number) => x * x * (3 - 2 * x)
-    const k = a.t < T_LIFT ? ease(a.t / T_LIFT) * 0.3 : a.t < T_IN ? 0.3 + 0.7 * ease((a.t - T_LIFT) / (T_IN - T_LIFT)) : a.t < T_POUR ? 1
-      : a.t < T_OUT ? 1 - ease((a.t - T_POUR) / (T_OUT - T_POUR)) : 0
-    const lifted = b.pos.clone().add(b.off).add(new THREE.Vector3(0, Math.min(1, k * 3) * 0.06, 0))
-    const jug = targets[0].top
-    const mouth = pose(b, k, lifted, jug.clone().add(new THREE.Vector3(0, 0.03, 0)))
-    // (carried up over the others on its way, not through them: an arc that's down again as it's over the tokkuri)
-    const arc = k < 1 ? Math.sin(Math.PI * k) * ARC_H : 0
-    b.node.position.y += arc
-    mouth.y += arc
-    const p = a.t < T_IN ? 0 : Math.min(1, (a.t - T_IN) / (T_POUR - T_IN))
-    if (b.liquid) b.liquid.scale.y = Math.max(0.02, a.t >= T_OUT && a.opened ? 1 : a.from + (a.to - a.from) * p)
-    showStream(a.t > T_IN - 0.05 && a.t < T_POUR + 0.05 ? mouth : null, jug.clone().add(new THREE.Vector3(0, -0.02, 0)))
-    if (a.t >= T_OUT) {
-      b.node.position.copy(b.pos); b.node.quaternion.copy(b.q)
-      if (b.liquid) b.liquid.scale.y = Math.max(0.02, SAKE.levels[a.k])
-      act.current = null
-    }
+    showStream(null, null)
   })
   /** which bottle a pointer's on (its node up the tree), or -1 */
   const bottleOf = (o: THREE.Object3D | null) => {
@@ -1600,7 +1568,7 @@ function SakeStand() {
     return true
   }
   const onDown = (e: { stopPropagation: () => void; object: THREE.Object3D; nativeEvent: PointerEvent }) => {
-    if (getEdit().on || act.current || drag.current) return
+    if (getEdit().on || drag.current) return
     const k = bottleOf(e.object)
     if (k < 0 || !bottles[k]) return
     e.stopPropagation()
@@ -1646,6 +1614,19 @@ function SakeStand() {
     if (l) l.scale.y = 0.001
     setTip({ title: '燒酒杯', hint: '空的｜拖一支酒到上方倒酒' })
   }
+  // (the tokkuri on the step: full after a pour, a click empties it; pointed at, what it holds and what to do)
+  const onJugClick = (e: { stopPropagation: () => void }) => {
+    if (getEdit().on || drag.current) return
+    e.stopPropagation()
+    if (!full.current[0]) return
+    full.current[0] = false
+    setTip({ title: '德利', hint: '空的｜拖一支清酒到上方倒酒' })
+  }
+  const onJugOver = (e: { stopPropagation: () => void }) => {
+    if (getEdit().on || drag.current) return
+    e.stopPropagation()
+    setTip({ title: '德利', hint: full.current[0] ? '倒滿了｜點一下清空' : '空的｜拖一支清酒到上方倒酒' })
+  }
   const onCupOver = (e: { stopPropagation: () => void; object: THREE.Object3D }) => {
     const c = cupOf(e.object)
     if (c < 0 || getEdit().on || drag.current) return
@@ -1657,21 +1638,17 @@ function SakeStand() {
       <primitive object={obj} onPointerDown={onDown} onPointerOver={onOver} onPointerOut={onOut} />
       <primitive object={shochu} onPointerDown={onDown} onPointerOver={(e: { stopPropagation: () => void; object: THREE.Object3D }) => { onOver(e); onCupOver(e) }}
         onPointerOut={onOut} onClick={onCupClick} />
-      {/* (the tokkuri on the front step, poured into by hand or by the third cook (item 107)) */}
-      <group position={JUG_AT}><Tokkuri /></group>
+      {/* (the tokkuri on the front step, poured into by hand (item 107); full, a click empties it (item 177: a customer's is poured at the sake
+          station on the serving counter and carried out, not this one, out of everyone's reach)) */}
+      <group position={JUG_AT} onClick={onJugClick} onPointerOver={onJugOver} onPointerOut={onOut}><Tokkuri /></group>
       <mesh geometry={STREAM_GEO} material={STREAM_MAT} scale={[1, 0.0001, 1]} ref={stream} />
     </group>
   )
 }
 const X_AXIS = new THREE.Vector3(1, 0, 0)
-/** the third cook's pour's times (s): lifted by T_LIFT, over the tokkuri and tipped by T_IN, pouring till T_POUR, back and set down by
- * T_OUT */
-const T_LIFT = 0.35, T_IN = 0.9, T_POUR = 1.9, T_OUT = 2.6
-/** how high over the others a bottle's carried on its way to the tokkuri and back (the stand's frame) */
-const ARC_H = 0.32
 /** the sake's stream: a thin straw-gold thread, its top at its origin, a unit long downward (scaled to the drop) */
-const STREAM_GEO = new THREE.CylinderGeometry(0.0022, 0.0018, 1, 6, 1, true).translate(0, -0.5, 0)
-const STREAM_MAT = new THREE.MeshStandardMaterial({ color: '#e9dcae', transparent: true, opacity: 0.75, roughness: 0.05, emissive: '#3a3018' })
+export const STREAM_GEO = new THREE.CylinderGeometry(0.0022, 0.0018, 1, 6, 1, true).translate(0, -0.5, 0)
+export const STREAM_MAT = new THREE.MeshStandardMaterial({ color: '#e9dcae', transparent: true, opacity: 0.75, roughness: 0.05, emissive: '#3a3018' })
 
 function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternAt: [number, number, number]; fanAt: [number, number, number] }) {
   return (
