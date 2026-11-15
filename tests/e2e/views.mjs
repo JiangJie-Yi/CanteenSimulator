@@ -1,7 +1,7 @@
 // Every view from the eye button, pictured from a fresh browser (nothing placed by hand): for checking each frames its part of the shop.
 //   node tests/e2e/views.mjs [url]      OUT=<dir>  Q=<tier, default medium>
 import { chromium } from 'playwright-core'
-const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
+const URL = process.argv[2] ?? 'http://localhost:5173/GrilledFishBusiness/'
 const OUT = process.env.OUT ?? '.'
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 860 } })).newPage()

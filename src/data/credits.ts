@@ -16,8 +16,8 @@ export const CC_BY_URL = 'https://creativecommons.org/licenses/by/4.0/'
 /** who makes the game, its source on GitHub and where it's played (GitHub Pages: the repository's name is its path) */
 export const DEVELOPER = 'JiangJie-Yi'
 export const DEVELOPER_URL = 'https://github.com/JiangJie-Yi'
-export const REPO_URL = 'https://github.com/JiangJie-Yi/CanteenSimulator'
-export const SITE_URL = 'https://jiangjie-yi.github.io/CanteenSimulator/'
+export const REPO_URL = 'https://github.com/JiangJie-Yi/GrilledFishBusiness'
+export const SITE_URL = 'https://jiangjie-yi.github.io/GrilledFishBusiness/'
 /** the game's version (the owner's: up 0.01 with every push), and the AI model it's developed with */
 /** the game's version: <gameVersion's whole part>.<commit count> (<short hash>), worked out by vite.config.ts as it builds or serves */
 declare const __GAME_VERSION__: string | undefined

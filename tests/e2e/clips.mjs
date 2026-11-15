@@ -10,7 +10,7 @@
 import { chromium } from 'playwright-core'
 import { writeFileSync } from 'node:fs'
 
-const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
+const URL = process.argv[2] ?? 'http://localhost:5173/GrilledFishBusiness/'
 const TOL = Number(process.env.TOL ?? 0.015)
 const TOP = Number(process.env.TOP ?? 40)
 const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })

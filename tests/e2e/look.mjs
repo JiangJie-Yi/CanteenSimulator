@@ -11,7 +11,7 @@
 import { chromium } from 'playwright-core'
 import { toOpeningHours } from './hours.mjs'
 
-const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
+const URL = process.argv[2] ?? 'http://localhost:5173/GrilledFishBusiness/'
 const WATCH = Number(process.env.WATCH ?? 120000)
 const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 } })

@@ -147,7 +147,7 @@ def poll():
     if state and state.get("blend"):
         wanted = os.path.join(HERE, state["blend"])
         if os.path.exists(wanted) and not same_path(bpy.data.filepath or "", wanted):
-            print(f"[CanteenSimulator] page switched to {state['dish']}, opening {wanted}")
+            print(f"[GrilledFishBusiness] page switched to {state['dish']}, opening {wanted}")
             run_op(bpy.ops.wm.open_mainfile, filepath=wanted)
             return POLL_SECONDS
 
@@ -156,7 +156,7 @@ def poll():
     if path and os.path.exists(path):
         mtime = os.path.getmtime(path)
         if watch["blend_mtime"] is not None and mtime != watch["blend_mtime"]:
-            print(f"[CanteenSimulator] {os.path.basename(path)} changed on disk, reloading")
+            print(f"[GrilledFishBusiness] {os.path.basename(path)} changed on disk, reloading")
             watch["blend_mtime"] = mtime
             run_op(bpy.ops.wm.revert_mainfile)
             return POLL_SECONDS

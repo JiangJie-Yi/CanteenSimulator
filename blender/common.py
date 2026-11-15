@@ -1,4 +1,4 @@
-"""Shared helpers for the CanteenSimulator dish scripts: procedural textures, materials and mesh utilities.
+"""Shared helpers for the GrilledFishBusiness dish scripts: procedural textures, materials and mesh utilities.
 
 Import from a dish script run with `blender -b --python blender/<dish>.py`:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

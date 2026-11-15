@@ -1,10 +1,10 @@
-# 聞野・日式烤魚（JapaneseGrillSimulator）
+# 聞野・日式烤魚（GrilledFishBusiness）
 
 在瀏覽器裡玩的手繪風 3D 日式烤魚店經營遊戲。
 
 他拖著一只行李箱，隻身從台灣來到大阪天滿的窄巷，開了一間只有八個座位、一座圍爐裏的烤魚店「聞野」。備長炭一根根燒成灰，冷凍櫃裡的魚一天天倒數鮮度，時薪、水電從掀開暖簾那一刻就沒停過。這不是一間悠閒的小店，是一場生存戰：顧好火候、算好帳，把每條魚烤出焦香。
 
-**線上遊玩：** https://jiangjie-yi.github.io/CanteenSimulator/ （電腦與平板；手機版目前暫不開放）
+**線上遊玩：** https://jiangjie-yi.github.io/GrilledFishBusiness/ （電腦與平板；手機版目前暫不開放）
 
 ## 玩法
 
@@ -66,7 +66,7 @@
 
 ```bash
 npm install
-npm run dev      # 開發伺服器 http://localhost:5173/JapaneseGrillSimulator/
+npm run dev      # 開發伺服器 http://localhost:5173/GrilledFishBusiness/
 npm test         # 單元測試與 BDD 情境
 npm run e2e      # 瀏覽器實際玩一遍（需先開開發伺服器）
 npm run bench    # 性能測試（需先開開發伺服器）

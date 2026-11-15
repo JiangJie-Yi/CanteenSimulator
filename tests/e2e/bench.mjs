@@ -4,12 +4,12 @@
 //    again, developer mode in and out (the character viewer with it); every frame's time recorded: average fps, the 1% low, the worst frame,
 //    and the heap before and after (it shouldn't keep growing).
 // Writes a Markdown table (OUT=<file>, default bench.md) and the numbers as JSON beside it; BEFORE=<an earlier run's .json> puts that run in a
-// column of its own, with the change. BASE=<url> (default the dev server; `npx vite preview` at http://localhost:4173/JapaneseGrillSimulator/
+// column of its own, with the change. BASE=<url> (default the dev server; `npx vite preview` at http://localhost:4173/GrilledFishBusiness/
 // measures the build, without the dev-only hooks: the lights and the counts the page gives (__gl) are then skipped where they're missing).
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 
-const BASE = process.env.BASE ?? 'http://localhost:5173/JapaneseGrillSimulator/'
+const BASE = process.env.BASE ?? 'http://localhost:5173/GrilledFishBusiness/'
 const HOLD = Number(process.env.HOLD ?? 1000)
 const OUT = process.env.OUT ?? 'bench.md'
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] })

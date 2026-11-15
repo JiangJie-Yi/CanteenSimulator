@@ -30,7 +30,7 @@
 
 **最終呈現**：
 
-- 網站：GitHub Pages（https://jiangjie-yi.github.io/CanteenSimulator/），推 `main` 就自動測試、建置、部署，版本 +0.01。
+- 網站：GitHub Pages（https://jiangjie-yi.github.io/GrilledFishBusiness/），推 `main` 就自動測試、建置、部署，版本 +0.01。
 - 電腦與平板是完整的 3D：
   - 低面數模型加烘焙貼圖，卡通光影；
   - Overcooked 風格的人物與表情；
@@ -495,10 +495,10 @@ e2e 與檢查腳本用電腦上的 Chrome（Playwright 的 `channel: 'chrome'`�
 
 | 指令 | 網址 | 說明 |
 |---|---|---|
-| `npm run dev` | http://localhost:5173/JapaneseGrillSimulator/ | 開發伺服器（開發時的根路徑是 `/`，http://localhost:5173/ 也可以） |
+| `npm run dev` | http://localhost:5173/GrilledFishBusiness/ | 開發伺服器（開發時的根路徑是 `/`，http://localhost:5173/ 也可以） |
 | `npm run dev:sync` | 同上（5173） | 店主平常用的：開發伺服器＋每 20 秒同步 GitHub |
-| `npx vite --port 5176 --strictPort` | http://localhost:5176/JapaneseGrillSimulator/ | 指定別的埠（worktree 用） |
-| `npm run build` 然後 `npx vite preview` | http://localhost:4173/JapaneseGrillSimulator/ | 正式版（量效能用這個） |
+| `npx vite --port 5176 --strictPort` | http://localhost:5176/GrilledFishBusiness/ | 指定別的埠（worktree 用） |
+| `npm run build` 然後 `npx vite preview` | http://localhost:4173/GrilledFishBusiness/ | 正式版（量效能用這個） |
 
 網址參數：`?q=low|medium|high`（畫質）、`?pace=0`（不自動降畫質）、`?tex=512`（貼圖上限）、`?scene=0`、`?stage=0..3`（只載到第幾批）。
 
@@ -506,7 +506,7 @@ e2e 與檢查腳本用電腦上的 Chrome（Playwright 的 `channel: 'chrome'`�
 
 1. `npx tsc -b`（型別檢查）
 2. `npm test`（Vitest：單元測試、BDD、架構測試，約 1 秒）
-3. 有動到遊戲流程時 `npm run e2e`（需要先開開發伺服器；約 5 分鐘；別的埠：`npm run e2e -- http://localhost:5176/JapaneseGrillSimulator/`）
+3. 有動到遊戲流程時 `npm run e2e`（需要先開開發伺服器；約 5 分鐘；別的埠：`npm run e2e -- http://localhost:5176/GrilledFishBusiness/`）
 4. 改模型時：`node tests/e2e/clips.mjs`（穿模）、`node scripts/mesh-audit.mjs public/models/<檔名>.glb`（網格）
 5. 效能相關時：`npm run bench`、`node tests/e2e/perf.mjs`
 6. `npm run lint`（oxlint）

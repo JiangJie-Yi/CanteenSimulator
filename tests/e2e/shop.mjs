@@ -8,7 +8,7 @@
 //   await openShop(page, { x2: true, at: 16 * 60 + 35 })
 import { chromium } from 'playwright-core'
 
-export async function boot({ width = 1440, height = 860, url = process.env.URL ?? 'http://localhost:5173/JapaneseGrillSimulator/?pace=0' } = {}) {
+export async function boot({ width = 1440, height = 860, url = process.env.URL ?? 'http://localhost:5173/GrilledFishBusiness/?pace=0' } = {}) {
   const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }), headless: true,
     args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] })
   const page = await (await browser.newContext({ viewport: { width, height } })).newPage()

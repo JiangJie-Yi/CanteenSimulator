@@ -57,8 +57,8 @@ function gameVersion() {
 
 // https://vite.dev/config/
 // GitHub Pages serves the site from https://<user>.github.io/<repo>/: built on GitHub, the repo's own name (so the site
-// works whatever the repo's called); built here, and in `vite preview`, JapaneseGrillSimulator
-const REPO = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'JapaneseGrillSimulator'
+// works whatever the repo's called); built here, and in `vite preview`, GrilledFishBusiness
+const REPO = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'GrilledFishBusiness'
 export default defineConfig(({ command, isPreview }) => ({
   base: command === 'build' || isPreview ? `/${REPO}/` : '/',
   plugins: [react(), blenderBridge()],

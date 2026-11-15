@@ -130,7 +130,7 @@ export const ROAST_STAGES = [
   { until: Infinity, label: '焦了', key: 'burnt' },
 ] as const
 
-/** Files in public/, resolved against the site's base path (\/\ in dev, \/JapaneseGrillSimulator/\ on GitHub Pages). */
+/** Files in public/, resolved against the site's base path (\/\ in dev, \/GrilledFishBusiness/\ on GitHub Pages). */
 const asset = (path: string) => import.meta.env.BASE_URL + path
 
 /** the shop: a Japanese grill */

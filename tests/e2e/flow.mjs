@@ -10,7 +10,7 @@
 import { chromium } from 'playwright-core'
 import { toOpeningHours } from './hours.mjs'
 
-const URL = process.argv[2] ?? 'http://localhost:5173/JapaneseGrillSimulator/'
+const URL = process.argv[2] ?? 'http://localhost:5173/GrilledFishBusiness/'
 // (only the grill is open in this build; a new game starts in it, already set up)
 const SHOPS = ['grilledfish']
 const ONLY = process.argv.slice(3)

@@ -1,4 +1,4 @@
-# JapaneseGrillSimulator 日式燒烤模擬器：開發守則
+# GrilledFishBusiness 烤魚經營：開發守則
 
 React 19 + TypeScript + Vite + three.js（@react-three/fiber / drei）。推到 `main` 就會由 GitHub Actions 測試、建置，並部署到 GitHub Pages。
 
@@ -79,7 +79,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 | 指令 | 用途 |
 |---|---|
-| `npm run dev` | 開發伺服器 http://localhost:5173/JapaneseGrillSimulator/ |
+| `npm run dev` | 開發伺服器 http://localhost:5173/GrilledFishBusiness/ |
 | `npm run dev:sync` | 開發伺服器＋自動同步（見「同步流程」） |
 | `npm run sync` | 只做自動同步 |
 | `npm test` | 單元測試＋架構測試（Vitest，約 1 秒） |

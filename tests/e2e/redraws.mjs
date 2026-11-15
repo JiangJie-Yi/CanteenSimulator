@@ -93,7 +93,7 @@ await ctx.addInitScript(() => {
 const p = await ctx.newPage()
 p.setDefaultTimeout(8000)
 p.on('pageerror', (e) => console.log('ERR', e.message))
-await p.goto(`${process.env.BASE ?? 'http://localhost:5173'}/JapaneseGrillSimulator/?pace=0`, { timeout: 60000 })
+await p.goto(`${process.env.BASE ?? 'http://localhost:5173'}/GrilledFishBusiness/?pace=0`, { timeout: 60000 })
 await p.waitForTimeout(5000)
 if (await p.locator('.welcome-go').count()) await p.locator('.welcome-go').click()
 await p.waitForTimeout(2500)

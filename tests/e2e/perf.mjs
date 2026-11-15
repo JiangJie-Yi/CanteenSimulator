@@ -12,7 +12,7 @@
 // The page is opened with ?pace=0, so the frame pacer doesn't step the drawing down while it's measured.
 import { chromium } from 'playwright-core'
 import { toOpeningHours } from './hours.mjs'
-const URL = 'http://localhost:5173/JapaneseGrillSimulator/?pace=0' + (process.env.Q ? `&q=${process.env.Q}` : '')
+const URL = 'http://localhost:5173/GrilledFishBusiness/?pace=0' + (process.env.Q ? `&q=${process.env.Q}` : '')
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] })
 const ctx0 = await b.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: +(process.env.DSF ?? 1) })
 const p = await ctx0.newPage()
