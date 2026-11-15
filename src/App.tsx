@@ -115,6 +115,7 @@ const gameMinutes = () => getClock().day * 1440 + getClock().minute
 import { tl } from '@/data/i18n'
 import { hhmm, skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
 import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
+import { startAdminLink, type AdminSnap } from '@/ui/admin/link'
 import { GameClock } from '@/ui/GameClock'
 import { ageFresh } from '@/game/freshness'
 import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, type Lot } from '@/game/lots'
@@ -2167,6 +2168,28 @@ export default function App() {
   const phone = usePhone()
   phoneRef.current = phone
   const [lang, setLang] = useState<Lang>(() => SAVED?.lang ?? 'zh')
+  // (the back office (item 184, admin.html, ui/admin/link): what's going on in this game, told once a second while one's open in another tab of
+  // this browser, nothing when there's none; the few things it asks (the game's speed, its clock) done)
+  const adminSnap = useRef<() => AdminSnap>(() => { throw new Error('not yet') })
+  adminSnap.current = () => {
+    const dish = DISHES[active], c = getClock(), working = new Set(staffOf(dish.id).map((w) => w.id))
+    return {
+      at: Date.now(), lang, clock: { day: c.day, minute: c.minute }, speed, open: ai, owner: owner ?? '', cash, capital: CAPITAL,
+      names: Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)])), ledger: { ...ledger }, rating: shopRating, visits: shopVisits.length,
+      reviews: shopVisits.slice(-40).reverse(), days: dayLog.slice(-30),
+      guests: (guestsRef.current[dish.id] ?? []).map((g) => ({ id: g.id, state: g.state, seat: g.seat, items: g.items, rating: g.rating })),
+      orders: Object.entries(ordersBy.open[dish.id] ?? {}).filter(([, n]) => n > 0).map(([id, n]) => {
+        const item = dish.items.find((x) => x.id === id)
+        return { id, name: item ? nameIn(lang, item) : id, n }
+      }),
+      staff: (CANDIDATES[dish.id] ?? []).filter((w) => hired[dish.id]?.[w.id]).map((w) => ({ id: w.id, role: w.role, name: personName(w, lang), on: working.has(w.id) })),
+      log: chat.slice(-80),
+    }
+  }
+  useEffect(() => startAdminLink(() => adminSnap.current(), (cmd) => {
+    if (cmd.kind === 'speed') setSpeed(cmd.x > 1 ? 2 : 1)
+    else if (cmd.kind === 'clock') setClock({ day: cmd.day, minute: Math.max(0, Math.min(1439, Math.round(cmd.minute))) })
+  }), [])
   // (each speaker's tag over their bubbles: the role and the name, in the game's language; the till's whoever's at it, the owner if nobody)
   {
     const crew = staffOf(DISHES[active].id)

@@ -8,6 +8,7 @@ import { laterPending, laterSeen, sceneDrawn } from '@/scene/Later'
 import { VERSION, versionText } from '@/data/credits'
 import { panelSound } from '@/ui/uiSound'
 import { PathLegend } from './PathLegend'
+import { ADMIN_URL } from '@/scene/toolPage'
 import { discardEdit, dissolveGroup, frameSelected, freezeSelected, getCharHidden, hideSelected, isDirty, makeGroup, playGame, redo, resetAll, saveEdit,
   select, selectedName, setCharHidden, setPaths, setShade, SHADES, showHidden, subscribeEdit, undo, useEditSel } from './edit'
 
@@ -87,7 +88,7 @@ export const EditorShell = memo(function EditorShell({ lang }: { lang: Lang }) {
       'gap',
       { label: st.paths ? T.pathsOff : T.pathsOn, run: () => setPaths(!st.paths), on: st.paths },
     ] },
-    { name: T.menuWindow, items: [{ label: T.charWin, run: toggleChar, on: charOn }] },
+    { name: T.menuWindow, items: [{ label: T.charWin, run: toggleChar, on: charOn }, { label: T.adminWin, run: () => window.open(ADMIN_URL, 'grill-admin') }] },
     { name: T.menuHelp, items: [{ label: T.hotkeysWin, run: () => setKeysOpen(true) }] },
   ]
   const name = selectedName()

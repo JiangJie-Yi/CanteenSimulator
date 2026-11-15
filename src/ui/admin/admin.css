@@ -1,0 +1,69 @@
+/* The back office (item 184, admin.html): dark, as the shop's editor is; its own sheet, not the game's */
+:root { color-scheme: dark; }
+body { margin: 0; background: #1b1b1b; color: #d6d6d6; font: 13px/1.45 "Inter", "Segoe UI", "Noto Sans TC", sans-serif; }
+* { box-sizing: border-box; }
+.ad { display: grid; grid-template-columns: 210px 1fr; grid-template-rows: 48px 1fr; height: 100vh; }
+.ad-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 0 16px; background: #2b2b2b; border-bottom: 1px solid #141414; white-space: nowrap; }
+.ad-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ad-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; background: linear-gradient(#e8a33d, #c27a1e); color: #1e1e1e; }
+.ad-brand b { font-size: 15px; font-weight: 600; color: #f2f2f2; letter-spacing: 0.04em; }
+.ad-brand small { color: #8f8f8f; }
+.ad-link { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px; border-radius: 12px; background: #333; color: #b8b8b8; font-size: 12px; }
+.ad-link i { width: 8px; height: 8px; border-radius: 50%; background: #8a8a8a; }
+.ad-link.is-live { background: #23402a; color: #bfe6c6; }
+.ad-link.is-live i { background: #57c26b; box-shadow: 0 0 0 3px rgba(87, 194, 107, 0.25); }
+.ad-link em { font-style: normal; color: #8fb79a; font-size: 11px; }
+.ad-acts { margin-left: auto; display: flex; gap: 8px; }
+.ad button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 5px; background: #3c3c3c; color: #e0e0e0;
+  font: 12px/1 "Inter", "Segoe UI", "Noto Sans TC", sans-serif; cursor: pointer; white-space: nowrap; }
+.ad button:hover { background: #4a4a4a; }
+.ad button.is-on, .ad button.is-main { background: #2f6fb0; color: #fff; }
+.ad button.is-on:hover, .ad button.is-main:hover { background: #3b80c8; }
+.ad-nav { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; background: #232323; border-right: 1px solid #141414; overflow: auto; }
+.ad-nav button { justify-content: flex-start; width: 100%; height: 34px; background: none; color: #c8c8c8; font-size: 13px; }
+.ad-nav button:hover { background: #2f2f2f; }
+.ad-nav button.is-on { background: #2f4d73; color: #fff; }
+.ad-main { padding: 18px 22px 40px; overflow: auto; }
+.ad-main h2 { margin: 0 0 14px; font-size: 18px; font-weight: 600; color: #f0f0f0; white-space: nowrap; }
+.ad-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.ad-tile { display: grid; gap: 4px; padding: 12px 14px; background: #262626; border: 1px solid #141414; border-radius: 8px; }
+.ad-tile span { color: #9a9a9a; font-size: 12px; white-space: nowrap; }
+.ad-tile b { font: 600 20px/1.2 "Inter", "Segoe UI", "Noto Sans TC", sans-serif; color: #f2f2f2; white-space: nowrap; }
+.ad-tile small { color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-tile.is-up b { color: #7fd48e; }
+.ad-tile.is-down b { color: #f08a7a; }
+.ad-card { padding: 14px 16px; margin-bottom: 14px; background: #262626; border: 1px solid #141414; border-radius: 8px; overflow-x: auto; }
+.ad-card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: #e6e6e6; white-space: nowrap; }
+.ad-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.ad-table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.ad-table th { padding: 6px 10px; border-bottom: 1px solid #3a3a3a; color: #9a9a9a; font-weight: 500; font-size: 12px; text-align: left; }
+.ad-table td { padding: 7px 10px; border-bottom: 1px solid #303030; }
+.ad-table .num { text-align: right; font-family: "Cascadia Mono", Consolas, "SF Mono", Menlo, ui-monospace, monospace; }
+.ad-table .is-up { color: #7fd48e; }
+.ad-table .is-down { color: #f08a7a; }
+.ad-table tr.ad-sub td { color: #8a8a8a; font-size: 12px; }
+.ad-table tfoot td { border-bottom: 0; border-top: 1px solid #4a4a4a; font-weight: 600; color: #f2f2f2; }
+.ad-stars { display: inline-flex; align-items: center; gap: 1px; color: #f0b43c; }
+.ad-stars b { margin-left: 6px; font: 600 13px/1 "Cascadia Mono", Consolas, "SF Mono", Menlo, ui-monospace, monospace; color: #f2f2f2; }
+.ad-dim { color: #808080; }
+.ad-log { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.ad-log li { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid #2e2e2e; }
+.ad-log li span { flex: none; min-width: 44px; color: #9fc3ea; white-space: nowrap; }
+.ad-log.is-full { max-height: calc(100vh - 170px); overflow: auto; }
+.ad-reviews { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.ad-reviews li { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; padding: 8px 0; border-bottom: 1px solid #2e2e2e; }
+.ad-reviews li b { color: #f0f0f0; white-space: nowrap; }
+.ad-reviews li span, .ad-reviews li small { grid-column: 2; color: #9a9a9a; white-space: nowrap; }
+.ad-reviews li em { grid-column: 2; font-style: normal; color: #f0a37a; }
+.ad-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #3a3a3a; color: #cfcfcf; font-size: 11px; white-space: nowrap; }
+.ad-pill.is-on, .ad-pill.is-eating { background: #23402a; color: #bfe6c6; }
+.ad-pill.is-waiting { background: #3f3420; color: #f0cf8a; }
+.ad-pill.is-angry { background: #4a2420; color: #f3b0a5; }
+.ad-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ad-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.ad-row label { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.ad-row input { height: 30px; padding: 0 8px; border: 1px solid #444; border-radius: 5px; background: #1e1e1e; color: #e6e6e6; font: 13px/1 "Cascadia Mono", Consolas, "SF Mono", Menlo, ui-monospace, monospace; color-scheme: dark; }
+.ad-empty { max-width: 560px; }
+.ad-empty p { color: #a8a8a8; line-height: 1.7; }
+.ad-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 9px 18px; border-radius: 8px; background: rgba(10, 30, 60, 0.95);
+  border: 1px solid #3fa9ff; color: #cfeaff; white-space: nowrap; }

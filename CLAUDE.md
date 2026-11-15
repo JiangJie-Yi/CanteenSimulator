@@ -131,6 +131,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 完整說明（操作、熱鍵、選取、群組與分區、軸心、渲染設定、角色預覽、面板）在 `docs/DETAILS.md` 同名的一節。新增或調整擺設時要守的：
 - **開發者模式是獨立的店面編輯器**（`editor.html`，第 178 項；dev 是 http://localhost:5173/editor.html）：遊戲裡按 **G** 會在新分頁開它；編輯器一打開就在編輯模式（不用按 G、Esc 不會離開），上方選單與工具列、左邊階層、右邊屬性、下方狀態列；**Ctrl+S 儲存**、檔案選單「捨棄未儲存的修改」、「試玩」先存再開遊戲分頁；有未儲存的修改時標題與狀態列會說，離開前會問。程式與量測裡要在遊戲頁面原地開關：`__edit.toggle()`。
+- **後台**（`admin.html`，第 184 項；dev 是 http://localhost:5173/admin.html，編輯器的「視窗 → 後台」也能開）：連著同一個瀏覽器正在跑的遊戲分頁的主控台（`src/ui/admin/`，BroadcastChannel），看營運、帳本、評價、客人、員工、日誌，能調速度、跳時間；規劃與做法在 `docs/BACKOFFICE.md`。
 - 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。
 - 預設位置寫在 `edit.ts` 的 `BASES`（父層單位；編輯面板顯示的是房間座標，寫預設前用 `fromRoom(id, v)` 換算）；大小與轉向用 `<Movable baseScale baseTurn>`；站在地上的加 `ground`。改了預設要把 `edit.ts` 開頭三個 localStorage key 的版本加一。
 - 吊掛或貼牆的擺設加進 `edit.ts` 的 `HANGS`（操作軸在中心；其他的在腳底中心）。

@@ -67,7 +67,7 @@ export default defineConfig(({ command, isPreview }) => ({
   // (the same alias as tsconfig.app.json's paths)
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   // (two pages: the game, and the shop's editor (item 178, scene/toolPage.ts))
-  build: { rollupOptions: { input: { main: fileURLToPath(new URL('./index.html', import.meta.url)), editor: fileURLToPath(new URL('./editor.html', import.meta.url)) } } },
+  build: { rollupOptions: { input: { main: fileURLToPath(new URL('./index.html', import.meta.url)), editor: fileURLToPath(new URL('./editor.html', import.meta.url)), admin: fileURLToPath(new URL('./admin.html', import.meta.url)) } } },
   server: {
     // the bridge rewrites this file constantly; don't reload the page for it
     watch: { ignored: ['**/blender/**'] },

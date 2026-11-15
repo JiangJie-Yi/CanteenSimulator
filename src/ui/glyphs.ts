@@ -8,7 +8,7 @@ export type GlyphPart = { d: string; stroke?: number; cut?: boolean; o?: number 
 export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
-  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb' | 'towel' | 'soap' | 'check'
+  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb' | 'towel' | 'soap' | 'check' | 'calendar' | 'list' | 'people'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -61,6 +61,10 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
   arrowR: [{ d: 'M2.2 8h10.6M8.8 4 12.8 8l-4 4', stroke: S }],
   // (a tick: a step done (the editor's start-up, item 190))
   check: [{ d: 'M3 8.6 6.3 11.6 13 4.6', stroke: S }],
+  // (the back office's (item 184): a day's page, a list, two people)
+  calendar: [{ d: 'M2.8 4.2h10.4v9H2.8zM2.8 7h10.4M5.4 2.6v3M10.6 2.6v3', stroke: S }],
+  list: [{ d: 'M6 4.5h7.2M6 8h7.2M6 11.5h7.2M2.9 4.5h.2M2.9 8h.2M2.9 11.5h.2', stroke: S }],
+  people: [{ d: 'M6 7.4a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2ZM2.3 13.2c0-2.1 1.7-3.7 3.7-3.7s3.7 1.6 3.7 3.7M10.9 7a1.8 1.8 0 1 0 0-3.6M12 9.7c1.2.4 1.9 1.7 1.9 3.3', stroke: S }],
   arrowU: [{ d: 'M8 13.8V3.2M4 7.2 8 3.2l4 4', stroke: S }],
   // (no entry: a ring struck through)
   ban: [{ d: 'M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2Z', stroke: 1.8 }, { d: 'M3.8 3.8l8.4 8.4', stroke: 1.8 }],

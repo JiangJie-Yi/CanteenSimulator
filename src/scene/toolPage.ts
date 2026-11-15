@@ -7,3 +7,5 @@ export const TOOL_PAGE = typeof document !== 'undefined' && document.documentEle
 /** the editor's page and the game's, each opened from the other in a tab of its own (the same tab each time) */
 export const EDITOR_URL = `${import.meta.env.BASE_URL}editor.html`
 export const GAME_URL = import.meta.env.BASE_URL
+/** the back office's page (item 184, ui/admin): a console on the game being played in another tab */
+export const ADMIN_URL = `${import.meta.env.BASE_URL}admin.html`
