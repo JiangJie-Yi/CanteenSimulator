@@ -81,7 +81,9 @@ import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
 import { activityOf, effective, isTired, restPerHour, ROLES, tireNow, workFatigue, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
-import { CLOSE_AT, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy, overtimeRate } from '@/game/hours'
+import { CLOSE_AT, OPEN_AT, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy, overtimeRate } from '@/game/hours'
+import { GUIDE_KEY } from '@/game/firstDay'
+import { FirstDayGuide } from '@/ui/FirstDayGuide'
 import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
 import { keptForResume, resumeFrom } from '@/game/resume'
@@ -1269,6 +1271,18 @@ export default function App() {
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
   const { on: editOn } = useEdit()
+  // (the first day's guide (item 175): up for a new game, unless it's been finished or skipped before; ?guide=1 shows it whatever)
+  const [guide, setGuide] = useState(() => {
+    try {
+      if (new URLSearchParams(location.search).get('guide') === '1') return true
+      return !SAVED && localStorage.getItem(GUIDE_KEY) !== 'done'
+    } catch { return !SAVED }
+  })
+  const guideDone = useCallback(() => {
+    setGuide(false)
+    try { localStorage.setItem(GUIDE_KEY, 'done') } catch { /* (not kept) */ }
+  }, [])
+  const guideHours = useClock((c) => inHours(c.minute))
   // edit mode is for the scene alone: no game action goes through (a click on the 3D view is swallowed before it reaches what's clicked; the menu and buttons are shut by CSS)
   useEffect(() => {
     if (!editOn) return
@@ -3403,6 +3417,12 @@ export default function App() {
       {daySum && <DaySummary s={daySum.s} day={daySum.day} hours={[daySum.from, daySum.to]} lang={lang} onClose={dayDone}
         nameOf={(key) => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === key); return e ? nameIn(lang, e) : key }} />}
       <HoverTip hidden={editOn} />
+      {guide && !editOn && !flatGrill && (
+        <FirstDayGuide lang={lang} takings={ledger.revenue}
+          shop={{ kinds: dish.items.filter((it) => (stock[it.id] ?? 0) > 0).length, cooks: cooksNow(dish).length, menu: entriesOf(dish.id).length,
+            menuMin: MENU_MIN[dish.id] ?? 1, open: ai, inHours: guideHours, sold: ledger.revenue > 0 }}
+          onSkipTime={() => setClock({ ...getClock(), minute: OPEN_AT })} onDone={guideDone} />
+      )}
       <RegisterManual lang={lang} />
       <LoadingScreen scene={!NO_WEBGL && !flatGrill} />
     </div>

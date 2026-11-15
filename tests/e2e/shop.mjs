@@ -12,6 +12,8 @@ export async function boot({ width = 1440, height = 860, url = process.env.URL ?
   const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }), headless: true,
     args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] })
   const page = await (await browser.newContext({ viewport: { width, height } })).newPage()
+  // (the first day's guide (item 175) taken as done: its card at the foot of the screen would stand over what's clicked)
+  await page.addInitScript(() => { try { localStorage.setItem('jgs-guide-1', 'done') } catch { /* (blocked) */ } })
   page.setDefaultTimeout(15000)
   page.on('pageerror', (e) => console.log('ERR', e.message))
   page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', m.text().slice(0, 240)) })
