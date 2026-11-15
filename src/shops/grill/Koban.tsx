@@ -261,7 +261,7 @@ export function Koban() {
     sp.scale.setScalar(face.size * (0.3 + 0.7 * v))
   })
   return (
-    <group {...nameOver('小判金幣', '招財納福的金幣，據說能招引財富')}>
+    <group {...nameOver('小判金幣', '招財納福的金幣，據說能招引巨財')}>
       <primitive object={obj} />
       <sprite ref={spark} name="koban-spark" raycast={() => {}} renderOrder={6}>
         <spriteMaterial map={SPARK_TEX} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />

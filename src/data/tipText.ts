@@ -122,7 +122,7 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   拖曳移動: ['ドラッグで移動', 'Drag to move'],
   '拖曳移動，放回櫃子或遞給客人': ['ドラッグで移動、棚に戻すかお客さんへ', 'Drag: back in the fridge, or to a customer'],
   招財納福的金幣: ['福を招く金貨', 'A coin to bring in luck'],
-  '招財納福的金幣，據說能招引財富': ['福を招く金貨。金運を呼び込むといわれる', 'A coin to bring in luck: said to draw in wealth'],
+  '招財納福的金幣，據說能招引巨財': ['福を招く金貨。巨万の富を呼び込むといわれる', 'A coin to bring in luck: said to draw in a great fortune'],
   '放不下了，等底下的炭燒成灰再加': ['いっぱい、下の炭が灰になってから', 'No room: wait till the coals below burn down'],
   '正在洗碗；點一下也能自己開水': ['皿洗い中；クリックで水も出せる', 'Washing up; click to run it yourself'],
   '江戶浮世繪藝伎，洋溢典雅古韻': ['江戸の浮世絵美人、雅な趣', 'An Edo ukiyo-e beauty, elegant and old'],
