@@ -82,7 +82,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -4185,11 +4185,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const skTraySpot = () => skewerSpot('skewer-tray', home())
       const skHolderSpot = () => skewerSpot('skewer-holder', home())
       const faceTo = (v: THREE.Vector3) => { pl.yaw = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
-      /** where they stand on the kitchen's floor to reach something on (or by) the cook table: the nearest spot clear of it */
+      /** where they stand on the kitchen's floor to reach something on (or by) the cook table: the nearest spot clear of it that a way reaches
+       * from where they are (game/kitchenPath's reachSpot; the nearest side alone (standClear) could be one no way reaches: the sake stand,
+       * moved along the table's back by the owner, was reached from the gap between the table and the bar, the way there none, and the
+       * second cook walked the straight line through the table and the fire bed and back, the hearth's guard throwing him out of it a metre
+       * and more each frame (the owner, 2026-11-15: the dayaudit, 193 pushes, 20 jumps of 1.7 m)) */
       const reachOf = (v: THREE.Vector3) => {
         const blocks = kitchenBlocks()
         if (!blocks.length) return v.clone().setY(0)
-        const [a, l] = standClear(flat(v), blocks)
+        const k = kitchenOf(counters)
+        const [a, l] = reachSpot(flat(v), flat(pl.pos), { x0: k.along[0], z0: k.lay[0], x1: k.along[1], z1: k.lay[1] }, blocks)
         const c0 = counters[0]
         return c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
       }
@@ -5538,6 +5543,30 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (shown > 0 && binThere) bs.position.copy(inBar('SinkBinTop', endOf(1)))
       bs.children.forEach((c, i) => { c.visible = binThere && i < shown })
     }
+    // (what each of the kitchen's people has in hand, laid out above: for the hearth's guard to move with them if it puts them out of the cook
+    // table (bar's CARRIED; each one's list kept and refilled, nothing made a frame))
+    const heldBy = (o: THREE.Object3D) => { let a = CARRIED.get(o); if (!a) { a = []; CARRIED.set(o, a) } a.length = 0; return a }
+    const po = platerObj.current
+    if (po) {
+      const h = heldBy(po)
+      if (platerStack.current) h.push(platerStack.current)
+      if (platerCoal.current) h.push(platerCoal.current)
+      if (platerDipper.current) h.push(platerDipper.current)
+      if (platerBowl.current) h.push(platerBowl.current)
+      if (platerBall.current) h.push(platerBall.current)
+    }
+    waiters.current.forEach((w, wi) => {
+      const o = waiterObjs.current[wi]
+      if (!o) return
+      const h = heldBy(o)
+      const so = stackObjs.current[wi], rag = ragObjs.current[wi], sb = serverSkewers.current
+      if (so) h.push(so)
+      if (rag) h.push(rag)
+      if (sb && sb.userData.by === wi) h.push(sb)
+      if (w.carry) for (const key of w.carry) { const r = runObjs.current.get(key); if (r) h.push(r) }
+      const pr = runObjs.current.get(w.run ?? -1)
+      if (pr) h.push(pr)
+    })
   })
 
   // (the customers' shoes at the door and the soy at their places, for SeatBits: worked out again only when who's in, and where, changes)

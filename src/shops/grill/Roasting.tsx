@@ -78,7 +78,7 @@ import { Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
-import { AISLE, aisleCornerOf, FIGURES, FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
+import { AISLE, aisleCornerOf, FIGURES, CARRIED, FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -1438,7 +1438,7 @@ const HEARTH_ZONES: HearthZones = {
   notch: { along: [COOK_NOTCH.along[0], COOK_NOTCH.along[1]], lay: [COOK_NOTCH.lay[0], COOK_NOTCH.lay[1]] },
   bay: { along: [SOUS_NOTCH.along[0], SOUS_NOTCH.along[1]], lay: [SOUS_NOTCH.lay[0], SOUS_NOTCH.lay[1]] },
 }
-const GUARD_AT = new THREE.Vector3(), GUARD_LOCAL = new THREE.Vector3(), GUARD_INV = new THREE.Matrix4()
+const GUARD_AT = new THREE.Vector3(), GUARD_LOCAL = new THREE.Vector3(), GUARD_INV = new THREE.Matrix4(), GUARD_SHIFT = new THREE.Vector3(), GUARD_HELD = new THREE.Vector3()
 /** how high over the cook table's top he carries a piece (his hands' middle, what he holds hanging from it), and a spare for the top's
  * height in the world */
 const CARRY_LIFT = 0.2
@@ -1477,9 +1477,18 @@ function HearthGuard() {
         }
         // (moved along the table's own axes only, in its frame; back into the world, and into its own parent's frame)
         GUARD_LOCAL.addScaledVector(ALONG, a2 - al).addScaledVector(LAY, l2 - la).applyMatrix4(frame.matrixWorld)
+        GUARD_SHIFT.subVectors(GUARD_LOCAL, GUARD_AT)
         o.parent.worldToLocal(GUARD_LOCAL)
         o.position.copy(GUARD_LOCAL)
         o.updateMatrixWorld(true)
+        // (and what they've in hand, as far (bar's CARRIED))
+        for (const c of CARRIED.get(o) ?? []) {
+          if (!c.parent || !c.visible) continue
+          c.getWorldPosition(GUARD_HELD).add(GUARD_SHIFT)
+          c.parent.worldToLocal(GUARD_HELD)
+          c.position.copy(GUARD_HELD)
+          c.updateMatrixWorld(true)
+        }
       }
     }
     return () => { scene.onBeforeRender = was }

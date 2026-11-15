@@ -103,7 +103,11 @@ export const KITCHEN_FOLK = new Set<THREE.Object3D>()
  * HearthGuard puts them out of it the last thing before each frame's drawn, after all that moves them). One no longer in the scene is let go.
  */
 export const FIGURES = new Map<THREE.Object3D, HearthRole>()
-if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __figures: FIGURES })
+/** what each of the kitchen's people has in hand this frame (GuestBar3D lists it as it lays it out): the hearth's guard moves it as far as it
+ * moves them, so nothing carried is left in the air where they were put out of the cook table from (the owner, 2026-11-15: plates stood over
+ * the fire bed and by the lantern) */
+export const CARRIED = new Map<THREE.Object3D, THREE.Object3D[]>()
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __figures: FIGURES, __carried: CARRIED })
 
 /**
  * Serving through the pass, when there's a server on the floor: what's grilled is put out at the pass (the end of the
