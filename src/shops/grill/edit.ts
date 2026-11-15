@@ -23,6 +23,8 @@ export type V3 = [number, number, number]
 /** the panel's language (the game's: App sets it) */
 let lang: Lang = 'zh'
 const T = () => EDIT_TEXT[lang]
+/** the edit panel's words, in its language (the paths' map names its people and places with them) */
+export const editWords = () => T()
 export function setEditLang(l: Lang) {
   if (lang === l) return
   lang = l
@@ -39,6 +41,7 @@ const KEY_P = 'jgs-edit-pivots-2'
 const KEY_PATHS = 'jgs-edit-paths-1'
 /** the keep-clear patches (item 168) */
 const KEY_ZONES = 'jgs-edit-zones-1'
+const KEY_VIAS = 'jgs-edit-vias-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
@@ -228,7 +231,10 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
    * and manage them?"): what stands in the way on the kitchen's floor, the ways the staff go and are going (PathMap) */
   paths: boolean
   /** the keep-clear patches of the kitchen's floor (PathZone), by their ids (pathzone-<n>): the staff's ways go round them */
-  zones: string[] }
+  zones: string[]
+  /** the waypoints set by hand on the staff's usual ways (item 189), by the way's key (`<from>><to>`, bar's PathRoute): each a piece of its own
+   * (pathvia-<n>), the way going through them in turn, nearest its start first */
+  vias: Record<string, string[]> }
 /** offsets made defaults (BASES) since they were set by hand: a browser still holding just that offset drops it, so it isn't counted twice
  * (the rest it holds are kept, as a new KEY would lose them) */
 const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0], willow: [-0.465, 0, -0.367] }
@@ -325,7 +331,8 @@ if (!relaid) try {
 } catch { /* private window */ }
 let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
   pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', shade: 'lit', hidden: [], paths: (() => { try { return localStorage.getItem(KEY_PATHS) === '1' } catch { return false } })(),
-  zones: (() => { try { const z = JSON.parse(localStorage.getItem(KEY_ZONES) ?? '[]'); return Array.isArray(z) ? z.filter((x) => typeof x === 'string' && x.startsWith('pathzone-')) : [] } catch { return [] } })() }
+  zones: (() => { try { const z = JSON.parse(localStorage.getItem(KEY_ZONES) ?? '[]'); return Array.isArray(z) ? z.filter((x) => typeof x === 'string' && x.startsWith('pathzone-')) : [] } catch { return [] } })(),
+  vias: (() => { try { const v = JSON.parse(localStorage.getItem(KEY_VIAS) ?? '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([, ids]) => Array.isArray(ids)).map(([k, ids]) => [k, (ids as unknown[]).filter((x): x is string => typeof x === 'string' && x.startsWith('pathvia-'))]).filter(([, ids]) => ids.length)) : {} } catch { return {} } })() }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
 let lastSelected: string | null = null
@@ -1136,6 +1143,39 @@ export function addZone() {
   // (chosen once it's drawn and listed)
   window.setTimeout(() => select(id), 60)
 }
+/** the waypoints, kept for the next time */
+const saveVias = () => { try { localStorage.setItem(KEY_VIAS, JSON.stringify(state.vias)) } catch { /* (not kept) */ } }
+/**
+ * A waypoint put on one of the staff's usual ways (item 189), at `at` (its move from the waypoints' origin, PATH_MAP.home): the next number,
+ * chosen, to be dragged where the way should pass; the way goes through it from then on, both ways
+ */
+export function addVia(key: string, at: V3) {
+  const all = Object.values(state.vias).flat()
+  let n = 1
+  while (all.includes(`pathvia-${n}`)) n++
+  const id = `pathvia-${n}`
+  state.vias = { ...state.vias, [key]: [...(state.vias[key] ?? []), id] }
+  saveVias()
+  state.offsets = { ...state.offsets, [id]: at }
+  if (!state.paths) setPaths(true)
+  emit()
+  toast(T().viaAdded(n), 'edit')
+  // (chosen once it's drawn and listed)
+  window.setTimeout(() => select(id), 60)
+}
+/** a waypoint taken away (Delete with it chosen): its way goes as it would without it */
+export function removeVia(id: string) {
+  const key = Object.keys(state.vias).find((k) => state.vias[k].includes(id))
+  if (!key) return
+  const left = state.vias[key].filter((x) => x !== id), next = { ...state.vias }
+  if (left.length) next[key] = left
+  else delete next[key]
+  state.vias = next
+  saveVias()
+  if (state.selected === id) state.selected = null
+  emit()
+  toast(T().viaRemoved, 'edit')
+}
 /** a keep-clear patch taken up (Delete with it chosen) */
 export function removeZone(id: string) {
   if (!state.zones.includes(id)) return
@@ -1864,6 +1904,8 @@ if (typeof window !== 'undefined') {
       if (k === 'escape') { e.preventDefault(); if (state.selected || state.picked.length) { state.picked = []; select(null) } else if (!TOOL_PAGE) toggleEdit(); return }
       // (Delete: a keep-clear patch chosen, taken up (item 168))
       if ((k === 'delete' || k === 'backspace') && state.selected?.startsWith('pathzone-')) { e.preventDefault(); removeZone(state.selected); return }
+      // (and a waypoint (item 189))
+      if ((k === 'delete' || k === 'backspace') && state.selected?.startsWith('pathvia-')) { e.preventDefault(); removeVia(state.selected); return }
       // (1 to 5: the ways the scene's drawn (item 191; 4 the wireframe still, as Maya's))
       const sh = k.length === 1 ? '12345'.indexOf(k) : -1
       if (sh >= 0) { e.preventDefault(); setShade(SHADES[sh]); return }

@@ -193,8 +193,18 @@ export const OWNER_OUT = { on: false }
  * twice a second while it's shown: what stands in the way on the kitchen's floor (each its four corners and the piece it is), the staff's
  * usual ways, those being walked, the customers' from the door to each seat. `v` counts its changes
  */
-export const PATH_MAP: { v: number; blocks: { id: string; pts: THREE.Vector3[] }[]; routes: { kind: 'staff' | 'live' | 'guest'; pts: THREE.Vector3[] }[] } =
-  { v: 0, blocks: [], routes: [] }
+/** a way on the paths' map (item 189, the owner's, 2026-11-16: "mark clearly whose each way is, and let them be edited by hand"): whose it is
+ * (`who`: 'server-<i>', 'owner', 'plater', 'guest'), from which place to which (PATH_MAP.places' keys), and, for the staff's usual ways, the key
+ * the waypoints set for it by hand are kept under (`<from>><to>`: edit mode's vias) */
+export type PathRoute = { kind: 'staff' | 'live' | 'guest'; pts: THREE.Vector3[]; who: string; from: string; to: string; key?: string }
+export const PATH_MAP: { v: number; blocks: { id: string; pts: THREE.Vector3[] }[]; routes: PathRoute[]
+  /** the places the ways go between, named on the floor: the staff's own, the sink, the racks, the plating place's two sides, the door, the seats */
+  places: { key: string; at: THREE.Vector3 }[]
+  /** where the waypoints' moves are counted from (the origin of their pieces' frame) */
+  home: THREE.Vector3 | null
+  /** the person or the way the map's list is pointing at (a `who`, or a way's key): drawn bright, the rest faint */
+  hot: string | null } =
+  { v: 0, blocks: [], routes: [], places: [], home: null, hot: null }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pathMap: PATH_MAP })
 export const SERVICE = {
   /** how many servers there are to carry (GuestBar3D says): none, and the cook hands it over the bar himself */

@@ -7,6 +7,7 @@ import { useProgress } from '@react-three/drei'
 import { laterPending, laterSeen, sceneDrawn } from '@/scene/Later'
 import { VERSION, versionText } from '@/data/credits'
 import { panelSound } from '@/ui/uiSound'
+import { PathLegend } from './PathLegend'
 import { discardEdit, dissolveGroup, frameSelected, freezeSelected, getCharHidden, hideSelected, isDirty, makeGroup, playGame, redo, resetAll, saveEdit,
   select, selectedName, setCharHidden, setPaths, setShade, SHADES, showHidden, subscribeEdit, undo, useEditSel } from './edit'
 
@@ -125,6 +126,7 @@ export const EditorShell = memo(function EditorShell({ lang }: { lang: Lang }) {
         <span className="bt-sel">{name ? T.selectedIs(name) : T.noSelection}</span>
         <span className={`bt-saved${dirty ? ' is-dirty' : ''}`}>{dirty && <i className="bt-dot" />}{dirty ? T.dirty : T.clean}</span>
       </div>
+      <PathLegend lang={lang} />
       <EditorSplash lang={lang} />
       {keysOpen && (
         <div className="bt-keys" role="dialog" aria-label={T.hotkeysWin} onClick={() => { setKeysOpen(false); panelSound(false) }}>

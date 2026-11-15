@@ -36,7 +36,7 @@ import { newWashPose, spongePose, washPose, type WashPoints } from '@/scene/wash
 import { PLATE_SCALE } from '@/game/plateSize'
 import { PathMap } from './PathMap'
 import { ServeCounter } from './ServeCounter'
-import { PathZones } from './PathZone'
+import { PathVias, PathZones } from './PathZone'
 import { unlitShade } from '@/game/roomLights'
 import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SHAPE_HAND, SweepBroom, ownerSweepPose, floorWipePose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
@@ -73,7 +73,7 @@ import { drawerOpens, paysByCard, tabletActive } from '@/game/till'
 import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDesk'
 import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
-import { getEdit, setLocked } from './edit'
+import { getEdit, offsetOf, setLocked } from './edit'
 import { basinHint, scrubOnce } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
@@ -91,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -3313,17 +3313,62 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     blockIds.current = ids
     return out
   }
-  /** a server's way across the kitchen's floor, round the cook's table and all that stands on it (game/kitchenPath) */
+  /** where the waypoints set by hand are counted from (item 189): the kitchen's middle (not the keep-clear patches' first place, which goes
+   * with the serving counter: a waypoint stays where it was put) */
+  const viaHome = useMemo(() => {
+    const k = kitchenOf(counters), c0 = counters[0]
+    return c0.at.clone().addScaledVector(c0.along, (k.along[0] + k.along[1]) / 2).addScaledVector(c0.lay, (k.lay[0] + k.lay[1]) / 2).setY(0)
+  }, [counters])
+  /** the staff's places a way's ends are known by (item 189): each server's own place, the owner's, the sink, the racks, the plating place's
+   * two sides; looked at afresh at most twice a second */
+  const placesMemo = useRef({ at: -1e9, list: [] as { key: string; at: THREE.Vector3 }[] })
+  const placesNow = () => {
+    const now = performance.now()
+    if (now - placesMemo.current.at > 500) {
+      const pl = platingOf()
+      placesMemo.current = { at: now, list: [...homes.map((h, i) => ({ key: `server-${i}`, at: h.at.clone().setY(0) })), { key: 'owner', at: ownerAt() },
+        { key: 'sink', at: sinkFront() }, { key: 'rack-0', at: rackFront(0) }, { key: 'rack-1', at: rackFront(1) },
+        { key: 'plate-out', at: pl.out.clone().setY(0) }, { key: 'plate-in', at: pl.in.clone().setY(0) }] }
+    }
+    return placesMemo.current.list
+  }
+  /** the waypoints set by hand for the way between the places `from` and `to` stand at (each within a step of one), nearest `from` first; none
+   * for a way between any other two points */
+  const viaStops = (from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] => {
+    const vias = getEdit().vias
+    if (!Object.keys(vias).length) return []
+    const places = placesNow()
+    const near = (p: THREE.Vector3) => {
+      let best: string | null = null, d = 0.35
+      for (const q of places) { const e = Math.hypot(q.at.x - p.x, q.at.z - p.z); if (e < d) { d = e; best = q.key } }
+      return best
+    }
+    const a = near(from), b = near(to)
+    const ids = a && b && a !== b ? vias[`${a}>${b}`] ?? vias[`${b}>${a}`] : undefined
+    if (!ids?.length) return []
+    const dx = to.x - from.x, dz = to.z - from.z
+    const along = (p: THREE.Vector3) => (p.x - from.x) * dx + (p.z - from.z) * dz
+    return ids.map((id) => { const o = offsetOf(id); return viaHome.clone().add(new THREE.Vector3(o[0], 0, o[2])) }).sort((p, q) => along(p) - along(q))
+  }
+  /** a server's way across the kitchen's floor, round the cook's table and all that stands on it (game/kitchenPath); one between two of the
+   * staff's places given waypoints by hand in edit mode goes through them in turn (item 189), each leg still round what's in the way */
   const kitchenRoute = (from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] => {
     const c0 = counters[0], k = kitchenOf(counters)
     const back = ([a, l]: [number, number]) => c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
-    const way = kitchenPath(flat(from), flat(to), { x0: k.along[0], z0: k.lay[0], x1: k.along[1], z1: k.lay[1] }, kitchenBlocks())
-    return way ? way.map(back) : [from.clone().setY(0), to.clone().setY(0)]
+    const area = { x0: k.along[0], z0: k.lay[0], x1: k.along[1], z1: k.lay[1] }, blocks = kitchenBlocks()
+    const stops = [from, ...viaStops(from, to), to]
+    let out: THREE.Vector3[] = []
+    for (let i = 1; i < stops.length; i++) {
+      const way = kitchenPath(flat(stops[i - 1]), flat(stops[i]), area, blocks)
+      const leg = way ? way.map(back) : [stops[i - 1].clone().setY(0), stops[i].clone().setY(0)]
+      out = i === 1 ? leg : [...out, ...leg.slice(1)]
+    }
+    return out
   }
   /** the paths' map (item 168, PathMap) filled: what's in the way, looked at afresh (it may have been moved in edit mode); the staff's usual
    * ways (from each one's place, and the owner's, to the sink, the racks and the plating place), worked out again only when that's changed;
    * the ways being walked; the customers' from the door to each seat */
-  const pathsMap = useRef({ at: 0, sig: '', staff: [] as THREE.Vector3[][] })
+  const pathsMap = useRef({ at: 0, sig: '', staff: [] as PathRoute[] })
   /** when the serving counter's marks were last read */
   const serveRead = useRef(0)
   const mapPaths = (now: number) => {
@@ -3334,20 +3379,29 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const c0 = counters[0]
     const back = (a: number, l: number) => c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
     PATH_MAP.blocks = blocks.map((r, i) => ({ id: blockIds.current[i] ?? '', pts: [back(r.x0, r.z0), back(r.x1, r.z0), back(r.x1, r.z1), back(r.x0, r.z1)] }))
-    const sig = blocks.map((r) => [r.x0, r.z0, r.x1, r.z1].map((v) => v.toFixed(2)).join()).join('|')
+    // (and the waypoints set by hand, where each stands: a way given one, or one moved, is worked out again (item 189))
+    const vias = getEdit().vias
+    const sig = blocks.map((r) => [r.x0, r.z0, r.x1, r.z1].map((v) => v.toFixed(2)).join()).join('|') + '#'
+      + Object.entries(vias).map(([key, ids]) => `${key}:${ids.map((id) => offsetOf(id).map((v) => v.toFixed(2)).join()).join(';')}`).join('|')
     if (sig !== pathsMap.current.sig) {
       pathsMap.current.sig = sig
-      const from = [...homes.map((h) => h.at), ownerAt()]
+      placesMemo.current.at = -1e9
       const pl = platingOf()
-      const to = [sinkFront(), rackFront(0), rackFront(1), pl.out, pl.in]
-      pathsMap.current.staff = from.flatMap((a) => to.map((b) => kitchenRoute(a, b)))
+      // (each named: whose, from where to where (item 189))
+      const from = [...homes.map((h, i) => ({ who: `server-${i}`, at: h.at })), { who: 'owner', at: ownerAt() }]
+      const to = [{ key: 'sink', at: sinkFront() }, { key: 'rack-0', at: rackFront(0) }, { key: 'rack-1', at: rackFront(1) }, { key: 'plate-out', at: pl.out }, { key: 'plate-in', at: pl.in }]
+      pathsMap.current.staff = from.flatMap((a) => to.map((b): PathRoute => ({ kind: 'staff', who: a.who, from: a.who, to: b.key, key: `${a.who}>${b.key}`, pts: kitchenRoute(a.at, b.at) })))
     }
-    const live: THREE.Vector3[][] = []
-    for (const w of waiters.current) if (w.phase !== 'idle' && w.path.length > 1) live.push(w.path)
-    if (platerRun.current.phase !== 'idle' && platerRun.current.path.length > 1) live.push(platerRun.current.path)
-    if (bossWash.current && bossWash.current.path.length > 1) live.push(bossWash.current.path)
-    PATH_MAP.routes = [...pathsMap.current.staff.map((pts) => ({ kind: 'staff' as const, pts })), ...live.map((pts) => ({ kind: 'live' as const, pts })),
-      ...seats.map((st) => ({ kind: 'guest' as const, pts: pathTo(counters, st) }))]
+    const live: PathRoute[] = []
+    const walking = (who: string, pts: THREE.Vector3[]) => { if (pts.length > 1) live.push({ kind: 'live', who, from: '', to: '', pts }) }
+    waiters.current.forEach((w, i) => { if (w.phase !== 'idle') walking(ownerServes ? 'owner' : `server-${i}`, w.path) })
+    if (platerRun.current.phase !== 'idle') walking('plater', platerRun.current.path)
+    if (bossWash.current) walking('owner', bossWash.current.path)
+    const guestWays = seats.map((st, n): PathRoute => ({ kind: 'guest', who: 'guest', from: 'door', to: `seat-${n}`, pts: pathTo(counters, st) }))
+    PATH_MAP.routes = [...pathsMap.current.staff, ...live, ...guestWays]
+    // (the places named on the floor: the staff's own and where they go, the door, each seat at its way's end)
+    PATH_MAP.places = [...placesNow(), ...(guestWays.length ? [{ key: 'door', at: guestWays[0].pts[0] }] : []), ...guestWays.map((g) => ({ key: g.to, at: g.pts[g.pts.length - 1] }))]
+    PATH_MAP.home = viaHome
     PATH_MAP.v++
   }
   /**
@@ -6260,6 +6314,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       <PathMap />
       {/* (the keep-clear patches (item 168): put down by the serving counter, moved and sized by hand) */}
       <PathZones home={zoneHome} />
+      <PathVias home={viaHome} />
       {/* (the serving counter, in the corridor between the cook table and the freezer (item 167)) */}
       {servePlace && (
         <Movable id="servecounter" label="備餐檯" ground={0}>

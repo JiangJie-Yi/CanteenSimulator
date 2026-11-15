@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useEditSel } from './edit'
 import { Movable } from './Movable'
+import { whoColor } from './PathMap'
 
 /**
  * A keep-clear patch of the kitchen's floor (item 168, the owner's: the paths' map "to see, edit and manage"): a piece of edit mode's own, a
@@ -46,6 +47,41 @@ export function PathZones({ home }: { home: THREE.Vector3 }) {
           <group position={home.toArray()}><PathZone /></group>
         </Movable>
       ))}
+    </>
+  )
+}
+
+/** a waypoint's marker (item 189): a ring on the floor in the colour of the person whose way it's on, a dot at its middle, the disc between
+ * faint (what's picked, the size of a step); drawn over what's on the floor, seen only with the map. Rings, not fans from a middle point */
+const VIA_DISC = new THREE.RingGeometry(0.015, 0.1, 24, 1).rotateX(-Math.PI / 2).translate(0, 0.03, 0)
+const VIA_RING = new THREE.RingGeometry(0.075, 0.1, 24, 1).rotateX(-Math.PI / 2).translate(0, 0.031, 0)
+const VIA_DOT = new THREE.RingGeometry(0.008, 0.03, 12, 1).rotateX(-Math.PI / 2).translate(0, 0.031, 0)
+function PathVia({ who }: { who: string }) {
+  const on = useEditSel((s) => s.on), paths = useEditSel((s) => s.paths)
+  const parts = useMemo(() => {
+    const col = whoColor(who)
+    return ([[VIA_DISC, 0.3], [VIA_RING, 0.95], [VIA_DOT, 0.95]] as const).map(([g, opacity]) => {
+      const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide }))
+      m.renderOrder = 1002
+      return m
+    })
+  }, [who])
+  useEffect(() => () => { for (const m of parts) (m.material as THREE.Material).dispose() }, [parts])
+  useFrame(() => { const v = on && paths; for (const m of parts) m.visible = v })
+  return <group>{parts.map((m, i) => <primitive key={i} object={m} />)}</group>
+}
+
+/** the waypoints set by hand on the staff's usual ways (item 189), each a piece of its own, moved with edit mode's arrows: the way goes through
+ * them (GuestBar3D's kitchenRoute); added from the paths' list, taken away with Delete */
+export function PathVias({ home }: { home: THREE.Vector3 }) {
+  const vias = useEditSel((s) => s.vias)
+  return (
+    <>
+      {Object.entries(vias).flatMap(([key, ids]) => ids.map((id) => (
+        <Movable key={id} id={id} label={`中途點 ${id.split('-')[1]}`} ground={0}>
+          <group position={home.toArray()}><PathVia who={key.split('>')[0]} /></group>
+        </Movable>
+      )))}
     </>
   )
 }
