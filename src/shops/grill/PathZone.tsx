@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useEdit } from './edit'
+import { useEditSel } from './edit'
 import { Movable } from './Movable'
 
 /**
@@ -17,7 +17,7 @@ const FILL = new THREE.MeshBasicMaterial({ color: '#ff2d55', transparent: true, 
 const EDGE = new THREE.LineBasicMaterial({ color: '#ff5c7a', transparent: true, opacity: 0.95 })
 
 export function PathZone() {
-  const { on, paths } = useEdit()
+  const on = useEditSel((s) => s.on), paths = useEditSel((s) => s.paths)
   const parts = useMemo(() => {
     const fill = new THREE.Mesh(GEO, FILL)
     const edge = new THREE.LineSegments(EDGE_GEO, EDGE)
@@ -38,7 +38,7 @@ export function PathZone() {
 /** the keep-clear patches put down in edit mode, each a piece of its own: listened to here, not in GuestBar3D (it'd draw it all again at
  * every change of edit mode's) */
 export function PathZones({ home }: { home: THREE.Vector3 }) {
-  const { zones } = useEdit()
+  const zones = useEditSel((s) => s.zones)
   return (
     <>
       {zones.map((id) => (

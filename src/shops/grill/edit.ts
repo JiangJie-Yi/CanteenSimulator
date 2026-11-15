@@ -15,6 +15,7 @@ import { setTip } from '@/scene/hoverTip'
 import { GRILL_SEATS } from './bar'
 import { replaces } from '@/scene/hot'
 import { glyphSvg, type GlyphId } from '@/ui/glyphs'
+import { EDITOR_URL, GAME_URL, TOOL_PAGE } from '@/scene/toolPage'
 /** a drawn icon (ui/glyphs) put in front of a button's or label's words, never an emoji or a symbol (the owner's) */
 const withGlyph = (el: HTMLElement, id: GlyphId, text = '', size = 12) => { el.innerHTML = glyphSvg(id, size); if (text) el.append(' ' + text) }
 
@@ -339,6 +340,15 @@ const emit = () => {
 const POINTER_RESET = () => { if (typeof document === 'undefined') return; document.body.style.cursor = ''; document.querySelectorAll('canvas').forEach((c) => { c.style.cursor = '' }) }
 export const getEdit = () => state
 export const useEdit = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f) }, () => state)
+/** told of every change to the edit state (the editor's frame, to work out a little later whether anything's unsaved) */
+export const subscribeEdit = (f: () => void) => { subs.add(f); return () => { subs.delete(f) } }
+/**
+ * A part of the edit state, as it changes (item 186, the owner's, 2026-11-16: "the editor's far too slow"): useEdit hands over the whole state,
+ * and every piece and every piece's handles, the shop's whole page and the kitchen redrew with each step of a drag (27 frames a second while
+ * one piece moved, a second in four on the main thread). `pick` returns a string, a number, a flag, or an object the state keeps as it is; the
+ * caller redraws only when that changes
+ */
+export const useEditSel = <T,>(pick: (s: State) => T): T => useSyncExternalStore(subscribeEdit, () => pick(state))
 /** the piece (or group) whose row in the list the pointer is over: lit in the scene as it would be pointed at there (each piece listens for its own
  * yes or no, so only the one or two that change are drawn again) */
 let listHot: string | null = null
@@ -865,6 +875,8 @@ export const groupTransformOf = (piece: string): Group[] | null => {
   const gs = chainOf(state.groups, piece).map((g) => state.groups[g])
   return gs.some((g) => !isStill(g)) ? gs : null
 }
+/** the moves, turns and sizes of the groups a piece is in, as one string: what it's redrawn on, when it changes (useEditSel) */
+export const groupSigOf = (piece: string) => chainOf(state.groups, piece).map((g) => { const x = state.groups[g]; return `${g}:${x.t}:${x.yaw}:${x.r}:${x.s}:${x.pivot}` }).join(';')
 /** the transforms of the groups a group is in (the one holding it first): what its own handles stand in */
 export const outerTransformOf = (gid: string): Group[] => chainOf(state.groups, gid).map((g) => state.groups[g])
 // ---- the views' areas: each view's camera stands somewhere and looks at a part of the shop; what it has in sight, and is nearest the point it
@@ -954,6 +966,8 @@ function leave(text: string) {
 }
 /** what a piece or a group is called, in the panel's language */
 const nameOf = (id: string) => (state.groups[id] ? pieceName(state.groups[id].name, lang) : registry.get(id) ? pieceName(registry.get(id)!.label, lang) : id)
+/** what's chosen, by name in the panel's language (the editor's status line), or null */
+export const selectedName = () => (state.selected ? nameOf(state.selected) : null)
 /**
  * Clicked again where the last click was (Movable; the owner's, 2026-11-10: a piece behind another was never reached, the one in front taken
  * every time): the next one back of what's under the pointer (`stack`, front to back), round to the front after the last; said which it is
@@ -996,6 +1010,37 @@ export function cancelEdit() {
   const changed = baseline ? JSON.stringify(baseline) !== snap() : false
   revert()
   leave(changed ? T().cancelled : T().left)
+}
+/** whether anything's been changed since editing began or was last saved (the editor's title and status line say so; leaving it then asks) */
+export const isDirty = () => state.on && !!baseline && JSON.stringify(baseline) !== snap()
+/** 儲存 (the shop's editor, Ctrl+S; item 178): the way it all stands now kept as the shop's, and what 捨棄 goes back to from here on; still
+ * editing */
+export function saveEdit() {
+  if (!state.on) return
+  save()
+  baseline = take()
+  emit()
+  toast(T().saved, 'edit')
+}
+/** 捨棄未儲存的修改 (the editor): back to the last save (or as it was opened); still editing */
+export function discardEdit() {
+  if (!state.on || !baseline) return
+  put(JSON.parse(JSON.stringify(baseline)))
+  save()
+  past.length = 0; future = []
+  emit()
+  toast(T().discarded, 'plain')
+}
+/** the game's G (item 178): the developer mode is a tool of its own now, the shop's editor, opened in its own tab (the same one each time) */
+export function openEditor() {
+  if (typeof window === 'undefined') return
+  window.open(EDITOR_URL, 'grill-editor')
+  toast(T().openedEditor, 'edit')
+}
+/** 試玩 (the editor): saved, then the game opened in its own tab (the same one each time), to play it as it now is */
+export function playGame() {
+  saveEdit()
+  if (typeof window !== 'undefined') window.open(GAME_URL, 'grill-game')
 }
 export function toggleEdit() {
   if (state.on) { cancelEdit(); return }
@@ -1127,7 +1172,7 @@ export function setCharHidden(v: boolean) {
   showDock()
 }
 function showDock() {
-  if (typeof document === 'undefined') return
+  if (typeof document === 'undefined' || TOOL_PAGE) return
   if (!dock) {
     dock = document.createElement('div')
     dock.className = 'be-dock'
@@ -1195,6 +1240,9 @@ const PANEL_CSS = `
 .be { position:fixed; left:12px; bottom:92px; z-index:9999; width:360px; box-sizing:border-box; max-height:calc(100vh - 110px); display:flex; background:#303030; color:#d6d6d6;
   font:11.5px/1.35 "Inter","Segoe UI","Noto Sans TC",sans-serif; border:1px solid #1a1a1a; border-radius:6px; box-shadow:0 6px 22px rgba(0,0,0,.55); overflow:hidden; user-select:none }
 .be * { box-sizing:border-box }
+.be.be-docked { left:auto; right:0; top:var(--bt-top); bottom:var(--bt-foot); width:var(--bt-right); max-height:none; border:0; border-left:1px solid #141414;
+  border-radius:0; box-shadow:none; transition:none }
+.be.be-docked .be-head, .be.be-docked .be-grip { display:none }
 .be-keys { display:flex; flex-wrap:wrap; gap:0 12px; margin:6px 0 2px; padding:5px 7px; border-radius:4px; background:#262626; color:#9a9a9a; font:10.5px/1.6 monospace }
 .be-key { white-space:nowrap }
 .be-space { display:block; width:100%; margin:0 0 6px; padding:5px 8px; border:0; border-radius:4px; text-align:left; cursor:pointer;
@@ -1205,12 +1253,14 @@ const PANEL_CSS = `
 .be-tool-text.local { background:#c27a1e !important }
 .be-stats { margin-top:3px; font:11px monospace; color:#9ab }
 .be-tools { display:flex; flex-direction:column; gap:3px; padding:6px 4px; background:#262626; border-right:1px solid #1a1a1a }
+.bt-tools .be-tools { flex-direction:row; align-items:center; padding:0; background:none; border:0 }
 .be-tool { width:30px; height:30px; display:grid; place-items:center; background:#3c3c3c; border:0; border-radius:4px; color:#d6d6d6; cursor:pointer; padding:0 }
 .be-tool svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round }
 .be-tool:hover { background:#4d4d4d }
 .be-tool.on { background:#4772b3; color:#fff }
 .be-tool-text { font:700 13px/1 system-ui, sans-serif }
 .be-tool-gap { height:8px; border-bottom:1px solid #4a4a4a; margin-bottom:4px }
+.bt-tools .be-tool-gap { width:1px; height:22px; border:0; background:#4a4a4a; margin:0 6px }
 .be-main { flex:1; min-width:0; display:flex; flex-direction:column }
 .be-head { display:flex; align-items:center; gap:8px; height:36px; padding:0 10px; background:#262626; border-bottom:1px solid #1a1a1a; font:600 13px/1 "Inter","Segoe UI","Noto Sans TC",sans-serif; letter-spacing:.02em; color:#f0f0f0; white-space:nowrap }
 .be-head small { margin-left:auto; font-weight:400; color:#8a8a8a; white-space:nowrap }
@@ -1243,6 +1293,11 @@ const PANEL_CSS = `
 .be-tris { margin-top:-3px; color:#e0b860 }
 .be-find { width:100%; background:#1d1d1d; color:#d6d6d6; border:1px solid #3a3a3a; border-radius:4px; padding:3px 7px; font:inherit; margin-bottom:5px }
 .be-list { height:320px; min-height:90px; overflow:auto; scrollbar-width:thin; scrollbar-color:#555 #2a2a2a; background:#242424; border-radius:4px; padding:2px }
+.bt-left .be-list { flex:1; height:auto }
+.bt-left .be-sec { display:flex; flex-direction:column; height:100%; border:0 }
+.bt-left .be-sc { flex:1; display:flex; flex-direction:column; min-height:0 }
+.bt-left .be-st { cursor:default }
+.bt-left .be-lgrip { display:none }
 .be-lgrip { position:relative; height:10px; cursor:ns-resize; margin-top:1px }
 .be-lgrip::after { content:''; position:absolute; left:50%; top:3px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#5a5a5a }
 .be-lgrip:hover::after { background:#e08a2c }
@@ -1302,7 +1357,11 @@ const TOOL_ICONS: Record<Tool, string> = {
 }
 function panel() {
   if (typeof document === 'undefined') return
-  if (!state.on) { tucked = false; showDock(); el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null); return }
+  if (!state.on) {
+    tucked = false; showDock(); el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null)
+    if (TOOL_PAGE) { document.getElementById('bt-left')?.replaceChildren(); document.getElementById('bt-tools')?.replaceChildren() }
+    return
+  }
   if (!document.getElementById('be-style')) {
     const st = document.createElement('style')
     st.id = 'be-style'
@@ -1314,8 +1373,9 @@ function panel() {
   if (!el || built !== sig) {
     el?.remove()
     el = document.createElement('div')
-    el.className = 'be'
-    if (tucked) requestAnimationFrame(() => setTucked(true))
+    // (the editor's: docked down the right as its inspector, never moved, sized or folded away (item 178))
+    el.className = TOOL_PAGE ? 'be be-docked' : 'be'
+    if (tucked && !TOOL_PAGE) requestAnimationFrame(() => setTucked(true))
     const h = (tag: string, cls?: string, text?: string) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n }
     // (its top edge a grip: dragged up, the panel grows taller (it stands on the bottom); the height kept for next time)
     const grip = h('div', 'be-grip')
@@ -1323,7 +1383,7 @@ function panel() {
     const panel = el
     const keptH = Number(localStorage.getItem(KEY_PH) ?? 0)
     const fit = (px: number) => Math.max(220, Math.min(window.innerHeight - 110, px))
-    if (keptH > 0) { panel.style.height = `${fit(keptH)}px`; panel.style.maxHeight = 'none' }
+    if (keptH > 0 && !TOOL_PAGE) { panel.style.height = `${fit(keptH)}px`; panel.style.maxHeight = 'none' }
     grip.onpointerdown = (e) => {
       e.preventDefault(); e.stopPropagation()
       const y0 = e.clientY, h0 = panel.offsetHeight
@@ -1388,7 +1448,7 @@ function panel() {
     }
     try {
       const kept = JSON.parse(localStorage.getItem(KEY_PPOS) ?? 'null')
-      if (Array.isArray(kept) && kept.length === 2) requestAnimationFrame(() => place(kept[0], kept[1]))
+      if (Array.isArray(kept) && kept.length === 2 && !TOOL_PAGE) requestAnimationFrame(() => place(kept[0], kept[1]))
     } catch { /* (none kept) */ }
     head.style.cursor = 'move'
     head.onpointerdown = (e) => {
@@ -1538,7 +1598,7 @@ function panel() {
     lgrip.title = T().resize
     const keptLH = Number(localStorage.getItem(KEY_LH) ?? 0)
     const fitL = (px: number) => Math.max(90, Math.min(window.innerHeight - 260, px))
-    if (keptLH > 0) list.style.height = `${fitL(keptLH)}px`
+    if (keptLH > 0 && !TOOL_PAGE) list.style.height = `${fitL(keptLH)}px`
     lgrip.onpointerdown = (e) => {
       e.preventDefault(); e.stopPropagation()
       const y0 = e.clientY, h0 = list.offsetHeight
@@ -1664,11 +1724,17 @@ function panel() {
       mk(T().rename, T().renameTip, () => { const g = state.selected ? state.groups[state.selected] : null; if (g) { const n = window.prompt(T().renamePrompt, g.name); if (n) renameGroup(state.selected!, n) } }),
       mk(T().undo, 'Ctrl+Z', undo), mk(T().redo, 'Ctrl+Y', redo),
       mk(T().resetAll, T().resetAllTip, () => { if (window.confirm(T().resetAllAsk)) resetAll() }, 'warn'),
-      mk(T().cancel, T().cancelTip, () => cancelEdit()),
-      mk(T().confirm, T().confirmTip, () => confirmEdit(), 'ok'),
+      // (the editor never leaves editing: it saves and discards where it is (item 178))
+      TOOL_PAGE ? mk(T().discard, T().discardTip, discardEdit) : mk(T().cancel, T().cancelTip, () => cancelEdit()),
+      TOOL_PAGE ? mk(T().save, T().saveTip, saveEdit, 'ok') : mk(T().confirm, T().confirmTip, () => confirmEdit(), 'ok'),
     )
     main.append(head, body, foot)
     el.append(bar, main)
+    // (the editor: its tools along the top bar, its outliner down the left (EditorShell's places for them))
+    if (TOOL_PAGE) {
+      document.getElementById('bt-tools')?.replaceChildren(bar)
+      document.getElementById('bt-left')?.replaceChildren(out.parentElement!)
+    }
     document.body.appendChild(el)
     built = sig
   }
@@ -1732,6 +1798,8 @@ if (typeof window !== 'undefined') {
       const k = e.key.toLowerCase()
       if (k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return }
       if (k === 'y') { e.preventDefault(); redo(); return }
+      // (the editor: Ctrl+S saves, as every editor's does (not the browser's saving of the page))
+      if (k === 's' && TOOL_PAGE) { e.preventDefault(); saveEdit(); return }
     }
     // (H hides what's chosen, Alt+H shows all that's hidden: by the key's place, as Alt+H types another letter on a Mac)
     if (state.on && !typing && !e.repeat && !e.ctrlKey && !e.metaKey && e.code === 'KeyH') { e.preventDefault(); if (e.altKey) showHidden(); else hideSelected(); return }
@@ -1757,7 +1825,8 @@ if (typeof window !== 'undefined') {
       if (k === 'f') { e.preventDefault(); frameSelected(); return }
       if (k === 'a') { e.preventDefault(); window.dispatchEvent(new CustomEvent('edit-frame-all')); return }
       // (Esc: lets go of what's picked; with nothing picked, leaves the developer mode, as G does)
-      if (k === 'escape') { e.preventDefault(); if (state.selected || state.picked.length) { state.picked = []; select(null) } else toggleEdit(); return }
+      // (in the editor it never leaves: it's always editing there)
+      if (k === 'escape') { e.preventDefault(); if (state.selected || state.picked.length) { state.picked = []; select(null) } else if (!TOOL_PAGE) toggleEdit(); return }
       // (Delete: a keep-clear patch chosen, taken up (item 168))
       if ((k === 'delete' || k === 'backspace') && state.selected?.startsWith('pathzone-')) { e.preventDefault(); removeZone(state.selected); return }
       if (k === '4') { e.preventDefault(); setWire(true); return }
@@ -1766,7 +1835,11 @@ if (typeof window !== 'undefined') {
     if (e.key !== 'g' && e.key !== 'G') return
     const t = e.target
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
-    toggleEdit()
+    // (item 178: the developer mode is the shop's editor now, a page of its own: G opens it (or, the mode on here anyway, leaves it); in the
+    // editor it's always on)
+    if (TOOL_PAGE) return
+    if (state.on) toggleEdit()
+    else openEditor()
   }
   window.addEventListener('keydown', onKey)
   // (a hot update swaps this module for a new copy: the old one's key let go of (or G was heard by every copy left behind, each with its own

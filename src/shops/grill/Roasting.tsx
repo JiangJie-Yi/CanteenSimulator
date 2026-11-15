@@ -68,7 +68,7 @@ import { Boss, BOSS_TASTE } from './Boss'
 import { AxisGizmo, focusCamera, useEditBox } from './Movable'
 import { ashMaterial, MODEL_LEN, MODEL_R, useBinchotan } from './binchotanModel'
 import { coalLayer, coalLook, type CoalLook } from './coalLayer'
-import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, settleOffset, useEdit, type V3 } from './edit'
+import { beginChange, commitOffsets, getEdit, moveTo, offsetOf, positionOf, registerMovable, settleOffset, useEditSel, type V3 } from './edit'
 import { setTip } from '@/scene/hoverTip'
 import { slide as drawerSound } from './TillDesk'
 import { tissuePull } from './paperSound'
@@ -2130,7 +2130,7 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
   const body = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
-  const { on: editing, selected, space } = useEdit()
+  const editing = useEditSel((s) => s.on), selected = useEditSel((s) => s.selected), space = useEditSel((s) => s.space)
   const drag = useRef<{ at: THREE.Vector3; y: number; lift: boolean } | null>(null)
   const idx = BAR_GATES.indexOf(gate)
   // (its handles hang in the gate's own turned frame: for the world's axes they're turned back by that frame's turn; for its own, not at all)
@@ -2647,7 +2647,7 @@ const BarTableware = memo(function BarTableware() {
   const pieces = useRef<THREE.Group[]>([])
   const copy = useRef<{ made: number; home: ReturnType<typeof homeCopy> | null; group: THREE.Object3D | null }>({ made: 0, home: null, group: null })
   const frames = useRef(0)
-  const { on: editing } = useEdit()
+  const editing = useEditSel((s) => s.on)
   useFrame(() => {
     const r = root.current
     if (!r) return
@@ -3098,7 +3098,8 @@ useGLTF.preload(SETTING_URL)
 // (drawn again only when its place or size changes, not with every redraw of the kitchen: `at` is worked out afresh each time)
 const EditProxy = memo(EditProxyImpl, (a, b) => a.id === b.id && a.label === b.label && a.yaw === b.yaw && a.at.equals(b.at) && a.size.every((v, i) => v === b.size[i]))
 function EditProxyImpl({ id, label, at, size, yaw }: { id: string; label: string; at: THREE.Vector3; size: V3; yaw: number }) {
-  useEdit()
+  // (redrawn as its own place changes (item 186))
+  useEditSel(() => String(positionOf(id)))
   const o = positionOf(id)
   return (
     <Movable id={id} label={label}>
@@ -6349,7 +6350,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   type Tool = (typeof tools)[number]
   // (the cutting board, the seasoning box and the water bucket are moved in edit mode by the same nudge a hand moves them by: the change in what
   // the edit says is added to it, and the box's pots and the bucket's dipper go along)
-  const { offsets: editOffsets } = useEdit()
+  // (redrawn as those pieces' own places change (item 186: the whole kitchen redrew with each step of any piece's drag))
+  const editOffsets = useEditSel((s) => Object.values(EDIT_PIECES).map((id) => String(s.offsets[id])).join('|'))
   const editSeen = useRef<Record<string, THREE.Vector3>>({})
   useLayoutEffect(() => {
     let any = false

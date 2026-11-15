@@ -74,8 +74,10 @@ if (lights) {
   await page.evaluate(() => window.__lights.press()); await pause(HOLD)
   await page.evaluate(() => window.__lights.press()); await pause(HOLD)
 }
-await step('dev mode'); await page.keyboard.press('g'); await pause(2500)
-await page.keyboard.press('g'); await pause(1000)
+// (the developer mode's own drawing, in and out (a page of its own now, the shop's editor (item 178): G opens that; here it's toggled in
+// place, drawn as the editor draws it)
+await step('dev mode'); await page.evaluate(() => window.__edit?.toggle()); await pause(2500)
+await page.evaluate(() => window.__edit?.toggle()); await pause(1000)
 const [frames, steps] = await page.evaluate(() => { window.__benchOn = false; return [window.__benchFrames.slice(1), window.__benchSteps.slice(1)] })
 // (the slowest frames, and where in the sweep each came)
 const slow = frames.map((ms, i) => ({ ms: +ms.toFixed(1), step: steps[i] })).sort((a, b) => b.ms - a.ms).slice(0, 8)

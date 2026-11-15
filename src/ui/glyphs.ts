@@ -8,7 +8,7 @@ export type GlyphPart = { d: string; stroke?: number; cut?: boolean; o?: number 
 export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
-  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb' | 'towel' | 'soap'
+  | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb' | 'towel' | 'soap' | 'check'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -59,6 +59,8 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
   group: [{ d: 'M2.4 2.4h11.2v11.2H2.4Z', stroke: 1.3 }, { d: 'M5.2 5.2h5.6v5.6H5.2Z' }],
   search: [{ d: 'M6.8 2.2a4.6 4.6 0 1 1 0 9.2A4.6 4.6 0 1 1 6.8 2.2Z', stroke: S }, { d: 'M10.2 10.2 14 14', stroke: 2 }],
   arrowR: [{ d: 'M2.2 8h10.6M8.8 4 12.8 8l-4 4', stroke: S }],
+  // (a tick: a step done (the editor's start-up, item 190))
+  check: [{ d: 'M3 8.6 6.3 11.6 13 4.6', stroke: S }],
   arrowU: [{ d: 'M8 13.8V3.2M4 7.2 8 3.2l4 4', stroke: S }],
   // (no entry: a ring struck through)
   ban: [{ d: 'M8 2a6 6 0 1 1 0 12A6 6 0 1 1 8 2Z', stroke: 1.8 }, { d: 'M3.8 3.8l8.4 8.4', stroke: 1.8 }],

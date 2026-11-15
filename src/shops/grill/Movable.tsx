@@ -13,7 +13,7 @@ import { ROOM_TURN } from '@/game/editGroups'
 import { holdVeil } from '@/scene/Later'
 import { warmLater } from '@/scene/Prewarm'
 import { blockedBefore, blocksEdit, solidHit, pieceOf } from '@/scene/pickable'
-import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, registerPivotReset, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
+import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, registerPivotReset, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEditSel, groupSigOf, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
 
@@ -180,7 +180,9 @@ function chainMatrix(gs: Group[], out: THREE.Matrix4) {
  * size the group as one, as a piece's own handles do it. A group inside another (the till's, in its view's area) has them inside that one's
  * move, turn and size, as what it holds is */
 export function GroupGizmo() {
-  const { on, selected, groups, space } = useEdit()
+  // (redrawn as the group chosen, its move, turn or size, or the axes change (item 186))
+  useEditSel((s) => (s.on && s.selected && s.groups[s.selected] ? `${s.selected}|${s.space}|${groupSigOf(s.selected)}|${s.groups[s.selected].t}|${s.groups[s.selected].yaw}|${s.groups[s.selected].s}|${s.groups[s.selected].pivot}` : ''))
+  const { on, selected, groups, space } = getEdit()
   const g = on && selected ? groups[selected] : null
   if (!g || !selected) return null
   const outer = chainMatrix(outerTransformOf(selected), new THREE.Matrix4())
@@ -207,7 +209,7 @@ const WIRE_DEPTH = new THREE.MeshBasicMaterial({ colorWrite: false, polygonOffse
  * layer under its front showed through it, and its wiring read as parts all overlapping (the owner's). In each canvas it's put in.
  */
 export function WireView() {
-  const { wire, on } = useEdit()
+  const wire = useEditSel((s) => s.wire), on = useEditSel((s) => s.on)
   const scene = useThree((st) => st.scene)
   useEffect(() => {
     if (!wire || !on) return
@@ -270,7 +272,9 @@ export function AxisGizmo({ id, at, theta = 0, own, pivotGroup, tilt }: { id: st
   const root = useRef<THREE.Group>(null)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, selected, tool } = useEdit()
+  // (shown, and redrawn, only for the piece chosen, as the tool changes (item 186: every piece's handles redrew with each step of a drag))
+  const shownTool = useEditSel((s) => (s.on && s.selected === id ? s.tool : null))
+  const on = shownTool !== null, selected = on ? id : null, tool = shownTool ?? 'select'
   // (the handles keep one size on the screen, whatever the piece's size or how far the camera is, as in a modelling program: the group is scaled to fit,
   // undoing its parents' own scale so the arrows stay straight)
   useFrame(() => {
@@ -586,7 +590,7 @@ const ParentPiece = createContext<string | null>(null)
  * mode it has no handlers, so it's no part of the game's pointing.
  */
 export function EditBlock({ children, whole = true }: { children: ReactNode; whole?: boolean }) {
-  const { on } = useEdit()
+  const on = useEditSel((s) => s.on)
   const stop = (e: { stopPropagation: () => void; object: THREE.Object3D }) => { if (solidHit(e.object) && blocksEdit(e.object)) e.stopPropagation() }
   const h = on ? stop : undefined
   return <group userData={whole ? { editBlock: true } : {}} onPointerDown={h} onPointerOver={h} onPointerMove={h}>{children}</group>
@@ -603,8 +607,10 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   const laid = useRef(false)
   const { camera, gl, raycaster } = useThree()
   const controls = useThree((s) => s.controls) as unknown as Controls
-  const { on, offsets, rotations, scales, selected, groups, tool, pivots, space, hidden } = useEdit()
-  void pivots
+  // (redrawn only when what's its own changes (item 186): its place, turn, size and pivot, its groups' moves, whether it's chosen or hidden, the
+  // tool and the axes; not with every step of another piece's drag (all 194 of them, and their handles, redrew with each))
+  useEditSel((s) => `${s.on}|${s.tool}|${s.space}|${s.on && s.hidden.includes(id)}|${isPicked(id)}|${s.offsets[id]}|${s.rotations[id]}|${s.scales[id]}|${s.pivots[id]}|${groupSigOf(id)}`)
+  const { on, selected, tool, space, hidden } = getEdit()
   // (hidden by hand (H) for now, to reach and see what's behind it: not drawn, not picked; Alt+H, or leaving the mode, shows it again)
   const hiddenHere = on && hidden.includes(id)
   /** the group the turn and scale act about (the pivot): its matrix, with what's inside it, is what moving the pivot must make up for */
@@ -645,7 +651,6 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   // the piece's own axes are simply its turn there)
   const theta = space === 'local' ? ownYaw : thetaW
   useEffect(() => { setFrame(id, thetaW, ownYaw) }, [id, thetaW, ownYaw])
-  void offsets; void rotations; void scales; void selected; void groups // (read so it redraws as it's moved, turned or scaled)
   const o0 = positionOf(id)
   const o: V3 = [o0[0] + madeShift[0], o0[1] + madeShift[1], o0[2] + madeShift[2]]
   const rot = rotationOf(id), sc = scaleOf(id)

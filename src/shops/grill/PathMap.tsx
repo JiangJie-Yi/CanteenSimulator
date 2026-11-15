@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PATH_MAP } from './bar'
-import { useEdit } from './edit'
+import { useEditSel } from './edit'
 
 const KINDS = ['staff', 'live', 'guest'] as const
 const COLOR: Record<(typeof KINDS)[number], string> = { staff: '#3d9bff', live: '#ffd23c', guest: '#4fd26e' }
@@ -26,7 +26,7 @@ function band(out: number[], a: THREE.Vector3, b: THREE.Vector3, w: number, y: n
 }
 
 export function PathMap() {
-  const { on, paths } = useEdit()
+  const on = useEditSel((s) => s.on), paths = useEditSel((s) => s.paths)
   const made = useMemo(() => {
     const noRay = () => {}
     const flat = (color: string, opacity: number) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide })

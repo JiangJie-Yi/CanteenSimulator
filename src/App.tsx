@@ -54,7 +54,9 @@ import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { BOARD_SLOTS } from '@/game/fireSlots'
 import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
-import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
+import { getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
+import { EditorShell } from '@/shops/grill/EditorShell'
+import { TOOL_PAGE } from '@/scene/toolPage'
 import { EditBlock, GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { ROOM_TURN, type ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
@@ -622,7 +624,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
   useEffect(() => { if (import.meta.env.DEV) Object.assign(window, { __ctl: controls.current }) })
   const camera = useThree((s) => s.camera)
   // while the kitchen's being tried out (the shop's closed) the view is held at camera 1; edit mode, and the shop being open, leave it free
-  const { on: editing } = useEdit()
+  const editing = useEditSel((s) => s.on)
   const lockView = holdsCameraOne(modeOf(ai, research), editing) && !!DISHES[active].roast && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
   const lockRef = useRef(lockView)
   lockRef.current = lockView
@@ -1281,7 +1283,19 @@ export default function App() {
   const drinksOpen = useSyncExternalStore(onDrinkPanel, () => DRINK_PANEL.open)
   // the game's speed: ×1, or ×2 with the button top right (the 3D scene's clock and the shop's own timers)
   const [speed, setSpeed] = useState(1)
-  const { on: editOn } = useEdit()
+  const editOn = useEditSel((s) => s.on)
+  // (the shop's editor (item 178): its page marked for its layout, and into the developer mode as soon as the shop's loaded, the character
+  // viewer put by (its Window menu brings it out); it never leaves it)
+  useEffect(() => {
+    if (!TOOL_PAGE) return
+    document.body.classList.add('be-tool')
+    setCharHidden(true)
+    const t = window.setInterval(() => {
+      if (getEdit().on) { window.clearInterval(t); return }
+      if (!document.querySelector('.loading-screen')) toggleEdit()
+    }, 300)
+    return () => { window.clearInterval(t); document.body.classList.remove('be-tool') }
+  }, [])
   // (the first day's guide (item 175): up for a new game, unless it's been finished or skipped before; ?guide=1 shows it whatever)
   const [guide, setGuide] = useState(() => {
     try {
@@ -3322,6 +3336,8 @@ export default function App() {
       </>)}
       {/* (developer mode's character viewer, on the right: every figure on a turntable (the owner's: it comes with G)) */}
       {editOn && !phone && <CharacterViewer lang={lang} />}
+      {/* (the shop's editor (editor.html, item 178): its frame of menus, tools, docks and status line round the shop) */}
+      {TOOL_PAGE && <EditorShell lang={lang} />}
       {/* (the stock: everything kept, at any time, from the little fridge top right; researching, its foods are taken out to try from it) */}
       {fridgeOpen && !editOn && !!dish.roast && (
         <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} lots={lots} cash={cash} focus={stockFocus} meter={meterShown}

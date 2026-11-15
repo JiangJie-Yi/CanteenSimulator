@@ -125,12 +125,12 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
   3. （只在 `SYNC_PUSH=1`）本機自己還沒推的提交 → 檢查通過才推。
 - 網站只在推 `main` 時部署，推 `cloud-work` 不會；所以雲端 chat 每做完一次就推 `cloud-work`，使用者的 localhost 看得到，網站不動。
 - 本機的 Claude Code 在這個專案開始工作時，若 `git fetch origin` 後 `origin/cloud-work` 有 `main` 沒有的提交，且工作目錄乾淨：合併它、跑 `npx tsc -b && npm test`、通過後**不要推 `main`**，除非使用者說；有衝突或失敗就停下來告訴使用者。
-- 遊戲裡的開發者模式（按 G，閉店時才能用）調的位置存在瀏覽器裡；確定後把面板上的 offset 數值告訴雲端 chat，由它寫成預設值。
+- 店面編輯器（`editor.html`，遊戲裡按 G 開）調的位置存在瀏覽器裡；確定後把面板上的 offset 數值告訴雲端 chat，由它寫成預設值。
 
 ## 開發者模式（`src/shops/grill/edit.ts`、`Movable.tsx`）
 
 完整說明（操作、熱鍵、選取、群組與分區、軸心、渲染設定、角色預覽、面板）在 `docs/DETAILS.md` 同名的一節。新增或調整擺設時要守的：
-- 只用 **G** 鍵進出（閉店、營業中都可以；營業中進入時遊戲暫停）。
+- **開發者模式是獨立的店面編輯器**（`editor.html`，第 178 項；dev 是 http://localhost:5173/editor.html）：遊戲裡按 **G** 會在新分頁開它；編輯器一打開就在編輯模式（不用按 G、Esc 不會離開），上方選單與工具列、左邊階層、右邊屬性、下方狀態列；**Ctrl+S 儲存**、檔案選單「捨棄未儲存的修改」、「試玩」先存再開遊戲分頁；有未儲存的修改時標題與狀態列會說，離開前會問。程式與量測裡要在遊戲頁面原地開關：`__edit.toggle()`。
 - 每件能動的擺設用 `<Movable id label>` 包起來（裡面放自己的 `<StaticBatch>`；Movable 不能放在別的 StaticBatch 裡面）。
 - 預設位置寫在 `edit.ts` 的 `BASES`（父層單位；編輯面板顯示的是房間座標，寫預設前用 `fromRoom(id, v)` 換算）；大小與轉向用 `<Movable baseScale baseTurn>`；站在地上的加 `ground`。改了預設要把 `edit.ts` 開頭三個 localStorage key 的版本加一。
 - 吊掛或貼牆的擺設加進 `edit.ts` 的 `HANGS`（操作軸在中心；其他的在腳底中心）。
