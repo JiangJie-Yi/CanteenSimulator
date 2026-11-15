@@ -67,7 +67,7 @@ import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
+import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, GUEST_BILLS, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
 import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
 import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, type Visit } from '@/game/reputation'
@@ -1760,6 +1760,8 @@ export default function App() {
   ledgerNow.current = ledger
   // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
   const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
+  // (and told to the till, which rings it up as it is (item 182))
+  GUEST_BILLS.of = (guest) => bills.current[DISHES[active].id]?.[guest] ?? null
   /**
    * The second chef cooks these, in turn, as many as there's food for (up to max): each uses up its food from stock,
    * costs its ingredients, and goes in the notebook as a try, like the owner's own. How it comes out is what it

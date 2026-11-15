@@ -9,7 +9,9 @@ import { inkModel } from '@/scene/inkHull'
 import { countedBatch, mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { SACK_STICKS } from '@/game/supplies'
-import { askPantry, SUPPLIES, tipOver } from './bar'
+import { askPantry, SUPPLIES, anyInStock, tipOver } from './bar'
+import { DISHES } from '@/data/menu'
+import { storageOf } from '@/data/storage'
 import { getEdit } from './edit'
 
 const STOCK_URL = import.meta.env.BASE_URL + 'models/cubbystock.glb'
@@ -187,8 +189,12 @@ export function CubbyStock({ which }: { which: 'right' | 'left' }) {
   useStudio()
   const gltf = useGLTF(STOCK_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => partOf(gltf.scene, which === 'right' ? 'StockRight' : 'StockLeft', 0.0025), [gltf, which])
+  // (empty with none of the chilled foods in stock (item 182: its shelves full under a panel saying 0))
+  useFrame(() => { const v = anyInStock(CHILLED_FOODS); if (obj.visible !== v) obj.visible = v })
   return <primitive object={obj} />
 }
+/** the foods the cook table's cupboards hold (data/storage's chilled ones on the menu) */
+const CHILLED_FOODS = DISHES.flatMap((d) => d.items.map((x) => x.id)).filter((id) => storageOf(id) === 'chilled')
 
 /**
  * The sacks of potatoes and sweet potatoes, their backs to the bar, along it: what's kept at room temperature, so pointed at they light and

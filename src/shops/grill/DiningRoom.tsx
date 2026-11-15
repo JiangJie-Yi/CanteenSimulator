@@ -8262,8 +8262,16 @@ function RiceSacks() {
     // (the rice and the cloth's inside aren't outlined: the rice is seen down into the sack, its rim tucked under the cuff)
     inkModel(r, (m) => /RiceSackRice|RiceSackIn$|RiceMasuRice/.test(m.name), { width: 0.004, weld: true })
     plainColours(r)
-    return mergeByMaterial(r)
+    // (each sack drawn apart, to be put away as the rice runs down (item 182))
+    return mergeByMaterial(r, (o) => /^RiceSack[01]$|^RiceSackOpenSet$/.test(o.name))
   }, [gltf])
+  // (as many sacks as the rice in stock makes: the open one while there's any, the next at over a third of the most kept (STOCK_CAP, 100),
+  // the last at over two thirds (item 182, the owner's: "the things themselves don't match the interface": three full sacks over "used up")
+  const sacks = useMemo(() => ['RiceSackOpenSet', 'RiceSack1', 'RiceSack0'].map((n) => obj.getObjectByName(n) ?? null), [obj])
+  useFrame(() => {
+    const n = SUPPLIES.has('Onigiri')
+    sacks.forEach((o, k) => { const v = n < 0 || n > (k * 100) / 3; if (o && o.visible !== v) o.visible = v })
+  })
   const says = () => {
     // (the owner's: its stock, and a word when it's run out; clicked, the stock's room-temperature tab, where it's ordered)
     const n = SUPPLIES.has('Onigiri')

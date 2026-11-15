@@ -709,6 +709,12 @@ export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => numbe
   // (n of something taken out of stock, if there are as many: a spare box of tissues, the stock keeper's)
   take: () => true,
 }
+/** whether any of these foods is in stock (item 182, the owner's: "the things themselves don't match the interface": a store's contents drawn
+ * only while there's something of it in stock); with no shop running (not known), as if there were */
+export const anyInStock = (ids: readonly string[]) => ids.some((id) => SUPPLIES.has(id) !== 0)
+/** what a customer's ordered comes to (App's own books: the menu's prices, how many parts): rung up at the till as it is (item 182: the till
+ * charged a flat 380 a dish whatever was ordered); null for one not known */
+export const GUEST_BILLS: { of: (guest: number) => { paid: number; parts: number } | null } = { of: () => null }
 /** the stock keeper at a toilet just now, to change its roll: which, whether near enough its door to have it open, whether in (the guests
  * leave that toilet till he's done; the door opens and shuts for him as for them) */
 export const STOCKER_WC: { who: 'm' | 'f' | null; near: boolean; inside: boolean } = { who: null, near: false, inside: false }

@@ -2796,7 +2796,8 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
       }
       if (s.sheets) {
         const used = s.used || tissuesAt(seat) < BOX_SHEETS
-        s.sheets.up.visible = used
+        // (an empty box shows none (item 182: one stood up out of the slot of a box with none left))
+        s.sheets.up.visible = used && tissuesAt(seat) > 0
         s.sheets.flat.visible = !used
       }
     }

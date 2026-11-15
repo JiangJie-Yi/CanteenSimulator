@@ -13,7 +13,9 @@ import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
-import { ONIGIRI_TRAY, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES } from './bar'
+import { DISHES } from '@/data/menu'
+import { storageOf } from '@/data/storage'
+import { ONIGIRI_TRAY, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
@@ -177,6 +179,8 @@ export const CRATE = { left: CRATE_FULL, tended: false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __crate: CRATE })
 /** a stick taken up out of the crate in the hand: gone from it at once (item 109, the owner's, 2026-11-14: "picked up, there should be one
  * fewer"; it went only once it was on the fire), its gap there while it's carried */
+/** the foods the freezer holds (data/storage's frozen ones on the menu): its contents drawn only while there's one of them (item 182) */
+const FROZEN_FOODS = DISHES.flatMap((d) => d.items.map((x) => x.id)).filter((id) => storageOf(id) === 'frozen')
 export function liftFromCrate() {
   CRATE.left = Math.max(0, CRATE.left - 1)
 }
@@ -728,8 +732,8 @@ function IngredientFridge() {
     if (knobCap.current) knobCap.current.rotation.z += (knobTurn(FREEZER_TEMP.set) - knobCap.current.rotation.z) * Math.min(1, dt * 12)
     // (the lid hinged on its back edge, swinging up and over)
     if (lid.current) lid.current.rotation.x += ((-open * 1.85) - lid.current.rotation.x) * 0.1
-    // (shut, nothing inside can be seen: not drawn)
-    if (goods) goods.visible = !lid.current || lid.current.rotation.x < -0.02
+    // (shut, nothing inside can be seen: not drawn; open, empty with none of its foods in stock (item 182: full under a panel saying 0))
+    if (goods) goods.visible = (!lid.current || lid.current.rotation.x < -0.02) && anyInStock(FROZEN_FOODS)
     if (light.current) light.current.intensity += (open * 0.45 - light.current.intensity) * 0.12
   })
   const W = 1.5, H = 0.86, HOUSE = 0.34
