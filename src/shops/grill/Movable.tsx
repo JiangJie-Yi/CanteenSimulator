@@ -660,7 +660,9 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     inn.traverse((m) => {
       if (!(m instanceof THREE.Mesh)) return
       // (only what's drawn counts: not a hidden mesh (a batch's originals, a model's floor plane left out), nor an unseen hit-box or a clear glow)
-      for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
+      // (an edit proxy (`proxy`) counts though it isn't drawn: it's the piece's own shape, what's drawn of it elsewhere (the bar's chopsticks,
+      // the owner's, 2026-11-15: measured as nothing, the piece's handle stood a metre off, by a stool))
+      if (!m.userData.proxy) for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
       const mats = Array.isArray(m.material) ? m.material : [m.material]
       // (nor the ink outlines (back faces drawn a little larger), nor decals and glows laid over a surface (clear, no depth write): they'd only fatten the box)
       // (an edit proxy's unseen box is the piece, though)
@@ -824,7 +826,9 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const meshes: THREE.Mesh[] = []
     inn.traverse((m) => {
       if (!(m instanceof THREE.Mesh) || (m as THREE.InstancedMesh).isInstancedMesh) return
-      for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
+      // (an edit proxy (`proxy`) counts though it isn't drawn: it's the piece's own shape, what's drawn of it elsewhere (the bar's chopsticks,
+      // the owner's, 2026-11-15: measured as nothing, the piece's handle stood a metre off, by a stool))
+      if (!m.userData.proxy) for (let o: THREE.Object3D | null = m; o && o !== inn; o = o.parent) if (!o.visible) return
       const mats = Array.isArray(m.material) ? m.material : [m.material]
       if (!m.userData.proxy && mats.every((x) => !x.visible || x.opacity <= 0.02 || !x.colorWrite || x.blending === THREE.AdditiveBlending || x.side === THREE.BackSide || (x.transparent && !x.depthWrite))) return
       if (m.geometry.getAttribute('position')) meshes.push(m)
