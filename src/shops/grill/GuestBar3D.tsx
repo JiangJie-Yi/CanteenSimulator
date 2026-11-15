@@ -3011,10 +3011,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * draining basket's plates hung in the air over the cook table's end: their marks first looked for before the sink's model was in, the
    * miss was kept for good and they stood at the fallback all day) */
   const missed = useRef(new Map<string, number>())
+  /** whether a mark is still in the scene (a piece rebuilt leaves its old one in a subtree no longer drawn: its place was a stale one) */
+  const inScene = (o: THREE.Object3D) => { let q: THREE.Object3D = o; while (q.parent) q = q.parent; return q === scene }
+  /** when each mark found was last made sure of (twice a second at most: it's asked for many times a frame) */
+  const sure = useRef(new Map<string, number>())
   const markOf = (name: string) => {
     let o = marks.current.get(name)
     const now = performance.now()
-    if (o === undefined || (o && !o.parent) || (o === null && now - (missed.current.get(name) ?? 0) > 1000)) {
+    let stale = false
+    if (o && now - (sure.current.get(name) ?? 0) > 500) { sure.current.set(name, now); stale = !inScene(o) }
+    if (o === undefined || stale || (o === null && now - (missed.current.get(name) ?? 0) > 1000)) {
       o = scene.getObjectByName(name) ?? null
       marks.current.set(name, o)
       if (o === null) missed.current.set(name, now)
@@ -5460,7 +5466,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         sinkPlaced.current = now
         const n = Math.min(dirty.current, SINK_SHOWN)
         // (not drawn till the sink's in: put at the fallback meanwhile, the bar's end, they hung in the air over the cook table)
-        const there = !!markOf('SinkTop') && !!markOf('SinkBasinFloor')
+        const there = !!markOf('SinkTop') && !!markOf('SinkBasinFloor') && !!markOf('SinkBasket') && !!markOf('SinkFront')
         for (let i = 0; i < n; i++) { const q = sinkPlates.current[i]; if (q) { q.position.copy(dirtyAt(i)); q.visible = there } }
       }
     }
@@ -5502,7 +5508,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     // (the plating place's stack of clean plates, the plates in the dryer, and the sticks in the bin: as many drawn as there are)
     plateStack.current?.children.forEach((c, i) => { c.visible = i < PLATING.stock })
-    if (DRYER.n > 0 && dryerPlates.current) {
+    // (nor the dryer's till its marks are found (the owner, 2026-11-15: a row of plates stood in the air over the fire bed, at the bar's end))
+    if (DRYER.n > 0 && dryerPlates.current && markOf('SinkDryerRack0') && markOf('SinkDryerRack1')) {
       const along = dryerAt(1).sub(dryerAt(0)).normalize()
       dryerPlates.current.children.forEach((c, i) => {
         c.visible = i < DRYER.n
@@ -5512,8 +5519,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const bs = binSticks.current
     if (bs) {
       const shown = Math.min(SINK_BIN.sticks, BIN_SHOWN)
-      if (shown > 0) bs.position.copy(inBar('SinkBinTop', endOf(1)))
-      bs.children.forEach((c, i) => { c.visible = i < shown })
+      const binThere = !!markOf('SinkBinTop')
+      if (shown > 0 && binThere) bs.position.copy(inBar('SinkBinTop', endOf(1)))
+      bs.children.forEach((c, i) => { c.visible = binThere && i < shown })
     }
   })
 
