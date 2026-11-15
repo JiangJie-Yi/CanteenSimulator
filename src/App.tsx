@@ -57,7 +57,7 @@ import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDr
 import { getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
 import { EditorShell } from '@/shops/grill/EditorShell'
 import { TOOL_PAGE } from '@/scene/toolPage'
-import { EditBlock, GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
+import { EditBlock, GroupGizmo, Movable, ShadeView, WireView } from '@/shops/grill/Movable'
 import { ROOM_TURN, type ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -1177,6 +1177,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
       <GroupGizmo />
       {/* (developer mode's wireframe, 4 / 5) */}
       <WireView />
+      <ShadeView />
       <FocusTracker />
       {editing && <AxisWidget />}
       <OrbitControls

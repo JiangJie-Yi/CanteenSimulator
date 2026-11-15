@@ -210,11 +210,18 @@ function settleGroups() {
 }
 /** the axes the arrows, rings and fields go by: the room's (world), or the piece's own (local: its parent's frame, as it stands on its wall) */
 export type Space = 'world' | 'local'
+/**
+ * How the scene's drawn in edit mode (item 191, the owner's, 2026-11-16: "render modes in edit mode, switched on the keys 1 to 5"), as the
+ * mainstream editors' view modes: 1 lit (as the game draws it), 2 unlit (the colours and pictures alone, no light), 3 clay (the light alone, on
+ * bare grey forms), 4 wireframe (each model's topology, as the 4 was before), 5 lit wireframe (the topology over the lit scene)
+ */
+export type Shade = 'lit' | 'unlit' | 'clay' | 'wire' | 'litwire'
+export const SHADES: Shade[] = ['lit', 'unlit', 'clay', 'wire', 'litwire']
 type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string, V3>; rotations: Record<string, V3>; scales: Record<string, V3>; selected: string | null; groups: Record<string, Group>; picked: string[]
   /** each piece's pivot, moved from its middle by hand (in its own frame), what it turns and grows about; and whether the arrows move the pivot (D) */
   pivots: Record<string, V3>; pivotMode: boolean; space: Space
-  /** the scene drawn as its wireframe (Maya's 4), to see each model's topology; off is shaded (5) */
-  wire: boolean
+  /** how the scene's drawn (the keys 1 to 5: Shade); lit as the mode's entered */
+  shade: Shade
   /** pieces hidden by hand for now (H), to reach and see what's behind them: not drawn, not picked; Alt+H or leaving the mode shows them */
   hidden: string[]
   /** the walking paths' map drawn on the floor (item 168, the owner's, 2026-11-15: "can you draw the paths, to see in edit mode, and edit
@@ -317,7 +324,7 @@ if (!relaid) try {
   for (const [k] of relaidDue) localStorage.setItem(k, '1')
 } catch { /* private window */ }
 let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
-  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false, hidden: [], paths: (() => { try { return localStorage.getItem(KEY_PATHS) === '1' } catch { return false } })(),
+  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', shade: 'lit', hidden: [], paths: (() => { try { return localStorage.getItem(KEY_PATHS) === '1' } catch { return false } })(),
   zones: (() => { try { const z = JSON.parse(localStorage.getItem(KEY_ZONES) ?? '[]'); return Array.isArray(z) ? z.filter((x) => typeof x === 'string' && x.startsWith('pathzone-')) : [] } catch { return [] } })() }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
@@ -1049,7 +1056,7 @@ export function toggleEdit() {
   settleGroups()
   groupByViews()
   settleGroupFeet()
-  state.wire = false
+  state.shade = 'lit'
   baseline = take()
   state.on = true
   state.selected = null
@@ -1109,8 +1116,13 @@ const readLoc = (id: string): V3 => { const o = offsetOf(id), z = zeroOf(id).o; 
 const readRot = (id: string): V3 => { const r = rotationOf(id), z = zeroOf(id).r; return [r[0] - z[0], r[1] - z[1], r[2] - z[2]] }
 const readScale = (id: string): V3 => { const sc = scaleOf(id), z = zeroOf(id).s; return [sc[0] / (z[0] || 1), sc[1] / (z[1] || 1), sc[2] / (z[2] || 1)] }
 export const fromRoom = (id: string, v: V3): V3 => turnY(v, frameFor(id))
-/** wireframe (Maya's 4) or shaded (5) */
-export function setWire(on: boolean) { if (state.wire === on) return; state.wire = on; emit(); toast(on ? T().wireOn : T().wireOff, 'edit') }
+/** how the scene's drawn (item 191): one of the five, named and said what it's for as it's chosen */
+export function setShade(s: Shade) {
+  if (state.shade === s) return
+  state.shade = s
+  emit()
+  toast(T().shadeSays(T().shades[s], SHADES.indexOf(s) + 1, T().shadeTips[s]), 'edit')
+}
 /** a keep-clear patch put down (item 168): the next number, chosen, the map shown with it */
 export function addZone() {
   let n = 1
@@ -1211,6 +1223,8 @@ let spaceBadge: HTMLButtonElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
+/** the editor's buttons for the five ways the scene's drawn (item 191) */
+let shadeButtons: HTMLButtonElement[] = []
 let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null, pathsButton: HTMLButtonElement | null = null, zoneButton: HTMLButtonElement | null = null
 let rows = new Map<string, HTMLDivElement>()
 /** the piece whose row is being dragged in the scene list (item 69), while it is */
@@ -1355,10 +1369,17 @@ const TOOL_ICONS: Record<Tool, string> = {
   rotate: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
   scale: '<svg viewBox="0 0 24 24"><rect x="4" y="10" width="10" height="10" rx="1"/><path d="M14 10l6-6M15 4h5v5"/></svg>',
 }
+const SHADE_ICONS: Record<Shade, string> = {
+  lit: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16a4 8 0 0 0 0-16z" fill="currentColor" stroke="none"/><circle cx="8.8" cy="8.6" r="1.5" fill="currentColor" stroke="none"/></svg>',
+  unlit: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor" stroke="none"/></svg>',
+  clay: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16a4 8 0 0 0 0-16z" fill="currentColor" stroke="none" opacity=".45"/></svg>',
+  wire: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.6" ry="8"/><path d="M4 12h16M5.4 7.5h13.2M5.4 16.5h13.2"/></svg>',
+  litwire: '<svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 1 0 16a4 8 0 0 0 0-16z" fill="currentColor" stroke="none" opacity=".5"/><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.6" ry="8"/><path d="M4 12h16"/></svg>',
+}
 function panel() {
   if (typeof document === 'undefined') return
   if (!state.on) {
-    tucked = false; showDock(); el?.remove(); el = null; info = null; fields = []; toolButtons = []; rows = new Map(); built = ''; setListHot(null)
+    tucked = false; showDock(); el?.remove(); el = null; info = null; fields = []; toolButtons = []; shadeButtons = []; rows = new Map(); built = ''; setListHot(null)
     if (TOOL_PAGE) { document.getElementById('bt-left')?.replaceChildren(); document.getElementById('bt-tools')?.replaceChildren() }
     return
   }
@@ -1427,6 +1448,19 @@ function panel() {
     zoneButton.title = T().zoneAdd
     zoneButton.onclick = () => addZone()
     bar.append(spaceButton, pivotButton, aabbButton, obbButton, pathsButton, zoneButton)
+    // (the editor: the five ways the scene's drawn along the top bar after the tools (item 191), as the editors' view-mode buttons; in the
+    // game's own panel the keys 1 to 5 alone, its tools a column down its side)
+    shadeButtons = []
+    if (TOOL_PAGE) {
+      bar.appendChild(h('div', 'be-tool-gap'))
+      shadeButtons = SHADES.map((s) => {
+        const b = h('button', 'be-tool') as HTMLButtonElement
+        b.innerHTML = SHADE_ICONS[s]
+        b.onclick = () => setShade(s)
+        bar.appendChild(b)
+        return b
+      })
+    }
     const main = h('div', 'be-main')
     const head = h('div', 'be-head', T().title)
     head.appendChild(h('small', '', T().keys))
@@ -1749,6 +1783,7 @@ function panel() {
   if (pivotButton) { pivotButton.textContent = 'D'; pivotButton.title = T().pivot; pivotButton.classList.toggle('on', state.pivotMode) }
   if (pathsButton) { pathsButton.title = T().paths; pathsButton.classList.toggle('on', state.paths) }
   if (zoneButton) { zoneButton.title = T().zoneAdd; zoneButton.style.display = state.paths ? '' : 'none' }
+  shadeButtons.forEach((b, k) => { const s = SHADES[k]; b.classList.toggle('on', state.shade === s); b.title = T().shadeKey(T().shades[s], k + 1) })
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)); row.classList.toggle('off', state.hidden.includes(id)) }
   // (a new pick shows its own tab: a camera picked in the scene brings up the cameras)
   if (state.selected !== tabFollows) {
@@ -1813,7 +1848,7 @@ if (typeof window !== 'undefined') {
       if (k === '-' || k === '_') { e.preventDefault(); setGizmoSize(-1); return }
       if (k === 'd') { e.preventDefault(); togglePivotMode(); return }
       // (as in Maya: Q select, W move, E rotate, R scale; the tool's key pressed again while it's on flips its axes between the world's and the
-      // object's own, as Maya's W/E held for its marking menu does; 4 the wireframe, 5 shaded)
+      // object's own, as Maya's W/E held for its marking menu does; 1 to 5 the ways the scene's drawn)
       const t: Tool | null = k === 'q' ? 'select' : k === 'w' ? 'move' : k === 'e' ? 'rotate' : k === 'r' ? 'scale' : null
       if (t) {
         e.preventDefault()
@@ -1829,8 +1864,9 @@ if (typeof window !== 'undefined') {
       if (k === 'escape') { e.preventDefault(); if (state.selected || state.picked.length) { state.picked = []; select(null) } else if (!TOOL_PAGE) toggleEdit(); return }
       // (Delete: a keep-clear patch chosen, taken up (item 168))
       if ((k === 'delete' || k === 'backspace') && state.selected?.startsWith('pathzone-')) { e.preventDefault(); removeZone(state.selected); return }
-      if (k === '4') { e.preventDefault(); setWire(true); return }
-      if (k === '5') { e.preventDefault(); setWire(false); return }
+      // (1 to 5: the ways the scene's drawn (item 191; 4 the wireframe still, as Maya's))
+      const sh = k.length === 1 ? '12345'.indexOf(k) : -1
+      if (sh >= 0) { e.preventDefault(); setShade(SHADES[sh]); return }
     }
     if (e.key !== 'g' && e.key !== 'G') return
     const t = e.target

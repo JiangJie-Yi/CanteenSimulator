@@ -14,7 +14,7 @@ import { FolkFigure } from '@/scene/FolkFigure'
 import type { Mood } from '@/scene/people'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { BossModel } from './Boss'
-import { WireView } from './Movable'
+import { ShadeView, WireView } from './Movable'
 import { isInk } from '@/scene/inkHull'
 import type { CrewFace } from '@/scene/faceSheet'
 import { usePanelSound } from '@/ui/uiSound'
@@ -328,6 +328,7 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
             <OrbitControls makeDefault target={[0, 0.9, 0]} enablePan={false} minDistance={2} maxDistance={9} />
             {/* (the wireframe (4) here too, its hidden lines hidden) */}
             <WireView />
+            <ShadeView />
           </Canvas>
           {([-1, 1] as const).map((d) => (
             <button key={d} type="button" className={`char-view-arrow ${d < 0 ? 'is-prev' : 'is-next'}`} onClick={() => step(d)}

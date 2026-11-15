@@ -8,7 +8,7 @@ import { laterPending, laterSeen, sceneDrawn } from '@/scene/Later'
 import { VERSION, versionText } from '@/data/credits'
 import { panelSound } from '@/ui/uiSound'
 import { discardEdit, dissolveGroup, frameSelected, freezeSelected, getCharHidden, hideSelected, isDirty, makeGroup, playGame, redo, resetAll, saveEdit,
-  select, selectedName, setCharHidden, setPaths, setWire, showHidden, subscribeEdit, undo, useEditSel } from './edit'
+  select, selectedName, setCharHidden, setPaths, setShade, SHADES, showHidden, subscribeEdit, undo, useEditSel } from './edit'
 
 /**
  * The shop's editor (editor.html, item 178, the owner's, 2026-11-15: "the developer's way of working: more professional, as the mainstream
@@ -21,8 +21,8 @@ import { discardEdit, dissolveGroup, frameSelected, freezeSelected, getCharHidde
 type Item = { label: string; keys?: string; run: () => void; on?: boolean; off?: boolean } | 'gap'
 export const EditorShell = memo(function EditorShell({ lang }: { lang: Lang }) {
   const T = EDIT_TEXT[lang]
-  // (only what it shows: what's chosen, the wireframe, the paths' map; not every step of a drag (item 186))
-  const st = { selected: useEditSel((s) => s.selected), wire: useEditSel((s) => s.wire), paths: useEditSel((s) => s.paths) }
+  // (only what it shows: what's chosen, how the scene's drawn, the paths' map; not every step of a drag (item 186))
+  const st = { selected: useEditSel((s) => s.selected), shade: useEditSel((s) => s.shade), paths: useEditSel((s) => s.paths) }
   // (whether anything's unsaved: worked out a quarter second after the last change, not with every step of a drag (it compares the whole
   // layout as written out))
   const [dirty, setDirty] = useState(false)
@@ -81,7 +81,8 @@ export const EditorShell = memo(function EditorShell({ lang }: { lang: Lang }) {
       { label: T.frameSel, keys: 'F', run: frameSelected, off: !st.selected },
       { label: T.frameAll, keys: 'A', run: () => window.dispatchEvent(new CustomEvent('edit-frame-all')) },
       'gap',
-      { label: T.wire, keys: '4', run: () => setWire(true), on: st.wire }, { label: T.shaded, keys: '5', run: () => setWire(false), on: !st.wire },
+      // (the five ways the scene's drawn, on 1 to 5 (item 191))
+      ...SHADES.map((s, i): Item => ({ label: T.shades[s], keys: String(i + 1), run: () => setShade(s), on: st.shade === s })),
       'gap',
       { label: st.paths ? T.pathsOff : T.pathsOn, run: () => setPaths(!st.paths), on: st.paths },
     ] },

@@ -70,7 +70,8 @@ function apply(m: THREE.Mesh, p: RenderPref | null) {
   u.renderSig = sig
   if (!u.renderOrig) {
     if (!sig) return
-    u.renderOrig = { mat: m.material, cast: m.castShadow, receive: m.receiveShadow }
+    // (in edit mode's unlit or clay view (item 191) the material it had before the view, not the view's own)
+    u.renderOrig = { mat: (m.userData.shadeWas as THREE.Material | THREE.Material[] | undefined) ?? m.material, cast: m.castShadow, receive: m.receiveShadow }
   }
   const o = u.renderOrig
   m.material = o.mat

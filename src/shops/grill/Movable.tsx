@@ -9,8 +9,11 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
+import { onRenderPrefs } from './renderPrefs'
 import { ROOM_TURN } from '@/game/editGroups'
 import { holdVeil } from '@/scene/Later'
+import { isInk } from '@/scene/inkHull'
+import { TOOL_PAGE } from '@/scene/toolPage'
 import { warmLater } from '@/scene/Prewarm'
 import { blockedBefore, blocksEdit, solidHit, pieceOf } from '@/scene/pickable'
 import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, registerPivotReset, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEditSel, groupSigOf, useListHot, type Group, type V3 } from './edit'
@@ -208,12 +211,32 @@ const WIRE_DEPTH = new THREE.MeshBasicMaterial({ colorWrite: false, polygonOffse
  * the edges that can be seen (a depth-only copy of each mesh drawn first, its lines over it): drawn all through, a figure's back and every
  * layer under its front showed through it, and its wiring read as parts all overlapping (the owner's). In each canvas it's put in.
  */
+/**
+ * Shapes whose line index (three's, made the first time a shape's drawn as lines) is to be let go once a wireframe view's left: a few at a
+ * time, between frames. Each one let go is sent to the graphics card again as it's next drawn: all at once, the frame after the view was left
+ * stalled (67 ms after the wireframe, 117 after the lit wireframe: every shape in the shop sent again). Kept, they held 200 MB.
+ */
+const releaseQ: THREE.BufferGeometry[] = []
+let releasing = 0
+function releaseLines(gs: Iterable<THREE.BufferGeometry>) {
+  for (const g of gs) releaseQ.push(g)
+  if (releasing || !releaseQ.length) return
+  const step = () => {
+    for (const g of releaseQ.splice(0, 60)) g.dispose()
+    releasing = releaseQ.length ? window.setTimeout(step, 40) : 0
+  }
+  releasing = window.setTimeout(step, 40)
+}
+/** a wireframe view begun again: what was waiting to be let go is drawn as lines again, kept (let go once this view's left) */
+const keepLines = () => { releaseQ.length = 0 }
+
 export function WireView() {
-  const wire = useEditSel((s) => s.wire), on = useEditSel((s) => s.on)
+  const wire = useEditSel((s) => s.shade === 'wire'), on = useEditSel((s) => s.on)
   const scene = useThree((st) => st.scene)
   useEffect(() => {
     if (!wire || !on) return
     wireUsers++
+    keepLines()
     const shadows: THREE.Mesh[] = []
     const seen = new Set<THREE.Object3D>()
     // (every shape drawn as lines: three builds each one a line index for it, kept as long as the shape is; let go once it's shaded again)
@@ -256,11 +279,157 @@ export function WireView() {
         for (const [mat, w] of WIRE_WAS) (mat as THREE.Material & { wireframe: boolean }).wireframe = w
         WIRE_WAS.clear()
         // (each shape's line index let go (three drops it with the shape's buffers; they're sent again as it's next drawn): kept, the heap
-        // stayed 200 MB up after the wireframe was left (the owner saw 606 MB))
-        for (const g of wired) g.dispose()
+        // stayed 200 MB up after the wireframe was left (the owner saw 606 MB); a few at a time (releaseLines))
+        releaseLines(wired)
       }
     }
   }, [wire, on, scene])
+  return null
+}
+
+/** (item 191) the materials the other views draw with: made once each, kept for the next time */
+const SURFACES = new Set(['MeshToonMaterial', 'MeshStandardMaterial', 'MeshPhysicalMaterial', 'MeshBasicMaterial', 'MeshLambertMaterial', 'MeshPhongMaterial'])
+const UNLIT = new WeakMap<THREE.Material, THREE.MeshBasicMaterial>()
+const CLAYS = new Map<string, THREE.MeshStandardMaterial>()
+/** the lines laid over the lit scene (lit wireframe): dark and half seen, drawn a hair nearer the eye than the surface they're on (level with
+ * it, they'd flicker in and out of it) */
+const WIRE_OVER = new THREE.MeshBasicMaterial({ color: '#141414', wireframe: true, transparent: true, opacity: 0.5, depthWrite: false })
+WIRE_OVER.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n\tgl_Position.z -= 3e-5 * gl_Position.w;') }
+WIRE_OVER.customProgramCacheKey = () => 'edit-wire-over'
+type Mats = THREE.Material | THREE.Material[]
+/** what a material's drawn as in the unlit or the clay view; itself where it's left as it is */
+function shadeOf(mode: 'unlit' | 'clay', src: THREE.Material): THREE.Material {
+  // (left as they are: shaders of their own (the ink, the window's view, the steam), what's not drawn, and a material whose shader's been
+  // changed (a painted face, a window cut round, a sway): made again plainly, it'd lose the change)
+  if (!SURFACES.has(src.type) || !src.visible || isInk(src) || src.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) return src
+  const s = src as THREE.MeshStandardMaterial
+  if (mode === 'unlit') {
+    if (src.type === 'MeshBasicMaterial') return src
+    let u = UNLIT.get(src)
+    if (!u) {
+      u = new THREE.MeshBasicMaterial({ map: s.map ?? null, alphaMap: s.alphaMap ?? null, alphaTest: src.alphaTest, transparent: src.transparent, opacity: src.opacity,
+        side: src.side, vertexColors: src.vertexColors, depthWrite: src.depthWrite, depthTest: src.depthTest, colorWrite: src.colorWrite, blending: src.blending,
+        polygonOffset: src.polygonOffset, polygonOffsetFactor: src.polygonOffsetFactor, polygonOffsetUnits: src.polygonOffsetUnits })
+      // (its colour the original's own, not a copy: one that changes as it plays (the coals' glow) changes here too)
+      if (s.color) u.color = s.color
+      u.name = src.name
+      UNLIT.set(src, u)
+    }
+    return u
+  }
+  // (see-through and cut-out things (glass, smoke, leaves, a curtain's edge) as they are: clay would fill them in; not the tiny alphaTest every
+  // material's given to share its program (scene/materialNormalize: 0.002), a cut-out's own is far above it)
+  if (src.transparent || src.alphaTest > 0.01 || s.alphaMap) return src
+  const flat = !!s.flatShading
+  const key = `${src.side}|${flat}|${src.polygonOffset}|${src.polygonOffsetFactor}|${src.polygonOffsetUnits}|${src.depthWrite}|${src.colorWrite}`
+  let c = CLAYS.get(key)
+  if (!c) {
+    // (a mid grey, the room's own light (the indoor HDRI) taken at a little over half: a light grey went all but white under the shop's lights
+    // (nothing tones the picture down: what's over 1 is cut off), the forms lost in it)
+    c = new THREE.MeshStandardMaterial({ color: '#8f8a83', roughness: 0.92, metalness: 0, envMapIntensity: 0.6, side: src.side, flatShading: flat, depthWrite: src.depthWrite,
+      colorWrite: src.colorWrite, polygonOffset: src.polygonOffset, polygonOffsetFactor: src.polygonOffsetFactor, polygonOffsetUnits: src.polygonOffsetUnits })
+    c.name = 'edit-clay'
+    CLAYS.set(key, c)
+  }
+  return c
+}
+/** what a mesh is drawn with in the unlit or the clay view; null where it's left as it is */
+function shadedMats(m: THREE.Mesh, mode: 'unlit' | 'clay'): Mats | null {
+  const was = m.material
+  const now = Array.isArray(was) ? was.map((x) => shadeOf(mode, x)) : shadeOf(mode, was)
+  return (Array.isArray(was) ? (now as THREE.Material[]).every((x, i) => x === was[i]) : now === was) ? null : now
+}
+/** what the views leave alone: the editor's own handles, the wireframe's depth copies, the views' own line copies */
+const notShaded = (m: THREE.Mesh) => !m.isMesh || !m.material || !!m.userData.editHandle || !!m.userData.wireDepth || !!m.userData.shadeOver
+/** the scenes whose clay's been compiled ahead (ShadeView) */
+const clayWarm = new WeakSet<THREE.Scene>()
+/**
+ * The scene drawn the other ways (item 191, the owner's, 2026-11-16: "render modes in edit mode, switched on 1 to 5"): unlit (each surface
+ * an unlit copy of its colour and pictures), clay (every solid surface one light grey: the light and the shadows alone), lit wireframe (the
+ * lit scene, each model's lines laid over it); the wireframe itself is WireView's. All it changed is put back as the view's left, or the
+ * edit mode is; a mesh whose material something else changed meanwhile (a piece's render setting) is taken as that left it.
+ */
+export function ShadeView() {
+  const shade = useEditSel((s) => (s.on ? s.shade : 'lit'))
+  const scene = useThree((st) => st.scene), gl = useThree((st) => st.gl), camera = useThree((st) => st.camera)
+  // (in the editor, once it's open and the page is idle: the clay compiled in the background for everything that'd take it, as a dry run put
+  // back at once, nothing drawn in it: the first clay view stopped the picture a third of a second while its programs were linked (a shape
+  // bent by bones, one set out many times, one with tangents: each its own program, so a template of its own didn't reach them))
+  useEffect(() => {
+    if (!TOOL_PAGE || clayWarm.has(scene)) return
+    const t = window.setInterval(() => {
+      if (!getEdit().on) return
+      window.clearInterval(t)
+      clayWarm.add(scene)
+      const idle = (window as { requestIdleCallback?: (f: () => void) => number }).requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 300))
+      idle(() => {
+        const back: [THREE.Mesh, Mats][] = []
+        scene.traverse((o) => { const m = o as THREE.Mesh; if (notShaded(m)) return; const now = shadedMats(m, 'clay'); if (now) { back.push([m, m.material]); m.material = now } })
+        try { gl.compileAsync(scene, camera).catch(() => {}) } finally { for (const [m, was] of back) m.material = was }
+      })
+    }, 500)
+    return () => window.clearInterval(t)
+  }, [scene, gl, camera])
+  useEffect(() => {
+    if (shade !== 'unlit' && shade !== 'clay' && shade !== 'litwire') return
+    let live = true
+    if (shade === 'litwire') keepLines()
+    const swaps = new Map<THREE.Mesh, { was: Mats; now: Mats }>()
+    const overs = new Map<THREE.Mesh, THREE.Mesh>()
+    const lined = new Set<THREE.BufferGeometry>()
+    const apply = () => {
+      if (!live) return
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (notShaded(m)) return
+        if (shade === 'litwire') {
+          const had = overs.get(m)
+          // (an instanced copy keeps its count with its mesh's: the plates, the shoes, the cups come and go)
+          if (had) { if ((m as THREE.InstancedMesh).isInstancedMesh) (had as THREE.InstancedMesh).count = (m as THREE.InstancedMesh).count; return }
+          const mats = Array.isArray(m.material) ? m.material : [m.material]
+          // (no lines over the ink, over see-through things that don't hide what's behind them, or over what's not drawn)
+          if (!mats.some((x) => x.visible && !isInk(x) && !(x.transparent && !x.depthWrite))) return
+          const sk = m as THREE.SkinnedMesh, im = m as THREE.InstancedMesh
+          let c: THREE.Mesh
+          if (sk.isSkinnedMesh) { const k = new THREE.SkinnedMesh(m.geometry, WIRE_OVER); k.bind(sk.skeleton, sk.bindMatrix); c = k }
+          else if (im.isInstancedMesh) { const i = new THREE.InstancedMesh(m.geometry, WIRE_OVER, im.count); i.instanceMatrix = im.instanceMatrix; c = i }
+          else c = new THREE.Mesh(m.geometry, WIRE_OVER)
+          c.userData.shadeOver = true
+          c.renderOrder = 2
+          c.frustumCulled = m.frustumCulled
+          c.raycast = () => {}
+          m.add(c)
+          overs.set(m, c)
+          lined.add(m.geometry)
+          return
+        }
+        const had = swaps.get(m)
+        if (had && m.material === had.now) return
+        // (new, or its material changed since by something else (a piece's render setting): taken as it is now)
+        const was = m.material
+        const now = shadedMats(m, shade)
+        if (!now) { if (had) { swaps.delete(m); delete m.userData.shadeWas } return }
+        swaps.set(m, { was, now })
+        // (what it was, for a piece's render setting laid on meanwhile to start from (renderPrefs))
+        m.userData.shadeWas = was
+        m.material = now
+      })
+    }
+    apply()
+    // (models still coming in, batches merging, people walking in: caught a moment later; and a piece's render setting changed, once it's
+    // been laid on)
+    const t = window.setInterval(apply, 1000)
+    const off = onRenderPrefs(() => { window.setTimeout(apply, 150) })
+    return () => {
+      live = false
+      window.clearInterval(t)
+      off()
+      for (const [m, r] of swaps) { if (m.material === r.now) m.material = r.was; delete m.userData.shadeWas }
+      for (const c of overs.values()) c.removeFromParent()
+      // (each shape's line index let go, as the wireframe's are: a few at a time)
+      releaseLines(lined)
+    }
+  }, [shade, scene])
   return null
 }
 
