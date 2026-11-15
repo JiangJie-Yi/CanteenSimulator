@@ -29,8 +29,9 @@ import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWal
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
+import { HAND_WASH_LINES, handStops, scrubbed } from '@/game/handWash'
 import { unlitShade } from '@/game/roomLights'
-import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SHAPE_HAND, SweepBroom, ownerSweepPose, OWNER_BEND } from '@/scene/StaffFigure'
+import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SHAPE_HAND, SweepBroom, ownerSweepPose, floorWipePose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
 import { BossModel, drawnCentre } from './Boss'
@@ -155,6 +156,7 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     // (sweeping up broken glass, or the broom carried: the tray put by)
     // (nor while he's down sweeping or wiping the floor (item 116: the tray showed in his hands as he wiped, a black disc on the floor))
     if (tray.current) tray.current.visible = !o.parent?.userData.broom && o.parent?.userData.scrub === undefined && o.parent?.userData.sweep === undefined
+      && o.parent?.userData.floorWipe === undefined
     // (sweeping: both his hands on the broom's handle, going with it from side to side, as a server's are (the owner's, 2026-11-11: his hands
     // stood still at his sides while the broom swept); back where they rest after)
     if (!hands.current) {
@@ -166,12 +168,15 @@ function OwnerWalker({ moving }: { moving: boolean }) {
       if (l && r && l.parent && r.parent) hands.current = [l, r].map((node, k) => ({ node, at: node.position.clone(), q: node.quaternion.clone(), upper: k === 1, palm: null }))
     }
     const sweep = o.parent?.userData.sweep as number | undefined
+    // (wiping a spill off the floor after (item 164): stooped as for the sweep, the broom put by, a hand on the cloth)
+    const floorWipe = o.parent?.userData.floorWipe as number | undefined
+    const wipeAt = o.parent?.userData.wipeAt as [number, number, number] | undefined
     // (washing up at the sink (item 103): leant a little over the basin, both hands down in it, the right scrubbing round on the plate)
     const scrub = o.parent?.userData.scrub as number | undefined
     // (stooped over the small broom while he sweeps, upright after)
-    o.rotation.x += ((sweep !== undefined ? OWNER_BEND : scrub !== undefined ? OWNER_BEND * 0.35 : 0) - o.rotation.x) * 0.2
+    o.rotation.x += ((sweep !== undefined || floorWipe !== undefined ? OWNER_BEND : scrub !== undefined ? OWNER_BEND * 0.35 : 0) - o.rotation.x) * 0.2
     if (hands.current) for (const h of hands.current) {
-      if ((sweep === undefined && scrub === undefined) || !h.node.parent) { h.node.position.copy(h.at); h.node.quaternion.copy(h.q); continue }
+      if ((sweep === undefined && scrub === undefined && floorWipe === undefined) || !h.node.parent) { h.node.position.copy(h.at); h.node.quaternion.copy(h.q); continue }
       if (!h.palm) {
         o.updateWorldMatrix(true, true)
         const parent = h.node.parent
@@ -184,6 +189,12 @@ function OwnerWalker({ moving }: { moving: boolean }) {
         const k = scrub * Math.PI * 10
         OWNER_HAND.set(h.upper ? 0.09 + Math.cos(k) * 0.035 : -0.08, 0.36 + (h.upper ? Math.sin(k) * 0.02 : 0), 0.3 + (h.upper ? Math.sin(k) * 0.03 : 0))
         h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND))).sub(h.palm!)
+        continue
+      }
+      if (floorWipe !== undefined) {
+        // (his own frame is the server's he stands in for, scaled up to his height: the cloth's place brought into it)
+        const w = floorWipePose(OWNER_HAND.set(...(wipeAt ?? [0.05, 0.004, 0.62])).divideScalar(OWNER_IN_STAFF))
+        h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? w.right : w.left)))).sub(h.palm!)
         continue
       }
       const p = ownerSweepPose(sweep!)
@@ -3239,9 +3250,32 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * the log) and walks from the fire to the sink, scrubs it plate by plate into the draining basket, and walks back. Out serving himself (no
    * server hired), it's simply his to wash as a server's chore from then; out on another errand, he goes once he's back.
    */
-  const bossWash = useRef<{ phase: 'go' | 'wash' | 'back'; path: THREE.Vector3[]; len: number; t: number; pos: THREE.Vector3; yaw: number } | null>(null)
+  const bossWash = useRef<{ phase: 'go' | 'wash' | 'back'; path: THREE.Vector3[]; len: number; t: number; pos: THREE.Vector3; yaw: number
+    /** sent by the player (item 166): every dirty plate washed, a plate's worth of the liquid each, not only the counter's stack; and where he
+     * came from, to go back to */
+    manual?: boolean; home?: THREE.Vector3 } | null>(null)
   const bossObj = useRef<THREE.Group | null>(null)
+  /** where the owner is just now, in the bar's frame: his own figure's place (at the fire while the shop's shut, along the aisle while it's
+   * open), so he walks off from where he's seen and comes back there */
+  const bossNow = () => {
+    const b = scene.getObjectByName('BossFollow'), f = frame.current
+    return b && f ? f.worldToLocal(b.getWorldPosition(new THREE.Vector3())).setY(0) : ownerAt()
+  }
   const bossWashTick = (step: number) => {
+    // (the player's washing up handed to him (item 166, Sink's scrubOnce): he goes once he's free; at the counter's stack already, he washes
+    // the lot)
+    if (HAND_WASH.ask === 'wash' && !SHOP.leaving && !(open && ownerServes)) {
+      if (bossWash.current) { bossWash.current.manual = true; HAND_WASH.ask = null }
+      else if (!OWNER_OUT.on) {
+        HAND_WASH.ask = null
+        const from = bossNow(), path = kitchenRoute(from, sinkFront())
+        bossWash.current = { phase: 'go', path, len: pathLength(path), t: 0, pos: from.clone(), yaw: OWNER_YAW, manual: true, home: from }
+        OWNER_OUT.on = true
+        STAFF_SAY.say('owner', HAND_WASH_LINES.start)
+      }
+    }
+    HAND_WASH.boss = (!!bossWash.current?.manual && bossWash.current.phase !== 'back')
+      || (open && ownerServes && waiters.current.some((x) => x.phase === 'handGo' || x.phase === 'handwash'))
     if (open && !SHOP.leaving && !bossWash.current && PILE.saidDay !== SHOP.day && bossCleans(SHOP.day, PILE.n)
       && performance.now() - SHOP.openedAt > 9000 && (ownerServes || !OWNER_OUT.on)) {
       PILE.saidDay = SHOP.day
@@ -3274,7 +3308,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (a plate of the stack scrubbed and stood in the basket; the stack washed, or the basket full, back to the fire)
       b.t = 0
       const before = dirty.current
-      const r = PILE.n > 0 ? handOne(before, DRAIN) : null
+      // (sent by the player: any dirty plate, while there's water and the liquid in it; else the counter's stack)
+      const sinkNow = () => ({ dirty: dirty.current, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: true })
+      const stop = b.manual ? handStops(sinkNow()) : null
+      const r = b.manual ? (stop ? null : handOne(before, DRAIN)) : PILE.n > 0 ? handOne(before, DRAIN) : null
+      if (r && b.manual && r.dirty !== before) SINK.soap = scrubbed(SINK.soap)
       if (r && r.dirty !== before) {
         dirty.current = r.dirty
         DRAIN.n = r.drain.n
@@ -3284,9 +3322,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         PILE.n = pileLeft(PILE.n, dirty.current)
         redraw()
       }
-      if (!r || r.dirty === before || PILE.n <= 0 || DRAIN.n >= DRAIN_CAP) {
+      const why = b.manual ? stop ?? handStops(sinkNow()) : null
+      if (b.manual ? !!why : (!r || r.dirty === before || PILE.n <= 0 || DRAIN.n >= DRAIN_CAP)) {
+        // (and says why: all washed, the basket full, the liquid or the water gone)
+        if (why) STAFF_SAY.say('owner', HAND_WASH_LINES[why])
         b.phase = 'back'; b.t = 0
-        b.path = kitchenRoute(b.pos, ownerAt()); b.len = pathLength(b.path)
+        b.path = kitchenRoute(b.pos, b.home ?? ownerAt()); b.len = pathLength(b.path)
       }
     }
     if (o) {
@@ -4995,7 +5036,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (the used skewers due a wash and no one on it already)
           const skewersDue = washGoes(SKEWERS.s) && !atSink && !waiters.current.some((x) => SK_PHASES.has(x.phase)) && !['toSkTray', 'takeSk', 'toSkSink', 'washSk', 'toHolder', 'putSk'].includes(platerRun.current.phase)
           // (the shop shut and going home: nothing new taken on; what's left is put away overnight with the closing)
-          const chore = SHOP.leaving ? null : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : staffSink(dirty.current, PILE.n), rack: PLATE_RACK.n,
+          // (the player's washing up handed to the owner while he serves the floor himself (item 166): his next chore, once there's nothing
+          // ready to carry out; the counter's stack in with the rest)
+          const asked = open && ownerServes && HAND_WASH.ask === 'wash' && slot < 0 && dirty.current > 0 && !SHOP.leaving
+          if (asked) { HAND_WASH.ask = null; PILE.n = 0 }
+          const chore = SHOP.leaving ? null : asked ? 'handwash' : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : staffSink(dirty.current, PILE.n), rack: PLATE_RACK.n,
             // (the draining basket left as it is till the shop opens (the owner, 2026-11-15: "four clean ones in the basket to start, right?":
             // the day's first four, dry already, were carried off to the racks the moment the page came up, the basket bare); the player may)
             dryer: atSink ? { n: 0, left: null } : DRYER, drain: atSink || !open ? { n: 0, left: null } : DRAIN, skewers: skewersDue && (washUrgent(SKEWERS.s) ? 'urgent' : true),
@@ -5342,13 +5387,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         w.keys.forEach((key, i) => SERVICE.carried.set(key, toShop(hold.clone().add(new THREE.Vector3((i % 3 - 1) * 0.05, 0.035 + Math.floor(i / 3) * 0.03, 0)))))
       }
       const o = waiterObjs.current[wi]
-      if (ownerServes) OWNER_OUT.on = w.phase !== 'idle'
+      // (out on the floor, or gone to wash up for the player while the shop's shut (item 166): out either way, not at his place)
+      if (ownerServes) OWNER_OUT.on = w.phase !== 'idle' || !!bossWash.current
       // (the plate up on the tray, the bar where it was wiped down with a cloth, twice along and back (the owner's))
       const wiping = w.phase === 'clearTake' && w.t > 0.45 && w.t < 0.45 + WIPE_S && w.seat >= 0
       if (o) o.userData.wipe = wiping ? (w.t - 0.45) / WIPE_S : undefined
       // (sweeping up broken glass: how long into it; the broom in hand there and back (StaffFigure, the owner's SweepBroom))
       // (wiping the floor after: stooped as they sweep, the broom put by, the cloth in their hand on the floor (item 116))
-      if (o) { o.userData.sweep = w.phase === 'sweep' || w.phase === 'wipeFloor' ? w.t : undefined; o.userData.broom = !!w.broom }
+      // (wiping the floor its own: stooped as for the sweep, but the broom and the dustpan put by and the cloth in hand (item 164: the three
+      // were out together, the sweep's flag kept on for the stoop))
+      if (o) { o.userData.sweep = w.phase === 'sweep' ? w.t : undefined; o.userData.floorWipe = w.phase === 'wipeFloor' ? w.t : undefined; o.userData.broom = !!w.broom }
       // (washing up at the sink, by hand or into the washer: the scrubbing motion (StaffFigure's scrub))
       if (o) o.userData.scrub = w.phase === 'wash' || w.phase === 'handwash' ? w.t : undefined
       // (they step in to the bar's edge between the stools for it, facing it, and back out: the cloth's under their hand (StaffFigure's
@@ -5364,6 +5412,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const a = w.t * 7
           rag.position.set(at.x + Math.cos(a) * 0.07, at.y + 0.004, at.z + Math.sin(a) * 0.07)
           rag.rotation.y = a
+          // (and where it is from the one wiping, in their own upright frame, for their hand to be on it)
+          if (o) {
+            const d = rag.position.clone().sub(w.pos).applyAxisAngle(UP_Y, -w.yaw).divideScalar(STAFF_SCALE)
+            o.userData.wipeAt = [d.x, rag.position.y / STAFF_SCALE, d.z]
+          }
         }
       }
       if (wiping) {
@@ -5463,21 +5516,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         redraw()
       }
     }
-    // (the player washing up by hand (Sink, game/plates): a plate out of the sink into the basket with a splash and a clink; or the basket's
-    // dry plates back to the racks)
-    if (HAND_WASH.ask === 'wash') {
-      HAND_WASH.ask = null
-      const r = handOne(dirty.current, DRAIN)
-      if (r.dirty !== dirty.current) {
-        dirty.current = r.dirty
-        DRAIN.n = r.drain.n
-        DRAIN.left = r.drain.left
-        meterWater('dish')
-        const f = frame.current
-        if (f) { washSplash(f.localToWorld(SOUND_AT.copy(inBar('SinkBasinFloor', endOf(1))))); window.setTimeout(() => plateClink(SOUND_AT), 520) }
-        redraw()
-      }
-    } else if (HAND_WASH.ask === 'take') {
+    // (the player's washing up by hand is the owner's to do (item 166: a plate went clean at a click, nothing seen done): bossWashTick sends
+    // him, or out serving himself he takes it as his next chore; the shop shutting meanwhile, asked no more. The basket's dry plates back to
+    // the racks at a click, as before)
+    if (HAND_WASH.ask === 'wash' && SHOP.leaving) HAND_WASH.ask = null
+    if (HAND_WASH.ask === 'take') {
       HAND_WASH.ask = null
       const u = unbasket(DRAIN)
       if (u.take > 0) {
@@ -5832,8 +5875,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && open && <TiredBadges />}
       {/* (what's just been paid, rising green over the one who paid it, and gone) */}
       {payFloats.map((f) => <PayFloat key={f.key} text={f.text} follow={() => groups.current.get(f.id)} done={() => setPayFloats((all) => all.filter((x) => x.key !== f.key))} />)}
-      {/* (the owner gone to wash the stack left on the sink's counter (item 103): only while he's at it) */}
-      {!ownerServes && (
+      {/* (the owner gone to wash the stack left on the sink's counter (item 103), or the player's washing up (item 166): only while he's at it;
+          there with nobody hired too, as he's at the fire while the shop's shut and it's him who goes then) */}
+      {(
         <group ref={(o) => {
           const was = bossObj.current
           if (was && was !== o) { KITCHEN_FOLK.delete(was); FIGURES.delete(was) }

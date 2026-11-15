@@ -13,10 +13,10 @@ import { inkModel } from '@/scene/inkHull'
 import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { Steam } from '@/scene/Steam'
-import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, handTime, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
+import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
 import { DRAIN, DRYER, HAND_WASH, POINTER_HINT, SINK, SINK_BIN, tipOver } from './bar'
 import { basinSays, waterTick } from '@/game/sinkWater'
-import { HAND_STEP_SAYS, handStep, pumpSoap, scrubbed, soapWith } from '@/game/handWash'
+import { HAND_STEP_SAYS, handStep, pumpSoap, soapWith } from '@/game/handWash'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { getEdit } from './edit'
@@ -405,20 +405,22 @@ export function SinkModel() {
   )
 }
 /** the sink as washing up by hand sees it (game/handWash) */
-/** a plate scrubbed by hand, if that's the step now and the last one's done: the basin's click, and the dirty stack's beside it (the owner,
- * 2026-11-15: clicking the stack did nothing, "I can't wash up by hand"); whether one was */
+/** the washing up handed to the owner, if it's all ready for it: the basin's click, and the dirty stack's beside it (the owner, 2026-11-15:
+ * clicking the stack did nothing, "I can't wash up by hand"; then, item 166: a plate went clean at a click, with nothing seen done, "isn't
+ * the owner meant to take it over?"): he walks over and scrubs them one by one (GuestBar3D); whether he's on it */
 export function scrubOnce() {
-  const now = performance.now()
-  if (now < HAND_WASH.until || handStep(handSink()) !== 'scrub') return false
+  if (HAND_WASH.boss) return true
+  if (handStep(handSink()) !== 'scrub') return false
   HAND_WASH.ask = 'wash'
-  SINK.soap = scrubbed(SINK.soap)
-  HAND_WASH.until = now + handTime(SINK.dirt.at(-1) ?? 1) * 1000
   return true
 }
 const handSink = () => ({ dirty: SINK.dirty, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: SINK.sponge })
 /** what the basin says pointed at: its water and plug, then the next step of washing up by hand (item 103), how many plates are waiting */
 export const basinHint = () => {
   const st = handStep(handSink())
+  // (the owner at it: say so, not the next step)
+  if (HAND_WASH.boss) return `${basinSays(SINK.water, SINK.plug)}｜老闆在洗（髒盤 ${SINK.dirty}）`
+  if (HAND_WASH.ask === 'wash') return `${basinSays(SINK.water, SINK.plug)}｜老闆忙完就來洗（髒盤 ${SINK.dirty}）`
   return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}`
 }
 /** the rubbish bin's lid: asked open (a click), or lifted for a moment till then (sticks thrown in); how far it lifts (rad) */
@@ -492,7 +494,10 @@ export function SinkPart({ node }: { node: string }) {
   if (node !== 'SinkBasketSet') return (
     // (the rest name themselves pointed at (the owner's, 2026-11-11: every one of them), the bin with how many sticks are in it)
     <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: name, hint: partSays(node) }) }}
-      onPointerOut={() => { if (!HOVER.paused) setTip(null) }}>
+      onPointerOut={() => { if (!HOVER.paused) setTip(null) }}
+      // (a click is theirs, to do nothing with but say what they are: it went on through the soap or the brush to the basin behind, and
+      // washed a plate (the owner, 2026-11-15, item 166: "why does clicking the soap and the brush clean the plates?"))
+      onClick={(e) => { if (getEdit().on) return; e.stopPropagation(); setTip({ title: name, hint: partSays(node) }) }}>
       <primitive object={obj} />
     </group>
   )

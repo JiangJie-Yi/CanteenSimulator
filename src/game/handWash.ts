@@ -38,3 +38,25 @@ export const HAND_STEP_SAYS: Record<HandStep, string> = {
   sponge: '洗碗：拿起菜瓜布',
   scrub: '點一下刷一個盤子，刷好放進瀝水籃',
 }
+
+/**
+ * Washing up by hand is the owner's to do (item 166, the owner's, 2026-11-15: "isn't the owner meant to take it over?"): the player's click
+ * on the basin (or the dirty stack) once it's all ready sends him over; he scrubs plate after plate with the sponge, a plate's worth of the
+ * liquid each, till there's nothing left to wash, or nothing to wash with, and walks back. Why he stops, from the sink as it is after a plate
+ * (null: he goes on).
+ */
+export function handStops(s: HandSink): 'done' | 'basketFull' | 'soap' | 'water' | null {
+  if (s.dirty <= 0) return 'done'
+  if (s.drain.n >= DRAIN_CAP) return 'basketFull'
+  if (s.water < WASH_WATER) return 'water'
+  if (s.soap <= 0) return 'soap'
+  return null
+}
+/** what he says as he comes over, and as he stops */
+export const HAND_WASH_LINES = {
+  start: { zh: ['盤子我來洗。'], ja: ['皿はわしが洗おう。'], en: ["I'll do the plates."] },
+  done: { zh: ['洗好了。'], ja: ['洗い終わった。'], en: ['All washed.'] },
+  basketFull: { zh: ['瀝水籃滿了，先收一收。'], ja: ['水切りかごがいっぱいだ。'], en: ["The draining basket's full."] },
+  soap: { zh: ['洗碗精用完了，再擠一點。'], ja: ['洗剤が切れた。'], en: ['Out of washing-up liquid.'] },
+  water: { zh: ['水不夠了。'], ja: ['水が足りない。'], en: ['Not enough water.'] },
+} as const

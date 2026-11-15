@@ -80,6 +80,20 @@ const unbend = (v: THREE.Vector3) => {
   const c = Math.cos(OWNER_BEND), n = Math.sin(OWNER_BEND)
   return v.set(v.x, v.y * c + v.z * n, -v.y * n + v.z * c)
 }
+/**
+ * Wiping a spill off the floor after sweeping its glass up (item 164, the owner's, 2026-11-15: "the cloth and the little broom out together?":
+ * the stoop was the sweep's, and with it the broom and the dustpan): stooped the same, the broom and the pan put by; the right hand flat on
+ * the cloth where it goes round on the floor (`at`: the cloth, in the figure's upright frame), the left on the knee. The same tipped frame as
+ * the sweep's
+ */
+const WIPE_POSE = { right: new THREE.Vector3(), left: new THREE.Vector3() }
+const WIPE_AT = new THREE.Vector3()
+export function floorWipePose(at: THREE.Vector3) {
+  // (the palm a hand's thickness over the cloth)
+  unbend(WIPE_POSE.right.set(at.x, at.y + 0.03, at.z))
+  unbend(WIPE_POSE.left.set(-0.13, 0.3, 0.36))
+  return WIPE_POSE
+}
 /** `upper`: the right hand, on the broom's handle; `lower`: the left, on the dustpan's grip; `pan`: the dustpan's middle on the floor */
 export function ownerSweepPose(t: number) {
   const s = Math.sin(t * Math.PI * 2.2)
@@ -462,7 +476,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
     const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number
-      sweep?: number; broom?: boolean; scrub?: number; shape?: number } | undefined
+      sweep?: number; broom?: boolean; scrub?: number; shape?: number
+      /** wiping the floor (item 164): how long at it, and where the cloth is in their own upright frame */
+      floorWipe?: number; wipeAt?: [number, number, number] } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -508,7 +524,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const slack = !id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' && job?.sweep === undefined && !job?.broom
     const word = STAFF_TALK.find((w) => w.id === id)
     const tapping = seated && (t + seed) % 7 < 2.2
-    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined || job?.sweep !== undefined || slack ? 'focused'
+    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined || job?.sweep !== undefined || job?.floorWipe !== undefined || slack ? 'focused'
       : job?.carry || job?.stretch || (job?.nod ?? 0) > 0.2 ? 'happy' : 'idle')
     if (!faceAsked && word && Math.sin(t * 17) + Math.sin(t * 7.3) * 0.6 > 0.2) face = 'talk'
     if ((t + seed * 0.9) % 3.4 < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
@@ -525,13 +541,21 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     fw.carry = !!job?.carry
     setFace(fig.root, face)
     // (no squash and stretch while they sweep, stooped: it pushed the broom's straw and the dustpan into the floor and lifted them off it)
-    const [jw, jh] = job?.sweep !== undefined ? [1, 1] : jelly(t - fw.at)
+    const stooped = job?.sweep !== undefined || job?.floorWipe !== undefined
+    const [jw, jh] = stooped ? [1, 1] : jelly(t - fw.at)
     fig.body.scale.set(jw, (1 + (1 - walk) * Math.sin(t * 2 + seed) * 0.008) * jh, jw)
     const hold = role === 'server' || role === 'stock' || job?.carry ? 1 : role === 'cashier' ? 0.6 : 0
     handheld.visible = slack
     if (slack) handheld.position.y = HANDHELD_AT.y + Math.sin(t * 2.2 + seed) * 0.004
     for (const [hand, rest, sd] of [[fig.handL, REST.L, -1], [fig.handR, REST.R, 1]] as const) {
       if (!hand) continue
+      // (wiping the floor: the right hand on the cloth, going round with it, the left on the knee)
+      if (job?.floorWipe !== undefined) {
+        const p = floorWipePose(WIPE_AT.set(...(job.wipeAt ?? [0.05, 0.004, 0.62])))
+        hand.position.copy(sd > 0 ? p.right : p.left)
+        hand.rotation.set(sd > 0 ? -1.2 : -0.5, 0, 0)
+        continue
+      }
       // (sweeping up broken glass: both hands on the broom's handle, the right above the left, going with it from side to side)
       if (job?.sweep !== undefined) {
         // (stooped (the body tipped below): the right hand on the hand broom's handle, the left on the dustpan's grip, both out in front)
@@ -612,12 +636,13 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     fig.clip?.scale.setScalar(role === 'stock' && !moving && !slack ? 1 : 0)
     // (a server's broom: swept, or carried at their side in their right hand, there and back; their tray put by meanwhile)
     // (stooped over it while they sweep, upright after: the whole figure tipped about its feet, the broom and pan in its frame with it)
-    bend.current += ((job?.sweep !== undefined ? OWNER_BEND : 0) - bend.current) * Math.min(1, dt * 8)
+    bend.current += ((stooped ? OWNER_BEND : 0) - bend.current) * Math.min(1, dt * 8)
     fig.body.rotation.x += bend.current
     poseBroom(broom, job?.sweep, !!job?.broom, fig.handR, undefined, true)
     pan.visible = job?.sweep !== undefined
     if (pan.visible) { pan.position.copy(ownerSweepPose(job!.sweep!).pan); pan.rotation.set(-OWNER_BEND, 0, 0) }
-    fig.tray?.scale.setScalar(role === 'server' && !job?.broom ? 1 : 0)
+    // (nor while they're down wiping the floor)
+    fig.tray?.scale.setScalar(role === 'server' && !job?.broom && job?.floorWipe === undefined ? 1 : 0)
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>
