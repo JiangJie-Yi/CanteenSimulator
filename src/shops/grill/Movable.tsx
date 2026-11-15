@@ -12,7 +12,7 @@ import { ALONG } from './bar'
 import { ROOM_TURN } from '@/game/editGroups'
 import { holdVeil } from '@/scene/Later'
 import { warmLater } from '@/scene/Prewarm'
-import { solidHit, pieceOf } from '@/scene/pickable'
+import { blockedBefore, blocksEdit, solidHit, pieceOf } from '@/scene/pickable'
 import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, registerPivotReset, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEdit, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
@@ -577,6 +577,21 @@ export function AxisGizmo({ id, at, theta = 0, own, pivotGroup, tilt }: { id: st
 /** the Movable a piece sits inside, if any: the outliner lists it under that one */
 const ParentPiece = createContext<string | null>(null)
 
+/**
+ * Something in the edit mode's way that's no piece (a counter, a wall): while editing, a press or a point landing on it, solid, stops there,
+ * so the pieces it hides aren't chosen or lit through it (scene/pickable's blocksEdit). Stopped at every move, not only as the pointer comes
+ * onto it (item 162, the owner's, 2026-11-15: "the cursor still finds what's behind": come onto the bar through its ink line first, which isn't
+ * solid, the bar let every move after it through, and the produce and the coal sack behind it lit up). `whole` false: only what's marked
+ * `editBlock` inside it stands in the way (the hearth's frame and stones in the grill's model), the rest of it is only looked at. Out of edit
+ * mode it has no handlers, so it's no part of the game's pointing.
+ */
+export function EditBlock({ children, whole = true }: { children: ReactNode; whole?: boolean }) {
+  const { on } = useEdit()
+  const stop = (e: { stopPropagation: () => void; object: THREE.Object3D }) => { if (solidHit(e.object) && blocksEdit(e.object)) e.stopPropagation() }
+  const h = on ? stop : undefined
+  return <group userData={whole ? { editBlock: true } : {}} onPointerDown={h} onPointerOver={h} onPointerMove={h}>{children}</group>
+}
+
 export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0], ground }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3
   /** it stands on the floor, this high in its own frame: sized about the middle of its foot there, not about its own middle, so made bigger
    * it grows up from the floor and doesn't sink into it (the dish cabinet's and the freezer's feet went down through the kitchen's dais and
@@ -983,7 +998,7 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on, poseKey])
 
-  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; object: THREE.Object3D; intersections?: { object: THREE.Object3D }[] }) => {
+  const down = (e: { stopPropagation: () => void; nativeEvent: PointerEvent; object: THREE.Object3D; distance: number; intersections?: { object: THREE.Object3D; distance: number }[] }) => {
     const grp = g.current
     if (!on || !grp || !grp.parent) return
     // (an axis arrow under the pointer takes it: the box is only for the free move)
@@ -991,14 +1006,19 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     // (what was hit isn't drawn and solid (a lamp's glow, its pool of light on the bar, an unseen hit box, a piece hidden by hand): not this
     // piece's to take; the ray goes on to what's behind it)
     if (!solidHit(e.object)) return
+    // (a counter or a wall in front of it: hidden by it, not to be chosen through it (items 149, 162))
+    if (blockedBefore(e)) return
     e.stopPropagation()
     // (everything solid under the pointer, front to back, each once: a piece in a group as its group (the group's own handles move, turn and
     // size it all together), Alt the piece alone; a view's whole area isn't picked so (that's from the list, or its tag): the piece in it is)
     const alt = e.nativeEvent.altKey
+    // (up to a counter or a wall in the way, EditBlock: what's behind it is hidden by it, not the next one back)
     const stack: string[] = []
     for (const hit of e.intersections ?? []) {
-      const p = solidHit(hit.object) ? pieceOf(hit.object) : null
-      const s = p && (alt ? p : clickPick(p))
+      if (!solidHit(hit.object)) continue
+      const p = pieceOf(hit.object)
+      if (!p) { if (blocksEdit(hit.object)) break; continue }
+      const s = alt ? p : clickPick(p)
       if (s && !stack.includes(s)) stack.push(s)
     }
     if (!stack.length) stack.push(alt ? id : clickPick(id))
@@ -1077,8 +1097,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
           scaled there, and stood back) */}
       <group ref={pg} position={piv} rotation-y={thetaW} visible={ready || !pivoted}
         onPointerDown={on ? down : undefined}
-        onPointerOver={on ? (e: { stopPropagation: () => void; object: THREE.Object3D; index?: number; instanceId?: number }) => {
-          if (!solidHit(e.object)) return
+        onPointerOver={on ? (e: { stopPropagation: () => void; object: THREE.Object3D; index?: number; instanceId?: number; distance: number; intersections?: { object: THREE.Object3D; distance: number }[] }) => {
+          if (!solidHit(e.object) || blockedBefore(e)) return
           e.stopPropagation(); over.current.add(overKey(e)); setHover(true)
         } : undefined}
         onPointerOut={on ? (e: { object: THREE.Object3D; index?: number; instanceId?: number }) => {

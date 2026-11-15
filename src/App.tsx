@@ -55,7 +55,7 @@ import { GAME_SPEED, paused } from '@/scene/speed'
 import { BOARD_SLOTS } from '@/game/fireSlots'
 import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { getEdit, offsetOf, positionOf, rotationOf, setEditLang, setViewCams, useEdit, type V3 } from '@/shops/grill/edit'
-import { GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
+import { EditBlock, GroupGizmo, Movable, WireView } from '@/shops/grill/Movable'
 import { ROOM_TURN, type ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -1081,9 +1081,12 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
         // everything drawn from the dish's model (the full one, or its light version)
         const models = (url: string) => (
           <group position={dish.roast ? FIRE_SHIFT : undefined}>
+              {/* (looked at by edit mode's pointer: the hearth's frame and stones in it stand in its way (item 162), nothing else of it) */}
+              <EditBlock whole={false}>
               <Dish url={url} itemIds={ITEM_IDS[dish.id]} quantities={onTable(dish, orders[dish.id], ai)}
                 hidden={hidden} layout={dish.layout}
                 instant={reducedMotion} />
+              </EditBlock>
               {/* after <Dish>, so its transforms win over the pop-in each frame */}
               {dish.roast && (
                 <Roasting url={url} roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])}

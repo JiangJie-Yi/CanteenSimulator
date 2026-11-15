@@ -4,10 +4,15 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 /** the shop's ink: a dark line round every object, drawn as its back faces pushed out a little along their normals */
 const HULL = new THREE.ShaderMaterial({
   uniforms: { uWidth: { value: 0.012 }, uColor: { value: new THREE.Color('#3b2a20') } },
+  // (a shape that bends by a morph target (the shop's own beckoning cat's arm, item 163) bends its line with it: three's own morph chunks,
+  // nothing where there's none)
   vertexShader: /* glsl */ `
+    #include <morphtarget_pars_vertex>
     uniform float uWidth;
     void main() {
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normalize(normal) * uWidth, 1.0);
+      vec3 transformed = vec3(position);
+      #include <morphtarget_vertex>
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed + normalize(normal) * uWidth, 1.0);
     }`,
   fragmentShader: /* glsl */ `
     uniform vec3 uColor;
@@ -36,8 +41,11 @@ const hullOf = (width: number) => {
 function welded(g: THREE.BufferGeometry) {
   const p = new THREE.BufferGeometry()
   p.setAttribute('position', g.attributes.position)
+  // (its morph targets kept, welded with it: the line bends as the shape does)
+  if (g.morphAttributes.position) { p.morphAttributes.position = g.morphAttributes.position; p.morphTargetsRelative = g.morphTargetsRelative }
   if (g.index) p.setIndex(g.index)
   const w = mergeVertices(p, 1e-5)
+  w.morphTargetsRelative = g.morphTargetsRelative
   w.computeVertexNormals()
   return w
 }
@@ -80,6 +88,8 @@ export function inkModel(root: THREE.Object3D, skip: (m: THREE.Mesh) => boolean 
   for (const m of meshes) {
     m.userData.inked = true
     const hull = new THREE.Mesh(weld ? welded(m.geometry) : m.geometry, hullMat)
+    // (a shape that bends: its line takes the same weights, the very same list, so it bends as one with it)
+    if (m.morphTargetInfluences) { hull.morphTargetInfluences = m.morphTargetInfluences; hull.morphTargetDictionary = m.morphTargetDictionary }
     hull.raycast = () => {}
     hull.userData.inked = true
     m.add(hull)

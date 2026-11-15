@@ -23,7 +23,7 @@ import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE, depthOf } from '@/game/drinkStock'
 import { cartonMaterials } from './drinkCartons'
 import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, type Counter, type DrinkId } from './bar'
-import { Movable } from './Movable'
+import { EditBlock, Movable } from './Movable'
 import { getEdit } from './edit'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { aimTip, setTip } from '@/scene/hoverTip'
@@ -4504,6 +4504,9 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
     <group position={c.at} rotation-y={yaw}>
       {/* (local x is away from the cook: the wall stands at the floor's far edge, facing back toward the bar) */}
       <group ref={wall} position-x={-far} name="room-wall" userData={{ from, to, shelf }}>
+        {/* (the wall stands in edit mode's way: a press on it doesn't go on through to what's behind it, the toilets', the lanterns
+            out at the door (scene/pickable's blocksEdit); the pieces on it are still their own) */}
+        <EditBlock>
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
         <StaticBatch plain key={`${from}|${to}|${door}|${!!altar}`}>
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
@@ -4604,10 +4607,13 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]} scale-y={0.5}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
         {/* (the omiki poured, the motes rising over the shrine: not merged) */}
         {altar && <Movable id="altarfittings" label="供桌上的供品"><group name="look-altar" position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><Altar omiki={altar === true ? undefined : altar} /></group></Movable>}
+        </EditBlock>
       </group>
       {/* the toilets: not part of the wall that's hidden from behind, so they're still there when the camera swings round to the back */}
       <group position-x={-far}>
         {/* the toilets, the men's and the women's, side by side */}
+        {/* (their doors and frames, shut, stand in edit mode's way as the wall does: not chosen through) */}
+        <EditBlock>
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
           <group key={who} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletDoor who={who} /></group>
         ))}
@@ -4615,6 +4621,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {door !== undefined && (['m', 'f'] as const).map((who, k) => (
           <group key={who} name={`look-wc-${who}`} position-z={door + (k ? 1 : -1) * (WC_W / 2 + 0.06)}><ToiletPanel who={who} /><ToiletHit who={who} /></group>
         ))}
+        </EditBlock>
       </group>
       {/* pendant lamps over the bar's customer side, low: one between each two places, midway (the owner's: a lamp between one customer and
           the next; bar's lampsAlong), their bands 鱗 and 立涌 in turn */}

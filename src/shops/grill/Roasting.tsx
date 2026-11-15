@@ -74,7 +74,7 @@ import { slide as drawerSound } from './TillDesk'
 import { tissuePull } from './paperSound'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { ColdMist } from '@/scene/ColdMist'
-import { Movable } from './Movable'
+import { EditBlock, Movable } from './Movable'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
@@ -800,14 +800,18 @@ function BarImpl() {
   // (and one top over both, in one piece round the corner, its edges rounded and flush where they meet)
   return (
     <group position={GRILL_OFFSET} scale={GRILL_SCALE}>
-      <StaticBatch plain>
-        {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)}
-          trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} butt={i > 0}
-          gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
-        {GRILL_COUNTERS.length > 1 && <BarTop />}
-      </StaticBatch>
+      {/* (the counters, their top and their drawers stand in edit mode's way: a press on them doesn't go on through to the kitchen floor
+          behind (the owner's, 2026-11-15: the bar top beside a pair of chopsticks chose the charcoal sack)) */}
+      <EditBlock>
+        <StaticBatch plain>
+          {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)}
+            trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} butt={i > 0}
+            gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
+          {GRILL_COUNTERS.length > 1 && <BarTop />}
+        </StaticBatch>
+        {GRILL_COUNTERS.map((c, i) => <BarDrawers key={`drawers-${i}`} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)} />)}
+      </EditBlock>
       {GRILL_COUNTERS.map((c, i) => BAR_GATES[i] && <BarGate key={i} c={c} gate={BAR_GATES[i]} />)}
-      {GRILL_COUNTERS.map((c, i) => <BarDrawers key={`drawers-${i}`} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)} />)}
       <BarTableware />
       <BarChopsticks />
     </group>
@@ -2694,10 +2698,12 @@ const BarTableware = memo(function BarTableware() {
                   {/* (the pair of chopsticks: a piece of its own, moved apart from the rest; BarChopsticks, instanced, lays them where this stands, and
                       picks them up for its customer; the box here is only their reach, to be pointed at and chosen: marked the piece's stand-in
                       (`proxy`), or the edit mode's picking passed it by as unseen and a click on the sticks chose the seat they're drawn with (the
-                      owner, 2026-11-15, said four times)) */}
+                      owner, 2026-11-15, said four times)); fitted to the two sticks as drawn (measured: 22.2 cm long, 2.4 cm across the pair,
+                      their sheets 2.7 to 11 mm over the top as they rise onto the rest), so its AABB and OBB are theirs (it stood 2.6 cm tall and
+                      4 cm across, and a low camera's ray to the bar top past their end met it first) */}
                   <Movable id={`chopstickpair${seat}`} label={`筷子（座位 ${no}）`}>
                     <group ref={keep(k++)} name={`chop-pair-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷子', '黑漆塗箸，客人開動時拿起來')}>
-                      <mesh visible={false} userData={{ proxy: true }} position={[0, 0.012, 0]}><boxGeometry args={[SETTING.chopL + 0.01, 0.026, 0.04]} /></mesh>
+                      <mesh visible={false} userData={{ proxy: true }} position={[0, 0.007, 0]}><boxGeometry args={[SETTING.chopL + 0.003, 0.011, 0.024]} /></mesh>
                     </group>
                   </Movable>
                   <Movable id={`soydish${seat}`} label={`醬油碟（座位 ${no}）`}>
@@ -4364,6 +4370,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // still planted where they were, now well inside the ring
   useMemo(() => {
     for (const o of root.children) {
+      // (the hearth's bed, frame and stones stand in edit mode's way: what's behind them isn't chosen or lit through them (item 162: the trash bin
+      // and the knives lit through the frame); App's EditBlock round the model looks at them)
+      if (/^(FirePit|Robuchi|Stone)/.test(o.name)) o.userData.editBlock = true
       if (!PIT_PARTS.test(o.name) || o.userData.pitScaled) continue
       o.userData.pitScaled = true
       o.position.x *= PIT_SCALE
@@ -8318,7 +8327,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.rawDish && <EditProxy id="ricedish" label="飯糰小碟" at={containerAt('rawdish')} size={[DISH_R * 2, 0.06, DISH_R * 2]} yaw={0} />}
       {/* (the table, the crew and the bar stay where they were drawn: the fire and all round it stand FIRE_SHIFT along from them, to the table's middle) */}
       <group position={[-FIRE_SHIFT.x, 0, -FIRE_SHIFT.z]}>
-      <CookTable floor={!bar} />
+      {/* (the table stands in edit mode's way: the pieces behind it and under it aren't chosen or lit through it (item 162)) */}
+      <EditBlock><CookTable floor={!bar} /></EditBlock>
       {/* (the crew keep their own places on the kitchen floor: carried back by the shift) */}
       <group position={[FIRE_SHIFT.x, 0, FIRE_SHIFT.z]}>
       {/* the owner: at his grill while the shop's shut; open, his chef has the grill and he stands along the aisle from it, keeping an eye  (he fades himself out of the way when he stands between the camera and what it looks at: Boss.tsx) */}

@@ -4,8 +4,8 @@ low-poly mesh of quads over its shape, its colour baked into a picture (as the b
 
 How: the door cat's mesh, turned to face -y and brought to 0.30 tall, is fused whole (a voxel remesh), retopologised into an even grid of quads
 (a coarse voxel remesh) and the quads shrunk back onto its surface; unwrapped, and its colours baked from the original into a 1024 picture (Cycles,
-selected to active). The raised paw (its hand, out past the head's side) cut off into a node of its own, its origin at the wrist, the game
-swinging it about x to beckon; both cuts closed.
+selected to active). The raised paw (its hand, out past the head's side) beckons by bending: a shape key tips it forward about its foot,
+fading into the body round it, which the game eases in and out (a morph target); no cut.
 
 Run:
     blender -b --factory-startup --python blender/ownluckycat.py -- <project path> [preview.png]
@@ -33,44 +33,45 @@ VOXEL = 0.018
 PAW_X, PAW_Z0, PAW_Z1 = 0.086, 0.4, 0.9
 
 
-FONTS = ("C:/Windows/Fonts/YuMinB.ttf", "C:/Windows/Fonts/msmincho.ttc", "C:/Windows/Fonts/YuGothB.ttc")
+# ---- the koban's picture: gold, 千万両 written down it by hand, as the door cat's is (the owner's, 2026-11-15: "the words on the coin:
+# draw them, not a typeface"; the door cat's koban (luckycat3's own picture) has 千万両 in thick round-ended strokes, a marker's, no font's).
+# Each character's strokes drawn as a hand would go, a round nib along each, on the coin's face in metres (its oval 2 x KOBAN_R), each
+# point a fraction of a millimetre off true (the same each time it's made)
+KOBAN_R = (0.026, 0.042)
+STROKES = {
+    "千": [[(0.76, 0.06), (0.55, 0.15), (0.30, 0.22)],
+           [(0.08, 0.50), (0.50, 0.48), (0.92, 0.46)],
+           [(0.50, 0.20), (0.50, 0.58), (0.50, 0.95)]],
+    "万": [[(0.06, 0.15), (0.50, 0.14), (0.94, 0.13)],
+           [(0.40, 0.15), (0.39, 0.42), (0.31, 0.68), (0.12, 0.92)],
+           [(0.39, 0.44), (0.62, 0.43), (0.82, 0.43), (0.81, 0.66), (0.76, 0.86), (0.64, 0.91), (0.55, 0.85)]],
+    "両": [[(0.06, 0.09), (0.50, 0.09), (0.94, 0.09)],
+           [(0.50, 0.09), (0.50, 0.72)],
+           [(0.17, 0.32), (0.17, 0.95)],
+           [(0.17, 0.32), (0.83, 0.32), (0.83, 0.88), (0.74, 0.95)],
+           [(0.33, 0.48), (0.33, 0.73), (0.67, 0.73), (0.67, 0.48)]],
+}
+# (each character's cell down the coin's middle (across, down, in metres), their middles' heights, the nib's radius)
+CELL_W, CELL_H, CELL_Z, NIB = 0.019, 0.023, (0.025, 0.0, -0.025), 0.0021
 
 
-def glyph(ch):
-    bpy.ops.object.text_add(location=(0, 0, 0))
-    tx = bpy.context.view_layer.objects.active
-    tx.data.body = ch
-    for f_ in FONTS:
-        if os.path.exists(f_):
-            tx.data.font = bpy.data.fonts.load(f_, check_existing=True)
-            break
-    tx.data.size = 1.0
-    tx.data.align_x = "CENTER"; tx.data.align_y = "CENTER"
-    tx.data.resolution_u = 5
-    bpy.ops.object.convert(target="MESH")
-    o = bpy.context.view_layer.objects.active
-    bm_ = bmesh.new(); bm_.from_mesh(o.data)
-    bmesh.ops.triangulate(bm_, faces=bm_.faces[:])
-    tris = [[(lp.vert.co.x, lp.vert.co.y) for lp in f.loops] for f in bm_.faces]
-    bm_.free()
-    bpy.data.objects.remove(o)
-    return tris
-
-
-def fill_tris(mask, tris, cx, cy, sx, sy):
-    H_, W_ = mask.shape
-    for t in tris:
-        P_ = [(cx + x * sx, cy + y * sy) for x, y in t]
-        x0, x1 = int(max(0, min(p_[0] for p_ in P_))), int(min(W_ - 1, max(p_[0] for p_ in P_) + 1))
-        y0, y1 = int(max(0, min(p_[1] for p_ in P_))), int(min(H_ - 1, max(p_[1] for p_ in P_) + 1))
-        if x1 <= x0 or y1 <= y0:
-            continue
-        gy, gx = np.mgrid[y0:y1 + 1, x0:x1 + 1].astype(np.float32) + 0.5
-        (ax, ay), (bx, by), (qx, qy) = P_
-        d1 = (gx - bx) * (ay - by) - (ax - bx) * (gy - by)
-        d2 = (gx - qx) * (by - qy) - (bx - qx) * (gy - qy)
-        d3 = (gx - ax) * (qy - ay) - (qx - ax) * (gy - ay)
-        mask[y0:y1 + 1, x0:x1 + 1] |= ~(((d1 < 0) | (d2 < 0) | (d3 < 0)) & ((d1 > 0) | (d2 > 0) | (d3 > 0)))
+def brush_mask(n):
+    """how much ink each texel of an n x n picture of the coin's face holds (0..1): every stroke of 千万両 drawn with a round nib"""
+    v_, u_ = np.mgrid[0:n, 0:n].astype(np.float32) + 0.5
+    x = (u_ / n - 0.5) * 2 * KOBAN_R[0]
+    z = (v_ / n - 0.5) * 2 * KOBAN_R[1]
+    ink = np.zeros((n, n), np.float32)
+    px_ = 2 * KOBAN_R[0] / n
+    for k_, (ch, zc) in enumerate(zip("千万両", CELL_Z)):
+        for s_, stroke in enumerate(STROKES[ch]):
+            pts = [((cu - 0.5) * CELL_W + 0.00025 * math.sin(3.1 * k_ + 1.7 * s_ + 2.3 * j_),
+                    zc + (0.5 - cw) * CELL_H - 0.00025 * math.cos(2.7 * k_ + 1.3 * s_ + 1.9 * j_)) for j_, (cu, cw) in enumerate(stroke)]
+            for (ax, az), (bx, bz) in zip(pts, pts[1:]):
+                dx, dz = bx - ax, bz - az
+                t = np.clip(((x - ax) * dx + (z - az) * dz) / max(1e-12, dx * dx + dz * dz), 0, 1)
+                d = np.hypot(x - ax - t * dx, z - az - t * dz)
+                ink = np.maximum(ink, np.clip((NIB - d) / px_ + 0.5, 0, 1))
+    return ink
 
 
 KN = 256
@@ -78,13 +79,8 @@ ku, kv = grid01(KN)
 # (made as the door cat's (luckycat3) is (the owner's, 2026-11-15: "make it as that one's made"): its warm golden yellow all over, a little
 # lighter in the middle, no engraved ring)
 kob = mix((0.9, 0.62, 0.02), (0.97, 0.74, 0.12), smooth(0.95, 0.25, np.hypot((ku - 0.5) * 1.4, kv - 0.5) * 2))
-km = np.zeros((KN * 2, KN * 2), bool)
-for i_, ch in enumerate("千萬兩"):
-    fill_tris(km, glyph(ch), KN, (0.78 - i_ * 0.28) * KN * 2, 0.78 * KN, 0.3 * KN * 2)
-# (bold, as the door cat's coin is lettered: each stroke thickened a few texels)
-for _ in range(6):
-    km = km | np.roll(km, 1, 0) | np.roll(km, 1, 1)
-kob = mix(kob, (0.1, 0.07, 0.04), km.reshape(KN, 2, KN, 2).mean(axis=(1, 3)))
+# (drawn at twice the picture's size, each texel the mean of its four: smooth edges)
+kob = mix(kob, (0.1, 0.07, 0.04), brush_mask(KN * 2).reshape(KN, 2, KN, 2).mean(axis=(1, 3)))
 koban_img = image("ownluckycat_koban", np.clip(kob, 0, 1))
 
 
@@ -215,54 +211,59 @@ bpy.data.objects.remove(src)
 bpy.data.objects.remove(fuse_src)
 bpy.data.objects.remove(shape_src)
 
-# ---- the raised hand cut off, its own node, its origin at the wrist; the cuts closed
-# (cut along a clean plane across the arm (x = PAW_X), and swung about the middle of that cut, about x: the cut face then only turns in its
-# own plane over the body's, and the body's cap stays covered (the owner's, 2026-11-15: waving, the flat cap of a jagged cut showed, a
-# ghost of the paw left behind; it had swung about the hand's foot))
-bm = bmesh.new()
-bm.from_mesh(lp.data)
-band = [f for f in bm.faces if PAW_Z0 * TALL < f.calc_center_median().z < PAW_Z1 * TALL and f.calc_center_median().x > PAW_X - 0.03]
-bmesh.ops.bisect_plane(bm, geom=band + list({e for f in band for e in f.edges}) + list({v for f in band for v in f.verts}),
-                       plane_co=(PAW_X, 0, 0), plane_no=(1, 0, 0))
-paw = [f for f in bm.faces if f.calc_center_median().x > PAW_X and PAW_Z0 * TALL < f.calc_center_median().z < PAW_Z1 * TALL]
-pv = {v for f in paw for v in f.verts}
-rim = [v for v in pv if abs(v.co.x - PAW_X) < 1e-4]
-wrist = Vector((PAW_X, sum(v.co.y for v in rim) / len(rim), sum(v.co.z for v in rim) / len(rim)))
-print("PAW_RIM", len(rim))
-for f in bm.faces:
-    f.select = f in paw
-bm.to_mesh(lp.data)
-bm.free()
-select_only(lp)
-bpy.ops.object.mode_set(mode="EDIT")
-bpy.ops.mesh.separate(type="SELECTED")
-bpy.ops.object.mode_set(mode="OBJECT")
-hand = [o for o in bpy.data.objects if o.type == "MESH" and o is not lp][0]
-hand.name = "OwnCatPaw"
-for o in (lp, hand):
-    bm = bmesh.new()
-    bm.from_mesh(o.data)
-    edges = [e for e in bm.edges if e.is_boundary]
-    if edges:
-        uvl = bm.loops.layers.uv.active
-        old = set(bm.faces)
-        bmesh.ops.holes_fill(bm, edges=edges, sides=0)
-        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
-        # (the cut's closing faces painted as the fur round their edge (item 128: they read the picture's corner, a dark gash where the
-        # hand meets the arm): each corner's colour where its point already had one)
-        for f in bm.faces:
-            if f in old:
-                continue
-            for l in f.loops:
-                had = [l2 for l2 in l.vert.link_loops if l2.face in old]
-                if had:
-                    l[uvl].uv = had[0][uvl].uv
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.to_mesh(o.data)
-    bm.free()
-sc.cursor.location = wrist
-select_only(hand)
-bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+# ---- the raised hand beckons by bending, not cut off (the owner's, 2026-11-15: "the cat's hand is simply cut off": it was cut off along a
+# plane across the arm into a node of its own and swung there, its seam a line down the paw and the flat faces of the cut showing as it
+# swung): the cat one mesh, with a shape key ("Beckon"): the raised arm tipped forward about its foot (where it rises from the body by the
+# head), its pull fading out over a ring of the grid round it, so the fur there stretches with it and nothing opens. The game eases the key
+# in and out (a morph target), as the door cat's arm bends with its skin
+import heapq
+from collections import defaultdict
+me_ = lp.data
+lo_, hi_ = PAW_Z0 * TALL, PAW_Z1 * TALL
+hand_ = [v.index for v in me_.vertices if v.co.x > PAW_X and lo_ - 0.008 < v.co.z < hi_]
+top_z = max(me_.vertices[i].co.z for i in hand_)
+foot_ = [me_.vertices[i].co for i in hand_ if me_.vertices[i].co.z < lo_ + 0.02] or [me_.vertices[i].co for i in hand_]
+pivot = Vector((PAW_X, sum(c.y for c in foot_) / len(foot_), lo_ + 0.004))
+# (how far round the hand its pull reaches over the surface, fading (a few rings of the grid: over one, the fur folded where the hand's top
+# meets the ear); how far it's tipped at the most (rad): its top a little over 2 cm forward, as the cut hand's went)
+REACH, BECKON = 0.045, 0.22
+adj = defaultdict(list)
+for e in me_.edges:
+    a_, b_ = e.vertices
+    L_ = (me_.vertices[a_].co - me_.vertices[b_].co).length
+    adj[a_].append((b_, L_))
+    adj[b_].append((a_, L_))
+dist = {i: 0.0 for i in hand_}
+pq = [(0.0, i) for i in hand_]
+heapq.heapify(pq)
+while pq:
+    d_, i = heapq.heappop(pq)
+    if d_ > dist.get(i, 1e9):
+        continue
+    for j_, L_ in adj[i]:
+        nd = d_ + L_
+        if nd < REACH and nd < dist.get(j_, 1e9):
+            dist[j_] = nd
+            heapq.heappush(pq, (nd, j_))
+lp.shape_key_add(name="Basis", from_mix=False)
+key = lp.shape_key_add(name="Beckon", from_mix=False)
+moved = 0
+for i, d_ in dist.items():
+    c = me_.vertices[i].co
+    t_ = min(1.0, d_ / REACH)
+    w_ = 1.0 - t_ * t_ * (3 - 2 * t_)
+    # (less and less of the head over the hand's top: its ear stays where it is)
+    if c.z > top_z:
+        t_ = min(1.0, (c.z - top_z) / 0.03)
+        w_ *= 1.0 - t_ * t_ * (3 - 2 * t_)
+    if w_ <= 0:
+        continue
+    a_ = BECKON * w_
+    dy, dz = c.y - pivot.y, c.z - pivot.z
+    # (about x: its top toward -y, the cat's front)
+    key.data[i].co = Vector((c.x, pivot.y + dy * math.cos(a_) - dz * math.sin(a_), pivot.z + dy * math.sin(a_) + dz * math.cos(a_)))
+    moved += 1
+print("BECKON_VERTS", len(hand_), "MOVED", moved)
 
 # ---- the koban, made: a flat lens of an oval, 千萬兩 written down it, set where the dark blob was, just in front of it
 kmat = pbr("OwnCatKoban", (1, 1, 1), tex=koban_img, rough=0.35)
@@ -342,8 +343,8 @@ else:
 
 root = bpy.data.objects.new("OwnLuckyCat", None)
 bpy.context.collection.objects.link(root)
-for o in (lp, hand, koban) + ((bell,) if bell else ()):
+for o in (lp, koban) + ((bell,) if bell else ()):
     o.parent = root
-print("OWNCAT_TRIS", sum(len(p.vertices) - 2 for o in (lp, hand) for p in o.data.polygons), "WRIST", tuple(round(c, 3) for c in wrist))
-export_dish(root, [lp, hand, koban, root] + ([bell] if bell else []), os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW, ladder=False)
+print("OWNCAT_TRIS", sum(len(p.vertices) - 2 for p in lp.data.polygons), "PIVOT", tuple(round(c, 3) for c in pivot))
+export_dish(root, [lp, koban, root] + ([bell] if bell else []), os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW, ladder=False)
 print("OWNCAT_DONE")
