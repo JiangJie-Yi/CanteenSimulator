@@ -32,11 +32,11 @@ const MAX_LINES = 6
  */
 function spreadBubbles() {
   // (at most so many lines up at once, the newest: the oldest put away (not the dots of those waiting to order); a shop full of talk
-  // was a wall of bubbles)
+  // was a wall of bubbles. The staff's and the owner's first (item 180): among a full shop's talk theirs were the ones put away)
   const lines = [...document.querySelectorAll<HTMLElement>('.g3-say')]
   const now = performance.now()
   for (const el of lines) if (!el.dataset.born) el.dataset.born = String(now)
-  lines.sort((a, b) => +b.dataset.born! - +a.dataset.born!)
+  lines.sort((a, b) => Number(b.classList.contains('staff-say')) - Number(a.classList.contains('staff-say')) || +b.dataset.born! - +a.dataset.born!)
   lines.forEach((el, i) => el.classList.toggle('is-crowded', i >= MAX_LINES))
   const placed: { l: number; r: number; t: number; h: number }[] = []
   const all = [...document.querySelectorAll<HTMLElement>('.g3-bubble')].map((el) => {

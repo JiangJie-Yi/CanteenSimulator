@@ -427,7 +427,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   // (their name tag's words (App keeps who's who); their role alone before it's known)
   const nameTag = useMemo(() => () => SPEAKERS.get(id) ?? ROLE_TAG[role], [id, role])
   // (their face (setExpression): what they're doing says it; a squash and stretch as it changes, or as they start to say something)
-  const faceWas = useRef<{ face: CrewFace; at: number; said: number; carry: boolean; wipe: boolean }>({ face: 'idle', at: -1e9, said: 0, carry: false, wipe: false })
+  const faceWas = useRef<{ face: CrewFace; at: number; said: number; saidAt: number; carry: boolean; wipe: boolean }>({ face: 'idle', at: -1e9, said: 0, saidAt: -1e9, carry: false, wipe: false })
   // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
   const [fanning, setFanning] = useState(false)
   const clock = useRef(0)
@@ -519,7 +519,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // (a waddle as they walk, as Overcooked's cooks do: bobbing at each step, rocking side to side; standing, breathing)
     const ph = t * 9
     fig.body.position.y = walk * Math.abs(Math.sin(ph)) * 0.035
-    fig.body.rotation.z = walk * Math.sin(ph) * 0.07
+    // (and standing, never quite still (item 183, the owner's: "the staff are far too stiff"): their weight shifted from foot to foot, slowly)
+    fig.body.rotation.z = walk * Math.sin(ph) * 0.07 + (1 - walk) * Math.sin(t * 0.8 + seed * 2.1) * 0.022
     // (a bow of the head and shoulders at the door)
     fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0) + (!id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' ? 0.1 : 0)
     // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
@@ -540,12 +541,18 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // at their shoulders, their face went under it (the owner saw a server's face in the bar))
     const wiping = job?.wipe !== undefined
     if ((settled(face) !== settled(fw.face) && wiping === fw.wipe) || (word && word.key !== fw.said) || (!!job?.carry && !fw.carry)) fw.at = t
+    if (word && word.key !== fw.said) fw.saidAt = t
     if (wiping) fw.at = Math.min(fw.at, t - 1)
     fw.wipe = wiping
     fw.face = face
     fw.said = word?.key ?? fw.said
     fw.carry = !!job?.carry
     setFace(fig.root, face)
+    // (a little nod of the head and shoulders as they start to say something, as one does greeting or serving (item 183))
+    if (word) fig.body.rotation.x += Math.max(0, Math.sin(Math.min(1, (t - fw.saidAt) / 0.55) * Math.PI)) * 0.16
+    // (and, standing free (not at a task that holds them: the till, a wipe, a sweep, a reach, the handheld), looking about now and then)
+    const free = !seated && !slack && !job?.handsAt && job?.wipe === undefined && job?.sweep === undefined && job?.floorWipe === undefined && !id.startsWith('viewer-')
+    fig.body.rotation.y = free ? (1 - walk) * (Math.sin(t * 0.31 + seed * 1.7) * 0.13 + Math.sin(t * 0.73 + seed) * 0.04) : 0
     // (no squash and stretch while they sweep, stooped: it pushed the broom's straw and the dustpan into the floor and lifted them off it)
     const stooped = job?.sweep !== undefined || job?.floorWipe !== undefined
     const [jw, jh] = stooped ? [1, 1] : jelly(t - fw.at)

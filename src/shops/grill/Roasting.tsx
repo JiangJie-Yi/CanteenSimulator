@@ -78,7 +78,7 @@ import { EditBlock, Movable } from './Movable'
 import { plateFor } from '@/game/plateSize'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
-import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
+import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
 import { AISLE, aisleCornerOf, FIGURES, CARRIED, FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
@@ -5863,6 +5863,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (off the fire in his hands to the plating place, or kept warm in the bowl; one waiting by the fire for a place there is taken over when one's free (above))
       if (handLive && ready.collected && !inBasket(ready) && (ready.via === 'plated' ? ready.readyAt !== undefined : !!ready.container)) carry(ready, 'toPlate')
       say(L().done(nameOfP(ready)))
+      // (and called out over his head, as a real kitchen calls a dish ready (item 180, the owner's: "the owner's words don't sound natural"))
+      STAFF_TALK.push({ key: performance.now(), id: 'owner', text: L().callDone(nameOfP(ready)), until: performance.now() + 2400 })
       for (const k of planOf(ready)) if (!ready.dabs[k] && bestStage(k) === 'after') dab(ready, k)
       return
     }

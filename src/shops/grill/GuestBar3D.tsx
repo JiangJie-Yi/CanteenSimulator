@@ -25,7 +25,7 @@ import { Glyph } from '@/ui/GameIcons'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
-import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
+import { makeTrip, through, tripStep, turnSmooth, turnToward, type Trip } from './commuteWalk'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
@@ -115,6 +115,10 @@ const SPEED = 1.32                                  // how fast they walk in and
 /** how long the third cook rakes the fire over with the irons (item 108) */
 const RAKE_S = 1.6
 const SERVER_SPEED = 2.1                            // and the servers, carrying (brisk)
+/** how far along a server's way they've got `t` seconds in (item 183): up to their pace over the first fifth of a second (a start from a
+ * standstill), then at it; never past its end `len` */
+const SERVER_RAMP = 0.2
+const rampedAlong = (t: number, len: number) => Math.min(len, t < SERVER_RAMP ? (SERVER_SPEED * t * t) / (2 * SERVER_RAMP) : SERVER_SPEED * (t - SERVER_RAMP / 2))
 // (stepping aside for each other (the owner's item 45): how far ahead they see someone coming (seconds), how quick a step aside is (per
 // second: about a walk), the fastest anyone walks (a quicker move between two frames is a leap, a phase begun elsewhere, not a walk))
 const AHEAD_S = 0.6, ASIDE_V = 1.5, WALK_MOST = 3.2
@@ -5389,7 +5393,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (v.phase === 'in') {
           const len = pathLength(walk), d = Math.min(len, v.t * sp), { p, dir } = alongPath(walk, d)
           v.pos.copy(p)
-          v.yaw = Math.atan2(dir.x, dir.z)
+          v.yaw = turnSmooth(v.yaw, Math.atan2(dir.x, dir.z), Math.min(step, 0.1))
           v.fade = Math.min(1, d / 0.6 + v.t / FADE_S)
           if (d >= len) { v.phase = 'sit'; v.t = 0; benchChanged = true }
         } else if (v.phase === 'sit') {
@@ -5401,7 +5405,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         } else {
           const back = v.outFrom ? (v.outVia ? [v.outFrom, before, way.door] : [v.outFrom, way.door]) : [at, before, way.door], len = pathLength(back), d = Math.min(len, v.t * sp), { p, dir } = alongPath(back, d)
           v.pos.copy(p)
-          v.yaw = Math.atan2(dir.x, dir.z)
+          v.yaw = turnSmooth(v.yaw, Math.atan2(dir.x, dir.z), Math.min(step, 0.1))
           if (len - d < 0.9) v.fadeT += step
           v.fade = Math.max(0, Math.min(1, Math.max((len - d) / 0.9, 1 - v.fadeT / FADE_S)))
           if (d >= len && v.fade <= 0) { BENCH.gone.delete(v.id); sitters.current.delete(v.id); benchChanged = true }
@@ -5474,7 +5478,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const setMove = (on: boolean) => setWaiterMoving(wi, on)
       const go = (path: THREE.Vector3[], phase: WaiterPhase) => { w.path = path; w.len = pathLength(path); w.phase = phase; w.t = 0; setMove(true) }
       const walk = (then: () => void) => {
-        const d = Math.min(w.len, w.t * SERVER_SPEED)
+        // (from a standstill they pick up their pace over the first fifth of a second, not off at full speed at once (item 183, the owner's:
+        // "the staff are far too stiff"))
+        const d = rampedAlong(w.t, w.len)
         const { p, dir } = alongPath(w.path, d)
         w.pos.copy(p)
         if (dir.x || dir.z) w.yaw = Math.atan2(dir.x, dir.z)
@@ -5765,7 +5771,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       } else if (w.phase === 'go') walk(() => {
         w.phase = 'set'; face(plateAt(w.seat))
         const id = servers[wi]?.id
-        if (id && Math.random() < 0.5) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].serveSay(Math.floor(Math.random() * 3)), until: performance.now() + 2600 })
+        if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].serveSay(Math.floor(Math.random() * 3)), until: performance.now() + 2600 })
       })
       else if (w.phase === 'set' && w.t > 0.4) {
         // (down at their place: the plate, and what's on it with it)
@@ -5793,7 +5799,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (back the shortest way to their place, in through their gate)
         else go(backPath(wi, w.seat).slice(0, -1).concat(w.pos.clone()), 'back')
       } else if (w.phase === 'back') {
-        const d = Math.min(w.len, w.t * SERVER_SPEED)
+        // (picking up their pace on the way back too (item 183))
+        const d = rampedAlong(w.t, w.len)
         const { p, dir } = alongPath(w.path, w.len - d)
         w.pos.copy(p)
         w.yaw = Math.atan2(-dir.x, -dir.z)
@@ -6034,7 +6041,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (the owner's figure here only while he's out: at his place, Roasting draws him)
         o.visible = !ownerServes || OWNER_OUT.on
         o.position.copy(w.pos)
-        w.look = turnToward(w.look ?? w.yaw, w.yaw, step)
+        // (the facing shown eased to the way they're going, never more than a little a frame (turnSmooth, item 183))
+        w.look = turnSmooth(w.look ?? w.yaw, w.yaw, step)
         o.rotation.y = w.look
         if (wipeAt) {
           o.position.lerp(wipeAt.p, wipeAt.k)

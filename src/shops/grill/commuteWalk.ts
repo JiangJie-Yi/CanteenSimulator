@@ -64,6 +64,9 @@ export type TripPose = {
 /** a facing turned toward the way they're to face, quickly but not at once (setting off from where they'd stood, they snapped round to the
  * way in a frame, as much as 90°) */
 export const turnToward = (cur: number, want: number, dt: number) => cur + Math.atan2(Math.sin(want - cur), Math.cos(want - cur)) * Math.min(1, dt * 10)
+/** a turn as it's shown (item 183, the owner's: "the staff are far too stiff"): eased as turnToward is, but never more than about a quarter of
+ * a right angle in one frame: a slow frame, or the game at double speed, snapped them round half a turn at once */
+export const turnSmooth = (cur: number, want: number, dt: number) => cur + Math.max(-0.45, Math.min(0.45, Math.atan2(Math.sin(want - cur), Math.cos(want - cur)) * Math.min(1, dt * 10)))
 
 /**
  * A step along a trip: `dt` seconds, `speed` everyone's walking pace in the walker's frame, `world` the walker's frame to the world (for
