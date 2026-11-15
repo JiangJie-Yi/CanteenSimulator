@@ -188,6 +188,14 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 /** the owner out on the floor serving (no server hired: he carries the plates, clears them and takes the washed ones back himself, the
  * owner's: nothing flies): GuestBar3D walks a figure of him; Roasting's, at his place in the kitchen, is hidden meanwhile */
 export const OWNER_OUT = { on: false }
+/**
+ * The walking paths' map for edit mode (item 168; PathMap draws it): in the bar's frame (GuestBar3D's), its floor at y 0. GuestBar3D fills it
+ * twice a second while it's shown: what stands in the way on the kitchen's floor (each its four corners and the piece it is), the staff's
+ * usual ways, those being walked, the customers' from the door to each seat. `v` counts its changes
+ */
+export const PATH_MAP: { v: number; blocks: { id: string; pts: THREE.Vector3[] }[]; routes: { kind: 'staff' | 'live' | 'guest'; pts: THREE.Vector3[] }[] } =
+  { v: 0, blocks: [], routes: [] }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pathMap: PATH_MAP })
 export const SERVICE = {
   /** how many servers there are to carry (GuestBar3D says): none, and the cook hands it over the bar himself */
   servers: 0,

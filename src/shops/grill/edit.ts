@@ -34,6 +34,8 @@ const KEY_R = 'jgs-edit-rotations-11'
 const KEY_S = 'jgs-edit-scales-11'
 const KEY_G = 'jgs-edit-groups-2'
 const KEY_P = 'jgs-edit-pivots-2'
+/** the paths' map shown (item 168) */
+const KEY_PATHS = 'jgs-edit-paths-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
@@ -211,7 +213,10 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
   /** the scene drawn as its wireframe (Maya's 4), to see each model's topology; off is shaded (5) */
   wire: boolean
   /** pieces hidden by hand for now (H), to reach and see what's behind them: not drawn, not picked; Alt+H or leaving the mode shows them */
-  hidden: string[] }
+  hidden: string[]
+  /** the walking paths' map drawn on the floor (item 168, the owner's, 2026-11-15: "can you draw the paths, to see in edit mode, and edit
+   * and manage them?"): what stands in the way on the kitchen's floor, the ways the staff go and are going (PathMap) */
+  paths: boolean }
 /** offsets made defaults (BASES) since they were set by hand: a browser still holding just that offset drops it, so it isn't counted twice
  * (the rest it holds are kept, as a new KEY would lose them) */
 const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0], willow: [-0.465, 0, -0.367] }
@@ -307,7 +312,7 @@ if (!relaid) try {
   for (const [k] of relaidDue) localStorage.setItem(k, '1')
 } catch { /* private window */ }
 let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
-  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false, hidden: [] }
+  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false, hidden: [], paths: (() => { try { return localStorage.getItem(KEY_PATHS) === '1' } catch { return false } })() }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
 let lastSelected: string | null = null
@@ -1056,6 +1061,14 @@ const readScale = (id: string): V3 => { const sc = scaleOf(id), z = zeroOf(id).s
 export const fromRoom = (id: string, v: V3): V3 => turnY(v, frameFor(id))
 /** wireframe (Maya's 4) or shaded (5) */
 export function setWire(on: boolean) { if (state.wire === on) return; state.wire = on; emit(); toast(on ? T().wireOn : T().wireOff, 'edit') }
+/** the paths' map on the floor shown or put away (item 168), kept for the next time */
+export function setPaths(on: boolean) {
+  if (state.paths === on) return
+  state.paths = on
+  try { localStorage.setItem(KEY_PATHS, on ? '1' : '0') } catch { /* (not kept) */ }
+  emit()
+  toast(on ? T().pathsOn : T().pathsOff, 'edit')
+}
 /** what a piece is made of (its triangles, vertices and meshes), told by the piece once edit mode opens: for the panel */
 const stats = new Map<string, { tris: number; verts: number; meshes: number }>()
 export const setStats = (id: string, st: { tris: number; verts: number; meshes: number }) => { stats.set(id, st); panel() }
@@ -1126,7 +1139,7 @@ let spaceBadge: HTMLButtonElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
-let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null
+let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null, pathsButton: HTMLButtonElement | null = null
 let rows = new Map<string, HTMLDivElement>()
 /** the piece whose row is being dragged in the scene list (item 69), while it is */
 let dragging: string | null = null
@@ -1318,7 +1331,11 @@ function panel() {
     const obbButton = h('button', 'be-tool be-tool-text', 'OB') as HTMLButtonElement
     obbButton.title = T().pivotObb
     obbButton.onclick = () => resetPivot('obb')
-    bar.append(spaceButton, pivotButton, aabbButton, obbButton)
+    // (and the walking paths' map on the floor (item 168))
+    pathsButton = h('button', 'be-tool be-tool-text', '線') as HTMLButtonElement
+    pathsButton.title = T().paths
+    pathsButton.onclick = () => setPaths(!state.paths)
+    bar.append(spaceButton, pivotButton, aabbButton, obbButton, pathsButton)
     const main = h('div', 'be-main')
     const head = h('div', 'be-head', T().title)
     head.appendChild(h('small', '', T().keys))
@@ -1633,6 +1650,7 @@ function panel() {
   if (spaceButton) spaceButton.classList.toggle('local', state.space === 'local')
   if (spaceButton) { spaceButton.textContent = state.space === 'local' ? T().spaceLocalShort : T().spaceWorldShort; spaceButton.title = state.space === 'local' ? T().spaceLocal : T().spaceWorld }
   if (pivotButton) { pivotButton.textContent = 'D'; pivotButton.title = T().pivot; pivotButton.classList.toggle('on', state.pivotMode) }
+  if (pathsButton) { pathsButton.title = T().paths; pathsButton.classList.toggle('on', state.paths) }
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)); row.classList.toggle('off', state.hidden.includes(id)) }
   // (a new pick shows its own tab: a camera picked in the scene brings up the cameras)
   if (state.selected !== tabFollows) {
