@@ -106,6 +106,31 @@ def rod(name, a, b, r0, r1, segs=12):
 # =====================================================================
 # The potted bamboo
 # =====================================================================
+_leaf_img = None
+
+
+def bamboo_leaf(N=256):
+    """a bamboo leaf, along u from its stalk to its tip: narrow and long, widest a third of the way, drawn out to a fine point, a short wedge to
+    the stalk; a fresh green, paler along its midrib, fine veins running along it, a dark line a few texels in round its edge (the ink line
+    the card can't have); outside it clear"""
+    global _leaf_img
+    if _leaf_img:
+        return _leaf_img
+    u, v = grid01(N)
+    ac = np.abs(v - 0.5) * 2
+    prof = np.where(u < 0.12, u / 0.12 * 0.6, np.clip(np.sin(np.pi * np.clip((u - 0.04) / 0.96, 0, 1) ** 0.65), 0, 1)) * 0.95
+    # (drawn out to a fine point over its last third)
+    prof = prof * np.clip((1.0 - u) / 0.35, 0, 1) ** 0.6
+    inn = prof - ac
+    col = mix((0.16, 0.42, 0.1), (0.3, 0.58, 0.16), np.clip(u * 0.4 + fbm(N, 6, 6, 3) * 0.4 + smooth(0.6, 1.0, ac) * 0.3, 0, 1))
+    rib = smooth(0.05, 0.0, ac)
+    veins = smooth(0.8, 1.0, np.cos(ac * np.pi * 9) * 0.5 + 0.5) * (1 - rib) * 0.25
+    col = mix(col, (0.62, 0.8, 0.38), np.clip(rib * 0.8 + veins, 0, 1))
+    col = mix(col, (0.06, 0.2, 0.04), smooth(0.08, 0.0, inn) * 0.85)
+    _leaf_img = image("bambooLeaf", col, alpha=smooth(-0.01, 0.015, inn))
+    return _leaf_img
+
+
 def bamboo():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     seed(21)
@@ -125,8 +150,10 @@ def bamboo():
          "pebble": pbr("PotPebble", lin("#e2dccd"), rough=0.5),
          "culm": pbr("BambooCulm", (1, 1, 1), tex=image("bamboo", culm), rough=0.35, coat=0.3),
          "node": pbr("BambooNode", lin("#8a9a4a"), rough=0.5),
-         "leaf": pbr("BambooLeaf", lin("#4f8a32"), rough=0.45),
-         "leaf2": pbr("BambooLeaf2", lin("#6a9e3a"), rough=0.45)}
+         # (each leaf a card, its shape the picture's alpha (item 154, the owner's, 2026-11-15: "the leaves one piece each", as the money
+         # tree's (item 99)): two tones of it)
+         "leaf": pbr("BambooLeafCutout", (1, 1, 1), tex=bamboo_leaf(), rough=0.45, blend=True),
+         "leaf2": pbr("BambooLeaf2Cutout", lin("#d8f0b8"), tex=bamboo_leaf(), rough=0.45, blend=True)}
     parts = []
     # (the pot: a tapering bowl with a rolled lip; the unglazed clay foot)
     pot = lathe("BambooPot", [(0.0, 0.012), (0.1, 0.012), (0.115, 0.03), (0.15, 0.12), (0.168, 0.22), (0.17, 0.25), (0.178, 0.262), (0.17, 0.27),
@@ -149,6 +176,7 @@ def bamboo():
         fin(m, f"BambooPebble{i}", M["pebble"], parts)
     # (the culms: each its height and lean, nodes every so often, narrowing as they rise)
     leaf_bm = bmesh.new()
+    leaf_uv = leaf_bm.loops.layers.uv.new()
     for k, (x, z, h, lean_x, lean_z) in enumerate([(0.03, 0.02, 1.32, 0.04, 0.02), (-0.045, 0.03, 1.12, -0.06, 0.03), (0.0, -0.06, 0.96, 0.02, -0.07),
                                                    (0.06, -0.035, 0.82, 0.08, -0.03), (-0.03, -0.02, 1.2, -0.02, -0.05)]):
         y0 = 0.24
@@ -201,30 +229,38 @@ def bamboo():
             bpy.ops.mesh.primitive_cylinder_add(vertices=5, radius=0.0022, depth=blen, location=(base + tip) / 2)
             bo = active(); bo.rotation_euler = dirv.to_track_quat("Z", "Y").to_euler(); bpy.ops.object.transform_apply(rotation=True)
             fin(bo, f"BambooBranch{k}_{i}", M["node"], parts)
-            for j in range(5 + (i % 3)):
-                la = ang + (j - 2.5) * 0.55 + rng.uniform(-0.15, 0.15)
-                L = 0.11 + rng.random() * 0.05
-                W = L * 0.17
-                d0 = Vector((math.cos(la), math.sin(la), 0.15)).normalized()
+            # (a thin twig on from the branch's tip, the leaves along it one by one, left and right by turns, hanging off it, one at its end
+            # (item 154: they were a fan of five to seven from one point, a star))
+            tw_dir = (dirv + Vector((0, 0, -0.25))).normalized()
+            tw_len = 0.06 + 0.03 * rng.random()
+            tw_tip = tip + tw_dir * tw_len
+            bpy.ops.mesh.primitive_cylinder_add(vertices=4, radius=0.0012, depth=tw_len, location=(tip + tw_tip) / 2)
+            to = active(); to.rotation_euler = tw_dir.to_track_quat("Z", "Y").to_euler(); bpy.ops.object.transform_apply(rotation=True)
+            fin(to, f"BambooTwig{k}_{i}", M["node"], parts)
+            flat = Vector((tw_dir.x, tw_dir.y, 0)).normalized()
+            n_leaf = 4 + (i + k) % 3
+            for j in range(n_leaf):
+                s_at = 0.15 + 0.85 * j / (n_leaf - 1)
+                at = tip + tw_dir * (tw_len * s_at)
+                side_sign = 1 if j % 2 else -1
+                la = math.atan2(flat.y, flat.x) + (0.0 if j == n_leaf - 1 else side_sign * (0.7 + 0.4 * rng.random()))
+                L = 0.1 + rng.random() * 0.04
+                W = L * 0.26
+                d0 = Vector((math.cos(la), math.sin(la), -0.35 - 0.3 * rng.random())).normalized()
                 side = d0.cross(Vector((0, 0, 1))).normalized()
-                # (a narrow lanceolate leaf, drooping along its length)
-                prev = None
-                vs = []
-                # (five rows down it: seven made the pot's leaves some six thousand triangles)
-                for s_ in range(5):
-                    t_ = s_ / 4
-                    w_ = W * math.sin(math.pi * min(1, t_ * 1.15)) * (1 - 0.3 * t_)
-                    c_ = tip + d0 * (L * t_) + Vector((0, 0, -0.06 * t_ * t_ - 0.01 * t_))
-                    # (its base one point: two there in one place, with every leaf of the fan's, made a pole of degenerate triangles)
-                    if s_ == 0:
-                        v0 = leaf_bm.verts.new(c_)
-                        vs.append((v0, v0))
-                        continue
-                    vs.append((leaf_bm.verts.new(c_ - side * w_), leaf_bm.verts.new(c_ + side * w_)))
-                for s_ in range(4):
-                    q = (vs[s_][0], vs[s_][1], vs[s_ + 1][1], vs[s_ + 1][0]) if s_ else (vs[0][0], vs[1][1], vs[1][0])
-                    f = leaf_bm.faces.new(q)
-                    f.material_index = (j + i) % 2
+                # (each turned a little about its own length, some showing more of their face than others)
+                tw_ = rng.uniform(-0.5, 0.5)
+                side = (side * math.cos(tw_) + d0.cross(side) * math.sin(tw_)).normalized()
+                rows = []
+                for r_ in range(3):
+                    t_ = r_ / 2
+                    c_ = at + d0 * (L * t_) + Vector((0, 0, -0.03 * t_ * t_))
+                    rows.append((leaf_bm.verts.new(c_ - side * W / 2), leaf_bm.verts.new(c_ + side * W / 2)))
+                for r_ in range(2):
+                    f = leaf_bm.faces.new((rows[r_][0], rows[r_ + 1][0], rows[r_ + 1][1], rows[r_][1]))
+                    for lp, uv in zip(f.loops, ((r_ / 2, 0), ((r_ + 1) / 2, 0), ((r_ + 1) / 2, 1), (r_ / 2, 1))):
+                        lp[leaf_uv].uv = uv
+                    f.material_index = (j + i + k) % 2
     me = bpy.data.meshes.new("BambooLeaves")
     leaf_bm.to_mesh(me)
     leaf_bm.free()
@@ -232,8 +268,6 @@ def bamboo():
     bpy.context.collection.objects.link(lo)
     lo.data.materials.append(M["leaf"])
     lo.data.materials.append(M["leaf2"])
-    sol = lo.modifiers.new("t", "SOLIDIFY"); sol.thickness = 0.0012
-    apply_all(lo)
     for p_ in lo.data.polygons:
         p_.use_smooth = True
     parts.append(lo)

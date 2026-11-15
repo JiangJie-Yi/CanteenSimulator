@@ -49,8 +49,9 @@ function toonOf(url: string, scene: THREE.Group) {
         // (the washroom's mirror kept a mirror: nearly smooth (the rest a little softened))
         ? new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, metalness: src.metalness, roughness: src.name === 'WashMirror' ? 0.04 : Math.max(0.2, src.roughness), clearcoat: 0.5,
           ...(FINISH[src.name] ? { ...FINISH[src.name], color: FINISH[src.name].color ? new THREE.Color(FINISH[src.name].color) : src.color.clone() } : {}) })
-        // (the chair back's kumiko: one picture, its gaps cut out by its alpha (tested, not blended), seen from either side)
-        : src.name === 'TillKumiko'
+        // (the chair back's kumiko, and the bamboo's leaves (each a card, item 154): one picture, its gaps cut out by its alpha (tested, not
+        // blended), seen from either side)
+        : src.name === 'TillKumiko' || /Cutout/.test(src.name)
           ? new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })
           : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map, side: /Leaves/.test(m.name) ? THREE.DoubleSide : THREE.FrontSide })
       mats.set(src, t)
