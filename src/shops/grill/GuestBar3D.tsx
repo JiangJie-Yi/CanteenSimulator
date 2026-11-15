@@ -30,6 +30,7 @@ import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
 import { HAND_WASH_LINES, handStops, scrubbed } from '@/game/handWash'
+import { PLATE_SCALE } from '@/game/plateSize'
 import { PathMap } from './PathMap'
 import { ServeCounter } from './ServeCounter'
 import { unlitShade } from '@/game/roomLights'
@@ -2445,6 +2446,8 @@ const DRINK_STAY = 2.25
  * nobody on its floor), off the racks to the seat by itself ('serve'), cleared away to the sink by itself ('clear', after a pause), and
  * washed, back to the racks ('home') */
 type PlateRun = { key: number; seat: number; guest: number; phase: 'ready' | 'serve' | 'carry' | 'set' | 'dirty' | 'taken' | 'clear' | 'home'; t: number; from: THREE.Vector3
+  /** the small plate (game/plateSize, item 169: what's ordered is all small things), not the big one; for all its run, to the seat and back */
+  small?: boolean
   /** (clearing) its place on the dirty stack in the sink, taken when it sets off, so two cleared at once don't aim for the same one; (going
    * home) where on the racks it goes */
   to?: THREE.Vector3
@@ -2559,7 +2562,9 @@ const SIPS = 4
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and the sticks left on it, of what was eaten off it,
  * thrown away with it at the sink (the owner's)); drawn again only when it gets dirty */
 const Plate = memo(PlateImpl)
-function PlateImpl({ dirty = false, dirt = 1, design = 0, sticks = 1, bones = 0, glass, tissue, drink, level = 0 }: { dirty?: boolean; dirt?: number; design?: number; sticks?: number; bones?: number
+function PlateImpl({ size = 1, dirty = false, dirt = 1, design = 0, sticks = 1, bones = 0, glass, tissue, drink, level = 0 }: { dirty?: boolean; dirt?: number; design?: number; sticks?: number; bones?: number
+  /** the plate's size against the big one (game/plateSize, item 169): it and what's left on it, not what stands beside it */
+  size?: number
   /** where what they drank was left, from the plate's middle (on the bar where it was drunk, or on the plate being cleared): its own bottle or
    * can (the owner's, 2026-11-10: a glass from nowhere stood there), as much left in it as they left, and a sake's cup by it */
   glass?: readonly [number, number, number]
@@ -2569,6 +2574,7 @@ function PlateImpl({ dirty = false, dirt = 1, design = 0, sticks = 1, bones = 0,
   tissue?: readonly [number, number, number] }) {
   return (
     <group>
+      <group scale={size}>
       <mesh geometry={PLATE_GEO} castShadow receiveShadow>
         <meshToonMaterial color="#ffffff" map={wareDesign(design)} />
       </mesh>
@@ -2595,6 +2601,11 @@ function PlateImpl({ dirty = false, dirt = 1, design = 0, sticks = 1, bones = 0,
               <mesh geometry={HEAD_GEO}><meshToonMaterial color="#8a5a30" /></mesh>
             </group>
           ))}
+        </>
+      )}
+      </group>
+      {dirty && (
+        <>
           {/* (the tissue they wiped their mouth with, crumpled up) */}
           {tissue && <mesh name="plate-tissue" geometry={CRUMPLE_GEO} position={[tissue[0], tissue[1] + 0.016, tissue[2]]} material={CRUMPLE_MAT} />}
           {/* (what they drank, its bottle or can left, drunk down (and a sake's cup by it)) */}
@@ -3276,7 +3287,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       return
     }
     PLATE_RACK.n -= 1
-    runs.current.push({ key: ++runSeq.current, seat, guest, phase: 'serve', t: 0, from: rackTop(ri) })
+    runs.current.push({ key: ++runSeq.current, seat, guest, phase: 'serve', t: 0, from: rackTop(ri), small: smallFor(guest) })
     redraw()
   }
   /** this customer's plate is cleared away (after a moment); one still waiting for a plate needn't get one */
@@ -3432,6 +3443,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const stackObjs = useRef<(THREE.Group | null)[]>([])
   const ragObjs = useRef<(THREE.Mesh | null)[]>([])
   const shownRef = useRef<Shown[]>([])
+  /** whether a guest's plate is the small one (item 169): what they ordered all small things, as Roasting says; unknown, the big one */
+  const guestsNow = useRef(guests)
+  guestsNow.current = guests
+  const smallFor = (id: number | undefined) => guestsNow.current.find((x) => x.id === id)?.big === false
   // (the shop open: its furnishings can't be moved about by hand; shut, they can: edit mode, key G)
   useEffect(() => { setLocked(open) }, [open])
   // (the day's rice and soup made fresh: the cooker and the soup's pot empty as the shop opens, the third cook to cook them (the owner's,
@@ -4216,7 +4231,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const r = runs.current.find((x) => x.phase === 'ready' && x.slot === k)
       if (sl?.plate && !r) {
         const g = shownRef.current.find((x) => x.seat === sl.seat && x.phase !== 'leave')
-        runs.current.push({ key: ++runSeq.current, seat: sl.seat, guest: g?.id ?? -1, phase: 'ready', slot: k, t: 0, from: platingPlace(readyAlong(k)) })
+        runs.current.push({ key: ++runSeq.current, seat: sl.seat, guest: g?.id ?? -1, phase: 'ready', slot: k, t: 0, from: platingPlace(readyAlong(k)), small: smallFor(g?.id) })
         redraw()
       } else if (r && (!sl || !sl.plate || sl.seat !== r.seat)) {
         runs.current = runs.current.filter((x) => x !== r)
@@ -5958,7 +5973,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             o.position.copy(r.from)
           }
         }}>
-          <Plate dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} dirt={r.dirt ?? 1} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} drink={r.drink} level={r.level}
+          <Plate size={r.small ? PLATE_SCALE.small : PLATE_SCALE.big} dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} dirt={r.dirt ?? 1} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} drink={r.drink} level={r.level}
             tissue={r.tissue && (r.phase === 'taken' ? TISSUE_ON : r.tissue)} />
         </group>
       ))}

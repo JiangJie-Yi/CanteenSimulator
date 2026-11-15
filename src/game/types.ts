@@ -7,7 +7,9 @@ export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'an
   /** their stool at the bar, where their plate is set */
   seat?: number
   /** the one they came in with, if they're a couple */
-  partner?: number }
+  partner?: number
+  /** what they've ordered has a big dish on it (game/plateSize, item 169): their plate's the big one, else the small */
+  big?: boolean }
 
 /** how one try at a food went: how good, how far cooked, what went on it */
 /** one try at a dish: how good it was, how done, what went on it — and, at the grill, when each went on — and when */

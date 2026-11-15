@@ -75,6 +75,7 @@ import { tissuePull } from './paperSound'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { ColdMist } from '@/scene/ColdMist'
 import { EditBlock, Movable } from './Movable'
+import { plateFor } from '@/game/plateSize'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW } from '@/game/shopState'
@@ -5613,7 +5614,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * taken it in SAKE_WAIT_S */
   const sakeAsked = useRef(new Map<number, number>())
   const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
-    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner })))
+    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner, big: plateFor(g.orders) === 'big' })))
   const chefSaid = useRef(0)
   /** when the chef last said there's no clean skewer */
   const noSkewerSaid = useRef(-1e9)
