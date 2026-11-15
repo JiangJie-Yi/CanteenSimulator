@@ -33,6 +33,7 @@ import { HAND_WASH_LINES, handStops, scrubbed } from '@/game/handWash'
 import { PLATE_SCALE } from '@/game/plateSize'
 import { PathMap } from './PathMap'
 import { ServeCounter } from './ServeCounter'
+import { PathZones } from './PathZone'
 import { unlitShade } from '@/game/roomLights'
 import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SHAPE_HAND, SweepBroom, ownerSweepPose, floorWipePose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
@@ -3150,7 +3151,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       x1: Math.max(...fl.map((q) => q[0])) + PASS_ROOM, z1: Math.max(...fl.map((q) => q[1])) + PASS_ROOM })
     const v = new THREE.Vector3(), m4 = new THREE.Matrix4()
     scene.traverse((o) => {
-      if (!KITCHEN_BLOCKS.has(o.userData?.editId)) return
+      // (and the keep-clear patches put down in edit mode (item 168))
+      const id = o.userData?.editId
+      if (!KITCHEN_BLOCKS.has(id) && !(typeof id === 'string' && id.startsWith('pathzone-'))) return
       let a0 = Infinity, a1 = -Infinity, l0 = Infinity, l1 = -Infinity
       o.updateWorldMatrix(true, true)
       o.traverse((q) => {
@@ -3213,6 +3216,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * measured once both are found (not a number set blind), then kept (moved by hand in edit mode, it's the edit's)
    */
   const [servePlace, setServePlace] = useState<{ at: THREE.Vector3; yaw: number } | null>(null)
+  /** the keep-clear patches (item 168), and where a new one's first put down: the serving counter's side, toward the cook table, else the
+   * kitchen's middle */
+  const zoneHome = useMemo(() => {
+    if (servePlace) return servePlace.at.clone().add(new THREE.Vector3(Math.sin(servePlace.yaw), 0, Math.cos(servePlace.yaw)).multiplyScalar(0.45))
+    const k = kitchenOf(counters), c0 = counters[0]
+    return c0.at.clone().addScaledVector(c0.along, (k.along[0] + k.along[1]) / 2).addScaledVector(c0.lay, (k.lay[0] + k.lay[1]) / 2).setY(0)
+  }, [servePlace, counters])
   /** when it was last measured, and how many times running it's come out the same */
   const placeTry = useRef({ at: 0, same: 0 })
   const placeServe = () => {
@@ -5769,6 +5779,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (the walking paths' map, in edit mode when asked for (item 168)) */}
       <PathMap />
+      {/* (the keep-clear patches (item 168): put down by the serving counter, moved and sized by hand) */}
+      <PathZones home={zoneHome} />
       {/* (the serving counter, in the corridor between the cook table and the freezer (item 167)) */}
       {servePlace && (
         <Movable id="servecounter" label="備餐檯" ground={0}>

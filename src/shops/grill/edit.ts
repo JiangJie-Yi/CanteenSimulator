@@ -36,6 +36,8 @@ const KEY_G = 'jgs-edit-groups-2'
 const KEY_P = 'jgs-edit-pivots-2'
 /** the paths' map shown (item 168) */
 const KEY_PATHS = 'jgs-edit-paths-1'
+/** the keep-clear patches (item 168) */
+const KEY_ZONES = 'jgs-edit-zones-1'
 const load = (key: string): Record<string, V3> => {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
@@ -216,7 +218,9 @@ type State = { on: boolean; locked: boolean; tool: Tool; offsets: Record<string,
   hidden: string[]
   /** the walking paths' map drawn on the floor (item 168, the owner's, 2026-11-15: "can you draw the paths, to see in edit mode, and edit
    * and manage them?"): what stands in the way on the kitchen's floor, the ways the staff go and are going (PathMap) */
-  paths: boolean }
+  paths: boolean
+  /** the keep-clear patches of the kitchen's floor (PathZone), by their ids (pathzone-<n>): the staff's ways go round them */
+  zones: string[] }
 /** offsets made defaults (BASES) since they were set by hand: a browser still holding just that offset drops it, so it isn't counted twice
  * (the rest it holds are kept, as a new KEY would lose them) */
 const SETTLED: Record<string, V3> = { oranges: [0.0275, 0, 0], shrinecups: [0.0502, 0, 0], willow: [-0.465, 0, -0.367] }
@@ -312,7 +316,8 @@ if (!relaid) try {
   for (const [k] of relaidDue) localStorage.setItem(k, '1')
 } catch { /* private window */ }
 let state: State = { on: false, locked: false, tool: 'move', offsets: loadOffsets(), rotations: loadRotations(), scales: loadScales(), selected: null, groups: loadGroups(), picked: [],
-  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false, hidden: [], paths: (() => { try { return localStorage.getItem(KEY_PATHS) === '1' } catch { return false } })() }
+  pivots: dropRelaid(load(KEY_P)), pivotMode: false, space: 'local', wire: false, hidden: [], paths: (() => { try { return localStorage.getItem(KEY_PATHS) === '1' } catch { return false } })(),
+  zones: (() => { try { const z = JSON.parse(localStorage.getItem(KEY_ZONES) ?? '[]'); return Array.isArray(z) ? z.filter((x) => typeof x === 'string' && x.startsWith('pathzone-')) : [] } catch { return [] } })() }
 const subs = new Set<() => void>()
 /** what was selected last time round: a newly picked piece starts in its own (object) axes */
 let lastSelected: string | null = null
@@ -1061,6 +1066,28 @@ const readScale = (id: string): V3 => { const sc = scaleOf(id), z = zeroOf(id).s
 export const fromRoom = (id: string, v: V3): V3 => turnY(v, frameFor(id))
 /** wireframe (Maya's 4) or shaded (5) */
 export function setWire(on: boolean) { if (state.wire === on) return; state.wire = on; emit(); toast(on ? T().wireOn : T().wireOff, 'edit') }
+/** a keep-clear patch put down (item 168): the next number, chosen, the map shown with it */
+export function addZone() {
+  let n = 1
+  while (state.zones.includes(`pathzone-${n}`)) n++
+  const id = `pathzone-${n}`
+  state.zones = [...state.zones, id]
+  try { localStorage.setItem(KEY_ZONES, JSON.stringify(state.zones)) } catch { /* (not kept) */ }
+  if (!state.paths) setPaths(true)
+  emit()
+  toast(T().zoneAdded(n), 'edit')
+  // (chosen once it's drawn and listed)
+  window.setTimeout(() => select(id), 60)
+}
+/** a keep-clear patch taken up (Delete with it chosen) */
+export function removeZone(id: string) {
+  if (!state.zones.includes(id)) return
+  state.zones = state.zones.filter((z) => z !== id)
+  try { localStorage.setItem(KEY_ZONES, JSON.stringify(state.zones)) } catch { /* (not kept) */ }
+  if (state.selected === id) state.selected = null
+  emit()
+  toast(T().zoneRemoved, 'edit')
+}
 /** the paths' map on the floor shown or put away (item 168), kept for the next time */
 export function setPaths(on: boolean) {
   if (state.paths === on) return
@@ -1139,7 +1166,7 @@ let spaceBadge: HTMLButtonElement | null = null
 let info: HTMLDivElement | null = null
 let fields: HTMLInputElement[] = []
 let toolButtons: HTMLButtonElement[] = []
-let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null, pathsButton: HTMLButtonElement | null = null
+let spaceButton: HTMLButtonElement | null = null, pivotButton: HTMLButtonElement | null = null, pathsButton: HTMLButtonElement | null = null, zoneButton: HTMLButtonElement | null = null
 let rows = new Map<string, HTMLDivElement>()
 /** the piece whose row is being dragged in the scene list (item 69), while it is */
 let dragging: string | null = null
@@ -1335,7 +1362,11 @@ function panel() {
     pathsButton = h('button', 'be-tool be-tool-text', '線') as HTMLButtonElement
     pathsButton.title = T().paths
     pathsButton.onclick = () => setPaths(!state.paths)
-    bar.append(spaceButton, pivotButton, aabbButton, obbButton, pathsButton)
+    // (and with the map out, a keep-clear patch put down)
+    zoneButton = h('button', 'be-tool be-tool-text', '＋') as HTMLButtonElement
+    zoneButton.title = T().zoneAdd
+    zoneButton.onclick = () => addZone()
+    bar.append(spaceButton, pivotButton, aabbButton, obbButton, pathsButton, zoneButton)
     const main = h('div', 'be-main')
     const head = h('div', 'be-head', T().title)
     head.appendChild(h('small', '', T().keys))
@@ -1651,6 +1682,7 @@ function panel() {
   if (spaceButton) { spaceButton.textContent = state.space === 'local' ? T().spaceLocalShort : T().spaceWorldShort; spaceButton.title = state.space === 'local' ? T().spaceLocal : T().spaceWorld }
   if (pivotButton) { pivotButton.textContent = 'D'; pivotButton.title = T().pivot; pivotButton.classList.toggle('on', state.pivotMode) }
   if (pathsButton) { pathsButton.title = T().paths; pathsButton.classList.toggle('on', state.paths) }
+  if (zoneButton) { zoneButton.title = T().zoneAdd; zoneButton.style.display = state.paths ? '' : 'none' }
   for (const [id, row] of rows) { row.classList.toggle('on', state.selected === id); row.classList.toggle('multi', state.picked.includes(id)); row.classList.toggle('off', state.hidden.includes(id)) }
   // (a new pick shows its own tab: a camera picked in the scene brings up the cameras)
   if (state.selected !== tabFollows) {
@@ -1726,6 +1758,8 @@ if (typeof window !== 'undefined') {
       if (k === 'a') { e.preventDefault(); window.dispatchEvent(new CustomEvent('edit-frame-all')); return }
       // (Esc: lets go of what's picked; with nothing picked, leaves the developer mode, as G does)
       if (k === 'escape') { e.preventDefault(); if (state.selected || state.picked.length) { state.picked = []; select(null) } else toggleEdit(); return }
+      // (Delete: a keep-clear patch chosen, taken up (item 168))
+      if ((k === 'delete' || k === 'backspace') && state.selected?.startsWith('pathzone-')) { e.preventDefault(); removeZone(state.selected); return }
       if (k === '4') { e.preventDefault(); setWire(true); return }
       if (k === '5') { e.preventDefault(); setWire(false); return }
     }
