@@ -253,9 +253,11 @@ const LIGHTING: Record<Sky, { sun: string; sunIntensity: number; sky: string; gr
   // too red)
   dusk: { sun: '#ffb46e', sunIntensity: 1.5, sky: '#b6b2d6', ground: '#6e5848', hemi: 0.95, spot: 24, fire: 3,
     shadow: '#000000', shadowOpacity: 0.36, env: 0.88 },
-  // moonlight; the warm spot, fire and burners carry the scene
-  night: { sun: '#b8c4ff', sunIntensity: 0.9, sky: '#6a6274', ground: '#3a2c20', hemi: 1.35, spot: 30, fire: 4,
-    shadow: '#000000', shadowOpacity: 0.45, env: 1 },
+  // moonlight; the warm spot, fire and burners carry the scene. The even fill from all round (hemi, env) turned well down (item 194, the
+  // owner's, 2026-11-16: "the shop's light by night isn't enough, and isn't real"): it lit every corner alike, brighter than by day; the
+  // pendants' own lights (DiningRoom's PendantLight) carry the room now, a pool under each, the corners darker
+  night: { sun: '#b8c4ff', sunIntensity: 0.9, sky: '#6a6274', ground: '#3a2c20', hemi: 0.75, spot: 30, fire: 4,
+    shadow: '#000000', shadowOpacity: 0.45, env: 0.6 },
 }
 
 // a warm lamp hanging above and in front of the dish, like over a stall counter

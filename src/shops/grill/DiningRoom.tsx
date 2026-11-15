@@ -31,6 +31,8 @@ import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { useSfxMuted } from '@/scene/sfx'
 import { drawGlyph } from '@/ui/glyphs'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
+import { AnchoredLight } from '@/scene/AnchoredLight'
+import { QUALITY } from '@/scene/quality'
 import { lampGlow, lightOn, wcDarkness, type Circuit } from '@/game/roomLights'
 import type { Sky } from '@/game/clock'
 import { lampLit } from './lampShades'
@@ -4361,6 +4363,22 @@ const LANTERN_SHADE = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', ma
 /** every other lantern's: the same washi, its band 立涌 */
 const LANTERN_SHADE_TATEWAKU = lampLit(new THREE.MeshBasicMaterial({ color: '#ffffff', map: signTexture(1024, 300, (g) => lanternPaper(g, true, 'tatewaku')),
   toneMapped: false, side: THREE.DoubleSide }), { offMap: signTexture(1024, 300, (g) => lanternPaper(g, false, 'tatewaku')) })
+/**
+ * Each pendant's own light (item 194, the owner's, 2026-11-16: "the shop's light by night isn't enough, and isn't real"): a warm lamp's
+ * light (about 2700 K) from inside the lantern, a pool of it on the bar and on the faces and plates round it, falling away to the room's
+ * darker corners; on with the room's lights (the room circuit, as the shades are). In the scene from the first and always there (the count
+ * of lights never changes: every material would be compiled again), its strength alone changed; casts no shadow; not at the lowest quality
+ */
+const PENDANT_LIGHT = 4
+function PendantLight({ y }: { y: number }) {
+  const lamp = useRef<THREE.PointLight | null>(null)
+  useFrame(() => {
+    const l = lamp.current
+    const want = getLights().on ? PENDANT_LIGHT : 0
+    if (l && l.intensity !== want) l.intensity = want
+  })
+  return <AnchoredLight light={lamp} position={[0, y, 0]} color="#ffb46a" intensity={getLights().on ? PENDANT_LIGHT : 0} distance={3.4} decay={2} />
+}
 /** a pendant lamp, an oval washi lantern, its band 鱗 or 立涌 (`band` 0 or 1; the owner's: every one the plain lantern again, the round
  * one with 日式烤魚 and the fish taken down) */
 function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: number; band?: number }) {
@@ -4388,6 +4406,8 @@ function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: n
         <sprite scale={0.85} material={PENDANT_GLOW} raycast={NO_RAY} />
         {/* (and by night a wide soft bloom round it) */}
         <sprite scale={2.2} material={PENDANT_BLOOM} raycast={NO_RAY} />
+        {/* (and its own light, a little under the lantern's middle (item 194)) */}
+        {QUALITY.tier !== 'low' && <PendantLight y={-0.12} />}
       </group>
       {/* (the pool of light on the bar top below, down from the lamp's height) */}
       <mesh position-y={pool - WALL_H + 0.004} rotation-x={-Math.PI / 2} renderOrder={1} raycast={NO_RAY}>
