@@ -65,6 +65,7 @@ import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDes
 import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, setLocked } from './edit'
+import { basinHint, scrubOnce } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
@@ -3006,9 +3007,18 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   }, [seats, drinkSpot])
   const scene = useThree((st) => st.scene)
   const marks = useRef(new Map<string, THREE.Object3D | null>())
+  /** when each mark was last looked for and not found: looked for again a second later (the owner, 2026-11-15: the dirty stack and the
+   * draining basket's plates hung in the air over the cook table's end: their marks first looked for before the sink's model was in, the
+   * miss was kept for good and they stood at the fallback all day) */
+  const missed = useRef(new Map<string, number>())
   const markOf = (name: string) => {
     let o = marks.current.get(name)
-    if (o === undefined || (o && !o.parent)) { o = scene.getObjectByName(name) ?? null; marks.current.set(name, o) }
+    const now = performance.now()
+    if (o === undefined || (o && !o.parent) || (o === null && now - (missed.current.get(name) ?? 0) > 1000)) {
+      o = scene.getObjectByName(name) ?? null
+      marks.current.set(name, o)
+      if (o === null) missed.current.set(name, now)
+    }
     return o
   }
   const inBar = (name: string, or: THREE.Vector3) => {
@@ -3048,7 +3058,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       let at = bw.addScaledVector(front, 0.52).addScaledVector(side, 0.25).setY(y)
       // (worked out in the counter top's own frame (the owner's, 2026-11-15: the stack hung half off the counter's corner, over the palm
       // brush's dish, the sink moved since those offsets were measured): in the clear space in front of the draining basket, between its
-      // front edge and the counter's, toward the end away from the basin, a plate's width and a centimetre in from every edge)
+      // front edge and the counter's, a plate's width and a centimetre in from every edge)
       const tm = top as THREE.Mesh
       if (tm.isMesh) {
         if (!tm.geometry.boundingBox) tm.geometry.computeBoundingBox()
@@ -3063,8 +3073,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (the basket against the back (-z) or the front: the clear strip on the other side of it; along it, its far end's half)
         const back = (bb.min.z + bb.max.z) / 2 < (tb.min.z + tb.max.z) / 2
         const z = back ? (bb.max.z + tb.max.z) / 2 : (bb.min.z + tb.min.z) / 2
-        const farX = (bb.min.x + bb.max.x) / 2 > (tb.min.x + tb.max.x) / 2
-        const x = farX ? (bb.min.x + bb.max.x) / 2 + (bb.max.x - bb.min.x) / 4 : (bb.min.x + bb.max.x) / 2 - (bb.max.x - bb.min.x) / 4
+        // (along it, the basket's own middle (the owner, 2026-11-15, circled: right in front of it, not off at the counter's end))
+        const x = (bb.min.x + bb.max.x) / 2
         const l = new THREE.Vector3(THREE.MathUtils.clamp(x, tb.min.x + r, tb.max.x - r), 0, THREE.MathUtils.clamp(z, tb.min.z + r, tb.max.z - r))
         at = tm.localToWorld(l).setY(y)
       }
@@ -5449,7 +5459,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (now - sinkPlaced.current > 1000) {
         sinkPlaced.current = now
         const n = Math.min(dirty.current, SINK_SHOWN)
-        for (let i = 0; i < n; i++) sinkPlates.current[i]?.position.copy(dirtyAt(i))
+        // (not drawn till the sink's in: put at the fallback meanwhile, the bar's end, they hung in the air over the cook table)
+        const there = !!markOf('SinkTop') && !!markOf('SinkBasinFloor')
+        for (let i = 0; i < n; i++) { const q = sinkPlates.current[i]; if (q) { q.position.copy(dirtyAt(i)); q.visible = there } }
       }
     }
     // (the sink's plates, each as dirty as it came: as many as there are (any come by another way counted dirty as the first dish leaves one;
@@ -5479,7 +5491,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     PLATE_COUNT.basket = DRAIN.n
     PLATE_COUNT.out = Math.max(0, PLATES_ALL - PLATE_RACK.n - LOW_RACK.n - dirty.current - DRYER.n - DRAIN.n)
     if (drainPlates.current) {
-      if (DRAIN.n > 0) {
+      // (nor the basket's till its marks are found (as the sink's own))
+      if (DRAIN.n > 0 && markOf('SinkRackSlot0') && markOf('SinkRackSlot1')) {
         const along = inBar('SinkRackSlot1', endOf(1)).sub(inBar('SinkRackSlot0', endOf(1))).normalize()
         drainPlates.current.children.forEach((c, i) => {
           c.visible = i < DRAIN.n
@@ -5610,7 +5623,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (each seated customer's soy in the little dish at their place, a dab of grated daikon in it: drawn with the shoes, SeatBits) */}
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
       {Array.from({ length: Math.min(dirty.current, SINK_SHOWN) }, (_, i) => (
-        <group key={`d${i}`} ref={(o) => { sinkPlates.current[i] = o }} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}><Plate dirty sticks={0} design={i} /></group>
+        <group key={`d${i}`} ref={(o) => { sinkPlates.current[i] = o }} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}
+          // (the dirty plates can be clicked to wash one, as the basin can (the owner, 2026-11-15: "I can't wash up by hand": the stack did nothing))
+          onPointerOver={(e) => { if (getEdit().on) return; e.stopPropagation(); tipOver('髒盤子', basinHint()).onPointerOver(e) }}
+          onPointerOut={(e) => { if (getEdit().on) return; tipOver('髒盤子', '').onPointerOut(e) }}
+          onClick={(e) => { if (getEdit().on) return; e.stopPropagation(); scrubOnce(); window.setTimeout(() => tipOver('髒盤子', basinHint()).onPointerOver(e), 80) }}><Plate dirty sticks={0} design={i} /></group>
       ))}
       {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
           of the shop's plates, it goes with the food) */}

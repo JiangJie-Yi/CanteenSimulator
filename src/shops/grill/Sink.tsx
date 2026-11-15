@@ -360,7 +360,7 @@ export function SinkModel() {
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
       <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: basinHint() }) }}
         onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null) }}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; const now = performance.now(); if (now < HAND_WASH.until || handStep(handSink()) !== 'scrub') { setTip({ title: '流理台', hint: basinHint() }); return } HAND_WASH.ask = 'wash'; SINK.soap = scrubbed(SINK.soap); HAND_WASH.until = now + handTime(SINK.dirt.at(-1) ?? 1) * 1000; window.setTimeout(() => setTip({ title: '流理台', hint: basinHint() }), 80) }}>
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; if (!scrubOnce()) { setTip({ title: '流理台', hint: basinHint() }); return } window.setTimeout(() => setTip({ title: '流理台', hint: basinHint() }), 80) }}>
         <primitive object={root} />
       </group>
       <primitive object={pool} />
@@ -405,9 +405,19 @@ export function SinkModel() {
   )
 }
 /** the sink as washing up by hand sees it (game/handWash) */
+/** a plate scrubbed by hand, if that's the step now and the last one's done: the basin's click, and the dirty stack's beside it (the owner,
+ * 2026-11-15: clicking the stack did nothing, "I can't wash up by hand"); whether one was */
+export function scrubOnce() {
+  const now = performance.now()
+  if (now < HAND_WASH.until || handStep(handSink()) !== 'scrub') return false
+  HAND_WASH.ask = 'wash'
+  SINK.soap = scrubbed(SINK.soap)
+  HAND_WASH.until = now + handTime(SINK.dirt.at(-1) ?? 1) * 1000
+  return true
+}
 const handSink = () => ({ dirty: SINK.dirty, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: SINK.sponge })
 /** what the basin says pointed at: its water and plug, then the next step of washing up by hand (item 103), how many plates are waiting */
-const basinHint = () => {
+export const basinHint = () => {
   const st = handStep(handSink())
   return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}`
 }
