@@ -3012,6 +3012,21 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * miss was kept for good and they stood at the fallback all day) */
   const missed = useRef(new Map<string, number>())
   /** whether a mark is still in the scene (a piece rebuilt leaves its old one in a subtree no longer drawn: its place was a stale one) */
+  /** a mark of the sink's: looked for only in the sink's own pieces (the sink and what stands on it, `sink`, `sink-*`), never by its name over
+   * the whole room; and only if it's within a few metres of the sink (the owner, 2026-11-15: the dirty stack and a row of plates stood by the
+   * cook table's lantern, over the fire bed, in their game; never found so here, but never to be possible: they wait for the sink instead) */
+  const sinkMark = (name: string): THREE.Object3D | null => {
+    let home: THREE.Object3D | null = null, hit: THREE.Object3D | null = null
+    scene.traverse((q) => {
+      const id = q.userData?.editId
+      // (the sink's own place: the group it's set out in (Decor's look-sink); its piece's root is at the room's origin)
+      if (id === 'sink') home = q.getObjectByName('look-sink') ?? q
+      if (!hit && (id === 'sink' || (typeof id === 'string' && id.startsWith('sink-')))) hit = q.getObjectByName(name) ?? null
+    })
+    if (!hit || !home) return null
+    const h = (home as THREE.Object3D).getWorldPosition(new THREE.Vector3())
+    return (hit as THREE.Object3D).getWorldPosition(new THREE.Vector3()).distanceTo(h) < 3 ? hit : null
+  }
   const inScene = (o: THREE.Object3D) => { let q: THREE.Object3D = o; while (q.parent) q = q.parent; return q === scene }
   /** when each mark found was last made sure of (twice a second at most: it's asked for many times a frame) */
   const sure = useRef(new Map<string, number>())
@@ -3021,7 +3036,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     let stale = false
     if (o && now - (sure.current.get(name) ?? 0) > 500) { sure.current.set(name, now); stale = !inScene(o) }
     if (o === undefined || stale || (o === null && now - (missed.current.get(name) ?? 0) > 1000)) {
-      o = scene.getObjectByName(name) ?? null
+      o = name.startsWith('Sink') ? sinkMark(name) : scene.getObjectByName(name) ?? null
       marks.current.set(name, o)
       if (o === null) missed.current.set(name, now)
     }
