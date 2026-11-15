@@ -165,6 +165,8 @@ const loadGroups = (): Record<string, Group> => {
   } catch { /* storage blocked */ }
   // (the rice corner's group a browser kept under its old name (item 156): named for what's in it)
   if (g['grp-ricecorner']?.name === '米袋與舊飯桶') g['grp-ricecorner'] = { ...g['grp-ricecorner'], name: '米袋' }
+  // (the back room's area a browser kept under the view's old name (item 165): named for the view now, the sink (流理台))
+  if (g['grp-view-back']?.name === '後台區') g['grp-view-back'] = { ...g['grp-view-back'], name: '流理台區' }
   // (a kept cat stand from before the coin and the helmet were set on it: they join it, out of whatever else held them, so they go where it goes
   // (the owner's, 2026-11-11: left behind when the stand moved for the bench))
   const cats = g['grp-doorcats']
@@ -877,7 +879,7 @@ const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', ch
   // (item 156, the owner's: every place's chopsticks and the long bar's third lamp with the rest of the bar's, in the cook table's area (a view
   // that happened to see one took it); the staff's door with the back, not the shrine's)
   ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [`chopstickpair${n}`, 'grill'])), barlamp2: 'grill', staffdoor: 'back' }
-/** an area's name: its view's, as an area (後台區 is one already) */
+/** an area's name: its view's, as an area */
 const areaName = (view: string) => { const n = VIEW_SPOTS.find((v) => v.id === view)?.zh ?? view; return n.endsWith('區') ? n : `${n}區` }
 /** each view's area made a group, of the pieces (and the shop's groups, whole) loose at the top that are new to it */
 export function groupByViews() {
