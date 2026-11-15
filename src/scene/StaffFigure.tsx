@@ -695,7 +695,8 @@ useGLTF.preload(BROOM_URL)
  * into the shadow's picture makes its program), were made as they first walked in, a frame stopped each.
  */
 export function StaffWarm() {
-  const gltfs = VARIANTS.map((v) => useGLTF(url(v)) as unknown as { scene: THREE.Group })
+  // (all the outfits in one call, the hook asked once (item 193: one call per outfit in a loop broke the rules of hooks, lint's one error))
+  const gltfs = useGLTF(VARIANTS.map(url)) as unknown as { scene: THREE.Group }[]
   const roots = useMemo(() => VARIANTS.map((v, i) => {
     if (!made.has(v)) made.set(v, build(gltfs[i].scene, v))
     const r = cloneFigure(made.get(v)!.root) as THREE.Group

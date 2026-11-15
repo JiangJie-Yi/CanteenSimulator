@@ -34,7 +34,10 @@ export type Counter = { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vect
   /** its stools moved along it this far from evenly spaced about its middle (clear of a gate at one end) */
   shift?: number
   /** how far behind its middle line its wall stands (FLOOR_FAR unless it's further back, to make room by it) */
-  far?: number }
+  far?: number
+  /** how far behind its middle line those walking its aisle go (AISLE unless it's drawn in, clear of what stands against its wall; the wall
+   * stays where AISLE puts it) */
+  aisle?: number }
 export type Seat = {
   /** the place's middle on the counter's line (y 0): what's laid there goes by it (PLACE) */
   mid: THREE.Vector3
@@ -71,6 +74,8 @@ export const FLOOR_NEAR = 0.42
 export const FLOOR_FAR = -(AISLE + 0.5)
 /** where a counter's wall stands, behind its middle line */
 export const farOf = (c: Counter) => c.far ?? FLOOR_FAR
+/** how far behind a counter's middle line its aisle's walkers go */
+export const aisleOf = (c: Counter) => c.aisle ?? AISLE
 
 /**
  * The seats with a customer's plate set down at them just now (GuestBar3D keeps it, every frame): what's grilled for
@@ -317,7 +322,7 @@ export function toiletsOf(cs: Counter[]) {
     // (a spot in the rooms, in their own frame: x back from the wall, across from the door's middle; the toilet's room is on the side `k`)
     const room = (x: number, across: number) => c.at.clone().addScaledVector(c.along, z + k * across).addScaledVector(c.lay, farOf(c) - x)
     const { D, X0, E } = WC_ROOM
-    return { z, front: at(farOf(c) + 0.45), aisle: at(-AISLE),
+    return { z, front: at(farOf(c) + 0.45), aisle: at(-aisleOf(c)),
       // (just in at the door; before the washstand, facing it; the turn toward the toilet's room; before the toilet, round the corner)
       inside: room(0.12, 0), basin: room(D - 0.6, 0), turn: room(0.34, WC_W / 2 - 0.11), stall: room((X0 + D) / 2 - 0.02, WC_W / 2 + E * 0.13),
       // (the way they face at the washstand: into the room, away from the door)
@@ -342,7 +347,7 @@ export function fridgesOf(cs: Counter[]) {
     // no wider than the cabinets), their sides not in one plane)
     const z = z0 - n * (FRIDGE.W + 0.03)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
-    return { n, z, at: at(farOf(c) + FRIDGE_GAP + FRIDGE.D / 2), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE_GAP + FRIDGE.D + 0.33).add(side), aisle: at(-AISLE) }
+    return { n, z, at: at(farOf(c) + FRIDGE_GAP + FRIDGE.D / 2), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE_GAP + FRIDGE.D + 0.33).add(side), aisle: at(-aisleOf(c)) }
   })
 }
 /** how far a fridge's back stands off the wall's face: clear of the rail over the wainscot (DiningRoom's, 4.5 cm proud of the wall; at 1 cm it
@@ -731,7 +736,7 @@ export function payOf(cs: Counter[]) {
   const c0 = cs[0]
   const at = (along: number, lay: number) => c0.at.clone().addScaledVector(c0.along, c0.length / 2 + along).addScaledVector(c0.lay, lay)
   // (stood a step back from the counter's marble edge, which comes to their chest: close, it went into them)
-  return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.46), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.46), aisle: at(0.4, -AISLE) }
+  return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.46), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.46), aisle: at(0.4, -aisleOf(c0)) }
 }
 
 /** how tall the raised lip along the counters' cook's side stands over their tops */
@@ -981,7 +986,7 @@ export function seatsOf(cs: Counter[]): Seat[] {
       mid,
       plate: mid.clone().addScaledVector(c.lay, PLACE.plate),
       stool: mid.clone().addScaledVector(c.lay, -SIT_BACK),
-      aisle: mid.clone().addScaledVector(c.lay, -AISLE),
+      aisle: mid.clone().addScaledVector(c.lay, -aisleOf(c)),
       yaw: Math.atan2(c.lay.x, c.lay.z),
       along: c.along,
       lay: c.lay,
@@ -1020,23 +1025,25 @@ export function inGenkan(cs: Counter[], p: THREE.Vector3) {
 /** where the first counter's aisle meets another counter's (the aisle behind its stools) */
 export function aisleCornerOf(cs: Counter[], c: Counter) {
   const c0 = cs[0]
-  const p0 = c0.at.clone().addScaledVector(c0.lay, -AISLE)
-  return p0.clone().addScaledVector(c0.along, c.at.clone().addScaledVector(c.lay, -AISLE).sub(p0).dot(c0.along))
+  const p0 = c0.at.clone().addScaledVector(c0.lay, -aisleOf(c0))
+  return p0.clone().addScaledVector(c0.along, c.at.clone().addScaledVector(c.lay, -aisleOf(c)).sub(p0).dot(c0.along))
 }
-/** the way in: on the first counter's aisle, just past its far end */
+/** the doorway (the noren's hung there, the cat stand by it): on the first counter's aisle, just past its far end */
 export const doorOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].along, cs[0].length / 2 + 1.0)
   .addScaledVector(cs[0].lay, -AISLE)
+/** where the customers come in at the door and go out: the doorway's place, on their line along the first counter's aisle */
+export const wayInOf = (cs: Counter[]) => doorOf(cs).addScaledVector(cs[0].lay, AISLE - aisleOf(cs[0]))
 
 /**
  * From the door to a stool: along the first counter's aisle, round the corner into another counter's aisle if
  * that's where the stool is, up behind the stool, and onto it.
  */
 export function pathTo(cs: Counter[], s: Seat): THREE.Vector3[] {
-  const door = doorOf(cs)
+  const door = wayInOf(cs)
   if (s.counter === 0) return [door, s.aisle, s.stool]
   const c0 = cs[0], c = cs[s.counter]
-  const p0 = c0.at.clone().addScaledVector(c0.lay, -AISLE)
-  const p1 = c.at.clone().addScaledVector(c.lay, -AISLE)
+  const p0 = c0.at.clone().addScaledVector(c0.lay, -aisleOf(c0))
+  const p1 = c.at.clone().addScaledVector(c.lay, -aisleOf(c))
   const corner = p0.clone().addScaledVector(c0.along, p1.clone().sub(p0).dot(c0.along))
   return [door, corner, s.aisle, s.stool]
 }
@@ -1076,8 +1083,13 @@ export const GRILL_COUNTERS: Counter[] = [
   // (four places spread evenly over all the run there is (the owner's: the places moved along into the empty end and spread evenly): from one
   // by the gate, drawn back from it (the owner's: place 1 was too near the genkan's door), to one by the corner end, where the run was left
   // bare when that end's place went round to the side counter)
+  // (its aisle walked 0.08 in from AISLE's line, toward the counter (item 193): the benches against its wall and the helmet's stand come out to
+  // 0.19 behind that line (their fronts at -1.346, -1.352: tests/e2e/_wall193.mjs), as far as a customer's round body is wide from its middle
+  // (GuestBar3D's R / 2), so those going by brushed their fronts (tests/e2e/paths.mjs: 9 clashes into the benches' legs, the stand's), and a
+  // step aside toward the wall for anyone took them 0.11 to 0.24 into a bench's seat; drawn in, 0.08 clear of them going by, 0.09 clear of
+  // the stools' backs (at -0.79); the wall stays where AISLE puts it)
   { at: new THREE.Vector3().addScaledVector(LAY, -2.45).addScaledVector(ALONG, -0.35 + SIDE_PULL / 2 - BAR_TRIM / 2), along: ALONG, lay: LAY, length: 5.2 - SIDE_PULL - BAR_TRIM, seats: 4,
-    ...spread(4, -1.5, 1.45) },
+    ...spread(4, -1.5, 1.45), aisle: AISLE - 0.08 },
   // (the side counter drawn back from its wall by SIDE_PULL, so the fridges' doors swing clear of its stools)
   // (four places (the long counter's by the corner brought round, four and four) spread evenly over its whole run (the owner's: the corner
   // end was left bare): from the one by the gate, where it was, to one by the corner, its stool clear of the long counter's back)

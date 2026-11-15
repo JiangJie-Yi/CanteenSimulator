@@ -91,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -123,6 +123,49 @@ const rampedAlong = (t: number, len: number) => Math.min(len, t < SERVER_RAMP ? 
 // second: about a walk), the fastest anyone walks (a quicker move between two frames is a leap, a phase begun elsewhere, not a walk))
 const AHEAD_S = 0.6, ASIDE_V = 1.5, WALK_MOST = 3.2
 const STOCKER_KEY = -99
+/** those waiting on the genkan's bench, among those stepping aside for each other: keyed apart from the customers (SITTER_KEY less their id) */
+const SITTER_KEY = -1000
+/** the pieces standing against the first counter's wall, behind its aisle: the waiting benches, the helmet's stand and the helmet on it */
+const WALL_PIECES = ['bench', 'bench2', 'kabutostand', 'kabuto']
+const WALL_V = new THREE.Vector3(), WALL_INV = new THREE.Matrix4()
+type WallKeep = { at: number; boxes: { a0: number; a1: number; front: number }[]; roots: Map<string, THREE.Object3D> }
+/**
+ * Each of WALL_PIECES' footprints in the first counter's frame (item 193), from its own meshes' vertices between the floor and a body's
+ * shoulders: along the counter from its middle (`a0` to `a1`), and how far toward the aisle its front comes (`front`, lay). Measured now and
+ * then, not laid down here, so it follows a piece moved by hand.
+ */
+function measureWall(scene: THREE.Object3D, frame: THREE.Object3D, c: { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vector3 }, keep: WallKeep) {
+  keep.boxes.length = 0
+  WALL_INV.copy(frame.matrixWorld).invert()
+  for (const id of WALL_PIECES) {
+    let root = keep.roots.get(id)
+    if (!root || !root.parent) {
+      let found: THREE.Object3D | undefined
+      scene.traverse((o) => { if (!found && o.userData?.editId === id) found = o })
+      if (!found) continue
+      root = found
+      keep.roots.set(id, root)
+    }
+    let a0 = Infinity, a1 = -Infinity, front = -Infinity
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      const pos = m.isMesh && !(o as THREE.InstancedMesh).isInstancedMesh ? m.geometry?.attributes.position : undefined
+      if (!pos || !m.visible || m.userData?.editHandle) return
+      // (a big one sampled: its outline's there in every few thousandth vertex)
+      const stride = Math.max(1, Math.floor(pos.count / 3000))
+      for (let i = 0; i < pos.count; i += stride) {
+        WALL_V.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld).applyMatrix4(WALL_INV)
+        if (WALL_V.y < 0.02 || WALL_V.y > 0.75) continue
+        const dx = WALL_V.x - c.at.x, dz = WALL_V.z - c.at.z
+        const al = dx * c.along.x + dz * c.along.z, ly = dx * c.lay.x + dz * c.lay.z
+        if (al < a0) a0 = al
+        if (al > a1) a1 = al
+        if (ly > front) front = ly
+      }
+    })
+    if (front > -Infinity) keep.boxes.push({ a0, a1, front })
+  }
+}
 const INK = '#3b2a20'
 
 /** toon material, and its ink outline (a slightly bigger back-faced shell) */
@@ -2726,12 +2769,23 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** how far each walker's stepped aside off their way just now (eased to what's needed), and where their way had them the frame before
    * (keyed by id: a customer's, a server's -1 - i, the stock keeper's) */
   const aside = useRef(new Map<number, { x: number; z: number; f: number }>())
+  /** what stands against the first counter's wall behind its aisle, that nobody stepping aside for another goes into (measureWall) */
+  const wallKeep = useRef<WallKeep>({ at: -9, boxes: [], roots: new Map() })
   const lastAt = useRef(new Map<number, { x: number; z: number; f: number }>())
   const asideTick = useRef(0)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestGroups?: typeof groups }).__guestGroups = groups
   const clock = useRef(0)
   const counters = useMemo(() => given ?? singleCounter(at, length), [given, at, length])
   const seats = useMemo(() => seatsOf(counters), [counters])
+  /** the first counter's stools as they stand sat at, for those passing behind them (item 193): the stretch of its aisle they're along (a
+   * stool's half width past the end ones) and how far toward the aisle their backs come (a stool's half width, 0.21, behind where it stands:
+   * tests/e2e/_clash193.mjs's hits on them, -0.79) */
+  const stoolLine = useMemo(() => {
+    const c = counters[0], at = seats.filter((st) => st.counter === 0).map((st) => st.stool.clone().sub(c.at))
+    if (!at.length) return null
+    const al = at.map((d) => d.dot(c.along))
+    return { a0: Math.min(...al) - 0.21, a1: Math.max(...al) + 0.21, back: Math.min(...at.map((d) => d.dot(c.lay))) - 0.21 }
+  }, [counters, seats])
   const wcs = useMemo(() => (given ? toiletsOf(counters) : null), [counters, given])
   const fridges = useMemo(() => (given ? fridgesOf(counters) : null), [counters, given])
   // (the stretches of the side wall kept clear for the fridges: one array, so the wall (memo'd) isn't drawn again with every redraw here)
@@ -2743,6 +2797,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const o = g?.partner !== undefined ? shown.find((x) => x.id === g.partner && x.phase === 'sit') : undefined
     return s.phase === 'sit' && o ? Math.sign(o.seat - s.seat) : 0
   }
+  /** where the customers come in at the door: where a customer's figure stands as it's put in the scene (one called off the bench, where they
+   * sat), till their walk puts it on their way (put at the frame's middle, it stood there, in the kitchen, between being put in and its first
+   * frame: tests/e2e/paths.mjs saw it, and one called off the bench was drawn there for a frame, put in after the walk's frame was done:
+   * dayaudit.mjs RUSH=1, 13 of them, from the door to the bench when it was the door) */
+  const wayIn = useMemo(() => wayInOf(counters), [counters])
   const paths = useMemo(() => seats.map((st) => {
     const path = pathTo(counters, st)
     return { path, len: pathLength(path) }
@@ -2794,7 +2853,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const { mid } = gateOf(c, g)
       const at = mid.clone().addScaledVector(c.lay, 0.85).addScaledVector(c.along, -g.end * 0.3)
       // (in to the doorway square on, through it, and out to the aisle)
-      const way = [at, mid.clone().addScaledVector(c.lay, 0.42), mid.clone().addScaledVector(c.lay, -0.5), mid.clone().addScaledVector(c.lay, -AISLE - 0.08)]
+      const way = [at, mid.clone().addScaledVector(c.lay, 0.42), mid.clone().addScaledVector(c.lay, -0.5), mid.clone().addScaledVector(c.lay, -aisleOf(c) - 0.08)]
       return { at, yaw: Math.atan2(-c.lay.x, -c.lay.z), counter: i, way }
     })
   }, [counters, given])
@@ -4081,7 +4140,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const st = seats[s.seat]
       if (!st) continue
       // (one called off the bench walks in from it, not from the door)
-      if (s.from && !s.fromWay) { const p = [s.from.clone(), ...paths[s.seat].path.slice(1)]; s.fromWay = { path: p, len: pathLength(p) } }
+      // (a step straight out from it onto the first counter's aisle first, then along it: cut across from their place to the corner, one from
+      // the first bench went through the second and those sat on it (item 193, tests/e2e/_clash193.mjs))
+      if (s.from && !s.fromWay) {
+        const c0 = counters[0], back = s.from.clone().sub(c0.at).dot(c0.lay) + aisleOf(c0)
+        const p = [s.from.clone(), ...(back < -0.02 ? [s.from.clone().addScaledVector(c0.lay, -back)] : []), ...paths[s.seat].path.slice(1)]
+        s.fromWay = { path: p, len: pathLength(p) }
+      }
       const { path, len } = s.phase === 'enter' && s.fromWay ? s.fromWay : paths[s.seat]
       if (s.phase === 'enter') {
         // in through the noren, along the aisle behind the stools (round the corner, for the other counter), and
@@ -4481,8 +4546,27 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       waiters.current.forEach((w, wi) => add(waiterObjs.current[wi]?.position ?? w.pos, false, -1 - wi))
       if (STOCKER_FIG.o?.visible) add(STOCKER_FIG.o.position, false, STOCKER_KEY)
+      // (and those waiting on the bench, on their way to it, sat there or on their way out: they keep to their way, the rest step round them
+      // (item 193: going by in the aisle, customers walked through one stood before their place on it))
+      sitters.current.forEach((v) => { const o = sitterObjs.current.get(v.id); if (o && !v.handed) add(o.position, false, SITTER_KEY - v.id) })
       // (a body's width, the round bodies' shoulders and all, so no two ever overlap)
       const R = 0.38
+      // (what stands against the first counter's wall, measured every few seconds)
+      const wallC = counters[0], keep = wallKeep.current, nowS = performance.now() / 1000
+      if (given && wallC && frame.current && (nowS - keep.at > 3 || nowS < keep.at)) { keep.at = nowS; measureWall(scene, frame.current, wallC, keep) }
+      /** how far one can step that way (sx, sz) from where their way has them before they'd touch what stands against the first counter's
+       * wall, or, the other way, the first counter's stools (a body's half width and 2 cm from either); no end to it if neither is that way */
+      const roomToward = (p: THREE.Vector3, sx: number, sz: number) => {
+        if (!wallC || !keep.boxes.length) return Infinity
+        const toWall = -(sx * wallC.lay.x + sz * wallC.lay.z)
+        if (Math.abs(toWall) <= 1e-3) return Infinity
+        const dx = p.x - wallC.at.x, dz = p.z - wallC.at.z
+        const al = dx * wallC.along.x + dz * wallC.along.z, ly = dx * wallC.lay.x + dz * wallC.lay.z
+        let room = Infinity
+        if (toWall > 0) { for (const b of keep.boxes) if (al >= b.a0 - R / 2 && al <= b.a1 + R / 2) room = Math.min(room, Math.max(0, ly - (b.front + R / 2 + 0.02)) / toWall) }
+        else if (stoolLine && ly < stoolLine.back && al >= stoolLine.a0 && al <= stoolLine.a1) room = Math.max(0, stoolLine.back - R / 2 - 0.02 - ly) / -toWall
+        return room
+      }
       const met = new Set<string>()
       for (let i = 0; i < walkers.length; i++) for (let j = i + 1; j < walkers.length; j++) {
         const a = walkers[i], b = walkers[j]
@@ -4507,12 +4591,28 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (s < 0.02) { sx = -uz; sz = ux; s = Math.sqrt(uu) }
           if (s < 1e-4) { sx = 1; sz = 0; s = 1 }
           side = { x: sx / s, z: sz / s }
+          // (and passed the other way round if that's where there's room: with the benches or the helmet's stand that way of whichever has to
+          // step aside, they go round each other on the room's side (item 193: held off the benches, a customer met there by a server, who
+          // keeps to his way, stood in him as they passed))
+          const fits = (x: number, z: number) => Math.min(need, (lo.give ? roomToward(lo.p, x, z) : 0) + (hi.give ? roomToward(hi.p, -x, -z) : 0))
+          if (fits(-side.x, -side.z) > fits(side.x, side.z) + 1e-3) { side.x = -side.x; side.z = -side.z }
+          // (and two going the same way with no room abreast (the benches one side of the aisle, the stools the other) go one behind the
+          // other: whichever's ahead a step on, the other a step back (item 193: two leaving together walked the aisle in each other))
+          if (fits(side.x, side.z) < need - 1e-3) {
+            const vx = lo.vx + hi.vx, vz = lo.vz + hi.vz, vv = Math.hypot(vx, vz)
+            if (vv > 0.3 && uu < 0.25 * vv * vv) { const ahead = rx * vx + rz * vz >= 0 ? 1 : -1; side.x = (ahead * vx) / vv; side.z = (ahead * vz) / vv }
+          }
           passing.current.set(key, side)
         }
         // (two walking: half of it each; one into someone who doesn't give (sat, or a server with a tray): all of it, round them)
-        const share = lo.give && hi.give ? need * 0.5 : need
-        if (lo.give) { lo.ax += side.x * share; lo.az += side.z * share }
-        if (hi.give) { hi.ax -= side.x * share; hi.az -= side.z * share }
+        // (and one with the benches or the helmet's stand behind them steps back toward it only as far as there's room: the other takes the
+        // rest, into the room behind the stools if it's there (item 193: held off the benches, the two passing went into each other))
+        let sl = lo.give ? (hi.give ? need * 0.5 : need) : 0, sh = hi.give ? (lo.give ? need * 0.5 : need) : 0
+        const rl = lo.give ? roomToward(lo.p, side.x, side.z) : 0, rh = hi.give ? roomToward(hi.p, -side.x, -side.z) : 0
+        if (sl > rl) { if (hi.give) sh += sl - rl; sl = rl }
+        if (sh > rh) { if (lo.give) sl = Math.min(rl, sl + sh - rh); sh = rh }
+        if (lo.give) { lo.ax += side.x * sl; lo.az += side.z * sl }
+        if (hi.give) { hi.ax -= side.x * sh; hi.az -= side.z * sh }
       }
       for (const k of passing.current.keys()) if (!met.has(k)) passing.current.delete(k)
       // (each one's step aside eased to what it should be now: out as they come up, back once they're by)
@@ -4531,6 +4631,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const k = t > most ? most / t : 1
         off.x += tx * k; off.z += tz * k
         w.p.x += off.x; w.p.z += off.z
+        // (and never stepped aside into what stands against the first counter's wall, the benches and the helmet's stand (item 193: stepping
+        // aside for someone, customers went 0.11 to 0.24 into a bench's seat): a step toward it goes no nearer it than just short of
+        // touching it (a body's half width and 2 cm from its front), or than their own way has them, if that runs nearer it (to a place on
+        // the bench, and up from it)
+        if (w.give && wallC && keep.boxes.length) {
+          const dx = w.p.x - wallC.at.x, dz = w.p.z - wallC.at.z
+          const al = dx * wallC.along.x + dz * wallC.along.z
+          let ly = dx * wallC.lay.x + dz * wallC.lay.z
+          const own = ly - (off.x * wallC.lay.x + off.z * wallC.lay.z)
+          for (const b of keep.boxes) {
+            if (al < b.a0 - R / 2 || al > b.a1 + R / 2) continue
+            const near = Math.min(b.front + R / 2 + 0.02, own)
+            if (ly >= near) continue
+            // (back no quicker than a step aside: come up to it stepped aside further, they'd have jumped back in a frame; its ends are
+            // reached a body's half width early, so they're back by then)
+            const back = Math.min(near - ly, most)
+            w.p.x += wallC.lay.x * back; w.p.z += wallC.lay.z * back; off.x += wallC.lay.x * back; off.z += wallC.lay.z * back
+            ly += back
+          }
+        }
         // (a step aside is a step: stood in a queue or at the genkan's step, eased aside they slid across the floor, their feet still (item 50))
         if (w.s && w.give && t * k > 0.002) w.s.still = false
         if (w.ax === 0 && w.az === 0 && Math.abs(off.x) + Math.abs(off.z) < 1e-4) aside.current.delete(w.id)
@@ -6602,7 +6722,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const g = guests.find((x) => x.id === s.id)
         const walking = s.phase !== 'sit'
         return (
-          <group key={s.id} userData={{ guest: s.id }} ref={(o) => { if (o) { groups.current.set(s.id, o); FIGURES.set(o, 'other') } else groups.current.delete(s.id) }}>
+          <group key={s.id} position={s.from ?? wayIn} userData={{ guest: s.id }} ref={(o) => { if (o) { groups.current.set(s.id, o); FIGURES.set(o, 'other') } else groups.current.delete(s.id) }}>
             {/* (a soft shadow under them, sat or walking) */}
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
