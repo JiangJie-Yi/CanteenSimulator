@@ -176,7 +176,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `GuestBar3D.tsx` | 客人（進出、坐下、上廁所、拿飲料、換拖鞋、淡出）、外場服務生（從閘門進出，走進廚房到主廚旁端裝好的菜、收盤、洗碗、烘碗、搬回碗盤櫃）、廚房補盤的人（碗盤櫃 → 出餐口）、盤子、地板、玄關、收銀台 `Register` |
 | `DiningRoom.tsx` | 牆面與牆上的東西（畫、門口的神棚與供品 `Altar`、男女廁所與室內 `WcRoom`）、飲料櫃 `DrinkFridge`、場內擺設 `ShopProps`（酒樽、竹子、柳樹、酒箱） |
 | `Decor.tsx` | 料理台上的擺設：炭箱、扇子、行燈、飯桶與作業台 |
-| `Grill2D.tsx`、`Grill2DArt.tsx` | 手機不用 3D（`game/device.ts` 的 `showsFlat`，BDD `device`：寬不到 600px、或高不到 500px（橫拿）、或瀏覽器說自己是手機（`phoneDevice`：userAgentData.mobile，沒有就看 iPhone、iPod、Android 手機……）；平板與電腦是網頁，一律完整的 3D，店主要的）：同樣的烤爐玩法畫成 2D（邏輯在 Grill2D，SVG 插圖在 Grill2DArt）。**目前不開放**（店主要的：手機尺寸時顯示「手機版（2D）暫不開放」，`ui/PhoneClosed.tsx`，直接放進 `body`、蓋住一切（放在舞台裡會被右上角的按鈕蓋過）；App 的 `PHONE_2D_OPEN` 改成 true 就恢復 2D） |
+| `ui/PhoneClosed.tsx` | 手機不用 3D（`game/device.ts` 的 `showsFlat`，BDD `device`：寬不到 600px、或高不到 500px（橫拿）、或瀏覽器說自己是手機（`phoneDevice`：userAgentData.mobile，沒有就看 iPhone、iPod、Android 手機……）；平板與電腦是網頁，一律完整的 3D，店主要的）：手機只顯示「手機版（2D）暫不開放」（直接放進 `body`、蓋住一切）。以前的 2D 手機版（`Grill2D`、`Grill2DArt`、2D 吧台 `ui/GuestCounter`、手機的客人看板與供酒按鈕、手機尺寸的 CSS）第 188 項整個拿掉了（店主 2026-11-16：「原本的2D手機板先移除，做專案減肥」） |
 
 每件擺設與每個流程的細節（客人、外場、灶台、廁所、飲料櫃、收銀、炊飯、鐵串、碗盤、評價、水電、時鐘…）在 `docs/DETAILS.md` 的「烤魚店的 3D 店面」一節，用搜尋找，只讀那一段。
 
@@ -197,7 +197,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 
 ## 慣例
 
-- **網頁只用完整的 3D，手機用 2D**（店主要的；`game/device.ts`，BDD `device`）：手機（尺寸或裝置，App 的 `usePhone`）整個是 2D：灶台畫成 2D（`Grill2D`，目前顯示暫不開放）、客人在 2D 吧台（`ui/GuestCounter`），不跑任何 3D；電腦與平板是完整的 3D（3D 吧台與客人；以前觸控的平板也用 2D 吧台）。**手機一開頁就不下載任何 3D 模型**（`scene/flatGate.ts`，`main.tsx` 最先 import：一開頁就是手機時，`useGLTF.preload`、`useLoader.preload` 什麼都不做；以前手機沒有 3D 畫面卻在背景下載了 54 個模型）。檢查：`tests/e2e/_device.mjs`（在 git 外：電腦、手機尺寸、手機裝置、平板各開一次，印出有沒有 3D 畫面、下載了哪些模型）。
+- **網頁只用完整的 3D，手機暫不開放**（店主要的；`game/device.ts`，BDD `device`）：手機（尺寸或裝置，App 的 `usePhone`）只顯示「暫不開放」（`ui/PhoneClosed`），不跑任何 3D（以前的 2D 手機版第 188 項拿掉了；寬不到 600、高不到 500 一定是這張卡片，所以那些尺寸的 CSS 也一起拿掉）；電腦與平板是完整的 3D。**手機一開頁就不下載任何 3D 模型**（`scene/flatGate.ts`，`main.tsx` 最先 import：一開頁就是手機時，`useGLTF.preload`、`useLoader.preload` 什麼都不做；以前手機沒有 3D 畫面卻在背景下載了 54 個模型）。檢查：`tests/e2e/_device.mjs`（在 git 外：電腦、手機尺寸、手機裝置、平板各開一次，印出有沒有 3D 畫面、下載了哪些模型）。
 - 程式註解用英文，風格跟周圍一致；介面文字中日雙語（`data/i18n.ts`、`data/lines.ts`）。
 
 ## 節省 token 的做法

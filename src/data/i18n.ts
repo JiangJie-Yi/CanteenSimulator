@@ -53,11 +53,9 @@ export const UI = {
     wage: '師傅薪資',
     profit: '利潤',
     margin: '利潤率',
-    guests: (n: number, here: number) => `來客 ${n} 位・在座 ${here} 位`,
     waiting: '等餐中',
     eating: '用餐中',
     leftAngry: '等太久走了',
-    chefPick: '掌廚',
     showMenu: '打開菜單',
     // what's been ordered: the sets by name and how many portions in all, or, open for business, what the customers
     // have ordered so far and what it comes to
@@ -135,11 +133,9 @@ export const UI = {
     wage: '人件費',
     profit: '利益',
     margin: '利益率',
-    guests: (n: number, here: number) => `来客 ${n} 名・在席 ${here} 名`,
     waiting: '待ち',
     eating: '食事中',
     leftAngry: '待ちきれず帰った',
-    chefPick: '担当',
     showMenu: '品書を開く',
     tally: (base: string | null, count: number, total: number, open: boolean) => (open ? ['お客の注文 ', count, ' 品・売上 ', total, ' 円']
       : !count ? ['ご注文なし', null, '', null, ''] : base ? [`${base}・計 `, count, ' 品・合計 ', total, ' 円'] : ['注文 ', count, ' 品・合計 ', total, ' 円']) as readonly [string, number | null, string, number | null, string],
@@ -215,11 +211,9 @@ export const UI = {
     wage: 'Wages',
     profit: 'Profit',
     margin: 'Margin',
-    guests: (n: number, here: number) => `${n} guests · ${here} seated`,
     waiting: 'Waiting',
     eating: 'Eating',
     leftAngry: 'Left after waiting too long',
-    chefPick: 'Head chef',
     showMenu: 'Show menu',
     tally: (base: string | null, count: number, total: number, open: boolean) => (open ? ['Guests ordered ', count, ' · revenue NT$', total, '']
       : !count ? ['Nothing ordered yet', null, '', null, ''] : base ? [`${base}: `, count, ' in all · NT$', total, ''] : ['Ordered ', count, ' · NT$', total, '']) as readonly [string, number | null, string, number | null, string],

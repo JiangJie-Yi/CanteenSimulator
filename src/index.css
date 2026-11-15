@@ -227,15 +227,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   box-shadow: 0 0 12px rgb(232 116 42 / 0.6);
 }
 
-@media (max-width: 599px) {
-  .ai-toggle {
-    top: 14px;
-    right: 108px;
-    width: 40px;
-    height: 40px;
-  }
-}
-
 .ai-chat {
   position: absolute;
   left: 22px;
@@ -366,13 +357,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .notice.is-shown {
   opacity: 1;
   transform: translate(-50%, 0);
-}
-
-@media (max-width: 480px) {
-  .notice {
-    font-size: 12px;
-    bottom: 96px;
-  }
 }
 
 /* text stays on one line; narrow screens shrink it instead (see the responsive section) */
@@ -972,15 +956,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   background: color-mix(in srgb, var(--washi) 75%, transparent);
 }
 
-@media (max-width: 599px) {
-  .view-reset {
-    left: 14px;
-    bottom: 14px;
-    width: 36px;
-    height: 36px;
-  }
-}
-
 /* switching language mustn't shuffle the layout: labels keep a fixed box, lines don't wrap */
 .heat-label {
   min-height: 3.3em;
@@ -1030,29 +1005,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   width: 46px;
   height: 46px;
   flex: none;
-}
-
-@media (max-width: 599px) {
-  .fullness {
-    top: 146px;
-    left: 14px;
-  }
-
-  .fullness-icon {
-    width: 36px;
-    height: 36px;
-  }
-}
-
-@media (max-height: 499px) and (orientation: landscape) {
-  .fullness {
-    top: 116px;
-  }
-
-  .fullness-icon {
-    width: 30px;
-    height: 30px;
-  }
 }
 
 .fire-row {
@@ -1513,269 +1465,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   }
 }
 
-@media (max-width: 599px) {
-  .app {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-
-  .menu {
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: 10px 16px 14px;
-    column-gap: 12px;
-    border-top: 1px dashed var(--text-soft);
-  }
-
-  .menu-title {
-    font-size: 28px;
-  }
-
-  .strips {
-    grid-auto-flow: column;
-    grid-template-columns: none;
-    grid-auto-columns: 44px;
-    grid-auto-rows: 244px;   /* fits a four-character name (麻辣湯底) in one column */
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    /* paged with the ‹ › buttons instead of a scrollbar */
-    scrollbar-width: none;
-    /* side padding is a little wider than the fade, so tags only fade once they're scrolled into it */
-    padding: 12px 44px 10px;
-    /* tags fade out at both ends of the scrolling row instead of being sliced off at the edge */
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
-  }
-
-  .strip {
-    scroll-snap-align: start;
-  }
-
-  .strip-name {
-    font-size: 19px;
-  }
-
-  .tally {
-    margin-top: 8px;
-    padding-top: 8px;
-  }
-
-  .game-clock {
-    top: 62px;
-    right: 14px;
-  }
-
-  .brand {
-    --hang: 18px;
-    left: 14px;
-    font-size: 25px;
-  }
-
-  .heat {
-    top: 76px;
-    left: 16px;
-    grid-template-columns: auto 160px;
-    column-gap: 10px;
-  }
-
-  .heat-label {
-    font-size: 22px;
-  }
-
-  .switcher {
-    bottom: 12px;
-    gap: 16px;
-  }
-
-  .switcher-arrow {
-    width: 42px;
-    height: 42px;
-    font-size: 26px;
-  }
-
-  .switcher-center {
-    min-width: 110px;
-  }
-
-  .dish-name {
-    font-size: 26px;
-  }
-}
-
-@media (max-width: 480px) {
-  :root {
-    font-size: 15px;
-  }
-
-  .menu {
-    padding: 8px 12px 12px;
-  }
-
-  .menu-title {
-    font-size: 24px;
-  }
-
-  .strips {
-    grid-auto-columns: 40px;
-    grid-auto-rows: 226px;
-    gap: 8px;
-  }
-
-  .strip-name {
-    font-size: 17px;
-  }
-
-  .strip .icon {
-    width: 19px;
-    height: 19px;
-  }
-
-  .stamp {
-    width: 30px;
-    height: 30px;
-    font-size: 16px;
-  }
-
-  /* same footprint as the icon it replaces */
-  .stamp.stamp-base {
-    width: 19px;
-    height: 19px;
-    font-size: 11px;
-  }
-
-  .tally strong {
-    font-size: 19px;
-  }
-
-  .heat {
-    grid-template-columns: auto 120px;
-  }
-
-  .heat-word {
-    font-size: 16px;
-  }
-
-  .switcher {
-    gap: 10px;
-  }
-
-  .dish-name {
-    font-size: 22px;
-  }
-}
-
-@media (max-height: 499px) and (orientation: landscape) {
-  .app {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 46vw);
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .tally {
-    flex-wrap: wrap;
-    row-gap: 2px;
-    margin-top: 6px;
-    padding-top: 6px;
-  }
-
-  .tally strong {
-    font-size: 17px;
-  }
-
-  .menu {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-content: center;
-    padding: 10px 14px 10px 0;
-    border-top: none;
-  }
-
-  .menu-title {
-    font-size: 24px;
-  }
-
-  .strips {
-    grid-auto-flow: column;
-    grid-template-columns: none;
-    grid-auto-columns: 40px;
-    grid-auto-rows: min(196px, calc(100vh - 110px));
-    overflow-x: auto;
-    padding: 12px 44px 4px;
-    scrollbar-width: none;
-    /* the row fades out at both ends instead of slicing tags off */
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent);
-  }
-
-  /* the row already fades sideways; don't also fade the whole menu top and bottom */
-  .menu {
-    max-height: none;
-    overflow-y: visible;
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-
-  .stamp.stamp-base {
-    width: 17px;
-    height: 17px;
-    font-size: 10px;
-  }
-
-  .strip {
-    gap: 3px;
-    padding: 8px 0;
-  }
-
-  .strip .icon {
-    width: 17px;
-    height: 17px;
-  }
-
-  .strip-name {
-    font-size: 15px;
-  }
-
-  .strip-price {
-    font-size: 12px;
-  }
-
-  .stamp {
-    width: 28px;
-    height: 28px;
-    font-size: 15px;
-  }
-
-  .brand {
-    --hang: 12px;
-    left: 12px;
-    font-size: 19px;
-  }
-
-  .heat {
-    top: 56px;
-    left: 12px;
-    grid-template-columns: auto 120px;
-  }
-
-  .game-clock {
-    top: 54px;
-    right: 10px;
-  }
-
-  .switcher {
-    bottom: 8px;
-    gap: 12px;
-  }
-
-  .switcher-arrow {
-    width: 36px;
-    height: 36px;
-    font-size: 22px;
-  }
-
-  .dish-name {
-    font-size: 20px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .strip,
   .stamp {
@@ -2023,43 +1712,9 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   }
 }
 
-@media (max-width: 599px), (max-height: 499px) {
-  .menu-fold {
-    display: none;
-  }
-}
-
 @media (max-width: 1280px) {
   .menu {
     --tag-font: 15.5px;
-  }
-}
-
-@media (max-width: 599px) {
-  .menu {
-    --tag-font: 15px;
-  }
-
-  .menu .strips {
-    grid-template-columns: none;
-    grid-auto-columns: calc(var(--tag-font) * 2.7);
-  }
-}
-
-@media (max-width: 480px) {
-  .menu {
-    --tag-font: 13.5px;
-  }
-}
-
-@media (max-height: 499px) and (orientation: landscape) {
-  .menu {
-    --tag-font: 11.5px;
-  }
-
-  .menu .strips {
-    grid-template-columns: none;
-    grid-auto-columns: calc(var(--tag-font) * 2.7);
   }
 }
 
@@ -2092,43 +1747,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   outline: 3px solid var(--moss);
   outline-offset: 3px;
 }
-@media (max-width: 599px) {
-  .speed-toggle {
-    top: 14px;
-    right: 156px;
-    width: 40px;
-    height: 40px;
-    font-size: 13px;
-  }
-}
-@media (max-width: 400px) {
-  .speed-toggle {
-    width: 34px;
-    height: 34px;
-    right: 124px;
-    font-size: 12px;
-  }
-}
-
-/* (a phone's) light the incense: under the round buttons, top right */
-.omiki-toggle {
-  position: fixed;
-  z-index: 10;
-  top: 62px;
-  right: 10px;
-  padding: 6px 10px;
-  border: 1.5px solid #c4302a;
-  border-radius: 16px;
-  background: var(--page);
-  color: #c4302a;
-  font: 700 13px/1 var(--brush);
-  cursor: pointer;
-}
-.omiki-toggle.is-on {
-  background: #c4302a;
-  color: #fff6e0;
-  cursor: default;
-}
 
 /* language toggle, at the right end of the row of round buttons (the day/night button was beyond it: the game's clock turns day and night
    now) */
@@ -2157,26 +1775,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   outline-offset: 3px;
 }
 
-@media (max-width: 599px) {
-  .lang-toggle {
-    top: 14px;
-    right: 62px;
-    width: 40px;
-    height: 40px;
-    font-size: 15px;
-  }
-}
-
-@media (max-height: 499px) and (orientation: landscape) {
-  .lang-toggle {
-    top: 10px;
-    right: 54px;
-    width: 36px;
-    height: 36px;
-    font-size: 14px;
-  }
-}
-
 /* frosted rice-paper panel behind the menu: its own layer in the menu's grid cell, so it stays put while the
    menu scrolls, with a broad, gentle feather on every side */
 .stage { grid-area: 1 / 1; }
@@ -2201,46 +1799,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   mask-image: radial-gradient(farthest-side at 58% 50%, #000 42%, rgb(0 0 0 / 0.55) 68%, transparent 100%);
 }
 
-@media (max-width: 599px) {
-  .menu, .menu-backing { grid-area: 2 / 1; }
-
-  .menu-backing::before {
-    inset: -50px 0 0;
-    -webkit-mask-image: linear-gradient(transparent, #000 80px);
-    mask-image: linear-gradient(transparent, #000 80px);
-  }
-}
-
-@media (max-height: 499px) and (orientation: landscape) {
-  .menu, .menu-backing { grid-area: 1 / 2; }
-
-  .menu-backing::before {
-    inset: 0 0 0 -60px;
-    -webkit-mask-image:
-      linear-gradient(90deg, transparent, #000 110px, #000 calc(100% - 10px), transparent),
-      linear-gradient(transparent, #000 50px, #000 calc(100% - 50px), transparent);
-    mask-image:
-      linear-gradient(90deg, transparent, #000 110px, #000 calc(100% - 10px), transparent),
-      linear-gradient(transparent, #000 50px, #000 calc(100% - 50px), transparent);
-  }
-}
-/* the AI customers (and who's cooking) and the books: side by side in the empty sky at the top right of the
-   stage, clear of the things on the table the cook reaches for */
-.side-boards {
-  position: absolute;
-  top: 84px;
-  right: 16px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  z-index: 3;
-}
-
-.side-boards > section {
-  width: 220px;
-}
-
-.guest-board,
 .ledger {
   padding: 8px 12px;
   border-radius: 12px;
@@ -2248,58 +1806,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   box-shadow: 0 6px 16px -10px rgb(59 42 32 / 0.6);
   color: var(--ink);
   font: 13px/1.4 var(--brush);
-}
-
-.chef-pick {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.chef-pick span {
-  margin-right: 4px;
-  color: var(--text-soft);
-}
-
-.chef-pick button {
-  padding: 2px 8px;
-  border: 1px solid rgb(59 42 32 / 0.3);
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.chef-pick button.is-on {
-  border-color: var(--hanko);
-  background: var(--hanko);
-  color: #fff;
-}
-
-.guest-count {
-  margin: 2px 0 4px;
-  font-weight: 700;
-}
-
-.guest-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 1px;
-}
-
-.guest-row {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-}
-
-.guest-id {
-  min-width: 2.4em;
-  color: var(--text-soft);
 }
 
 .guest-stars {
@@ -2317,14 +1823,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   font-style: normal;
   color: #3d6a9a;
   font-size: 12px;
-}
-
-.guest-row.is-angry .guest-note {
-  color: #c4442f;
-}
-
-.guest-note {
-  color: var(--text-soft);
 }
 
 .ledger p {
@@ -2353,261 +1851,8 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   color: var(--text-soft);
 }
 
-@media (max-width: 599px) {
-  .side-boards {
-    top: 64px;
-    right: 10px;
-    flex-direction: column;
-    align-items: flex-end;
-  }
-
-  .side-boards > section {
-    width: min(200px, 48vw);
-  }
-
-  .guest-board,
-  .ledger {
-    font-size: 12px;
-    padding: 6px 10px;
-  }
-}
-/* ---- the little shop above the guest list: noren door, counter, stools, customers walking in and out ---- */
-.side-boards > section.guest-board {
-  width: 280px;
-}
-
-.side-boards > section.ledger {
-  width: 190px;
-}
-
-.gc-scene {
-  position: relative;
-  height: 92px;
-  margin: 4px 0 6px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: linear-gradient(180deg, #efe2c6 0%, #e6d4b0 62%, #c9a77a 62%, #b8925f 100%);
-  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.25);
-}
-
-/* plank wall with a lamp's warm glow */
-.gc-wall {
-  position: absolute;
-  inset: 0 0 38% 0;
-  background:
-    radial-gradient(ellipse 40% 70% at 62% 0%, rgb(255 214 140 / 0.55), transparent 70%),
-    repeating-linear-gradient(90deg, transparent 0 23px, rgb(120 84 50 / 0.18) 23px 24px);
-}
-
-/* the counter top the stools stand in front of */
-.gc-counter {
-  position: absolute;
-  left: 22%;
-  right: 0;
-  top: 50%;
-  height: 9px;
-  background: linear-gradient(180deg, #a0703f, #7a4e2a);
-  border-top: 1px solid #3b2a20;
-  border-bottom: 1px solid #3b2a20;
-  z-index: 1;
-}
-
-/* noren: two indigo panels over the door, hung from a rod, split in the middle */
-.gc-noren {
-  position: absolute;
-  left: 2%;
-  top: 0;
-  width: 17%;
-  height: 46%;
-  display: flex;
-  gap: 2px;
-  padding-top: 3px;
-  border-top: 3px solid #5a3a20;
-  transform-origin: top center;
-  z-index: 3;
-}
-
-.gc-noren span {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  background: #24427f;
-  color: #f4ecd8;
-  font: 700 11px/1 var(--brush);
-  border-radius: 0 0 2px 2px;
-  transform-origin: top center;
-}
-
-.gc-noren.is-swaying span:first-child {
-  animation: noren-sway 1.1s ease-out;
-}
-
-.gc-noren.is-swaying span:last-child {
-  animation: noren-sway 1.1s ease-out 0.08s;
-}
-
-@keyframes noren-sway {
-  0% { transform: skewX(0) scaleY(1); }
-  20% { transform: skewX(-16deg) scaleY(0.92); }
-  45% { transform: skewX(9deg); }
-  70% { transform: skewX(-4deg); }
-  100% { transform: skewX(0); }
-}
-
-.gc-guest {
-  position: absolute;
-  bottom: 0;
-  width: 34px;
-  margin-left: -17px;
-  left: var(--seat);
-  z-index: 2;
-}
-
-.gc-guest.is-enter {
-  animation: gc-walk-in 1.7s ease-out both;
-}
-
-.gc-guest.is-leave {
-  animation: gc-walk-out 2.6s ease-in both;
-}
-
-/* in through the noren, along to the stool */
-@keyframes gc-walk-in {
-  0% { left: var(--door); opacity: 0; transform: scale(0.92); }
-  15% { opacity: 1; }
-  100% { left: var(--seat); opacity: 1; transform: none; }
-}
-
-/* a moment to get up (and let the stars float), then back out the door */
-@keyframes gc-walk-out {
-  0%, 30% { left: var(--seat); opacity: 1; }
-  90% { left: var(--door); opacity: 1; }
-  100% { left: var(--door); opacity: 0; }
-}
-
-.gc-person {
-  display: block;
-  width: 34px;
-  height: 51px;
-  overflow: visible;
-}
-
-.gc-person.is-walking .gc-body {
-  animation: gc-step 0.42s ease-in-out infinite;
-}
-
-.gc-person.is-walking .gc-legs {
-  animation: gc-legs 0.42s ease-in-out infinite;
-  transform-origin: 20px 44px;
-}
-
-@keyframes gc-step {
-  50% { transform: translateY(-1.5px); }
-}
-
-@keyframes gc-legs {
-  50% { transform: scaleX(-1); }
-}
-
-.gc-person.is-eating .gc-head {
-  animation: gc-nod 0.7s ease-in-out infinite;
-  transform-origin: 20px 28px;
-}
-
-@keyframes gc-nod {
-  50% { transform: translateY(2px) rotate(6deg); }
-}
-
-.gc-tag {
-  position: absolute;
-  bottom: -1px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0 3px;
-  border-radius: 3px;
-  background: rgb(43 33 25 / 0.7);
-  color: #fff3dc;
-  font: 9px/1.3 var(--sans, system-ui), sans-serif;
-  z-index: 3;
-}
-
-.gc-bubble {
-  position: absolute;
-  top: -6px;
-  left: 60%;
-  padding: 0 5px;
-  border-radius: 8px 8px 8px 2px;
-  background: #fff;
-  border: 1px solid #3b2a20;
-  font: 700 11px/1.2 var(--brush);
-  color: #3b2a20;
-  animation: gc-dots 1.4s ease-in-out infinite;
-}
-
 @keyframes gc-dots {
   50% { transform: translateY(-2px); }
-}
-
-.gc-stars {
-  position: absolute;
-  top: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  color: #e8742a;
-  font-size: 11px;
-  text-shadow: 0 1px 0 #fff, 0 0 4px #fff;
-  animation: gc-float 2.6s ease-out forwards;
-}
-
-.gc-stars i {
-  font-style: normal;
-  color: rgb(59 42 32 / 0.25);
-}
-
-@keyframes gc-float {
-  0% { opacity: 0; transform: translate(-50%, 6px); }
-  15% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; transform: translate(-50%, -18px); }
-}
-
-.gc-anger {
-  position: absolute;
-  top: -2px;
-  right: -6px;
-  width: 16px;
-  height: 16px;
-  animation: gc-pulse 0.5s ease-in-out infinite;
-}
-
-.gc-guest.is-angry.is-leave {
-  animation-duration: 1.6s;
-}
-
-@keyframes gc-pulse {
-  50% { transform: scale(1.25); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gc-guest.is-enter,
-  .gc-guest.is-leave,
-  .gc-person *,
-  .gc-noren span {
-    animation-duration: 0.01s !important;
-  }
-}
-/* each seated customer's stomach, over their head */
-.gc-belly {
-  position: absolute;
-  top: -14px;
-  left: -6px;
-}
-
-.gc-belly .mood-face {
-  width: 16px;
-  height: 16px;
-  animation: gc-dots 1.6s ease-in-out infinite;
 }
 
 .mood-face {
@@ -2670,242 +1915,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   color: #fff;
   font: inherit;
 }
-/* phones held upright: the menu tags wrap into rows and the menu scrolls down (a finger swipe), instead of a
-   single row paged sideways; a peek of the next row and a fade at the bottom show there's more */
-@media (max-width: 599px) and (orientation: portrait) {
-  .menu .strips {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(auto-fill, 44px);
-    grid-auto-columns: auto;
-    justify-content: center;
-    gap: 10px 8px;
-    max-height: 300px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    scroll-snap-type: y proximity;
-    touch-action: pan-y;
-    padding: 10px 6px 30px;
-    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 46px), transparent);
-    mask-image: linear-gradient(180deg, #000 calc(100% - 46px), transparent);
-  }
-
-  .menu .strip {
-    scroll-snap-align: start;
-  }
-
-}
-
-@media (max-width: 480px) and (orientation: portrait) {
-  .menu .strips {
-    grid-template-columns: repeat(auto-fill, 40px);
-    max-height: 270px;
-  }
-}
-/* ---- phones: keep the 3D view clear ---- */
-.boards-chip {
-  display: none;
-}
-
-@media (max-width: 599px) {
-  /* the guest board and the books fold into one chip at the top; tapped, they open over the scene */
-  .boards-chip {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 12px;
-    border: 1px solid rgb(59 42 32 / 0.25);
-    border-radius: 999px;
-    background: rgb(251 243 228 / 0.92);
-    color: #3b2a20;
-    font: 600 13px/1.3 var(--brush);
-    box-shadow: 0 4px 12px -6px rgb(0 0 0 / 0.45);
-  }
-
-  .chip-part {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .chip-part .mood-face {
-    width: 18px;
-    height: 18px;
-  }
-
-  .chip-profit {
-    color: #2f7a2d;
-  }
-
-  .chip-profit.is-loss {
-    color: #c4442f;
-  }
-
-  .chip-caret {
-    font-size: 9px;
-    opacity: 0.6;
-  }
-
-  .side-boards {
-    top: 62px;
-    right: 10px;
-    left: auto;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
-  }
-
-  .side-boards:not(.is-open) > section {
-    display: none;
-  }
-
-  .side-boards.is-open {
-    left: 10px;
-    z-index: 9;
-  }
-
-  .side-boards.is-open > section,
-  .side-boards.is-open > section.guest-board,
-  .side-boards.is-open > section.ledger {
-    width: 100%;
-    box-sizing: border-box;
-    /* (sliding in from the right edge, right to left) */
-    animation: board-slide 280ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
-  }
-  .side-boards.is-open > section + section {
-    animation-delay: 60ms;
-  }
-
-  /* only the latest thing said, small, just above the dish switcher */
-  .ai-chat {
-    left: 12px;
-    right: 12px;
-    bottom: 70px;
-    max-width: none;
-  }
-
-  .ai-line:not(:last-child) {
-    display: none;
-  }
-
-  .ai-line {
-    padding: 3px 10px;
-    font-size: 12px;
-    justify-self: start;
-  }
-
-  .ai-who {
-    font-size: 10px;
-    padding: 0 4px;
-  }
-}
-
-/* upright phones: shorter tags, one row in view and the rest a swipe down, so the 3D view gets the space */
-@media (max-width: 599px) and (orientation: portrait) {
-  .menu .strips {
-    grid-auto-rows: 176px;
-    max-height: 206px;
-    padding-bottom: 22px;
-  }
-
-  .menu .strip-en {
-    display: none;
-  }
-
-  .menu-title {
-    font-size: 22px;
-  }
-
-  .tally {
-    margin-top: 4px;
-    padding-top: 4px;
-  }
-
-  .tally-hint {
-    display: none;
-  }
-}
-
-@media (max-width: 480px) and (orientation: portrait) {
-  .menu .strips {
-    max-height: 200px;
-  }
-}
-/* ---- upright phones: the menu below takes at most 40% of the screen, and folds away with the tab on its top
-   edge (the 3D view then gets the whole screen) ---- */
-@media (max-width: 599px) and (orientation: portrait) {
-  .menu {
-    height: 40vh;
-    height: 40dvh;
-    box-sizing: border-box;
-    overflow: hidden;
-    grid-template-rows: minmax(0, 1fr) auto;
-    align-content: stretch;
-  }
-
-  .menu .strips-frame {
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* the tags scroll inside the space left (the frame only clips) */
-  .menu .strips {
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: none;
-    height: auto;
-    box-sizing: border-box;
-  }
-
-  .app.menu-folded .menu,
-  .app.menu-folded .menu-backing {
-    display: none;
-  }
-
-  .menu-fold {
-    display: grid;
-    place-items: center;
-    position: fixed;
-    z-index: 11;
-    left: 50%;
-    bottom: calc(40vh - 1px);
-    bottom: calc(40dvh - 1px);
-    width: 64px;
-    height: 20px;
-    margin-left: -32px;
-    padding: 0;
-    border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
-    background: color-mix(in srgb, var(--page) 88%, transparent);
-    color: var(--text);
-    font-size: 15px;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  /* the chevron points down to fold, up to bring it back */
-  .menu-fold {
-    transform: none;
-  }
-
-  .menu-fold::first-letter {
-    display: inline-block;
-  }
-
-  .app.menu-folded .menu-fold {
-    bottom: 0;
-  }
-}
-
-@media (max-width: 599px) and (orientation: portrait) {
-  .menu-fold span {
-    display: inline-block;
-    transform: rotate(90deg);
-  }
-}
 /* ---- the shop sign switch (營業中 / 閉店), where the AI button was ---- */
 .ai-toggle {
   width: auto;
@@ -2935,15 +1944,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 
 @keyframes shop-lamp {
   50% { box-shadow: 0 0 10px 4px rgb(255 230 140 / 0.7); }
-}
-
-@media (max-width: 599px) {
-  .ai-toggle {
-    min-width: 58px;
-    padding: 0 10px;
-    right: 108px;
-    font-size: 13px;
-  }
 }
 
 /* ---- a customer's order coming in: the tag lights up and gets their number, and the slip is written ---- */
@@ -3076,57 +2076,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   background: #e8742a;
   color: #fff;
 }
-/* narrow phones: the round switches shrink and close up so they clear the shop sign */
-@media (max-width: 400px) {
-  .lang-toggle {
-    top: 10px;
-    width: 34px;
-    height: 34px;
-    font-size: 14px;
-    right: 10px;
-  }
-
-  .ai-toggle {
-    top: 10px;
-    height: 34px;
-    min-width: 0;
-    padding: 0 8px;
-    right: 48px;
-    font-size: 12px;
-    gap: 4px;
-  }
-}
-/* ---- the three shop fronts ---- */
-
-.gc-ware {
-  position: absolute;
-  top: calc(50% - 8px);
-  width: 16px;
-  height: 8px;
-  z-index: 1;
-}
-
-.gc-lantern {
-  position: absolute;
-  top: 4px;
-  right: 8%;
-  width: 18px;
-  height: 24px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(circle at 50% 40%, #ff8a5a, #c4302a 70%);
-  color: #fff3dc;
-  font: 700 9px/1 var(--brush);
-  box-shadow: 0 0 10px 2px rgb(255 120 70 / 0.5);
-  animation: lantern-sway 4s ease-in-out infinite;
-  transform-origin: top center;
-  z-index: 1;
-}
-
-@keyframes lantern-sway {
-  50% { transform: rotate(4deg); }
-}
 
 /* the shop switch is a single round sign again: 營 / 閉 */
 .ai-toggle {
@@ -3136,23 +2085,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   justify-content: center;
   border-radius: 50%;
   font-size: 18px;
-}
-
-@media (max-width: 599px) {
-  .ai-toggle {
-    width: 40px;
-    font-size: 16px;
-    right: 108px;
-  }
-}
-
-@media (max-width: 400px) {
-  .ai-toggle {
-    width: 34px;
-    height: 34px;
-    right: 86px;
-    font-size: 14px;
-  }
 }
 
 .tools-toggle {
@@ -3171,74 +2103,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .menu.is-locked .strip:hover {
   box-shadow: none;
   filter: none;
-}
-
-/* phones: the round switches fold into one ☰ button that opens them in a column */
-@media (max-width: 599px) {
-  .tools-toggle {
-    display: grid;
-    place-items: center;
-    position: fixed;
-    z-index: 12;
-    top: 14px;
-    right: 14px;
-    width: 40px;
-    height: 40px;
-    border: 1.5px solid var(--text-soft);
-    border-radius: 50%;
-    background: var(--page);
-    color: var(--text);
-    font: 700 18px/1 system-ui, sans-serif;
-  }
-
-  .app .lang-toggle,
-  .app .ai-toggle {
-    display: none;
-  }
-
-  .app.tools-open .game-clock {
-    display: none;
-  }
-
-  .app.tools-open .lang-toggle,
-  .app.tools-open .ai-toggle {
-    display: grid;
-    place-items: center;
-    right: 14px;
-    width: 40px;
-    height: 40px;
-    z-index: 12;
-    box-shadow: 0 4px 12px -6px rgb(0 0 0 / 0.5);
-    animation: tools-drop 180ms ease-out both;
-  }
-
-  .app.tools-open .ai-toggle { top: 62px; }
-  .app.tools-open .lang-toggle { top: 108px; }
-
-  /* the chip with the guests and the books sits left of the ☰ */
-  .side-boards {
-    right: 62px;
-    top: 16px;
-  }
-
-  .side-boards.is-open {
-    top: 62px;
-    right: 10px;
-  }
-}
-
-@keyframes tools-drop {
-  from { opacity: 0; transform: translateX(24px); }
-}
-@keyframes board-slide {
-  from { opacity: 0; transform: translateX(105%); }
-}
-
-/* touch screens swipe between dishes: no arrows needed */
-@media (max-width: 599px) and (hover: none) {
-  .switcher-arrow {
-    display: none;
-  }
 }
 /* (open or closed, the owner is the head chef: the stove and the fire stay theirs) */
 
@@ -3364,20 +2228,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .nb-last,
 .notebook-empty {
   color: #7a6656;
-}
-
-@media (max-width: 599px) {
-  .notebook-toggle {
-    top: 196px;
-    left: 16px;
-    width: 34px;
-    height: 34px;
-  }
-
-  .notebook {
-    top: 238px;
-    left: 12px;
-  }
 }
 
 /* ---- the back office: cash, buying stock, hiring ---- */
@@ -3548,8 +2398,7 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 }
 
 .ofc-list button,
-.ofc-person button,
-.chef-pick button {
+.ofc-person button {
   padding: 2px 10px;
   border: 1px solid rgb(59 42 32 / 0.3);
   border-radius: 6px;
@@ -3629,34 +2478,9 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   color: #3b2a20;
 }
 
-.chef-pick b {
-  font-weight: 600;
-}
-
 .ledger-cash {
   font-weight: 700;
   color: #2f7a2d;
-}
-
-@media (max-width: 599px) {
-  .office-toggle {
-    top: 196px;
-    left: 20px;
-    height: 34px;
-  }
-
-  .office {
-    top: 70px;
-  }
-
-  .ofc-person,
-  .ofc-person.is-hired {
-    grid-template-columns: 4.5em 1fr 1fr auto;
-  }
-
-  .ofc-person .ofc-bar:nth-of-type(3) {
-    display: none;
-  }
 }
 
 /* out of stock: the tag greys and gets a 缺 slip */
@@ -3677,127 +2501,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   z-index: 2;
 }
 
-/* ---- the shop interiors (drawn backdrops), with the staff ---- */
-.gc-scene {
-  height: 140px;
-  background: #3a2a1e;
-}
-
-.gc-backdrop {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.gc-scene .gc-noren {
-  height: 54%;
-  z-index: 4;
-}
-
-.gc-stand {
-  position: absolute;
-  bottom: 37%;
-  width: 30px;
-  margin-left: -15px;
-  z-index: 1;
-}
-
-.gc-stand svg {
-  display: block;
-  width: 30px;
-  height: 45px;
-}
-
-.gc-stand-chef.gc-at-grilledfish { left: 53%; }
-
-.gc-stand-cashier {
-  left: 94%;
-}
-
-.gc-till {
-  position: absolute;
-  bottom: -2px;
-  left: -14px;
-  width: 16px;
-  height: 10px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #5a5550, #3a3632);
-  box-shadow: inset 0 2px 0 #8a8580;
-}
-
-/* the chef at work: the grill fan flaps, the strainer bobs, the knife chops */
-.gc-staff.is-working .gc-tool {
-  animation: gc-tool 0.6s ease-in-out infinite;
-  transform-origin: 31px 46px;
-}
-
-@keyframes gc-tool {
-  50% { transform: rotate(-16deg); }
-}
-
-/* floor staff walk to and fro in front of the counter with a tray */
-.gc-walker {
-  position: absolute;
-  bottom: 2%;
-  width: 28px;
-  margin-left: -14px;
-  z-index: 2;
-  animation: gc-patrol 9s ease-in-out infinite;
-}
-
-.gc-walker svg {
-  display: block;
-  width: 28px;
-  height: 42px;
-  animation: gc-step 0.42s ease-in-out infinite;
-}
-
-@keyframes gc-patrol {
-  0%, 100% { left: 24%; transform: scaleX(1); }
-  45% { left: 88%; transform: scaleX(1); }
-  50% { left: 88%; transform: scaleX(-1); }
-  95% { left: 24%; transform: scaleX(-1); }
-}
-
-/* steam and smoke rising, lanterns and the fan moving */
-.gc-backdrop .gc-steam path {
-  animation: gc-rise 3s ease-in-out infinite;
-}
-
-.gc-backdrop .gc-steam path:nth-child(2) {
-  animation-delay: -1.5s;
-}
-
-@keyframes gc-rise {
-  0% { opacity: 0; transform: translateY(6px); }
-  40% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-8px); }
-}
-
-.gc-backdrop .gc-sway {
-  animation: lantern-sway 4.5s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: top center;
-}
-
-.gc-scene .gc-ware {
-  top: calc(63% - 8px);
-}
-
-.gc-stars .mood-face {
-  width: 18px;
-  height: 18px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gc-walker,
-  .gc-backdrop *,
-  .gc-staff * {
-    animation: none !important;
-  }
-}
-
 /* the office and the notebook float over everything, menu included */
 .office {
   position: fixed;
@@ -3807,38 +2510,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .notebook {
   position: fixed;
   z-index: 40;
-}
-
-@media (max-width: 599px) {
-  .office {
-    top: 64px;
-    max-height: 56vh;
-  }
-
-  .ofc-list li {
-    grid-template-columns: 1fr auto auto auto;
-    row-gap: 0;
-  }
-
-  .ofc-list li > :not(.ofc-name):not(.ofc-cost) {
-    grid-row: 1 / span 2;
-  }
-
-  .ofc-list .ofc-cost {
-    grid-column: 1;
-    grid-row: 2;
-    font-size: 11px;
-  }
-}
-
-.guest-id {
-  min-width: 5.2em;
-  white-space: nowrap;
-}
-
-.gc-tag {
-  white-space: nowrap;
-  font-size: 8px;
 }
 
 /* the guest board and the books are dragged by any bare part of them */
@@ -4251,8 +2922,7 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .app.is-hushed .heat,
 .app.is-hushed .fullness,
 .app.is-hushed .notebook-toggle,
-.app.is-hushed .office-toggle,
-.app.is-hushed .side-boards {
+.app.is-hushed .office-toggle {
   display: none !important;
 }
 
@@ -4673,26 +3343,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .avatar {
   display: block;
   flex: none;
-}
-
-@media (max-width: 599px) {
-  .ofc-list li {
-    grid-template-columns: 20px 1fr 64px 44px 44px;
-  }
-
-  .ofc-list li > .ofc-cost {
-    text-align: left;
-  }
-
-  .ofc-list li > .ofc-cost {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
-  .ofc-list li > :not(.ofc-name):not(.ofc-cost) {
-    grid-row: 1 / span 2;
-  }
-
 }
 
 /* 試做 board: each tag shows what it costs and what's in, and buys ten more */
@@ -5127,20 +3777,13 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 
 /* night: the boards and the office go dark, and everything written on them light */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .guest-board,
   :root:not([data-theme='light']) .ledger {
     background: rgb(30 36 50 / 0.88);
     color: var(--text);
     box-shadow: 0 6px 16px -10px rgb(0 0 0 / 0.8);
   }
-  :root:not([data-theme='light']) .guest-board *:not(button):not(.fill-guest),
   :root:not([data-theme='light']) .ledger *:not(button) {
     color: inherit;
-  }
-  :root:not([data-theme='light']) .guest-board .guest-note,
-  :root:not([data-theme='light']) .guest-board .chef-pick span,
-  :root:not([data-theme='light']) .guest-board small {
-    color: #c9bfae;
   }
   :root:not([data-theme='light']) .office {
     color: var(--text);
@@ -5192,20 +3835,13 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   
 }
 
-:root[data-theme='dark'] .guest-board,
 :root[data-theme='dark'] .ledger {
   background: rgb(30 36 50 / 0.88);
   color: var(--text);
   box-shadow: 0 6px 16px -10px rgb(0 0 0 / 0.8);
 }
-:root[data-theme='dark'] .guest-board *:not(button):not(.fill-guest),
 :root[data-theme='dark'] .ledger *:not(button) {
   color: inherit;
-}
-:root[data-theme='dark'] .guest-board .guest-note,
-:root[data-theme='dark'] .guest-board .chef-pick span,
-:root[data-theme='dark'] .guest-board small {
-  color: #c9bfae;
 }
 :root[data-theme='dark'] .office {
   color: var(--text);
@@ -5415,11 +4051,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .guest-board button:not(.is-on) { color: #3b2a20; }
-}
-:root[data-theme='dark'] .guest-board button:not(.is-on) { color: #3b2a20; }
-
-@media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .office .nb-chat .from-chef b { color: #ff9a80 !important; }
   :root:not([data-theme='light']) .office .nb-chat .from-me { background: #c4442f; color: #fff !important; border: 0; }
   :root:not([data-theme='light']) .office .ofc-seat.is-open small { color: #ff8f78; }
@@ -5525,7 +4156,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   -webkit-backdrop-filter: blur(3px) saturate(1.2);
   backdrop-filter: blur(3px) saturate(1.2);
 }
-.guest-board,
 .ledger {
   background: rgb(251 243 228 / 0.85);
   -webkit-backdrop-filter: blur(3px);
@@ -5540,11 +4170,9 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .office { background: rgb(30 26 22 / 0.85) !important; }
-  :root:not([data-theme='light']) .guest-board,
   :root:not([data-theme='light']) .ledger { background: rgb(30 36 50 / 0.85); }
 }
 :root[data-theme='dark'] .office { background: rgb(30 26 22 / 0.85) !important; }
-:root[data-theme='dark'] .guest-board,
 :root[data-theme='dark'] .ledger { background: rgb(30 36 50 / 0.85); }
 /* the 經營 button: a little shop front for its icon, frosted like the office it opens */
 .office-toggle {
@@ -5624,14 +4252,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 
 @keyframes auto-blink {
   50% { opacity: 0.4; }
-}
-
-@media (max-width: 599px) {
-  .auto-toggle {
-    top: 238px;
-    left: 20px;
-    height: 30px;
-  }
 }
 
 /* the shop's diary at the foot of the menu: which day, and how many customers */
@@ -5786,18 +4406,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   --hang: 10px;
   top: 6px;
 }
-@media (max-width: 599px) {
-  .brand.brand-grilledfish {
-    --hang: 9px;
-    top: 4px;
-  }
-}
-@media (max-width: 400px) {
-  .brand.brand-grilledfish {
-    --hang: 8px;
-    top: 4px;
-  }
-}
 .brand-grilledfish .brand-cord {
   height: calc(var(--hang) + 6.4%);
 }
@@ -5884,143 +4492,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .ai-order .ai-who {
   background: #7a6a3e;
 }
-
-/* ---- the grill drawn flat, on a phone (Grill2D): the customers' bar on top, the fire pit in the middle, the
-   seasonings under it, all above the menu ---- */
-.grill2d {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 118px;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px 6px;
-  pointer-events: auto;
-}
-.grill2d-top {
-  width: 100%;
-  flex: 0 0 auto;
-}
-.grill2d-pit {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
-  max-width: 520px;
-  touch-action: manipulation;
-}
-.g2-piece {
-  cursor: pointer;
-}
-/* the paper tags on the skewers: the name in ink, the doneness on a coloured pill */
-.g2-tag {
-  font: 700 9.6px/1 var(--brush);
-  fill: #3b2a20;
-}
-.g2-pill {
-  font: 700 7.4px/1 var(--brush);
-  fill: #fff;
-  letter-spacing: 0.04em;
-}
-.g2-pop {
-  font: 700 10.5px/1 var(--brush);
-  fill: #c4302a;
-  paint-order: stroke;
-  stroke: #fff8ec;
-  stroke-width: 3px;
-  stroke-linejoin: round;
-}
-.g2-pop.is-good {
-  fill: #2a8a3a;
-}
-/* (the tray's and the plate's paper slips) */
-.g2-label {
-  font: 700 7.2px/1 var(--brush);
-  fill: #3b2a20;
-}
-.g2-more {
-  font-size: 9px;
-  fill: #fff6e6;
-  paint-order: stroke;
-  stroke: #3b2a20;
-  stroke-width: 2px;
-}
-/* sparks rising off the coals, smoke drifting up, the embers breathing (and a burnt piece smoking) */
-.g2-spark {
-  animation: g2-spark 2.8s ease-out infinite;
-  opacity: 0;
-}
-@keyframes g2-spark {
-  0% { transform: translate(0, 0); opacity: 0; }
-  12% { opacity: 1; }
-  100% { transform: translate(var(--dx, 0), -30px); opacity: 0; }
-}
-.g2-smoke {
-  animation: g2-smoke 4.5s ease-out infinite;
-  opacity: 0;
-}
-.g2-smoke.g2-burnt {
-  animation-duration: 2.4s;
-}
-@keyframes g2-smoke {
-  0% { transform: translate(0, 4px); opacity: 0; }
-  30% { opacity: 0.32; }
-  100% { transform: translate(4px, -22px); opacity: 0; }
-}
-.g2-flicker {
-  animation: g2-flicker 1.9s ease-in-out infinite alternate;
-}
-@keyframes g2-flicker {
-  0% { opacity: 1; }
-  40% { opacity: 0.82; }
-  70% { opacity: 0.95; }
-  100% { opacity: 0.86; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .g2-spark, .g2-smoke, .g2-flicker { animation: none; }
-}
-/* the seasonings: little paper chips, each with its picture, in one row under the fire */
-.grill2d-tools {
-  display: flex;
-  gap: 5px;
-  max-width: 520px;
-}
-.g2-tool {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  height: 30px;
-  padding: 0 9px 0 3px;
-  border: 1.5px solid #3b2a20;
-  border-radius: 15px;
-  background: linear-gradient(180deg, #fffaf0, #f1e4c8);
-  box-shadow: 0 2px 0 rgb(59 42 32 / 0.45), inset 0 1px 0 #fff;
-  color: #3b2a20;
-  font: 700 12.5px/1 var(--brush);
-  white-space: nowrap;
-  transition: transform 0.12s, box-shadow 0.12s;
-}
-.g2-tool-icon {
-  width: 22px;
-  height: 22px;
-  padding: 1px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, #fff, color-mix(in srgb, var(--dab) 35%, #f6ead2));
-  box-shadow: inset 0 0 0 1px rgb(59 42 32 / 0.35);
-  flex: 0 0 auto;
-}
-.g2-tool.is-on {
-  background: linear-gradient(180deg, #f2a04a, #d8701e);
-  color: #fff;
-  transform: translateY(2px);
-  box-shadow: 0 0 0 rgb(59 42 32 / 0.45), 0 0 0 2px #ffd88a, inset 0 1px 2px rgb(0 0 0 / 0.25);
-  text-shadow: 0 1px 0 rgb(90 40 10 / 0.6);
-}
-.g2-tool.is-on .g2-tool-icon {
-  background: radial-gradient(circle at 40% 35%, #fff, #fbe8c8);
-}
 /* (with the grill drawn flat on a phone, the stage's controls step aside to the top right, clear of the bar and the
    fire pit under them) */
 .is-flatgrill .office-toggle {
@@ -6050,51 +4521,8 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   transform: scale(0.8);
   transform-origin: top left;
 }
-.is-flatgrill .omiki-toggle {
-  top: 62px;
-}
-.is-flatgrill .grill2d {
-  top: 182px;
-  bottom: 22px;
-}
-.g2-fridge-sign {
-  font: 700 10px/1 var(--brush);
-  fill: #fff6d0;
-  letter-spacing: 0.12em;
-  paint-order: stroke;
-  stroke: #8a1010;
-  stroke-width: 1.6px;
-}
 .is-flatgrill .switcher {
   display: none;
-}
-.grill2d .gc-scene {
-  height: 96px;
-  margin: 0;
-}
-.grill2d-tools {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  justify-content: flex-start;
-  width: 100%;
-  padding: 0 52px 4px;
-  scrollbar-width: none;
-}
-.g2-tool {
-  flex: 0 0 auto;
-}
-.g2-label-dark {
-  fill: #2f5a9a;
-}
-.grill2d-tools {
-  box-sizing: border-box;
-  padding-left: 60px;
-}
-.is-flatgrill .omiki-toggle {
-  position: fixed;
-  top: 146px;
-  left: 8px;
-  right: auto;
 }
 /* (phone, grill drawn flat: 經營 and 自動營運 lined up flush at the top left, under the fire's gauge; the incense on
    the right) */
@@ -6111,11 +4539,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   right: auto;
   transform: scale(0.82);
   transform-origin: top left;
-}
-.is-flatgrill .omiki-toggle {
-  top: 108px;
-  left: auto;
-  right: 10px;
 }
 .is-flatgrill .fullness {
   top: 150px;
@@ -6404,12 +4827,6 @@ body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-to
 .fridge-toggle:hover svg { transform: translateY(-1px) scale(1.06); }
 .fridge-toggle.is-on svg { fill: #bfe6ff; stroke: #1d5e8a; }
 .fridge-toggle:focus-visible { outline: 3px solid var(--moss); outline-offset: 3px; border-radius: 8px; }
-@media (max-width: 599px) {
-  .fridge-toggle { top: 14px; right: 260px; width: 40px; height: 40px; }
-}
-@media (max-width: 400px) {
-  .fridge-toggle { right: 206px; width: 34px; height: 34px; }
-}
 
 /* the ingredients' panel while researching: further right (no board title beside it), in three zones: frozen, chilled, room temperature */
 .menu.is-research { padding-right: 14px; justify-content: end; }
@@ -6514,7 +4931,6 @@ body.be-tool .axis-widget { left: calc(var(--bt-left) + 12px); bottom: calc(var(
   border-radius: 10px;
 }
 
-.guest-board,
 .ledger,
 .notebook {
   background: rgb(251 243 228 / 0.88);
@@ -6550,7 +4966,6 @@ body.be-tool .axis-widget { left: calc(var(--bt-left) + 12px); bottom: calc(var(
 }
 
 .office,
-.guest-board,
 .ledger,
 .notebook {
   background: rgb(251 246 234 / 0.66) !important;

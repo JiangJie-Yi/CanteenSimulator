@@ -24,15 +24,12 @@ import { FireControl, setFireGauge } from '@/shops/grill/FireControl'
 import { Fullness } from '@/ui/Fullness'
 import { bestOf, Notebook } from '@/ui/Notebook'
 import { findItem, MENU_MAX, MENU_MIN, partEn, partName, recipeKey, SEASON_NAME, signature, type Entry, type Seasoning } from '@/data/recipes'
-import { moodOf } from '@/game/taste'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
-import { MoodFace } from '@/ui/MoodFace'
-import { GuestCounter } from '@/ui/GuestCounter'
 import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
@@ -81,7 +78,6 @@ import { householdOrder, type Household } from '@/game/household'
 import { LINES, tallyNames } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
-import { useDrag } from '@/ui/useDrag'
 import { activityOf, effective, isTired, restPerHour, ROLES, tireNow, workFatigue, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
 import { CLOSE_AT, OPEN_AT, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy, overtimeRate } from '@/game/hours'
 import { GUIDE_KEY } from '@/game/firstDay'
@@ -96,11 +92,10 @@ import { showsFlat } from '@/game/device'
 import { MOBILE } from '@/scene/flatGate'
 import { platerOf } from '@/game/kitchenCrew'
 import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
-import { Grill2D } from '@/shops/grill/Grill2D'
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
-import { Glyph, StarIcon, StatusIcon } from '@/ui/GameIcons'
+import { Glyph, StarIcon } from '@/ui/GameIcons'
 import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
@@ -297,11 +292,10 @@ function SfxEar() {
   useEffect(() => { setEar(camera) }, [camera])
   return null
 }
-/** whether the phone's flat grill (Grill2D) is open: not yet (the owner's); at a phone's size a card says so instead (PhoneClosed) */
-const PHONE_2D_OPEN = false
 /**
- * A phone, by its size or by its word (game/device's showsFlat; the owner's): everything drawn flat, in 2D, the grill (Grill2D) and the
- * customers on the guest board, no 3D at all; anything else, a computer or a tablet, is the web page in full 3D, its full models only.
+ * A phone, by its size or by its word (game/device's showsFlat; the owner's): no 3D at all, none of its models downloaded (scene/flatGate), a
+ * card saying the game isn't open on phones yet (PhoneClosed; the flat 2D version for phones was taken out, item 188); anything else, a
+ * computer or a tablet, is the web page in full 3D, its full models only.
  */
 function usePhone() {
   const read = () => showsFlat({ width: window.innerWidth, height: window.innerHeight, mobile: MOBILE })
@@ -1330,7 +1324,7 @@ export default function App() {
     setView((v) => { if (v !== 'free') HOLD_POSE.next = true; return 'free' })
     // (the game's panels shut as it's entered (the owner's: the stock, the office, the rating, the drinks, the boards and tools; it's for the
     // scene alone), not merely hidden to come back as it's left)
-    setFridgeOpen(false); setOffice(null); setShowRating(false); setDrinkPanel(false); setBoardsOpen(false); setToolsOpen(false); setViewMenu(false)
+    setFridgeOpen(false); setOffice(null); setShowRating(false); setDrinkPanel(false); setToolsOpen(false); setViewMenu(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editOn])
   // (the game stands still while developer mode's on during business (the owner's): the customers, the clock, the wages, the fire, the
@@ -1525,9 +1519,6 @@ export default function App() {
   const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
   const guestsRef = useRef(guestsBy)
   guestsRef.current = guestsBy
-  const guests = guestsBy[DISHES[active].id] ?? []
-  // how many have come in all (customers are numbered as they come; the list itself only keeps the latest)
-  const visits = guests.reduce((n, g) => Math.max(n, g.id), 0)
   // how many customers came in, today (since midnight on the game's clock) and all told (the day itself is the clock's, shown under the round
   // buttons)
   const [days, setDays] = useState({ today: 0, total: 0 })
@@ -1547,10 +1538,6 @@ export default function App() {
   // customers' orders as they come in, for the menu to write them down
   const [feed, setFeed] = useState<{ key: number; id: string; guest: number }[]>([])
   const feedSeq = useRef(0)
-  // (phone) the guest board and the books folded into a chip until tapped
-  const [boardsOpen, setBoardsOpen] = useState(false)
-  // the guest board and the books can be dragged anywhere on the screen
-  const dragBoard = useDrag('guests')
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
@@ -1705,7 +1692,6 @@ export default function App() {
       window.setTimeout(() => {
         if (e.defaultPrevented) return
         if (office) setOffice(null)
-        else if (boardsOpen) setBoardsOpen(false)
         else if (toolsOpen) setToolsOpen(false)
         else if (fridgeOpen) setFridgeOpen(false)
         else if (viewMenu) setViewMenu(false)
@@ -1713,7 +1699,7 @@ export default function App() {
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [office, boardsOpen, toolsOpen, fridgeOpen, viewMenu, editOn])
+  }, [office, toolsOpen, fridgeOpen, viewMenu, editOn])
   // (the panels docked at the right (the office, the pantry, the drinks' stock), and the shop's rating out at the left, fold away at a click
   // on the 3D view that lands on nothing that can be clicked (a wall, the floor): not at a drag that turns the view, nor at a click on
   // something that does something there (the grill's food and tools while cooking, the freezer, the speaker), which goes on as it did)
@@ -2300,7 +2286,7 @@ export default function App() {
     return true
   }
   const dish = DISHES[active]
-  // a phone at the grill has no 3D view: the fire pit and the customers' bar are drawn flat (Grill2D)
+  // a phone has no 3D view: a card says the game isn't open on phones yet (PhoneClosed)
   // (by the screen's size: a tablet, touch screen or not, keeps the 3D grill)
   const flatGrill = phone && !!dish.roast
   const sceneOffFire = (n: number, loose: number) => { setOffFire(n); setLoose(loose) }
@@ -2989,7 +2975,7 @@ export default function App() {
           <div className={`grill-focus${hand ? '' : ' is-centered'}`} aria-hidden="true"><i /><b /></div>
         )}
         <Crash inline>
-        {/* (a phone at the grill draws it all flat, in 2D: no 3D view at all) */}
+        {/* (a phone: no 3D view at all, a card in its place (PhoneClosed)) */}
         {!NO_WEBGL && !flatGrill && <Canvas
           shadows={QUALITY.shadows ? 'percentage' : false}
           // phones get a lighter canvas (their screens are sharp enough, and the GPU memory is tight)
@@ -3044,18 +3030,7 @@ export default function App() {
         </Crash>
       </div>
       <div className="stage" ref={stageRef}>
-        {flatGrill && !PHONE_2D_OPEN && <PhoneClosed lang={lang} />}
-        {flatGrill && PHONE_2D_OPEN && dish.roast && (
-          <Grill2D roast={dish.roast} itemIds={ITEM_IDS[dish.id]} quantities={servings(dish, orders[dish.id])} active fire={fire} heat={heat}
-            onOffFire={sceneOffFire} onEat={onEat} onNotice={sceneNotice} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal}
-            onSay={talk} chef={chefOf(dish.id)} onGuests={(g) => setShopGuests(dish.id, g)}
-            crowd={(staffOf(dish.id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed} onDrink={onDrink}
-            onWalkOut={(ids, g) => refund(ids, dish, g)} lang={lang} entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
-            names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))} space={ai ? 'open' : 'closed'}
-            notes={Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, bestOf(n)]))}
-            top={ai ? <GuestCounter guests={guests} shop={dish.id} lang={lang} staff={{ chef: staffOf(dish.id, 'chef').length,
-              cashier: staffOf(dish.id, 'cashier').length, server: staffOf(dish.id, 'server').length }} /> : undefined} />
-        )}
+        {flatGrill && <PhoneClosed lang={lang} />}
         <Brand night={theme === 'dark'} late={lateNow} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
           onClick={editOn ? undefined : () => setShowRating((v) => !v)} />
         {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars; a drawer out from the left, kept
@@ -3189,57 +3164,6 @@ export default function App() {
               return { ...h, [dish.id]: mine }
             })} />
         )}
-        <div className={`side-boards${boardsOpen ? ' is-open' : ''}`}>
-          {/* on a phone the boards fold into one line at the top: tap it to open them */}
-          {ai && (
-            <button type="button" className="boards-chip" onClick={() => setBoardsOpen((o) => !o)} aria-expanded={boardsOpen}>
-              {ai && (() => {
-                const here = guests.filter((g) => g.state === 'waiting' || g.state === 'eating')
-                const rated = guests.filter((g) => g.rating !== null)
-                const avg = rated.length ? rated.reduce((n, g) => n + (g.rating ?? 0), 0) / rated.length : null
-                return (
-                  <span className="chip-part">
-                    {avg !== null && <MoodFace guest={{ state: 'done', rating: avg }} />}
-                    {tl(lang, '客', '客', 'Guests')} {here.length}/{visits}
-                  </span>
-                )
-              })()}
-              <span className="chip-caret"><StatusIcon up={boardsOpen} size="0.8em" /></span>
-            </button>
-          )}
-          {/* (the customers' board only on a phone, where the bar is the 2D one; on a computer they're seen at the bar itself) */}
-          {ai && phone && (
-            <section className="guest-board is-draggable" aria-label={UI[lang].guests(0, 0)} style={dragBoard.style}
-              onPointerDown={dragBoard.onPointerDown} onDoubleClick={dragBoard.onDoubleClick}>
-              <div className="chef-pick">
-                <span>{UI[lang].chefPick}</span>
-                <b>{[owner || (tl(lang, '老闆', '店主', 'Owner')), ...staffOf(DISHES[active].id, 'chef'), ...staffOf(DISHES[active].id, 'sous')].map((w) => (typeof w === 'string' ? w : personName(w, lang))).filter(Boolean).join('、')}</b>
-                <button type="button" onClick={() => setOffice('staff')}>{tl(lang, '人事', '人事', 'Staff')}</button>
-              </div>
-              <p className="guest-count">
-                {UI[lang].guests(visits, guests.filter((g) => g.state === 'waiting' || g.state === 'eating').length)}
-              </p>
-              {/* (a phone shows the customers here, in the 2D bar, which stays sharp and clear of the rest on a small screen) */}
-              {!flatGrill && (
-                <GuestCounter guests={guests} shop={DISHES[active].id} lang={lang} staff={{ chef: staffOf(DISHES[active].id, 'chef').length,
-                  cashier: staffOf(DISHES[active].id, 'cashier').length, server: staffOf(DISHES[active].id, 'server').length }} />
-              )}
-              <ul className="guest-list">
-                {guests.slice(-4).reverse().map((g) => {
-                  return (
-                    <li key={g.id} className={`guest-row is-${g.state}`}>
-                      <span className="guest-id">{guestLabel(g.id, lang)}</span>
-                      <MoodFace guest={g} />
-                      {g.state === 'angry' ? <span className="guest-note">{UI[lang].leftAngry}</span>
-                        : g.rating === null ? <span className="guest-note">{UI[lang].waiting}</span>
-                          : <span className="guest-note">{UI[lang].moods[moodOf(g.rating)]}{g.state === 'eating' && <em>{UI[lang].eating}</em>}</span>}
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )}
-        </div>
         {chat.length > 0 && (
           // (the day's log, as an online game's chat window (the owner's): the newest at the foot, older ones up it fading, the wheel to read
           // back; held at the newest unless it's been scrolled up to read)
@@ -3389,13 +3313,6 @@ export default function App() {
       </button>
       {/* (the game's day and time, under the round buttons (the owner's): day and night come round with it) */}
       <GameClock lang={lang} />
-      {/* (on a phone there's no 3D room and no shrine to click: the sake is offered from here) */}
-      {phone && ai && !!dish.roast && (
-        <button type="button" className={`omiki-toggle${blessed ? ' is-on' : ''}`} onClick={offerOmiki} disabled={blessed}
-          title={tl(lang, '供清酒（花 NT$1,000，三分鐘內客人變多、點得也多）', 'お神酒を供える（NT$1,000、三分間、客足とご注文が増える）', 'Offer sake (NT$1,000: three minutes of more customers ordering more)')}>
-          {blessed ? (tl(lang, '供酒中', 'お供え中', 'Offering')) : (tl(lang, '供酒', 'お神酒', 'Offer sake'))}
-        </button>
-      )}
       {/* (a little fridge, top right, always there: opens and shuts the stock panel (the owner's)) */}
       {!!dish.roast && !editOn && (
         <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => setFridgeOpen((v) => !v)} aria-pressed={fridgeOpen}
