@@ -91,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -1866,8 +1866,8 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
       {/* (and under the genkan's stone, solid up to it) */}
       {layers(gal, gly, 'g')}
-      <mesh position={[-(gly[0] + gly[1]) / 2, (top + 0.0 - step) / 2 - 0.0015, (gal[0] + gal[1]) / 2]}>
-        <boxGeometry args={[gly[1] - gly[0], -step - top - 0.003, gal[1] - gal[0]]} />
+      <mesh position={[-(gly[0] + gly[1]) / 2, (top + 0.0 - step) / 2 - (GENKAN_SUNK + 0.004) / 2, (gal[0] + gal[1]) / 2]}>
+        <boxGeometry args={[gly[1] - gly[0], -step - top - GENKAN_SUNK - 0.004, gal[1] - gal[0]]} />
         <meshToonMaterial color={BASE_COLOR} />
       </mesh>
     </>
@@ -2174,64 +2174,66 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
           geometry={timberBox(l[1] - l[0], baseDrop + 0.004, a[1] - a[0], BASE_TILE.along, BASE_TILE.across)} material={BASE_TIMBER[1]} />
       )))}
       {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
-      {/* the genkan: its stone, the step's riser round its two inner sides, and the polished kamachi on the edge */}
-      <mesh position={[-(l0 + gl) / 2, -D + 0.004, (g0 + a1) / 2]} rotation-x={-Math.PI / 2} receiveShadow>
-        <planeGeometry args={[gl - l0, a1 - g0]} />
-        <meshToonMaterial color="#ffffff" map={GENKAN_STONE} />
-      </mesh>
-      <mesh position={[-(l0 + gl) / 2, -D / 2, g0]}><boxGeometry args={[gl - l0, D, 0.012]} /><meshToonMaterial color="#3a2416" /></mesh>
-      <mesh position={[-gl, -D / 2, (g0 + a1) / 2]}><boxGeometry args={[0.012, D, a1 - g0]} /><meshToonMaterial color="#3a2416" /></mesh>
-      <mesh position={[-(l0 + gl) / 2 - 0.0, 0.007, g0 + 0.03]}><boxGeometry args={[gl - l0 + 0.06, 0.008, 0.06]} /><meshToonMaterial color="#4a2a18" /></mesh>
-      <mesh position={[-gl + 0.03, 0.007, (g0 + a1) / 2]}><boxGeometry args={[0.06, 0.008, a1 - g0]} /><meshToonMaterial color="#4a2a18" /></mesh>
-      {/* (the wall's foot, and the room's open end, down to the stone) */}
-      <mesh position={[-l0, -D / 2, (g0 + a1) / 2]}><boxGeometry args={[0.02, D, a1 - g0]} /><meshToonMaterial color="#2a1a10" /></mesh>
-      <mesh position={[-(l0 + gl) / 2, -D / 2, a1]}><boxGeometry args={[gl - l0, D, 0.012]} /><meshToonMaterial color="#2a1a10" /></mesh>
+      {/* (the wall's foot, and the room's open end, down to the genkan's pebble-wash (its stones, step and threshold: GenkanFloor, below)) */}
+      <mesh position={[-l0, -(D + GENKAN_SUNK) / 2, (g0 + a1) / 2]}><boxGeometry args={[0.02, D + GENKAN_SUNK, a1 - g0]} /><meshToonMaterial color="#2a1a10" /></mesh>
+      <mesh position={[-(l0 + gl) / 2, -(D + GENKAN_SUNK) / 2, a1]}><boxGeometry args={[gl - l0, D + GENKAN_SUNK, 0.012]} /><meshToonMaterial color="#2a1a10" /></mesh>
       </StaticBatch>
+      {/* the genkan: its stones laid crazy-paving in pebble-wash, the shoe-off stone at the step, the threshold, the polished keyaki step
+          (item 185: one flat picture of stones and two thin boards before) */}
+      <GenkanFloor x={[-gl, -l0]} z={[g0, a1]} />
     </group>
   )
 }
 /**
- * The genkan's stone: flagstones of grey granite and darker slate, each its own shape (cut on a jittered grid), its own shade and speckle,
- * set in a pale mortar with a fine pebble wash (洗い出し) between them; worn smoother and darker where feet go
+ * The genkan's floor and step (blender/genkanfloor.py, item 185, the owner's, 2026-11-15: "the genkan's doorway, its stone step and floor,
+ * too plain"; it was one flat picture of a grid of grey slabs in thick pale joints, and the step two thin dark boards): natural stones laid
+ * crazy-paving, each its own outline, tint (its points' colour) and chamfer, in a pebble-wash (洗い出し) seen in the joints; the shoe-off stone
+ * (沓脱石) at the step where the way in crosses it (people stand on it: bar.ts's KUTSUNUGI, genkanY); a dark granite threshold across the
+ * doorway; and the step's edge (上框), a polished keyaki beam along both open sides, mitred at the corner. Modelled in RoomFloor's own frame,
+ * the genkan as it is (x 0.42..1.6569, z 2.4..3.7155); fitted to it as it is now, if that's changed. Toon-shaded as the room is, its pictures'
+ * relief in their normal maps; one draw for each of its three materials (stone, pebbles, wood)
  */
-const GENKAN_STONE = (() => {
-  if (typeof document === 'undefined') return null
-  const S = 512
-  const c = document.createElement('canvas')
-  c.width = c.height = S
-  const g = c.getContext('2d')!
-  let seed = 19
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  // (the mortar and its pebbles)
-  g.fillStyle = '#8a8478'; g.fillRect(0, 0, S, S)
-  for (let k = 0; k < 2600; k++) { const v = 90 + rnd() * 90; g.fillStyle = `rgb(${v},${v - 4},${v - 10})`; g.beginPath(); g.arc(rnd() * S, rnd() * S, 0.8 + rnd() * 1.8, 0, Math.PI * 2); g.fill() }
-  // (the stones: a 4 x 4 grid of corners, each moved about, a stone in each cell inset from its neighbours)
-  const N = 4, cell = S / N
-  const corner: [number, number][][] = []
-  for (let j = 0; j <= N; j++) { corner.push([]); for (let i = 0; i <= N; i++) corner[j].push([i * cell + (i % N ? (rnd() - 0.5) * cell * 0.4 : 0), j * cell + (j % N ? (rnd() - 0.5) * cell * 0.4 : 0)]) }
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const q = [corner[j][i], corner[j][i + 1], corner[j + 1][i + 1], corner[j + 1][i]]
-    const cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4
-    const pts = q.map(([x, y]) => [cx + (x - cx) * 0.92, cy + (y - cy) * 0.92] as [number, number])
-    const dark = rnd() < 0.35
-    const v = dark ? 46 + rnd() * 16 : 92 + rnd() * 26
-    const path = () => { g.beginPath(); pts.forEach(([x, y], k) => { const [nx, ny] = pts[(k + 1) % 4]; const mx = (x + nx) / 2 + (rnd() - 0.5) * 8, my = (y + ny) / 2 + (rnd() - 0.5) * 8; if (!k) g.moveTo(x, y); g.quadraticCurveTo(mx, my, nx, ny) }); g.closePath() }
-    path()
-    const gr = g.createLinearGradient(cx - cell / 2, cy - cell / 2, cx + cell / 2, cy + cell / 2)
-    gr.addColorStop(0, `rgb(${v + 10},${v + 8},${v + 4})`); gr.addColorStop(1, `rgb(${v - 8},${v - 9},${v - 12})`)
-    g.fillStyle = gr; g.fill()
-    g.save(); path(); g.clip()
-    for (let k = 0; k < 260; k++) { const w = rnd() < 0.5; g.fillStyle = w ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.14)'; g.fillRect(cx + (rnd() - 0.5) * cell, cy + (rnd() - 0.5) * cell, 1.5, 1.5) }
-    g.restore()
-    path(); g.strokeStyle = 'rgba(30,26,22,0.6)'; g.lineWidth = 2; g.stroke()
-  }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.anisotropy = 4
-  t.repeat.set(1.2, 1.2)
-  return t
-})()
+const GENKAN_FLOOR_URL = import.meta.env.BASE_URL + 'models/genkanfloor.glb'
+useGLTF.preload(GENKAN_FLOOR_URL)
+/** how far under the genkan's stone its pebble-wash lies (the model's), for the walls' foot and the base to reach down to */
+const GENKAN_SUNK = 0.012
+const GENKAN_MODELLED = { x: [0.42, 1.6569], z: [2.4, 3.7155] }
+const GenkanFloor = memo(function GenkanFloor({ x, z }: { x: [number, number]; z: [number, number] }) {
+  const gltf = useGLTF(GENKAN_FLOOR_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('GenkanRoot') ?? gltf.scene).clone(true)
+    // (the shoe-off stone and the threshold their own material (the same pictures), so they're drawn apart from the flat stones and take the
+    // room's ink line round them as the step does: a raised stone the floor's colour, unlined, didn't show as one)
+    const made = new Map<string, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      const raised = /Kutsunugi|Sill/.test(m.name)
+      const key = `${src.uuid}|${raised}`
+      let t = made.get(key)
+      if (!t) {
+        t = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, normalMap: src.normalMap ?? null, vertexColors: !!m.geometry.attributes.color })
+        if (src.normalMap) (t as THREE.MeshToonMaterial).normalScale.set(0.8, 0.8)
+        t.name = src.name + (raised ? 'Raised' : '')
+        made.set(key, t)
+      }
+      m.material = t
+      m.receiveShadow = true
+      // (what stands up off the floor throws its shadow: the shoe-off stone, the threshold and the step; the flat stones don't)
+      m.castShadow = raised || /Kamachi/.test(m.name)
+    })
+    inkModel(r, (m) => !/Kutsunugi|Sill|Kamachi/.test(m.name), { width: 0.0008, weld: true })
+    return mergeByMaterial(r)
+  }, [gltf])
+  // (fitted to the genkan as it is: the same as modelled, unless the room's been laid out otherwise)
+  const sx = (x[1] - x[0]) / (GENKAN_MODELLED.x[1] - GENKAN_MODELLED.x[0]), sz = (z[1] - z[0]) / (GENKAN_MODELLED.z[1] - GENKAN_MODELLED.z[0])
+  return (
+    <group position={[x[0] - GENKAN_MODELLED.x[0] * sx, 0, z[0] - GENKAN_MODELLED.z[0] * sz]} scale={[sx, 1, sz]}>
+      <primitive object={obj} />
+    </group>
+  )
+})
 
 /** the counter itself (for the shops that don't draw their own): hinoki top, panelled dark front, a lip */
 function Counter({ length }: { length: number }) {
@@ -4350,7 +4352,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // (down a step, standing in the genkan)
       // (sat on a toilet: lowered so the seat they're lifted onto is its seat's height (FolkFigure's SEAT, a stool's))
-      if (g && given) g.position.y = s.wcSit ? WC_SIT_LIFT : inGenkan(counters, g.position) ? -GENKAN.depth : 0
+      if (g && given) g.position.y = s.wcSit ? WC_SIT_LIFT : genkanY(counters, g.position)
     }
     // (the register and the money follow what's being paid: each dish rung up in turn, the total, the note laid on the tray, the drawer out and
     // the note put in it, the change worked out and set on the tray, the drawer shut, the change taken)
@@ -5217,7 +5219,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const g = visitorObjs.current.get(v.id)
         if (g) {
           g.position.copy(v.pos)
-          g.position.y = inGenkan(counters, v.pos) ? -GENKAN.depth : 0
+          g.position.y = genkanY(counters, v.pos)
           // (turned to the way they face a moment at a time: set at once, they spun round as they took their bag and went)
           g.rotation.y = turnToward(g.rotation.y, v.yaw, step * 1.5)
         }
@@ -5353,7 +5355,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const g = sitterObjs.current.get(v.id)
         if (g) {
           g.position.copy(v.pos)
-          g.position.y = inGenkan(counters, v.pos) ? -GENKAN.depth : 0
+          g.position.y = genkanY(counters, v.pos)
           // (and those on the bench as they sit down, get up and go)
           g.rotation.y = turnToward(g.rotation.y, v.yaw, step * 1.5)
         }

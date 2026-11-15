@@ -981,6 +981,20 @@ export function seatsOf(cs: Counter[]): Seat[] {
  */
 // (its step drawn back toward the bar: a longer stone floor to come in on, take off one's shoes and step up, not crowded at the door)
 export const GENKAN = { depth: 0.1, along: [0.15, 1.45] as [number, number], lay: [FLOOR_FAR, -0.42] as [number, number] }
+/**
+ * The shoe-off stone (沓脱石) at the genkan's step (item 185, blender/genkanfloor.py: its place there and here the same): where the way in
+ * from the door crosses the step, clear of the shoe cupboard's doors and the doormat; along (from the first counter's end) and lay as
+ * GENKAN's, and how high its top stands over the genkan's stone
+ */
+export const KUTSUNUGI = { along: [0.195, 0.47] as [number, number], lay: [-1.27, -0.8] as [number, number], top: 0.05 }
+/** how high someone stands at a point (the bar's frame): the room's floor, down in the genkan, or up on its shoe-off stone there */
+export function genkanY(cs: Counter[], p: THREE.Vector3) {
+  if (!inGenkan(cs, p)) return 0
+  const c0 = cs[0], d = p.clone().sub(c0.at)
+  const a = d.dot(c0.along) - c0.length / 2, l = d.dot(c0.lay)
+  const on = a > KUTSUNUGI.along[0] && a < KUTSUNUGI.along[1] && l > KUTSUNUGI.lay[0] && l < KUTSUNUGI.lay[1]
+  return -GENKAN.depth + (on ? KUTSUNUGI.top : 0)
+}
 /** whether a point (the bar's frame) is down in the genkan */
 export function inGenkan(cs: Counter[], p: THREE.Vector3) {
   const c0 = cs[0], d = p.clone().sub(c0.at)
