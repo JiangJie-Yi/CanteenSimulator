@@ -45,7 +45,7 @@ export const VIEW_SPOTS: ViewSpot[] = [
     about: { zh: '飲料冷藏櫃：客人自己拿飲料', ja: '飲み物の冷蔵庫：客がセルフで取る', en: 'The drinks fridge: customers help themselves' } },
   { id: 'toilet', zh: '廁所', ja: 'お手洗い', en: 'Toilets', anchor: 'look-wc-m', back: 5.8, up: 2.3, from: [0.808, -0.589], shift: [-0.55, -0.76], fov: 45,
     about: { zh: '男女廁所的拉門與洗手台', ja: '男女のお手洗いの引き戸と手洗い', en: 'The toilets: sliding doors and wash basins' } },
-  { id: 'back', zh: '流理台', ja: '流し台', en: 'Sink', anchor: 'look-back', back: 4.4, up: 5.4, faceOn: true, fov: 40,
+  { id: 'back', zh: '流理台', ja: '流し台', en: 'Sink', anchor: 'look-sink', back: 4.4, up: 5.4, faceOn: true, fov: 40,
     about: { zh: '流理台：水槽、瀝水籃、碗盤架與冷凍櫃', ja: '流し台：シンク、水切りかご、食器ラックと冷凍庫', en: 'The sink: basin, draining basket, dish racks and freezer' } },
   { id: 'boss', zh: '老闆', ja: '店主', en: 'Owner', anchor: 'BossFollow', follow: true,
     about: { zh: '老闆的第一人稱：從他的眼睛看出去，跟著他走、跟著他轉（閉店時）', ja: '店主の目線：店主の目から、歩けばついて、向けば向く（閉店中）', en: 'Through the owner’s eyes: where he goes and where he looks (while closed)' } },
