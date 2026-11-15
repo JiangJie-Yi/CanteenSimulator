@@ -133,9 +133,35 @@ for v in src.data.vertices:
     v.co = Vector(((v.co.x - (lo.x + hi.x) / 2) * k, (v.co.y - (lo.y + hi.y) / 2) * k, (v.co.z - lo.z) * k))
 src.data.update()
 
+# ---- the door cat's own koban (a thin plate the grid of quads can't keep: fused with the body it came out a lump the bake found no colour
+# for, gold or white round the made coin, the owner's "something odd at the coin's side", 2026-11-15) taken off a copy before it's fused;
+# where it was kept, for the made one (its faces are those on the picture's top right corner, the coin's own island)
+bm = bmesh.new()
+bm.from_mesh(src.data)
+uvl0 = bm.loops.layers.uv.active
+coin_f = [f for f in bm.faces if 0.72 < sum(l[uvl0].uv.x for l in f.loops) / len(f.loops) < 0.91 and sum(l[uvl0].uv.y for l in f.loops) / len(f.loops) > 0.81]
+coin_pts = [v.co.copy() for f in coin_f for v in f.verts]
+bmesh.ops.delete(bm, geom=coin_f, context="FACES")
+# (two copies of what's left: one baked from, as it is; one fused and shrunk onto, its open edges (the model has many: inside its ears, the
+# coin's own) all closed, or the fusing can't tell inside from out and keeps a scrap of the cat; baked from that one, the closing faces,
+# with no place in the picture, came out streaks on the ear)
+fuse_src = src.copy()
+fuse_src.data = src.data.copy()
+fuse_src.name = "OwnCatSource"
+bpy.context.collection.objects.link(fuse_src)
+bm.to_mesh(fuse_src.data)
+bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+shape_src = src.copy()
+shape_src.data = src.data.copy()
+shape_src.name = "OwnCatShape"
+bpy.context.collection.objects.link(shape_src)
+bm.to_mesh(shape_src.data)
+bm.free()
+print("COIN_FACES", len(coin_f))
+
 # ---- the new mesh: fused, quads over it, shrunk back onto its surface
-lp = src.copy()
-lp.data = src.data.copy()
+lp = shape_src.copy()
+lp.data = shape_src.data.copy()
 lp.name = "OwnCatBody"
 bpy.context.collection.objects.link(lp)
 lp.data.materials.clear()
@@ -143,7 +169,7 @@ select_only(lp)
 # (a coarse voxel remesh: whole, and quads already, an even grid of them over it (QuadriFlow does nothing run in the background))
 m_ = lp.modifiers.new("fuse", "REMESH"); m_.mode = "VOXEL"; m_.voxel_size = VOXEL
 bpy.ops.object.modifier_apply(modifier="fuse")
-m_ = lp.modifiers.new("onto", "SHRINKWRAP"); m_.target = src; m_.wrap_method = "NEAREST_SURFACEPOINT"
+m_ = lp.modifiers.new("onto", "SHRINKWRAP"); m_.target = shape_src; m_.wrap_method = "NEAREST_SURFACEPOINT"
 bpy.ops.object.modifier_apply(modifier="onto")
 print('QUADS', len(lp.data.polygons))
 for p in lp.data.polygons:
@@ -165,16 +191,15 @@ sc = bpy.context.scene
 sc.render.engine = "CYCLES"
 sc.cycles.samples = 4
 sc.cycles.device = "CPU"
-select_only(src, lp, active=lp)
+select_only(fuse_src, lp, active=lp)
 bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, cage_extrusion=0.012, max_ray_distance=0.06, margin=8)
 # (the koban: a thin plate, too thin for the grid of quads to keep, its baked rays found nothing and it came out black. Where the picture
 # baked dark: gold; and which faces those are, for where the koban goes)
 px = np.array(img.pixels[:], dtype=np.float32).reshape(1024, 1024, 4)
 dark = px[..., :3].max(axis=2) < 0.015   # (no colour found at all: the black ear's black is lighter than this)
-# (painted the fur's own white, not gold (the owner's, 2026-11-15: the paw that holds it came out a lump of gold round the coin): the made koban
-# below is the only gold there, held in a white paw as the door cat's is)
-lit = px[..., :3].min(axis=2) > 0.5
-px[dark, :3] = np.median(px[lit & ~dark][:, :3], axis=0) if lit.any() else (0.86, 0.83, 0.74)
+# (gold, the koban's own (the owner's, 2026-11-15: painted white, the source's thin plate showed as a white sliver beside the made coin and
+# a white lump over the bell): the made koban below covers the plate, so what shows of it reads as the coin's own edge)
+px[dark, :3] = np.median(px[(px[..., :3].min(axis=2) > 0.5) & ~dark][:, :3], axis=0)
 img.pixels.foreach_set(px.ravel())
 uvl_ = lp.data.uv_layers.active.data
 dark_at = []
@@ -187,13 +212,23 @@ img.pack()
 # (the picture into the colour only once it's baked: wired in before, it was read while it was being written)
 nt.links.new(tex.outputs["Color"], nt.nodes["Principled BSDF"].inputs["Base Color"])
 bpy.data.objects.remove(src)
+bpy.data.objects.remove(fuse_src)
+bpy.data.objects.remove(shape_src)
 
 # ---- the raised hand cut off, its own node, its origin at the wrist; the cuts closed
+# (cut along a clean plane across the arm (x = PAW_X), and swung about the middle of that cut, about x: the cut face then only turns in its
+# own plane over the body's, and the body's cap stays covered (the owner's, 2026-11-15: waving, the flat cap of a jagged cut showed, a
+# ghost of the paw left behind; it had swung about the hand's foot))
 bm = bmesh.new()
 bm.from_mesh(lp.data)
+band = [f for f in bm.faces if PAW_Z0 * TALL < f.calc_center_median().z < PAW_Z1 * TALL and f.calc_center_median().x > PAW_X - 0.03]
+bmesh.ops.bisect_plane(bm, geom=band + list({e for f in band for e in f.edges}) + list({v for f in band for v in f.verts}),
+                       plane_co=(PAW_X, 0, 0), plane_no=(1, 0, 0))
 paw = [f for f in bm.faces if f.calc_center_median().x > PAW_X and PAW_Z0 * TALL < f.calc_center_median().z < PAW_Z1 * TALL]
 pv = {v for f in paw for v in f.verts}
-wrist = Vector((PAW_X, sum(v.co.y for v in pv) / len(pv), min(v.co.z for v in pv) + 0.012))
+rim = [v for v in pv if abs(v.co.x - PAW_X) < 1e-4]
+wrist = Vector((PAW_X, sum(v.co.y for v in rim) / len(rim), sum(v.co.z for v in rim) / len(rim)))
+print("PAW_RIM", len(rim))
 for f in bm.faces:
     f.select = f in paw
 bm.to_mesh(lp.data)
@@ -236,8 +271,23 @@ kh = (max(c.z for c in dark_at) - min(c.z for c in dark_at)) if dark_at else 0.0
 front = min(c.y for c in dark_at) if dark_at else kc.y
 bm = bmesh.new()
 uvk = bm.loops.layers.uv.new()
-# (as the door cat's: a tall plump oval held in its paw, a little over a quarter of the cat's height)
-KR = (0.026, 0.009, 0.04)
+# (as the door cat's: a tall plump oval held in its paw, over the whole of the source's plate (the gold patch below the bell), a few
+# millimetres past it all round)
+plate = coin_pts
+if plate:
+    kc = Vector(((min(c.x for c in plate) + max(c.x for c in plate)) / 2, kc.y, (min(c.z for c in plate) + max(c.z for c in plate)) / 2))
+    # (its size the door cat's in proportion, a little over a quarter of the cat's height (the source's coin island takes in more than the
+    # coin: sized by it, it came out half the cat's height); its middle the source coin's, its back against the body's front there)
+    kc = Vector((sum(c.x for c in plate) / len(plate), kc.y, sum(c.z for c in plate) / len(plate)))
+    KR = (0.026, 0.009, 0.042)
+    # (in front of all of the body over its outline (the paw that held the source's coin wraps round its sides: a ray down its middle went
+    # through the gap and the coin sat behind the paw)
+    # (its upper half only: below it the cat's front feet reach out further, and taken in, the coin stood off the body in the air)
+    near = [v.co.y for v in lp.data.vertices if abs(v.co.x - kc.x) < KR[0] * 0.8 and kc.z - KR[2] * 0.2 < v.co.z < kc.z + KR[2]]
+    front = (min(near) if near else min(c.y for c in plate)) - KR[1] + 0.004
+else:
+    KR = (0.026, 0.009, 0.04)
+print("KOBAN_KR", tuple(round(v, 3) for v in KR))
 # (3 cuts: 16 round its edge, a smooth oval where 2 gave a twelve-sided plate (the owner's, 2026-11-15); 96 faces)
 for f in qsphere(bm, (0.0, 0.0, 0.0), KR, 3):
     for l in f.loops:
@@ -256,10 +306,34 @@ top_ = [c for c in dark_at if c.z > max(d.z for d in dark_at) - 0.02] if dark_at
 if top_:
     bc = Vector((sum(c.x for c in top_), sum(c.y for c in top_), sum(c.z for c in top_))) / len(top_)
     bm = bmesh.new()
-    qsphere(bm, (bc.x + 0.003, min(c.y for c in top_) + 0.002, bc.z + 0.006), (0.0135, 0.0135, 0.0135), 2)
+    BR = 0.0135
+    bctr = Vector((bc.x + 0.003, min(c.y for c in top_) + 0.002, bc.z + 0.006))
+    uvb = bm.loops.layers.uv.new()
+    for f in qsphere(bm, tuple(bctr), (BR, BR, BR), 2):
+        for l in f.loops:
+            d_ = l.vert.co - bctr
+            u_ = (math.atan2(d_.y, d_.x) + math.pi) / (2 * math.pi)
+            l[uvb].uv = (u_, 0.5 + d_.z / (2 * BR))
+    # (a seam's faces across u=0/1: their corners on the far side brought round, so the picture doesn't run back across them)
+    for f in bm.faces:
+        us = [l[uvb].uv.x for l in f.loops]
+        if max(us) - min(us) > 0.5:
+            for l in f.loops:
+                if l[uvb].uv.x < 0.5:
+                    l[uvb].uv.x += 1.0
     me = bpy.data.meshes.new("OwnCatBell"); bm.to_mesh(me); bm.free()
     bell = bpy.data.objects.new("OwnCatBell", me); bpy.context.collection.objects.link(bell)
-    bell.data.materials.append(pbr("OwnCatBellGold", (0.9, 0.62, 0.05), rough=0.3, metal=0.6))
+    # (as a bell is (the owner's, 2026-11-15: "the bell doesn't look like one"): gold, a raised band round its middle with a groove either
+    # side, and below it, facing the front, the slit with a round hole at its top end)
+    bu, bv = grid01(128)
+    bcol = mix((0.78, 0.5, 0.02), (0.98, 0.78, 0.2), smooth(0.0, 1.0, bv))
+    for at, dk in ((0.47, 0.45), (0.57, 0.45)):
+        bcol = mix(bcol, (0.35, 0.2, 0.0), (np.abs(bv - at) < 0.018).astype(np.float32) * dk)
+    bcol = mix(bcol, (1.0, 0.88, 0.4), (np.abs(bv - 0.52) < 0.02).astype(np.float32) * 0.7)
+    fu = np.minimum(np.abs(bu - 0.25), 1)
+    slit = ((fu < 0.018) & (bv > 0.1) & (bv < 0.36)) | (np.hypot((bu - 0.25) * 2.4, bv - 0.34) < 0.045)
+    bcol = mix(bcol, (0.05, 0.03, 0.0), slit.astype(np.float32))
+    bell.data.materials.append(pbr("OwnCatBellGold", (1, 1, 1), tex=image("ownluckycat_bell", np.clip(bcol, 0, 1)), rough=0.3, metal=0.6))
     for p_ in bell.data.polygons:
         p_.use_smooth = True
     print("BELL", tuple(round(c, 3) for c in bc))

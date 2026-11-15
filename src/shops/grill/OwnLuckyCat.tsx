@@ -29,7 +29,8 @@ export function OwnLuckyCat() {
         // (the bell and the koban a gold that catches the light; the rest toon)
         t = /Gold/.test(src.name)
           // (both sides: a face of the koban's laddered front came out turned in, a hole in it)
-          ? new THREE.MeshToonMaterial({ color: src.color.clone().multiplyScalar(1.15), emissive: '#3a2a08', side: THREE.DoubleSide })
+          // (the bell's picture kept: its band and its slit are drawn on it (the owner's, 2026-11-15))
+          ? new THREE.MeshToonMaterial({ color: src.color.clone().multiplyScalar(1.15), map: src.map ?? null, emissive: '#3a2a08', side: THREE.DoubleSide })
           : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
         t.name = src.name
         made.set(src, t)
