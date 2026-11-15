@@ -170,7 +170,7 @@ const RACK_OUT = 0.16
 export function SinkModel() {
   useStudio()
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const { root, tip, floor, handle, door, rack, rackZ, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise } = useMemo(() => {
+  const { root, tip, floor, handle, faucet, door, rack, rackZ, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise } = useMemo(() => {
     const r = gltf.scene.clone(true)
     // (what stands on it taken off: each placed as a piece of its own)
     for (const set of SINK_SETS) r.getObjectByName(set.node)?.removeFromParent()
@@ -197,6 +197,11 @@ export function SinkModel() {
     // turned down about its hinge as it's loaded and emptied, and its basket, slid out with it (the plates' marks in it go with it))
     const handle = r.getObjectByName('SinkTapHandle')!
     handle.removeFromParent()
+    // (and the rest of the tap, its foot, body, spout and mouth, with it: the whole tap takes the pointer, not its lever alone (item 196, the
+    // owner's 「我還是沒法用流理台桌來手動洗碗」: told to turn the water on, he clicked the tap, and its spout and body were the basin's, the
+    // basin's hint again and the water never on; of the points on the tap, three in four were taken by the basin))
+    const faucet = new THREE.Group()
+    for (const n of ['SinkTapFoot', 'SinkTapBody', 'SinkTapSpout', 'SinkTapMouth', 'SinkTapScreen']) if (r.getObjectByName(n)) faucet.add(lift(n))
     const door = r.getObjectByName('SinkDryerDoor')!
     const doorAt = door.position.clone()
     door.removeFromParent()
@@ -205,6 +210,7 @@ export function SinkModel() {
     rack.removeFromParent()
     dressSink(r)
     dressSink(handle)
+    dressSink(faucet)
     dressSink(door)
     dressSink(rack)
     r.updateMatrixWorld(true)
@@ -219,11 +225,13 @@ export function SinkModel() {
     plainColours(r)
     mergeByMaterial(r)
     mergeByMaterial(handle)
+    plainColours(faucet)
+    mergeByMaterial(faucet)
     mergeByMaterial(door)
     mergeByMaterial(rack)
     door.position.copy(doorAt)
     rack.position.copy(rackAt)
-    return { root: r, tip, floor, handle, door, rack, rackZ: rackAt.z, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise: top - base }
+    return { root: r, tip, floor, handle, faucet, door, rack, rackZ: rackAt.z, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise: top - base }
   }, [gltf])
   // (the plug's way out of the drain and back: 0 in, 1 lying beside it)
   const plugK = useRef(SINK.plug ? 0 : 1)
@@ -399,11 +407,12 @@ export function SinkModel() {
       </mesh>
       {/* (the breath of steam out of its door as it finishes) */}
       <Steam position={[steamAt.x, steamAt.y, steamAt.z]} level={steam} width={0.36} height={0.42} opacity={0.42} layers={3} speed={0.1} />
-      {/* (the tap's handle: pointed at it lights and says so; clicked, the water's turned on, or off) */}
+      {/* (the tap, its handle and the rest of it: pointed at it lights and says so; clicked, the water's turned on, or off) */}
       <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('水龍頭', says()).onPointerOver(e) }}
         onPointerOut={(e) => { if (getEdit().on) return; tipOver('水龍頭', '').onPointerOut(e) }}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.tap = !SINK.tap; tipOver('水龍頭', says()).onPointerOver(e) }}>
         <primitive object={handle} />
+        <primitive object={faucet} />
       </group>
       <mesh ref={stream} position={[tip.x, floor.y + len / 2, tip.z]} material={WATER} visible={false}>
         <cylinderGeometry args={[0.007, 0.009, len, 8, 1, true]} />

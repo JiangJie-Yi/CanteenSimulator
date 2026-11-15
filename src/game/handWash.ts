@@ -5,9 +5,11 @@ import { DRAIN_CAP, type Drain } from './plates'
 
 /** how full the basin must be to wash in (0 empty .. 1 at the overflow) */
 export const WASH_WATER = 0.25
-/** a squeeze of the liquid washes this many plates; the water holds no more than this many's worth */
-export const SOAP_PUMP = 3
-export const SOAP_MAX = 9
+/** a squeeze of the liquid washes this many plates; the water holds no more than this many's worth (item 196, the owner's 「我還是沒法用流理台桌
+ * 來手動洗碗」: a squeeze washed three, and with ten or twenty dirty in the sink in the evening the owner was sent back to the bottle every
+ * three plates, the boss walking back to his fire between; a squeeze into a basin of water does a sink-load) */
+export const SOAP_PUMP = 10
+export const SOAP_MAX = 30
 
 export type HandStep = 'none' | 'basketFull' | 'plug' | 'water' | 'soap' | 'sponge' | 'scrub'
 export type HandSink = { dirty: number; drain: Drain; plug: boolean; water: number; soap: number; sponge: boolean }

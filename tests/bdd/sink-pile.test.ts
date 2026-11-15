@@ -34,10 +34,15 @@ feature('手洗碗盤的步驟（店主要的，第 103 項）', () => {
       expect(handStep({ ...base, plug: true, water: WASH_WATER, soap: SOAP_PUMP, sponge: true })).toBe('scrub')
     })
   })
-  scenario('擠一次洗碗精洗三個，洗完要再擠', ({ given, when, then }) => {
+  // (item 196: a squeeze washed three, and the owner was sent back to the bottle every three plates, the boss walking back to his fire
+  // between; a squeeze into a basin of water does a sink-load)
+  scenario('擠一次洗碗精洗一整批（十個），洗完要再擠', ({ given, when, then, and }) => {
     given('擠了一次', (w) => { w.soap = pumpSoap(0) })
-    when('刷了三個', (w) => { for (let i = 0; i < 3; i++) w.soap = scrubbed(w.soap) })
-    then('又要擠洗碗精', (w) => { expect(handStep({ ...base, plug: true, water: 0.5, soap: w.soap, sponge: true })).toBe('soap') })
+    when('刷了九個', (w) => { for (let i = 0; i < 9; i++) w.soap = scrubbed(w.soap) })
+    then('還能再刷', (w) => { expect(handStep({ ...base, dirty: 20, plug: true, water: 0.5, soap: w.soap, sponge: true })).toBe('scrub') })
+    when('刷了第十個', (w) => { w.soap = scrubbed(w.soap) })
+    then('又要擠洗碗精', (w) => { expect(SOAP_PUMP).toBe(10); expect(handStep({ ...base, dirty: 20, plug: true, water: 0.5, soap: w.soap, sponge: true })).toBe('soap') })
+    and('多擠幾次，水裡最多存三十個的量', () => { expect(pumpSoap(pumpSoap(pumpSoap(pumpSoap(0))))).toBe(30) })
   })
   scenario('水放掉，洗碗精也跟著沒了', ({ then }) => {
     then('水是空的，洗碗精歸零', () => { expect(soapWith(6, 0)).toBe(0); expect(soapWith(6, 0.4)).toBe(6) })
