@@ -687,38 +687,80 @@ for z_ in (bz0 + 0.04, bz1 - 0.04):
 # comb each, the notches cut in its top (no rod or peg apiece))
 RACK_N, RACK_X0, RACK_X1 = 30, 0.04, 0.70
 RACK_PITCH = (RACK_X1 - RACK_X0) / (RACK_N - 1)
-RAIL_LO, RAIL_HI, NOTCH = y0_ + 0.004, y0_ + 0.045, y0_ + 0.022
+RAIL_LO, RAIL_HI, NOTCH = y0_ + 0.004, y0_ + 0.062, y0_ + 0.022   # (its teeth 4 cm over the notches: a comb, not a ridge (item 152))
 SLAT_TOP = y0_ + 0.004
 LANE_Z = (bz0 + bz1) / 2
 # (8 cm either side of the row's middle: where a plate's round edge comes down to the notches' floor)
+# (made as a bamboo comb is (the owner's, 2026-11-15: "these two are too plain": flat boards with square notches, one flat colour): each
+# tooth's top a rounded tip, each notch's floor rounded, 7 mm thick; split bamboo on it, its fibres along it, a darker node at three places,
+# lighter toward its teeth; and along its outer foot a round bamboo pole, its nodes ringed, the comb's stiffener)
+def comb_picture(n=512):
+    """split bamboo, its colours as written (the picture's own sRGB: lin()'s values there came out a deep orange, a round beam's shading):
+    pale straw toward the teeth, a shade warmer at the foot, fine fibres along it, three darker nodes with a pale lip"""
+    u, v = grid01(n)
+    srgb = lambda h: np.array([int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)], np.float32)
+    col = mix(srgb("#c9a764"), srgb("#ecd9a6"), np.clip(v * 1.2, 0, 1))
+    fib = vnoise(n, 3, 140)
+    col = col * (0.9 + 0.14 * fib)[..., None]
+    for at in (0.17, 0.5, 0.83):
+        d = np.abs(u - at)
+        col = mix(col, srgb("#8a6a3a"), smooth(0.01, 0.003, d) * 0.8)
+        col = mix(col, srgb("#f6e8c0"), (smooth(0.018, 0.012, d) - smooth(0.012, 0.010, d)).clip(0, 1) * 0.6)
+    return col
+
+
+M["comb"] = pbr("SinkComb", (1, 1, 1), tex=image("sink_comb", comb_picture()), rough=0.55)
+M["pole"] = pbr("SinkPole", lin("#d9c088"), rough=0.5)
+M["pole_node"] = pbr("SinkPoleNode", lin("#a07a44"), rough=0.55)
 for zi, z_ in enumerate((LANE_Z - 0.082, LANE_Z + 0.082)):
     bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
     top = []
-    # (from just before the first plate to just past the last: up at each tooth between plates, down in each notch where one stands)
+    tw = RACK_PITCH * 0.2                 # (a tooth's half width; its tip a half round over it)
     for k in range(RACK_N + 1):
         xt = RACK_X0 - RACK_PITCH / 2 + k * RACK_PITCH
-        top += [(xt - RACK_PITCH * 0.18, RAIL_HI), (xt + RACK_PITCH * 0.18, RAIL_HI)]
+        for a in (math.pi, math.pi * 0.75, math.pi * 0.5, math.pi * 0.25, 0.0):
+            top.append((xt + tw * math.cos(a), RAIL_HI - tw + tw * math.sin(a)))
         if k < RACK_N:
             xn = RACK_X0 + k * RACK_PITCH
-            top += [(xn - RACK_PITCH * 0.16, NOTCH), (xn + RACK_PITCH * 0.16, NOTCH)]
-    outline = [(top[0][0], RAIL_LO)] + top + [(top[-1][0], RAIL_LO)]
-    front = [bm.verts.new(P(x_, y_, z_ - 0.003)) for x_, y_ in outline]
-    back = [bm.verts.new(P(x_, y_, z_ + 0.003)) for x_, y_ in outline]
-    ff = bm.faces.new(front)
-    fb = bm.faces.new(back[::-1])
-    n = len(outline)
-    for i in range(n):
-        j = (i + 1) % n
-        bm.faces.new((front[i], back[i], back[j], front[j]))
-    bmesh.ops.triangulate(bm, faces=[ff, fb], quad_method="BEAUTY", ngon_method="EAR_CLIP")
+            nw = (RACK_PITCH - 2 * tw) / 2
+            for a in (math.pi * 0.85, math.pi * 1.5, math.pi * 2.15):
+                top.append((xn + nw * math.cos(a), NOTCH + nw + nw * math.sin(a) * 0.9))
+    xa, xb = top[0][0], top[-1][0]
+    uv_ = lambda x_, y_: ((x_ - xa) / (xb - xa), (y_ - RAIL_LO) / (RAIL_HI - RAIL_LO))
+    # (filled as a ladder: a strip from each point along the top straight down to the foot, every face a quad (one many-sided face, the
+    # notches came out filled in by its triangulation: a plain board))
+    cols = []
+    for x_, y_ in top:
+        cols.append([(bm.verts.new(P(x_, yy, z_ + sd * 0.0035)), (x_, yy)) for sd in (-1, 1) for yy in (RAIL_LO, y_)])
+    # (each column: front foot, front top, back foot, back top)
+    def quad(a, b, c, d):
+        f = bm.faces.new((a[0], b[0], c[0], d[0]))
+        for l, q in zip(f.loops, (a, b, c, d)):
+            l[uvl].uv = uv_(*q[1])
+    for k in range(len(cols) - 1):
+        (af, at_, ab, abt), (bf, bt, bb, bbt) = cols[k], cols[k + 1]
+        quad(af, bf, bt, at_)          # (front)
+        quad(bb, ab, abt, bbt)         # (back)
+        quad(at_, bt, bbt, abt)        # (top)
+        quad(bf, af, ab, bb)           # (foot)
+    for c_, fl in ((cols[0], True), (cols[-1], False)):
+        f_, t_, b_, bt_ = c_
+        quad(*((f_, b_, bt_, t_) if fl else (b_, f_, t_, bt_)))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(f"SinkBasketRail{zi}")
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(f"SinkBasketRail{zi}", me)
     bpy.context.collection.objects.link(o)
-    finish(o, f"SinkBasketRail{zi}", M["rod"], smooth_shade=False)
+    finish(o, f"SinkBasketRail{zi}", M["comb"], smooth_shade=False)
     parts.append(o)
+    # (the pole along its outer foot, a hair off the comb and the basket's floor, its three nodes ringed)
+    zo = z_ + (-1 if zi == 0 else 1) * (0.0035 + 0.0055)
+    tube(f"SinkBasketPole{zi}", [(xa, RAIL_LO + 0.0052, zo), (xb, RAIL_LO + 0.0052, zo)], 0.0048, "pole", res=1, sides=8)
+    for q, at in enumerate((0.17, 0.5, 0.83)):
+        xq = xa + (xb - xa) * at
+        tube(f"SinkBasketPoleNode{zi}{q}", [(xq - 0.003, RAIL_LO + 0.0052, zo), (xq + 0.003, RAIL_LO + 0.0052, zo)], 0.0056, "pole_node", res=1, sides=8)
 # (the game's plates (GuestBar3D's, 0.197 round in the sink's units) stand in the notches across its middle, along its slots: the slots'
 # marks two pitches apart from the first notch, so the game finds the pitch and the start)
 RACK_PLATE_R = 0.197
