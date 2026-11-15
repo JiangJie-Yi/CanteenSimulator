@@ -256,6 +256,7 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-25', ['vase-1', 'vase1']],
   // (the sake barrel and the lantern where the owner set them made their defaults, what was kept for them reset (2026-11-15))
   ['jgs-edit-relaid-26', ['sake', 'lantern']],
+  ['jgs-edit-relaid-27', ['shrinelamp-1', 'shrinelamp1']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -341,8 +342,9 @@ export const BASES: Record<string, V3> = {
   shrinecups: [0.0502, 0, 0.115],
   // (each 2 cm in toward the middle and 2 cm down, as the owner set them in the room's frame (item 110, 2026-11-14: left X 0.02, Y -0.02; right
   // X -0.02, Y -0.02), taken into their parents' (turned -90°: fromRoom))
-  'shrinelamp-1': [0.03, -0.02, -0.01],
-  shrinelamp1: [0.03, -0.02, 0.01],
+  // (the owner's, 2026-11-15: both up 0.02, then reset)
+  'shrinelamp-1': [0.03, 0, -0.01],
+  shrinelamp1: [0.03, 0, 0.01],
   flask: [0.15, 0, 0.0425],
   sutra: [0.142, 0, -0.03 + 0.035],
   // (each 4 cm in toward the middle as the owner set them in the room's frame (item 111, 2026-11-14: left X 0.04, right X -0.04), taken into
