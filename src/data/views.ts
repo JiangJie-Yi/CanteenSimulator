@@ -3,7 +3,7 @@
 // the whole shop's have their own framing).
 import type { Lang } from './i18n'
 
-export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back' | 'window' | 'boss'
+export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back' | 'window' | 'boss' | 'top'
 export type ViewSpot = {
   id: ViewId
   zh: string
@@ -49,6 +49,12 @@ export const VIEW_SPOTS: ViewSpot[] = [
     about: { zh: '流理台：水槽、瀝水籃、碗盤架與冷凍櫃', ja: '流し台：シンク、水切りかご、食器ラックと冷凍庫', en: 'The sink: basin, draining basket, dish racks and freezer' } },
   { id: 'boss', zh: '老闆', ja: '店主', en: 'Owner', anchor: 'BossFollow', follow: true,
     about: { zh: '老闆的第一人稱：從他的眼睛看出去，跟著他走、跟著他轉（閉店時）', ja: '店主の目線：店主の目から、歩けばついて、向けば向く（閉店中）', en: 'Through the owner’s eyes: where he goes and where he looks (while closed)' } },
+  // (the owner's, item 181, 2026-11-15: "a new view, its key `, from 90 degrees, straight down": the whole shop from right above it, the bar's
+  // length across the screen; a long lens, so the walls and what stands up lean out as little as can be)
+  { id: 'top', zh: '俯視', ja: '真上', en: 'Top-down', fov: 32,
+    about: { zh: '從正上方往下看整間店（90 度）', ja: '真上から店全体を見下ろす（90 度）', en: 'The whole shop from straight above (90°)' } },
 ]
+/** the key that brings each view up (its place in the list): 1 to 9, 0 the tenth (the owner's eyes), and ` the top-down one */
+export const viewKey = (i: number) => (VIEW_SPOTS[i]?.id === 'top' ? '`' : i === 9 ? '0' : String(i + 1))
 
 export const viewName = (v: ViewSpot, lang: Lang) => (lang === 'ja' ? v.ja : lang === 'en' ? v.en : v.zh)

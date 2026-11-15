@@ -104,7 +104,7 @@ import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
-import { VIEW_SPOTS, viewName, type ViewId } from '@/data/views'
+import { VIEW_SPOTS, viewKey, viewName, type ViewId } from '@/data/views'
 import { ViewToast } from '@/ui/ViewToast'
 
 /** closing up, by the game's minutes past closing time: those still in hurried out (half an hour), the shop shut whoever's left (an hour) */
@@ -214,6 +214,14 @@ const FIRE_BURN_PER_TICK = 1 / (90 * 60 * 5)
 const CAMERA_POSITION: [number, number, number] = [2.9, 2.2, 4.0]
 /** the second view the eye button gives (at the grill): from high up at 45 degrees, the whole shop in it */
 const OVERVIEW_TARGET = new THREE.Vector3(0.0, 0.3, -1.2)
+/** the top-down view (item 181): the point it looks straight down on (the shop's middle as it's seen from above: from its back wall to the
+ * genkan's door, the street outside it left out, 3.4 back along the bar from the world's origin), how high over it the camera is (with its
+ * 32° lens all of it in a 16:9 frame, the shrine on the back wall in too), and the way to the room's open side (LAY), the hair the camera stands
+ * off toward it so the bar's length lies across the screen */
+const TOP_AT = new THREE.Vector3(-2.9, -0.5, 1.85)
+// (the controls' furthest: further, and it's held at 24 anyway)
+const TOP_UP = 24
+const TOP_OPEN = new THREE.Vector3(0.59, 0, 0.81).normalize()
 const OVERVIEW_POSITION = new THREE.Vector3(21.7, 15.5, 2.2)
 const CAMERA_FOV = 40
 /** the lens of the view through the owner's eyes: wide, as a first-person view is */
@@ -547,7 +555,7 @@ const VIEWCAM_TURN: Partial<Record<ViewId, V3>> = { free: [0, 15, 5] }
 const viewCamPlaced = (id: ViewId) => [...positionOf(`viewcam-${id}`), ...rotationOf(`viewcam-${id}`), ...(VIEWCAM_TURN[id] ?? [])].some((x) => Math.abs(x) > 1e-6)
 
 /** a film camera's shape, pointing down its -z: the body, the lens, two reels on top */
-function CamIcon({ editing, n, name }: { editing: boolean; n: number; name: string }) {
+function CamIcon({ editing, n, name }: { editing: boolean; n: number | string; name: string }) {
   const g = useRef<THREE.Group>(null)
   // (only seen, and only to be pointed at, in edit mode: otherwise on a layer the camera doesn't draw and the pointer doesn't reach)
   useEffect(() => { g.current?.traverse((o) => o.layers.set(editing ? 0 : 5)) }, [editing])
@@ -591,8 +599,8 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
         if (!p) return null
         const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(p.pos, p.target, new THREE.Vector3(0, 1, 0)))
         return (
-          <Movable key={v.id} id={`viewcam-${v.id}`} label={`視角 ${i + 1}・${v.zh}`} baseTurn={VIEWCAM_TURN[v.id]}>
-            <group name={`viewcam-${v.id}`} position={p.pos} quaternion={q}><CamIcon editing={editing} n={i + 1} name={viewName(v, lang)} /></group>
+          <Movable key={v.id} id={`viewcam-${v.id}`} label={`視角 ${viewKey(i)}・${v.zh}`} baseTurn={VIEWCAM_TURN[v.id]}>
+            <group name={`viewcam-${v.id}`} position={p.pos} quaternion={q}><CamIcon editing={editing} n={viewKey(i)} name={viewName(v, lang)} /></group>
           </Movable>
         )
       })}
@@ -741,6 +749,9 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
    * the room's middle side, a little above, at about table height */
   const poseOf = (id: ViewId): { pos: THREE.Vector3; target: THREE.Vector3 } | null => {
     if (id === 'grill') return { pos: home.current.clone(), target: homeTarget.clone() }
+    // (straight down from right above the shop's middle (item 181): a hair off toward the room's open side, so the bar's length lies across
+    // the screen and the street side is at its foot, as in the overview)
+    if (id === 'top') return { pos: TOP_AT.clone().add(new THREE.Vector3(0, TOP_UP, 0)).addScaledVector(TOP_OPEN, 0.01), target: TOP_AT.clone() }
     if (id === 'free') return DISHES[active].roast ? { pos: OVERVIEW_POSITION.clone(), target: OVERVIEW_TARGET.clone() } : null
     const spot = VIEW_SPOTS.find((v) => v.id === id)
     const anchor = spot?.anchor ? scene.getObjectByName(spot.anchor) : null
@@ -777,7 +788,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
     setViewCams(() => {
       const cams: ViewCam[] = []
       for (const v of VIEW_SPOTS) {
-        if (v.id === 'free' || v.follow) continue
+        if (v.id === 'free' || v.id === 'top' || v.follow) continue
         const def = poseNow.current(v.id)
         if (!def) return null
         const eye = def.pos.clone(), target = def.target.clone()
@@ -1702,10 +1713,12 @@ export default function App() {
   useEffect(() => {
     if (editOn) return
     const key = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !/^[0-9]$/.test(e.key)) return
+      // (and ` (the key left of 1, by its place on the keyboard: any layout, an IME on) the top-down view, item 181)
+      const top = e.code === 'Backquote'
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (!top && !/^[0-9]$/.test(e.key))) return
       const t = e.target
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
-      const v = VIEW_SPOTS[e.key === '0' ? 9 : +e.key - 1]
+      const v = top ? VIEW_SPOTS.find((x) => x.id === 'top') : VIEW_SPOTS[e.key === '0' ? 9 : +e.key - 1]
       if (!v) return
       e.preventDefault()
       setView(v.id); setResetView((n) => n + 1); setViewMenu(false)
@@ -3241,7 +3254,7 @@ export default function App() {
               <li key={v.id}>
                 <button type="button" role="menuitemradio" aria-checked={view === v.id} className={view === v.id ? 'is-on' : ''}
                   onClick={() => { setView(v.id); setResetView((n) => n + 1); setViewMenu(false) }} title={v.about[lang]}>
-                  <i>{i + 1}</i>{viewName(v, lang)}
+                  <i>{viewKey(i)}</i>{viewName(v, lang)}
                 </button>
               </li>
             ))}
