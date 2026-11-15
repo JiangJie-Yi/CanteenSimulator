@@ -2,6 +2,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './admin.css'
+import '@/ui/pressFeel'
 import { AdminApp } from './AdminApp'
 
 createRoot(document.getElementById('root')!).render(

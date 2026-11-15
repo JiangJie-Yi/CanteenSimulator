@@ -695,7 +695,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .game-clock-sky .game-clock-arrow { fill: none; }
 .game-clock-sky:hover { background-color: rgb(255 255 255 / 0.16); }
 .game-clock-sky:hover svg { filter: drop-shadow(0 0 3px var(--sky-ink)); }
-.game-clock-sky:active { transform: scale(0.9); transition-duration: 0s; }
 .game-clock-sky:focus-visible { outline: 2px solid var(--sky-ink); outline-offset: 1px; }
 /* (the sound effects on or off: a little speaker at its end, its waves while they sound, struck through and dimmed while muted) */
 /* (past midnight: the deep night's mark, a little indigo seal) */
@@ -738,7 +737,6 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .game-clock-sfx .game-clock-sfx-box { fill: currentColor; }
 .game-clock-sfx.is-off { opacity: 0.55; }
 .game-clock-sfx:hover { background-color: rgb(255 255 255 / 0.16); opacity: 1; }
-.game-clock-sfx:active { transform: scale(0.9); transition-duration: 0s; }
 .game-clock-sfx:focus-visible { outline: 2px solid #f6ecda; outline-offset: 1px; }
 .game-clock-time {
   font-variant-numeric: tabular-nums;
@@ -2306,6 +2304,8 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .office {
   position: absolute;
   z-index: 20;
+  /* (it comes in as an iPhone's sheet does (item 179)) */
+  animation: sheet-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) backwards;
   top: 96px;
   left: 50%;
   width: min(560px, 94vw);
@@ -5213,6 +5213,8 @@ body:has(.app.is-editing), .app.is-editing canvas { cursor: default !important; 
 /* the views menu, opened from the eye button at the bottom left: a short list of the shop's parts, numbered as edit mode marks them */
 .view-menu {
   /* (its panel is light paper by day and by night: its words always dark ink on it) */
+  /* (it pops open as an iPhone's menu does (item 179)) */
+  animation: pop-in 0.22s cubic-bezier(0.32, 0.72, 0, 1) backwards;
   --menu-ink: #2b2118;
   position: absolute;
   left: 22px;
@@ -5539,6 +5541,8 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .drink-stock {
   position: fixed;
   z-index: 30;
+  /* (it comes in as an iPhone's sheet does: up a little and in, quick then easing, on the compositor (item 179)) */
+  animation: sheet-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) backwards;
   top: 84px;
   left: 50%;
   transform: translateX(-50%);
@@ -5722,7 +5726,7 @@ html[lang='en'] .menu-title-en { display: none; }
 }
 .panel-x::after { transform: rotate(-45deg); }
 .panel-x:hover { background: color-mix(in srgb, currentColor 16%, transparent); border-color: #e0a866; transform: rotate(90deg) scale(1.08); }
-.panel-x:active { transform: rotate(90deg) scale(0.94); }
+.panel-x:active { transform: rotate(90deg); }
 .panel-x:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .office > header .panel-x { margin-left: auto; }
 /* the staff tab's foot of the team: what the staff costs, and every open job filled at once */
@@ -6966,3 +6970,8 @@ body.be-tool { --bt-menu: 34px; --bt-toolbar: 40px; --bt-top: calc(var(--bt-menu
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); }
 .pm-tag.is-person { color: #101010; }
 .pm-tag.is-seat { padding: 1px 5px; background: rgba(79, 210, 110, 0.85); color: #0d2614; font-size: 10px; }
+/* (the sheets' and menus' coming in (item 179): translate, scale and opacity alone, which go on top of what's set as `transform` and run on
+   the compositor, smooth while the main thread's drawing the 3D view) */
+@keyframes sheet-in { from { opacity: 0; translate: 0 18px; scale: 0.98; } }
+@keyframes pop-in { from { opacity: 0; translate: 0 -6px; scale: 0.96; } }
+@media (prefers-reduced-motion: reduce) { .drink-stock, .office, .view-menu { animation: none; } }

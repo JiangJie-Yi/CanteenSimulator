@@ -7,6 +7,8 @@ import './scene/canvasKeep'
 import './scene/triProfiler'
 // (every sound effect through one switch: muted together from the clock, top right)
 import './scene/sfx'
+// (every button's press sinks at once and springs back as it's let go, as an iPhone's: item 179)
+import './ui/pressFeel'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
