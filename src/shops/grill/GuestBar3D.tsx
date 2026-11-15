@@ -2910,7 +2910,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const visitorObjs = useRef(new Map<number, THREE.Group>())
   /** those waiting on the genkan's bench for a stool (bar.ts's BENCH): in from the door to their place on it, sat there, and when called (`up`)
    * handed over to the way in to their stool from where they sat (`benchFrom`); given up, out of the door again */
-  type Sitter = { id: number; phase: 'in' | 'sit' | 'out'; t: number; fade: number; fadeT: number; pos: THREE.Vector3; yaw: number; spot: number; handed?: boolean }
+  type Sitter = { id: number; phase: 'in' | 'sit' | 'out'; t: number; fade: number; fadeT: number; pos: THREE.Vector3; yaw: number; spot: number; handed?: boolean
+    /** their place on the bench and the way it faces, as last found from its marks: kept while the marks aren't there for a frame */
+    at?: THREE.Vector3; face?: THREE.Vector3 }
   const sitters = useRef(new Map<number, Sitter>())
   const [sitterList, setSitterList] = useState<{ id: number; sat: boolean }[]>([])
   const sitterObjs = useRef(new Map<number, THREE.Group>())
@@ -4792,16 +4794,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         v.t += step
         const sp = SPEED * walkSpeedOf(kindOf(v.id).kind)
         // (its place on the bench where the bench is now, moved by hand or not)
+        // (the marks not there for a frame (the bench put back as the shop shuts): their place as last found, not the bench's place as laid
+        // before it was moved, a step off (the day's audit, 2026-11-15: one on the bench 0.84 across in a frame at 04:01))
         const laid = way?.benchSpots[v.spot], bm = BENCH_MARKS.get(v.spot), fb = frame.current
-        const at = laid && bm && fb ? fb.worldToLocal(bm.getWorldPosition(BENCH_AT[v.spot])) : laid
+        const found = !!(laid && bm && fb)
+        if (found) v.at = (v.at ?? new THREE.Vector3()).copy(fb!.worldToLocal(bm!.getWorldPosition(BENCH_AT[v.spot])))
+        const at = v.at ?? laid
         if (!way || !at) { sitters.current.delete(v.id); benchChanged = true; continue }
         // (which way the bench faces, as it stands now: across its row of places, away from the wall; and a step out in front of their place, the
         // way to it and from it bending there, clear of the shoe cupboard by the wall)
         // (the bench their place is on: its first place and its last)
         const b0 = v.spot - (v.spot % BENCH_EACH), m0 = BENCH_MARKS.get(b0), m1 = BENCH_MARKS.get(b0 + BENCH_EACH - 1)
-        if (m0 && m1 && fb) { fb.worldToLocal(m0.getWorldPosition(BENCH_A)); fb.worldToLocal(m1.getWorldPosition(BENCH_B)); BENCH_B.sub(BENCH_A) }
-        else BENCH_B.set(Math.cos(BENCH_PLACE.yaw), 0, -Math.sin(BENCH_PLACE.yaw))
-        BENCH_B.set(-BENCH_B.z, 0, BENCH_B.x).normalize()
+        if (m0 && m1 && fb) {
+          fb.worldToLocal(m0.getWorldPosition(BENCH_A)); fb.worldToLocal(m1.getWorldPosition(BENCH_B)); BENCH_B.sub(BENCH_A)
+          BENCH_B.set(-BENCH_B.z, 0, BENCH_B.x).normalize()
+          v.face = (v.face ?? new THREE.Vector3()).copy(BENCH_B)
+        } else if (v.face) BENCH_B.copy(v.face)
+        // (never found yet: across the bench as it's laid, its yaw turned a quarter)
+        else BENCH_B.set(Math.sin(BENCH_PLACE.yaw), 0, Math.cos(BENCH_PLACE.yaw))
         const before = at.clone().addScaledVector(BENCH_B, 0.42), walk = [way.door, before, at]
         if (BENCH.up.has(v.id)) {
           // (called: up off the bench and on in to their stool from here (setShown's way in starts where they sat))
