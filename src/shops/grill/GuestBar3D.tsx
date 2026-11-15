@@ -3712,7 +3712,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
 
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
@@ -5338,7 +5338,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (w.t >= 0.25) {
           w.t = 0
           // (not at their place: the day's first moment, stood where it was before the kitchen's floor was looked at (in the miso pot): over to it)
-          if (open && !SHOP.leaving && Math.hypot(w.pos.x - home.at.x, w.pos.z - home.at.z) > 0.05) { go([home.at.clone(), w.pos.clone()], 'back'); return }
+          if (open && !SHOP.leaving && Math.hypot(w.pos.x - home.at.x, w.pos.z - home.at.z) > 0.05) { go(kitchenRoute(home.at, w.pos), 'back'); return }
           // (a takeaway's box packed and its customer waiting for it in the genkan: out to them with it before anything else, no one
           // else's on the way with it)
           const box = takeoutWay && !SHOP.leaving ? TAKEOUT.orders.find((o) => o.ready && !o.taken && !boxClaimed.current.has(o.id) &&
@@ -5481,7 +5481,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (the way they came, from their place to here: walked from its end, here, back to its start (the owner's item 36: given from here,
         // they were back inside their gate the moment they set off, walked out to the stand again, and were at their place again, at a jump
         // each time, every takeaway the cashier handed over)
-        go([home.at.clone(), ...w.path.slice(0, -1).map((v) => v.clone()), w.pos.clone()], 'back')
+        // (and from where that way began to their place round what's in the kitchen (item 173): the way out began at the serving counter
+        // (item 167), and their place put straight before it, the last of it went straight through the low rack, the warmer and the cook
+        // table's corner: pushed out of the table, a jump each time, a dozen a night)
+        go([...kitchenRoute(home.at, w.path[0] ?? w.pos).slice(0, -1), ...w.path.slice(0, -1).map((v) => v.clone()), w.pos.clone()], 'back')
       } else if (w.phase === 'toTill') walk(() => {
         w.phase = 'hand'
         const v = visitors.current.get(w.box ?? -1)
