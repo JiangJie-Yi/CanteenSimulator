@@ -838,43 +838,138 @@ veg_from = len(parts)
 
 
 def wicker(n=512):
-    """a wicker basket's weave: willow weavers running round it (along u) over and under upright stakes, each weaver rounded (lit along its
-    middle, a dark gap between rows), every other crossing raised; golden brown, a shade darker inside (v past 0.55: basket() lays the outside
-    up v 0..0.5, the inside from 0.5 down)"""
+    """a wicker basket's weave (item 153, the owner's, 2026-11-15: the old picture was plain bars in a deep orange, no weave in it): willow
+    weavers running round it (rows along u), each rounded across its height, over one upright stake and under the next, the next row the
+    other way; where a weaver goes under, the stake shows, a rounded rod; a pale willow tan, in the picture's own colours, a shade darker
+    inside (v past 0.55: the outside is laid up v 0..0.5, the inside from 0.5 down)"""
     u, v = grid01(n)
-    ROWS, STAKES = 30, 28
-    ry = (v * ROWS) % 1
-    rk = np.floor(v * ROWS)
-    sk = np.floor(u * STAKES + rk * 0.5)
-    over = ((sk + rk) % 2).astype(np.float32)
-    sx = (u * STAKES + rk * 0.5) % 1
-    # (a weaver bulges where it passes over a stake, dips where it goes under)
-    bulge = 0.75 + 0.25 * np.where(over > 0, np.sin(sx * np.pi), 1 - np.sin(sx * np.pi))
-    round_ = np.sin(ry * np.pi) ** 0.6
-    tone = vnoise(n, 6, 40)
-    col = mix(lin("#b07a3a"), lin("#eab872"), np.clip(tone * 0.5 + 0.35, 0, 1))
-    col = col * (0.55 + 0.45 * round_ * bulge)[..., None]
-    col = np.where((v > 0.55)[..., None], col * 0.75, col)
+    srgb = lambda h: np.array([int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)], np.float32)
+    ROWS, STAKES = 14, 16
+    ry, rk = (v * ROWS) % 1, np.floor(v * ROWS)
+    sx, sk = (u * STAKES) % 1, np.floor(u * STAKES)
+    over = ((sk + rk) % 2) == 0
+    tone = np.clip(fbm(n, 6, 3) * 0.8 + 0.2, 0, 1)
+    weave = mix(srgb("#b88a50"), srgb("#e8c890"), tone)
+    rnd = np.sin(ry * np.pi) ** 0.5
+    # (over a stake: full and lit; going under: drawn in toward its ends, shadowed)
+    dip = np.where(over, 1.0, 0.72 + 0.28 * np.abs(np.cos(sx * np.pi)))
+    weave = weave * (0.32 + 0.68 * rnd * dip)[..., None]
+    rod = np.cos(np.clip((sx - 0.5) / 0.17, -1, 1) * np.pi / 2)
+    stake = srgb("#a07642") * (0.35 + 0.65 * rod)[..., None]
+    show = (~over) & (np.abs(sx - 0.5) < 0.17) & (np.abs(ry - 0.5) < 0.42)
+    col = np.where(show[..., None], stake, weave)
+    col = np.where((v > 0.55)[..., None], col * 0.78, col)
     return col
 
 
 M["wicker"] = pbr("VegWicker", (1, 1, 1), tex=image("veg_wicker", wicker()), rough=0.8)
 M["wicker_cane"] = pbr("VegWickerCane", tuple(lin("#c4884a")), rough=0.7)
-M["cabbage"] = pbr("VegCabbage", (1, 1, 1), tex=skin_picture("veg_cabbage", "#a6cf6c", "#5f9a3c", 16, 0.45), rough=0.6)
-M["cabbage_pale"] = pbr("VegCabbagePale", (1, 1, 1), tex=skin_picture("veg_cabbage_pale", "#c8e08a", "#8cbc5a", 14, 0.4), rough=0.6)
-M["broccoli"] = pbr("VegBroccoli", tuple(lin("#3f6e2a")), rough=0.85)
+def cabbage_picture(name, base, deep, n=256):
+    """a cabbage's leaf (item 153: the old one's dark wavy lines read as a watermelon's): a pale green, deeper in soft patches, and its veins
+    pale, near white, running from its root up and out (along v), a few branching off"""
+    u, v = grid01(n)
+    col = mix(lin(base), lin(deep), smooth(0.4, 0.8, fbm(n, 3, 4)) * 0.6)
+    wob = (fbm(n, 2, 3) - 0.5) * 0.35
+    main = smooth(0.9, 0.99, np.abs(np.sin((u * 6 + wob) * np.pi)))
+    side = smooth(0.95, 1.0, np.abs(np.sin((u * 18 + v * 3 + wob * 2) * np.pi))) * smooth(0.2, 0.6, v)
+    col = mix(col, lin("#eef5d6"), np.clip(main * 0.85 + side * 0.4, 0, 1))
+    return image(name, col)
+
+
+M["cabbage"] = pbr("VegCabbage", (1, 1, 1), tex=cabbage_picture("veg_cabbage", "#b6d98a", "#7fb556"), rough=0.6)
+M["cabbage_pale"] = pbr("VegCabbagePale", (1, 1, 1), tex=cabbage_picture("veg_cabbage_pale", "#d4e8a8", "#a6cc78"), rough=0.6)
+def buds(n=256):
+    """broccoli's florets: tight buds, a dark green with lighter tips speckled over it"""
+    d = vnoise(n, 40, 40)
+    return mix(lin("#2a4f1c"), lin("#6f9a48"), smooth(0.45, 0.8, d))
+
+
+M["broccoli"] = pbr("VegBroccoli", (1, 1, 1), tex=image("veg_broccoli", buds()), rough=0.85)
+# (an outer leaf of a cabbage: both its sides drawn, the head seen through between them)
+M["cabbage_leaf"] = pbr("VegCabbageLeaf", (1, 1, 1), tex=cabbage_picture("veg_cabbage_leaf", "#9fcd6c", "#5f9a3c"), rough=0.6)
+M["cabbage_leaf"].use_backface_culling = False
 M["broccoli_stem"] = pbr("VegBroccoliStem", tuple(lin("#8cb85a")), rough=0.6)
 M["pumpkin"] = pbr("VegPumpkin", (1, 1, 1), tex=skin_picture("veg_pumpkin", "#e88a2a", "#c0601a", 10, 0.6), rough=0.5)
 M["radish"] = pbr("VegRadish", tuple(lin("#a8183a")), rough=0.35, coat=0.4)
 M["courgette"] = pbr("VegCourgette", (1, 1, 1), tex=skin_picture("veg_courgette", "#b6d27a", "#7ea84c", 12, 0.5), rough=0.45)
 
 
+def qball(name, x, y, z, r, mat, squash=(1.0, 1.0, 1.0), rot=(0.0, 0.0, 0.0), cuts=3, shape=None):
+    """a round vegetable made finer (item 153, the owner's, 2026-11-15: "the quality isn't OK": icospheres of 80 faces, every face seen): a
+    cube's faces cut `cuts`+1 by `cuts`+1 and pushed out round, quads all over (no pole), smooth; `shape(n)` scales the radius along the
+    direction n (lobes, a dimple); laid out in the picture round it (u) and up it (v)"""
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=2.0)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=cuts, use_grid_fill=True)
+    uvl = bm.loops.layers.uv.new()
+    for v in bm.verts:
+        n = v.co.normalized()
+        k = shape(n) if shape else 1.0
+        v.co = Vector((n.x * r * k * squash[0], n.y * r * k * squash[1], n.z * r * k * squash[2]))
+    for f in bm.faces:
+        us = []
+        for l in f.loops:
+            n = l.vert.co.normalized()
+            us.append((math.atan2(n.y, n.x) + math.pi) / (2 * math.pi))
+        wrap = max(us) - min(us) > 0.5
+        for l, u_ in zip(f.loops, us):
+            l[uvl].uv = (u_ + (1.0 if wrap and u_ < 0.5 else 0.0), 0.5 + l.vert.co.normalized().z * 0.5)
+    o = mesh_object(name, bm, mat)
+    o.location = P(x, y, z)
+    o.rotation_euler = rot
+    return o
+
+
+def leaf_shell(name, x, y, z, r, mat, tilt, turn, reach=1.15, flare=0.18):
+    """a cabbage's outer leaf: a cup of a sphere `reach` rad round its middle, a little bigger than the head, its edge flared out, cupped round
+    it from the side `turn`, leant `tilt` off upright; rings from a little round its middle out (no fan to it), both its sides drawn"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    SEG, RINGS = 10, 4
+    rows = []
+    for k in range(RINGS + 1):
+        a = 0.25 + (reach - 0.25) * k / RINGS
+        rr = r * (1.05 + flare * (k / RINGS) ** 2)
+        rows.append([bm.verts.new((rr * math.sin(a) * math.cos(2 * math.pi * j / SEG + 0.3 * math.sin(j * 1.7)),
+                                   rr * math.sin(a) * math.sin(2 * math.pi * j / SEG + 0.3 * math.sin(j * 1.7)), rr * math.cos(a))) for j in range(SEG)])
+    for k in range(RINGS):
+        for j in range(SEG):
+            j2 = (j + 1) % SEG
+            f = bm.faces.new((rows[k][j], rows[k][j2], rows[k + 1][j2], rows[k + 1][j]))
+            for l, (uu, vv) in zip(f.loops, ((j, k), (j + 1, k), (j + 1, k + 1), (j, k + 1))):
+                l[uvl].uv = (uu / SEG, vv / RINGS)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = mesh_object(name, bm, mat)
+    o.location = P(x, y, z)
+    o.rotation_euler = (tilt, 0.0, turn)
+    return o
+
+
+def cabbage(name, x, y, z, r, mat, leaf_mat, rot=0.0):
+    """a cabbage: its tight head (a fine round), three outer leaves cupped round it from three sides, their edges flared out"""
+    qball(name, x, y, z, r, mat, squash=(1, 1, 0.92), rot=(0.2, 0.1, rot), cuts=2)
+    for k in range(3):
+        leaf_shell(f"{name}Leaf{k}", x, y, z, r, leaf_mat, tilt=1.25, turn=rot + k * 2 * math.pi / 3)
+
+
+def paprika(name, x, y, z, r, mat, rot=0.0):
+    """a bell pepper: four lobes round it, its shoulders up round a dimple where its stalk is, glossy; the stalk a short thick green one"""
+    def lobes(n):
+        th = math.atan2(n.y, n.x)
+        return (1 + 0.1 * math.cos(4 * th) * (1 - abs(n.z))) * (1 - 0.18 * max(0.0, n.z - 0.75) / 0.25)
+    qball(name, x, y, z, r, mat, squash=(1, 1, 1.08), rot=(0.15, 0.1, rot), cuts=3, shape=lobes)
+    stem(name + "Stem", x, y + r * 0.8, z, 0.014, r=0.0055)
+
+
 def broccoli(name, x, y, z, s=1.0):
-    """a head of broccoli: a short pale stalk, five dark florets bunched on it (a squashed icosphere each)"""
-    stem(name + "Stalk", x, y, z, 0.05 * s, mat="broccoli_stem", r=0.013 * s)
-    for k, (dx, dy, dz, r) in enumerate(((0, 0.062, 0, 0.03), (0.026, 0.05, 0.012, 0.022), (-0.024, 0.05, 0.014, 0.022),
-                                         (0.004, 0.052, -0.026, 0.022), (0.0, 0.05, 0.03, 0.02))):
-        ball(f"{name}Floret{k}", x + dx * s, y + dy * s, z + dz * s, r * s, "broccoli", squash=(1, 1, 0.8))
+    """a head of broccoli: a pale stalk, nine small florets bunched into a dome on it (a fine round each), budded (the picture)"""
+    stem(name + "Stalk", x, y, z, 0.05 * s, mat="broccoli_stem", r=0.012 * s)
+    for k in range(9):
+        a = k * 2.4
+        ring = 0 if k == 0 else (1 if k < 6 else 2)
+        rr = (0.0, 0.02, 0.03)[ring] * s
+        qball(f"{name}Floret{k}", x + rr * math.cos(a), y + (0.066 - 0.012 * ring) * s, z + rr * math.sin(a), (0.017 - 0.002 * ring) * s, "broccoli",
+              squash=(1, 1, 0.85), cuts=1)
 
 
 # -- the crate: two long boards each side, two each end, three across its floor, a square post inside each corner
@@ -894,13 +989,13 @@ F_ = 0.014                       # (its floor's top)
 ball("VegCrateUnder0", -0.05, F_ + 0.04, 0.02, 0.04, "pumpkin", squash=(1, 1, 0.8))
 ball("VegCrateUnder1", 0.06, F_ + 0.042, 0.025, 0.042, "cabbage", squash=(1, 1, 0.85))
 F_ += 0.035
-ball("VegCrateCabbage0", -0.068, F_ + 0.052, -0.03, 0.058, "cabbage", squash=(1, 1, 0.9), rot=(0.3, 0.2, 0.5))
-ball("VegCrateCabbage1", 0.072, F_ + 0.05, -0.034, 0.054, "cabbage", squash=(1, 1, 0.9), rot=(0.1, 0.6, 1.2))
-ball("VegCratePumpkin", -0.088, F_ + 0.04, 0.045, 0.042, "pumpkin", squash=(1, 1, 0.78))
+cabbage("VegCrateCabbage0", -0.068, F_ + 0.052, -0.03, 0.054, "cabbage", "cabbage_leaf", rot=0.5)
+cabbage("VegCrateCabbage1", 0.072, F_ + 0.05, -0.034, 0.05, "cabbage", "cabbage_leaf", rot=1.2)
+qball("VegCratePumpkin", -0.088, F_ + 0.04, 0.045, 0.042, "pumpkin", squash=(1, 1, 0.78), cuts=2,
+      shape=lambda n: 1 + 0.07 * math.cos(8 * math.atan2(n.y, n.x)) * (1 - abs(n.z)))
 stem("VegCratePumpkinStem", -0.088, F_ + 0.072, 0.045, 0.012, r=0.005)
 for k, (x_, z_, mat) in enumerate(((-0.022, 0.05, "paprika_r"), (0.03, 0.052, "paprika_r"), (0.095, 0.05, "paprika_y"))):
-    ball(f"VegCratePaprika{k}", x_, F_ + 0.05, z_, 0.033, mat, squash=(1, 1, 1.05), rot=(0.2 * k, 0.3, k))
-    stem(f"VegCratePaprikaStem{k}", x_, F_ + 0.082, z_, 0.012, r=0.005)
+    paprika(f"VegCratePaprika{k}", x_, F_ + 0.05, z_, 0.032, mat, rot=k * 0.9)
 broccoli("VegCrateBroccoli", 0.0, F_ + 0.06, -0.045, 0.9)
 crate_parts = parts[veg_from:]
 
@@ -926,16 +1021,16 @@ bm.faces.new(rows[-1])
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 mesh_object("VegBasketBody", bm, "wicker")
 RIM_Y = 0.1
-tube_obj("VegBasketRim", [(0.103 * EX * math.cos(2 * math.pi * j / 16), RIM_Y, 0.103 * math.sin(2 * math.pi * j / 16)) for j in range(16)], 0.0065,
+tube_obj("VegBasketRim", [(0.103 * EX * math.cos(2 * math.pi * j / 16), RIM_Y, 0.103 * math.sin(2 * math.pi * j / 16)) for j in range(16)], 0.0045,
          "wicker_cane", cyclic=True)
-tube_obj("VegBasketHandle", [(-0.124 * math.cos(math.pi * t / 10), RIM_Y + 0.17 * math.sin(math.pi * t / 10), 0.0) for t in range(11)], 0.0075,
+tube_obj("VegBasketHandle", [(-0.124 * math.cos(math.pi * t / 10), RIM_Y + 0.17 * math.sin(math.pi * t / 10), 0.0) for t in range(11)], 0.0038,
          "wicker_cane")
 B_ = 0.012                        # (its floor's top)
-ball("VegBasketCabbage", -0.025, B_ + 0.075, -0.03, 0.056, "cabbage_pale", squash=(1, 1, 0.92), rot=(0.4, 0.1, 0.8))
+cabbage("VegBasketCabbage", -0.025, B_ + 0.075, -0.03, 0.052, "cabbage_pale", "cabbage_leaf", rot=0.8)
 broccoli("VegBasketBroccoli", -0.07, B_ + 0.04, 0.035, 1.05)
 for k, (x_, z_, y_) in enumerate(((0.0, 0.05, 0.075), (0.028, 0.03, 0.08), (0.012, 0.072, 0.07), (-0.02, 0.07, 0.085))):
-    ball(f"VegBasketRadish{k}", x_, B_ + y_, z_, 0.021, "radish", rot=(k, 0.5, 0.2 * k))
-    stem(f"VegBasketRadishStem{k}", x_, B_ + y_ + 0.018, z_, 0.03, r=0.0025)
+    qball(f"VegBasketRadish{k}", x_, B_ + y_, z_, 0.021, "radish", squash=(1, 1, 0.9), rot=(k, 0.5, 0.2 * k), cuts=2)
+    stem(f"VegBasketRadishStem{k}", x_, B_ + y_ + 0.018, z_, 0.016, r=0.002)
 for k in range(2):
     long_veg(f"VegBasketCucumber{k}", 0.05 + 0.024 * k, B_ + 0.07 + 0.012 * k, -0.005, 0.15, 0.016, "cucumber",
              rot=(math.pi / 2 - 0.45, 0.0, 0.12 * (k - 0.5)), tip=0.7)

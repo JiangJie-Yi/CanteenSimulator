@@ -242,7 +242,8 @@ const VEG_SAYS: Record<string, [string, string]> = {
 export function VegBasket({ node }: { node: 'VegCrate' | 'VegBasket' }) {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
-    const r = partOf(gltf.scene, node, 0.004)
+    // (a fine ink line: the room's 4 mm round vegetables this small drew a thick black ring round each, a cartoon's blobs (item 153))
+    const r = partOf(gltf.scene, node, 0.0015)
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     return r
   }, [gltf, node])

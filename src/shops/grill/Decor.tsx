@@ -880,7 +880,8 @@ function VegAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)
   return <>{VEG_AT.map((v) => (
-    <Movable key={v.id} id={v.id} label={v.label} baseScale={1.4} ground={floor}>
+    // (1.9 times as made (the owner's, 2026-11-15: "too small" at 1.4, beside sacks of a metre))
+    <Movable key={v.id} id={v.id} label={v.label} baseScale={1.9} ground={floor}>
       <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}>
         <group position={[v.x * 1.4, 0, v.z * 1.4]} rotation-y={v.turn}><VegBasket node={v.node} /></group>
       </group>
