@@ -14,6 +14,7 @@ import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { keepOut, type HearthZones } from '@/game/hearthGuard'
 import * as THREE from 'three'
+import { flatOf } from '@/scene/flatBake'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
 import { bakeable, colourVertices, homeCopy, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
@@ -2678,7 +2679,7 @@ const BarTableware = memo(function BarTableware() {
                   {/* (the chopstick rest: its own piece (the owner's, 2026-11-12: the chopsticks themselves a piece to be moved, said three times)) */}
                   <Movable id={`chopsticks${seat}`} label={`筷架（座位 ${no}）`}>
                     <group ref={keep(k++)} name={`chop-set-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷架', '靛藍釉的筷架，黑漆塗箸擱在上面')}>
-                      <StaticBatch plain><group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group></StaticBatch>
+                      <StaticBatch plain><group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" flat /></group></StaticBatch>
                     </group>
                   </Movable>
                   {/* (the pair of chopsticks: a piece of its own, moved apart from the rest; BarChopsticks, instanced, lays them where this stands, and
@@ -2693,7 +2694,7 @@ const BarTableware = memo(function BarTableware() {
                   <Movable id={`soydish${seat}`} label={`醬油碟（座位 ${no}）`}>
                     <group ref={keep(k++)} userData={{ soySeat: seat }} position={[sauceSide(c, gate, x), BAR_TOP + 0.001, PLACE.sauce[1]]}
                       {...nameOver('醬油碟', '染付的小碟，客人坐下時倒醬油、放一點蘿蔔泥')}>
-                      <StaticBatch plain><BarPiece name="BarSoyDish" design={n} /></StaticBatch>
+                      <StaticBatch plain><BarPiece name="BarSoyDish" design={n} flat /></StaticBatch>
                     </group>
                   </Movable>
                 </group>
@@ -2911,6 +2912,7 @@ const CHOP_GONE = new THREE.Matrix4().makeScale(0, 0, 0)
  */
 const BarChopsticks = memo(function BarChopsticks() {
   const gltf = useGLTF(SETTING_URL) as unknown as { scene: THREE.Group }
+  const gl = useThree((s) => s.gl)
   const made = useMemo(() => {
     const src = gltf.scene.getObjectByName('BarChopstick')
     let mesh: THREE.Mesh | null = null
@@ -2940,18 +2942,25 @@ const BarChopsticks = memo(function BarChopsticks() {
         places.push(onSet.map((s) => at.clone().multiply(s)))
       }
     }
-    const sticks = new THREE.InstancedMesh(geo, mat, places.length * 2)
+    // (each lying stick one flat strip with its picture from above, its ink line in it (the owner's, 2026-11-15: "one sheet, with a picture"));
+    // those in a customer's hand are theirs, drawn with them)
+    const lone = new THREE.Mesh(geo, mat)
+    inkModel(lone, () => false, { width: 0.0008, weld: true })
+    const f = flatOf(gl, 'BarChopstick', lone, 512)
+    const sticks = new THREE.InstancedMesh(f.geo, f.mat, places.length * 2)
     const ink = new THREE.InstancedMesh(hull, CHOP_INK, places.length * 2)
+    ink.visible = false
     ink.instanceMatrix = sticks.instanceMatrix
     sticks.receiveShadow = true
     sticks.frustumCulled = ink.frustumCulled = false
     return { sticks, ink, places, geo, hull, mat, onSet }
-  }, [gltf])
+  }, [gltf, gl])
   // (the sets' pieces as they stand: looked up once they're drawn; read again while editing, as they're moved)
   const sets = useRef<(THREE.Object3D | null)[]>([])
   const settled = useRef(0)
   const scene = useThree((s) => s.scene)
-  useEffect(() => () => { if (made) { made.geo.dispose(); made.hull.dispose(); made.mat.dispose(); made.sticks.dispose(); made.ink.dispose() } }, [made])
+  // (the flat strip's geometry and material are flatOf's, shared: kept)
+  useEffect(() => () => { if (made) { made.geo.dispose(); made.hull.dispose(); made.mat.dispose(); made.ink.dispose() } }, [made])
   // (which places' pairs are up, last laid out: laid out again only when that changes)
   const shown = useRef('-')
   useFrame(() => {
@@ -3008,9 +3017,10 @@ const barBrassOf = () => {
  * drawer and its case (in the walnut's board `grain`, one of four: the places' drawers aren't all cut from one), the shared soy pot and wasabi.
  * `fade`: its own materials, to be faded out (a pulled tissue).
  */
-function BarPiece({ name, design, grain, fade }: { name: string; design?: number; grain?: number; fade?: boolean }) {
+function BarPiece({ name, design, grain, fade, flat }: { name: string; design?: number; grain?: number; fade?: boolean; flat?: boolean }) {
   useStudio()
   const gltf = useGLTF(SETTING_URL) as unknown as { scene: THREE.Group }
+  const gl = useThree((s) => s.gl)
   const obj = useMemo(() => {
     const board = grain === undefined ? undefined : grain % 4
     const key = `${name}|${design ?? ''}|${board ?? ''}`
@@ -3039,6 +3049,15 @@ function BarPiece({ name, design, grain, fade }: { name: string; design?: number
       inkModel(base, (m) => /Slot|Sheet|Spoon/.test(m.name), { width: 0.0008, weld: true })
       settingPieces.set(key, base)
     }
+    // (laid flat on the bar, one sheet with its picture from above (the owner's, 2026-11-15: the soy dishes, the chopsticks and their rests))
+    if (flat) {
+      const f = flatOf(gl, key, base)
+      const g = new THREE.Group(), m = new THREE.Mesh(f.geo, f.mat)
+      m.name = name
+      m.receiveShadow = true
+      g.add(m)
+      return g
+    }
     const made = base.clone(true)
     // (to fade: its own materials, see-through)
     if (fade) made.traverse((o) => {
@@ -3046,7 +3065,7 @@ function BarPiece({ name, design, grain, fade }: { name: string; design?: number
       if (m.isMesh) { const t = (m.material as THREE.Material).clone(); t.transparent = true; t.depthWrite = false; m.material = t }
     })
     return made
-  }, [gltf, name, design, grain, fade])
+  }, [gltf, name, design, grain, fade, flat, gl])
   // (a faded copy's materials are its own: let go of with it)
   useEffect(() => () => {
     if (fade) obj.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) (m.material as THREE.Material).dispose() })
