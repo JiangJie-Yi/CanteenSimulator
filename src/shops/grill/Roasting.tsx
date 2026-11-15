@@ -59,7 +59,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FREEZER, FRIDGE_KICK, backToCrate, liftFromCrate, takeFromCrate, type Held } from './Decor'
-import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, pourSake, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, pourSake, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, SERVE_COUNTER, barToFire, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -3531,9 +3531,12 @@ function raycastShown(this: THREE.Mesh, ray: THREE.Raycaster, hits: THREE.Inters
   for (let q: THREE.Object3D | null = this; q; q = q.parent) if (!q.visible) return
   THREE.Mesh.prototype.raycast.call(this, ray, hits)
 }
-const TakeoutBox = memo(function TakeoutBox({ position }: { position: [number, number, number] }) {
+const TakeoutBox = memo(function TakeoutBox({ at }: { at: () => THREE.Vector3 }) {
+  // (where it stands asked every frame: the serving counter's found a moment after, and may be moved in edit mode)
+  const g = useRef<THREE.Group>(null)
+  useFrame(() => { if (g.current) g.current.position.copy(at()) })
   return (
-    <group name="takeout-boxes" position={position} rotation-y={Math.atan2(ALONG.x, ALONG.z)}
+    <group ref={g} name="takeout-boxes" rotation-y={Math.atan2(ALONG.x, ALONG.z)}
       {...nameOver('外帶便當', '外帶與外送的菜裝在這裡｜裝好蓋上蓋子、綁上繩子，外場拿去收銀台交給客人')}>
       {Array.from({ length: BOX_TIERS }, (_, k) => <OneBox key={k} tier={k} />)}
     </group>
@@ -4905,7 +4908,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (kind === 'bowl') return bowlAt()
     // (the plating place's frame is the room's: in the fire's own, FIRE_SHIFT back, as the plates there are (readyFoodAt); without it the box
     // stood off the table's corner, half over the floor, what was packed into it hanging out over the bin (the owner's "brown block"))
-    if (kind === 'takeout') return new THREE.Vector3().addScaledVector(ALONG, TAKEOUT_SPOT.along).addScaledVector(LAY, TAKEOUT_SPOT.lay).sub(FIRE_SHIFT)
+    // (on the serving counter once it's found (item 167): in a plate at the plating place's second slot, it was)
+    if (kind === 'takeout') return SERVE_COUNTER.at ? barToFire(SERVE_COUNTER.at) : new THREE.Vector3().addScaledVector(ALONG, TAKEOUT_SPOT.along).addScaledVector(LAY, TAKEOUT_SPOT.lay).sub(FIRE_SHIFT)
     return kind === 'plate' ? plateAt(+n) : kind === 'dish' ? dishAt(+n) : basketAt(+n)
   }
   /** where the fan hangs: from its peg past the ledge's left end, its paper's middle below it (Decor turns it to face the cook) */
@@ -8294,7 +8298,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </group>
       ))}
       {/* the takeaway box, while one's being packed (game/takeout) */}
-      {space === 'open' && <TakeoutBox position={containerAt('takeout').toArray() as [number, number, number]} />}
+      {space === 'open' && <TakeoutBox at={() => containerAt('takeout')} />}
       <EmberBed fuel={fuel} />
       {/* (the sticks on the fire, their ink, and the crumbs they break into: a few instanced meshes, written each frame) */}
       <primitive object={coalDraw.group} />

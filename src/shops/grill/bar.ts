@@ -808,11 +808,21 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
 // (beside the ready plate along the table, toward the fire, clear of it: a plate's half-width and the box's, and a little between)
 // (a little back from the plates' row: the box is long enough for a whole saury now (0.58), its front end kept off the table's edge)
 export const TAKEOUT_SPOT = { along: PLATING_SPOT.along - 0.46, lay: PLATING_SPOT.lay - 0.04 }
-/** the same, in the bar's frame (for the server who comes for it): where it stands and where they stand to take it */
+/**
+ * The kitchen's serving counter (配膳台, item 167, the owner's, 2026-11-15): the takeaways' boxes are packed and wait on it, not at the
+ * plating place, where the box stood in its second slot's plate. GuestBar3D says where it is, in the bar's frame: its top's middle (`at`) and
+ * where one stands before it to take from it (`out`); null till it's found
+ */
+export const SERVE_COUNTER: { at: THREE.Vector3 | null; out: THREE.Vector3 | null } = { at: null, out: null }
+/** the same, in the bar's frame (for the server who comes for it): where it stands and where they stand to take it (on the serving counter
+ * once it's there; else at the cook table, by the plating place) */
 export const takeoutOf = () => {
+  if (SERVE_COUNTER.at && SERVE_COUNTER.out) return { at: SERVE_COUNTER.at.clone(), out: SERVE_COUNTER.out.clone() }
   const top = sceneToBar(0, 0, 0).y
   return { at: sceneToBar(TAKEOUT_SPOT.along, TAKEOUT_SPOT.lay).setY(top), out: sceneToBar(TAKEOUT_SPOT.along, PLATING_SPOT.serverLay).setY(0) }
 }
+/** a place in the bar's frame into the scene's (Roasting's, the fire's own: FIRE_SHIFT back), as sceneToBar undoes */
+export const barToFire = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET).sub(FIRE_SHIFT)
 /** the seats whose plate is out (set down at them, or on its way there): their later food is set out at the plating place loose, for adding to it */
 export const PLATES_OUT = new Set<number>()
 /** the kitchen's plater (the third cook, or the second) off their place, fetching plates for the plating place: GuestBar3D walks a figure of them,

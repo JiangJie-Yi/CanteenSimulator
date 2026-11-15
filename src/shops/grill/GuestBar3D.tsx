@@ -31,6 +31,7 @@ import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
 import { HAND_WASH_LINES, handStops, scrubbed } from '@/game/handWash'
 import { PathMap } from './PathMap'
+import { ServeCounter } from './ServeCounter'
 import { unlitShade } from '@/game/roomLights'
 import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SHAPE_HAND, SweepBroom, ownerSweepPose, floorWipePose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
@@ -84,7 +85,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, pourSake, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2510,7 +2511,7 @@ const IN_DRAIN: [number, number, number] = [IN_SINK, IN_SINK * 0.3, IN_SINK]
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegbasket', 'coalsack'])
+const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegbasket', 'coalsack', 'servecounter'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
@@ -3169,6 +3170,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * ways (from each one's place, and the owner's, to the sink, the racks and the plating place), worked out again only when that's changed;
    * the ways being walked; the customers' from the door to each seat */
   const pathsMap = useRef({ at: 0, sig: '', staff: [] as THREE.Vector3[][] })
+  /** when the serving counter's marks were last read */
+  const serveRead = useRef(0)
   const mapPaths = (now: number) => {
     if (now - pathsMap.current.at < 500) return
     pathsMap.current.at = now
@@ -3193,6 +3196,43 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ...seats.map((st) => ({ kind: 'guest' as const, pts: pathTo(counters, st) }))]
     PATH_MAP.v++
   }
+  /**
+   * The serving counter's place (item 167, the owner's red box): in the corridor between the cook table and the freezer, its middle midway
+   * across between the two (as they really reach, not the room left round them) and along at the freezer's middle, square to the cook table;
+   * measured once both are found (not a number set blind), then kept (moved by hand in edit mode, it's the edit's)
+   */
+  const [servePlace, setServePlace] = useState<{ at: THREE.Vector3; yaw: number } | null>(null)
+  /** when it was last measured, and how many times running it's come out the same */
+  const placeTry = useRef({ at: 0, same: 0 })
+  const placeServe = () => {
+    // (measured once a second till it's come out the same twice (the freezer's own place is put on it a moment after the page comes
+    // up: measured at once, the counter stood by the sink, a quarter under the floor), and all the while in edit mode, where they may move)
+    const now = performance.now()
+    if (now - placeTry.current.at < 1000 || (placeTry.current.same >= 2 && !getEdit().on)) return
+    placeTry.current.at = now
+    blocksMade.current = null
+    const blocks = kitchenBlocks(), ids = blockIds.current
+    const t = blocks[ids.indexOf('cooktable')], fz = blocks[ids.indexOf('freezer')]
+    // (not both found yet: looked at again in a second, not kept so for the day)
+    if (!t || !fz) { blocksMade.current = null; return }
+    // (the floor it stands on: the dais the freezer stands on, as high as the freezer's foot)
+    let fo: THREE.Object3D | null = null
+    scene.traverse((o) => { if (!fo && o.userData?.editId === 'freezer') fo = o })
+    const f = frame.current
+    if (!fo || !f) return
+    const foot = f.worldToLocal(new THREE.Box3().setFromObject(fo).min).y
+    const c0 = counters[0]
+    // (which side of the cook table the freezer's on, across it: the corridor's between the table's edge and the freezer's front)
+    const tableEdge = fz.z0 > t.z1 ? t.z1 - PASS_ROOM : t.z0 + PASS_ROOM, freezerFront = fz.z0 > t.z1 ? fz.z0 + PASS_ROOM : fz.z1 - PASS_ROOM
+    const a = (fz.x0 + fz.x1) / 2, l = (tableEdge + freezerFront) / 2
+    const at = c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(foot)
+    // (its long side along the table, its front (+z) toward the cook table: the side the servers come by)
+    const toTable = c0.lay.clone().multiplyScalar(fz.z0 > t.z1 ? -1 : 1)
+    const yaw = Math.atan2(toTable.x, toTable.z)
+    if (servePlace && servePlace.at.distanceTo(at) < 0.005 && Math.abs(servePlace.yaw - yaw) < 1e-3) { placeTry.current.same++; return }
+    placeTry.current.same = 0
+    setServePlace({ at, yaw })
+  }
   // (the crew's way home goes round the same things: Roasting asks for it as they leave)
   useEffect(() => {
     KITCHEN_ROUTE.route = (from, to) => kitchenRoute(from, to)
@@ -3210,6 +3250,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const [, setTick] = useState(0)
   const redraw = () => setTick((n) => n + 1)
   const runs = useRef<PlateRun[]>([])
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __plateRuns: runs })
   /** the plating place's carrier dishes (one a slot) */
   const carriers = useRef<(THREE.Group | null)[]>([])
   const runSeq = useRef(0)
@@ -5046,7 +5087,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (box && (duty !== 'dish' || nServers < 2)) {
             boxClaimed.current.add(box.id)
             w.box = box.id
-            go(fetchPath(wi), 'toBox')
+            // (from the serving counter, once it's there (item 167): to its front; else the plating place, as before)
+            go(SERVE_COUNTER.out ? kitchenRoute(homeOf(wi).at, SERVE_COUNTER.out) : fetchPath(wi), 'toBox')
             return
           }
           const slot = readySlot()
@@ -5163,11 +5205,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (o) o.taken = true
         if (cashierIn()) {
           const st = standSpots()
-          const path = [...kitchenRoute(pickupSpot, st.edge), st.reach]
+          const path = [...kitchenRoute(SERVE_COUNTER.out ?? pickupSpot, st.edge), st.reach]
           path[0] = w.pos.clone()
           go(path, 'toStand')
         } else {
-          const path = [...kitchenRoute(pickupSpot, home.at), ...tillPath(wi).slice(1)]
+          const path = [...kitchenRoute(SERVE_COUNTER.out ?? pickupSpot, home.at), ...tillPath(wi).slice(1)]
           path[0] = w.pos.clone()
           go(path, 'toTill')
         }
@@ -5567,6 +5609,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     // (the owner gone to wash the stack the player left on the counter (item 103): from the third day; washed into the draining basket)
     bossWashTick(step)
+    // (the serving counter (item 167): placed once the floor's measured; where its top and its front are, read again every second)
+    if (given) placeServe()
+    if (servePlace && performance.now() - serveRead.current > 1000) {
+      serveRead.current = performance.now()
+      const top = markOf('ServeCounterTop'), front = markOf('ServeCounterFront'), f = frame.current
+      if (top && front && f) {
+        SERVE_COUNTER.at = f.worldToLocal(top.getWorldPosition(SERVE_COUNTER.at ?? new THREE.Vector3()))
+        SERVE_COUNTER.out = f.worldToLocal(front.getWorldPosition(SERVE_COUNTER.out ?? new THREE.Vector3())).setY(0)
+      }
+    }
     // (the paths' map, while it's shown in edit mode (item 168))
     { const e = getEdit(); if (e.on && e.paths) mapPaths(performance.now()) }
     SINK.dirty = dirty.current
@@ -5702,6 +5754,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (the walking paths' map, in edit mode when asked for (item 168)) */}
       <PathMap />
+      {/* (the serving counter, in the corridor between the cook table and the freezer (item 167)) */}
+      {servePlace && (
+        <Movable id="servecounter" label="備餐檯" ground={0}>
+          <group name="look-servecounter" position={servePlace.at.toArray()} rotation-y={servePlace.yaw}><ServeCounter /></group>
+        </Movable>
+      )}
       {/* (one customer made with the page, never shown: their program linked while it loads) */}
       {people && <Suspense fallback={null}><FolkWarm /></Suspense>}
       {drawCounter && <group position={at}><Counter length={length} /></group>}
