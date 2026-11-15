@@ -4619,7 +4619,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
       {/* pendant lamps over the bar's customer side, low: one between each two places, midway (the owner's: a lamp between one customer and
           the next; bar's lampsAlong), their bands 鱗 and 立涌 in turn */}
       {lampsAlong(c).map((z, i) => (
-        <Movable key={i} id={`${lampId}${i}`} label={`吊燈（${lampName} ${i + 1}）`}><group position-x={0.05} userData={{ fade: 0.5 }}><Pendant z={z} drop={0.25} pool={top} band={i % 2} /></group></Movable>
+        <Movable key={i} id={`${lampId}${i}`} label={`吊燈（${lampName} ${i + 1}）`}><group position-x={0.05} userData={{ fadeOccluder: 0.5 }}><Pendant z={z} drop={0.25} pool={top} band={i % 2} /></group></Movable>
       ))}
     </group>
   )
@@ -7875,7 +7875,7 @@ function WallSpeaker() {
     ray.params.Line = { threshold: 0 }
     ray.params.Points = { threshold: 0 }
     const mine = (o: THREE.Object3D | null) => {
-      for (; o; o = o.parent) if (o === model.root || o === outer.current || o.userData.fade || o.userData.editHandle) return true
+      for (; o; o = o.parent) if (o === model.root || o === outer.current || o.userData.fadeOccluder || o.userData.fade || o.userData.editHandle) return true
       return false
     }
     const hit = ray.intersectObjects(room.children, true).find((h) => (h.object as THREE.Mesh).isMesh && !mine(h.object))

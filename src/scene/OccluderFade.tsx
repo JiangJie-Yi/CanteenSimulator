@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { warmLater } from './Prewarm'
 
 /**
- * Hangings that get in the way fade: a group marked `userData.fade` (the noren, the lanterns at the door, the lamps) that stands
+ * Hangings that get in the way fade: a group marked `userData.fadeOccluder` (the noren, the lanterns at the door, the lamps) that stands
  * between the camera and what it's looking at (the orbit's target, and a little round it) turns see-through, and comes back once it's out of the
  * way. Rays are cast at the group's own meshes (a batch's hidden originals included, since its merged copy can't be hit); what's drawn
  * (the merged copy, the ink lines) is what fades, each mesh on its own copy of its material so nothing else that shares it fades too. The
@@ -43,7 +43,9 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
   const gather = () => {
     const list: Fader[] = []
     scene.traverse((o) => {
-      if (!o.userData.fade) return
+      // (its own mark, not `fade`: that's the kitchen's people's own, how much of them shows as they come and go; read as this, every one of
+      // them was tried by these rays every third frame, a skinned figure's every vertex posed for it, some 420 a second (2026-11-15))
+      if (!o.userData.fadeOccluder) return
       const hit: THREE.Mesh[] = [], drawn: THREE.Mesh[] = [], ink: THREE.Mesh[] = []
       o.traverse((m) => {
         const mesh = m as THREE.Mesh
@@ -57,7 +59,7 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
       })
       const was = faders.current.find((f) => f.root === o)
       // (how far it fades: a number on the mark, or FADED; a lit lamp keeps more of itself, or it goes dark against the wall behind)
-      const low = typeof o.userData.fade === 'number' ? o.userData.fade : FADED
+      const low = typeof o.userData.fadeOccluder === 'number' ? o.userData.fadeOccluder : FADED
       const own = was?.own ?? new Map<THREE.Material, THREE.Material>()
       // (its see-through copies made now, and compiled with the rest at load (Prewarm): made the first time it faded, their programs were
       // compiled then, a hitch of 80 to 150 ms on turning to the grill, where a lamp hangs between the camera and the fire)

@@ -667,7 +667,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
       <Movable id="noren" label="門簾">
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
-        <group userData={{ fade: true }}>
+        <group userData={{ fadeOccluder: true }}>
           {/* (the pole laid on the lintel's brackets, no cords; the cloth longer than it was, as wide as the doorway so it stays clear of the walls) */}
           <group position-y={NOREN_CORD}>
           <group position={[0, H - 0.05, NZ]} scale={[NOREN_WIDE, NOREN_BIG * 1.05, 1]}><NorenModel tex={tex} panels={panels} pole="wood" /></group>
