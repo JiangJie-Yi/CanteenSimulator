@@ -14,6 +14,21 @@ export const CAPITAL = 300000
 /** what it costs to open one shop */
 // (a third of the capital: the shop opens with NT$200,000 in hand, as the owner set it, to buy its stock with)
 export const SHOP_COST = 100000
+/** the books as App keeps them, as far as the shop's cash goes */
+export type CashBooks = { revenue: number; bought: number; fuel: number; wage: number; utility?: number; setup?: number; offering?: number
+  promo?: number
+  /** what the owner's taken out of the till's drawer (a compartment's or a coin roll's worth at a click) */
+  till?: number
+  /** what of the takings has gone into the drawer: the cash customers' bills, paid in as they leave */
+  tillIn?: number }
+/**
+ * The shop's cash in hand, the money at the top of the screen (item 195; the owner's, item 182: "the things themselves don't match the
+ * interface"): the capital, the takings and the spending, less what those sat in still owe (`owed`: paid at the till as they leave) and what
+ * of the takings has gone into the till's drawer, and with what the owner's taken out of the drawer. The drawer's money is the shop's, but
+ * not in hand till it's taken out (a cash customer's bill was counted twice before: as they ordered, and again as it was taken out).
+ */
+export const cashInHand = (b: CashBooks, owed = 0) => CAPITAL + b.revenue - b.bought - b.fuel - b.wage - (b.utility ?? 0) - (b.setup ?? 0)
+  - (b.offering ?? 0) - (b.promo ?? 0) - owed - (b.tillIn ?? 0) + (b.till ?? 0)
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 export const CHARCOAL_COST = 18
 /** how much one load of charcoal raises the fire (0..1), and whether more can go on: at 100% the bed is full, so no more is added (nor paid for) */

@@ -4294,7 +4294,7 @@ type RoastingProps = {
   /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
   entries?: { key: string; name: string; ja?: string; parts: { id: string; dabs: string[]; name: string; ja?: string }[] }[]
   /** a customer orders this dish off the menu: false if it can't be had (out of stock, the fire's full) */
-  onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>) => boolean
+  onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean) => boolean
   /** how slowly customers come in (no cashier: fewer) */
   crowd?: number
   /** the omiki's been offered at the shrine: each customer orders a little more */
@@ -5960,7 +5960,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           }
           const reuse: Record<string, number> = {}
           for (const q of [...again, ...warm]) reuse[q.id] = (reuse[q.id] ?? 0) + 1
-          if (onOrderEntry?.(e.key, id, reuse)) {
+          if (onOrderEntry?.(e.key, id, reuse, seated)) {
             // (its prep: rice washed and cooked, the soup, what's rinsed)
             meterWater('cooking', e.parts.length)
             for (const q of again) revive(q)

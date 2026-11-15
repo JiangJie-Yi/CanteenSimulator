@@ -98,14 +98,16 @@ for (const [i, shop] of SHOPS.entries()) {
     check(shop, 'opens for business (enough dishes on the menu)', (await page.locator('.ai-toggle.is-on').count()) === 1)
     const tags = await page.locator('.menu .strip').count()
     check(shop, 'menu board shows the menu', tags >= 8, `${tags} dishes`)
-    // (the cash goes up when a customer pays; fuel and wages only take it down)
-    const open = await cash()
+    // (the takings go up as customers order: the cash itself only as they pay at the till on their way out, and a cash customer's money
+    // only as it's taken out of the till's drawer (item 195), so it's the books' takings that's watched)
+    const takings = () => page.evaluate(() => window.__books?.().revenue ?? 0)
+    const open = await takings()
     let best = open
     for (let t = 0; t < OPEN_FOR; t += 500) {
       await page.waitForTimeout(500)
-      best = Math.max(best, await cash())
+      best = Math.max(best, await takings())
     }
-    check(shop, 'customers come in and pay', best > open, `${open} -> ${best}`)
+    check(shop, 'customers come in and order (the takings go up)', best > open, `${open} -> ${best}`)
     // (SHOT=<path>: a picture of the shop at work, customers in, for a look at how they're drawn)
     if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT })
   } catch (e) {

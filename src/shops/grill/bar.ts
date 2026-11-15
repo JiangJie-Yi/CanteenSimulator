@@ -11,7 +11,7 @@ import type { Use } from '@/game/utilities'
 import type { HearthRole } from '@/game/hearthGuard'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
-import { openingFloat, startingRolls, type DrawerCash, type Rolls } from '@/game/till'
+import { deposit, openingFloat, startingRolls, type DrawerCash, type Rolls, type Tab } from '@/game/till'
 import { LOW_FULL, RACK_FULL, type Dryer, type Drain } from '@/game/plates'
 import { PILE_START } from '@/game/sinkPile'
 import type { Flower } from '@/game/shrineFlowers'
@@ -677,9 +677,22 @@ export const TILL_STATE = { text: '0', drawer: 0,
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __till?: typeof TILL_STATE }).__till = TILL_STATE
 /**
  * the money in the register's drawer (game/till): the day's float, and each cash customer's bill put in as they pay; the owner takes a
- * compartment's worth out by clicking it, and `onTake` (set by App) puts it to the shop's cash
+ * compartment's worth out by clicking it, and `onTake` (set by App) puts it to the shop's cash. `onPaid` (App's too): a bill paid at the
+ * till, by card or into the drawer; `paid`, the last few who've paid, so each pays once
  */
-export const TILL_CASH: { drawer: DrawerCash; rolls: Rolls; onTake: ((amount: number) => void) | null } = { drawer: openingFloat(), rolls: startingRolls(), onTake: null }
+export const TILL_CASH: { drawer: DrawerCash; rolls: Rolls; onTake: ((amount: number) => void) | null
+  onPaid: ((guest: number, amount: number, card: boolean) => void) | null; paid: Set<number> } =
+  { drawer: openingFloat(), rolls: startingRolls(), onTake: null, onPaid: null, paid: new Set() }
+/** a customer's bill paid at the till, once: cash into the drawer, and the shop's books told (GuestBar3D: as the cash key's pressed, or
+ * as they're by the till if a frame went past that moment; item 195: the register put it in the drawer only on the frame the key went
+ * down) */
+export function payIn(guest: number, amount: number, card: boolean) {
+  if (TILL_CASH.paid.has(guest)) return
+  TILL_CASH.paid.add(guest)
+  if (TILL_CASH.paid.size > 64) TILL_CASH.paid.delete(TILL_CASH.paid.values().next().value as number)
+  if (!card) TILL_CASH.drawer = deposit(TILL_CASH.drawer, amount)
+  TILL_CASH.onPaid?.(guest, amount, card)
+}
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
 export const PLATE_RACK = { n: RACK_FULL }
 /** the low rack by the cook table (game/plates' LOW_FULL; the owner's, 2026-11-11): how many clean plates are on it, and how many are on their
@@ -717,9 +730,10 @@ export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => numbe
 /** whether any of these foods is in stock (item 182, the owner's: "the things themselves don't match the interface": a store's contents drawn
  * only while there's something of it in stock); with no shop running (not known), as if there were */
 export const anyInStock = (ids: readonly string[]) => ids.some((id) => SUPPLIES.has(id) !== 0)
-/** what a customer's ordered comes to (App's own books: the menu's prices, how many parts): rung up at the till as it is (item 182: the till
- * charged a flat 380 a dish whatever was ordered); null for one not known */
-export const GUEST_BILLS: { of: (guest: number) => { paid: number; parts: number } | null } = { of: () => null }
+/** what a customer's ordered comes to (App's own books: the menu's prices, how many parts, the drink they took): rung up at the till as it
+ * is (item 182: the till charged a flat 380 a dish whatever was ordered; item 195: and the whole of it for one given some of it back);
+ * null for one not known */
+export const GUEST_BILLS: { of: (guest: number) => Tab | null } = { of: () => null }
 /** the stock keeper at a toilet just now, to change its roll: which, whether near enough its door to have it open, whether in (the guests
  * leave that toilet till he's done; the door opens and shuts for him as for them) */
 export const STOCKER_WC: { who: 'm' | 'f' | null; near: boolean; inside: boolean } = { who: null, near: false, inside: false }

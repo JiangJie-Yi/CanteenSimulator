@@ -28,8 +28,9 @@ import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
-import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
+import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, cashInHand, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
+import { afterRefund, drawerFrom, drawerTotal, owedAtTill, refundOf, rollsFrom, rollsValue, type Tab } from '@/game/till'
 import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
@@ -130,14 +131,17 @@ const FIRE_CAPACITY = RING_SLOTS
 const SAVE_KEY = 'canteen-save'
 /** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
 const RESUME_KEY = 'jgs-resume-1'
-type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number; promo?: number; overtime?: number }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; tillIn?: number; utility?: number; promo?: number
+    overtime?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, Rota>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
   /** each food's lots, as bought (game/lots) */
   lots?: Record<string, Lot[]>
   /** (kept across a lost 3D view only) the menus put out, the game's clock (the day and the time of day), the language, and the people who'd
    * applied for the jobs (made at random each visit: the staff taken on are some of them) */
-  menuBy?: Record<string, Entry[]>; clock?: Clock; lang?: Lang; candidates?: typeof CANDIDATES; rolls?: { day: number; left: number } }
+  menuBy?: Record<string, Entry[]>; clock?: Clock; lang?: Lang; candidates?: typeof CANDIDATES; rolls?: { day: number; left: number }
+  /** (kept across a lost 3D view only) the till's drawer and its coin rolls, as they were */
+  till?: { drawer: unknown; rolls: unknown } }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff). The one exception is a page
 // brought back because its 3D view was lost (game/resume): it goes on from where it was, once.
 // (Any save left by an older version is cleared.)
@@ -164,6 +168,11 @@ const SAVED: Saved | null = (() => {
   if (back?.candidates) for (const [shop, ws] of Object.entries(back.candidates)) CANDIDATES[shop] = ws
   // (and the clock as it was: the same day, the same time of day)
   if (back?.clock && typeof back.clock.day === 'number' && typeof back.clock.minute === 'number') setClock(back.clock)
+  // (and the till's drawer and coin rolls as they were (item 195): they were back to the day's float, the money in them not taken out yet
+  // lost, and the float and the rolls there to be taken again)
+  const drawer = drawerFrom(back?.till?.drawer), tillRolls = rollsFrom(back?.till?.rolls)
+  if (drawer) TILL_CASH.drawer = drawer
+  if (tillRolls) TILL_CASH.rolls = tillRolls
   return back
 })()
 
@@ -459,7 +468,7 @@ type SceneProps = {
   onVisit: (v: Visit) => void
   /** (shop open) what's on each shop's menu, and a customer ordering one of them */
   entriesOf: (dishId: string) => Entry[]
-  onOrderEntry: (key: string, guest: number, reuse?: Record<string, number>) => boolean
+  onOrderEntry: (key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean) => boolean
   onGuests: (dishId: string, g: GuestView[]) => void
   spotOn: boolean
   guestsBy: Record<string, GuestView[]>
@@ -1544,7 +1553,8 @@ export default function App() {
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0, overtime: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, tillIn: 0, utility: 0, overtime: 0, setup: SAVED ? 0 : SHOP_COST,
+    ...SAVED?.ledger }))
   // the water and power: the month so far on the meter (game/utilities), kept in the browser; shown in the stock panel every few seconds
   const meterRef = useRef<Meter>((() => {
     try { const v = JSON.parse(localStorage.getItem(METER_KEY) ?? 'null'); if (v && typeof v.kwh === 'number' && typeof v.day === 'number') return v as Meter } catch { /* (none kept) */ }
@@ -1605,8 +1615,14 @@ export default function App() {
   buyRef.current = buyReviews
   const onBuyReviews = useCallback((pack: number) => buyRef.current(pack), [])
   const meterTick = useRef(0)
-  // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages)
-  const cash = CAPITAL + ledger.revenue - ledger.bought - ledger.fuel - ledger.wage - (ledger.utility ?? 0) - (ledger.setup ?? 0) - (ledger.offering ?? 0) - (ledger.promo ?? 0) + (ledger.till ?? 0)
+  // the money in hand: the opening capital, plus what's been taken, less what's been spent (stock, fuel, wages); not what those sat in still
+  // owe till they pay, nor what's in the till's drawer till it's taken out (game/economy's cashInHand; item 195: a cash customer's bill was
+  // counted as they ordered, and again as it was taken out of the drawer)
+  /** the bills not yet paid at the till (the same objects as in `bills` below) */
+  const owing = useRef(new Set<Tab>())
+  /** (a card paid at the till: the cash in hand's gone up by it, drawn again) */
+  const [, setPaidTick] = useState(0)
+  const cash = cashInHand(ledger, owedAtTill(owing.current))
   // (the room's own purchases (a case of drinks from the crates) paid from the same cash, into what's bought)
   const cashNow = useRef(cash)
   cashNow.current = cash
@@ -1758,8 +1774,11 @@ export default function App() {
   const dayStart = useRef<{ ledger: typeof ledger; seen: Set<number>; sold: Record<string, number>; day: number; from: string } | null>(null)
   const ledgerNow = useRef(ledger)
   ledgerNow.current = ledger
-  // what each customer has paid, and for how many things (a walk-out is refunded for what they didn't get)
-  const bills = useRef<Record<string, Record<number, { paid: number; parts: number }>>>({})
+  // (dev: the books and the cash in hand, for tests/e2e: the takings go up as customers order, the cash only as they pay at the till)
+  useEffect(() => { if (import.meta.env.DEV) Object.assign(window, { __books: () => ({ ...ledgerNow.current, cash: cashNow.current }) }) }, [])
+  // what each customer has had, for how many things, and their drink (a walk-out is refunded for what they didn't get); paid at the till as
+  // they leave, but a takeaway's as it's ordered (game/till's Tab)
+  const bills = useRef<Record<string, Record<number, Tab>>>({})
   // (and told to the till, which rings it up as it is (item 182))
   GUEST_BILLS.of = (guest) => bills.current[DISHES[active].id]?.[guest] ?? null
   /**
@@ -2219,7 +2238,8 @@ export default function App() {
   langRef.current = lang
   // (what's kept if the 3D view is lost: read from here the moment it happens)
   const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh, lots }))
-  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, lots, menuBy, clock: getClock(), lang, candidates: CANDIDATES, rolls })
+  resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, lots, menuBy, clock: getClock(), lang, candidates: CANDIDATES, rolls,
+    till: { drawer: TILL_CASH.drawer, rolls: TILL_CASH.rolls } })
   const lostTimer = useRef(0)
   // (brought back after it was lost: said so, once)
   useEffect(() => {
@@ -2716,6 +2736,10 @@ export default function App() {
         setLeaving(false)
         // (the night's rest won't take all of a run of days' tiredness away (game/shifts))
         setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, r]) => [id, shutDay(r, SHOP.day)]))])))
+        // (a bill still not paid with the last customer gone (their figure gone some way without getting to the till): counted as paid, as
+        // every bill was before (item 195), not owed for ever)
+        for (const t of owing.current) t.settled = true
+        owing.current.clear()
         // (the day's closing sheet: the books since opening, the customers who came, what sold)
         const st = dayStart.current
         if (st) {
@@ -2824,7 +2848,14 @@ export default function App() {
       BOSS_FX.joyAt = performance.now()
       sayRef.current(tl(langRef.current, `從收銀機取出 NT$${amount.toLocaleString()}`, `レジから NT$${amount.toLocaleString()} を取り出しました`, `Took NT$${amount.toLocaleString()} from the till`))
     }
-    return () => { TILL_CASH.onTake = null }
+    // (a bill paid at the till, as the cash key's pressed (bar's payIn): settled; cash into the drawer, apart from the cash in hand till it's
+    // taken out; a card's in hand at once)
+    TILL_CASH.onPaid = (guest, amount, card) => {
+      for (const tabs of Object.values(bills.current)) { const t = tabs[guest]; if (t) { t.settled = true; owing.current.delete(t) } }
+      if (card) setPaidTick((n) => n + 1)
+      else book('tillIn', amount)
+    }
+    return () => { TILL_CASH.onTake = null; TILL_CASH.onPaid = null }
   }, [])
   // skewers count toward the fire's limit; potatoes in the ash and mochi on the net have their own
   const isSkewer = (id: string) => !!dish.roast && id in dish.roast.times && !dish.roast.loose.includes(id)
@@ -2912,8 +2943,10 @@ export default function App() {
   const refund = (ids: string[], d: DishInfo, guest?: number) => {
     // (what they paid for the menu's dishes, in proportion to what of it they didn't get)
     const bill = guest !== undefined ? bills.current[d.id]?.[guest] : undefined
-    const total = bill ? Math.round((bill.paid * ids.length) / Math.max(1, bill.parts))
+    const total = bill ? refundOf(bill, ids.length)
       : ids.reduce((n, id) => n + ((ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id))?.price ?? 0), 0)
+    // (and off what they pay at the till: it rang up the whole bill all the same, into the drawer (item 195))
+    if (bill) Object.assign(bill, afterRefund(bill, ids.length))
     if (total) book('revenue', -total)
   }
   /**
@@ -2921,7 +2954,8 @@ export default function App() {
    * the food and the seasonings, and its food is put out to be cooked. False if it can't be had now.
    */
   /** `reuse`: how many of each of its parts the kitchen makes from portions already put out and eaten (no new ones put out for those) */
-  const orderEntry = (e: Entry, guest: number, reuse: Record<string, number> = {}): boolean => {
+  /** `atTill`: they pay at the till as they leave (sat in), not as they order (a takeaway) */
+  const orderEntry = (e: Entry, guest: number, reuse: Record<string, number> = {}, atTill = true): boolean => {
     const d = DISHES.find((x) => x.id === e.shop)!
     const need = needOf(e)
     if (!canServe(e, stockRef.current)) return false
@@ -2943,7 +2977,9 @@ export default function App() {
       for (const [k, q] of Object.entries(partsOf(e))) cur[k] = (cur[k] ?? 0) + Math.max(0, q - (reuse[k] ?? 0))
       return { ...b, open: { ...b.open, [d.id]: cur } }
     })
-    const bill = ((bills.current[d.id] ??= {})[guest] ??= { paid: 0, parts: 0 })
+    const tabs = (bills.current[d.id] ??= {})
+    let bill = tabs[guest]
+    if (!bill) { bill = tabs[guest] = { paid: 0, parts: 0, atTill }; if (atTill) owing.current.add(bill) }
     bill.paid += e.price
     bill.parts += e.parts.length
     setEntryCount((c) => ({ ...c, [e.key]: (c[e.key] ?? 0) + 1 }))
@@ -2961,6 +2997,11 @@ export default function App() {
     if (!d) return
     book('revenue', d.price)
     book('food', Math.round(d.price * 0.35))
+    // (and on their bill, paid with their dishes at the till)
+    const tabs = (bills.current[DISHES[active].id] ??= {})
+    let t = tabs[guest]
+    if (!t) { t = tabs[guest] = { paid: 0, parts: 0, atTill: true }; owing.current.add(t) }
+    t.drink = (t.drink ?? 0) + d.price
     talk('order', lang === 'en' ? `took a ${((d as { en?: string }).en ?? d.zh).toLowerCase()} from the fridge` : lang === 'ja' ? `冷蔵庫から${d.ja}を取った` : `從冰箱拿了 ${d.zh}`, guest)
   }
   const sellDrinkRef = useRef(sellDrink)
@@ -2968,9 +3009,9 @@ export default function App() {
   const onDrink = useCallback((guest: number, id: DrinkId) => sellDrinkRef.current(guest, id), [])
   const orderEntryRef = useRef(orderEntry)
   orderEntryRef.current = orderEntry
-  const onOrderEntry = useCallback((key: string, guest: number, reuse?: Record<string, number>) => {
+  const onOrderEntry = useCallback((key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean) => {
     const e = Object.values(menuByRef.current).flat().find((x) => x.key === key)
-    return !!e && orderEntryRef.current(e, guest, reuse)
+    return !!e && orderEntryRef.current(e, guest, reuse, atTill)
   }, [])
   return (
     <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${!!dish.roast && !editOn ? ' has-fridge' : ''}${office || fridgeOpen ? ' is-docked' : ''} hud-rows-${hudRows}`} ref={appRef}>
@@ -3106,6 +3147,9 @@ export default function App() {
                 <p><span>{tl(lang, '開業費用', '開業費', 'Opening cost')}</span><b className="money">−{Math.round(ledger.setup ?? 0).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '採買支出', '仕入れ', 'Purchasing')}</span><b className="money">−{Math.round(ledger.bought).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '收銀機取款', 'レジから取り出し', 'Taken from till')}</span><b className="money">+{Math.round(ledger.till ?? 0).toLocaleString()}</b></p>
+                {/* (and what's in its drawer, the float and the cash customers' bills, not in the cash till it's taken out (item 195)) */}
+                <p><span>{tl(lang, '收銀機裡（還沒取出）', 'レジの中（未回収）', 'In the till, not taken')}</span>
+                  <b className="money">{Math.round(drawerTotal(TILL_CASH.drawer) + rollsValue(TILL_CASH.rolls)).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '宣傳費（買評價）', '宣伝費（クチコミ）', 'Promotion (reviews)')}</span><b className="money">−{Math.round(ledger.promo ?? 0).toLocaleString()}</b></p>
                 {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['utility', -(ledger.utility ?? 0)], ['wage', -ledger.wage]] as const)
@@ -3176,7 +3220,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0, overtime: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, tillIn: 0, utility: 0, overtime: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}

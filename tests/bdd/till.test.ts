@@ -1,6 +1,8 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { BUSY_QUEUE, breakDown, deposit, drawerOpens, drawerTotal, openingFloat, paysByCard, ROLL_COINS, startingRolls, tabletActive, takeOut, takeRoll } from '@/game/till'
+import { afterRefund, BUSY_QUEUE, breakDown, DENOMS, deposit, dishLines, drawerFrom, drawerOpens, drawerTotal, openingFloat, owedAtTill, paysAtTill, paysByCard,
+  refundOf, ROLL_COINS, rollsFrom, rollsValue, startingRolls, tabletActive, tabTotal, takeOut, takeRoll, type Tab } from '@/game/till'
+import { cashInHand, SHOP_COST, type CashBooks } from '@/game/economy'
 
 feature('收銀櫃的平板與付款方式', () => {
   scenario('平時平板不啟用', ({ given, then }) => {
@@ -72,5 +74,115 @@ feature('老闆從收銀機抽屜拿錢', () => {
     given('100 圓那捲已經拿走', (w) => { w.r = takeRoll(startingRolls(), 100).rolls })
     when('再點一次', (w) => { w.t = takeRoll(w.r, 100) })
     then('拿到 0 圓', (w) => { expect(w.t.amount).toBe(0) })
+  })
+})
+
+// (item 195, the owner's: the drawer's money was counted twice, as the customer ordered and again as it was taken out; and "面額是日元才對":
+// the drawer keeps its yen, the books their NT$, a figure for a figure)
+feature('現金只算抽屜外的錢，抽屜裡的錢拿出來才加進現金（第 195 項）', () => {
+  const start = (): CashBooks => ({ revenue: 0, bought: 0, fuel: 0, wage: 0, setup: SHOP_COST, till: 0, tillIn: 0 })
+  const sat = (): Tab => ({ paid: 0, parts: 0, atTill: true })
+
+  scenario('付現的客人：點菜時現金不變，付錢時錢進抽屜，老闆拿出來現金才增加，客人的錢只算一次', ({ given, when, then, and }) => {
+    given('開店時現金 NT$200,000，抽屜裡是零用金', (w) => {
+      w.books = start(); w.drawer = openingFloat(); w.tab = sat()
+      expect(cashInHand(w.books)).toBe(200000)
+    })
+    when('客人點了 480 元的菜，又從冰箱拿了 40 元的飲料', (w) => {
+      w.books.revenue += 480; w.tab.paid += 480; w.tab.parts += 1
+      w.books.revenue += 40; w.tab.drink = 40
+    })
+    then('還沒付錢，現金不變', (w) => { expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200000) })
+    when('客人在收銀台付了現金', (w) => {
+      const bill = tabTotal(w.tab)
+      w.drawer = deposit(w.drawer, bill); w.books.tillIn += bill; w.tab.settled = true
+    })
+    then('520 元進了抽屜，現金還是不變', (w) => {
+      expect(drawerTotal(w.drawer) - drawerTotal(openingFloat())).toBe(520)
+      expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200000)
+    })
+    when('老闆把抽屜每一格都拿出來', (w) => {
+      for (const k of DENOMS) { const r = takeOut(w.drawer, k); w.drawer = r.drawer; w.books.till += r.amount }
+    })
+    then('抽屜空了，現金多了客人的 520 元和零用金', (w) => {
+      expect(drawerTotal(w.drawer)).toBe(0)
+      expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200000 + 520 + drawerTotal(openingFloat()))
+    })
+    and('營收只記了一次 520 元', (w) => { expect(w.books.revenue).toBe(520) })
+  })
+
+  scenario('刷卡的客人：付款那一刻現金增加，抽屜不變', ({ given, when, then }) => {
+    given('一位刷卡的客人點了 760 元的菜', (w) => {
+      w.books = start(); w.drawer = openingFloat(); w.tab = sat()
+      w.books.revenue += 760; w.tab.paid += 760; w.tab.parts += 2
+      expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200000)
+    })
+    when('客人在收銀台刷卡', (w) => { w.tab.settled = true })
+    then('現金多了 760 元，抽屜裡還是零用金', (w) => {
+      expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200760)
+      expect(drawerTotal(w.drawer)).toBe(drawerTotal(openingFloat()))
+    })
+  })
+
+  scenario('零用金與棒金拿出來加進現金，但不算營收', ({ given, when, then, and }) => {
+    given('開店時的抽屜與棒金', (w) => { w.books = start(); w.drawer = openingFloat(); w.rolls = startingRolls() })
+    when('老闆拿走千元鈔那格和 100 圓那捲', (w) => {
+      const a = takeOut(w.drawer, 1000), b = takeRoll(w.rolls, 100)
+      w.drawer = a.drawer; w.rolls = b.rolls; w.books.till += a.amount + b.amount
+    })
+    then('現金多了 8,000 + 5,000 元', (w) => { expect(cashInHand(w.books)).toBe(213000) })
+    and('營收還是 0', (w) => { expect(w.books.revenue).toBe(0) })
+    and('剩下的棒金是 10 圓與 1 圓各一捲', (w) => { expect(rollsValue(w.rolls)).toBe(10 * ROLL_COINS + ROLL_COINS) })
+  })
+
+  scenario('等太久生氣走掉、什麼都沒吃的客人：全部退款，不用到收銀台付錢', ({ given, when, then, and }) => {
+    given('客人點了兩樣、共 760 元', (w) => {
+      w.books = start(); w.tab = sat()
+      w.books.revenue += 760; w.tab.paid = 760; w.tab.parts = 2
+    })
+    when('兩樣都沒吃到就走了', (w) => {
+      w.refund = refundOf(w.tab, 2); w.books.revenue -= w.refund; w.tab = afterRefund(w.tab, 2)
+    })
+    then('退了 760 元，帳單是 0，經過收銀台不付錢', (w) => {
+      expect(w.refund).toBe(760)
+      expect(tabTotal(w.tab)).toBe(0)
+      expect(paysAtTill(w.tab)).toBe(false)
+    })
+    and('現金跟開店時一樣', (w) => { expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200000) })
+  })
+
+  scenario('吃了一部分就走的客人：收銀台只收吃到的那份', ({ given, when, then }) => {
+    given('客人點了三樣、共 900 元', (w) => { w.tab = { ...sat(), paid: 900, parts: 3 } })
+    when('有一樣等不到就走了', (w) => { w.tab = afterRefund(w.tab, 1) })
+    then('收銀台打的兩道加起來是 600 元', (w) => {
+      expect(paysAtTill(w.tab)).toBe(true)
+      expect(dishLines(w.tab.paid, w.tab.parts).reduce((a: number, b: number) => a + b, 0)).toBe(600)
+      expect(owedAtTill([w.tab])).toBe(600)
+    })
+  })
+
+  scenario('外帶的客人不在收銀台付：點單時現金就增加', ({ given, when, then }) => {
+    given('一張外帶單', (w) => { w.books = start(); w.tab = { paid: 0, parts: 0, atTill: false } })
+    when('點了 350 元', (w) => { w.books.revenue += 350; w.tab.paid += 350; w.tab.parts += 1 })
+    then('現金多了 350 元', (w) => { expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200350) })
+  })
+
+  scenario('結帳時一道一道打進收銀機，加起來等於帳單', ({ then, and }) => {
+    then('1,001 元分三道是 333、333、335', () => { expect(dishLines(1001, 3)).toEqual([333, 333, 335]) })
+    and('什麼都沒有就沒有菜的那幾道', () => { expect(dishLines(0, 2)).toEqual([]) })
+  })
+
+  scenario('畫面掉了接著玩：抽屜與棒金照存下來的樣子，不對的就不用', ({ then, and }) => {
+    then('存下來的抽屜照樣讀回來', () => {
+      const d = deposit(openingFloat(), 1140)
+      expect(drawerFrom(JSON.parse(JSON.stringify(d)))).toEqual(d)
+      expect(rollsFrom(JSON.parse(JSON.stringify(takeRoll(startingRolls(), 10).rolls)))).toEqual({ 100: true, 10: false, 1: true })
+    })
+    and('少一格、負數或不是數字的不用', () => {
+      expect(drawerFrom({ ...openingFloat(), 500: -1 })).toBeNull()
+      expect(drawerFrom({ 10000: 1 })).toBeNull()
+      expect(drawerFrom(null)).toBeNull()
+      expect(rollsFrom({ 100: true })).toBeNull()
+    })
   })
 })

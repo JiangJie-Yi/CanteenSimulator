@@ -101,6 +101,8 @@ export function AdminApp() {
             <tr><td>{T.capital}</td><td className="num">{money(s.capital)}</td></tr>
             <tr><td>{T.ledger.revenue}</td><td className="num is-up">+{money(s.ledger.revenue ?? 0)}</td></tr>
             {(s.ledger.till ?? 0) > 0 && <tr><td>{T.ledger.till}</td><td className="num is-up">+{money(s.ledger.till)}</td></tr>}
+            {/* (a cash customer's bill goes into the till's drawer, not the cash, till it's taken out (item 195)) */}
+            {(s.ledger.tillIn ?? 0) > 0 && <tr><td>{T.ledger.tillIn}</td><td className="num is-down">-{money(s.ledger.tillIn)}</td></tr>}
             {COSTS.filter((k) => (s.ledger[k] ?? 0) > 0).map((k) => <tr key={k}><td>{T.ledger[k] ?? k}</td><td className="num is-down">-{money(s.ledger[k])}</td></tr>)}
             {(s.ledger.food ?? 0) > 0 && <tr className="ad-sub"><td>{T.ledger.food}</td><td className="num">{money(s.ledger.food)}</td></tr>}
           </tbody>

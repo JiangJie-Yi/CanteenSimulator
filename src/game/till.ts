@@ -51,3 +51,50 @@ export const startingRolls = (): Rolls => Object.fromEntries(ROLL_KINDS.map((k) 
 /** the owner takes one roll: the rolls without it, and what it was worth (nothing if it's gone) */
 export const takeRoll = (r: Rolls, k: number): { rolls: Rolls; amount: number } =>
   r[k] ? { rolls: { ...r, [k]: false }, amount: k * ROLL_COINS } : { rolls: r, amount: 0 }
+/** what the rolls still in the drawer are worth */
+export const rollsValue = (r: Rolls) => ROLL_KINDS.reduce((a, k) => a + (r[k] ? k * ROLL_COINS : 0), 0)
+
+/**
+ * A customer's bill as the shop's books keep it (App's; item 195): what they've had at the menu's prices, less what was let go and given
+ * back, for how many things; the drink they took from the fridge; whether they pay it at the till on the way out (those sat in: a takeaway's
+ * paid as it's ordered), and whether they have.
+ */
+export type Tab = { paid: number; parts: number; drink?: number; atTill?: boolean; settled?: boolean }
+/** what a customer's bill comes to at the till: their dishes and their drink */
+export const tabTotal = (t: Tab) => t.paid + (t.drink ?? 0)
+/** what's still owed at the till, by those sat in who haven't paid yet: not in the shop's hand till it's paid (a card's comes in then, cash
+ * goes into the drawer) */
+export function owedAtTill(tabs: Iterable<Tab>) {
+  let n = 0
+  for (const t of tabs) if (t.atTill && !t.settled) n += tabTotal(t)
+  return n
+}
+/** what one who walks out gets back for so many of the things on their bill that they didn't get: that share of what they'd paid */
+export const refundOf = (t: Tab, things: number) => (t.parts > 0 ? Math.round((t.paid * Math.min(things, t.parts)) / t.parts) : 0)
+/** their bill once that's given back: the refund off what they pay, the things off how many they had (item 195: the till rang up the whole
+ * bill all the same, and the money went into the drawer) */
+export const afterRefund = (t: Tab, things: number): Tab => ({ ...t, paid: t.paid - refundOf(t, things), parts: Math.max(0, t.parts - things) })
+/** whether one leaving has anything to pay at the till: one who'd nothing and drank nothing walks past it (one whose bill isn't known pays
+ * as ever) */
+export const paysAtTill = (t: Tab | null) => !t || tabTotal(t) > 0
+/** the dishes rung up for a bill, one line each: the bill split over so many, the last line taking what doesn't divide */
+export function dishLines(paid: number, n: number) {
+  if (paid <= 0) return []
+  const len = Math.max(1, n), each = Math.floor(paid / len)
+  return Array.from({ length: len }, (_, i) => each + (i === len - 1 ? paid - each * len : 0))
+}
+
+/** a drawer as kept (across a lost 3D view): every note and coin a count, or none */
+export function drawerFrom(x: unknown): DrawerCash | null {
+  if (!x || typeof x !== 'object') return null
+  const o = x as Record<string, unknown>
+  for (const k of DENOMS) if (typeof o[k] !== 'number' || !Number.isInteger(o[k]) || (o[k] as number) < 0) return null
+  return Object.fromEntries(DENOMS.map((k) => [k, o[k] as number])) as DrawerCash
+}
+/** the coin rolls as kept: each still there or not, or none */
+export function rollsFrom(x: unknown): Rolls | null {
+  if (!x || typeof x !== 'object') return null
+  const o = x as Record<string, unknown>
+  for (const k of ROLL_KINDS) if (typeof o[k] !== 'boolean') return null
+  return Object.fromEntries(ROLL_KINDS.map((k) => [k, o[k] as boolean]))
+}

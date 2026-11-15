@@ -76,7 +76,7 @@ import { Movable } from './Movable'
 import { getEdit, offsetOf, setLocked } from './edit'
 import { basinHint, scrubOnce } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
-import { ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
+import { dishLines, paysAtTill, ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
 import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
@@ -91,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2377,6 +2377,16 @@ function PayFloat({ text, follow, done }: { text: string; follow: () => THREE.Ob
 const PAY_S = 5.6
 /** how far back the next one waits while someone's paying */
 const QUEUE_GAP = 0.6
+/** what one paying at the till is rung up for, a line a dish and then their drink (item 182: at the menu's prices, as App's books have it;
+ * the old flat price only for one whose bill isn't known; item 195: as their bill stands, less what was given back for what they didn't
+ * get, and the drink on it) */
+function billFor(x: { id: number; items?: number; drink?: DrinkId }) {
+  const n = Math.max(1, x.items ?? 2), owed = GUEST_BILLS.of(x.id)
+  const each = owed ? dishLines(owed.paid, n) : Array.from({ length: n }, () => billOf(1))
+  const drink = owed ? owed.drink ?? 0 : x.drink ? (DRINKS.find((d) => d.id === x.drink)?.price ?? billOf(1, x.drink) - billOf(1)) : 0
+  const parts = drink ? [...each, drink] : each
+  return { parts, items: each.length, bill: parts.reduce((a, b) => a + b, 0) }
+}
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
 const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
 /**
@@ -4385,18 +4395,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const v = SPEED * walkSpeedOf(kindOf(s.id).kind)
         const raw = Math.max(0, (s.t - 0.8 - (s.hold ?? 0)) * v)
         const payAt = lp.len - lp.payD
+        // (one with nothing to pay (gone before anything came, and nothing drunk) goes by the till without stopping (item 195: they paid the
+        // whole bill, given back to them, into the drawer)); the money taken as the cash key's pressed, once
+        const payD = lp.payD && paysAtTill(GUEST_BILLS.of(s.id)) ? lp.payD : 0
+        if (payD && raw >= payAt + 0.44 * PAY_S * v && !TILL_CASH.paid.has(s.id)) payIn(s.id, billFor(s).bill, paysByCard(s.id))
         // (in the queue for the till (the owner's): someone else at it paying, they wait a body's length back till it's free)
         if (lp.payD && TILL_STATE.k >= 0 && TILL_STATE.payer !== s.id && raw >= payAt - QUEUE_GAP && raw < payAt) s.hold = (s.hold ?? 0) + dt
         // (a word getting up, if they ate; at the till, the cashier's thanks and the bill; the money handed over, theirs)
         const said = s.said ?? 0
         if (said < 1 && s.t > 0.3) {
           s.said = 1
-          if (guestsRef.current.find((x) => x.id === s.id)?.state !== 'angry') onSay?.('guest', LINES[lang].payGo(s.id, s.id), s.id)
+          if (payD && guestsRef.current.find((x) => x.id === s.id)?.state !== 'angry') onSay?.('guest', LINES[lang].payGo(s.id, s.id), s.id)
         }
         // (getting up: their stool pushed back with them first, and they walk off from there; it's pushed home behind them once they're
         // a little way off)
         const back = STOOL_LEAVE * Math.min(1, s.t / STOOL_PULL_S)
-        const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(raw, payAt, lp.payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v))))
+        const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(raw, payAt, payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v))))
         const { p, dir } = alongPath(lp.path, lp.len - d)
         const home = Math.max(0, s.t - 0.8 - STOOL_LEAVE / v - STOOL_HOME_WAIT)
         // (pushed home in under the counter)
@@ -4405,7 +4419,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
         // (at the step on the way out: their shoes out of their cubby and on)
         const shoeFrom = lp.len - stepAt(lp.path)
-        const paid = withPause(raw, payAt, lp.payD ? PAY_S * v : 0)
+        const paid = withPause(raw, payAt, payD ? PAY_S * v : 0)
         s.lastD = d
         s.slippers = lp.len - d > stepAt(lp.path)
         g?.position.copy(p)
@@ -4413,8 +4427,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         shoeStep(s, g, (paid - shoeFrom) / (SHOES_S * v), false)
         // (at the till, facing it: the register's reading follows what they owe)
         // (waiting to pay: on the way out and not yet past the till)
-        if (lp.payD && raw < payAt + PAY_S * v) queue++
-        if (lp.payD && raw >= payAt && raw < payAt + PAY_S * v) {
+        if (payD && raw < payAt + PAY_S * v) queue++
+        if (payD && raw >= payAt && raw < payAt + PAY_S * v) {
           if (g) g.rotation.y = Math.atan2(counters[0].lay.x, counters[0].lay.z)
           paying = { s, k: (raw - payAt) / (PAY_S * v) }
           const k = paying.k
@@ -4481,14 +4495,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // the note put in it, the change worked out and set on the tray, the drawer shut, the change taken)
     if (paying) {
       const { s: x, k } = paying
-      const n = Math.max(1, x.items ?? 2)
-      // (what they ordered, at the menu's prices, rung up a dish at a time, and their drink at its own (item 182: a flat 380 a dish and 320 a
-      // drink was rung up whatever they'd had, and that went into the drawer); the old flat price only for one whose bill isn't known)
-      const owed = GUEST_BILLS.of(x.id)
-      const each = owed && owed.paid > 0 ? Array.from({ length: n }, (_, i) => Math.floor(owed.paid / n) + (i === n - 1 ? owed.paid - Math.floor(owed.paid / n) * n : 0)) : Array.from({ length: n }, () => billOf(1))
-      const drinkPrice = x.drink ? (DRINKS.find((d) => d.id === x.drink)?.price ?? billOf(1, x.drink) - billOf(1)) : 0
-      const parts = [...each, ...(x.drink ? [drinkPrice] : [])]
-      const bill = parts.reduce((a, b) => a + b, 0)
+      const { parts, items, bill } = billFor(x)
       const given = Math.min(10000, Math.ceil(bill / 1000) * 1000)
       const rung = Math.min(parts.length, Math.floor(k / 0.32 * parts.length) + 1)
       TILL_STATE.text = yen(k < 0.32 ? parts.slice(0, rung).reduce((a, b) => a + b, 0) : k < 0.62 ? bill : Math.max(0, given - bill))
@@ -4503,7 +4510,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       TILL_STATE.bill = bill
       TILL_STATE.payer = x.id
       TILL_STATE.parts = parts
-      TILL_STATE.items = n
+      TILL_STATE.items = items
     } else {
       TILL_STATE.drawer = 0
       TILL_STATE.k = -1
