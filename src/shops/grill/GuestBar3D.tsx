@@ -2912,7 +2912,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
    * handed over to the way in to their stool from where they sat (`benchFrom`); given up, out of the door again */
   type Sitter = { id: number; phase: 'in' | 'sit' | 'out'; t: number; fade: number; fadeT: number; pos: THREE.Vector3; yaw: number; spot: number; handed?: boolean
     /** their place on the bench and the way it faces, as last found from its marks: kept while the marks aren't there for a frame */
-    at?: THREE.Vector3; face?: THREE.Vector3 }
+    at?: THREE.Vector3; face?: THREE.Vector3
+    /** sent away (the shop shutting) before they'd sat: where they were on their way in, the way out from there */
+    outFrom?: THREE.Vector3; outVia?: boolean }
   const sitters = useRef(new Map<number, Sitter>())
   const [sitterList, setSitterList] = useState<{ id: number; sat: boolean }[]>([])
   const sitterObjs = useRef(new Map<number, THREE.Group>())
@@ -4825,7 +4827,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (shownRef.current.some((x) => x.id === v.id) || v.t > 3) { sitters.current.delete(v.id); benchChanged = true }
           continue
         }
-        if (BENCH.gone.has(v.id) && v.phase !== 'out') { v.phase = 'out'; v.t = 0; v.fadeT = 0 }
+        // (sent away still on their way in: out from where they are, not from the place they never reached (the day's audit, 2026-11-15: one
+        // 2.22 across in a frame at 04:01, the shop shutting, back to their place on the bench and out from there))
+        if (BENCH.gone.has(v.id) && v.phase !== 'out') {
+          // (back the way they came: round the corner in front of the bench again if they'd passed it)
+          if (v.phase === 'in') { v.outFrom = v.pos.clone(); v.outVia = Math.min(pathLength(walk), v.t * sp) > way.door.distanceTo(before) }
+          v.phase = 'out'; v.t = 0; v.fadeT = 0
+        }
         if (v.phase === 'in') {
           const len = pathLength(walk), d = Math.min(len, v.t * sp), { p, dir } = alongPath(walk, d)
           v.pos.copy(p)
@@ -4839,7 +4847,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const yaw = Math.atan2(BENCH_B.x, BENCH_B.z)
           v.yaw += Math.atan2(Math.sin(yaw - v.yaw), Math.cos(yaw - v.yaw)) * Math.min(1, step * 6)
         } else {
-          const back = [at, before, way.door], len = pathLength(back), d = Math.min(len, v.t * sp), { p, dir } = alongPath(back, d)
+          const back = v.outFrom ? (v.outVia ? [v.outFrom, before, way.door] : [v.outFrom, way.door]) : [at, before, way.door], len = pathLength(back), d = Math.min(len, v.t * sp), { p, dir } = alongPath(back, d)
           v.pos.copy(p)
           v.yaw = Math.atan2(dir.x, dir.z)
           if (len - d < 0.9) v.fadeT += step
