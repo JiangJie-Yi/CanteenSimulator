@@ -41,7 +41,7 @@ for ($k = 1; $k -le 5 -and -not $moved; $k++) {
 }
 if (-not $moved) {
   Say '還是有程式開著這個資料夾（Claude 的對話、終端、VS Code、檔案總管…），關掉後再執行一次。什麼都沒改。'
-  Start-Process -FilePath 'npm.cmd' -ArgumentList 'run', 'dev' -WorkingDirectory $old -WindowStyle Minimized
+  Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm.cmd run dev > logs\dev-server.log 2>&1' -WorkingDirectory $old -WindowStyle Hidden
   Say '開發伺服器已在原處重開'
   exit 2
 }
@@ -91,7 +91,9 @@ try {
 } catch { Say "備忘沒複製成：$($_.Exception.Message)" }
 
 # 6. 開發伺服器在新資料夾
-Start-Process -FilePath 'npm.cmd' -ArgumentList 'run', 'dev' -WorkingDirectory $new -WindowStyle Minimized
+# (in the background, its output to logs\dev-server.log: started in a console window of its own, a paused console (text selected in it)
+# stops it writing and the whole server with it: the page stuck at its loading screen, 100%, as the owner saw on 2026-11-15)
+Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm.cmd run dev > logs\dev-server.log 2>&1' -WorkingDirectory $new -WindowStyle Hidden
 $ok = $false
 for ($k = 0; $k -lt 20 -and -not $ok; $k++) {
   Start-Sleep -Seconds 2
