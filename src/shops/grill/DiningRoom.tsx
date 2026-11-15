@@ -907,6 +907,9 @@ const ART = {
   }),
 }
 type ArtKey = keyof typeof ART
+/** each picture's name, for edit mode's list (item 156, the owner's, 2026-11-15: they were named by where they hang, 畫（-2, 0.9）) */
+const ART_ZH: Record<ArtKey, string> = { fuji: '富士山', wave: '浪花', koi: '錦鯉', calligraphy: '書法', plum: '梅花', akaFuji: '赤富士', rainBridge: '雨中橋',
+  kabuki: '歌舞伎', bijin: '三味線美人圖' }
 /** a scroll's mounting: the dark silk of its top and foot (a fine weave, a soft sheen down it), and the brocade band round its picture (gold
  * flowers in a lattice of diamonds, 花菱, on olive) */
 const SCROLL_SILK = canvasTex(128, 384, (g) => {
@@ -4550,7 +4553,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         </StaticBatch>
         {/* (everything below is its own piece in a batch of its own, so each can be moved by hand when the shop's shut: key G) */}
         {art.filter((a) => !a.bare).map((a) => (
-          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={`${a.round ? '圓窗' : a.scroll ? '掛軸' : '畫'}（${from.toFixed(0)}, ${a.z.toFixed(1)}）`}><StaticBatch plain>
+          <Movable key={a.z} id={`art${from.toFixed(1)}_${a.z.toFixed(2)}`} label={a.round ? '圓窗' : `${a.scroll ? '掛軸' : '畫'}（${ART_ZH[a.scroll ?? a.print]}）`}><StaticBatch plain>
             <group position={[0, a.round ? 1.4 : a.scroll ? 1.42 : 1.5, a.z + nudgeArt(a.z)]}>
               {a.round ? <RoundWindow /> : a.scroll ? <Scroll art={a.scroll} /> : <Framed art={a.print} />}
             </group>

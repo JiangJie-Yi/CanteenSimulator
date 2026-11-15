@@ -56,7 +56,8 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   // (the shrine's shelf and everything on it: the shrine, the Ebisu, the vases, the cups, the sutra, the flask and the oranges ride on its fittings)
   // (the samurai helmet on its own little stand by the staff's door (the owner's, 2026-11-12): moved together)
   'grp-kabuto': { zh: '頭盔與木台', ja: '兜と飾り台', members: ['kabutostand', 'kabuto'] },
-  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-2.749, 0, 2.003] },
+  // (the owner's, 2026-11-15: in the panel, its own frame, X -3.401 to -3 and Y 0.125: back toward the door 0.4, up 12.5 cm)
+  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-2.4249, 0.125, 1.7663] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
     'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
@@ -70,7 +71,8 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
   // (the rice sacks in the kitchen's corner, and the old rice tub and stove set aside by them)
   // (the old rice tub gone from it: it's the warming tub on the takeaway table now)
-  'grp-ricecorner': { zh: '米袋與舊飯桶', ja: '米袋と飯桶', members: ['ricesacks'] },   // (the old rice pot and stove taken away: item 134, the owner's)
+  // (named for what's in it: the old rice pot, stove and tub all taken away (items 134, 156))
+  'grp-ricecorner': { zh: '米袋', ja: '米袋', members: ['ricesacks'] },
   'grp-wc-m': { zh: '男廁組', ja: '男子トイレ一式', members: ['wc2-m-noren', 'wc2-m-basin', 'wc2-m-moss', 'wc2-m-dryer', 'wc2-m-towelbox', 'wc2-m-duck', 'wc2-m-lamp', 'wc2-m-toilet', 'wc2-m-remote3', 'wc2-m-paper', 'wc2-m-brush', 'wc2-m-lamp2', 'wc-m-slippers'] },
   'grp-wc-f': { zh: '女廁組', ja: '女子トイレ一式', members: ['wc2-f-noren', 'wc2-f-basin', 'wc2-f-vase', 'wc2-f-dryer', 'wc2-f-towelbox', 'wc2-f-duck', 'wc2-f-lamp', 'wc2-f-toilet', 'wc2-f-remote3', 'wc2-f-oto', 'wc2-f-brush', 'wc2-f-paper', 'wc2-f-bin', 'wc2-f-pads', 'wc2-f-lamp2', 'wc-f-slippers'] },
 }
@@ -104,10 +106,12 @@ const loadGroups = (): Record<string, Group> => {
   // mode opens each view's area is made afresh (groupByViews))
   try {
     // (the keys by name: this runs as the module loads, before KEY_AK's line below)
-    if (!localStorage.getItem('jgs-edit-areas-replan-1')) {
+    // (again for item 156 (the owner's, 2026-11-15): the chopsticks and a pendant lamp had fallen into the far views' areas, the staff door
+    // into the shrine's)
+    if (!localStorage.getItem('jgs-edit-areas-replan-2')) {
       for (const k of Object.keys(g)) if (k.startsWith('grp-view-')) delete g[k]
       localStorage.removeItem('jgs-edit-area-known-1')
-      localStorage.setItem('jgs-edit-areas-replan-1', '1')
+      localStorage.setItem('jgs-edit-areas-replan-2', '1')
       localStorage.setItem(KEY_G, JSON.stringify(g))
     }
   } catch { /* storage blocked */ }
@@ -152,6 +156,15 @@ const loadGroups = (): Record<string, Group> => {
       localStorage.setItem('jgs-edit-groupshift-3', '1'); localStorage.setItem(KEY_G, JSON.stringify(g))
     }
   } catch { /* storage blocked */ }
+  // (the shrine's group set where the owner put it (item 155), reset once: whatever a browser kept of its place gives way to it)
+  try {
+    if (!localStorage.getItem('jgs-edit-groupshift-4')) {
+      if (g['grp-altar']) g['grp-altar'] = { ...g['grp-altar'], t: [...DEFAULT_GROUPS['grp-altar'].t!] as V3 }
+      localStorage.setItem('jgs-edit-groupshift-4', '1'); localStorage.setItem(KEY_G, JSON.stringify(g))
+    }
+  } catch { /* storage blocked */ }
+  // (the rice corner's group a browser kept under its old name (item 156): named for what's in it)
+  if (g['grp-ricecorner']?.name === '米袋與舊飯桶') g['grp-ricecorner'] = { ...g['grp-ricecorner'], name: '米袋' }
   // (a kept cat stand from before the coin and the helmet were set on it: they join it, out of whatever else held them, so they go where it goes
   // (the owner's, 2026-11-11: left behind when the stand moved for the bench))
   const cats = g['grp-doorcats']
@@ -257,6 +270,7 @@ const RELAIDS: [string, string[]][] = [
   // (the sake barrel and the lantern where the owner set them made their defaults, what was kept for them reset (2026-11-15))
   ['jgs-edit-relaid-26', ['sake', 'lantern']],
   ['jgs-edit-relaid-27', ['shrinelamp-1', 'shrinelamp1']],
+  ['jgs-edit-relaid-28', Array.from({ length: 8 }, (_, n) => [`chopsticks${n}`, `chopstickpair${n}`]).flat()],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -326,6 +340,9 @@ export const useListHot = (id: string) =>
  * offset shown and typed in edit mode is from here, so every piece starts at 0, 0, 0, its own centre.
  */
 export const BASES: Record<string, V3> = {
+  // (every place's chopsticks and their rest along the bar together (item 157, the owner's, 2026-11-15: Z 0.3125 in the chopsticks' own frame,
+  // the rest going with them): the long bar's places along their parent's x, the side bar's along its z)
+  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [[`chopsticks${n}`, n < 4 ? [0.3125, 0, 0] : [0, 0, 0.3125]], [`chopstickpair${n}`, n < 4 ? [0.3125, 0, 0] : [0, 0, 0.3125]]]).flat()) as Record<string, V3>,
   // (the helmet's stand and the helmet on it moved along the wall from beside the staff's door to under the round window's left half, just
   // left of the lucky cats' red stand, 4 cm clear of it (item 92, the owner's, 2026-11-14, its arrow's end): 2.83 m along the wall, measured;
   // both their parents count two to one)
@@ -856,7 +873,10 @@ const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', ch
   // (the kitchen's back: the rice station between the cook table and the till was nearer the till's camera; the rice corner and the sake
   // barrel by it in no view's sight at all)
   'grp-ricestation': 'back', 'grp-sink': 'back', 'grp-racks': 'back', 'grp-ricecorner': 'back', sake: 'back', freezer: 'back',
-  'grp-wc-m': 'toilet', 'grp-wc-f': 'toilet' }
+  'grp-wc-m': 'toilet', 'grp-wc-f': 'toilet',
+  // (item 156, the owner's: every place's chopsticks and the long bar's third lamp with the rest of the bar's, in the cook table's area (a view
+  // that happened to see one took it); the staff's door with the back, not the shrine's)
+  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [`chopstickpair${n}`, 'grill'])), barlamp2: 'grill', staffdoor: 'back' }
 /** an area's name: its view's, as an area (後台區 is one already) */
 const areaName = (view: string) => { const n = VIEW_SPOTS.find((v) => v.id === view)?.zh ?? view; return n.endsWith('區') ? n : `${n}區` }
 /** each view's area made a group, of the pieces (and the shop's groups, whole) loose at the top that are new to it */

@@ -217,7 +217,7 @@ const PIECES_JA: Record<string, string> = {
   竹盆栽: '竹の鉢植え', 酒箱: '酒の木箱', 電鍋: '電気釜', 羽釜與爐灶: '羽釜とかまど', '料理台（飯糰）': '調理台（おにぎり）', '料理台（保溫座）': '調理台（保温）', 外帶檯: '持ち帰り台', 外帶桌: '持ち帰り台', 白米袋: '米袋', 武士頭盔: '兜', '攝影機 1（研製視角）': 'カメラ 1（試作の視点）',
   瀝水籃: '水切りかご', 棕櫚刷: '棕櫚たわし', 肥皂: '石けん', 檜木手桶: '檜の手桶', 布巾: '布巾', 竹籤垃圾桶: '串入れのごみ箱', 垃圾桶與資源回收桶: 'ごみ箱と資源ごみ箱', 洗碗精: '食器用洗剤', 菜瓜布: 'スポンジたわし',
   門口招財貓組: '入口の招き猫', 小神龕組: '神棚', 收銀櫃組: 'レジ一式', 吧台座椅: 'カウンター席',
-  料理台組: '調理台一式', 流理台組: '流し一式', 碗盤架組: '食器棚', 米袋與舊飯桶: '米袋と飯桶', 男廁組: '男子トイレ一式', 女廁組: '女子トイレ一式',
+  料理台組: '調理台一式', 流理台組: '流し一式', 碗盤架組: '食器棚', 米袋: '米袋', 男廁組: '男子トイレ一式', 女廁組: '女子トイレ一式',
   火烤灶台區: '炉端エリア', 櫃檯區: 'レジエリア', 玄關區: '玄関エリア', 小神龕區: '神棚エリア', 飲品櫃區: '飲み物エリア', 廁所區: 'お手洗いエリア', 後台區: '裏方エリア', 窗口區: '丸窓エリア',
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
@@ -237,7 +237,7 @@ const PIECES_EN: Record<string, string> = {
   '紙箱（割箸）': 'Box (chopsticks)', 收銀機操作說明書: 'Register manual',
   老闆: 'Owner', 惠比壽石像: 'Ebisu statue', 武士頭盔: 'Samurai helmet', 門口招財貓組: 'Lucky cats (group)', 小神龕組: 'Shrine (group)',
   收銀櫃組: 'Till (group)', 吧台座椅: 'Bar stools',
-  料理台組: 'Cook counters (group)', 流理台組: 'Sink (group)', 碗盤架組: 'Dish racks (group)', 米袋與舊飯桶: 'Rice sacks and old tub (group)',
+  料理台組: 'Cook counters (group)', 流理台組: 'Sink (group)', 碗盤架組: 'Dish racks (group)', 米袋: 'Rice sacks (group)',
   男廁組: "Men's washroom (group)", 女廁組: "Women's washroom (group)",
   火烤灶台區: 'Grill area', 櫃檯區: 'Till area', 玄關區: 'Entrance area', 小神龕區: 'Shrine area', 飲品櫃區: 'Drinks area', 廁所區: 'Toilets area', 後台區: 'Back room area', 窗口區: 'Window area',
 }
@@ -246,13 +246,22 @@ const WORDS_JA: [string, string][] = [
   ['石洗手台與鏡子', '石の手洗い鉢と鏡'], ['簀之子踏板', 'すのこ'], ['室內拖鞋', 'トイレスリッパ'], ['衛生紙架', 'ペーパーホルダー'], ['免治馬桶遙控器', 'ウォシュレットのリモコン'], ['音姬', '音姫'], ['馬桶刷', 'トイレブラシ'], ['生理用品垃圾桶', 'サニタリーボックス'],
   ['廁所牌', 'お手洗い札'], ['竹花瓶', '竹の花入れ'], ['烘手機', 'ハンドドライヤー'], ['擦手紙盒', 'ペーパータオルホルダー'],
   ['吊燈', '吊り灯'], ['馬桶', '便器'], ['紙燈', '紙の灯り'], ['招財貓', '招き猫'], ['飲料櫃', 'ドリンク冷蔵庫'], ['座位', '席'],
-  ['圓窗', '丸窓'], ['掛軸', '掛け軸'], ['男廁', '男性用'], ['女廁', '女性用'], ['畫', '絵'],
+  ['圓窗', '丸窓'], ['掛軸', '掛け軸'], ['男廁', '男性用'], ['女廁', '女性用'],
+  // (the pictures' names (item 156): before 畫, which is in 三味線美人圖)
+  ['三味線美人圖', '三味線美人図'], ['富士山', '富士山'], ['浪花', '波'], ['書法', '書'], ['梅花', '梅'], ['雨中橋', '雨の橋'], ['畫', '絵'],
   ['筷子與筷架', '箸と箸置き'], ['筷架', '箸置き'], ['筷子', '箸'], ['醬油碟', '醤油皿'], ['醬油壺與山葵', '醤油差しと山葵'], ['桌上垃圾桶', '卓上のごみ箱'],
 ]
 /** and in English: the made-up names' words, and their brackets (the rest keep their Chinese) */
 const WORDS_EN: [string, string][] = [
   ['筷子與筷架', 'Chopsticks and rest'], ['筷架', 'Chopstick rest'], ['筷子', 'Chopsticks'], ['醬油碟', 'Soy dish'], ['醬油壺與山葵', 'Soy pot and wasabi'], ['桌上垃圾桶', 'Table waste basket'], ['座位', 'seat'], ['（', ' ('], ['）', ')'], ['・', ', '],
 ]
+/** the pictures by name (item 156) */
+for (const [zh, en] of [['富士山', 'Mt Fuji'], ['浪花', 'Waves'], ['錦鯉', 'Koi'], ['赤富士', 'Red Fuji'], ['雨中橋', 'Bridge in the rain'], ['書法', 'Calligraphy'],
+  ['梅花', 'Plum blossom'], ['歌舞伎', 'Kabuki'], ['三味線美人圖', 'Shamisen beauty']]) {
+  PIECES_EN[`畫（${zh}）`] = `Print (${en})`
+  PIECES_EN[`掛軸（${zh}）`] = `Scroll (${en})`
+}
+PIECES_EN['圓窗'] = 'Round window'
 /** a piece's name in the panel's language */
 export function pieceName(zh: string, lang: Lang) {
   if (lang === 'en') {
