@@ -768,8 +768,18 @@ for k in range(3):
     empty(f"SinkRackSlot{k}", RACK_X0 + k * RACK_PITCH * 2, SLAT_TOP + RACK_PLATE_R, LANE_Z)
 # (by the basin's front right corner: the palm scrubber on its dish, the soap on its)
 cyl("SinkDish0", -0.02, H, H + 0.01, 0.2, 0.05, "dish", seg=20, r1=0.055)
-bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=14, ring_count=8, location=P(-0.02, H + 0.035, 0.2))
+# (a cube's faces cut four by four and pushed out round: 96 quads, 192 triangles, no point a fan of them gathers at (a uv sphere's
+# 14 at each pole shaded in a dark spot, the owner's low-poly rule; 196 before); a point at each face's middle, so it's as long, wide
+# and tall as before (cut three by three it came out a tenth smaller); bumped as before)
+bpy.ops.mesh.primitive_cube_add(size=2, location=P(-0.02, H + 0.035, 0.2))
 palm = active()
+bm = bmesh.new()
+bm.from_mesh(palm.data)
+bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
+for vtx in bm.verts:
+    vtx.co = vtx.co.normalized()
+bm.to_mesh(palm.data)
+bm.free()
 palm.scale = (0.055, 0.035, 0.03)
 apply_scale(palm)
 bm = bmesh.new()

@@ -737,7 +737,8 @@ def washstand():
             f"WashHandleArm{int(a * 10)}", M["brass"], hparts)
     for k in range(4):
         a = k * math.pi / 2
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=0.008, location=P(-0.045 + 0.035 * math.cos(a), HY + 0.058, 0.035 * math.sin(a)))
+        # (an icosphere, 80 triangles: a uv sphere's 12 gathered at each pole shade in a dark spot, the owner's low-poly rule; 168 before)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=0.008, location=P(-0.045 + 0.035 * math.cos(a), HY + 0.058, 0.035 * math.sin(a)))
         fin(active(), f"WashHandleBall{k}", M["brass"], hparts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.011, depth=0.01, location=P(-0.045, HY + 0.064, 0))
     fin(active(), "WashHandleCap", M["brass"], hparts)

@@ -3240,8 +3240,18 @@ for name, off, rad, depth, glaze, belly, fill, fill_h, rough in pots:
     head = Vector((c.x, c.y, BOX_Z + depth * 0.7))
     if name in ("SoyPot", "MilkJar"):
         # a basting brush for each sauce: a tuft of bristles on a wooden handle (pale ones for the milk)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=12, ring_count=8, location=head)
+        # (a cube's faces cut three by three and pushed out round: 54 quads, 108 triangles, 12 steps round every way as the uv sphere
+        # had, and no point a fan of them gathers at (its poles were a fan of 12 at the tuft's tip and its root, the owner's low-poly
+        # rule; 168 before; an icosphere's 80 showed facets close up); a little bigger, as its points miss the faces' middles
+        bpy.ops.mesh.primitive_cube_add(size=2, location=head)
         tuft = active()
+        bm = bmesh.new()
+        bm.from_mesh(tuft.data)
+        bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=2, use_grid_fill=True)
+        for vtx in bm.verts:
+            vtx.co = vtx.co.normalized() * 1.065
+        bm.to_mesh(tuft.data)
+        bm.free()
         tuft.scale = (0.022, 0.016, 0.04)
         bristle = M["bristle"] if name == "SoyPot" else M.setdefault(
             "bristle_pale", pbr("BrushBristlePale", (0.86, 0.8, 0.66), rough=0.7))
