@@ -38,3 +38,18 @@ feature('打烊的日結算', () => {
     and(`只留最近 ${KEEP_DAYS} 天`, (w) => { let d = [] as typeof w.days; for (let i = 1; i <= KEEP_DAYS + 5; i++) d = addDay(d, i, w.s); expect(d.length).toBe(KEEP_DAYS); expect(d[0].day).toBe(6) })
   })
 })
+
+feature('營業時間記進帳本（店主 2026-11-15：營業時間也得記錄下來）', () => {
+  const sum = (o: Partial<ReturnType<typeof daySummary>> = {}) => ({ ...daySummary({ revenue: 0, food: 0, fuel: 0, wage: 0 }, { revenue: 1000, food: 300, fuel: 0, wage: 200, overtime: 40 }, [], {}), ...o })
+  scenario('打烊時，那天的開店、收店時間與晚了多久跟著存進帳本', ({ given, when, then, and }) => {
+    given('第 3 天 16:30 開店、05:30 收店（晚 60 分），加班費 40', (w) => { w.s = sum() })
+    when('打烊記帳', (w) => { w.days = addDay([], 3, w.s, { open: '16:30', close: '05:30', late: 60 }) })
+    then('那天的紀錄有營業時間', (w) => { expect(w.days[0]).toMatchObject({ day: 3, open: '16:30', close: '05:30', late: 60 }) })
+    and('也有加班費，而且加班費算在人事裡', (w) => { expect(w.days[0].overtime).toBe(40); expect(w.s.wage).toBe(200); expect(w.s.profit).toBe(1000 - 300 - 200) })
+  })
+  scenario('同一天開兩次：開店取第一次、收店取最後一次，加班費加起來', ({ given, when, then }) => {
+    given('第 5 天先開 16:30–20:00', (w) => { w.days = addDay([], 5, sum({ overtime: 0 }), { open: '16:30', close: '20:00', late: 0 }) })
+    when('又開到 05:00（晚 30 分），加班費 25', (w) => { w.days = addDay(w.days, 5, sum({ overtime: 25 }), { open: '21:00', close: '05:00', late: 30 }) })
+    then('記成 16:30–05:00、晚 30 分、加班費 25', (w) => { expect(w.days[0]).toMatchObject({ open: '16:30', close: '05:00', late: 30, overtime: 25 }) })
+  })
+})

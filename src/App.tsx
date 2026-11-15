@@ -81,7 +81,7 @@ import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { useDrag } from '@/ui/useDrag'
 import { activityOf, effective, isTired, restPerHour, ROLES, tireNow, workFatigue, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
-import { hoursEnd, hoursText, inHours, isLate, lastCall } from '@/game/hours'
+import { CLOSE_AT, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy, overtimeRate } from '@/game/hours'
 import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
 import { keptForResume, resumeFrom } from '@/game/resume'
@@ -130,7 +130,7 @@ const FIRE_CAPACITY = RING_SLOTS
 const SAVE_KEY = 'canteen-save'
 /** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
 const RESUME_KEY = 'jgs-resume-1'
-type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number; promo?: number }
+type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; utility?: number; promo?: number; overtime?: number }
   stock: Record<string, number>; hired: Record<string, Record<string, Rota>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
   /** each food's lots, as bought (game/lots) */
@@ -1514,7 +1514,7 @@ export default function App() {
   // (phone) the round switches at the top right folded into one button
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
-  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
+  const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0, overtime: 0, setup: SAVED ? 0 : SHOP_COST, ...SAVED?.ledger }))
   // the water and power: the month so far on the meter (game/utilities), kept in the browser; shown in the stock panel every few seconds
   const meterRef = useRef<Meter>((() => {
     try { const v = JSON.parse(localStorage.getItem(METER_KEY) ?? 'null'); if (v && typeof v.kwh === 'number' && typeof v.day === 'number') return v as Meter } catch { /* (none kept) */ }
@@ -2425,7 +2425,7 @@ export default function App() {
   // (the clock, the meter and what's counted by the second still tick every second; the staff's tiredness and the wage and the water and
   // power booked to the ledger every fifth, as five seconds' worth: each of those is a redraw of the whole page, and at one a second, with the
   // payments and the talk, the page was drawn three times a second, each one 30-50 ms in the dev build: the stutter at closing time, item 24)
-  const slowTick = useRef({ n: 0, wage: 0, utility: 0 })
+  const slowTick = useRef({ n: 0, wage: 0, utility: 0, overtime: 0 })
   useEffect(() => {
     const id = window.setInterval(() => {
       const st5 = slowTick.current
@@ -2476,7 +2476,12 @@ export default function App() {
       // (the hours over (04:30, the owner's): shut up as by hand, last orders and all)
       if (aiRef.current.ai && hoursEnd(was, getClock().minute)) hoursOver.current()
       // (and the chef's wage, by the second while the shop's open: in the same tick, so the two are one redraw of the page, not two)
-      if (aiRef.current.ai) st5.wage += aiRef.current.wage / 3600 * GAME_SPEED.value
+      // (past the hours' end, at the overtime's rate (game/hours, the owner's, 2026-11-15): the extra kept apart too, as the books' note of it)
+      if (aiRef.current.ai) {
+        const base = aiRef.current.wage / 3600 * GAME_SPEED.value, rate = overtimeRate(getClock().minute)
+        st5.wage += base * rate
+        if (rate > 1) st5.overtime += base * (rate - 1)
+      }
       // (and the water and power (the owner's: what keeping it going costs), metered by the second against the month)
       const k = GAME_SPEED.value
       const uses = UTILITY.uses
@@ -2492,8 +2497,9 @@ export default function App() {
       // (booked every fifth second, together: one redraw)
       if (fifth) {
         if (st5.wage > 0) book('wage', st5.wage)
+        if (st5.overtime > 0) book('overtime', st5.overtime)
         if (st5.utility > 0) book('utility', st5.utility)
-        st5.wage = 0; st5.utility = 0
+        st5.wage = 0; st5.utility = 0; st5.overtime = 0
       }
       meterTick.current++
       if (meterTick.current % 5 === 0) setMeterShown(m.meter)
@@ -2662,7 +2668,9 @@ export default function App() {
           const sum = daySummary(st.ledger, ledgerNow.current, visitsNow.current.filter((v) => !st.seen.has(v.id)), soldBetween(st.sold, entryCountNow.current))
           setDaySum({ s: sum, day: st.day, from: st.from, to: hhmm(getClock().minute) })
           setDayLog((log) => {
-            const next = addDay(log, st.day, sum)
+            // (with its hours: opened, shut, and how far past the hours' end (the owner's, 2026-11-15: "the hours must be kept too"))
+            const shut = getClock().minute
+            const next = addDay(log, st.day, sum, { open: st.from, close: hhmm(shut), late: Math.max(0, inHours(shut) ? 0 : lateBy(CLOSE_AT, shut)) })
             try { localStorage.setItem(DAYS_KEY, JSON.stringify(next)) } catch { /* (not kept) */ }
             return next
           })
@@ -3073,13 +3081,17 @@ export default function App() {
                         <section className="ledger-days">
                           <h4>{tl(lang, '每日結算', '日ごとの締め', 'Day by day')}</h4>
                           <div className="ledger-days-scroll"><table>
-                            <thead><tr><th>{tl(lang, '天', '日', 'Day')}</th><th>{tl(lang, '營業額', '売上', 'Takings')}</th><th>{UI[lang].profit}</th><th>{tl(lang, '來客', '来客', 'Guests')}</th><th aria-label={tl(lang, '星數', '星', 'Stars')}><StarIcon size={12} /></th></tr></thead>
+                            <thead><tr><th>{tl(lang, '天', '日', 'Day')}</th><th>{tl(lang, '營業時間', '営業時間', 'Hours')}</th><th>{tl(lang, '營業額', '売上', 'Takings')}</th><th>{UI[lang].profit}</th><th>{tl(lang, '加班費', '残業代', 'Overtime')}</th><th>{tl(lang, '來客', '来客', 'Guests')}</th><th aria-label={tl(lang, '星數', '星', 'Stars')}><StarIcon size={12} /></th></tr></thead>
                             <tbody>
                               {[...dayLog].reverse().map((d) => (
                                 <tr key={d.day} title={d.best ? `${tl(lang, '最暢銷', '一番人気', 'Best seller')}${lang === 'en' ? ': ' : '：'}${(() => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === d.best!.key); return e ? nameIn(lang, e) : d.best.key })()} ×${d.best.n}` : undefined}>
                                   <td>{tl(lang, `第 ${d.day} 天`, `${d.day} 日目`, `${d.day}`)}</td>
+                                  {/* (when it opened and shut, the shutting red when it was past the hours' end, how late on pointing) */}
+                                  <td className={d.late ? 'is-loss' : undefined} title={d.late ? tl(lang, `晚 ${Math.floor(d.late / 60)} 小時 ${d.late % 60} 分收店`, `${Math.floor(d.late / 60)}時間${d.late % 60}分遅れて閉店`, `Shut ${Math.floor(d.late / 60)} h ${d.late % 60} min late`) : undefined}>
+                                    {d.open && d.close ? `${d.open}–${d.close}` : '—'}</td>
                                   <td>{Math.round(d.revenue).toLocaleString('en-US')}</td>
                                   <td className={d.profit < 0 ? 'is-loss' : 'is-gain'}>{d.profit < 0 ? '−' : ''}{Math.abs(Math.round(d.profit)).toLocaleString('en-US')}</td>
+                                  <td className={d.overtime ? 'is-loss' : undefined}>{d.overtime ? Math.round(d.overtime).toLocaleString('en-US') : '—'}</td>
                                   <td>{d.guests}</td>
                                   <td>{d.stars === null ? '—' : d.stars.toFixed(1)}</td>
                                 </tr>
@@ -3120,7 +3132,7 @@ export default function App() {
               } catch {
                 // storage blocked
               }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
+              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, utility: 0, overtime: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
               window.location.replace(window.location.pathname + '?v=' + Date.now())
             }}
             hired={hired[dish.id] ?? {}}

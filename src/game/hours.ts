@@ -46,3 +46,16 @@ export const minutesOf = (hhmm: string) => {
 /** the hours as they read: 16:30–04:30 */
 export const hoursText = () => `${hm(OPEN_AT)}–${hm(CLOSE_AT)}`
 const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+/**
+ * Overtime (the owner's, 2026-11-15: the hours kept, as "past them the staff's pay goes up"): working past the hours' end the staff are paid
+ * more, as Taiwan's labour law has it for a working day (勞動基準法第 24 條): the first two hours over at 1.34 times the hour's pay, after that
+ * 1.67
+ */
+export const OVERTIME = { first: 120, firstRate: 1.34, laterRate: 1.67 } as const
+/** what the staff's pay is multiplied by at this minute: 1 within the hours, more past their end */
+export function overtimeRate(minute: number) {
+  if (inHours(minute)) return 1
+  const late = lateBy(CLOSE_AT, minute)
+  if (late <= 0) return 1
+  return late <= OVERTIME.first ? OVERTIME.firstRate : OVERTIME.laterRate
+}

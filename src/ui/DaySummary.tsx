@@ -41,11 +41,13 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
     window.addEventListener('keydown', key, true)
     return () => { window.clearInterval(tick); window.removeEventListener('keydown', key, true) }
   }, [])
+  // (the wages with what of them was overtime, when there was any (the owner's, 2026-11-15: past the hours the staff are paid more))
+  const overtime = s.overtime > 0.5 ? t(`（含加班費 ${nt(s.overtime)}）`, `（残業代 ${nt(s.overtime)} 込み）`, ` (incl. overtime ${nt(s.overtime)})`) : ''
   const rows: [string, number, boolean][] = [
     [t('營業額', '売上', 'Takings'), s.revenue, true],
     [t('食材', '食材', 'Food'), -s.food, false],
     [t('燃料（備長炭）', '燃料（備長炭）', 'Charcoal'), -s.fuel, false],
-    [t('人事', '人件費', 'Wages'), -s.wage, false],
+    [t('人事', '人件費', 'Wages') + overtime, -s.wage, false],
     [t('水電', '光熱費', 'Power & water'), -s.utility, false],
   ]
   const stars = s.stars === null ? null : Math.round(s.stars * 10) / 10

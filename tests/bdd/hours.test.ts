@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { CLOSE_AT, OPEN_AT, hoursBegin, hoursEnd, hoursText, inHours, isLate, lateBy, minutesOf } from '@/game/hours'
+import { CLOSE_AT, OPEN_AT, OVERTIME, hoursBegin, hoursEnd, hoursText, inHours, isLate, lateBy, minutesOf, overtimeRate } from '@/game/hours'
 
 const at = (h: number, m = 0) => h * 60 + m
 
@@ -32,5 +32,16 @@ feature('打烊結算寫出晚了多久開、多久結束（店主要的，2026-
     and('04:20 就關是提早 10 分鐘', () => { expect(lateBy(CLOSE_AT, at(4, 20))).toBe(-10) })
     and('晚到半夜才開也是晚，不是提早', () => { expect(lateBy(OPEN_AT, at(0, 10))).toBe(460) })
     and('時間字串讀得回來', () => { expect(minutesOf('05:30')).toBe(at(5, 30)); expect(minutesOf('x')).toBeNull() })
+  })
+})
+
+feature('超過營業時間，員工的薪水往上調（店主 2026-11-15）', () => {
+  scenario('營業時間內照原本的時薪', ({ then }) => {
+    then('16:30、午夜、04:29 都是 1 倍', () => { expect(overtimeRate(at(16, 30))).toBe(1); expect(overtimeRate(at(0))).toBe(1); expect(overtimeRate(at(4, 29))).toBe(1) })
+  })
+  scenario('超過 04:30 的前兩小時 1.34 倍，再超過 1.67 倍（勞基法）', ({ then, and }) => {
+    then('05:30（晚 1 小時）是 1.34 倍', () => { expect(overtimeRate(at(5, 30))).toBe(OVERTIME.firstRate) })
+    and('06:30（剛好晚 2 小時）還是 1.34 倍', () => { expect(overtimeRate(at(6, 30))).toBe(1.34) })
+    and('06:31 起是 1.67 倍', () => { expect(overtimeRate(at(6, 31))).toBe(OVERTIME.laterRate); expect(OVERTIME.laterRate).toBe(1.67) })
   })
 })
