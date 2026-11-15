@@ -29,7 +29,8 @@ import { makeTrip, through, tripStep, turnToward, type Trip } from './commuteWal
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
-import { HAND_WASH_LINES, handStops, scrubbed } from '@/game/handWash'
+import { HAND_WASH_LINES, SPONGE_S, beatLength, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
+import { newWashPose, spongePose, washPose, type WashPoints } from '@/scene/washMotion'
 import { PLATE_SCALE } from '@/game/plateSize'
 import { PathMap } from './PathMap'
 import { ServeCounter } from './ServeCounter'
@@ -79,7 +80,7 @@ import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, SHAPE_EACH, TRAY_MAX, WASH_S, emptyKama, kamaTick, riceGoes, setOn, takeRice, trayWants } from '@/game/rice'
 import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
 import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes } from '@/game/soup'
-import { bottleClink, lightSwitchSound, plateClink, stoolSound, washSplash } from './restroomSound'
+import { bottleClink, lightSwitchSound, plateClink, scrubSound, stoolSound, washSplash } from './restroomSound'
 import { SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
@@ -145,12 +146,13 @@ const BALL_NORI_GEO = new THREE.BoxGeometry(0.034, 0.022, 0.044)
 /** the owner's figure out serving, inside a server's frame (STAFF_SCALE): his own height (Roasting's BOSS_SCALE in the shop's frame) */
 const OWNER_IN_STAFF = (1.05 * 0.8) / STAFF_SCALE
 const OWNER_HAND = new THREE.Vector3()
+const OWNER_BONE = new THREE.Vector3()
 /** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a black-lacquered tray held in front */
 function OwnerWalker({ moving }: { moving: boolean }) {
   const g = useRef<THREE.Group>(null)
   const tray = useRef<THREE.Mesh>(null)
   /** his hands (the model's own nodes) and where they rest, found once he's drawn */
-  const hands = useRef<{ node: THREE.Object3D; at: THREE.Vector3; q: THREE.Quaternion; upper: boolean; palm: THREE.Vector3 | null }[] | null>(null)
+  const hands = useRef<{ node: THREE.Object3D; at: THREE.Vector3; q: THREE.Quaternion; upper: boolean }[] | null>(null)
   useFrame(({ clock }) => {
     const o = g.current
     if (!o) return
@@ -160,16 +162,15 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     // (sweeping up broken glass, or the broom carried: the tray put by)
     // (nor while he's down sweeping or wiping the floor (item 116: the tray showed in his hands as he wiped, a black disc on the floor))
     if (tray.current) tray.current.visible = !o.parent?.userData.broom && o.parent?.userData.scrub === undefined && o.parent?.userData.sweep === undefined
-      && o.parent?.userData.floorWipe === undefined
+      && o.parent?.userData.floorWipe === undefined && o.parent?.userData.washHands === undefined
     // (sweeping: both his hands on the broom's handle, going with it from side to side, as a server's are (the owner's, 2026-11-11: his hands
     // stood still at his sides while the broom swept); back where they rest after)
     if (!hands.current) {
       const l = o.getObjectByName('BossHandL'), r = o.getObjectByName('BossHandR')
       // (each hand's palm, where it's drawn, from its bone's origin (in the bone's parent's frame): the bone's origin isn't in the hand, so it's
       // the palm that's put on the handle (the owner's, 2026-11-12: set by its origin, his hands stood out wide at his sides, off the broom).
-      // Worked out the first time he sweeps, his whole figure's matrices brought up to date first (on his first frame they weren't: the
-      // palm came out in the room's frame, metres off, and flung his hands away))
-      if (l && r && l.parent && r.parent) hands.current = [l, r].map((node, k) => ({ node, at: node.position.clone(), q: node.quaternion.clone(), upper: k === 1, palm: null }))
+      // Worked out each frame he's at a job (below), not kept from the first)
+      if (l && r && l.parent && r.parent) hands.current = [l, r].map((node, k) => ({ node, at: node.position.clone(), q: node.quaternion.clone(), upper: k === 1 }))
     }
     const sweep = o.parent?.userData.sweep as number | undefined
     // (wiping a spill off the floor after (item 164): stooped as for the sweep, the broom put by, a hand on the cloth)
@@ -177,32 +178,37 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     const wipeAt = o.parent?.userData.wipeAt as [number, number, number] | undefined
     // (washing up at the sink (item 103): leant a little over the basin, both hands down in it, the right scrubbing round on the plate)
     const scrub = o.parent?.userData.scrub as number | undefined
+    // (washing a plate up by hand (item 174): each hand where the washing has it, in the world: the left on the plate, the right with the sponge)
+    const washHands = o.parent?.userData.washHands as { left: THREE.Vector3; right: THREE.Vector3 } | undefined
     // (stooped over the small broom while he sweeps, upright after)
-    o.rotation.x += ((sweep !== undefined || floorWipe !== undefined ? OWNER_BEND : scrub !== undefined ? OWNER_BEND * 0.35 : 0) - o.rotation.x) * 0.2
+    o.rotation.x += ((sweep !== undefined || floorWipe !== undefined ? OWNER_BEND : scrub !== undefined || washHands ? OWNER_BEND * 0.35 : 0) - o.rotation.x) * 0.2
+    const posing = sweep !== undefined || scrub !== undefined || floorWipe !== undefined || !!washHands
+    // (each hand's palm, where it's drawn, from its bone's origin, in the bone's parent's frame: worked out afresh each frame he's at a job,
+    // his whole figure's matrices and its skin's brought up to date first (item 174: worked out once, as he came to a job and leant in, it
+    // came out a hand's width off, and stayed so: his hands a hand's width off the plate and the sponge, the broom's handle, the cloth))
+    if (posing && hands.current) { o.updateWorldMatrix(true, false); o.updateMatrixWorld(true) }
     if (hands.current) for (const h of hands.current) {
-      if ((sweep === undefined && scrub === undefined && floorWipe === undefined) || !h.node.parent) { h.node.position.copy(h.at); h.node.quaternion.copy(h.q); continue }
-      if (!h.palm) {
-        o.updateWorldMatrix(true, true)
-        const parent = h.node.parent
-        const palmAt = h.node.localToWorld(drawnCentre(o, h.node)), boneAt = h.node.getWorldPosition(new THREE.Vector3())
-        h.palm = parent.worldToLocal(palmAt).sub(parent.worldToLocal(boneAt))
+      if (!posing || !h.node.parent) { h.node.position.copy(h.at); h.node.quaternion.copy(h.q); continue }
+      const parent = h.node.parent
+      const palm = parent.worldToLocal(h.node.localToWorld(drawnCentre(o, h.node))).sub(parent.worldToLocal(h.node.getWorldPosition(OWNER_BONE)))
+      if (washHands) {
+        h.node.position.copy(parent.worldToLocal(OWNER_HAND.copy(h.upper ? washHands.right : washHands.left))).sub(palm)
+        continue
       }
-      o.updateWorldMatrix(true, false)
-      h.node.parent.updateWorldMatrix(true, false)
       if (scrub !== undefined) {
         const k = scrub * Math.PI * 10
         OWNER_HAND.set(h.upper ? 0.09 + Math.cos(k) * 0.035 : -0.08, 0.36 + (h.upper ? Math.sin(k) * 0.02 : 0), 0.3 + (h.upper ? Math.sin(k) * 0.03 : 0))
-        h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND))).sub(h.palm!)
+        h.node.position.copy(parent.worldToLocal(o.localToWorld(OWNER_HAND))).sub(palm)
         continue
       }
       if (floorWipe !== undefined) {
         // (his own frame is the server's he stands in for, scaled up to his height: the cloth's place brought into it)
         const w = floorWipePose(OWNER_HAND.set(...(wipeAt ?? [0.05, 0.004, 0.62])).divideScalar(OWNER_IN_STAFF))
-        h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? w.right : w.left)))).sub(h.palm!)
+        h.node.position.copy(parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? w.right : w.left)))).sub(palm)
         continue
       }
       const p = ownerSweepPose(sweep!)
-      h.node.position.copy(h.node.parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? p.upper : p.lower)))).sub(h.palm!)
+      h.node.position.copy(parent.worldToLocal(o.localToWorld(OWNER_HAND.copy(h.upper ? p.upper : p.lower)))).sub(palm)
     }
   })
   return (
@@ -2523,6 +2529,25 @@ const PLATE_R = 0.13
 const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
   [0.3, 0.01], [0, 0.01]] as [number, number][]).map(([x, y]) => [x * PLATE_R * 2, y] as [number, number]), PLATE_R)
 const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
+/** the owner washing a plate up by hand (item 174): the suds on its face, a few small white blobs (x, z on it, how big), and the drops
+ * running off its edge into the water; low-poly, made once */
+const FOAM_AT: [number, number, number][] = [[0.01, 0, 1], [-0.035, 0.025, 0.85], [0.04, -0.03, 0.9], [-0.02, -0.045, 0.75], [0.05, 0.035, 0.7],
+  [-0.055, -0.005, 0.8], [0, 0.05, 0.7]]
+const FOAM_GEO = new THREE.IcosahedronGeometry(0.016, 1)
+const FOAM_MAT = new THREE.MeshToonMaterial({ color: '#f6f9fc' })
+const DRIP_GEO = new THREE.IcosahedronGeometry(0.0045, 0).scale(1, 1.7, 1)
+const DRIP_MAT = new THREE.MeshBasicMaterial({ color: '#d6ecf7' })
+/** how far along the sink's front the owner stands over toward the basket to wash (the bar's units), and where he works a plate: in from the
+ * basin's middle toward him, and up over the water */
+const WASH_SHIFT = 0.22
+// (0.16 in, the plate's edge came over the basin's near wall onto the counter)
+const WORK_IN = 0.05
+const WORK_UP = 0.035
+// (scratch, kept)
+const WASH_FWD = new THREE.Vector3()
+const SPOUT_AT = new THREE.Vector3()
+const STREAM_W = new THREE.Vector3()
+const DRIP_LOW = new THREE.Vector3()
 /** a smear's opacity by how dirty the plate is: as dark as it ever was (0.6) from a plate of two dishes on, a plate of one a little lighter,
  * fading smoothly to nothing as it soaks clean */
 const smearOpacity = (dirt: number) => 0.62 * Math.min(1, dirt * 1.6)
@@ -3035,6 +3060,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return f && seats[seat] ? f.localToWorld(drinkWorldAt.current.fromArray(drinkSpot(seat, cup))) : null
   }, [seats, drinkSpot])
   const scene = useThree((st) => st.scene)
+  const camera = useThree((st) => st.camera)
   const marks = useRef(new Map<string, THREE.Object3D | null>())
   /** when each mark was last looked for and not found: looked for again a second later (the owner, 2026-11-15: the dirty stack and the
    * draining basket's plates hung in the air over the cook table's end: their marks first looked for before the sink's model was in, the
@@ -3348,13 +3374,240 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const bossWash = useRef<{ phase: 'go' | 'wash' | 'back'; path: THREE.Vector3[]; len: number; t: number; pos: THREE.Vector3; yaw: number
     /** sent by the player (item 166): every dirty plate washed, a plate's worth of the liquid each, not only the counter's stack; and where he
      * came from, to go back to */
-    manual?: boolean; home?: THREE.Vector3 } | null>(null)
+    manual?: boolean; home?: THREE.Vector3
+    /** washing (item 174): the sponge being taken up (`grab`), a plate being washed (`plate`), the sponge put back (`stow`); the plate in hand:
+     * how dirty, its pattern, how it lay turned on the stack and where it was taken from; the left hand where the last plate left it (the bar's
+     * frame); the way he faces the basin; the beats' sounds made */
+    sub?: 'grab' | 'plate' | 'stow'; dirt?: number; design?: number; spin?: number; inHand?: boolean; from?: THREE.Vector3; fromL?: THREE.Vector3
+    base?: number; sounds?: number } | null>(null)
   const bossObj = useRef<THREE.Group | null>(null)
   /** where the owner is just now, in the bar's frame: his own figure's place (at the fire while the shop's shut, along the aisle while it's
    * open), so he walks off from where he's seen and comes back there */
   const bossNow = () => {
     const b = scene.getObjectByName('BossFollow'), f = frame.current
     return b && f ? f.worldToLocal(b.getWorldPosition(new THREE.Vector3())).setY(0) : ownerAt()
+  }
+  // ---- the owner washing up by hand, beat by beat (item 174, the owner's, 2026-11-15: 「別再讓我看到這麼低水平的動畫」: a plate a second went
+  // out of the stack and into the basket by itself while his hands circled inside the counter, the sponge left on its dish): he takes the
+  // sponge up, takes the top plate off the stack, scrubs it over the water as he turns it, rinses it under the tap (or swishes it in the
+  // water with the tap shut), stands it in the basket's next slot, and so on; the sponge put back after the last. The plate leaves the stack
+  // as it's taken up, and joins the basket as it's let go (game/handWash's washBeat; scene/washMotion's pose)
+  const WASH_POSE = useMemo(newWashPose, [])
+  /** his hands in the world, for his figure (OwnerWalker reads them off his group) */
+  const WASH_HANDS = useMemo(() => ({ left: new THREE.Vector3(), right: new THREE.Vector3() }), [])
+  const washPts = useRef<WashPoints | null>(null)
+  /** the plate in his hand, its scaled inside (the plate drawn), the suds on it, the drops off it */
+  const washHeld = useRef<THREE.Group>(null)
+  const washPlateIn = useRef<THREE.Group>(null)
+  const washFoam = useRef<THREE.Group>(null)
+  const washDrips = useRef<THREE.Group>(null)
+  /** the sponge for his hand: a copy of the sink's (its meshes, shared), made once; where it lies on its dish, measured as he takes it up */
+  const washSponge = useRef<{ g: THREE.Group; q: THREE.Quaternion; home: THREE.Vector3 } | null>(null)
+  /** where he stands to wash: before the sink, along its front toward the basket (from before the basin's middle the stack lay a metre off
+   * at his right, the basket behind it: out of his reach) */
+  const washSpot = () => {
+    const s0 = sinkFront(), mid = inBar('SinkWaterTop', endOf(1)).setY(0), side = basketAt(0).setY(0)
+    const fwd = mid.clone().sub(s0)
+    if (fwd.lengthSq() < 1e-8) return s0
+    fwd.normalize()
+    const off = side.sub(mid)
+    off.addScaledVector(fwd, -off.dot(fwd))
+    const d = off.length()
+    return d > 1e-3 ? s0.addScaledVector(off.divideScalar(d), Math.min(WASH_SHIFT, d * 0.5)) : s0
+  }
+  /** the sponge's copy (made the first time) and where it lies now on its dish (taken up off it by the player: a little over it) */
+  const spongeHome = () => {
+    let piece: THREE.Object3D | null = null
+    scene.traverse((q) => { if (!piece && q.userData?.editId === 'sink-sponge') piece = q })
+    const f = frame.current
+    if (!piece || !f) return null
+    const pc = piece as THREE.Object3D
+    pc.updateWorldMatrix(true, true)
+    const meshes: THREE.Mesh[] = []
+    pc.traverse((m) => { const q = m as THREE.Mesh; if (q.isMesh && !q.userData.proxy && !q.userData.editHandle) meshes.push(q) })
+    const box = new THREE.Box3()
+    for (const m of meshes) box.expandByObject(m)
+    if (box.isEmpty()) return null
+    const c = box.getCenter(new THREE.Vector3())
+    if (!washSponge.current) {
+      const q = (pc.getObjectByName('SinkSpongeSet') ?? pc).getWorldQuaternion(new THREE.Quaternion())
+      const inv = new THREE.Matrix4().compose(c, q, new THREE.Vector3(1, 1, 1)).invert()
+      const g = new THREE.Group()
+      g.name = 'wash-sponge'
+      for (const m of meshes) {
+        const k = new THREE.Mesh(m.geometry, m.material)
+        k.matrixAutoUpdate = false
+        k.matrix.multiplyMatrices(inv, m.matrixWorld)
+        k.raycast = () => {}
+        g.add(k)
+      }
+      g.visible = false
+      scene.add(g)
+      washSponge.current = { g, q, home: new THREE.Vector3() }
+    }
+    washSponge.current.home.copy(f.worldToLocal(c))
+    return washSponge.current
+  }
+  useEffect(() => () => { const w = washSponge.current; if (w) { w.g.removeFromParent(); washSponge.current = null } }, [])
+  // (dev: the washing as it's posed, for the probes (tests/e2e/_washanim.mjs, _washdbg.mjs))
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    Object.assign(window, { __wash: { pose: WASH_POSE, hands: WASH_HANDS, state: () => bossWash.current, sponge: () => washSponge.current, frame: () => frame.current } })
+  }, [WASH_POSE, WASH_HANDS])
+  /** everything of the washing put by: the plate, the drops, his copy of the sponge (the sink's shown on its dish again), the stream */
+  const washDone = () => {
+    HAND_WASH.spongeHeld = false
+    HAND_WASH.stream = null
+    if (washHeld.current) washHeld.current.visible = false
+    washDrips.current?.children.forEach((c) => { c.visible = false })
+    if (washSponge.current) washSponge.current.g.visible = false
+  }
+  const sinkNow = () => ({ dirty: dirty.current, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: true })
+  /** a plate's pattern put on a drawn plate (its first mesh with one): the plate in hand takes the stack's top plate's, the basket's slot the
+   * one let go of in it, so neither changes as it moves from one to the other */
+  const setPattern = (g: THREE.Object3D | null | undefined, design: number) => {
+    let done = false
+    g?.traverse((q) => {
+      const m = q as THREE.Mesh
+      if (done || !m.isMesh || m.geometry !== PLATE_GEO) return
+      const mat = m.material as THREE.MeshToonMaterial
+      if (!mat.map) return
+      const t = wareDesign(design)
+      if (mat.map !== t) mat.map = t
+      done = true
+    })
+  }
+  /** the next plate, or why he stops: all washed, the basket full, the water or the liquid gone (said, when the player sent him); the counter's
+   * stack only, when he went of himself */
+  const nextPlate = (b: NonNullable<typeof bossWash.current>) => {
+    b.t = 0; b.sounds = 0; b.inHand = false
+    const why = b.manual ? handStops(sinkNow()) : PILE.n > 0 && dirty.current > 0 && DRAIN.n < DRAIN_CAP ? null : 'done'
+    if (why) { b.sub = 'stow'; if (b.manual) STAFF_SAY.say('owner', HAND_WASH_LINES[why]); return }
+    const n = Math.min(dirty.current, SINK_SHOWN)
+    b.sub = 'plate'
+    b.dirt = SINK.dirt.at(-1) ?? 1
+    b.design = n - 1
+    b.spin = (n - 1) * 0.9
+  }
+  /** how near a sound is (as the restroom's): loud close by, gone 8.5 away */
+  const nearCam = (at: THREE.Vector3) => Math.max(0, Math.min(1, 1 - (at.distanceTo(camera.position) - 1.5) / 7))
+  /** the washing's beats: the sponge taken up, then a plate after another (off the stack as it's taken up, into the basket as it's let go),
+   * the sponge put back, and home */
+  const washTick = (b: NonNullable<typeof bossWash.current>) => {
+    const f = frame.current
+    if (b.sub === 'grab') { if (b.t >= SPONGE_S) nextPlate(b); return }
+    if (b.sub === 'stow') {
+      if (b.t < SPONGE_S) return
+      washDone()
+      b.phase = 'back'; b.t = 0
+      b.path = kitchenRoute(b.pos, b.home ?? ownerAt()); b.len = pathLength(b.path)
+      return
+    }
+    const dirt = b.dirt ?? 1
+    if (!b.inHand && b.t >= beatLength('take', dirt)) {
+      // (taken up: off the stack (where it lay kept, for the way it comes over))
+      if (dirty.current <= 0) { b.sub = 'stow'; b.t = 0; return }
+      b.inHand = true
+      b.from = dirtyAt(Math.max(0, Math.min(dirty.current, SINK_SHOWN) - 1))
+      dirty.current -= 1
+      PILE.n = pileLeft(PILE.n, dirty.current)
+      setPattern(washPlateIn.current, b.design ?? 0)
+      redraw()
+    }
+    const { beat } = washBeat(b.t, dirt)
+    const at = washPts.current?.work
+    if (f && at && beat === 'scrub' && !((b.sounds ?? 0) & 1)) { b.sounds = (b.sounds ?? 0) | 1; f.localToWorld(SOUND_AT.copy(at)); washSplash(SOUND_AT); scrubSound(nearCam(SOUND_AT)) }
+    if (f && at && beat === 'rinse' && !((b.sounds ?? 0) & 2)) { b.sounds = (b.sounds ?? 0) | 2; washSplash(f.localToWorld(SOUND_AT.copy(at))) }
+    if (b.t >= washPlateS(dirt)) {
+      // (let go of, standing in the basket's next slot: the basket's plate there drawn with its pattern)
+      const r = handOne(1, DRAIN)
+      DRAIN.n = r.drain.n
+      DRAIN.left = r.drain.left
+      if (b.manual) SINK.soap = scrubbed(SINK.soap)
+      meterWater('dish')
+      setPattern(drainPlates.current?.children[DRAIN.n - 1], b.design ?? 0)
+      if (f) plateClink(f.localToWorld(SOUND_AT.copy(WASH_POSE.plate)))
+      b.fromL = (b.fromL ?? new THREE.Vector3()).copy(WASH_POSE.left)
+      nextPlate(b)
+    }
+  }
+  /** the points the washing moves between, in the bar's frame, now (the water's top as it stands, the tap running or not, the basket's next slot) */
+  const washPoints = (b: NonNullable<typeof bossWash.current>) => {
+    const p = washPts.current ?? (washPts.current = { stack: new THREE.Vector3(), stackSpin: 0, work: new THREE.Vector3(), waterY: 0, spout: null,
+      slot: new THREE.Vector3(), along: new THREE.Vector3(), toward: new THREE.Vector3(), left: new THREE.Vector3(), spongeHome: new THREE.Vector3(),
+      fromL: new THREE.Vector3(), restL: new THREE.Vector3(), restR: new THREE.Vector3(), r: PLATE_R * IN_SINK })
+    const top = inBar('SinkWaterTop', endOf(1)), floor = inBar('SinkBasinFloor', endOf(1))
+    p.waterY = floor.y + (top.y - floor.y) * Math.min(1, Math.max(0, SINK.water))
+    p.toward.copy(b.pos).sub(top).setY(0).normalize()
+    const fwd = WASH_FWD.copy(p.toward).negate()
+    p.left.crossVectors(UP_Y, fwd)
+    p.work.copy(top).addScaledVector(p.toward, WORK_IN).setY(Math.max(p.waterY, floor.y + 0.03) + WORK_UP)
+    p.spout = SINK.tap || SINK.washing ? SPOUT_AT.copy(inBar('SinkSpoutTip', endOf(1))) : null
+    p.slot.copy(basketAt(DRAIN.n))
+    p.along.copy(inBar('SinkRackSlot1', endOf(1)).sub(inBar('SinkRackSlot0', endOf(1)))).normalize()
+    if (b.inHand && b.from) p.stack.copy(b.from)
+    else p.stack.copy(dirtyAt(Math.max(0, Math.min(dirty.current, SINK_SHOWN) - 1)))
+    p.stackSpin = b.spin ?? 0
+    if (washSponge.current) p.spongeHome.copy(washSponge.current.home)
+    // (his hands at rest: in front of him at his waist, either side)
+    p.restL.copy(b.pos).addScaledVector(p.left, 0.15).addScaledVector(fwd, 0.16).setY(b.pos.y + 0.5)
+    p.restR.copy(b.pos).addScaledVector(p.left, -0.15).addScaledVector(fwd, 0.16).setY(b.pos.y + 0.5)
+    p.fromL.copy(b.fromL ?? p.restL)
+    return p
+  }
+  /** the washing posed this frame: his hands, the plate (its smear, its suds), the drops off it, the sponge, the tap's stream on the plate, his
+   * body turned a little toward what his hands are at */
+  const washShow = (b: NonNullable<typeof bossWash.current>, step: number) => {
+    const f = frame.current
+    const p = washPoints(b), P = WASH_POSE, dirt = b.dirt ?? 1
+    const beat = b.sub === 'plate' ? washBeat(b.t, dirt) : null
+    if (!beat) spongePose(Math.min(1, b.t / SPONGE_S), b.sub === 'stow', p, P)
+    else washPose(beat.beat, beat.k, p, P)
+    if (f) { f.localToWorld(WASH_HANDS.left.copy(P.left)); f.localToWorld(WASH_HANDS.right.copy(P.right)) }
+    const h = washHeld.current
+    if (h) {
+      h.visible = !!beat && P.held
+      if (h.visible) {
+        h.position.copy(P.plate)
+        h.quaternion.copy(P.plateQ)
+        washPlateIn.current?.scale.set(IN_SINK, IN_SINK * (0.3 + 0.7 * P.deep), IN_SINK)
+        const sm = washPlateIn.current?.getObjectByName('plate-smear') as THREE.Mesh | undefined
+        if (sm) { const d = dirt * P.smear; (sm.material as THREE.MeshBasicMaterial).opacity = smearOpacity(d); sm.visible = d > CLEAN_AT }
+        washFoam.current?.children.forEach((c, i) => { const k = FOAM_AT[i][2] * P.foam; c.scale.set(k, k * 0.6, k); c.visible = k > 0.03 })
+      }
+    }
+    // (the drops running off its lowest edge down into the water, three, one after another)
+    const dr = washDrips.current
+    if (dr) {
+      const on = !!beat && P.held && P.wet > 0.3
+      if (on) {
+        WASH_FWD.copy(UP_Y).applyQuaternion(P.plateQ)
+        DRIP_LOW.copy(UP_Y).addScaledVector(WASH_FWD, -WASH_FWD.y).normalize()
+        DRIP_LOW.multiplyScalar(-p.r * 0.97).add(P.plate)
+      }
+      const fall = DRIP_LOW.y - p.waterY
+      dr.children.forEach((c, i) => {
+        c.visible = on && fall > 0.006
+        if (!c.visible) return
+        const k = (performance.now() / 1000 * 2.6 + i / 3) % 1
+        c.position.set(DRIP_LOW.x, DRIP_LOW.y - fall * k * k, DRIP_LOW.z)
+      })
+    }
+    // (the sponge: his copy where his hand has it, the one on the dish hidden meanwhile)
+    const sp = washSponge.current
+    HAND_WASH.spongeHeld = !!sp
+    if (sp && f) {
+      sp.g.visible = true
+      f.localToWorld(sp.g.position.copy(P.sponge))
+      sp.g.quaternion.copy(P.spongeQ).multiply(sp.q)
+    }
+    HAND_WASH.stream = P.stream && f ? f.localToWorld(STREAM_W.copy(P.stream)) : null
+    // (his body turned a little toward what his hands are at: the stack as he takes a plate, the basket as he stands it in, the sponge's dish)
+    const aim = !beat ? p.spongeHome : beat.beat === 'take' ? p.stack : beat.beat === 'rack' ? p.slot : p.work
+    const base = b.base ?? b.yaw
+    const want = Math.atan2(aim.x - b.pos.x, aim.z - b.pos.z)
+    const turn = Math.max(-0.5, Math.min(0.5, Math.atan2(Math.sin(want - base), Math.cos(want - base)))) * 0.6
+    b.yaw += Math.atan2(Math.sin(base + turn - b.yaw), Math.cos(base + turn - b.yaw)) * Math.min(1, step * 6)
   }
   const bossWashTick = (step: number) => {
     // (the player's washing up handed to him (item 166, Sink's scrubOnce): he goes once he's free; at the counter's stack already, he washes
@@ -3363,7 +3616,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (bossWash.current) { bossWash.current.manual = true; HAND_WASH.ask = null }
       else if (!OWNER_OUT.on) {
         HAND_WASH.ask = null
-        const from = bossNow(), path = kitchenRoute(from, sinkFront())
+        const from = bossNow(), path = kitchenRoute(from, washSpot())
         bossWash.current = { phase: 'go', path, len: pathLength(path), t: 0, pos: from.clone(), yaw: OWNER_YAW, manual: true, home: from }
         OWNER_OUT.on = true
         STAFF_SAY.say('owner', HAND_WASH_LINES.start)
@@ -3377,14 +3630,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       STAFF_SAY.say('owner', PILE_LINE)
       if (ownerServes) PILE.n = 0
       else {
-        const from = ownerAt(), path = kitchenRoute(from, sinkFront())
+        const from = ownerAt(), path = kitchenRoute(from, washSpot())
         bossWash.current = { phase: 'go', path, len: pathLength(path), t: 0, pos: from.clone(), yaw: OWNER_YAW }
         OWNER_OUT.on = true
       }
     }
     const b = bossWash.current, o = bossObj.current
     if (o) o.visible = !!b
-    if (!b) { setWaiterMoving(BOSS_WASH_I, false); return }
+    if (!b) { setWaiterMoving(BOSS_WASH_I, false); if (HAND_WASH.spongeHeld) washDone(); return }
     b.t += step
     if (b.phase === 'go' || b.phase === 'back') {
       const d = Math.min(b.len, b.t * SERVER_SPEED)
@@ -3394,41 +3647,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       setWaiterMoving(BOSS_WASH_I, d < b.len)
       if (d >= b.len) {
         if (b.phase === 'go') {
-          b.phase = 'wash'; b.t = 0
-          const at = inBar('SinkBasinFloor', endOf(1)).sub(b.pos)
-          b.yaw = Math.atan2(at.x, at.z)
-        } else { bossWash.current = null; OWNER_OUT.on = false; setWaiterMoving(BOSS_WASH_I, false); if (o) o.visible = false; return }
+          // (at the sink, facing the basin: the sponge taken up first (item 174))
+          b.phase = 'wash'; b.t = 0; b.sub = 'grab'; b.inHand = false; b.fromL = undefined
+          const at = inBar('SinkWaterTop', endOf(1)).sub(b.pos)
+          b.yaw = b.base = Math.atan2(at.x, at.z)
+          spongeHome()
+        } else { bossWash.current = null; OWNER_OUT.on = false; setWaiterMoving(BOSS_WASH_I, false); if (o) o.visible = false; washDone(); return }
       }
-    } else if (b.t >= handTime(SINK.dirt.at(-1) ?? 1)) {
-      // (a plate of the stack scrubbed and stood in the basket; the stack washed, or the basket full, back to the fire)
-      b.t = 0
-      const before = dirty.current
-      // (sent by the player: any dirty plate, while there's water and the liquid in it; else the counter's stack)
-      const sinkNow = () => ({ dirty: dirty.current, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: true })
-      const stop = b.manual ? handStops(sinkNow()) : null
-      const r = b.manual ? (stop ? null : handOne(before, DRAIN)) : PILE.n > 0 ? handOne(before, DRAIN) : null
-      if (r && b.manual && r.dirty !== before) SINK.soap = scrubbed(SINK.soap)
-      if (r && r.dirty !== before) {
-        dirty.current = r.dirty
-        DRAIN.n = r.drain.n
-        DRAIN.left = r.drain.left
-        meterWater('dish')
-        if (o) { washSplash(o.getWorldPosition(SOUND_AT)); window.setTimeout(() => plateClink(SOUND_AT), 520) }
-        PILE.n = pileLeft(PILE.n, dirty.current)
-        redraw()
-      }
-      const why = b.manual ? stop ?? handStops(sinkNow()) : null
-      if (b.manual ? !!why : (!r || r.dirty === before || PILE.n <= 0 || DRAIN.n >= DRAIN_CAP)) {
-        // (and says why: all washed, the basket full, the liquid or the water gone)
-        if (why) STAFF_SAY.say('owner', HAND_WASH_LINES[why])
-        b.phase = 'back'; b.t = 0
-        b.path = kitchenRoute(b.pos, b.home ?? ownerAt()); b.len = pathLength(b.path)
-      }
+    } else {
+      washTick(b)
+      if (bossWash.current === b && b.phase === 'wash') washShow(b, step)
     }
     if (o) {
       o.position.copy(b.pos)
       o.rotation.y = b.yaw
-      o.userData.scrub = b.phase === 'wash' ? b.t : undefined
+      o.userData.scrub = undefined
+      o.userData.washHands = b.phase === 'wash' ? WASH_HANDS : undefined
     }
   }
   /** where one stands on the kitchen's floor to reach something on (or by) the cook table: the nearest spot clear of it */
@@ -5890,6 +6124,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           {/* (drawn shallower than they are, so thirty stood in their notches show a gap between each (the owner's, 2026-11-12): the shop's
               plates are deep, and at the notches' pitch they lay nested into one another) */}
           {Array.from({ length: DRAIN_CAP }, (_, i) => <group key={i} scale={IN_DRAIN} visible={false}><Plate design={i + 2} /></group>)}
+        </group>
+      )}
+      {/* (the owner washing up by hand (item 174): the plate in his hand, the suds on it; the drops off its edge) */}
+      {given && (
+        <group ref={washHeld} name="wash-plate" visible={false}>
+          <group ref={washPlateIn} scale={IN_SINK}>
+            <Plate dirty sticks={0} design={0} />
+            <group ref={washFoam}>
+              {FOAM_AT.map(([x, z], i) => <mesh key={i} geometry={FOAM_GEO} material={FOAM_MAT} position={[x, 0.016, z]} visible={false} raycast={() => {}} />)}
+            </group>
+          </group>
+        </group>
+      )}
+      {given && (
+        <group ref={washDrips} name="wash-drips">
+          {[0, 1, 2].map((i) => <mesh key={i} geometry={DRIP_GEO} material={DRIP_MAT} visible={false} raycast={() => {}} />)}
         </group>
       )}
       {given && (

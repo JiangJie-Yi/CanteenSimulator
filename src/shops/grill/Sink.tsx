@@ -323,12 +323,22 @@ export function SinkModel() {
     tapRunning('washer', ph === 'washing' ? near * 0.45 : 0)
     steam.current = Math.max(0, 1 - (performance.now() - doneAt.current) / 7000) * (0.5 + 0.5 * opened.current)
     const t = clock.elapsedTime
+    // (the owner rinsing a plate under it (item 174): the stream stops on the plate's face, no ring on the water under it)
+    let stop: number | null = null
+    if (on && HAND_WASH.stream && stream.current?.parent) {
+      const y = stream.current.parent.worldToLocal(STOP_AT.copy(HAND_WASH.stream)).y
+      if (y > floor.y && y < tip.y - 0.002) stop = y
+    }
     if (stream.current) {
       stream.current.visible = on
-      if (on) stream.current.scale.set(1 + Math.sin(t * 31) * 0.12, 1, 1 + Math.cos(t * 27) * 0.12)
+      if (on) {
+        const from = stop ?? floor.y
+        stream.current.scale.set(1 + Math.sin(t * 31) * 0.12, (tip.y - from) / len, 1 + Math.cos(t * 27) * 0.12)
+        stream.current.position.y = from + (tip.y - from) / 2
+      }
     }
     if (ring.current) {
-      ring.current.visible = on
+      ring.current.visible = on && stop === null
       if (on) { const k = 1 + ((t * 2.4) % 1) * 1.6; ring.current.scale.set(k, k, k); (ring.current.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - ((t * 2.4) % 1)) }
       // (where the stream lands: on the water once there's any)
       ring.current.position.y = SINK.water > 0.002 ? Math.max(floor.y + 0.004, base + rise * SINK.water + 0.002) : floor.y + 0.004
@@ -408,6 +418,7 @@ export function SinkModel() {
 /** the washing up handed to the owner, if it's all ready for it: the basin's click, and the dirty stack's beside it (the owner, 2026-11-15:
  * clicking the stack did nothing, "I can't wash up by hand"; then, item 166: a plate went clean at a click, with nothing seen done, "isn't
  * the owner meant to take it over?"): he walks over and scrubs them one by one (GuestBar3D); whether he's on it */
+const STOP_AT = new THREE.Vector3()
 export function scrubOnce() {
   if (HAND_WASH.boss) return true
   if (handStep(handSink()) !== 'scrub') return false
@@ -465,7 +476,12 @@ export function SinkPart({ node }: { node: string }) {
   const name = SINK_SETS.find((s) => s.node === node)?.label ?? ''
   // (the sponge, taken up to wash with (item 103): lifted off its dish while it's held)
   const lift = useRef<THREE.Group>(null)
-  useFrame(() => { if (lift.current) lift.current.position.y += ((node === 'SinkSpongeSet' && SINK.sponge ? SPONGE_UP : 0) - lift.current.position.y) * 0.25 })
+  useFrame(() => {
+    if (!lift.current) return
+    lift.current.position.y += ((node === 'SinkSpongeSet' && SINK.sponge ? SPONGE_UP : 0) - lift.current.position.y) * 0.25
+    // (taken up by the owner to wash with (item 174): his hand has it, drawn there)
+    lift.current.visible = !(node === 'SinkSpongeSet' && HAND_WASH.spongeHeld)
+  })
   // (the washing-up liquid squeezed into the water, the sponge taken up or put down: steps of washing up by hand (item 103), clicked)
   if (node === 'SinkDetergentSet' || node === 'SinkSpongeSet') return (
     <group ref={lift} onPointerOver={(e) => { if (getEdit().on) return; tipOver(name, partSays(node)).onPointerOver(e) }}

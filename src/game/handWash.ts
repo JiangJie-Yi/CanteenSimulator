@@ -60,3 +60,31 @@ export const HAND_WASH_LINES = {
   soap: { zh: ['洗碗精用完了，再擠一點。'], ja: ['洗剤が切れた。'], en: ['Out of washing-up liquid.'] },
   water: { zh: ['水不夠了。'], ja: ['水が足りない。'], en: ['Not enough water.'] },
 } as const
+
+/**
+ * One plate washed by the owner's hands, in its beats (item 174, the owner's, 2026-11-15: 「別再讓我看到這麼低水平的動畫」: the plates went out
+ * of the stack and into the basket by themselves, a plate a second, while his hands circled somewhere inside the counter): his hand to the
+ * stack and the top plate taken up (`take`), brought over the water (`bring`), scrubbed with the sponge (`scrub`: the longer the dirtier it
+ * is, as it always took), rinsed (`rinse`), stood in the basket's next slot (`rack`). In the game's seconds. Before the first plate the sponge
+ * is taken up off its dish, after the last put back (SPONGE_S each).
+ */
+export type WashBeat = 'take' | 'bring' | 'scrub' | 'rinse' | 'rack'
+export const WASH_BEATS: readonly WashBeat[] = ['take', 'bring', 'scrub', 'rinse', 'rack']
+/** each beat's length, the scrub's for a plate as dirty as `dirt` (0 clean .. 1) */
+export const beatLength = (beat: WashBeat, dirt: number) =>
+  beat === 'take' ? 0.45 : beat === 'bring' ? 0.35 : beat === 'scrub' ? 0.8 + 0.9 * Math.min(1, Math.max(0, dirt)) : beat === 'rinse' ? 0.65 : 0.6
+/** a plate's washing, all its beats */
+export const washPlateS = (dirt: number) => WASH_BEATS.reduce((s, b) => s + beatLength(b, dirt), 0)
+/** the sponge taken up off its dish, and put back */
+export const SPONGE_S = 0.5
+/** which beat of a plate's washing it is `t` seconds into it, and how far through that beat (0 .. 1); past the end, the rack's end */
+export function washBeat(t: number, dirt: number): { beat: WashBeat; k: number } {
+  let at = Math.max(0, t)
+  for (const beat of WASH_BEATS) {
+    const d = beatLength(beat, dirt)
+    // (a hair short of a beat's end is its end: the sum of the lengths taken off one by one comes out a hair under)
+    if (at < d - 1e-9) return { beat, k: at / d }
+    at = Math.max(0, at - d)
+  }
+  return { beat: 'rack', k: 1 }
+}
