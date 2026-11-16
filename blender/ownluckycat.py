@@ -4,8 +4,8 @@ low-poly mesh of quads over its shape, its colour baked into a picture (as the b
 
 How: the door cat's mesh, turned to face -y and brought to 0.30 tall, is fused whole (a voxel remesh), retopologised into an even grid of quads
 (a coarse voxel remesh) and the quads shrunk back onto its surface; unwrapped, and its colours baked from the original into a 1024 picture (Cycles,
-selected to active). The raised paw (its hand, out past the head's side) beckons by bending: a shape key tips it forward about its foot,
-fading into the body round it, which the game eases in and out (a morph target); no cut.
+selected to active). The raised paw stays still (item 223, the owner's, 2026-11-16: 「你手別動好了，會不會比較好看」; it beckoned by a shape
+key before, items 97 and 163). The koban is made: a pillow-edged oval plate as thick as a coin should look, where the door cat's own was.
 
 Run:
     blender -b --factory-startup --python blender/ownluckycat.py -- <project path> [preview.png]
@@ -20,7 +20,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
-from common import export_dish, grid01, image, mix, pbr, smooth  # noqa: E402
+from common import export_dish, grid01, image, ladder_fill, mix, pbr, smooth  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,8 +29,6 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 
 TALL = 0.30
 VOXEL = 0.018
-# (the raised hand: past the head's side, between these heights (shares of TALL))
-PAW_X, PAW_Z0, PAW_Z1 = 0.086, 0.4, 0.9
 
 
 # ---- the koban's picture: gold, 千万両 written down it by hand, as the door cat's is (the owner's, 2026-11-15: "the words on the coin:
@@ -136,8 +134,41 @@ bm = bmesh.new()
 bm.from_mesh(src.data)
 uvl0 = bm.loops.layers.uv.active
 coin_f = [f for f in bm.faces if 0.72 < sum(l[uvl0].uv.x for l in f.loops) / len(f.loops) < 0.91 and sum(l[uvl0].uv.y for l in f.loops) / len(f.loops) > 0.81]
-coin_pts = [v.co.copy() for f in coin_f for v in f.verts]
-bmesh.ops.delete(bm, geom=coin_f, context="FACES")
+# (where the door cat's coin is and which way it faces, for the made one: the coin itself the largest group of those faces joined through
+# their edges (one face of the picture's corner is on the paw), its middle, and its axes by how its points spread (the thinnest way through
+# it its face's, turned toward the front; the longest, up))
+left_ = set(coin_f)
+groups_ = []
+while left_:
+    f0 = left_.pop()
+    st_, g_ = [f0], [f0]
+    while st_:
+        f_ = st_.pop()
+        for e_ in f_.edges:
+            for h_ in e_.link_faces:
+                if h_ in left_:
+                    left_.discard(h_)
+                    st_.append(h_)
+                    g_.append(h_)
+    groups_.append(g_)
+coin_xyz = np.array(list({v.index: tuple(v.co) for v in {v for f in max(groups_, key=len) for v in f.verts}}.values()))
+KC = Vector(coin_xyz.mean(axis=0))
+_w, _V = np.linalg.eigh(np.cov((coin_xyz - coin_xyz.mean(axis=0)).T))
+KN = Vector(_V[:, 0] if _V[1, 0] < 0 else -_V[:, 0])
+KUP = Vector(_V[:, 2] if _V[2, 2] > 0 else -_V[:, 2])
+KSIDE = KUP.cross(KN)
+print("COIN_FRAME", tuple(round(c, 4) for c in KC), "front", tuple(round(c, 3) for c in KN), "up", tuple(round(c, 3) for c in KUP))
+# (the body's own rim round the coin goes with it: a wall that hugged the coin's side, painted gold, left standing in front of the bib once
+# the coin was off; fused, a thin white sliver beside the made coin, its edge in ragged ink (the owner's circled shot, item 223). Every face
+# of the body within 7 mm of the coin and not in front of its face (the paw that holds it is) is taken off with it)
+from mathutils.bvhtree import BVHTree  # noqa: E402
+bm.verts.index_update()
+ctree = BVHTree.FromPolygons([v.co.copy() for v in bm.verts], [[v.index for v in f.verts] for f in max(groups_, key=len)])
+coin_set = set(coin_f)
+lip_f = [f for f in bm.faces if f not in coin_set and ctree.find_nearest(f.calc_center_median(), 0.007)[0] is not None
+         and -(f.calc_center_median() - KC).dot(KN) > -0.010]
+print("COIN_LIP", len(lip_f))
+bmesh.ops.delete(bm, geom=coin_f + lip_f, context="FACES")
 # (two copies of what's left: one baked from, as it is; one fused and shrunk onto, its open edges (the model has many: inside its ears, the
 # coin's own) all closed, or the fusing can't tell inside from out and keeps a scrap of the cat; baked from that one, the closing faces,
 # with no place in the picture, came out streaks on the ear)
@@ -189,21 +220,13 @@ sc.cycles.samples = 4
 sc.cycles.device = "CPU"
 select_only(fuse_src, lp, active=lp)
 bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, cage_extrusion=0.012, max_ray_distance=0.06, margin=8)
-# (the koban: a thin plate, too thin for the grid of quads to keep, its baked rays found nothing and it came out black. Where the picture
-# baked dark: gold; and which faces those are, for where the koban goes)
+# (where its baked rays found nothing (what was behind the door cat's coin): painted as the cat's white)
 px = np.array(img.pixels[:], dtype=np.float32).reshape(1024, 1024, 4)
 dark = px[..., :3].max(axis=2) < 0.015   # (no colour found at all: the black ear's black is lighter than this)
 # (gold, the koban's own (the owner's, 2026-11-15: painted white, the source's thin plate showed as a white sliver beside the made coin and
 # a white lump over the bell): the made koban below covers the plate, so what shows of it reads as the coin's own edge)
 px[dark, :3] = np.median(px[(px[..., :3].min(axis=2) > 0.5) & ~dark][:, :3], axis=0)
 img.pixels.foreach_set(px.ravel())
-uvl_ = lp.data.uv_layers.active.data
-dark_at = []
-for poly in lp.data.polygons:
-    uu = sum(uvl_[li].uv.x for li in poly.loop_indices) / poly.loop_total
-    vv = sum(uvl_[li].uv.y for li in poly.loop_indices) / poly.loop_total
-    if dark[min(1023, int(vv * 1024)), min(1023, int(uu * 1024))] and poly.center.y < -0.03 and poly.center.z < 0.16:
-        dark_at.append(poly.center.copy())
 img.pack()
 # (the picture into the colour only once it's baked: wired in before, it was read while it was being written)
 nt.links.new(tex.outputs["Color"], nt.nodes["Principled BSDF"].inputs["Base Color"])
@@ -211,140 +234,90 @@ bpy.data.objects.remove(src)
 bpy.data.objects.remove(fuse_src)
 bpy.data.objects.remove(shape_src)
 
-# ---- the raised hand beckons by bending, not cut off (the owner's, 2026-11-15: "the cat's hand is simply cut off": it was cut off along a
-# plane across the arm into a node of its own and swung there, its seam a line down the paw and the flat faces of the cut showing as it
-# swung): the cat one mesh, with a shape key ("Beckon"): the raised arm tipped forward about its foot (where it rises from the body by the
-# head), its pull fading out over a ring of the grid round it, so the fur there stretches with it and nothing opens. The game eases the key
-# in and out (a morph target), as the door cat's arm bends with its skin
-import heapq
-from collections import defaultdict
-me_ = lp.data
-lo_, hi_ = PAW_Z0 * TALL, PAW_Z1 * TALL
-hand_ = [v.index for v in me_.vertices if v.co.x > PAW_X and lo_ - 0.008 < v.co.z < hi_]
-top_z = max(me_.vertices[i].co.z for i in hand_)
-foot_ = [me_.vertices[i].co for i in hand_ if me_.vertices[i].co.z < lo_ + 0.02] or [me_.vertices[i].co for i in hand_]
-pivot = Vector((PAW_X, sum(c.y for c in foot_) / len(foot_), lo_ + 0.004))
-# (how far round the hand its pull reaches over the surface, fading (a few rings of the grid: over one, the fur folded where the hand's top
-# meets the ear); how far it's tipped at the most (rad): its top a little over 2 cm forward, as the cut hand's went)
-REACH, BECKON = 0.045, 0.22
-adj = defaultdict(list)
-for e in me_.edges:
-    a_, b_ = e.vertices
-    L_ = (me_.vertices[a_].co - me_.vertices[b_].co).length
-    adj[a_].append((b_, L_))
-    adj[b_].append((a_, L_))
-dist = {i: 0.0 for i in hand_}
-pq = [(0.0, i) for i in hand_]
-heapq.heapify(pq)
-while pq:
-    d_, i = heapq.heappop(pq)
-    if d_ > dist.get(i, 1e9):
-        continue
-    for j_, L_ in adj[i]:
-        nd = d_ + L_
-        if nd < REACH and nd < dist.get(j_, 1e9):
-            dist[j_] = nd
-            heapq.heappush(pq, (nd, j_))
-lp.shape_key_add(name="Basis", from_mix=False)
-key = lp.shape_key_add(name="Beckon", from_mix=False)
-moved = 0
-for i, d_ in dist.items():
-    c = me_.vertices[i].co
-    t_ = min(1.0, d_ / REACH)
-    w_ = 1.0 - t_ * t_ * (3 - 2 * t_)
-    # (less and less of the head over the hand's top: its ear stays where it is)
-    if c.z > top_z:
-        t_ = min(1.0, (c.z - top_z) / 0.03)
-        w_ *= 1.0 - t_ * t_ * (3 - 2 * t_)
-    if w_ <= 0:
-        continue
-    a_ = BECKON * w_
-    dy, dz = c.y - pivot.y, c.z - pivot.z
-    # (about x: its top toward -y, the cat's front)
-    key.data[i].co = Vector((c.x, pivot.y + dy * math.cos(a_) - dz * math.sin(a_), pivot.z + dy * math.sin(a_) + dz * math.cos(a_)))
-    moved += 1
-print("BECKON_VERTS", len(hand_), "MOVED", moved)
-
-# ---- the koban, made: a flat lens of an oval, 千萬兩 written down it, set where the dark blob was, just in front of it
+# ---- the koban, made (item 223, the owner's, 2026-11-16: 「錢幣的厚度呢?」: the lens it was before thinned to nothing at its edge and read as
+# a sheet of paper, and narrower and further forward than the door cat's coin, the body's wall that hugged that coin's side stood beside it, a
+# thin white sliver): a plate with a pillow edge, 1.4 cm through (as thick as the door cat's ceramic coin looks), its face flat and its rim
+# rounded, standing where the door cat's coin stood and turned as it was (KC, KN, KUP), as wide as it so the wall behind its side is covered,
+# its top just under the bell. Three rings of 16 round it (its face's edge, its widest, its back's edge), the face and the back each closed
+# with a ladder of quads straight across (never a fan into a point): 64 faces, 92 triangles. 千萬兩 laid flat over its face
 kmat = pbr("OwnCatKoban", (1, 1, 1), tex=koban_img, rough=0.35)
-kc = Vector((sum(c.x for c in dark_at), sum(c.y for c in dark_at), sum(c.z for c in dark_at))) / max(1, len(dark_at))
-kh = (max(c.z for c in dark_at) - min(c.z for c in dark_at)) if dark_at else 0.06
-front = min(c.y for c in dark_at) if dark_at else kc.y
+kc = Vector(KC)
+KR = (0.031, 0.007, 0.043)
+# (how far its face's edge comes in from its widest: the pillow of its rim)
+KINSET = 0.9
 bm = bmesh.new()
 uvk = bm.loops.layers.uv.new()
-# (as the door cat's: a tall plump oval held in its paw, over the whole of the source's plate (the gold patch below the bell), a few
-# millimetres past it all round)
-plate = coin_pts
-if plate:
-    kc = Vector(((min(c.x for c in plate) + max(c.x for c in plate)) / 2, kc.y, (min(c.z for c in plate) + max(c.z for c in plate)) / 2))
-    # (its size the door cat's in proportion, a little over a quarter of the cat's height (the source's coin island takes in more than the
-    # coin: sized by it, it came out half the cat's height); its middle the source coin's, its back against the body's front there)
-    kc = Vector((sum(c.x for c in plate) / len(plate), kc.y, sum(c.z for c in plate) / len(plate)))
-    KR = (0.026, 0.009, 0.042)
-    # (in front of all of the body over its outline (the paw that held the source's coin wraps round its sides: a ray down its middle went
-    # through the gap and the coin sat behind the paw)
-    # (its upper half only: below it the cat's front feet reach out further, and taken in, the coin stood off the body in the air)
-    near = [v.co.y for v in lp.data.vertices if abs(v.co.x - kc.x) < KR[0] * 0.8 and kc.z - KR[2] * 0.2 < v.co.z < kc.z + KR[2]]
-    front = (min(near) if near else min(c.y for c in plate)) - KR[1] + 0.004
-else:
-    KR = (0.026, 0.009, 0.04)
-print("KOBAN_KR", tuple(round(v, 3) for v in KR))
-# (3 cuts: 16 round its edge, a smooth oval where 2 gave a twelve-sided plate (the owner's, 2026-11-15); 96 faces)
-for f in qsphere(bm, (0.0, 0.0, 0.0), KR, 3):
+KSEG = 16
+
+
+def kring(scale, depth):
+    """a ring of KSEG points round the koban, `depth` behind its middle (toward the body), its first at its foot, going round anticlockwise
+    as it's looked at from in front"""
+    out = []
+    for i in range(KSEG):
+        t = -math.pi / 2 + 2 * math.pi * i / KSEG
+        p = kc + KSIDE * (KR[0] * scale * math.cos(t)) + KUP * (KR[2] * scale * math.sin(t)) - KN * depth
+        out.append(bm.verts.new(p))
+    return out
+
+
+front_r, mid_r, back_r = kring(KINSET, -KR[1]), kring(1.0, 0.0), kring(KINSET, KR[1])
+faces_ = ladder_fill(bm, front_r) + ladder_fill(bm, back_r[::-1])
+flat_ = set(faces_)
+for ra, rb in ((front_r, mid_r), (mid_r, back_r)):
+    for i in range(KSEG):
+        j = (i + 1) % KSEG
+        faces_.append(bm.faces.new((ra[i], rb[i], rb[j], ra[j])))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+for f in bm.faces:
+    f.smooth = f not in flat_
     for l in f.loops:
-        l[uvk].uv = (0.5 + l.vert.co.x / (2 * KR[0]), 0.5 + l.vert.co.z / (2 * KR[2]))
-bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=__import__("mathutils").Matrix.Rotation(0.2, 3, "X"))
-# (its foot clear of what the cat sits on)
-bmesh.ops.translate(bm, verts=bm.verts, vec=(kc.x, front - 0.004, max(kc.z, KR[2] + 0.006)))
+        d_ = l.vert.co - kc
+        l[uvk].uv = (0.5 + d_.dot(KSIDE) / (2 * KR[0]), 0.5 + d_.dot(KUP) / (2 * KR[2]))
 me = bpy.data.meshes.new("OwnCatKoban"); bm.to_mesh(me); bm.free()
 koban = bpy.data.objects.new("OwnCatKoban", me); bpy.context.collection.objects.link(koban)
 koban.data.materials.append(kmat)
-for p_ in koban.data.polygons:
-    p_.use_smooth = True
-print("KOBAN", len(dark_at), tuple(round(c, 3) for c in kc), round(kh, 3))
-# (the bell on its collar: in the same unbaked patch, painted white with it; made, a little gold ball where the patch's top is (54 faces))
-top_ = [c for c in dark_at if c.z > max(d.z for d in dark_at) - 0.02] if dark_at else []
-if top_:
-    bc = Vector((sum(c.x for c in top_), sum(c.y for c in top_), sum(c.z for c in top_))) / len(top_)
-    bm = bmesh.new()
-    BR = 0.0135
-    bctr = Vector((bc.x + 0.003, min(c.y for c in top_) + 0.002, bc.z + 0.006))
-    uvb = bm.loops.layers.uv.new()
-    for f in qsphere(bm, tuple(bctr), (BR, BR, BR), 2):
+kz = [v.co.z for v in koban.data.vertices]
+print("KOBAN", len(koban.data.polygons), "faces", sum(len(p.vertices) - 2 for p in koban.data.polygons), "tris; z", round(min(kz), 4), round(max(kz), 4))
+# (the bell on its collar, made: a little gold ball where the door cat's is, just over the coin's top and a little behind it, placed by the
+# coin (it was found by the patch the bake found no colour for, which goes with the coin's rim now) (54 faces)
+bm = bmesh.new()
+BR = 0.0135
+bctr = KC + KSIDE * 0.0073 + KUP * 0.0578 - KN * 0.0069
+uvb = bm.loops.layers.uv.new()
+for f in qsphere(bm, tuple(bctr), (BR, BR, BR), 2):
+    for l in f.loops:
+        d_ = l.vert.co - bctr
+        u_ = (math.atan2(d_.y, d_.x) + math.pi) / (2 * math.pi)
+        l[uvb].uv = (u_, 0.5 + d_.z / (2 * BR))
+# (a seam's faces across u=0/1: their corners on the far side brought round, so the picture doesn't run back across them)
+for f in bm.faces:
+    us = [l[uvb].uv.x for l in f.loops]
+    if max(us) - min(us) > 0.5:
         for l in f.loops:
-            d_ = l.vert.co - bctr
-            u_ = (math.atan2(d_.y, d_.x) + math.pi) / (2 * math.pi)
-            l[uvb].uv = (u_, 0.5 + d_.z / (2 * BR))
-    # (a seam's faces across u=0/1: their corners on the far side brought round, so the picture doesn't run back across them)
-    for f in bm.faces:
-        us = [l[uvb].uv.x for l in f.loops]
-        if max(us) - min(us) > 0.5:
-            for l in f.loops:
-                if l[uvb].uv.x < 0.5:
-                    l[uvb].uv.x += 1.0
-    me = bpy.data.meshes.new("OwnCatBell"); bm.to_mesh(me); bm.free()
-    bell = bpy.data.objects.new("OwnCatBell", me); bpy.context.collection.objects.link(bell)
-    # (as a bell is (the owner's, 2026-11-15: "the bell doesn't look like one"): gold, a raised band round its middle with a groove either
-    # side, and below it, facing the front, the slit with a round hole at its top end)
-    bu, bv = grid01(128)
-    bcol = mix((0.78, 0.5, 0.02), (0.98, 0.78, 0.2), smooth(0.0, 1.0, bv))
-    for at, dk in ((0.47, 0.45), (0.57, 0.45)):
-        bcol = mix(bcol, (0.35, 0.2, 0.0), (np.abs(bv - at) < 0.018).astype(np.float32) * dk)
-    bcol = mix(bcol, (1.0, 0.88, 0.4), (np.abs(bv - 0.52) < 0.02).astype(np.float32) * 0.7)
-    fu = np.minimum(np.abs(bu - 0.25), 1)
-    slit = ((fu < 0.018) & (bv > 0.1) & (bv < 0.36)) | (np.hypot((bu - 0.25) * 2.4, bv - 0.34) < 0.045)
-    bcol = mix(bcol, (0.05, 0.03, 0.0), slit.astype(np.float32))
-    bell.data.materials.append(pbr("OwnCatBellGold", (1, 1, 1), tex=image("ownluckycat_bell", np.clip(bcol, 0, 1)), rough=0.3, metal=0.6))
-    for p_ in bell.data.polygons:
-        p_.use_smooth = True
-    print("BELL", tuple(round(c, 3) for c in bc))
-else:
-    bell = None
+            if l[uvb].uv.x < 0.5:
+                l[uvb].uv.x += 1.0
+me = bpy.data.meshes.new("OwnCatBell"); bm.to_mesh(me); bm.free()
+bell = bpy.data.objects.new("OwnCatBell", me); bpy.context.collection.objects.link(bell)
+# (as a bell is (the owner's, 2026-11-15: "the bell doesn't look like one"): gold, a raised band round its middle with a groove either
+# side, and below it, facing the front, the slit with a round hole at its top end)
+bu, bv = grid01(128)
+bcol = mix((0.78, 0.5, 0.02), (0.98, 0.78, 0.2), smooth(0.0, 1.0, bv))
+for at, dk in ((0.47, 0.45), (0.57, 0.45)):
+    bcol = mix(bcol, (0.35, 0.2, 0.0), (np.abs(bv - at) < 0.018).astype(np.float32) * dk)
+bcol = mix(bcol, (1.0, 0.88, 0.4), (np.abs(bv - 0.52) < 0.02).astype(np.float32) * 0.7)
+fu = np.minimum(np.abs(bu - 0.25), 1)
+slit = ((fu < 0.018) & (bv > 0.1) & (bv < 0.36)) | (np.hypot((bu - 0.25) * 2.4, bv - 0.34) < 0.045)
+bcol = mix(bcol, (0.05, 0.03, 0.0), slit.astype(np.float32))
+bell.data.materials.append(pbr("OwnCatBellGold", (1, 1, 1), tex=image("ownluckycat_bell", np.clip(bcol, 0, 1)), rough=0.3, metal=0.6))
+for p_ in bell.data.polygons:
+    p_.use_smooth = True
+print("BELL", tuple(round(c, 3) for c in bctr))
 
 root = bpy.data.objects.new("OwnLuckyCat", None)
 bpy.context.collection.objects.link(root)
-for o in (lp, koban) + ((bell,) if bell else ()):
+for o in (lp, koban, bell):
     o.parent = root
-print("OWNCAT_TRIS", sum(len(p.vertices) - 2 for p in lp.data.polygons), "PIVOT", tuple(round(c, 3) for c in pivot))
-export_dish(root, [lp, koban, root] + ([bell] if bell else []), os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW, ladder=False)
+print("OWNCAT_TRIS", sum(len(p.vertices) - 2 for p in lp.data.polygons))
+export_dish(root, [lp, koban, root, bell], os.path.join(PROJECT, "public", "models", "ownluckycat.glb"), os.path.join(PROJECT, "blender", "ownluckycat.blend"), PREVIEW, ladder=False)
 print("OWNCAT_DONE")
