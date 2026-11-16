@@ -24,6 +24,7 @@ import { useGLTF } from '@react-three/drei'
 import { brushText, signTexture, SIGN_FONT } from '@/scene/signFont'
 import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE, depthOf } from '@/game/drinkStock'
+import { CARTON_CASES, cartonStack } from '@/game/cartonStack'
 import { cartonMaterials } from './drinkCartons'
 import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, type Counter, type DrinkId } from './bar'
 import { EditBlock, Movable } from './Movable'
@@ -7654,11 +7655,19 @@ const drinkLabel = (id: string) => DRINKS.find((d) => d.id === id)?.zh ?? id
 const lowestBack = () => [...new Set(FRIDGE_UNITS.flatMap((u) => u.shelves.flatMap((sh) => sh.ids)))]
   .sort((a, b) => (DRINK_BACK.back[a] ?? 0) / (CASE_SIZE[a] ?? 24) - (DRINK_BACK.back[b] ?? 0) / (CASE_SIZE[b] ?? 24))
 const CARTONS_URL = import.meta.env.BASE_URL + 'models/drinkcartons.glb'
+/** how far up each layer of the stack stands (blender/drinkcartons.py: a case 0.21 tall, sat on the tape of the one under it), and where its
+ * two columns' middles are along it */
+const CASE_STEP = 0.213
+const CASE_COL_X = [-0.2, 0.2] as const
 /** the cartons of canned drinks stacked by the crates (blender/drinkcartons.py): each printed for its drink on one print at one scale
- * (drinkCartons.ts), matte kraft with its flutes and handholes, taped shut with a translucent brown tape */
+ * (drinkCartons.ts), matte kraft with its flutes and handholes, taped shut with a translucent brown tape. As many of them there as the back
+ * has cans for (item 199, the owner's 「庫存的東西沒對上」: the nine stood whatever was in the back; game/cartonStack), those over one that's
+ * gone dropped onto what's under them; laid out again only when that changes, the cases there folded together by material each time (two
+ * draws for the stack, and their ink line, as it was) */
 function DrinkCartons() {
   const gltf = useGLTF(CARTONS_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => {
+  // (the cases as made: each its board and its tape, dressed, where it stands in the stack's frame; the model's own geometry, never let go)
+  const src = useMemo(() => {
     const root = gltf.scene.clone(true)
     const { board, tape } = cartonMaterials()
     root.traverse((o) => {
@@ -7670,12 +7679,48 @@ function DrinkCartons() {
       m.castShadow = !tapeOf
       m.receiveShadow = true
     })
-    inkModel(root, (m) => /Tape/.test((m.material as THREE.Material).name ?? ''), { width: 0.0012, weld: true })
-    // (nine cases, each its board and its tape: one material each, folded together: two draws for the stack, and their ink line)
-    mergeByMaterial(root)
-    return root
+    root.updateMatrixWorld(true)
+    const own = new Set<THREE.BufferGeometry>()
+    root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) own.add(m.geometry) })
+    return { cases: CARTON_CASES.map((_, i) => root.getObjectByName(`Carton${i}`) ?? null), own }
   }, [gltf])
-  return <primitive object={obj} />
+  const holder = useMemo(() => new THREE.Group(), [])
+  const laid = useRef({ key: '', at: -1 })
+  /** what's drawn let go: what was made for it (the merged cases, their ink line), not the model's own */
+  const clear = useCallback(() => {
+    for (const c of [...holder.children]) {
+      c.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !src.own.has(m.geometry)) m.geometry.dispose() })
+      c.removeFromParent()
+    }
+  }, [holder, src])
+  useEffect(() => { laid.current.key = ''; return clear }, [clear])
+  useFrame(({ clock }) => {
+    // (looked at twice a second)
+    if (laid.current.key && clock.elapsedTime - laid.current.at < 0.5) return
+    laid.current.at = clock.elapsedTime
+    const at = cartonStack(DRINK_BACK.back, (id) => CASE_SIZE[id] ?? 24)
+    const key = at.map((a) => (a.shown ? `${a.layer}${a.col}` : '-')).join(',')
+    if (key === laid.current.key) return
+    laid.current.key = key
+    clear()
+    const r = new THREE.Group()
+    at.forEach((a, i) => {
+      const c = src.cases[i]
+      if (!a.shown || !c) return
+      const k = c.clone(true)
+      c.matrixWorld.decompose(k.position, k.quaternion, k.scale)
+      k.position.y += (a.layer - CARTON_CASES[i].layer) * CASE_STEP
+      // (the one across the top, come down on one column alone: over that column's middle)
+      if (CARTON_CASES[i].col < 0 && a.col !== -1) k.position.x += CASE_COL_X[a.col]
+      r.add(k)
+    })
+    if (r.children.length) {
+      inkModel(r, (m) => /Tape/.test((m.material as THREE.Material).name ?? ''), { width: 0.0012, weld: true })
+      mergeByMaterial(r)
+    }
+    holder.add(r)
+  })
+  return <primitive object={holder} />
 }
 useGLTF.preload(CARTONS_URL)
 /** an unseen box over the crates and cartons: they're the drinks' stock; pointed at it says what's lowest and lights them all (`lit`: the
@@ -8422,12 +8467,15 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
       {fr && <Movable id="crates" label="酒箱"><group ref={stock}><StaticBatch plain>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <CrateBoxes />
-          {/* (and beside them the cartons of canned drinks) */}
-          <group position={CARTONS_AT} rotation-y={Math.PI / 2 + 0.04}><DrinkCartons /></group>
         </group>
       </StaticBatch>
-        {/* (the bottles in the crates, out of the batch, as many as the back stock has) */}
-        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><CrateBottles /></group>
+        {/* (the bottles in the crates, out of the batch, as many as the back stock has; and beside them the cartons of canned drinks, as many as
+            the back has cans for, laid out again as that changes (item 199): out of the batch too, which merges only what's there as it's
+            made and hides the rest) */}
+        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
+          <CrateBottles />
+          <group position={CARTONS_AT} rotation-y={Math.PI / 2 + 0.04}><DrinkCartons /></group>
+        </group>
       </group>
         {/* (the back stock: pointed at, what's running low; a click opens the drinks' stock) */}
         <group name="look-crates" position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
