@@ -118,7 +118,8 @@ class Col:
         self.col = np.broadcast_to(g, (CH, CWID, 3)).copy()
         self.col *= (0.8 + 0.2 * smooth(0.0, 0.05, self.vv))[..., None]
         seam = (np.abs(cdist(self.uu - 0.25)) < 0.003) | (np.abs(cdist(self.uu - 0.75)) < 0.003)
-        self.col[seam] *= 1.25
+        # (just showing: brighter, it read as a scratch down the bottle's side (item 197))
+        self.col[seam] *= 1.08
         self.col *= (0.94 + 0.06 * fbm(CH // 2, 20, 40, 3)[:CH // 2, :CWID].repeat(2, 0)[:CH])[..., None]
         self.rough = np.full((CH, CWID), 0.12, np.float32)
 
@@ -512,7 +513,9 @@ def bottle(k, prof, at, turn):
     opaque = lambda z: any(lo - 1e-6 <= z <= hi + 1e-6 for lo, hi in OPAQUE[k])
     rings = [[bm.verts.new((r * math.cos(-math.pi / 2 + 2 * math.pi * (i / NA - 0.5)), r * math.sin(-math.pi / 2 + 2 * math.pi * (i / NA - 0.5)), z))
               for i in range(NA)] for r, z in prof]
-    u0, uw = k / NB, 1 / NB
+    # (each bottle's column kept a little in from its edges: its back, where the column's edges meet, picked up the next bottle's colour as
+    # the picture was drawn smaller (item 197: a line of another bottle's colour down each one's back, the kitchen's side))
+    u0, uw = k / NB + 0.006 / NB, (1 - 0.012) / NB
     for j in range(len(prof) - 1):
         for i in range(NA):
             i2 = (i + 1) % NA
@@ -651,15 +654,17 @@ block("SakeStandRail", -L / 2 - 0.01, L / 2 + 0.01, D / 2 - 0.012, D / 2 - 0.002
 # ---- the bottles: three tall at the back, two short at the front, each turned a touch its own way, a hair over the step
 ys_back = -D / 2 + FRONT_D + (D - FRONT_D) / 2
 # (four up at the back and four at the front now (item 132), set closer: the front's right-hand end kept for the tokkuri)
-bottle(1, ISSHO, Vector((-0.24, ys_back + 0.004, BACK_H + 0.0005)), 0.12)
+# (each row on one line, every label square to the front, as a shop sets out what it pours (item 197, the owner's: the stand no good at
+# all; each bottle was askew on its own and its label turned its own way))
+bottle(1, ISSHO, Vector((-0.24, ys_back, BACK_H + 0.0005)), 0.0)
 bottle(0, ISSHO, Vector((-0.08, ys_back, BACK_H + 0.0005)), 0.0)
-bottle(2, ISSHO, Vector((0.08, ys_back - 0.004, BACK_H + 0.0005)), -0.1)
-bottle(5, ISSHO, Vector((0.24, ys_back + 0.002, BACK_H + 0.0005)), -0.06)
+bottle(2, ISSHO, Vector((0.08, ys_back, BACK_H + 0.0005)), 0.0)
+bottle(5, ISSHO, Vector((0.24, ys_back, BACK_H + 0.0005)), 0.0)
 ys_front = -D / 2 + FRONT_D / 2
-bottle(3, YONGO, Vector((-0.24, ys_front, FRONT_H + 0.0005)), 0.08)
-bottle(6, YONGO, Vector((-0.12, ys_front - 0.002, FRONT_H + 0.0005)), 0.04)
-bottle(4, YONGO, Vector((0.0, ys_front + 0.002, FRONT_H + 0.0005)), -0.14)
-bottle(7, YONGO, Vector((0.12, ys_front, FRONT_H + 0.0005)), -0.08)
+bottle(3, YONGO, Vector((-0.24, ys_front, FRONT_H + 0.0005)), 0.0)
+bottle(6, YONGO, Vector((-0.12, ys_front, FRONT_H + 0.0005)), 0.0)
+bottle(4, YONGO, Vector((0.0, ys_front, FRONT_H + 0.0005)), 0.0)
+bottle(7, YONGO, Vector((0.12, ys_front, FRONT_H + 0.0005)), 0.0)
 
 # (joined by material)
 by = {}
