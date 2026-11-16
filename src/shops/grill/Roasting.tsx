@@ -41,6 +41,8 @@ import { fireCall, HOT_AT } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { pickOrders } from '@/game/orderPick'
+import { sideChance } from '@/game/sides'
+import { RICE_SIDE, riceName } from '@/data/sides'
 import { SHAPE_S, fromTray, takeRice } from '@/game/rice'
 import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
 import { SAKE_SERVE_S, SAKE_SIDE, SAKE_WAIT_S } from '@/game/sakeStand'
@@ -80,7 +82,7 @@ import { plateFor } from '@/game/plateSize'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
-import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, SAY_SEATED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
+import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -115,11 +117,16 @@ const FAN_RISE = 0.06
 const FAN_BURN = 0.02
 const FIRE_FANNED_MAX = 1.2
 const FAN_OVER_BURN = 0.03
+/** how long a bowl of rice or of soup takes a customer to eat (the shop's clock; SideBowls' EAT_MS draws it eaten down over as long) */
+const SIDE_EAT_S = 12
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
   /** the one they came in with (a couple, sat side by side) */
   partner?: number
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
   leftAt?: number; cleared?: boolean
+  /** (shop clock) till when they're eating their bowl of rice or soup (item 205: set down, it was eaten that moment, and one whose last it
+   * was got up and went, the bowl there a second): not up before then */
+  sideUntil?: number
   /** (shop clock) when they ate their first piece: how long they waited for it */
   firstAte?: number
   /** when they last began a piece off the fire (the soup or sake don't count: item 203): waiting on the rest of their order from then */
@@ -6007,10 +6014,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         return true
       })
       // (a bowl of miso soup alongside, as many have (the owner's, 2026-11-11: the soup ordered): charged and taken from the stock as any
-      // order is, ladled from the pot)
-      if (orders.length && !orders.includes('MisoSoup') && Math.random() < SOUP_SIDE && onOrder?.('MisoSoup', id, false)) {
+      // order is, ladled from the pot; sat at the bar, most of those having fish (item 205: one in three, whatever they had, and it was
+      // never seen ladled or carried, so the owner never saw it ordered))
+      const fishy = seated && bar
+      if (orders.length && !orders.includes('MisoSoup') && Math.random() < (fishy ? sideChance('soup', orders) : SOUP_SIDE) && onOrder?.('MisoSoup', id, false)) {
         orders.push('MisoSoup')
         said.push(nameOf('MisoSoup'))
+      }
+      // (and a bowl of rice, sat at the bar (item 205: there was none to be had): scooped from the cooker and carried out as the soup is)
+      if (fishy && orders.length && Math.random() < sideChance('rice', orders) && SIDE_SALE.sell(RICE_SIDE.id, id)) {
+        orders.push(RICE_SIDE.id)
+        said.push(riceName(lang))
       }
       // (and some a tokkuri of sake, sat at the bar (item 89, the owner's: "it's on the menu, the customers order it"; they never did): charged
       // and taken from the stock as any order is, poured from the stand)
@@ -6192,11 +6206,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const g of guests.current) {
       if (g.state === 'waiting' || g.state === 'eating' || g.cleared) continue
       if (pieces.current.some((p) => p.guest === g.id && p.eat > 0 && !p.stickOnly && !p.eaten)) continue
+      if (g.state === 'done' && (g.sideUntil ?? 0) > now) continue
       g.leftAt ??= now
       if (now - g.leftAt < 1.6) continue
       g.cleared = true
-      // (their soup bowl cleared with their plate)
+      // (their soup bowl cleared with their plate, and their rice bowl; their bowls not yet brought, not to be now)
       if (SOUP_SEATS.delete(g.seat)) SOUP.served++
+      if (RICE_SEATS.delete(g.seat)) BOWLS.ver++
+      BOWLS.setAt.delete(`rice:${g.seat}`)
+      BOWLS.setAt.delete(`soup:${g.seat}`)
+      BOWLS.want = BOWLS.want.filter((x) => x.guest !== g.id)
+      BOWLS.asked.delete(g.id)
+      BOWLS.got.delete(`rice:${g.id}`)
+      BOWLS.got.delete(`soup:${g.id}`)
       if (SAKE_SEATS.delete(g.seat)) SAKE.served++
       // (a tokkuri asked for them and not brought: not to be poured now)
       const wi = SAKE.want.indexOf(g.id)
@@ -6254,9 +6276,30 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       const owed = [...g.orders]
       for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
+      // (their rice and soup, sat at the bar with the room drawn (items 205, 206): asked for once, scooped and ladled at the counter and carried
+      // out to them (bar.ts's BOWLS, GuestBar3D); theirs, and eaten, once they're set down at their place)
+      if (space === 'open' && bar && !g.takeout && (owed.includes('MisoSoup') || owed.includes(RICE_SIDE.id))) {
+        if (!BOWLS.asked.has(g.id)) {
+          BOWLS.asked.add(g.id)
+          BOWLS.want.push({ guest: g.id, rice: owed.includes(RICE_SIDE.id), soup: owed.includes('MisoSoup') })
+        }
+        const got = owed.includes(RICE_SIDE.id) && BOWLS.got.has(`rice:${g.id}`) ? RICE_SIDE.id : owed.includes('MisoSoup') && BOWLS.got.has(`soup:${g.id}`) ? 'MisoSoup' : null
+        if (got) {
+          BOWLS.got.delete(`${got === 'MisoSoup' ? 'soup' : 'rice'}:${g.id}`)
+          // (something to start on, but not a dish off the fire: the wait for the rest goes on from when they sat down (item 203))
+          g.firstAte ??= now
+          g.eaten.push(Math.max(0, SOUP_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
+          g.ate.push(got)
+          g.sideUntil = Math.max(g.sideUntil ?? 0, now + SIDE_EAT_S)
+          g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
+          report()
+          return
+        }
+      }
       // (their miso soup: ladled from the pot a while after they've ordered, once it's hot, set at their place and drunk (bar.ts's SOUP_SEATS);
-      // the pot run dry, they wait for the next (the third cook makes it); a takeaway's in a cup with the box)
-      if (space === 'open' && owed.includes('MisoSoup') && now - g.since > SOUP_SERVE_S && soupReady(SOUP.pot, SOUP.left)) {
+      // the pot run dry, they wait for the next (the third cook makes it); a takeaway's in a cup with the box; with no room drawn (a phone),
+      // as it always was)
+      if (space === 'open' && (!bar || g.takeout) && owed.includes('MisoSoup') && now - g.since > SOUP_SERVE_S && soupReady(SOUP.pot, SOUP.left)) {
         const b = takeBowl(SOUP.pot, SOUP.left)
         SOUP.pot = b.pot
         SOUP.left = b.left

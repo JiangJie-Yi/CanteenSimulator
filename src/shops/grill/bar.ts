@@ -934,7 +934,24 @@ export const SEAT_BONES = new Map<number, number>()
  */
 // (empty when the day starts, the third cook to cook it (the owner's, 2026-11-11): it opened with a pot's worth cooked)
 /** (`batch`: how many portions the pot on the stove was set on with, what it's full of once cooked (item 199)) */
-export const RICE: { rice: number; kama: Kama; washing: boolean; batch: number } = { rice: 0, kama: emptyKama(), washing: false, batch: 20 }
+export const RICE: { rice: number; kama: Kama; washing: boolean; batch: number
+  /** how far its lid's lifted off by the one scooping a bowl of rice from it (0..1, item 206: GuestBar3D's scoop; Decor draws it) */
+  lid: number } = { rice: 0, kama: emptyKama(), washing: false, batch: 20, lid: 0 }
+/**
+ * The rice and the miso soup had with the dishes (items 205, 206, the owner's, 2026-11-16: 「我看客人都沒叫白飯跟味噌湯」「打飯的動畫？我
+ * 要看到好的動畫品質」): Roasting asks for a customer's bowls once they've ordered them (`want`); the third cook (with none, a server)
+ * scoops the rice at the cooker and ladles the soup at the pot, sets them on a tray at the serving counter; a server carries it out and sets
+ * them at the customer's place, and only then are they theirs (`got`: `rice:<guest>`, `soup:<guest>`; Roasting has them eat). `setAt`, when
+ * each place's was set down (`rice:<seat>`, `soup:<seat>`: how much is left of it as they eat, GuestBar3D draws it); `ver` counts each
+ * change, for the drawing to see.
+ */
+export const BOWLS = { want: [] as { guest: number; rice: boolean; soup: boolean }[], asked: new Set<number>(), got: new Set<string>(),
+  setAt: new Map<string, number>(), ver: 0 }
+/** the places with a bowl of rice set at them (as SOUP_SEATS has the soup's) */
+export const RICE_SEATS = new Set<number>()
+/** a bowl of rice sold to a customer as they order (App's: its price on their bill, a portion of rice off the stock); false: none to be had */
+export const SIDE_SALE: { sell: (id: string, guest: number) => boolean } = { sell: () => false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bowls: BOWLS, __riceSeats: RICE_SEATS })
 /** the finished rice balls on the bamboo tray at the rice-ball counter's end (game/rice, item 129): the third cook shapes them ahead
  * (GuestBar3D's plater), the head chef's fetcher takes an order's off it first (Roasting); Decor shows as many. Full as the shop's first set out */
 export const ONIGIRI_TRAY = { n: TRAY_MAX }

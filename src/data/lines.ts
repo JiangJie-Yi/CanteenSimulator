@@ -88,6 +88,10 @@ const ZH = {
     '清酒來了，酒杯放這邊，請慢用。',
     '您點的清酒一合，請慢慢喝。',
   ][Math.abs(k) % 3],
+  /** a customer's rice and miso soup set at their place by the server who carried them out (item 205) */
+  sideServe: (k: number, rice: boolean, soup: boolean) => (rice && soup
+    ? ['白飯跟味噌湯來了，請慢用。', '您的白飯、味噌湯，小心燙。', '飯和湯幫您放這邊，請慢用。']
+    : rice ? ['白飯來了，請慢用。', '您的白飯，剛盛的，請慢用。'] : ['味噌湯來了，小心燙。', '您的味噌湯，請慢用。'])[Math.abs(k) % (rice && soup ? 3 : 2)],
   serveSay: (k: number) => ['久等了，請慢用。', '小心燙，請慢用。', '烤魚來了，趁熱吃喔。'][Math.abs(k) % 3],
   washSay: (k: number) => ['盤子我來洗。', '洗好烘乾，馬上放回去。', '這疊交給我～'][Math.abs(k) % 3],
   /** a floor server come with a broom to glass broken on the floor (game/spills) */
@@ -194,6 +198,9 @@ const JA: typeof ZH = {
     '日本酒一合お持ちしました。お猪口はこちらに。',
     'お待たせいたしました、お酒です。どうぞごゆっくり。',
   ][Math.abs(k) % 3],
+  sideServe: (k: number, rice: boolean, soup: boolean) => (rice && soup
+    ? ['ご飯とお味噌汁です、ごゆっくりどうぞ。', 'お待たせしました、ご飯とお味噌汁です。', 'ご飯とお汁、こちらに置きますね。']
+    : rice ? ['ご飯お持ちしました。', 'お待たせしました、ご飯です。'] : ['お味噌汁です、熱いのでお気をつけて。', 'お待たせしました、お味噌汁です。'])[Math.abs(k) % (rice && soup ? 3 : 2)],
   serveSay: (k: number) => ['お待たせしました、ごゆっくりどうぞ。', '熱いのでお気をつけて。', '焼き魚です、熱いうちにどうぞ。'][Math.abs(k) % 3],
   washSay: (k: number) => ['お皿、洗います。', '洗って乾かして戻します。', 'この山、片付けます～'][Math.abs(k) % 3],
   sweepSay: (k: number) => ['足元お気をつけて、片付けます。', '割れちゃった、近づかないでくださいね！', '破片、片付けます。'][Math.abs(k) % 3],
@@ -298,6 +305,9 @@ const EN: typeof ZH = {
     'Your sake, and the cup right here. Enjoy.',
     'One go of sake for you. Take your time.',
   ][Math.abs(k) % 3],
+  sideServe: (k: number, rice: boolean, soup: boolean) => (rice && soup
+    ? ['Your rice and miso soup. Enjoy.', 'Rice and miso soup, right here.', 'Rice and soup for you. Careful, it is hot.']
+    : rice ? ['Your rice, fresh from the pot.', 'Here is your rice. Enjoy.'] : ['Your miso soup. Careful, it is hot.', 'Miso soup for you. Enjoy.'])[Math.abs(k) % (rice && soup ? 3 : 2)],
   serveSay: (k: number) => ['Thanks for waiting, enjoy!', 'Careful, it is hot. Enjoy!', 'Grilled fish, best while hot!'][Math.abs(k) % 3],
   washSay: (k: number) => ['Dishes, on it.', 'Washed, dried, back on the rack.', 'Leave this pile to me.'][Math.abs(k) % 3],
   sweepSay: (k: number) => ['Mind your step, sweeping up.', 'Broken! Keep clear, please.', 'Got the shards.'][Math.abs(k) % 3],

@@ -3,7 +3,7 @@
 // shop: a shop only offers those of them it has).
 export type FoodKind = { words: string[]; zh: string; ja: string; ids: string[] }
 
-const FISH = ['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Salmon', 'Hokke', 'Buri', 'Gindara', 'Nodoguro']
+export const FISH = ['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Salmon', 'Hokke', 'Buri', 'Gindara', 'Nodoguro']
 
 /** (more particular kinds first: 菇 before 蔬菜, 海鮮 before 魚) */
 export const FOOD_KINDS: FoodKind[] = [

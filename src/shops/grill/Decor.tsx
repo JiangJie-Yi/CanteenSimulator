@@ -1106,7 +1106,8 @@ function DenkiNabe() {
     // (opened: up and back off the rim, tipped back on its hinge side; shut while it cooks)
     if (cooking) open.current = false
     openK.current += ((open.current ? 1 : 0) - openK.current) * Math.min(1, dt * 7)
-    const o = openK.current * openK.current * (3 - 2 * openK.current)
+    // (or lifted off by the one scooping a bowl of rice from it, as far as they have it (item 206: GuestBar3D's scoop))
+    const o = Math.max(openK.current * openK.current * (3 - 2 * openK.current), RICE.lid)
     model.lid.position.y = model.lidY + boil * Math.max(0, Math.sin(t * 19)) * 0.004 + o * 0.06
     model.lid.position.z = model.lidZ - o * 0.13
     model.lid.rotation.x = -o * 1.05
@@ -1128,8 +1129,9 @@ function DenkiNabe() {
         <group ref={steam} visible={false}>
           <Steam position={[0, 0.42, 0]} width={0.22} height={0.4} opacity={0.32} layers={2} />
         </group>
-        {/* (where the rice goes in and comes out) */}
+        {/* (where the rice goes in and comes out; and its foot, on the counter (the one scooping holds the bowl a little over it, item 206)) */}
         <group name="cooker-top" position={[0, 0.3, 0]} />
+        <group name="cooker-foot" />
       </group>
       {/* (where whoever's cooking it stands, before it: a step out from the counter's front (the owner's: 0.35 from its edge)) */}
       <group name="cooker-front" position={[0, floor, WARMER_D / 2 + 0.35]} />

@@ -51,8 +51,9 @@ import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { BOARD_SLOTS } from '@/game/fireSlots'
-import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
+import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, SIDE_SALE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { unitCost } from '@/game/drinkStock'
+import { RICE_SIDE, riceName } from '@/data/sides'
 import { getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
 import { EditorShell } from '@/shops/grill/EditorShell'
 import { TOOL_PAGE } from '@/scene/toolPage'
@@ -2888,12 +2889,13 @@ export default function App() {
     }
     // (a bill paid at the till, as the cash key's pressed (bar's payIn): settled; cash into the drawer, apart from the cash in hand till it's
     // taken out; a card's in hand at once)
+    SIDE_SALE.sell = (id, guest) => sellSideRef.current(id, guest)
     TILL_CASH.onPaid = (guest, amount, card) => {
       for (const tabs of Object.values(bills.current)) { const t = tabs[guest]; if (t) { t.settled = true; owing.current.delete(t) } }
       if (card) setPaidTick((n) => n + 1)
       else book('tillIn', amount)
     }
-    return () => { TILL_CASH.onTake = null; TILL_CASH.onPaid = null }
+    return () => { TILL_CASH.onTake = null; TILL_CASH.onPaid = null; SIDE_SALE.sell = () => false }
   }, [])
   // skewers count toward the fire's limit; potatoes in the ash and mochi on the net have their own
   const isSkewer = (id: string) => !!dish.roast && id in dish.roast.times && !dish.roast.loose.includes(id)
@@ -3047,6 +3049,23 @@ export default function App() {
   }
   const sellDrinkRef = useRef(sellDrink)
   sellDrinkRef.current = sellDrink
+  /** a bowl of rice ordered with their dishes (item 205, the owner's: 「我看客人都沒叫白飯跟味噌湯」): a portion of the rice cooked for the
+   * rice balls off the stock, its price on their bill (paid at the till as the soup's is), its cost the rice's; said with their order.
+   * False: no rice to be had */
+  const sellSide = (id: string, guest: number) => {
+    if (id !== RICE_SIDE.id || !ai || (stockRef.current[RICE_SIDE.stock] ?? 0) < 1) return false
+    shiftStock({ [RICE_SIDE.stock]: -1 })
+    book('revenue', RICE_SIDE.price)
+    book('food', costOf(ALL_ITEMS.get(RICE_SIDE.stock) ?? { price: 0 }))
+    const tabs = (bills.current[dish.id] ??= {})
+    let t = tabs[guest]
+    if (!t) { t = tabs[guest] = { paid: 0, parts: 0, atTill: true }; owing.current.add(t) }
+    ;(t.side ??= []).push({ id: RICE_SIDE.id, price: RICE_SIDE.price })
+    sayOrder(guest, RICE_SIDE.id, riceName(lang))
+    return true
+  }
+  const sellSideRef = useRef(sellSide)
+  sellSideRef.current = sellSide
   const onDrink = useCallback((guest: number, id: DrinkId) => sellDrinkRef.current(guest, id), [])
   const orderEntryRef = useRef(orderEntry)
   orderEntryRef.current = orderEntry
