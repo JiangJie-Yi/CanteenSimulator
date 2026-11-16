@@ -3,9 +3,10 @@
 // (dirty), carried to the sink and washed (carrying), back into the holder. Clean + in use + dirty + carrying is always the pool.
 
 export const SKEWER_POOL = 50
-/** when the used ones go to be washed: this many dirty, or the holder down to this few */
+/** when the used ones go to be washed: this many dirty, or the holder down to this few (15, item 220: at 5 the holder ran dry on an
+ * ordinary evening, the servers always serving first and the grill waiting on a skewer (tests/e2e/flowhealth.mjs: clean 0..50, both runs)) */
 export const WASH_AT = 10
-export const WASH_LOW = 5
+export const WASH_LOW = 15
 /** how long they take to wash at the sink (seconds) */
 export const SKEWER_WASH_S = 1.8
 
