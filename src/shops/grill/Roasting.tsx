@@ -5746,12 +5746,17 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         FIRE_TEND.want = 'coal'
         coalAsked.current = nowS
       } else {
-        // (no one to send, or the one sent off on something long (the rice, the plates) with the fire nearly out: dropped in at once)
+        // (no one to send, or the one sent off on something long (the rice, the plates) with the fire nearly out: the owner tosses a handful
+        // in himself from where he stands at it (item 203: they flew in from the crate by themselves); away from it, it waits for him)
+        const ownerThere = space !== 'open' || performance.now() - OWNER_GRILL.seenAt < 1000
+        if (!ownerThere) return
         if (FIRE_TEND.want === 'coal') FIRE_TEND.want = null
         // (out of the crate, as it's thrown from it (item 199: thrown from the crate, the sticks came off the sack's count and the crate never
         // emptied): the crate filled from the sack first if it's empty, paid for then, not again now)
         takeFromCrate()
-        const placed = dropCoals(undefined, Math.min(CRATE.left, coalPortion()))
+        // (from his hands, a little in from where he stands toward the fire, as the third cook's are from his)
+        const tip = space === 'open' ? CHEF_AT.clone().multiplyScalar(0.85) : null
+        const placed = dropCoals(tip ? { x: tip.x, y: 0.45, z: tip.z } : undefined, Math.min(CRATE.left, coalPortion()))
         if (!placed) return
         CRATE.left = Math.max(0, CRATE.left - placed)
         if (onAddCharcoal?.(placed, false, true) === false) return
