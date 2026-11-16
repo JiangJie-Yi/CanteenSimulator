@@ -197,9 +197,25 @@ export const SKEWERS: { s: Skewers; inUse: number } = { s: startSkewers(), inUse
  * where each was (the world) and when (performance.now()); SkewerStore flies each into the used bucket and lets it go */
 export const PULLED: { from: THREE.Vector3; at: number }[] = []
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __skewers?: typeof SKEWERS }).__skewers = SKEWERS
-/** the owner out on the floor serving (no server hired: he carries the plates, clears them and takes the washed ones back himself, the
- * owner's: nothing flies): GuestBar3D walks a figure of him; Roasting's, at his place in the kitchen, is hidden meanwhile */
-export const OWNER_OUT = { on: false }
+/** what takes the owner off his place at the fire: out on the floor serving (no server hired: he carries the plates, clears them and takes
+ * the washed ones back himself, the owner's: nothing flies), washing up at the sink, the third cook's rounds with none hired */
+export type OwnerJob = 'serve' | 'wash' | 'plate'
+/**
+ * The owner off his place at the fire, and what for: GuestBar3D walks a figure of him for that job; Roasting's (Boss), at his place in the
+ * kitchen, is hidden meanwhile. `by`: the one job that has him (item 216, the owner's 「老闆會引分身」: the three each set and cleared the one
+ * flag and drew him each their own way, and the serving one was shown whenever he was out for anything: with no server hired and the player's
+ * washing up handed to him, one owner washed at the sink while another stood by the pass). Only that job's figure of him is drawn, and no
+ * other's started till he's back from it.
+ */
+export const OWNER_OUT: { on: boolean; by: OwnerJob | null } = { on: false, by: null }
+/** the owner off on a job, or back from it (only that job's own coming back frees him) */
+export function ownerAway(by: OwnerJob, on: boolean) {
+  if (on) { OWNER_OUT.by = by; OWNER_OUT.on = true } else if (OWNER_OUT.by === by) { OWNER_OUT.by = null; OWNER_OUT.on = false }
+}
+/** whether the owner's free for a job: at his place, or on that one already */
+export const ownerFree = (by: OwnerJob) => OWNER_OUT.by === null || OWNER_OUT.by === by
+/** nothing has him any more (the floor laid out afresh, the day begun) */
+export const ownerBack = () => { OWNER_OUT.by = null; OWNER_OUT.on = false }
 /**
  * The walking paths' map for edit mode (item 168; PathMap draws it): in the bar's frame (GuestBar3D's), its floor at y 0. GuestBar3D fills it
  * twice a second while it's shown: what stands in the way on the kitchen's floor (each its four corners and the piece it is), the staff's

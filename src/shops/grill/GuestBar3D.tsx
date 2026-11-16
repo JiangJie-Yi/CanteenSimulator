@@ -95,7 +95,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -3532,7 +3532,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return () => {
       SERVICE.servers = 0
       SAKE.station = false
-      OWNER_OUT.on = false
+      ownerBack()
       SEATS_TAKEN.clear()
       CHOPS_UP.clear()
     }
@@ -4176,25 +4176,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // the lot)
     if (HAND_WASH.ask === 'wash' && !SHOP.leaving && !(open && ownerServes)) {
       if (bossWash.current) { bossWash.current.manual = true; HAND_WASH.ask = null }
-      else if (!OWNER_OUT.on) {
+      else if (ownerFree('wash')) {
         HAND_WASH.ask = null
         const from = bossNow(), path = kitchenRoute(from, washSpot())
         bossWash.current = { phase: 'go', path, len: pathLength(path), t: 0, pos: from.clone(), yaw: OWNER_YAW, manual: true, home: from }
-        OWNER_OUT.on = true
+        ownerAway('wash', true)
         STAFF_SAY.say('owner', HAND_WASH_LINES.start)
       }
     }
     HAND_WASH.boss = (!!bossWash.current?.manual && bossWash.current.phase !== 'back')
       || (open && ownerServes && waiters.current.some((x) => x.phase === 'handGo' || x.phase === 'handwash'))
     if (open && !SHOP.leaving && !bossWash.current && PILE.saidDay !== SHOP.day && bossCleans(SHOP.day, PILE.n)
-      && performance.now() - SHOP.openedAt > 9000 && (ownerServes || !OWNER_OUT.on)) {
+      && performance.now() - SHOP.openedAt > 9000 && (ownerServes || ownerFree('wash'))) {
       PILE.saidDay = SHOP.day
       STAFF_SAY.say('owner', PILE_LINE)
       if (ownerServes) PILE.n = 0
       else {
         const from = ownerAt(), path = kitchenRoute(from, washSpot())
         bossWash.current = { phase: 'go', path, len: pathLength(path), t: 0, pos: from.clone(), yaw: OWNER_YAW }
-        OWNER_OUT.on = true
+        ownerAway('wash', true)
       }
     }
     const b = bossWash.current, o = bossObj.current
@@ -4214,7 +4214,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const at = inBar('SinkWaterTop', endOf(1)).sub(b.pos)
           b.yaw = b.base = Math.atan2(at.x, at.z)
           spongeHome()
-        } else { bossWash.current = null; OWNER_OUT.on = false; setWaiterMoving(BOSS_WASH_I, false); if (o) o.visible = false; washDone(); return }
+        } else { bossWash.current = null; ownerAway('wash', false); setWaiterMoving(BOSS_WASH_I, false); if (o) o.visible = false; washDone(); return }
       }
     } else {
       washTick(b)
@@ -4327,7 +4327,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     platerRun.current = { phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 }
     PLATER_OUT.id = null
     ownerHome.current = null
-    OWNER_OUT.on = false
+    ownerBack()
     waiters.current = waiters.current.map((w, i) => ({ phase: 'idle', t: 0, seat: -1, keys: [], run: null, path: [], len: 0,
       pos: (ownerServes ? ownerAt() : homes[i]?.at)?.clone() ?? w.pos, yaw: ownerServes ? OWNER_YAW : homes[i]?.yaw ?? w.yaw }))
     SERVICE.waiting.clear()
@@ -5193,7 +5193,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (going: stood in for from just how the one at their place stands)
       const away = (on: boolean) => {
         if (on) { const y = yawOfCrew(); if (y !== null) pl.yaw = y }
-        if (plater) PLATER_OUT.id = on ? plater.id : null; else OWNER_OUT.on = on
+        if (plater) PLATER_OUT.id = on ? plater.id : null; else ownerAway('plate', on)
       }
       // (worn out, at half pace (the owner's))
       pl.t += step * paceOfStaff(plater?.id)
@@ -5318,7 +5318,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (open && washGoes(SKEWERS.s)) SKEWERS.s = washAll(SKEWERS.s)
       } else if (pl.phase === 'idle') {
         // (the second cook, plating with no third cook to: not while he's fetching an order or skewering it at the board)
-        if (pl.t > 0.5 && platerFree(!!plater && FETCHER.id === plater.id, FETCHER.busy)) {
+        // (the owner doing it, with no third cook: not while he's off on another job, the washing up (item 216: two of him at once))
+        if (pl.t > 0.5 && (!!plater || ownerFree('plate')) && platerFree(!!plater && FETCHER.id === plater.id, FETCHER.busy)) {
           pl.t = 0
           if (open && !SHOP.leaving && FIRE_TEND.want && !FIRE_TEND.done) {
             // (the fire's asked for: charcoal from the crate, or water from the bucket on the table by his bay, first of all)
@@ -6110,8 +6111,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         return true
       }
       if (w.phase === 'idle') {
-        // (looked about every quarter of a second, not every frame)
-        if (w.t >= 0.25) {
+        // (looked about every quarter of a second, not every frame; the owner serving with no server hired: not while he's off washing up
+        // (item 216))
+        if (w.t >= 0.25 && !(ownerServes && !ownerFree('serve'))) {
           w.t = 0
           // (not at their place: the day's first moment, stood where it was before the kitchen's floor was looked at (in the miso pot): over to it)
           if (open && !SHOP.leaving && Math.hypot(w.pos.x - home.at.x, w.pos.z - home.at.z) > 0.05) { go(kitchenRoute(home.at, w.pos), 'back'); return }
@@ -6703,7 +6705,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       const o = waiterObjs.current[wi]
       // (out on the floor, or gone to wash up for the player while the shop's shut (item 166): out either way, not at his place)
-      if (ownerServes) OWNER_OUT.on = w.phase !== 'idle' || !!bossWash.current
+      if (ownerServes) ownerAway('serve', w.phase !== 'idle')
       // (the plate up on the tray, the bar where it was wiped down with a cloth, twice along and back (the owner's))
       const wiping = w.phase === 'clearTake' && w.t > 0.45 && w.t < 0.45 + WIPE_S && w.seat >= 0
       if (o) o.userData.wipe = wiping ? (w.t - 0.45) / WIPE_S : undefined
@@ -6771,8 +6773,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         w.out = undefined
         // (still finishing as the others go: the shop waits for them too)
         if (SHOP.leaving && !ownerServes) SHOP.walking.add(servers[wi]?.id ?? `server${wi}`)
-        // (the owner's figure here only while he's out: at his place, Roasting draws him)
-        o.visible = !ownerServes || OWNER_OUT.on
+        // (the owner's figure here only while he's out serving: at his place, Roasting draws him; out washing up, his washing figure (item 216:
+        // this one was shown whenever he was out for anything, a second owner standing by the pass while he washed at the sink))
+        o.visible = !ownerServes || OWNER_OUT.by === 'serve'
         o.position.copy(w.pos)
         o.position.y += genkanY(counters, w.pos)
         // (the facing shown eased to the way they're going, never more than a little a frame (turnSmooth, item 183))
