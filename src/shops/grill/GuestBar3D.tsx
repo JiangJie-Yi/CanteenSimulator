@@ -3960,6 +3960,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // (how many are still in the room: the shop shuts only once they're all out of the door)
   useEffect(() => { SHOP.inRoom = shown.length + visitorList.length + sitterList.length; return () => { SHOP.inRoom = 0 } }, [shown, visitorList, sitterList])
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __shown: shownRef })
+  // (dev: each walker's step aside as it stands, and the pairs passing, for tests/e2e/_jump203.mjs)
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __aside: aside, __passing: passing })
   // closing the shop empties the room at once: nobody at the stools, no plates out or being carried, the stacks as at the start
   // (and looked at as the shop opens: measured while it was shut, the room may still have been coming in (the miso pot by the rice tub wasn't
   // there yet, and the whole day the servers' places and ways went through it))

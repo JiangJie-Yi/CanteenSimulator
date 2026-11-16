@@ -7392,7 +7392,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const o = root.getObjectByName(nm)
       if (o) o.visible = false
     }
-    if (burning && !bedSeeded.current && !coals.current.some((c) => c && !c.gone && !c.dying)) { bedSeeded.current = true; dropCoals() }
+    // (as many as the fire's level has burning (item 199: a handful's six or seven under a gauge at half, eighteen's worth))
+    if (burning && !bedSeeded.current && !coals.current.some((c) => c && !c.gone && !c.dying)) { bedSeeded.current = true; dropCoals(undefined, Math.max(1, glowingFor(fire?.current ?? f))) }
 
     embers.current.forEach((e, i) => {
       // no fire, no glow; as the heap kindles its glow goes from a deep red, through orange, toward a yellower white at the full blaze, and it breathes
