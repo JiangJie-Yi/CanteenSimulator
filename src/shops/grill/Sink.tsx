@@ -18,7 +18,8 @@ import { EMPTY_AT } from '@/game/bins'
 import { DRAIN, DRYER, HAND_WASH, IN_USE, POINTER_HINT, SINK, SINK_BIN, SUPPLIES, squeezeSoap, tipOver } from './bar'
 import { DISH_SOAP } from '@/game/household'
 import { basinSays, waterTick } from '@/game/sinkWater'
-import { HAND_STEP_SAYS, handStep, pumpSoap, soapWith } from '@/game/handWash'
+import { GUIDE_OF, HAND_STEP_SAYS, handStep, pumpSoap, soapWith } from '@/game/handWash'
+import { glowOff, glowOn } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { getEdit } from './edit'
@@ -172,7 +173,7 @@ const RACK_OUT = 0.16
 export function SinkModel() {
   useStudio()
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
-  const { root, tip, floor, handle, faucet, door, rack, rackZ, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise } = useMemo(() => {
+  const { root, tip, floor, handle, faucet, tapBox, door, rack, rackZ, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise } = useMemo(() => {
     const r = gltf.scene.clone(true)
     // (what stands on it taken off: each placed as a piece of its own)
     for (const set of SINK_SETS) r.getObjectByName(set.node)?.removeFromParent()
@@ -204,6 +205,10 @@ export function SinkModel() {
     // basin's hint again and the water never on; of the points on the tap, three in four were taken by the basin))
     const faucet = new THREE.Group()
     for (const n of ['SinkTapFoot', 'SinkTapBody', 'SinkTapSpout', 'SinkTapMouth', 'SinkTapScreen']) if (r.getObjectByName(n)) faucet.add(lift(n))
+    // (the handle's box, a couple of centimetres over every way: more of it to point at (item 215); not the whole tap's, whose spout reaches
+    // out over the middle of the basin, over the plug: a box round it all took the plug's, the basin's and the dirty plates' clicks)
+    const tb = new THREE.Box3().setFromObject(handle)
+    const tapBox = { at: tb.getCenter(new THREE.Vector3()), size: tb.getSize(new THREE.Vector3()).addScalar(0.03).toArray() as [number, number, number] }
     const door = r.getObjectByName('SinkDryerDoor')!
     const doorAt = door.position.clone()
     door.removeFromParent()
@@ -233,7 +238,7 @@ export function SinkModel() {
     mergeByMaterial(rack)
     door.position.copy(doorAt)
     rack.position.copy(rackAt)
-    return { root: r, tip, floor, handle, faucet, door, rack, rackZ: rackAt.z, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise: top - base }
+    return { root: r, tip, floor, handle, faucet, tapBox, door, rack, rackZ: rackAt.z, ringAt, steamAt, plug, plugAt, plugOut, ringTop, chain, pool, poolY, base, rise: top - base }
   }, [gltf])
   // (the plug's way out of the drain and back: 0 in, 1 lying beside it)
   const plugK = useRef(SINK.plug ? 0 : 1)
@@ -378,17 +383,19 @@ export function SinkModel() {
   return (
     <group>
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
-      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: basinHint() }) }}
-        onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null) }}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; if (!scrubOnce()) { setTip({ title: '流理台', hint: basinHint() }); return } window.setTimeout(() => setTip({ title: '流理台', hint: basinHint() }), 80) }}>
+      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: basinHint() }); if (SINK.dirty > 0) guideOn() }}
+        onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null); guideOff() }}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; if (!scrubOnce()) { setTip({ title: '流理台', hint: basinHint() }); guideOn(); return } guideOff(); window.setTimeout(() => setTip({ title: '流理台', hint: basinHint() }), 80) }}>
         <primitive object={root} />
       </group>
       <primitive object={pool} />
       {/* (the plug: pointed at it lights and says so; clicked, it's pulled out and laid by the drain, or put back in) */}
-      <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('塞子', plugSays()).onPointerOver(e) }}
+      <group ref={(g) => { WASH_GUIDE.plug = g }} onPointerOver={(e) => { if (getEdit().on) return; tipOver('塞子', plugSays()).onPointerOver(e) }}
         onPointerOut={(e) => { if (getEdit().on) return; tipOver('塞子', '').onPointerOut(e) }}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.plug = !SINK.plug; tapTurnSound(SINK.plug, 0.4); tipOver('塞子', plugSays()).onPointerOver(e) }}>
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.plug = !SINK.plug; tapTurnSound(SINK.plug, 0.4); guideOff(); tipOver('塞子', plugSays()).onPointerOver(e) }}>
         <primitive object={plug} />
+        {/* (a box round it a little bigger than it, unseen, to point at: it's a coin's size down in the basin (item 215)) */}
+        <mesh visible={false} position={plugAt}><boxGeometry args={[0.07, 0.04, 0.07]} /></mesh>
       </group>
       <primitive object={chain} />
       {/* (the washer's door: pointed at it lights and says what the washer's doing; clicked, down or up (not while it washes)) */}
@@ -410,11 +417,14 @@ export function SinkModel() {
       {/* (the breath of steam out of its door as it finishes) */}
       <Steam position={[steamAt.x, steamAt.y, steamAt.z]} level={steam} width={0.36} height={0.42} opacity={0.42} layers={3} speed={0.1} />
       {/* (the tap, its handle and the rest of it: pointed at it lights and says so; clicked, the water's turned on, or off) */}
-      <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('水龍頭', says()).onPointerOver(e) }}
+      <group ref={(g) => { WASH_GUIDE.tap = g }} onPointerOver={(e) => { if (getEdit().on) return; tipOver('水龍頭', says()).onPointerOver(e) }}
         onPointerOut={(e) => { if (getEdit().on) return; tipOver('水龍頭', '').onPointerOut(e) }}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.tap = !SINK.tap; tipOver('水龍頭', says()).onPointerOver(e) }}>
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.tap = !SINK.tap; guideOff(); tipOver('水龍頭', says()).onPointerOver(e) }}>
         <primitive object={handle} />
         <primitive object={faucet} />
+        {/* (a box round its handle, unseen, a little bigger, to point at (item 215: in the sink's view the tap's a thin rod, and the owner
+            couldn't find where to click it; lit as the next step, it shows itself)) */}
+        <mesh visible={false} position={tapBox.at}><boxGeometry args={tapBox.size} /></mesh>
       </group>
       <mesh ref={stream} position={[tip.x, floor.y + len / 2, tip.z]} material={WATER} visible={false}>
         <cylinderGeometry args={[0.007, 0.009, len, 8, 1, true]} />
@@ -436,7 +446,22 @@ export function scrubOnce() {
   HAND_WASH.ask = 'wash'
   return true
 }
-const handSink = () => ({ dirty: SINK.dirty, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: SINK.sponge })
+const handSink = () => ({ dirty: SINK.dirty, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: SINK.sponge, tap: SINK.tap })
+/** what lights up as the next thing to click to wash up by hand (item 215): the plug, the tap, the washing-up liquid, the sponge, the
+ * draining basket (each set as it's drawn); lit while the dirty plates or the basin are pointed at, put out as the pointer leaves */
+export const WASH_GUIDE: Record<'plug' | 'tap' | 'soap' | 'sponge' | 'basket', THREE.Object3D | null> = { plug: null, tap: null, soap: null, sponge: null, basket: null }
+let guideLit: THREE.Object3D | null = null
+export function guideOn() {
+  const want = GUIDE_OF[handStep(handSink())]
+  const o = want ? WASH_GUIDE[want] : null
+  if (o === guideLit) return
+  guideOff()
+  if (o) { glowOn(o); guideLit = o }
+}
+export function guideOff() {
+  if (guideLit) glowOff(guideLit)
+  guideLit = null
+}
 /** what the basin says pointed at: its water and plug, then the next step of washing up by hand (item 103), how many plates are waiting */
 export const basinHint = () => {
   const st = handStep(handSink())
@@ -501,6 +526,12 @@ export function SinkPart({ node }: { node: string }) {
     for (const nm of ['SinkBinBag', 'SinkBinRecBag', 'SinkBinNewBag']) { const o = r.getObjectByName(nm); if (o) o.visible = false }
     return r
   }, [gltf, node])
+  // (a box a little bigger than it, in its own frame, to point at (item 215): the washing-up liquid and the sponge are small)
+  const hit = useMemo(() => {
+    obj.updateMatrixWorld(true)
+    const b = new THREE.Box3().setFromObject(obj)
+    return { at: b.getCenter(new THREE.Vector3()), size: b.getSize(new THREE.Vector3()).addScalar(0.04).toArray() as [number, number, number] }
+  }, [obj])
   // (each bin's lid: lifted while it's asked open, for a moment as something's thrown in, or held up by the stock keeper at it; standing a
   // little open on a bin heaped over full; eased up and back down. Its bag and what's in it: what's in it raised from the bin's floor toward
   // its mouth as it fills, none of it there while its bag's out (item 208))
@@ -543,15 +574,18 @@ export function SinkPart({ node }: { node: string }) {
   })
   // (the washing-up liquid squeezed into the water, the sponge taken up or put down: steps of washing up by hand (item 103), clicked)
   if (node === 'SinkDetergentSet' || node === 'SinkSpongeSet') return (
-    <group ref={lift} onPointerOver={(e) => { if (getEdit().on) return; tipOver(name, partSays(node)).onPointerOver(e) }}
+    <group ref={(g) => { lift.current = g; WASH_GUIDE[node === 'SinkDetergentSet' ? 'soap' : 'sponge'] = g }} onPointerOver={(e) => { if (getEdit().on) return; tipOver(name, partSays(node)).onPointerOver(e) }}
       onPointerOut={(e) => { if (getEdit().on) return; tipOver(name, '').onPointerOut(e) }}
       onClick={(e) => {
         e.stopPropagation(); if (getEdit().on) return
         // (out of the bottle in use, a new one opened from stock as it runs out: none at all, nothing comes (item 203))
         if (node === 'SinkDetergentSet') { if (SINK.water > 0 && squeezeSoap()) { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } } else SINK.sponge = !SINK.sponge
+        guideOff()
         window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
       }}>
       <primitive object={obj} />
+      {/* (a box a little bigger than it, unseen, to point at (item 215)) */}
+      <mesh visible={false} position={hit.at}><boxGeometry args={hit.size} /></mesh>
     </group>
   )
   if (node === 'SinkBinSet') return (
@@ -583,7 +617,7 @@ export function SinkPart({ node }: { node: string }) {
   )
   return (
     // (clickable now (the player takes its dry plates back to the racks): the pointing hand and its glow, as everything that can be clicked)
-    <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('瀝水籃', drainSays(DRAIN)).onPointerOver(e) }}
+    <group ref={(g) => { WASH_GUIDE.basket = g }} onPointerOver={(e) => { if (getEdit().on) return; tipOver('瀝水籃', drainSays(DRAIN)).onPointerOver(e) }}
       onPointerOut={(e) => { if (getEdit().on) return; tipOver('瀝水籃', '').onPointerOut(e) }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; HAND_WASH.ask = 'take'; window.setTimeout(() => setTip({ title: '瀝水籃', hint: drainSays(DRAIN) }), 80) }}>
       <primitive object={obj} />

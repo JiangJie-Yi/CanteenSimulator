@@ -4643,8 +4643,13 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {staffDoor !== undefined && <Movable id="kabutostand" label="頭盔木台"><StaticBatch plain>
           <group position={[-KSTAND_OFF, 0, staffDoor + KSTAND_ALONG]} rotation-y={-Math.PI / 2}><KabutoStandModel /></group>
         </StaticBatch></Movable>}
+        {/* (turned about to face into the room, its crest and visor toward the counter, and a quarter as big again (item 212, the owner's,
+            2026-11-16: 「武士頭盔轉180度，放大1.25倍，Reset!」): its back was what the room saw) */}
+        {/* (turned and grown about its own foot, so it stays sat on the stand: about the piece's middle it sank into the stand's top) */}
         {staffDoor !== undefined && <Movable id="kabuto" label="武士頭盔">
-          <group position={[-KSTAND_OFF, KSTAND_H, staffDoor + KSTAND_ALONG]} rotation-y={-Math.PI / 2} scale={0.48}><Kabuto /></group>
+          {/* (its model's middle is off its own axis: turned about, it was carried 9 cm off where it stood and its foot 7 mm down into the stand;
+              set back so its middle's where it was and it sits on the top) */}
+          <group position={[-KSTAND_OFF - 0.0453, KSTAND_H + 0.0035, staffDoor + KSTAND_ALONG]} rotation-y={Math.PI / 2} scale={0.48 * 1.25}><Kabuto /></group>
         </Movable>}
         {/* (the exit sign on the frieze by the way out, its arrow and running figure toward the door at the wall's end) */}
         {altar && <Movable id="exitsign" label="逃生出口燈"><group name="look-exit" position={[-0.045, 2.08, to - 0.62]} rotation-y={-Math.PI / 2}><ExitSign /></group></Movable>}

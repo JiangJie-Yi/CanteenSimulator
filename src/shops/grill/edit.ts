@@ -298,6 +298,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-28', Array.from({ length: 8 }, (_, n) => [`chopsticks${n}`, `chopstickpair${n}`]).flat()],
   // (the side bar's four sets set along it as the long bar's are (item 198))
   ['jgs-edit-relaid-29', Array.from({ length: 4 }, (_, n) => [`chopsticks${n + 4}`, `chopstickpair${n + 4}`]).flat()],
+  // (the helmet turned about to face the room and a quarter bigger, made its default: what was kept for it reset (item 212))
+  ['jgs-edit-relaid-30', ['kabuto']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length

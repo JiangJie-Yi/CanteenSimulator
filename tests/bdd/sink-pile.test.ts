@@ -29,6 +29,8 @@ feature('手洗碗盤的步驟（店主要的，第 103 項）', () => {
     then('一步一步提示下一步', () => {
       expect(handStep(base)).toBe('plug')
       expect(handStep({ ...base, plug: true })).toBe('water')
+      // (item 215: the tap on and the basin still filling, there's nothing to click but to wait; it said to turn the tap on again)
+      expect(handStep({ ...base, plug: true, tap: true })).toBe('filling')
       expect(handStep({ ...base, plug: true, water: WASH_WATER })).toBe('soap')
       expect(handStep({ ...base, plug: true, water: WASH_WATER, soap: SOAP_PUMP })).toBe('sponge')
       expect(handStep({ ...base, plug: true, water: WASH_WATER, soap: SOAP_PUMP, sponge: true })).toBe('scrub')

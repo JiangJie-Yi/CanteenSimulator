@@ -11,14 +11,15 @@ export const WASH_WATER = 0.25
 export const SOAP_PUMP = 10
 export const SOAP_MAX = 30
 
-export type HandStep = 'none' | 'basketFull' | 'plug' | 'water' | 'soap' | 'sponge' | 'scrub'
-export type HandSink = { dirty: number; drain: Drain; plug: boolean; water: number; soap: number; sponge: boolean }
+export type HandStep = 'none' | 'basketFull' | 'plug' | 'water' | 'filling' | 'soap' | 'sponge' | 'scrub'
+/** (`tap`: whether the tap's running: turned on, the basin filling is only to be waited for (item 215)) */
+export type HandSink = { dirty: number; drain: Drain; plug: boolean; water: number; soap: number; sponge: boolean; tap?: boolean }
 
 /** what's to be done next */
 export function handStep(s: HandSink): HandStep {
   if (s.dirty <= 0) return 'none'
   if (s.drain.n >= DRAIN_CAP) return 'basketFull'
-  if (s.water < WASH_WATER) return s.plug ? 'water' : 'plug'
+  if (s.water < WASH_WATER) return s.plug ? (s.tap ? 'filling' : 'water') : 'plug'
   if (s.soap <= 0) return 'soap'
   if (!s.sponge) return 'sponge'
   return 'scrub'
@@ -30,15 +31,21 @@ export const scrubbed = (soap: number) => Math.max(0, soap - 1)
 /** the soap goes with the water: the basin emptied, none left */
 export const soapWith = (soap: number, water: number) => (water <= 0 ? 0 : soap)
 
-/** what the basin says of the next step */
+/** what the basin says of the next step (item 215, the owner's 「我還是不會洗，教我否?」: it said what to do, never which thing to click, and the
+ * tap was a thin rod at the back of the basin: each step's thing lights up now (GUIDE_OF), and the hint says so) */
 export const HAND_STEP_SAYS: Record<HandStep, string> = {
   none: '沒有髒盤子',
-  basketFull: '瀝水籃滿了，先把乾的收回碗盤架',
-  plug: '洗碗：先塞上塞子（點水槽底的排水孔）',
-  water: '洗碗：打開水龍頭放水',
-  soap: '洗碗：按一下洗碗精，擠一點到水裡',
-  sponge: '洗碗：拿起菜瓜布',
-  scrub: '點一下刷一個盤子，刷好放進瀝水籃',
+  basketFull: '瀝水籃滿了，點瀝水籃把乾的收回碗盤架',
+  plug: '洗碗第 1 步：點亮起來的塞子，塞住水槽底',
+  water: '洗碗第 2 步：點亮起來的水龍頭，開水',
+  filling: `放水中，水到 ${Math.round(WASH_WATER * 100)}% 就能洗`,
+  soap: '洗碗第 3 步：點亮起來的洗碗精，擠一點到水裡',
+  sponge: '洗碗第 4 步：點亮起來的菜瓜布，拿起來',
+  scrub: '洗碗第 5 步：點這疊髒盤子，老闆就來洗',
+}
+/** the thing that lights up for each step, to be clicked next (none: there's nothing to click, or it's the dirty plates themselves) */
+export const GUIDE_OF: Record<HandStep, 'plug' | 'tap' | 'soap' | 'sponge' | 'basket' | null> = {
+  none: null, basketFull: 'basket', plug: 'plug', water: 'tap', filling: null, soap: 'soap', sponge: 'sponge', scrub: null,
 }
 
 /**

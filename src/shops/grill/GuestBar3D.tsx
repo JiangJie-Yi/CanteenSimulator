@@ -76,7 +76,7 @@ import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDes
 import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, offsetOf, setLocked } from './edit'
-import { basinHint, scrubOnce, useBinBags } from './Sink'
+import { basinHint, guideOff, guideOn, scrubOnce, useBinBags } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { dishLines, paysAtTill, takeOut, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
@@ -7266,11 +7266,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (each seated customer's soy in the little dish at their place, a dab of grated daikon in it: drawn with the shoes, SeatBits) */}
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
       {Array.from({ length: Math.min(dirty.current, SINK_SHOWN) }, (_, i) => (
-        <group key={`d${i}`} ref={(o) => { sinkPlates.current[i] = o }} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}
+        <group key={`d${i}`} name={`sink-dirty-${i}`} ref={(o) => { sinkPlates.current[i] = o }} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}
           // (the dirty plates can be clicked to wash one, as the basin can (the owner, 2026-11-15: "I can't wash up by hand": the stack did nothing))
-          onPointerOver={(e) => { if (getEdit().on) return; e.stopPropagation(); tipOver('髒盤子', basinHint()).onPointerOver(e) }}
-          onPointerOut={(e) => { if (getEdit().on) return; tipOver('髒盤子', '').onPointerOut(e) }}
-          onClick={(e) => { if (getEdit().on) return; e.stopPropagation(); scrubOnce(); window.setTimeout(() => tipOver('髒盤子', basinHint()).onPointerOver(e), 80) }}><Plate dirty sticks={0} design={i} /></group>
+          // (and the thing to click next for washing up by hand lit up while they're pointed at (item 215))
+          onPointerOver={(e) => { if (getEdit().on) return; e.stopPropagation(); tipOver('髒盤子', basinHint()).onPointerOver(e); guideOn() }}
+          onPointerOut={(e) => { if (getEdit().on) return; tipOver('髒盤子', '').onPointerOut(e); guideOff() }}
+          onClick={(e) => { if (getEdit().on) return; e.stopPropagation(); scrubOnce(); guideOff(); window.setTimeout(() => { tipOver('髒盤子', basinHint()).onPointerOver(e); guideOn() }, 80) }}><Plate dirty sticks={0} design={i} /></group>
       ))}
       {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
           of the shop's plates, it goes with the food) */}
