@@ -9,7 +9,7 @@ import { RENDER_DEFAULT, type RenderPref } from '@/game/renderPrefs'
 import { EDIT_TEXT, pieceName } from '@/data/editText'
 import type { Lang } from '@/data/i18n'
 import { VIEW_SPOTS } from '@/data/views'
-import { applyGroup, areasOf, chainOf, isStill, leavesOf, parentOf, ROOM_TURN, undoGroup, within, type ViewCam } from '@/game/editGroups'
+import { applyGroup, AREA_REACH, areasOf, chainOf, isStill, leavesOf, parentOf, ROOM_TURN, undoGroup, viewOf, within, type ViewCam } from '@/game/editGroups'
 import { glowOnly, HOVER } from '@/scene/hoverGlow'
 import { setTip } from '@/scene/hoverTip'
 import { GRILL_SEATS } from './bar'
@@ -679,13 +679,23 @@ const save = () => {
     localStorage.setItem(KEY_P, JSON.stringify(state.pivots))
   } catch { /* private window: it just won't be kept */ }
 }
-// ---- undo: each change (a drag, an arrow, a field edited, reset all) is a step; Ctrl+Z goes back one, Ctrl+Y (or Ctrl+Shift+Z) forward again
-type Snap = { o: Record<string, V3>; r: Record<string, V3>; s: Record<string, V3>; g: Record<string, Group> }
+// ---- undo: each change (a drag, an arrow, a field edited, reset all, a waypoint or a keep-clear patch put down or taken up) is a step; Ctrl+Z
+// goes back one, Ctrl+Y (or Ctrl+Shift+Z) forward again
+// (the paths' waypoints and keep-clear patches with the rest (item 232, the owner's 「加中途點要可以還原阿　ctrl+z」: they weren't kept, a waypoint
+// added stayed whatever Ctrl+Z was pressed))
+type Snap = { o: Record<string, V3>; r: Record<string, V3>; s: Record<string, V3>; g: Record<string, Group>; v?: Record<string, string[]>; z?: string[] }
 const past: Snap[] = []
 let future: Snap[] = []
-const take = (): Snap => JSON.parse(JSON.stringify({ o: state.offsets, r: state.rotations, s: state.scales, g: state.groups }))
+const take = (): Snap => JSON.parse(JSON.stringify({ o: state.offsets, r: state.rotations, s: state.scales, g: state.groups, v: state.vias, z: state.zones }))
 const snap = () => JSON.stringify(take())
-const put = (v: Snap) => { state.offsets = v.o; state.rotations = v.r; state.scales = v.s; state.groups = v.g ?? {} }
+const put = (v: Snap) => {
+  state.offsets = v.o; state.rotations = v.r; state.scales = v.s; state.groups = v.g ?? {}
+  if (v.v) { state.vias = v.v; saveVias() }
+  if (v.z) { state.zones = v.z; try { localStorage.setItem(KEY_ZONES, JSON.stringify(state.zones)) } catch { /* (not kept) */ } }
+  // (what's chosen gone with what was undone: nothing chosen)
+  if (state.selected && (state.selected.startsWith('pathvia-') || state.selected.startsWith('pathzone-'))
+    && !Object.values(state.vias).flat().includes(state.selected) && !state.zones.includes(state.selected)) state.selected = null
+}
 /** called as a change begins: the way things are now is kept, to go back to */
 export function beginChange() {
   const last = past.length ? JSON.stringify(past[past.length - 1]) : null
@@ -938,17 +948,62 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
 /** what the views' own words (views.ts's about) say they're of, where their cameras alone don't settle it: the entrance is framed a little into
  * the room, so its lanterns, its noren, the shoe rack (and the helmet on it) and the lucky cats' stand by the door are at the edge of its frame or
  * out of it, and nearer what the till's or the shrine's camera looks at */
-const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan', 'grp-doorcats': 'genkan',
-  koban: 'genkan', bench: 'genkan', bench2: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', vegcrate: 'back', vegbasket: 'back', coalsack: 'back',
+const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan',
+  // (the door's cat stand by the round window since it was moved along the wall (item 218, the owner's 「招財貓台應該在圓窗?」))
+  'grp-doorcats': 'window', koban: 'window', bench: 'genkan', bench2: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', vegcrate: 'back', vegbasket: 'back', coalsack: 'back',
   // (the kitchen's back: the rice station between the cook table and the till was nearer the till's camera; the rice corner and the sake
   // barrel by it in no view's sight at all)
   'grp-ricestation': 'back', 'grp-sink': 'back', 'grp-racks': 'back', 'grp-ricecorner': 'back', sake: 'back', freezer: 'back',
   'grp-wc-m': 'toilet', 'grp-wc-f': 'toilet',
   // (item 156, the owner's: every place's chopsticks and the long bar's third lamp with the rest of the bar's, in the cook table's area (a view
   // that happened to see one took it); the staff's door with the back, not the shrine's)
-  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [`chopstickpair${n}`, 'grill'])), barlamp2: 'grill', staffdoor: 'back' }
+  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [`chopstickpair${n}`, 'grill'])), barlamp2: 'grill', staffdoor: 'back',
+  // (and all the rest of the bar's places' things with them, each kind together (item 225, the owner's 「刷子同一屬性的放一起就好」): the
+  // chopstick rests, the soy pots, the table bins, and every lamp over the bars (half of them were in the drinks' or the window's area, by
+  // which camera happened to see them))
+  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [`chopsticks${n}`, 'grill'])),
+  'condiments0-0': 'grill', 'condiments0-1': 'grill', 'condiments4-0': 'grill', 'condiments4-1': 'grill',
+  'tablebasket0-0': 'grill', 'tablebasket0-1': 'grill', 'tablebasket4-0': 'grill', 'tablebasket4-1': 'grill',
+  barlamp0: 'grill', barlamp1: 'grill', sidelamp0: 'grill', sidelamp1: 'grill', sidelamp2: 'grill' }
+/** (dev, item 218: 「有一些分類還是很奇怪」) every area's top-level things: the area each is in, the one the views' cameras alone would put it
+ * in (no AREA_OF), the one AREA_OF names, and where it is */
+function areaCheck() {
+  const cams = viewCams?.() ?? []
+  const centre = (id: string) => {
+    const leaves = state.groups[id] ? leavesOf(state.groups, id) : [id]
+    const pts = leaves.map((m) => registry.get(m)?.center?.() ?? null).filter((v): v is V3 => !!v)
+    return pts.length ? middle(pts) : null
+  }
+  const out: { id: string; name: string; area: string; byCam: string | null; fixed: string | null; at: V3 | null }[] = []
+  for (const [gid, g] of Object.entries(state.groups)) {
+    if (!isArea(gid)) continue
+    for (const m of g.members) {
+      const at = centre(m)
+      out.push({ id: m, name: state.groups[m]?.name ?? registry.get(m)?.label ?? m, area: gid.slice(AREA.length), byCam: at ? viewOf(at, cams, AREA_REACH) : null, fixed: AREA_OF[m] ?? null,
+        at: at ? at.map((v) => +v.toFixed(2)) as V3 : null })
+    }
+  }
+  return out
+}
 /** an area's name: its view's, as an area */
 const areaName = (view: string) => { const n = VIEW_SPOTS.find((v) => v.id === view)?.zh ?? view; return n.endsWith('區') ? n : `${n}區` }
+/** an editor already laid out in areas (item 218): each thing AREA_OF names that's in another area moved into its own, once (its areas still
+ * as made: moved, turned or sized, an area's left as it is) */
+const KEY_REAREA = 'jgs-edit-rearea-218'
+function reArea() {
+  try { if (localStorage.getItem(KEY_REAREA)) return } catch { return }
+  let moved = false
+  for (const [id, view] of Object.entries(AREA_OF)) {
+    const to = AREA + view, into = state.groups[to]
+    const from = Object.keys(state.groups).find((g) => isArea(g) && g !== to && state.groups[g].members.includes(id))
+    if (!into || !from || !isStill(state.groups[from]) || !isStill(into)) continue
+    state.groups = { ...state.groups, [from]: { ...state.groups[from], members: state.groups[from].members.filter((m) => m !== id) }, [to]: { ...into, members: [...into.members, id] } }
+    moved = true
+  }
+  // (only once the areas are there to move between: kept for the time they are)
+  if (Object.keys(state.groups).some(isArea)) try { localStorage.setItem(KEY_REAREA, '1') } catch { /* storage blocked */ }
+  if (moved) { save(); emit() }
+}
 /** each view's area made a group, of the pieces (and the shop's groups, whole) loose at the top that are new to it */
 export function groupByViews() {
   const cams = viewCams?.()
@@ -983,6 +1038,7 @@ export function groupByViews() {
   for (const id of registry.keys()) knownNow.add(id)
   try { localStorage.setItem(KEY_AK, JSON.stringify([...known()])) } catch { /* storage blocked */ }
   if (made) { save(); emit() }
+  reArea()
 }
 
 /** the shop opening (locked) or shut: opening switches the mode off */
@@ -1164,6 +1220,7 @@ export function setShade(s: Shade) {
 }
 /** a keep-clear patch put down (item 168): the next number, chosen, the map shown with it */
 export function addZone() {
+  beginChange()
   let n = 1
   while (state.zones.includes(`pathzone-${n}`)) n++
   const id = `pathzone-${n}`
@@ -1182,6 +1239,7 @@ const saveVias = () => { try { localStorage.setItem(KEY_VIAS, JSON.stringify(sta
  * chosen, to be dragged where the way should pass; the way goes through it from then on, both ways
  */
 export function addVia(key: string, at: V3) {
+  beginChange()
   const all = Object.values(state.vias).flat()
   let n = 1
   while (all.includes(`pathvia-${n}`)) n++
@@ -1199,6 +1257,7 @@ export function addVia(key: string, at: V3) {
 export function removeVia(id: string) {
   const key = Object.keys(state.vias).find((k) => state.vias[k].includes(id))
   if (!key) return
+  beginChange()
   const left = state.vias[key].filter((x) => x !== id), next = { ...state.vias }
   if (left.length) next[key] = left
   else delete next[key]
@@ -1211,6 +1270,7 @@ export function removeVia(id: string) {
 /** a keep-clear patch taken up (Delete with it chosen) */
 export function removeZone(id: string) {
   if (!state.zones.includes(id)) return
+  beginChange()
   state.zones = state.zones.filter((z) => z !== id)
   try { localStorage.setItem(KEY_ZONES, JSON.stringify(state.zones)) } catch { /* (not kept) */ }
   if (state.selected === id) state.selected = null
@@ -1945,15 +2005,15 @@ if (typeof window !== 'undefined') {
     if (e.key !== 'g' && e.key !== 'G') return
     const t = e.target
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable)) return
-    // (item 178: the developer mode is the shop's editor now, a page of its own: G opens it (or, the mode on here anyway, leaves it); in the
-    // editor it's always on)
+    // (G: the developer mode on and off right here, at once (item 233, the owner's 「現在按下G會載入，能否像之前那樣直接使用???」: since item 178
+    // it opened the shop's editor in a tab of its own, the whole shop loaded again); Shift+G opens that editor. In the editor it's always on)
     if (TOOL_PAGE) return
-    if (state.on) toggleEdit()
-    else openEditor()
+    if (e.shiftKey && !state.on) openEditor()
+    else toggleEdit()
   }
   window.addEventListener('keydown', onKey)
   // (a hot update swaps this module for a new copy: the old one's key let go of (or G was heard by every copy left behind, each with its own
   // developer mode, one more with every edit), its panel and notice taken away)
   replaces(import.meta.hot, () => { window.removeEventListener('keydown', onKey); offRenderPrefs(); el?.remove(); toastEl?.remove() })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, resetAll, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, resetAll, areaCheck, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
 }
