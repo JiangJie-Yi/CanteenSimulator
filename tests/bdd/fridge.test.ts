@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
-import { PAR, averageOrder, eachOrder, goodsOf, inPacks, keepsDry, packOf, topUpOrder, type Stock } from '@/game/economy'
+import { PAR, averageOrder, eachOrder, goodsOf, inPacks, keepsDry, packOf, topUpOrder, type Stock, parOf } from '@/game/economy'
 
 const grill = DISHES.find((d) => d.id === 'grilledfish')!
 
@@ -50,6 +50,7 @@ feature('三個補貨鍵', () => {
   scenario('補滿：每樣補到標準量', ({ given, when, then }) => {
     given('庫存全空', (w) => { w.stock = {} as Stock })
     when('按「補滿」', (w) => { w.o = topUpOrder(grill, w.stock) })
-    then(`每樣都補到 ${PAR}`, (w) => { for (const g of goodsOf(grill)) expect(w.o.buy[g.id]).toBe(PAR) })
+    // (the sides' rice and soup to a day's worth: item 207)
+    then(`每樣都補到 ${PAR}，白飯與味噌湯補到一天的量`, (w) => { for (const g of goodsOf(grill)) expect(w.o.buy[g.id]).toBe(parOf(g.id)) })
   })
 })

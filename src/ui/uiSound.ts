@@ -95,3 +95,58 @@ export function frostSound() {
     o.connect(k).connect(a.destination); o.start(t + dt); o.stop(t + dt + 0.1)
   }
 }
+
+// ---- item 209 (the owner's, 2026-11-16: 「我要讓這遊戲看起來覺得好玩」): the good moments heard
+
+/** one bell-like note: a sine and its octave, struck and dying away */
+function bell(a: AudioContext, at: number, hz: number, vol: number, len: number) {
+  for (const [mul, k] of [[1, 1], [2.01, 0.35], [3.02, 0.12]] as const) {
+    const o = a.createOscillator(); o.type = 'sine'; o.frequency.value = hz * mul
+    const g = a.createGain()
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol * k, at + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, at + len)
+    o.connect(g).connect(a.destination); o.start(at); o.stop(at + len + 0.02)
+  }
+}
+/** a customer who loved it: two bright notes, rising (a little bell's 'ding-ling'); not more than one in a breath, however many at once */
+let joyAt = -1
+export function joySound() {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  if (t - joyAt < 0.35) return
+  joyAt = t
+  bell(a, t, 1318.5, 0.045, 0.5)
+  bell(a, t + 0.09, 1760, 0.04, 0.7)
+}
+/** money in: a coin's light double ping */
+let coinAt = -1
+export function coinSound() {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  if (t - coinAt < 0.12) return
+  coinAt = t
+  bell(a, t, 2349, 0.022, 0.18)
+  bell(a, t + 0.055, 3136, 0.02, 0.25)
+}
+/** the full house's stamp: a soft drum's thump as it comes down, the stamp's knock on the paper, then a little bell */
+export function stampSound() {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  const o = a.createOscillator(); o.type = 'sine'
+  o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.28)
+  const g = a.createGain()
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.16, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42)
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.45)
+  const n = Math.max(1, Math.floor(a.sampleRate * 0.05))
+  const buf = a.createBuffer(1, n, a.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 3
+  const src = a.createBufferSource(); src.buffer = buf
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.8
+  const k = a.createGain(); k.gain.value = 0.12
+  src.connect(f).connect(k).connect(a.destination); src.start(t + 0.02)
+  bell(a, t + 0.3, 1046.5, 0.035, 0.9)
+  bell(a, t + 0.42, 1568, 0.03, 1.1)
+}

@@ -7,6 +7,8 @@ import { HOUSEHOLD, HOUSEHOLD_LOW, householdOrder } from './household'
 import { DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, GARNISH, GARNISH_GOODS, NORI, NORI_PAR, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
+import { RICE_FULL } from './rice'
+import { SOUP_BOWLS } from './soup'
 
 export type Stock = Record<string, number>
 
@@ -173,6 +175,14 @@ export const roomFor = (id: string, have: number) => {
 /** a stock keeper (倉儲) tops up whatever the menu uses once it's down to this many portions, back up to PAR */
 export const PAR = 10
 export const REORDER_AT = 3
+/** the rice and the miso soup had alongside the dishes, whatever's on the menu board (items 205, 207: kept to PAR, ten portions, like any good,
+ * a pot of rice was cooked with what rice there was, three bowls' worth, the cooker holding twenty; and the miso, not on the board, was never
+ * ordered at all: in a rush three of twenty-one who'd asked for rice had it, one of ten their soup): kept to a day's worth, two pots of rice
+ * and three of soup, and ordered once there's less than a pot's */
+export const SIDE_PAR: Record<string, number> = { Onigiri: 2 * RICE_FULL, MisoSoup: 3 * SOUP_BOWLS }
+export const SIDE_LOW: Record<string, number> = { Onigiri: RICE_FULL, MisoSoup: SOUP_BOWLS }
+/** a good's standard stock: PAR, or the sides' day's worth */
+export const parOf = (id: string) => Math.max(PAR, SIDE_PAR[id] ?? 0)
 /** how much off the suppliers' price a stock keeper gets: nothing for a beginner, up to 5% for a skilled one */
 export const supplierDiscount = (skill: number) => Math.max(0, Math.min(0.05, (skill - 60) / 800))
 
@@ -183,6 +193,8 @@ export const supplierDiscount = (skill: number) => Math.max(0, Math.min(0.05, (s
 export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number, skill: number) {
   const per: Stock = {}
   for (const e of menu) for (const [k, q] of Object.entries(needOf(e))) per[k] = Math.max(per[k] ?? 0, q)
+  // (and the sides' rice and soup, whatever's on the menu, once there's a menu at all)
+  if (menu.length) for (const id of Object.keys(SIDE_PAR)) per[id] = Math.max(per[id] ?? 0, 1)
   const goods = new Map([...goodsOf(d), ...SEASON_GOODS, ...GARNISH_GOODS].map((g) => [g.id, g]))
   const off = 1 - supplierDiscount(skill)
   const buy: Stock = {}
@@ -192,8 +204,8 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     const have = stock[id] ?? 0
     // (a seasoning, counted in doses, is kept at its own usual stock: ordered once it's down to a third of it)
     const kept = isSeasonId(id) ? SEASON_PAR : id === NORI ? NORI_PAR : 0
-    const par = kept || PAR * q
-    if (!g || have > (kept ? kept / 3 : REORDER_AT * q)) continue
+    const par = kept || Math.max(PAR * q, SIDE_PAR[id] ?? 0)
+    if (!g || have > (kept ? kept / 3 : Math.max(REORDER_AT * q, (SIDE_LOW[id] ?? 0) - 1))) continue
     const n = Math.min(inPacks(id, par - have), roomFor(id, have))
     if (n <= 0) continue
     const c = Math.round(costOf(g) * n * off)
@@ -244,7 +256,7 @@ export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
   let cost = 0
   for (const g of goodsOf(d)) {
     const have = stock[g.id] ?? 0
-    const n = Math.min(inPacks(g.id, Math.max(par, packOf(g.id)) - have), roomFor(g.id, have))
+    const n = Math.min(inPacks(g.id, Math.max(par === PAR ? parOf(g.id) : par, packOf(g.id)) - have), roomFor(g.id, have))
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n

@@ -36,6 +36,11 @@ export const emptyPot = (): SoupPot => ({ state: 'empty', left: 0 })
 
 /** whether the soup's to be made: the pot empty */
 export const soupGoes = (p: SoupPot) => p.state === 'empty'
+/** a hot pot run down to this many bowls is topped up: the third cook makes the next pot's worth and adds it, the pot kept hot (item 207:
+ * made only from empty, the soup was out the twenty-five minutes it took to make and heat again, and in a rush those who'd asked for it
+ * went without) */
+export const SOUP_LOW = 4
+export const topUpGoes = (p: SoupPot, left: number) => p.state === 'hot' && left <= SOUP_LOW
 
 /** made, in the well: heating up */
 export const setSoup = (): SoupPot => ({ state: 'heating', left: HEAT_S })

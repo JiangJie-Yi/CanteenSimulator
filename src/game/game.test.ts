@@ -10,7 +10,7 @@ import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPr
 import { ROLES } from '@/data/staff'
 import { KINDS, kindOf } from '@/data/guests'
 import { SAY_CHUNK, sayChunks } from '@/game/say'
-import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder } from '@/game/economy'
+import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder, SIDE_PAR, parOf } from '@/game/economy'
 import { SEASON_GOODS, SEASON_PAR } from './supplies'
 import { trialIdeas } from '@/game/research'
 import { APPLICANTS, makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
@@ -192,7 +192,8 @@ describe('game/economy: the stock keeper', () => {
   const menu = [entry('grilledfish', ['Saury']), entry('grilledfish', ['GrilledCorn'])]
   it('tops up only what the menu uses and is running low, back to PAR', () => {
     // (the charcoal's sack full enough, the tissues, receipt rolls and cleaning things too: they aren't what's tested here)
-    const { buy, cost } = restockOrder(grill, menu, { Saury: 2, GrilledCorn: REORDER_AT + 1, Salmon: 0, charcoal: 100, [TISSUE]: 10, [RECEIPT]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10,
+    // (the sides' rice and soup at their day's worth: item 207)
+    const { buy, cost } = restockOrder(grill, menu, { Saury: 2, GrilledCorn: REORDER_AT + 1, Salmon: 0, ...SIDE_PAR, charcoal: 100, [TISSUE]: 10, [RECEIPT]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10,
       [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 }, 1e6, 60)
     expect(buy).toEqual({ Saury: PAR - 2 })
     expect(cost).toBe(costOf(grill.items.find((x) => x.id === 'Saury')!) * (PAR - 2))
@@ -246,7 +247,7 @@ describe('game/economy: 一鍵補貨', () => {
     // (the seasonings are topped up too, each to its own usual stock)
     const all = [...goodsOf(grill), ...SEASON_GOODS, ...GARNISH_GOODS]
     expect(cost).toBe(Object.entries(buy).reduce((n, [id, q]) => n + costOf(all.find((g) => g.id === id)!) * q, 0))
-    expect(topUpOrder(grill, Object.fromEntries([...goodsOf(grill).map((g) => [g.id, PAR]), ...SEASON_GOODS.map((g) => [g.id, SEASON_PAR]), [NORI, NORI_PAR]])).cost).toBe(0)
+    expect(topUpOrder(grill, Object.fromEntries([...goodsOf(grill).map((g) => [g.id, parOf(g.id)]), ...SEASON_GOODS.map((g) => [g.id, SEASON_PAR]), [NORI, NORI_PAR]])).cost).toBe(0)
   })
 })
 

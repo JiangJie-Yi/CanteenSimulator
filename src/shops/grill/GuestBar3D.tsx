@@ -9,6 +9,7 @@ import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, ROLL_LOW, stockerChore, type StockChore } from '@/game/stocker'
+import { bagOut, binToEmpty, toss, type BinKind, type Waste } from '@/game/bins'
 import { ROLL, SOAP, SOAP_FULL, SOAP_REFILL_AT, takeOne, takesTowel, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT } from '@/game/washroom'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
@@ -21,7 +22,8 @@ import { QUALITY } from '@/scene/quality'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
-import { Glyph } from '@/ui/GameIcons'
+import { Glyph, StarIcon } from '@/ui/GameIcons'
+import { joySound } from '@/ui/uiSound'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
@@ -74,7 +76,7 @@ import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDes
 import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, offsetOf, setLocked } from './edit'
-import { basinHint, scrubOnce } from './Sink'
+import { basinHint, scrubOnce, useBinBags } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { dishLines, paysAtTill, takeOut, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
@@ -82,7 +84,7 @@ import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPat
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, SHAPE_EACH, TRAY_MAX, WASH_S, emptyKama, kamaTick, riceGoes, setOn, takeRice, trayWants } from '@/game/rice'
 import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
-import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes, soupReady, takeBowl } from '@/game/soup'
+import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes, soupReady, takeBowl, topUpGoes } from '@/game/soup'
 import { RICE_BEATS, SOUP_BEATS, beatsLength } from '@/game/sides'
 import { SeatBowls, fillRice, fillSoup, ladleRest, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
 import { bottleClink, lightSwitchSound, plateClink, scrubSound, stoolSound, washSplash } from './restroomSound'
@@ -93,7 +95,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -212,9 +214,13 @@ const BOWL_PASS = { rice: new THREE.Vector3(-0.35, SERVE_TOP, -0.035), soup: new
 const RICE_LEN = beatsLength(RICE_BEATS), SOUP_LEN = beatsLength(SOUP_BEATS)
 /** seconds: the bowls set down at the counter; taken up onto a tray; set down at a place */
 const BOWL_PUT_S = 0.5, BOWL_UP_S = 0.45, BOWL_SET_S = 0.6
-/** the server's tray as they carry the bowls out, and which way they face (as SAKE_TRAY) */
-const BOWL_TRAY = new THREE.Vector3()
-const BOWL_TRAY_YAW = { v: 0 }
+/** (item 207) how many customers' bowls wait at the counter at most (in rows at its left end: the counter's frame, z of each), and how many
+ * sets a server takes out on one tray (the second to a seat along the same counter after the first): one at a time, the plater waited for
+ * each customer's to be carried out before he could fill the next, and in a rush those who'd asked for rice and soup sat on half an hour
+ * after their fish, waiting for them */
+const PASS_MAX = 2
+const PASS_Z = [-0.07, 0.08]
+const TRAY_SETS = 2
 const SAKE_TRAY = new THREE.Vector3()
 const SAKE_TRAY_YAW = { v: 0 }
 const OWNER_BONE = new THREE.Vector3()
@@ -382,6 +388,9 @@ const panelTex = (tex: THREE.Texture | null, i: number) => {
  * as a trip carries) and goes back to the crates.
  */
 const STOCK_CARRY = 8
+/** (item 208) the stock keeper's ways for a bin's bag (StockerImpl's binWays), and how long he's gone down the stair with it (the shop's seconds) */
+type BinWays = { toBin: THREE.Vector3[]; toDoor: THREE.Vector3[]; door: THREE.Vector3; mouths: Record<BinKind, THREE.Vector3>; scale: number }
+const BIN_AWAY_S = 6
 /** the stock keeper's figure (in the bar's frame, as the customers' are): they step round him as they do the servers (the owner's item 45) */
 const STOCKER_FIG: { o: THREE.Object3D | null } = { o: null }
 // (he walks by his own frame loop: drawn again only if he or the room changes, not with every redraw of the bar)
@@ -402,7 +411,10 @@ const Stocker = memo(StockerImpl, (a, b) => a.counters === b.counters && a.fridg
  */
 function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges: NonNullable<ReturnType<typeof fridgesOf>>; who: { id: string; look: StaffLook } }) {
   const g = useRef<THREE.Group>(null)
-  const held = useRef<{ crate: THREE.Object3D | null; roll: THREE.Object3D | null; box: THREE.Object3D | null }>({ crate: null, roll: null, box: null })
+  const held = useRef<{ crate: THREE.Object3D | null; roll: THREE.Object3D | null; box: THREE.Object3D | null; bag: THREE.Group | null }>({ crate: null, roll: null, box: null, bag: null })
+  const scene = useThree((st3) => st3.scene)
+  // (a bin's bag tied up and carried out, and the new one brought back (item 208): copies of the sink's own)
+  const bags = useBinBags()
   const statusEl = useRef<HTMLSpanElement>(null)
   const c1 = counters[1]
   const home = useMemo(() => {
@@ -418,7 +430,39 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   /** his way out into the side counter's aisle, across from his place */
   const homeAisle = useMemo(() => c1.at.clone().addScaledVector(c1.along, home.clone().sub(c1.at).dot(c1.along) / c1.along.lengthSq()).addScaledVector(c1.lay, -AISLE), [home, c1])
   const st = useRef({ phase: 'idle' as 'idle' | 'take' | 'go' | 'work' | 'back', t: 0, chore: null as StockChore, path: [] as THREE.Vector3[], len: 0, d: 0,
-    pos: home.clone(), yaw: 0, check: 0, done: false })
+    pos: home.clone(), yaw: 0, check: 0, done: false,
+    /** (a bin's bag, item 208) which part of the round he's at (0 to the bins, 1 out to the staff door with it, 2 gone down the stair, 3 back
+     * to the bins with a new one), his ways, and what's in his hands */
+    leg: 0, ways: null as BinWays | null, bag: null as BinKind | 'new' | null })
+  /** (item 208) his ways for a bin's bag, in the bar's frame on the floor: from his place along the aisles to the first counter's gate, through
+   * it into the kitchen and across to before the bins; and from them back out through the gate, along the aisle to the staff door and in
+   * through it, to the stair behind (the rubbish goes down it to be put out). Null while the bins or the door aren't there to be found */
+  const binWays = (): BinWays | null => {
+    const o = g.current, par = o?.parent, route = KITCHEN_ROUTE.route
+    if (!o || !par || !route) return null
+    let front: THREE.Object3D | null = null, mouth: THREE.Object3D | null = null, recMouth: THREE.Object3D | null = null
+    scene.traverse((q) => {
+      if (!front && q.name === 'SinkBinFront') front = q
+      if (!mouth && q.name === 'SinkBinTop') mouth = q
+      if (!recMouth && q.name === 'SinkBinRecTop') recMouth = q
+    })
+    const sd = scene.getObjectByName('staff-door')
+    if (!front || !mouth || !recMouth || !sd) return null
+    const local = (q: THREE.Object3D) => par.worldToLocal(q.getWorldPosition(new THREE.Vector3())).setY(0)
+    const c0 = counters[0], gate = gateOf(c0, BAR_GATES[0]).mid.clone().setY(0)
+    const gateIn = gate.clone().addScaledVector(c0.lay, 0.45), gateOut = gate.clone().addScaledVector(c0.lay, -aisleOf(c0))
+    const bin = local(front)
+    const inner = route(gateIn, bin)
+    if (!inner.length || inner[inner.length - 1].distanceTo(bin) > 0.02) inner.push(bin.clone())
+    const toBin = [home.clone(), homeAisle.clone(), aisleCornerOf(counters, c1), gateOut.clone(), gate.clone(), gateIn.clone(), ...inner.slice(1)]
+    sd.updateWorldMatrix(true, false)
+    const dW = sd.getWorldPosition(new THREE.Vector3()), room = sd.localToWorld(new THREE.Vector3(-1, 0, 0)).sub(dW).setY(0).normalize()
+    const at = (k: number) => par.worldToLocal(dW.clone().addScaledVector(room, k)).setY(0)
+    const toDoor = [...[...inner].reverse(), gateIn.clone(), gate.clone(), gateOut.clone(), aisleCornerOf(counters, c1), at(1.6), at(0.75), at(0), at(-0.6)]
+    // (the bags in his hands at the sink's own size: his figure's drawn smaller than the room)
+    const sk = (mouth as THREE.Object3D).getWorldScale(new THREE.Vector3()).x, gs = o.getWorldScale(new THREE.Vector3()).x
+    return { toBin, toDoor, door: at(0), mouths: { rubbish: local(mouth), recycle: local(recMouth) }, scale: gs > 0 ? sk / gs : 1 }
+  }
   const [moving, setMoving] = useState(false)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stocker?: typeof st }).__stocker = st
   // (his walk in as the shop opens and home as it shuts (commuteWalk): out along the side counter's aisle, round the corner, to the front door)
@@ -512,11 +556,20 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           boxes: seats.map((_, i) => tissuesAt(i)), seatTaken: (n) => SEATS_TAKEN.has(n), spares: Math.max(0, SUPPLIES.has(TISSUE)),
           // (a roll changed only with a spare in stock; and the washrooms' paper towels and soap topped up from theirs, on the same round)
           rollSpares: Math.max(0, SUPPLIES.has(ROLL)), wcLow: { m: wcLow('m'), f: wcLow('f') },
+          // (a bin by the sink full enough to empty (item 208), none of its bags out already)
+          bin: SINK_BIN.out ? null : binToEmpty(SINK_BIN.b),
         })
-        if (next && !(next.kind === 'roll' && !wcs)) {
+        const ways = next?.kind === 'bin' ? binWays() : null
+        if (next && !(next.kind === 'roll' && !wcs) && !(next.kind === 'bin' && !ways)) {
           s.chore = next
           s.done = false
           if (next.kind === 'drinks') set([home.clone(), fridges.find((f) => f.n === next.unit)!.front.clone()])
+          else if (next.kind === 'bin') {
+            s.ways = ways
+            s.leg = 0
+            set(ways!.toBin)
+            if (held.current.bag) held.current.bag.scale.setScalar(ways!.scale)
+          }
           else if (next.kind === 'roll') {
             const w = wcs![next.who]
             STOCKER_WC.who = next.who
@@ -572,6 +625,37 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           if (topUp(t.soap, SOAP_FULL, SOAP_REFILL_AT, 1).level !== t.soap && SUPPLIES.take(SOAP, 1)) t.soap = SOAP_FULL
         }
         if (s.t > 2.8) s.phase = 'back'
+      } else if (c.kind === 'bin') {
+        const w = s.ways!
+        if (s.leg === 0 || s.leg === 3) {
+          // (at the bins, bent to the one he's come for, its lid held up: the full bag lifted out and its neck tied (0), or the new one shaken
+          // out and set in over its rim (3))
+          const m = w.mouths[c.which]
+          s.yaw = Math.atan2(m.x - s.pos.x, m.z - s.pos.z)
+          SINK_BIN.lids[c.which].until = performance.now() + 450
+          if (g.current) g.current.userData.lean = 0.38 * Math.sin(Math.min(1, s.t / 1.4) * Math.PI)
+          if (s.leg === 0 && s.t > 0.7 && !s.done) {
+            s.done = true
+            SINK_BIN.b = bagOut(SINK_BIN.b, c.which)
+            if (c.which === 'rubbish') SINK_BIN.sticks = 0
+            SINK_BIN.out = c.which
+            s.bag = c.which
+          }
+          if (s.leg === 0 && s.t > 1.4) { s.leg = 1; set(w.toDoor); s.phase = 'go'; setMoving(true) }
+          if (s.leg === 3 && s.t > 0.7 && s.bag) { s.bag = null; SINK_BIN.out = null }
+          if (s.leg === 3 && s.t > 1.3) { if (g.current) g.current.userData.lean = 0; set(w.toBin); s.phase = 'back' }
+        } else if (s.leg === 1) {
+          // (through the staff door with it and down the stair behind, to put it out with the shop's rubbish)
+          s.leg = 2
+          s.t = 0
+        } else if (s.leg === 2 && s.t > BIN_AWAY_S) {
+          // (back up with a new bag for it, out through the door again and back to the bins)
+          s.bag = 'new'
+          s.leg = 3
+          set([...w.toDoor].reverse())
+          s.phase = 'go'
+          setMoving(true)
+        }
       } else {
         // (the drawer out, the box in it changed for a spare, the drawer back in)
         const seat = seats[c.seat]
@@ -591,6 +675,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         s.t = 0
         s.pos.copy(home)
         if (c?.kind === 'roll') STOCKER_WC.who = null
+        if (c?.kind === 'bin') { s.ways = null; s.leg = 0 }
         s.chore = null
         setMoving(false)
       }
@@ -601,14 +686,22 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       STOCKER_WC.near = s.pos.distanceTo(w.front) < 1.3 && !(s.phase === 'work')
       STOCKER_WC.inside = s.phase === 'work'
     } else { STOCKER_WC.near = false; STOCKER_WC.inside = false }
+    let fade = 1
+    if (c?.kind === 'bin' && s.ways) {
+      const toDoor = s.pos.distanceTo(s.ways.door)
+      if ((s.leg === 1 || s.leg === 3) && toDoor < 1.6) STAFF_DOOR_HOLD.until = performance.now() + 1200
+      // (past the door, in the stair: fading out going in, in coming back out)
+      if ((s.leg === 1 && s.phase === 'go' && s.len - s.d < 0.6) || (s.leg === 3 && s.phase === 'go' && s.d < 0.6)) fade = Math.max(0, Math.min(1, (s.leg === 1 ? s.len - s.d : s.d) / 0.6))
+      if (s.leg === 2 || (s.leg === 1 && s.phase === 'work')) fade = 0
+    }
     if (g.current) {
       g.current.position.copy(s.pos)
       // (turned toward the way he's to face a frame at a time: set at once, he spun round at each corner and at the fridge, 130° in a frame)
       g.current.rotation.y = turnToward(g.current.rotation.y, s.yaw, dt)
       // (seen all the way in the toilet's stall changing the roll, as the customers are since the owner's 2026-11-12 (item 203: he alone still
-      // faded out in there))
-      g.current.userData.fade = 1
-      g.current.visible = true
+      // faded out in there); faded only through the staff door, taking a bin's bag out (item 208))
+      g.current.userData.fade = fade
+      g.current.visible = fade > 0.02
     }
     // (in his arms: a case of drinks carried out; a new roll; a new box of tissues; back empty-handed)
     const out = s.phase === 'go' || s.phase === 'work'
@@ -627,15 +720,30 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         : c?.kind === 'drinks' ? (s.phase === 'work' ? tl3('補貨中', '補充中', 'Restocking') + pct(s.t / 1.6) : tl3('搬運飲料中', '飲み物運搬中', 'Carrying drinks'))
         : c?.kind === 'roll' ? (rolling(c.who) ? tl3('更換衛生紙', 'トイレ紙交換', 'Changing the toilet roll') : tl3('補充洗手間用品', 'トイレ用品の補充', 'Restocking the washroom'))
           + (s.phase === 'work' ? pct(s.t / 2.8) : '')
+        : c?.kind === 'bin' ? (s.leg === 3 ? tl3('換新垃圾袋', 'ゴミ袋の交換', 'Putting in a new bag')
+          : c.which === 'rubbish' ? tl3('倒垃圾', 'ゴミ出し', 'Taking out the rubbish') : tl3('倒資源回收', '資源ごみ出し', 'Taking out the recycling'))
         : tl3('補充面紙', 'ティッシュ補充', 'Refilling tissues') + (s.phase === 'work' ? pct(s.t / 2.0) : '')
       if (el.textContent !== text) el.textContent = text
       el.style.visibility = slacking || g.current?.visible === false || (g.current?.userData.fade ?? 1) < 0.5 ? 'hidden' : ''
     }
     if (h.roll) h.roll.visible = out && c?.kind === 'roll' && !s.done && rolling(c.who)
     if (h.box) h.box.visible = out && c?.kind === 'tissue' && !s.done
+    // (a bin's bag: the full one tied up and carried out, the new one brought back folded (item 208))
+    if (h.bag) {
+      h.bag.visible = c?.kind === 'bin' && s.bag !== null
+      // (the group's three, in the order they're hung in it: the rubbish's, the recycling's, the new one)
+      const [rub, rec, fresh] = h.bag.children
+      if (rub) rub.visible = s.bag === 'rubbish'
+      if (rec) rec.visible = s.bag === 'recycle'
+      if (fresh) fresh.visible = s.bag === 'new'
+    }
   })
   // (shut, nothing of his left about: no drawer held out, no toilet waiting on him)
-  useEffect(() => () => { STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear(); for (const f of FRIDGE_STATE) f.stocker = false }, [])
+  useEffect(() => () => {
+    STOCKER_WC.who = null; STOCKER_WC.near = false; STOCKER_WC.inside = false; DRAWER_HELD.clear(); for (const f of FRIDGE_STATE) f.stocker = false
+    // (a bin's bag he had out: put back in as it was (gone home or let go mid-round), the bin as he left it)
+    SINK_BIN.out = null
+  }, [])
   return (
     <group ref={(o) => { g.current = o; STOCKER_FIG.o = o; if (o) FIGURES.set(o, 'other') }} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
       <BlobShadow r={0.17} />
@@ -655,6 +763,12 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         <boxGeometry args={[0.2, 0.06, 0.11]} />
         <meshToonMaterial color="#e9e3d4" />
       </mesh>
+      {/* (a bin's bag by its knot in his hands, hanging below them; or the new one folded (item 208)) */}
+      <group ref={(o) => { held.current.bag = o }} position={[0, HELD_AT[1] + 0.02, HELD_AT[2]]} visible={false}>
+        <primitive object={bags.rubbish} />
+        <primitive object={bags.recycle} />
+        <primitive object={bags.fresh} />
+      </group>
     </group>
   )
 }
@@ -2534,8 +2648,22 @@ type PlateRun = { key: number; seat: number; guest: number; phase: 'ready' | 'se
   dirt?: number }
 const STACK_GAP = 0.026
 const UP_Y = new THREE.Vector3(0, 1, 0)
-/** how many used sticks the bin by the sink shows at most (a bundle standing up out of it) */
-const BIN_SHOWN = 14
+/** what was left on cleared plates thrown into the bins by the sink (item 208, game/bins): the sticks, the fish's bones and the crumpled
+ * tissues into the rubbish bin, the bottles and cans into the recycling bin; each bin's lid lifted a moment for what goes in it */
+function binThrow(plates: readonly PlateRun[]) {
+  let b = SINK_BIN.b
+  const was = { ...b }
+  for (const x of plates) {
+    b = toss(b, 'stick', x.sticks ?? 0)
+    b = toss(b, 'bone', x.bones ?? 0)
+    if (x.tissue) b = toss(b, 'tissue')
+    if (x.drink) b = toss(b, (isCan(x.drink) ? 'can' : 'bottle') as Waste)
+  }
+  SINK_BIN.b = b
+  const now = performance.now()
+  if (b.rubbish > was.rubbish) SINK_BIN.lids.rubbish.until = now + 1400
+  if (b.recycle > was.recycle) SINK_BIN.lids.recycle.until = now + 1400
+}
 const SERVE_S = 0.55
 const CLEAR_S = 0.6
 const CLEAR_DELAY = 1.0
@@ -3113,13 +3241,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   type BowlJob = { guest: number; seat: number; rice: boolean; soup: boolean
     /** who fills them: the plater, or a server (index) who takes them straight out */
     by: 'plater' | number
-    /** where it's got to: the rice being scooped, the soup ladled; to the counter with them; waiting there; out on a tray */
-    stage: 'rice' | 'soup' | 'toPass' | 'pass' | 'out'
+    /** where it's got to: the rice being scooped, the soup ladled; to the counter with them (then they're the counter's: passQ) */
+    stage: 'rice' | 'soup' | 'toPass'
+    /** the row at the counter they're to be set down in (the plater's) */
+    row?: number
     /** seconds into the filling's beats; how full each bowl is; the places the filling's posed from */
     t: number; riceFill: number; soupFill: number; W: FillAt | null
     /** the server carrying them out; lifting them onto the tray (0..1); setting them down at the place (0..1) */
     server?: number; up?: number; down?: number }
   const bowlJob = useRef<BowlJob | null>(null)
+  /** (item 207) customers' bowls filled and set at the counter (each in its `row` there), or out on a server's tray (`server`; `up`, how far
+   * they're lifted onto it, `down`, how far set down at the place; `row` -1: filled by the server and taken straight out): the oldest first */
+  type PassBowls = { guest: number; seat: number; rice: boolean; soup: boolean; row: number; server?: number; up: number; down: number
+    /** how long they've waited at the counter for a server (as the plating place's slots count it: readyFor) */
+    wait: number }
+  const passQ = useRef<PassBowls[]>([])
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __passQ: passQ })
+  /** each server's tray as they carry bowls out: where it is, which way they face */
+  const bowlTrays = useRef(new Map<number, { at: THREE.Vector3; yaw: number }>())
+  /** the bowls on the move, drawn as the seats' are (SeatBowls): those at the counter and on the trays, laid out afresh every frame */
+  const movingBowls = useRef<{ rice: { key: string; at: THREE.Vector3; yaw: number }[]; soup: { key: string; at: THREE.Vector3; yaw: number }[] }>({ rice: [], soup: [] })
   const side = useSideProps()
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bowlJob: bowlJob, __side: side })
   /** the cooker's mouth and the way one stands at it (SideBowls' FillAt); where they stand */
@@ -3205,24 +3346,36 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (the counter's top the one it stands in: the cooker's (one counter, the two joined))
     return { top: p.top, face: c.face, right: c.right, r: p.r, surface: p.surface, stand, low: c.low, open: p.open, put: besideOf(p.top, p.r, c.right, c.face, c.low, c.top, c.r) }
   }
-  /** the counter's places for a customer's bowls (the bar's frame) */
-  const passRice = () => stationIn(BOWL_PASS.rice), passSoup = () => stationIn(BOWL_PASS.soup)
+  /** a customer's bowls' place at the counter in its row (the bar's frame) */
+  const passAt = (row: number, kind: 'rice' | 'soup') => stationIn((kind === 'rice' ? BOWL_PASS.rice : BOWL_PASS.soup).clone().setZ(PASS_Z[row] ?? BOWL_PASS.rice.z))
+  /** a row at the counter with no bowls in it (none there, or being lifted off it), or -1 */
+  const freeRow = () => {
+    for (let r = 0; r < PASS_MAX; r++) if (!passQ.current.some((b) => b.row === r && (b.server === undefined || b.up < 1))) return r
+    return -1
+  }
   const passSpot = () => stationIn(BOWL_PASS.front).setY(0)
   /** the job's next customer: the first whose bowls can be filled now (the rice cooked and some in the pot; the soup hot), sat at the bar */
   const nextBowls = () => {
     const riceOk = RICE.kama.state === 'done' && RICE.rice > 0, soupOk = soupReady(SOUP.pot, SOUP.left)
-    // (what can be had of it now taken out first, the rest left asked for: the soup while the rice is still cooking, or the other way)
-    const k = BOWLS.want.findIndex((x) => (x.rice && riceOk) || (x.soup && soupOk))
+    // (what can be had of it now taken out first, the rest left asked for: the soup while the rice is still cooking, or the other way; one
+    // not at the bar just now (in the toilet) passed over for the next, not keeping everyone after them waiting)
+    const k = BOWLS.want.findIndex((x) => ((x.rice && riceOk) || (x.soup && soupOk)) && guestSeat(x.guest) >= 0)
     if (k < 0) return null
     const w = BOWLS.want[k], seat = guestSeat(w.guest)
-    if (seat < 0) return null
     const rice = w.rice && riceOk, soup = w.soup && soupOk
     if ((w.rice && !rice) || (w.soup && !soup)) BOWLS.want[k] = { ...w, rice: w.rice && !rice, soup: w.soup && !soup }
     else BOWLS.want.splice(k, 1)
     return { guest: w.guest, rice, soup, seat }
   }
+  /** whether there's a customer's bowls to be filled now (nextBowls would give one): the rice cooked and some in the pot, or the soup hot, for
+   * one sat at the bar (item 207: asked for while neither was ready, the plater took it for his job, found none to fill, and stood idle; the
+   * plates, the soup's making and the rice's cooking under it never came to: the plating place bare, the fish done waited all evening) */
+  const bowlsNow = () => {
+    const riceOk = RICE.kama.state === 'done' && RICE.rice > 0, soupOk = soupReady(SOUP.pot, SOUP.left)
+    return BOWLS.want.some((x) => ((x.rice && riceOk) || (x.soup && soupOk)) && guestSeat(x.guest) >= 0)
+  }
   /** the bowls set down at their place: theirs (Roasting has them eat), drawn there and eaten down */
-  const setBowls = (j: BowlJob) => {
+  const setBowls = (j: { guest: number; seat: number; rice: boolean; soup: boolean }) => {
     const now = performance.now()
     if (j.rice) { RICE_SEATS.add(j.seat); BOWLS.setAt.set(`rice:${j.seat}`, now); BOWLS.got.add(`rice:${j.guest}`) }
     if (j.soup) { SOUP_SEATS.add(j.seat); SOUP.served++; BOWLS.setAt.set(`soup:${j.seat}`, now); BOWLS.got.add(`soup:${j.guest}`) }
@@ -3318,7 +3471,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const plateStack = useRef<THREE.Group>(null)
   const dryerPlates = useRef<THREE.Group>(null)
   /** the used sticks in the bin by the sink (as many as are in it, up to a handful drawn) */
-  const binSticks = useRef<THREE.Group>(null)
   /** the plates standing in the draining basket by the sink (washed by hand while the washer was busy) */
   const drainPlates = useRef<THREE.Group>(null)
   /** how long each of the plating place's slots has been ready to go */
@@ -4125,6 +4277,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (the basket with the day's first washed plates in it, dry already: taken back to the racks as any dry ones are)
     Object.assign(DRAIN, { n: START_DRAIN, left: START_DRAIN ? 0 : null })
     SINK_BIN.sticks = 0
+    SINK_BIN.b = { rubbish: 0, recycle: 0, cans: 0, bottles: 0 }
+    SINK_BIN.out = null
     platerRun.current = { phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 }
     PLATER_OUT.id = null
     ownerHome.current = null
@@ -4139,6 +4293,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SAY_SEATED.lines.clear()
     // (no bowls asked for or out, the cooker's lid down (items 205, 206))
     bowlJob.current = null
+    passQ.current = []
+    bowlTrays.current.clear()
     BOWLS.want = []; BOWLS.asked.clear(); BOWLS.got.clear(); BOWLS.setAt.clear(); BOWLS.ver++
     RICE_SEATS.clear()
     RICE.lid = 0
@@ -4876,6 +5032,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           redraw()
         } else if (r.phase === 'taken' && !holding.has(r.key)) {
           SINK_BIN.sticks += r.sticks ?? 0
+          binThrow([r])
           r.phase = 'clear'
           r.to = undefined
           r.t = 0
@@ -4942,6 +5099,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (how long it's been ready to go: what's for it all down on it, nothing more on its way)
       readyFor.current[k] = sl && sl.landed > 0 && sl.flying === 0 ? readyFor.current[k] + step : 0
     }
+    for (const b of passQ.current) if (b.server === undefined) b.wait += step
     const sitting = (n: number) => shownRef.current.some((x) => x.seat === n && (x.phase === 'sit' || x.phase.startsWith('wc')))
     /** a slot of the plating place ready to go, for a customer sat at their place, that no server's on their way for */
     const readySlot = () => {
@@ -5082,6 +5240,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.phase = phase
         pl.t = 0
       }
+      /** off for plates for the plating place's stack: off the low rack by the table while it has any (a few steps), else across the kitchen
+       * to the racks */
+      const goPlates = () => {
+        pl.pos.copy(home())
+        pl.src = plateSource(LOW_RACK.n)
+        pl.path = kitchenRoute(pl.pos, pl.src === 'low' ? lowFront() : rackFront(rackNow()))
+        pl.len = pathLength(pl.path)
+        pl.phase = 'toRack'
+        away(true)
+      }
       if (!given || ownerServes) {
         // (nobody to plate: a bar on its own, or the owner out serving it all himself; the plating place's stack kept up as it's used, and
         // the rice cooked by itself)
@@ -5128,12 +5296,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               setOff(stationSpot(), 'toSake')
               away(true)
             }
-          } else if (open && !SHOP.leaving && !bowlJob.current && BOWLS.want.length && STATION_OBJ.group) {
+          } else if (open && !SHOP.leaving && PLATING.stock + PLATING.coming === 0 && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
+            // (the plating place bare: plates before anything else but the fire and a pour of sake, nothing done coming off the fire can be
+            // served without one (item 207))
+            goPlates()
+          } else if (open && !SHOP.leaving && !bowlJob.current && STATION_OBJ.group && freeRow() >= 0 && bowlsNow()) {
             // (a customer's rice and soup (items 205, 206): over to the cooker for the rice, to the pot for the soup, both filled by hand,
-            // then to the serving counter with them)
+            // then to the serving counter with them; only with some ready to fill (bowlsNow, item 207), and a place at the counter to set
+            // them down in (another customer's may wait there already: item 207))
             const b = nextBowls()
             if (b) {
-              bowlJob.current = { ...b, by: 'plater', stage: b.rice ? 'rice' : 'soup', t: 0, riceFill: 0, soupFill: 0, W: null }
+              bowlJob.current = { ...b, by: 'plater', stage: b.rice ? 'rice' : 'soup', t: 0, riceFill: 0, soupFill: 0, W: null, row: freeRow() }
               pl.pos.copy(home())
               setOff(b.rice ? riceStand() : soupFillAt().stand, b.rice ? 'toRiceBowl' : 'toSoupBowl')
               away(true)
@@ -5146,7 +5319,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             away(true)
           // (made before the plates are seen to when someone's waiting for a bowl of it (item 205: in a rush the plates always wanted, and the
           // soup and the rice were never made: the bowls waited all evening))
-          } else if (open && !SHOP.leaving && soupGoes(SOUP.pot) && anyInStock(['MisoSoup']) && (BOWLS.want.some((x) => x.soup) || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
+          } else if (open && !SHOP.leaving && (soupGoes(SOUP.pot) || topUpGoes(SOUP.pot, SOUP.left)) && anyInStock(['MisoSoup']) && (BOWLS.want.some((x) => x.soup) || topUpGoes(SOUP.pot, SOUP.left) || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
+            // (or run low, hot: the next pot's worth made and added, the pot kept hot (item 207))
             // (the soup's pot empty (the day's start): to it to make it, water and dashi in and the miso stirred in, then it heats in its well)
             pl.pos.copy(home())
             pl.making = true
@@ -5162,13 +5336,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             pl.t = 0
             away(true)
           } else if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
-            pl.pos.copy(home())
-            // (off the low rack by the table while it has any: a few steps; else across the kitchen to the racks)
-            pl.src = plateSource(LOW_RACK.n)
-            pl.path = kitchenRoute(pl.pos, pl.src === 'low' ? lowFront() : rackFront(rackNow()))
-            pl.len = pathLength(pl.path)
-            pl.phase = 'toRack'
-            away(true)
+            goPlates()
           } else if (open && !SHOP.leaving && lowGoes(LOW_RACK.n, LOW_RACK.coming, PLATE_RACK.n)) {
             // (the low rack by the table run low, nothing else wanting: across to the racks for a carry of plates to fill it)
             pl.pos.copy(home())
@@ -5271,14 +5439,19 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       else if (pl.phase === 'toBowlPass') walk(() => { pl.phase = 'bowlPut'; pl.yaw = stationYaw() })
       else if (pl.phase === 'bowlPut' && pl.t > BOWL_PUT_S) {
+        // (left at the counter in their row for a server, and the plater free for the next customer's (item 207); they gone meanwhile,
+        // put by)
         const j = bowlJob.current
-        if (j) { j.stage = 'pass'; j.W = null }
+        if (j && guestSits(j.guest, j.seat)) passQ.current.push({ guest: j.guest, seat: j.seat, rice: j.rice, soup: j.soup, row: j.row ?? 0, up: 0, down: 0, wait: 0 })
+        bowlJob.current = null
         setOff(home(), 'home')
       }
       else if (pl.phase === 'toSoup') walk(() => { pl.phase = 'stir'; faceTo(soupPot()) })
       else if (pl.phase === 'stir' && pl.t > (pl.making ? MAKE_S : STIR_S)) {
         // (made: in its well heating up (the water for it metered as the rice's is))
-        if (pl.making) { SOUP.pot = setSoup(); SOUP.batch = batchOf('MisoSoup', SOUP_BOWLS); meterWater('cooking', 10); pl.making = false; soupAt.current = performance.now() / 1000 }
+        // (or a hot pot run low topped up with as much as it takes to fill it, still hot (item 207))
+        if (pl.making && SOUP.pot.state === 'hot') { SOUP.left += batchOf('MisoSoup', Math.max(0, SOUP_BOWLS - SOUP.left)); meterWater('cooking', 6); pl.making = false }
+        else if (pl.making) { SOUP.pot = setSoup(); SOUP.batch = batchOf('MisoSoup', SOUP_BOWLS); meterWater('cooking', 10); pl.making = false; soupAt.current = performance.now() / 1000 }
         setOff(home(), 'home')
       }
       else if (pl.phase === 'toRack') walk(() => {
@@ -5863,6 +6036,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             : [...fetchPath(wi), ...(w.phase === 'go' ? passed : []), w.pos.clone()], 'back')
         w.seat = -1
       }
+      /** (item 207) what a server's filled themself, on their tray at once (no counter between), and the filling done */
+      const trayFilled = (j: BowlJob) => {
+        passQ.current.push({ guest: j.guest, seat: j.seat, rice: j.rice, soup: j.soup, row: -1, server: wi, up: 1, down: 0, wait: 0 })
+        bowlJob.current = null
+      }
+      /** (item 207) customers' bowls waiting at the counter taken out: the oldest set, and one more for a seat at the same counter on the same
+       * tray; over to the counter for them. Whether they went */
+      const takeBowls = () => {
+        const waiting = passQ.current.filter((b) => b.server === undefined && guestSits(b.guest, b.seat)).sort((a, b) => b.wait - a.wait)
+        if (!waiting.length) return false
+        const first = waiting[0], c = seats[first.seat]?.counter
+        const more = waiting.filter((b) => b !== first && seats[b.seat]?.counter === c).slice(0, TRAY_SETS - 1)
+        for (const b of [first, ...more]) b.server = wi
+        const to = passSpot(), path = kitchenRoute(w.pos, to)
+        if (!path.length || path[path.length - 1].distanceTo(to) > 0.02) path.push(to.clone())
+        go(path, 'toBowlPass')
+        return true
+      }
       if (w.phase === 'idle') {
         // (looked about every quarter of a second, not every frame)
         if (w.t >= 0.25) {
@@ -5880,17 +6071,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             go(SERVE_COUNTER.out ? kitchenRoute(homeOf(wi).at, SERVE_COUNTER.out) : fetchPath(wi), 'toBox')
             return
           }
+          // (a customer's food set out at the plating place, ready, or their bowls of rice and soup waiting at the counter: whichever's waited
+          // the longer carried out first, by either server, before a tokkuri or anything of their own (item 207: the bowls first, and the floor's
+          // server went from them to the sake and back while the food done off the fire waited at the plating place a quarter of an hour, as
+          // long as three quarters; the food first always, and in a rush the bowls were never taken: three of twenty-one who'd asked for rice
+          // had it, one of ten their soup))
+          const ready = SHOP.leaving ? -1 : readySlot()
+          const bowlsWait = SHOP.leaving || !STATION_OBJ.group ? -1
+            : passQ.current.reduce((m, b) => (b.server === undefined && guestSits(b.guest, b.seat) ? Math.max(m, b.wait) : m), -1)
+          if (bowlsWait >= 0 && (ready < 0 || bowlsWait > readyFor.current[ready]) && takeBowls()) return
+          if (ready >= 0) {
+            w.slot = ready
+            w.seat = PLATING.slots[ready]!.seat
+            go(fetchPath(wi), 'fetch')
+            return
+          }
           // (a customer's rice and soup waiting at the serving counter (items 205, 206): over for them and out to them on the tray; with no one
           // in the kitchen to fill them (the owner serving it all), filled by the server, at the cooker and the pot, and taken straight out)
           if (STATION_OBJ.group && !SHOP.leaving && (duty !== 'dish' || nServers < 2)) {
             const j = bowlJob.current
-            if (j && j.stage === 'pass' && j.server === undefined && guestSits(j.guest, j.seat)) {
-              j.server = wi
-              const to = passSpot(), path = kitchenRoute(w.pos, to)
-              if (!path.length || path[path.length - 1].distanceTo(to) > 0.02) path.push(to.clone())
-              go(path, 'toBowlPass')
-              return
-            }
             if (!j && open && (!given || ownerServes) && BOWLS.want.length) {
               const b = nextBowls()
               if (b) {
@@ -6117,7 +6316,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // (a customer's bowls: at the counter, taken up onto the tray; or filled by the server themself at the cooker and the pot; out to the
       // customer's place and set down there, rice on their left, soup on their right)
-      else if (w.phase === 'toBowlPass') walk(() => { const j = bowlJob.current; if (!j || j.server !== wi) go(kitchenRoute(homeOf(wi).at, w.pos), 'back'); else { w.phase = 'bowlUp'; w.t = 0; face(passRice().lerp(passSoup(), 0.5)) } })
+      else if (w.phase === 'toBowlPass') walk(() => {
+        const b = passQ.current.find((x) => x.server === wi)
+        if (!b) go(kitchenRoute(homeOf(wi).at, w.pos), 'back')
+        else { w.phase = 'bowlUp'; w.t = 0; face(passAt(Math.max(0, b.row), 'rice').lerp(passAt(Math.max(0, b.row), 'soup'), 0.5)) }
+      })
       else if (w.phase === 'toRiceFill') walk(() => { const j = bowlJob.current; if (!j) { go(kitchenRoute(homeOf(wi).at, w.pos), 'back'); return } j.W = riceFillAt(); j.t = 0; w.yaw = Math.atan2(j.W.face.x, j.W.face.z); w.phase = 'bowlRice'; w.t = 0 })
       else if (w.phase === 'bowlRice') {
         const j = bowlJob.current
@@ -6129,7 +6332,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             RICE.rice = r.rice; RICE.kama = r.kama; RICE.lid = 0
             j.riceFill = 1
             if (j.soup) { j.stage = 'soup'; const to = soupFillAt().stand, path = kitchenRoute(w.pos, to); if (!path.length || path[path.length - 1].distanceTo(to) > 0.02) path.push(to.clone()); go(path, 'toSoupFill') }
-            else { j.stage = 'out'; j.up = 1; j.W = null; w.phase = 'bowlUp'; w.t = BOWL_UP_S }
+            else { trayFilled(j); w.phase = 'bowlUp'; w.t = BOWL_UP_S }
           }
         }
       }
@@ -6143,42 +6346,47 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             const b = takeBowl(SOUP.pot, SOUP.left)
             SOUP.pot = b.pot; SOUP.left = b.left
             j.soupFill = 1
-            j.stage = 'out'; j.up = 1; j.W = null
+            trayFilled(j)
             w.phase = 'bowlUp'; w.t = BOWL_UP_S
           }
         }
       }
       else if (w.phase === 'bowlUp') {
-        const j = bowlJob.current
-        if (!j || !guestSits(j.guest, j.seat)) { bowlJob.current = null; go(kitchenRoute(homeOf(wi).at, w.pos), 'back') }
+        // (those whose customer's gone meanwhile put by; the rest lifted onto the tray)
+        passQ.current = passQ.current.filter((b) => b.server !== wi || guestSits(b.guest, b.seat))
+        const mine = passQ.current.filter((b) => b.server === wi)
+        if (!mine.length) go(kitchenRoute(homeOf(wi).at, w.pos), 'back')
         else {
-          if (j.stage === 'pass') j.stage = 'out'
-          j.up = Math.min(1, w.t / BOWL_UP_S)
+          for (const b of mine) b.up = Math.min(1, w.t / BOWL_UP_S)
           if (w.t >= BOWL_UP_S) {
-            // (on the tray: back across the kitchen to their place, out through their gate, along the aisle and in beside the customer)
-            const h = homeOf(wi)
-            const out = h.way.length < 2 ? [seats[j.seat].aisle.clone(), besideSeat(j.seat)] : backPath(wi, j.seat).slice(1)
+            // (on the tray: back across the kitchen to their place, out through their gate, along the aisle and in beside the first customer)
+            const h = homeOf(wi), seat = mine[0].seat
+            const out = h.way.length < 2 ? [seats[seat].aisle.clone(), besideSeat(seat)] : backPath(wi, seat).slice(1)
             go([...kitchenRoute(w.pos, h.at), ...out], 'bowlGo')
           }
         }
       }
       else if (w.phase === 'bowlGo') walk(() => {
-        const j = bowlJob.current
-        if (!j) { go(kitchenRoute(homeOf(wi).at, w.pos), 'back'); return }
+        const b = passQ.current.find((x) => x.server === wi)
+        if (!b) { go(kitchenRoute(homeOf(wi).at, w.pos), 'back'); return }
         w.phase = 'bowlSet'
-        face(seats[j.seat].plate)
+        face(seats[b.seat].plate)
         const id = ownerServes ? 'owner' : servers[wi]?.id
-        if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].sideServe(j.guest, j.rice, j.soup), until: performance.now() + 2600 })
+        if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].sideServe(b.guest, b.rice, b.soup), until: performance.now() + 2600 })
       })
       else if (w.phase === 'bowlSet') {
-        const j = bowlJob.current
-        if (j) j.down = Math.min(1, w.t / BOWL_SET_S)
-        if (!j || w.t >= BOWL_SET_S) {
+        const b = passQ.current.find((x) => x.server === wi)
+        if (b) b.down = Math.min(1, w.t / BOWL_SET_S)
+        if (!b || w.t >= BOWL_SET_S) {
           // (down at their place: theirs (Roasting has them eat them); they gone meanwhile, taken back with the server)
-          if (j && guestSits(j.guest, j.seat)) setBowls(j)
-          const seat = j?.seat ?? nearestSeat(w.pos)
-          bowlJob.current = null
-          go(backPath(wi, seat).slice(0, -1).concat(w.pos.clone()), 'back')
+          if (b && guestSits(b.guest, b.seat)) setBowls(b)
+          passQ.current = passQ.current.filter((x) => x !== b)
+          const seat = b?.seat ?? nearestSeat(w.pos)
+          // (the next set on the tray: along the aisle to its place, at the same counter (item 207)); their customer gone, put by
+          const next = passQ.current.find((x) => x.server === wi && guestSits(x.guest, x.seat))
+          passQ.current = passQ.current.filter((x) => x.server !== wi || x === next)
+          if (next) go([w.pos.clone(), seats[seat].aisle.clone(), seats[next.seat].aisle.clone(), besideSeat(next.seat)], 'bowlGo')
+          else go(backPath(wi, seat).slice(0, -1).concat(w.pos.clone()), 'back')
         }
       }
       else if (w.phase === 'pickup' && w.t > 0.4 && !(PLATING.slots[w.slot ?? -1]?.flying)) {
@@ -6272,10 +6480,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           go([...back, ...kitchenRoute(home.at, sinkFront()).slice(1)], 'clearBack')
         }
       } else if (w.phase === 'drop' && w.t > 0.5) {
-        // (into the sink with the dirty ones; the sticks left on them into the bin beside it (the owner's))
+        // (into the sink with the dirty ones; the sticks left on them into the bin beside it (the owner's); the bones and the tissues with
+        // them, and the bottles and cans into the recycling bin (item 208))
         const keys = new Set(w.carry ?? [])
         const taken = runs.current.filter((x) => keys.has(x.key) && x.phase === 'taken')
         SINK_BIN.sticks += taken.reduce((n, x) => n + (x.sticks ?? 0), 0)
+        binThrow(taken)
         for (const x of taken) SINK.dirt.push(x.dirt ?? DIRT_BASE)
         runs.current = runs.current.filter((x) => !keys.has(x.key))
         dirty.current += taken.length
@@ -6422,7 +6632,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (o) o.userData.handsAt = w.phase === 'sakePour' && SAKE_HANDS_ON.v ? SAKE_HANDS
         : (w.phase === 'bowlRice' || w.phase === 'bowlSoup') && BOWL_HANDS_ON.v ? BOWL_HANDS : undefined
       if (sakeJob.current?.server === wi) { SAKE_TRAY.copy(trayAt()); SAKE_TRAY_YAW.v = w.look ?? w.yaw }
-      if (bowlJob.current?.server === wi) { BOWL_TRAY.copy(trayAt()); BOWL_TRAY_YAW.v = w.look ?? w.yaw }
+      if (passQ.current.some((b) => b.server === wi)) bowlTrays.current.set(wi, { at: trayAt(), yaw: w.look ?? w.yaw })
+      else bowlTrays.current.delete(wi)
       // (they step in to the bar's edge between the stools for it, facing it, and back out: the cloth's under their hand (StaffFigure's
       // wipe: the right hand out on the top, along and back), on the near edge of the top where the plate was)
       let wipeAt: { p: THREE.Vector3; yaw: number; k: number } | null = null
@@ -6626,7 +6837,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     {
       // (a customer's bowls left at the counter, or not yet carried out, they gone meanwhile: not to be taken out (it stayed there for them,
       // and every customer's after it waited behind it))
-      { const j0 = bowlJob.current; if (j0 && (j0.stage === 'pass' || (j0.stage === 'out' && j0.server === undefined)) && !guestSits(j0.guest, j0.seat)) bowlJob.current = null }
+      passQ.current = passQ.current.filter((b) => b.server !== undefined || guestSits(b.guest, b.seat))
       const j = bowlJob.current, f = frame.current
       const now = performance.now()
       if (now - restsAt.current.at > 1000 && STATION_OBJ.group) {
@@ -6663,29 +6874,41 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (j.rice) riceAt = hands.clone().addScaledVector(rt, j.soup && j.stage === 'toPass' ? -0.065 : 0)
           if (j.soup && j.stage === 'toPass') soupAt = hands.clone().addScaledVector(rt, 0.065)
         }
-        // (set down at the counter, from their hands, and there)
-        if (j.stage === 'pass' || (j.by === 'plater' && platerRun.current.phase === 'bowlPut')) {
-          const k = j.stage === 'pass' ? 1 : Math.min(1, platerRun.current.t / BOWL_PUT_S)
-          if (j.rice) riceAt = (riceAt ?? passRice()).clone().lerp(passRice(), k * k * (3 - 2 * k))
-          if (j.soup) soupAt = (soupAt ?? passSoup()).clone().lerp(passSoup(), k * k * (3 - 2 * k))
+        // (set down at the counter in their row, from their hands)
+        if (j.by === 'plater' && platerRun.current.phase === 'bowlPut') {
+          const k = Math.min(1, platerRun.current.t / BOWL_PUT_S), row = j.row ?? 0
+          if (j.rice) riceAt = (riceAt ?? passAt(row, 'rice')).clone().lerp(passAt(row, 'rice'), k * k * (3 - 2 * k))
+          if (j.soup) soupAt = (soupAt ?? passAt(row, 'soup')).clone().lerp(passAt(row, 'soup'), k * k * (3 - 2 * k))
         }
-        // (onto the tray, out on it, and down at the place: rice on the customer's left, soup on their right)
-        if (j.stage === 'out' && j.server !== undefined) {
-          const e = (x: number) => x * x * (3 - 2 * x)
-          const sideV = new THREE.Vector3(Math.cos(BOWL_TRAY_YAW.v), 0, -Math.sin(BOWL_TRAY_YAW.v))
-          const trayRice = BOWL_TRAY.clone().addScaledVector(sideV, -0.06).setY(BOWL_TRAY.y + 0.006)
-          const traySoup = BOWL_TRAY.clone().addScaledVector(sideV, 0.06).setY(BOWL_TRAY.y + 0.006)
-          if ((j.down ?? 0) > 0) {
-            const k = e(j.down!)
-            if (j.rice) { riceAt = trayRice.lerp(riceSpotOf(j.seat), k); riceAt.y += Math.sin(Math.PI * k) * 0.03 }
-            if (j.soup) { soupAt = traySoup.lerp(soupSpotOf(j.seat), k); soupAt.y += Math.sin(Math.PI * k) * 0.03 }
-          } else {
-            const k = e(j.up ?? 0)
-            const fromRice = j.by === 'plater' ? passRice() : trayRice.clone(), fromSoup = j.by === 'plater' ? passSoup() : traySoup.clone()
-            if (j.rice) { riceAt = fromRice.lerp(trayRice, k); riceAt.y += Math.sin(Math.PI * k) * 0.04 }
-            if (j.soup) { soupAt = fromSoup.lerp(traySoup, k); soupAt.y += Math.sin(Math.PI * k) * 0.04 }
+      }
+      // (customers' bowls at the counter, lifted onto a tray, out on it two sets side by side, and down at the place: rice on the customer's
+      // left, soup on their right (item 207: drawn as the seats' are, instanced, as many as there are))
+      const mv = movingBowls.current
+      mv.rice.length = 0
+      mv.soup.length = 0
+      const ez = (x: number) => x * x * (3 - 2 * x)
+      for (const b of passQ.current) {
+        const tray = b.server !== undefined ? bowlTrays.current.get(b.server) : undefined
+        const nth = b.server === undefined ? 0 : passQ.current.filter((x) => x.server === b.server).indexOf(b)
+        const place = (kind: 'rice' | 'soup') => {
+          const pass = b.row >= 0 ? passAt(b.row, kind) : null
+          if (!tray) return pass
+          const sideV = new THREE.Vector3(Math.cos(tray.yaw), 0, -Math.sin(tray.yaw)), fwdV = new THREE.Vector3(Math.sin(tray.yaw), 0, Math.cos(tray.yaw))
+          const onTray = tray.at.clone().addScaledVector(sideV, kind === 'rice' ? -0.06 : 0.06).addScaledVector(fwdV, nth === 0 ? 0.045 : -0.045).setY(tray.at.y + 0.006)
+          if (b.down > 0) {
+            const k = ez(b.down), at = onTray.lerp(kind === 'rice' ? riceSpotOf(b.seat) : soupSpotOf(b.seat), k)
+            at.y += Math.sin(Math.PI * k) * 0.03
+            return at
           }
+          if (pass && b.up < 1) {
+            const k = ez(b.up), at = pass.clone().lerp(onTray, k)
+            at.y += Math.sin(Math.PI * k) * 0.04
+            return at
+          }
+          return onTray
         }
+        if (b.rice) { const at = place('rice'); if (at) mv.rice.push({ key: `pass:rice:${b.guest}`, at, yaw: 0 }) }
+        if (b.soup) { const at = place('soup'); if (at) mv.soup.push({ key: `pass:soup:${b.guest}`, at, yaw: 0 }) }
       }
       side.chawan.visible = !!riceAt
       if (riceAt) { side.chawan.position.copy(riceAt); fillRice(side.rice, j!.riceFill) }
@@ -6781,13 +7004,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (c.visible) { c.position.copy(dryerAt(i)); c.quaternion.setFromUnitVectors(UP_Y, along) }
       })
     } else dryerPlates.current?.children.forEach((c) => { c.visible = false })
-    const bs = binSticks.current
-    if (bs) {
-      const shown = Math.min(SINK_BIN.sticks, BIN_SHOWN)
-      const binThere = !!markOf('SinkBinTop')
-      if (shown > 0 && binThere) bs.position.copy(inBar('SinkBinTop', endOf(1)))
-      bs.children.forEach((c, i) => { c.visible = binThere && i < shown })
-    }
     // (what each of the kitchen's people has in hand, laid out above: for the hearth's guard to move with them if it puts them out of the cook
     // table (bar's CARRIED; each one's list kept and refilled, nothing made a frame))
     const heldBy = (o: THREE.Object3D) => { let a = CARRIED.get(o); if (!a) { a = []; CARRIED.set(o, a) } a.length = 0; return a }
@@ -6941,6 +7157,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && <SeatBits shoes={NO_SHOES} soys={seatSoys} soups={seatSoups} />}
       {/* (the rice and soup bowls at the places, eaten down; and the bowls, the paddle and the ladle of the one filling and serving them (items 205, 206)) */}
       {given && <SeatBowls rice={seatBowls.rice} soup={seatBowls.soup} />}
+      {/* (the bowls at the counter and out on the trays (item 207): the same lists every frame, refilled) */}
+      {given && <SeatBowls rice={movingBowls.current.rice} soup={movingBowls.current.soup} />}
       {given && <><primitive object={side.chawan} /><primitive object={side.wan} /><primitive object={side.shamoji} /><primitive object={side.otama} /><primitive object={side.stream} /></>}
       {given && seatSakes.map((k, i) => (
         <group key={i} position={k.at}><Tokkuri /><group position={k.cup}><SakeCup level={0.8} /></group></group>
@@ -7012,19 +7230,6 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && (
         <group ref={washDrips} name="wash-drips">
           {[0, 1, 2].map((i) => <mesh key={i} geometry={DRIP_GEO} material={DRIP_MAT} visible={false} raycast={() => {}} />)}
-        </group>
-      )}
-      {given && (
-        <group ref={binSticks}>
-          {Array.from({ length: BIN_SHOWN }, (_, i) => {
-            const a = i * 2.4, r = 0.012 + (i % 4) * 0.009, lean = 0.12 + (i % 3) * 0.08
-            return (
-              <mesh key={i} geometry={USED_STICK_GEO} position={[Math.cos(a) * r, -0.03 + (i % 5) * 0.006, Math.sin(a) * r]}
-                rotation={[Math.sin(a) * lean, 0, -Math.cos(a) * lean]} visible={false}>
-                <meshToonMaterial color="#c9a46a" />
-              </mesh>
-            )
-          })}
         </group>
       )}
       {/* (the kitchen's plater, off their place on the way to the racks and back with plates for the plating place; at their place, Roasting draws them;
@@ -7599,6 +7804,9 @@ function Say({ text, who, heart, ms }: { text: string; who: string; heart?: bool
 
 const LABEL_STYLE = { pointerEvents: 'none' } as const
 const LABEL_Z = [20, 10]
+/** a customer's rating at or over which they loved it (MoodFace's 超滿意), and what bursts out of their face then (item 209) */
+const LOVED_AT = 80
+const JOY_BITS = ['heart', 'star', 'heart', 'star', 'heart', 'star'] as const
 /** one customer's label over their head (what they're saying, or the dots while they wait; their face once they've eaten; their number): drawn
  * again only when one of those changes. Each is a page of its own (drei's Html renders its children into a root of their own), so drawn again
  * with every redraw of the bar, several times a second, every label was laid out again each time */
@@ -7608,6 +7816,9 @@ const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partne
   // (what they're saying, read here from ui/speechStore: only this label drawn again as it changes, not the bar, nor the page)
   const say = useSaid(id)
   const at = useMemo(() => [0, y, 0] as [number, number, number], [y])
+  // (loved it (item 209): a burst of hearts and stars out of their face as it shows, and a little bell's ding heard)
+  const loved = rating !== null && rating >= LOVED_AT && !angry
+  useEffect(() => { if (loved) joySound() }, [loved])
   return (
     <Html position={at} center zIndexRange={LABEL_Z} style={LABEL_STYLE}>
       <div className="g3-label" ref={(el) => onEl(id, el)}>
@@ -7616,6 +7827,11 @@ const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partne
         {say ? <Say key={say.key} text={say.text} who={name} heart={partner} ms={say.ms} />
           : dots && <span className="g3-bubble"><b className="say-who">{partner && <i className="say-heart"><Glyph id="heart" size="0.9em" /></i>}{name}</b>…</span>}
         {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
+        {loved && (
+          <span className="boss-joy guest-joy" aria-hidden="true">
+            {JOY_BITS.map((c, i) => <i key={i} className={`is-${c}`} style={{ '--i': i } as CSSProperties}>{c === 'star' ? <StarIcon size={17} /> : <Glyph id="heart" size={17} />}</i>)}
+          </span>
+        )}
       </div>
     </Html>
   )

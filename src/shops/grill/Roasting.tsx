@@ -37,11 +37,12 @@ import { sameProps } from '@/scene/sameProps'
 import { StaffFigure, StaffWarm, TRAY_AT } from '@/scene/StaffFigure'
 import { commuteOf, delayOf, paceOf } from '@/game/commute'
 import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
-import { fireCall, HOT_AT } from '@/game/fireTend'
+import { fireCall, fireLow, HOT_AT, roastRate } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { pickOrders } from '@/game/orderPick'
 import { sideChance } from '@/game/sides'
+import { overstayed } from '@/game/stay'
 import { RICE_SIDE, riceName } from '@/data/sides'
 import { SHAPE_S, fromTray, takeRice } from '@/game/rice'
 import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
@@ -4321,8 +4322,6 @@ type RoastingProps = {
   onGuests?: (guests: GuestView[]) => void
 }
 
-/** Roasting speed for a fire level: barely cooking on dying embers, about twice as fast at full blaze. */
-const roastRate = (fire: number) => 0.25 + 1.75 * fire
 
 /**
  * Roasting over the fire: each skewer browns as it cooks (raw → half → done → slowly charring), shows a tag above
@@ -5733,8 +5732,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (fire && heatOf() > HOT_AT) { if (hotSince.current === null) hotSince.current = nowS }
     else hotSince.current = null
     // (a rake asked for is no bar to charcoal or water: they're the more pressing, and take its place)
+    // (kept up higher with the kitchen busy (game/fireTend's fireLow, item 207): the skewers on the fire or waiting for it)
+    // (the skewers ordered and not yet off it: on it, on the board, or still to be fetched (a piece's customer is only put to it as it's
+    // served: counting by that, the kitchen was never busy))
+    const load = space === 'open' ? pieces.current.filter((p) => present(p) && !p.loose && !p.eaten && p.trash < 0 && !p.collected).length : 0
     const call = fire ? fireCall({ fire: fire.current, tender: tend, want: FIRE_TEND.want === 'tidy' ? null : FIRE_TEND.want, hotFor: hotSince.current === null ? 0 : nowS - hotSince.current,
-      askedFor: FIRE_TEND.want === 'coal' ? nowS - coalAsked.current : 0 }) : 'none'
+      askedFor: FIRE_TEND.want === 'coal' ? nowS - coalAsked.current : 0, low: fireLow(load) }) : 'none'
     if (call === 'ask-water') {
       hotSince.current = null
       FIRE_TEND.want = 'water'
@@ -5850,8 +5853,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const n = follows(p)
       return n?.doneness !== undefined ? Math.min(1.45, Math.max(0.95, n.doneness)) : chef.pullAt
     }
-    const ready = hasChef ? live.find((p) => !p.collected && !p.staged && p.homeFlight >= 1 &&
-      p.progress / roast.times[p.id] >= pullOf(p)) : undefined
+    // (of those done, the one nearest burning first (item 207: the fire kept higher, done ones go over sooner, and in a rush the first found
+    // was taken while one further on burnt waiting its turn))
+    let ready: Piece | undefined
+    if (hasChef) for (const p of live) {
+      if (p.collected || p.staged || p.homeFlight < 1) continue
+      const r = p.progress / roast.times[p.id]
+      if (r >= pullOf(p) && (!ready || r > ready.progress / roast.times[ready.id])) ready = p
+    }
     // what the chef means to put on a piece: what it was ordered with, else what the notes say worked best, else
     // what suits it (a less practised hand now and then forgets: decided once per piece)
     const planOf = (p: Piece): Exclude<Seasoning, 'water'>[] => {
@@ -6265,7 +6274,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (eaten some, and the rest long in coming (lost, or the kitchen swamped): up to pay for what they've had, the rest let go, not sat
       // at an empty plate for ever)
       // (or hurried out half an hour past closing (SHOP.hurry), nothing before them: up to pay for what they've had, the rest refunded)
-      if ((g.state === 'eating' && !FED.has(g.id) && now - (g.lastAte ?? now) > NEXT_DISH_WAIT + GUEST_EAT_SECONDS) || (SHOP.hurry && !FED.has(g.id))) {
+      // (or sat their time out (game/stay, item 207): up to pay for what they've had, the rest given back)
+      if ((g.state === 'eating' && !FED.has(g.id) && now - (g.lastAte ?? now) > NEXT_DISH_WAIT + GUEST_EAT_SECONDS) || (SHOP.hurry && !FED.has(g.id))
+        || (g.ate.length > 0 && !FED.has(g.id) && overstayed(g.since, now))) {
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
         g.state = 'done'

@@ -19,6 +19,7 @@ import { freshRoom } from '@/game/restroom'
 import { emptyBasin } from '@/game/basin'
 import { SOAP_FULL, TOWEL_FULL } from '@/game/washroom'
 import { emptyFridge, moveBetween, putInPlace, readDrinks, startBack, takeFromPlace, writeDrinks, type Back, type Places } from '@/game/drinkStock'
+import { emptyBins, type BinKind, type Bins } from '@/game/bins'
 import { replaces } from '@/scene/hot'
 import { ROLL_SLIPS } from '@/game/receipts'
 import { CLEANER_SCRUBS, DISH_SOAP, DISH_SOAP_SQUEEZES, TOILET_CLEANER, takeDose } from '@/game/household'
@@ -917,8 +918,12 @@ export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number; boss: bool
  * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
 export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __drain: DRAIN, __plateCount: PLATE_COUNT, __handWash: HAND_WASH, __ownerOut: OWNER_OUT })
-/** the bin by the sink: how many used sticks are in it (cleared off the customers' plates with them; the owner's: thrown away there) */
-export const SINK_BIN = { sticks: 0 }
+/** the bins by the sink (item 208, game/bins): how many used sticks are in the rubbish one (cleared off the customers' plates with them;
+ * the owner's: thrown away there), how full each is and the bottles and cans in the recycling one; each lid asked open (a click) or
+ * lifted till then (something thrown in, the stock keeper at it); and the bin whose bag is out just now (being carried off by the stock
+ * keeper: none in it till he's back with a new one) */
+export const SINK_BIN: { sticks: number; b: Bins; lids: Record<BinKind, { open: boolean; until: number }>; out: BinKind | null } = {
+  sticks: 0, b: emptyBins(), lids: { rubbish: { open: false, until: 0 }, recycle: { open: false, until: 0 } }, out: null }
 /** how many raw pieces wait on the cook table's board now (Roasting writes it every frame; App won't let more be taken out of the freezer
  * past its BOARD_SLOTS while researching: item 115) */
 export const BOARD = { n: 0 }

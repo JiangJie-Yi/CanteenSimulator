@@ -6,11 +6,13 @@ import { RECEIPT } from '@/game/receipts'
 import { DISH_SOAP, HOUSEHOLD_PACK, TOILET_CLEANER } from '@/game/household'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
-import { PAR, REORDER_AT, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
+import { PAR, REORDER_AT, SIDE_LOW, SIDE_PAR, inPacks, parOf, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
 import { CHARCOAL, SEASON_GOODS, SEASON_PAR } from '@/game/supplies'
 import type { Entry } from '@/data/recipes'
 
 const grill = DISHES.find((d) => d.id === 'grilledfish')!
+/** the rice and the miso soup for the sides at a day's worth (item 207): nothing of them to order */
+const SIDES_FULL: Stock = { ...SIDE_PAR }
 const entryOf = (id: string): Entry => ({ key: id, shop: 'grilledfish', name: id, ja: id, price: 100, parts: [{ id, dabs: [], name: id, ja: id }] })
 
 feature('倉儲自動補貨', () => {
@@ -25,26 +27,26 @@ feature('倉儲自動補貨', () => {
   })
 
   scenario('庫存還夠的品項不補', ({ given, when, then }) => {
-    given('庫存高於補貨門檻（木炭、衛生紙、發票紙也還夠）', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
+    given('庫存高於補貨門檻（木炭、衛生紙、發票紙也還夠）', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, ...SIDES_FULL, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('什麼都不買', (w) => { expect(w.o.buy).toEqual({}); expect(w.o.cost).toBe(0) })
   })
 
   scenario('衛生紙備品少於 4 盒時叫一組（5 盒）', ({ given, when, then }) => {
-    given('食材、木炭、發票紙都夠，衛生紙備品只剩 2 盒', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 2, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
+    given('食材、木炭、發票紙都夠，衛生紙備品只剩 2 盒', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, ...SIDES_FULL, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 2, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('只叫一組衛生紙', (w) => { expect(w.o.buy).toEqual({ [TISSUE]: TISSUE_PACK.boxes }) })
   })
 
   scenario('洗手間的捲筒衛生紙備品少於 4 捲時叫一包（12 捲）', ({ given, when, then }) => {
-    given('其他都夠，捲筒衛生紙只剩 2 捲', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 2, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
+    given('其他都夠，捲筒衛生紙只剩 2 捲', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, ...SIDES_FULL, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 2, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('只叫一包捲筒衛生紙', (w) => { expect(w.o.buy).toEqual({ [ROLL]: WASHROOM_PACKS[ROLL].n }) })
   })
 
   // (item 203: they're used now, so they're ordered as they run low, as the washrooms' spares are)
   scenario('洗碗精或廁所清潔劑剩不到 2 瓶時叫一組', ({ given, when, then }) => {
-    given('其他都夠，洗碗精剩 1 瓶、廁所清潔劑剩 3 瓶', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 1, [TOILET_CLEANER]: 3 } as Stock })
+    given('其他都夠，洗碗精剩 1 瓶、廁所清潔劑剩 3 瓶', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, ...SIDES_FULL, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 1, [TOILET_CLEANER]: 3 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('只叫一組洗碗精', (w) => { expect(w.o.buy).toEqual({ [DISH_SOAP]: HOUSEHOLD_PACK[DISH_SOAP].bottles }) })
   })
@@ -63,11 +65,39 @@ feature('倉儲自動補貨', () => {
     then('庫存超過的那樣不再買', (w) => { expect(w.o.buy[w.rich]).toBeUndefined() })
     and('其他每樣都補到 PAR，調味料各補到常備量，總價是它們成本的總和', (w) => {
       const rest = goodsOf(grill).filter((g) => g.id !== w.rich)
-      for (const g of rest) expect(w.o.buy[g.id]).toBe(PAR)
+      // (the sides' rice and soup to a day's worth: item 207)
+      for (const g of rest) expect(w.o.buy[g.id]).toBe(parOf(g.id))
       for (const g of SEASON_GOODS) expect(w.o.buy[g.id]).toBe(SEASON_PAR)
       // (and the nori, by the sheet, to its own usual stock)
       expect(w.o.buy[NORI]).toBe(NORI_PAR)
-      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * PAR, 0) + SEASON_GOODS.reduce((t, g) => t + costOf(g) * SEASON_PAR, 0) + NORI_COST * NORI_PAR)
+      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * parOf(g.id), 0) + SEASON_GOODS.reduce((t, g) => t + costOf(g) * SEASON_PAR, 0) + NORI_COST * NORI_PAR)
     })
+  })
+
+  // (item 207: kept to PAR, ten portions, like any good, a pot of rice was cooked with what rice there was (three bowls' worth, the cooker
+  // holding twenty), and the miso was never ordered at all, not being on the menu board: in a rush three of twenty-one who'd asked for rice had
+  // it, one of ten their soup)
+  scenario('白飯與味噌湯照一天的量備，不到一鍋就叫（第 207 項）', ({ given, when, then, and }) => {
+    given(`菜單只有一道魚；白米剩 ${SIDE_LOW.Onigiri - 5} 份、味噌湯剩 ${SIDE_LOW.MisoSoup - 2} 份（都不到一鍋）`, (w) => {
+      w.id = grill.items[0].id
+      w.menu = [entryOf(w.id)]
+      w.stock = { [w.id]: PAR, Onigiri: SIDE_LOW.Onigiri - 5, MisoSoup: SIDE_LOW.MisoSoup - 2 } as Stock
+    })
+    when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
+    then(`白米補到兩鍋（${SIDE_PAR.Onigiri} 份，整袋買）`, (w) => { expect(w.o.buy.Onigiri).toBe(inPacks('Onigiri', SIDE_PAR.Onigiri - (SIDE_LOW.Onigiri - 5))) })
+    and(`味噌湯補到三鍋（${SIDE_PAR.MisoSoup} 份）`, (w) => { expect(w.o.buy.MisoSoup).toBe(SIDE_PAR.MisoSoup - (SIDE_LOW.MisoSoup - 2)) })
+  })
+  scenario('還有一鍋以上就不叫', ({ given, when, then }) => {
+    given('白米、味噌湯都剛好一鍋', (w) => {
+      w.id = grill.items[0].id
+      w.menu = [entryOf(w.id)]
+      w.stock = { [w.id]: PAR, Onigiri: SIDE_LOW.Onigiri, MisoSoup: SIDE_LOW.MisoSoup } as Stock
+    })
+    when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
+    then('不叫白米與味噌湯', (w) => { expect(w.o.buy.Onigiri).toBeUndefined(); expect(w.o.buy.MisoSoup).toBeUndefined() })
+  })
+  scenario('一鍵補滿也補到一天的量', ({ when, then }) => {
+    when('什麼都沒有時按「補滿」', (w) => { w.o = topUpOrder(grill, {}) })
+    then('白米與味噌湯補到一天的量', (w) => { expect(w.o.buy.Onigiri).toBe(SIDE_PAR.Onigiri); expect(w.o.buy.MisoSoup).toBe(SIDE_PAR.MisoSoup) })
   })
 })

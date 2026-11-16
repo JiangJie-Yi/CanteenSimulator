@@ -98,6 +98,7 @@ const ZH = {
   sweepSay: (k: number) => ['小心腳下，我來掃。', '破了，先別靠近喔！', '碎片我來清。'][Math.abs(k) % 3],
   riceDone: '[內場] 呼～新潟越光米剛炊熟！粒粒分明、米香撲鼻！',
   soupDone: '[內場] 味噌湯煮好了，豆腐、海帶芽都下鍋，保溫中！',
+  fullHouse: '大入！今晚滿座，謝謝大家捧場！',
 
   // 結帳與離店
   payGo: (_id: number, k: number) => pick(k, [
@@ -206,6 +207,7 @@ const JA: typeof ZH = {
   sweepSay: (k: number) => ['足元お気をつけて、片付けます。', '割れちゃった、近づかないでくださいね！', '破片、片付けます。'][Math.abs(k) % 3],
   riceDone: '[厨房] 新潟産コシヒカリがふっくら艶やかに炊き上がりました！',
   soupDone: '[厨房] 味噌汁ができました！豆腐とわかめ入り、保温中です！',
+  fullHouse: '大入り！満席です、ありがとうございます！',
 
   // 会計と退店
   payGo: (_id, k) => pick(k, [
@@ -313,6 +315,7 @@ const EN: typeof ZH = {
   sweepSay: (k: number) => ['Mind your step, sweeping up.', 'Broken! Keep clear, please.', 'Got the shards.'][Math.abs(k) % 3],
   riceDone: '[Kitchen] Freshly steamed Koshihikari rice is ready! Fluffy and fragrant!',
   soupDone: '[Kitchen] The miso soup is hot, tofu and wakame in, kept warm!',
+  fullHouse: 'Full house! Every seat taken, thank you all!',
 
   // Checkout & Departure
   payGo: (_id, k) => pick(k, [

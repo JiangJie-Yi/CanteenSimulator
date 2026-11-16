@@ -22,6 +22,8 @@ import { DishSwitcher } from '@/ui/DishSwitcher'
 import { Fire } from '@/shops/grill/Fire'
 import { FireControl, setFireGauge } from '@/shops/grill/FireControl'
 import { Fullness } from '@/ui/Fullness'
+import { CashChip } from '@/ui/CashChip'
+import { fullHouse } from '@/game/fullHouse'
 import { bestOf, Notebook } from '@/ui/Notebook'
 import { findItem, MENU_MAX, MENU_MIN, partEn, partName, recipeKey, SEASON_NAME, signature, type Entry, type Seasoning } from '@/data/recipes'
 import { idealSteps, trialIdeas } from '@/game/research'
@@ -96,7 +98,7 @@ import { MOBILE } from '@/scene/flatGate'
 import { platerOf } from '@/game/kitchenCrew'
 import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { PhoneClosed } from '@/ui/PhoneClosed'
-import { usePanelSound } from '@/ui/uiSound'
+import { stampSound, usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
 import { Glyph, StarIcon } from '@/ui/GameIcons'
 import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
@@ -1700,6 +1702,8 @@ export default function App() {
     }
   }, [])
   const [office, setOffice] = useState<null | OfficeTab>(null)
+  /** the ledger opened or shut from the cash (the same function every time: the cash chip's drawn again only as the cash changes) */
+  const openLedger = useCallback(() => setOffice((o) => (o ? null : 'ledger')), [])
   useEffect(() => { if (office) { setFridgeOpen(false); setDrinkPanel(false) } }, [office])
   useEffect(() => { if (fridgeOpen) { setOffice(null); setDrinkPanel(false) } }, [fridgeOpen])
   useEffect(() => {
@@ -2140,6 +2144,20 @@ export default function App() {
   /** (the orders said in the log just now: the same customer's same dish again at once (two of it ordered together, next to each other or
    * not) is its line with how many, 點了 味噌烤香菇×2, as a takeaway's order is called (item 56: two lines the same, one after the other,
    * in a busy evening's log)) */
+  // (a full house (大入り, item 209, game/fullHouse): every stool at the bar taken by someone sat at it; a red stamp over the room, its drum
+  // and bell, and the owner's word in the log; once as it fills, again only once it's emptied a little and filled again)
+  const house = useRef({ armed: true })
+  const [ooiri, setOoiri] = useState(0)
+  useEffect(() => {
+    const g = guestsBy[DISHES[active].id] ?? []
+    const seated = g.filter((x) => x.seat !== undefined && x.seat >= 0 && (x.state === 'waiting' || x.state === 'eating')).length
+    const r = fullHouse(house.current, seated, ai ? GRILL_SEATS.length : 0)
+    house.current = { armed: r.armed }
+    if (!r.full) return
+    setOoiri(performance.now())
+    stampSound()
+    talk('owner', LINES[langRef.current].fullHouse)
+  }, [guestsBy, active, ai, talk])
   const recentOrders = useRef<OrderSaid[]>([])
   const sayOrder = (guest: number, dish: string, name: string) => {
     const o = orderSaid(recentOrders.current, guest, dish, performance.now())
@@ -3170,10 +3188,15 @@ export default function App() {
         {/* (on a wide screen 經營 and 自動營運 are round buttons in the row top right, and the cash stands on its own here, where 經營 was:
             a click on it opens the books) */}
         {/* (and a click again shuts it, whichever of its pages is open (the owner's)) */}
-        <button type="button" className="money-chip" onClick={() => setOffice((o) => (o ? null : 'ledger'))} aria-expanded={!!office}
-          title={tl(lang, '現金（點一下看帳簿，再點一下關上）', '現金（クリックで帳簿、もう一度で閉じる）', 'Cash (click for the ledger, again to close it)')}>
-          <b className="money"><small className="money-cur">NT$</small>{Math.round(cash).toLocaleString()}</b>
-        </button>
+        {/* (the full house's stamp, come down over the room and gone (item 209)) */}
+        {ooiri > 0 && (
+          <div key={ooiri} className="ooiri" aria-hidden="true" onAnimationEnd={(e) => { if (e.target === e.currentTarget) setOoiri(0) }}>
+            <b>大入</b><small>{tl(lang, '滿座', '満席', 'Full house')}</small>
+          </div>
+        )}
+        {/* (counting up as money comes in, what came in floating out of it: item 209) */}
+        <CashChip cash={cash} open={!!office} onClick={openLedger}
+          title={tl(lang, '現金（點一下看帳簿，再點一下關上）', '現金（クリックで帳簿、もう一度で閉じる）', 'Cash (click for the ledger, again to close it)')} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
           aria-label={tl(lang, '經營', '経営', 'Office')} title={tl(lang, '經營（廚房・人事・帳簿）', '開発ノート・人事・帳簿', 'Office (kitchen · staff · ledger)')}>
           <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">

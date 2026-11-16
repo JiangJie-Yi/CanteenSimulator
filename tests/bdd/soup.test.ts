@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { HEAT_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, nextHeat, potTick, setSoup, soupGoes, soupReady, takeBowl } from '@/game/soup'
+import { HEAT_S, SOUP_BOWLS, SOUP_LOW, emptyPot, heatNow, heatRate, nextHeat, potTick, setSoup, soupGoes, soupReady, takeBowl, topUpGoes } from '@/game/soup'
 
 feature('味噌湯：開店時湯鍋是空的，三廚煮好才有', () => {
   scenario('湯鍋空著才去煮', ({ then, but }) => {
@@ -19,6 +19,18 @@ feature('味噌湯：開店時湯鍋是空的，三廚煮好才有', () => {
       for (let i = 0; i < 3; i++) { const r = potTick(p, 1); p = r.pot; hot += +r.hot }
       expect(p.state).toBe('hot')
       expect(hot).toBe(1)
+    })
+  })
+  // (item 207: made only once it was empty, the soup was out the twenty-five minutes it took to make and heat again, and in a rush those who'd
+  // asked for it went without)
+  scenario(`熱的湯剩 ${SOUP_LOW} 碗以下，三廚就煮下一鍋的份補進去，湯不會斷`, ({ then, and, but }) => {
+    const hot = { state: 'hot' as const, left: 0 }
+    then(`剩 ${SOUP_LOW} 碗：去補`, () => { expect(topUpGoes(hot, SOUP_LOW)).toBe(true) })
+    and('補的時候鍋子還是熱的，盛得出來', () => { expect(soupReady(hot, SOUP_LOW)).toBe(true) })
+    but('還多、或還沒熱、或是空的：不補（空的是重煮）', () => {
+      expect(topUpGoes(hot, SOUP_LOW + 1)).toBe(false)
+      expect(topUpGoes(setSoup(), 0)).toBe(false)
+      expect(topUpGoes(emptyPot(), 0)).toBe(false)
     })
   })
   scenario('空的湯鍋放著不會自己變熱', ({ then }) => {

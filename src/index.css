@@ -5537,6 +5537,13 @@ html[lang='en'] .heat-label { font-size: 13px; }
   .money-chip:active { transform: none; filter: brightness(0.88); transition-duration: 0s; }
   .app.is-hushed .money-chip { display: none; }
   .app:not(.is-hushed) .money-chip { animation: ui-pop-top 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 300ms both; }
+  /* (money in (item 209, ui/CashChip): the figure bobs and shines a moment as it counts up; what came in rises out of the chip and fades) */
+  .money-chip .money.is-up { display: inline-block; animation: cash-bump 520ms cubic-bezier(0.2, 1.6, 0.4, 1); }
+  .money-chip .cash-up {
+    position: absolute; right: 14px; top: 100%; margin-top: 4px; white-space: nowrap; pointer-events: none;
+    font: 800 14px/1 var(--brush); color: #4fff85; text-shadow: 0 0 4px rgb(0 0 0 / 0.85), 0 1px 0 #0a2a14;
+    animation: cash-up 1.4s ease-out forwards;
+  }
 }
 
 /* ---- the drinks' stock, opened from the back stock by the fridges (shops/grill/DrinkStockPanel): a drinks fridge of its own, its two
@@ -6333,18 +6340,51 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
   15% { opacity: 1; transform: translate(0, 0) scale(1); }
   100% { opacity: 0; transform: translate(14px, -46px) scale(1.05); }
 }
-.boss-joy { position: relative; display: block; width: 0; height: 0; }
-.boss-joy i {
+/* (and a customer who loved what they had: hearts and stars out of their face (item 209)) */
+.boss-joy, .guest-joy { position: relative; display: block; width: 0; height: 0; }
+.boss-joy i, .guest-joy i {
   position: absolute; left: 0; top: 0; font-style: normal; font-size: 18px; line-height: 1; opacity: 0;
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
   animation: boss-joy 2s ease-out forwards; animation-delay: calc(var(--i) * 0.12s);
 }
-.boss-joy i:nth-child(odd) { --dx: -1; }
+.boss-joy i:nth-child(odd), .guest-joy i:nth-child(odd) { --dx: -1; }
 /* (the drawn coins and hearts that rise from him: an old gold coin, its hole and rim cut in a darker gold; a red heart) */
 .boss-joy i.is-coin { color: #f6c84a; --icon-cut: #9a6516; }
-.boss-joy i.is-heart { color: #ff5f86; }
+.boss-joy i.is-heart, .guest-joy i.is-heart { color: #ff5f86; }
+.guest-joy i.is-star { color: #ffc93c; }
 .boss-float .game-icon { margin-left: 3px; vertical-align: -0.1em; }
-.boss-joy i:nth-child(even) { --dx: 1; }
+.boss-joy i:nth-child(even), .guest-joy i:nth-child(even) { --dx: 1; }
+@keyframes cash-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.14); filter: drop-shadow(0 0 6px rgb(79 255 133 / 0.8)); }
+  100% { transform: scale(1); }
+}
+@keyframes cash-up {
+  0% { opacity: 0; transform: translateY(-6px) scale(0.9); }
+  18% { opacity: 1; transform: translateY(0) scale(1.05); }
+  100% { opacity: 0; transform: translateY(18px) scale(1); }
+}
+/* the full house (大入り, item 209): a red seal stamped down over the top of the room, its brush letters white, a word under it; held a
+   moment, then gone */
+.ooiri {
+  position: fixed; left: 50%; top: 92px; z-index: 12; pointer-events: none;
+  display: grid; justify-items: center; gap: 4px;
+  animation: ooiri-in 2.8s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.ooiri b {
+  display: grid; place-items: center; width: 92px; height: 92px; border-radius: 12px;
+  border: 4px solid #fff3e6; outline: 3px solid var(--hanko);
+  background: var(--hanko); color: #fff8ee; font: 700 40px/1 var(--brush); letter-spacing: -0.04em; white-space: nowrap;
+  box-shadow: 0 10px 24px -8px rgb(60 10 0 / 0.65);
+}
+.ooiri small { font: 700 14px/1 var(--brush); color: #fff3e6; white-space: nowrap; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
+@keyframes ooiri-in {
+  0% { opacity: 0; transform: translateX(-50%) rotate(-12deg) scale(2.3); }
+  10% { opacity: 1; transform: translateX(-50%) rotate(-8deg) scale(0.92); }
+  15% { transform: translateX(-50%) rotate(-8deg) scale(1); }
+  82% { opacity: 1; transform: translateX(-50%) rotate(-8deg) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) rotate(-8deg) scale(1.04) translateY(-6px); }
+}
 @keyframes boss-joy {
   0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
   15% { opacity: 1; transform: translate(calc(-50% + var(--dx) * 10px), -12px) scale(1); }
