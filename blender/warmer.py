@@ -71,6 +71,9 @@ grain = np.sin((u * 34 + (fbm(N, 2, 5, 4) - 0.5) * 0.9 + (fbm(N, 6, 2, 3) - 0.5)
 sugi = mix((0.04, 0.034, 0.03), (0.016, 0.014, 0.013), smooth(0.6, 1.0, grain) * 0.7)
 sugi = sugi * (0.94 + 0.08 * fbm(N, 3, 12, 4))[..., None]
 hin = mix((0.86, 0.74, 0.55), (0.76, 0.62, 0.42), smooth(0.6, 1.0, np.sin((u * 40 + fbm(N, 2, 4, 3)) * 2 * math.pi) * 0.5 + 0.5) * 0.6)
+# (plywood for the cupboards' insides: a paler, plainer grain than the hinoki, a little shade of age)
+ply = mix((0.62, 0.5, 0.36), (0.55, 0.43, 0.3), smooth(0.55, 1.0, np.sin((u * 22 + fbm(N, 2, 3, 3) * 1.4) * 2 * math.pi) * 0.5 + 0.5) * 0.7)
+ply = ply * (0.9 + 0.12 * fbm(N, 5, 5, 3))[..., None]
 # (a thermometer's face: cream, a scale round its top, a red needle at 70 or so)
 dn = 128
 yy, xx = np.mgrid[0:dn, 0:dn] / (dn - 1) * 2 - 1
@@ -93,8 +96,9 @@ def mats(pre):
         "terrazzo": pbr(f"{pre}Terrazzo", (1, 1, 1), tex=image(f"{pre.lower()}_terrazzo", np.clip(terr, 0, 1).astype(np.float32)), rough=0.35),
         "sugi": pbr(f"{pre}Sugi", (1, 1, 1), tex=image(f"{pre.lower()}_sugi", np.clip(sugi, 0, 1).astype(np.float32)), rough=0.5),
         "kick": pbr(f"{pre}Kick", lin("#1a120c"), rough=0.6),
-        # (the cupboards' insides, behind their doors (item 130)): dark, under the counter
-        "inside": pbr(f"{pre}Inside", lin("#2a1c12"), rough=0.8),
+        # (the cupboards' insides, behind their doors (item 130)): plain plywood, as a kitchen's cupboards are inside (item 197: a dark sheet
+        # a hair in front of the cabinet's face, the cupboard flat as a wall behind its open door)
+        "inside": pbr(f"{pre}Inside", (1, 1, 1), tex=image(f"{pre.lower()}_inside", np.clip(ply[::2, ::2], 0, 1).astype(np.float32)), rough=0.8),
         "brass": pbr(f"{pre}Brass", lin("#b98a3a"), rough=0.3, metal=0.8),
     }
 
@@ -116,7 +120,45 @@ M.update({
     "water": pbr("PrepWater", lin("#8fb2b8"), rough=0.1),
     "salt": pbr("PrepSalt", lin("#e9e4d6"), rough=0.5),
 })
+M.update({
+    # (what's kept in the cupboards (item 197), each its plain colour: drawn as one by the game (plainColours))
+    "s_cream": pbr("StoreCream", lin("#eee4cf"), rough=0.5),
+    "s_orange": pbr("StoreOrange", lin("#d4742c"), rough=0.45),
+    "s_lacq": pbr("StoreLacquer", lin("#8a1f17"), rough=0.3),
+    "s_black": pbr("StoreBlack", lin("#1f1b19"), rough=0.35),
+    "s_kraft": pbr("StoreKraft", lin("#b48d5a"), rough=0.85),
+    "s_red": pbr("StoreRed", lin("#b3362b"), rough=0.6),
+    "s_nori": pbr("StoreNori", lin("#22301f"), rough=0.6),
+    "s_white": pbr("StoreWhite", lin("#f1efe9"), rough=0.5),
+    "s_blue": pbr("StoreBlue", lin("#6f97bb"), rough=0.45),
+    "s_indigo": pbr("StoreIndigo", lin("#2c466d"), rough=0.8),
+    "s_bamboo": pbr("StoreBamboo", lin("#c7a765"), rough=0.7),
+})
 parts = []
+
+
+def lathe(name, x, y0, z, prof, mat, segs=16, top=True):
+    """a round thing turned about its upright axis, its foot at (x, y0, z): `prof` (radius, height) from its foot up; its foot left open (it
+    stands on something), its top closed with a ladder of quads if `top` (never a fan into one point)"""
+    bm = bmesh.new()
+    rings = []
+    for r_, h_ in prof:
+        rings.append([bm.verts.new(P(x + r_ * math.cos(2 * math.pi * i / segs), y0 + h_, z + r_ * math.sin(2 * math.pi * i / segs))) for i in range(segs)])
+    for a_, b_ in zip(rings, rings[1:]):
+        for i in range(segs):
+            bm.faces.new((a_[i], a_[(i + 1) % segs], b_[(i + 1) % segs], b_[i]))
+    if top:
+        ladder_fill(bm, rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    cyl_uv(o)
+    finish(o, name, M[mat])
+    parts.append(o)
+    return o
 
 
 def box_uv(o, tile=0.5):
@@ -191,17 +233,16 @@ def counter(L, pre, doors, cx=0.0):
     front = z1 - 0.04
     o = [
         box("kick", x0 + 0.04, x1 - 0.04, 0, KICK, z0 + 0.02, front - 0.06, k + "kick"),
-        box("cabinet", x0, x1, KICK, H - TT, z0, front, k + "sugi"),
         box("top", x0 - 0.02, x1 + 0.02, H - TT, H, z0, z1, k + "terrazzo", bev=0.008),
     ]
     dw = (L - 0.08) / doors
     leaves = []
+    if pre == "Warmer":
+        o += cupboards(x0, x1, z0, front, dw, doors, k)
+    else:
+        o.append(box("cabinet", x0, x1, KICK, H - TT, z0, front, k + "sugi"))
     for i in range(doors):
         a = x0 + 0.04 + i * dw
-        # (behind each door the cupboard's dark inside and a shelf across it, seen as it's opened (item 130, the owner's, 2026-11-15: "the
-        # doors under the counter all open"): a hair in front of the cabinet's face, behind the door)
-        o.append(box(f"inside{i}", a + 0.03, a + dw - 0.03, KICK + 0.06, H - TT - 0.17, front + 0.0005, front + 0.0015, k + "inside"))
-        o.append(box(f"shelf{i}", a + 0.03, a + dw - 0.03, (KICK + H - TT) / 2 - 0.01, (KICK + H - TT) / 2 + 0.008, front + 0.0015, front + 0.003, k + "sugi"))
         if pre != "Warmer":
             o.append(box(f"door{i}", a + 0.02, a + dw - 0.02, KICK + 0.05, H - TT - 0.16, front, front + 0.018, k + "sugi", bev=0.006))
             px = a + (dw - 0.1 if i % 2 == 0 else 0.1)
@@ -221,6 +262,111 @@ def counter(L, pre, doors, cx=0.0):
     o.append(box("rail", x0 + 0.02, x1 - 0.02, H - TT - 0.13, H - TT - 0.02, front, front + 0.012, k + "sugi"))
     body_ = join(o, f"{pre}Body")
     return (body_, leaves) if pre == "Warmer" else body_
+
+
+T_ = 0.025       # the cupboards' boards
+STORES = []      # what's kept in them: joined into one node of its own (WarmerStores), ink round it as round the rest
+
+
+def cupboards(x0, x1, z0, front, dw, doors, k):
+    """the counter's cupboards (item 197, the owner's, 2026-11-16: 「酒台與料理台的內裝完全不行」: behind each door was a dark sheet a hair in
+    front of a solid block, a strip of a shelf on it, nothing in it): a carcass of boards, the back, the ends, the floor and the ceiling,
+    a face frame round the doors' openings, a partition between each pair of doors (three cupboards), plywood inside, a shelf across each,
+    and in them what a soup and rice-ball counter keeps: the stock pot and the miso tub, the soup bowls; the rice, the trays, the nori and
+    the salt; the food boxes, the cloths, the bamboo trays and the takeaway boxes. Each board a little short of the next one's face, no two
+    faces in one plane."""
+    T = T_
+    y_lo, y_hi, mid = KICK + T, H - TT - T, (KICK + H - TT) / 2
+    zi = z0 + T + 0.004       # the inside of the back's lining
+    zf = front - 0.02         # the back of the face frame
+    o = [
+        box("back", x0, x1, KICK, H - TT, z0, z0 + T, k + "sugi"),
+        box("endl", x0, x0 + T, KICK, H - TT, z0 + T, zf, k + "sugi"),
+        box("endr", x1 - T, x1, KICK, H - TT, z0 + T, zf, k + "sugi"),
+        box("floor", x0 + T, x1 - T, KICK, y_lo, z0 + T, zf, k + "inside"),
+        box("ceil", x0 + T, x1 - T, y_hi, H - TT, z0 + T, zf, k + "inside"),
+        box("backin", x0 + T, x1 - T, y_lo, y_hi, z0 + T, zi, k + "inside"),
+        box("endlin", x0 + T, x0 + T + 0.004, y_lo, y_hi, zi, zf, k + "inside"),
+        box("endrin", x1 - T - 0.004, x1 - T, y_lo, y_hi, zi, zf, k + "inside"),
+        box("facebot", x0, x1, KICK, KICK + 0.05, zf, front, k + "sugi"),
+        box("facetop", x0, x1, H - TT - 0.16, H - TT, zf, front, k + "sugi"),
+        box("facel", x0, x0 + 0.06, KICK + 0.05, H - TT - 0.16, zf, front, k + "sugi"),
+        box("facer", x1 - 0.06, x1, KICK + 0.05, H - TT - 0.16, zf, front, k + "sugi"),
+    ]
+    bays = doors // 2
+    xs = [x0 + 0.04 + j * 2 * dw for j in range(bays + 1)]
+    for j in range(1, bays):
+        o.append(box(f"part{j}", xs[j] - T / 2, xs[j] + T / 2, y_lo, y_hi, zi, zf, k + "inside"))
+        o.append(box(f"stile{j}", xs[j] - 0.02, xs[j] + 0.02, KICK + 0.05, H - TT - 0.16, zf, front, k + "sugi"))
+    # (and a mullion where each pair of doors meet: the solid block's face showed in the gap between them, the cupboard would)
+    for j in range(bays):
+        o.append(box(f"mullion{j}", xs[j] + dw - 0.02, xs[j] + dw + 0.02, KICK + 0.05, H - TT - 0.16, zf, front, k + "sugi"))
+    # (each cupboard's inside, wall to wall, and its shelf across it, set back from the face; the shelf's top, the floor's top)
+    inn = [((x0 + T + 0.004) if j == 0 else (xs[j] + T / 2), (x1 - T - 0.004) if j == bays - 1 else (xs[j + 1] - T / 2)) for j in range(bays)]
+    ys = mid + 0.011
+    for j, (l, r) in enumerate(inn):
+        o.append(box(f"shelf{j}", l + 0.002, r - 0.002, mid - 0.011, ys, zi + 0.002, front - 0.09, k + "inside"))
+    stores(inn, y_lo, ys, zi, front - 0.09)
+    return o
+
+
+def stores(inn, yf, ys, zb, zs):
+    """what's kept in the cupboards, set in each from its walls, the back and the front with room round it: `inn` each cupboard's walls,
+    `yf` its floor's top, `ys` its shelf's top, `zb` its back, `zs` the shelf's front"""
+    def put(o):
+        STORES.append(o)
+        return o
+    zc = (zb + zs) / 2
+    # (the soup's cupboard, under the warming well)
+    l, r = inn[0]
+    # (a stock pot (寸胴鍋): its body, its lid and the lid's knob, its two handles)
+    px, pz, pr, ph = l + 0.27, zc - 0.07, 0.2, 0.36
+    put(lathe("pot", px, yf, pz, [(pr, 0.0), (pr, ph)], "well", segs=16, top=False))
+    put(lathe("potlid", px, yf + ph, pz, [(pr + 0.012, 0.0), (pr + 0.012, 0.012), (pr * 0.55, 0.035), (0.03, 0.04)], "well", segs=16))
+    put(lathe("potknob", px, yf + ph + 0.04, pz, [(0.022, 0.0), (0.026, 0.022)], "s_black", segs=8))
+    for sd in (-1, 1):
+        put(box(f"pothandle{sd}", px + sd * (pr + 0.004), px + sd * (pr + 0.05), yf + ph - 0.09, yf + ph - 0.06, pz - 0.035, pz + 0.035, "well"))
+    # (a tub of miso, its lid)
+    tx, tz, tr, th = l + 0.75, zc + 0.08, 0.15, 0.24
+    put(lathe("misotub", tx, yf, tz, [(tr * 0.93, 0.0), (tr, th)], "s_cream", segs=16, top=False))
+    put(lathe("misolid", tx, yf + th, tz, [(tr + 0.01, 0.0), (tr + 0.01, 0.03), (tr * 0.9, 0.034)], "s_orange", segs=16))
+    # (a second tub behind it, its lid the same)
+    put(lathe("misotub2", tx + 0.36, yf, tz - 0.12, [(tr * 0.93, 0.0), (tr, th)], "s_cream", segs=16, top=False))
+    put(lathe("misolid2", tx + 0.36, yf + th, tz - 0.12, [(tr + 0.01, 0.0), (tr + 0.01, 0.03), (tr * 0.9, 0.034)], "s_orange", segs=16))
+    # (on its shelf, the soup bowls in stacks (汁椀, red lacquer), and their lids in one)
+    for n_, bx in enumerate((l + 0.14, l + 0.36, l + 0.58)):
+        # (the stack's outline, a rim's step halfway up: 12 round, 70 faces)
+        prof = [(0.05, 0.0), (0.056, 0.012), (0.084, 0.03), (0.086, 0.09), (0.083, 0.095), (0.086, 0.19)]
+        put(lathe(f"bowls{n_}", bx, ys, zc + 0.02, prof, "s_lacq", segs=12))
+    put(lathe("bowllids", l + 0.82, ys, zc + 0.02, [(0.08, 0.0), (0.082, 0.015), (0.082, 0.1), (0.07, 0.11)], "s_black", segs=16))
+    # (and the small dishes, a stack of white)
+    put(lathe("dishes", l + 1.08, ys, zc - 0.02, [(0.07, 0.0), (0.1, 0.012), (0.1, 0.09), (0.095, 0.095)], "s_white", segs=16))
+
+    # (the middle cupboard: the rice, lying on its floor; on its shelf the trays, the nori and the salt)
+    l, r = inn[1]
+    cx = (l + r) / 2
+    put(box("ricebag", cx - 0.36, cx + 0.2, yf, yf + 0.17, zc - 0.22, zc + 0.2, "s_kraft", bev=0.03))
+    put(box("riceband", cx - 0.36 + 0.06, cx - 0.36 + 0.2, yf + 0.17 + 0.002, yf + 0.174, zc - 0.21, zc + 0.19, "s_red"))
+    put(box("ricebag2", cx + 0.26, cx + 0.58, yf, yf + 0.3, zc - 0.16, zc + 0.08, "s_kraft", bev=0.03))
+    put(box("trays", l + 0.04, l + 0.56, ys, ys + 0.16, zc - 0.2, zc + 0.17, "s_black", bev=0.008))
+    put(box("noribox", l + 0.66, l + 1.0, ys, ys + 0.12, zc - 0.17, zc + 0.12, "s_nori", bev=0.004))
+    put(box("norilabel", l + 0.7, l + 0.96, ys + 0.03, ys + 0.09, zc + 0.12 + 0.002, zc + 0.124, "s_white"))
+    put(lathe("salt", l + 1.17, ys, zc + 0.02, [(0.075, 0.0), (0.075, 0.16)], "s_white", segs=12, top=False))
+    put(lathe("saltcap", l + 1.17, ys + 0.16, zc + 0.02, [(0.078, 0.0), (0.078, 0.03), (0.07, 0.034)], "s_blue", segs=12))
+
+    # (the rice-ball side's cupboard: food boxes in two stacks and the cloths on its floor; the bamboo trays and the takeaway boxes above)
+    l, r = inn[2]
+    for n_, bx in enumerate((l + 0.06, l + 0.42)):
+        for q in range(3):
+            y_ = yf + q * 0.12
+            put(box(f"food{n_}{q}", bx, bx + 0.3, y_, y_ + 0.1, zc - 0.13, zc + 0.11, "s_white", bev=0.01))
+            put(box(f"foodlid{n_}{q}", bx - 0.005, bx + 0.305, y_ + 0.1, y_ + 0.118, zc - 0.135, zc + 0.115, "s_blue", bev=0.004))
+    for q, m_ in enumerate(("s_white", "s_indigo", "s_white", "s_indigo")):
+        put(box(f"cloth{q}", l + 0.84 + 0.006 * q, l + 1.12 + 0.006 * q, yf + q * 0.04, yf + q * 0.04 + 0.038, zc - 0.1, zc + 0.12, m_, bev=0.01))
+    for n_, bx in enumerate((l + 0.2, l + 0.56)):
+        put(lathe(f"zaru{n_}", bx, ys, zc, [(0.13, 0.0), (0.17, 0.035), (0.172, 0.045), (0.17, 0.09)], "s_bamboo", segs=16))
+    put(box("takeaway", l + 0.82, l + 1.14, ys, ys + 0.18, zc - 0.13, zc + 0.11, "s_black", bev=0.006))
+    put(box("takeawayband", l + 0.82 - 0.002, l + 1.14 + 0.002, ys + 0.05, ys + 0.08, zc - 0.132, zc + 0.112, "s_red"))
 
 
 def root_of(name, objs):
@@ -274,7 +420,8 @@ for o in ctrl:
                 co = me.vertices[me.loops[li].vertex_index].co
                 uvl.data[li].uv = ((co.x - o.location.x) / 0.056 + 0.5, (co.z - o.location.z) / 0.056 + 0.5)
 warmer_ctrl = join(ctrl, "WarmerControls")
-root = root_of("Warmer", [body, warmer_wells, warmer_ctrl] + warmer_doors)
+warmer_stores = join(STORES, "WarmerStores")
+root = root_of("Warmer", [body, warmer_wells, warmer_ctrl, warmer_stores] + warmer_doors)
 if PREVIEW:
     preview_cam()
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "warmer.glb"), os.path.join(PROJECT, "blender", "warmer.blend"),
