@@ -91,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -428,6 +428,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         s.pos.copy(pose.p)
         if (pose.yaw !== null) s.yaw = turnToward(s.yaw, pose.yaw, dt)
         o.position.copy(s.pos)
+        // (down on the genkan's stone as he crosses it, as the customers are (item 203: a step's height over it))
+        o.position.y += genkanY(counters, s.pos)
         o.rotation.y = s.yaw
         o.visible = pose.shown
         o.userData.fade = tr.done ? 1 : pose.vis
@@ -589,12 +591,10 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       g.current.position.copy(s.pos)
       // (turned toward the way he's to face a frame at a time: set at once, he spun round at each corner and at the fridge, 130° in a frame)
       g.current.rotation.y = turnToward(g.current.rotation.y, s.yaw, dt)
-      // (unseen while he's in the toilet's stall changing the roll: faded out as he goes in and in again as he comes out, as the customers
-      // are (put out of sight at once, seen from above through the slats, he went in a blink))
-      const inStall = c?.kind === 'roll' && s.phase === 'work'
-      const fade = inStall ? (s.t < 0.35 ? 1 - s.t / 0.35 : s.t > 2.45 ? Math.min(1, (s.t - 2.45) / 0.35) : 0) : 1
-      g.current.userData.fade = fade
-      g.current.visible = fade > 0.01
+      // (seen all the way in the toilet's stall changing the roll, as the customers are since the owner's 2026-11-12 (item 203: he alone still
+      // faded out in there))
+      g.current.userData.fade = 1
+      g.current.visible = true
     }
     // (in his arms: a case of drinks carried out; a new roll; a new box of tissues; back empty-handed)
     const out = s.phase === 'go' || s.phase === 'work'
@@ -2301,7 +2301,7 @@ function Counter({ length }: { length: number }) {
 }
 
 /** a stool pulled out and pushed in (the bar's frame): where its customer stops behind it, how far it's pulled out, how far they push it back
- * getting up; how long pulling it out, stepping onto it, sliding in (or home) take, and how long after they're off before it's pushed home */
+ * getting up; how long pulling it out, stepping onto it, sliding in (or home) take, and when, getting up, they push it home before they go */
 const STOOL_STAND = 0.42, STOOL_OUT = 0.25, STOOL_LEAVE = 0.22
 /**
  * Where each stool's seat and each place on the waiting bench are as they've been moved by hand (edit mode): a marker hung in each, where it
@@ -2314,7 +2314,7 @@ const BENCH_MARKS = new Map<number, THREE.Object3D>()
 const SEAT_SHIFT = new THREE.Vector3()
 const BENCH_AT = Array.from({ length: BENCH_SEATS }, () => new THREE.Vector3())
 const BENCH_A = new THREE.Vector3(), BENCH_B = new THREE.Vector3()
-const STOOL_PULL_S = 0.25, STOOL_STEP_S = 0.3, STOOL_SLIDE_S = 0.4, STOOL_HOME_WAIT = 0.3
+const STOOL_PULL_S = 0.25, STOOL_STEP_S = 0.3, STOOL_SLIDE_S = 0.4, STOOL_HOME_AT = 0.4
 /** the way back from a place's stool toward the aisle (level) */
 const backOf = (st: { stool: THREE.Vector3; aisle: THREE.Vector3 }) => st.aisle.clone().sub(st.stool).setY(0).normalize()
 type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcGo' | 'wcIn' | 'wcWash' | 'wcBack'; t: number
@@ -4015,6 +4015,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SEATS_TAKEN.clear()
     PLATES_SET.clear()
     for (const f of FRIDGE_STATE) { f.passing = 0; f.stocker = false }
+    SAY_SEATED.lines.clear()
     // (the toilets swept before the day, nobody in them; the paper as it was left)
     // (both scrubbed before the day, a dose of the cleaner each that was used at all (item 203; one clean already, as on a new page, isn't
     // scrubbed again): none left, brushed with water)
@@ -4203,6 +4204,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (d >= stand && (s.pullT ?? 0) >= STOOL_PULL_S + STOOL_STEP_S) {
           s.phase = 'sit'
           s.slideT = 0
+          // (what they're having said now they're sat (item 203: it was called out from the doorway))
+          const said = SAY_SEATED.lines.get(s.id)
+          if (said !== undefined) { SAY_SEATED.lines.delete(s.id); SAY_SEATED.say(s.id, said) }
           // a plate is set in front of them (or, with a server, brought with the first thing they ordered)
           if (!SERVICE.servers) serve(s.seat, s.id)
         }
@@ -4407,21 +4411,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const payD = lp.payD && paysAtTill(GUEST_BILLS.of(s.id)) ? lp.payD : 0
         if (payD && raw >= payAt + 0.44 * PAY_S * v && !TILL_CASH.paid.has(s.id)) payIn(s.id, billFor(s).bill, paysByCard(s.id))
         // (in the queue for the till (the owner's): someone else at it paying, they wait a body's length back till it's free)
-        if (lp.payD && TILL_STATE.k >= 0 && TILL_STATE.payer !== s.id && raw >= payAt - QUEUE_GAP && raw < payAt) s.hold = (s.hold ?? 0) + dt
+        // (or the cashier handing a takeaway's bag over it, item 203)
+        if (lp.payD && ((TILL_STATE.k >= 0 && TILL_STATE.payer !== s.id) || TAKEOUT_STAND.handing) && raw >= payAt - QUEUE_GAP && raw < payAt) s.hold = (s.hold ?? 0) + dt
         // (a word getting up, if they ate; at the till, the cashier's thanks and the bill; the money handed over, theirs)
         const said = s.said ?? 0
         if (said < 1 && s.t > 0.3) {
           s.said = 1
           if (payD && guestsRef.current.find((x) => x.id === s.id)?.state !== 'angry') onSay?.('guest', LINES[lang].payGo(s.id, s.id), s.id)
         }
-        // (getting up: their stool pushed back with them first, and they walk off from there; it's pushed home behind them once they're
-        // a little way off)
+        // (getting up: their stool pushed back with them first, then pushed home by them, stood behind it, before they walk off (item 203: it
+        // slid home by itself, 0.3 s after they'd gone, their back to it 0.6 off down the aisle))
         const back = STOOL_LEAVE * Math.min(1, s.t / STOOL_PULL_S)
         const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(raw, payAt, payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v))))
         const { p, dir } = alongPath(lp.path, lp.len - d)
-        const home = Math.max(0, s.t - 0.8 - STOOL_LEAVE / v - STOOL_HOME_WAIT)
-        // (pushed home in under the counter)
-        if (home < STOOL_SLIDE_S) SEAT_PULL.set(s.seat, s.t < 0.8 ? back : STOOL_LEAVE - (STOOL_LEAVE + STOOL_TUCK) * (home / STOOL_SLIDE_S))
+        const home = Math.max(0, s.t - STOOL_HOME_AT)
+        // (pushed home in under the counter, done as they turn to go at 0.8)
+        if (home < STOOL_SLIDE_S) SEAT_PULL.set(s.seat, s.t < STOOL_HOME_AT ? back : STOOL_LEAVE - (STOOL_LEAVE + STOOL_TUCK) * (home / STOOL_SLIDE_S))
         else SEAT_PULL.delete(s.seat)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
         // (at the step on the way out: their shoes out of their cubby and on)
@@ -5202,6 +5207,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (o) {
         o.visible = pl.phase !== 'idle'
         o.position.copy(pl.pos)
+        // (down on the genkan's stone where their way crosses it, item 203)
+        o.position.y += genkanY(counters, pl.pos)
         o.rotation.y = pl.yaw
         // (never the idle fanning of a cook at his place: his hands are full with the work here; bent forward to it: well down to the
         // sack on the floor, over the bucket on the table and the hearth to tip the coals in or splash the water, a little over the crate and
@@ -5345,6 +5352,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       w.pos.copy(pose.p)
       if (pose.yaw !== null) w.yaw = turnToward(w.yaw, pose.yaw, Math.min(dt, 0.1))
       o.position.copy(w.pos)
+      // (down on the genkan's stone crossing it, item 203)
+      o.position.y += genkanY(counters, w.pos)
       o.rotation.y = w.yaw
       ;(w as { look?: number }).look = w.yaw
       o.visible = pose.shown
@@ -5395,6 +5404,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             v.phase = 'out'; v.t = 0; changed = true
             onSay?.('guest', LINES[lang].payThanks(v.id, v.id + 1), v.id)
           }
+        } else if (v.phase === 'wait' && v.order.gone && !v.order.handed) {
+          // (given up waiting for it (Roasting's patience, item 203): off out of the door without it)
+          v.wait = v.pos.clone()
+          v.phase = 'out'; v.t = 0; changed = true
         } else if (v.phase === 'wait') {
           v.fade = 1
           // (turned to the step, where the box comes from)
@@ -5432,7 +5445,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (S.handing) { const v = visitors.current.get(S.handing.id); if (v) v.order.handed = true }
           S.bags = []; S.handing = null; S.turn = 0; S.carry = false
         } else {
-          if (!S.handing) {
+          // (not while someone's paying at the till (item 203: she turned round for a bag in the middle of ringing someone up, the drawer open
+          // behind her))
+          if (!S.handing && TILL_STATE.k < 0) {
             const id = S.bags.find((x) => visitors.current.get(x)?.phase === 'wait')
             if (id !== undefined) { S.handing = { id, t: 0 }; S.bags = S.bags.filter((x) => x !== id) }
           }
@@ -6182,6 +6197,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (the owner's figure here only while he's out: at his place, Roasting draws him)
         o.visible = !ownerServes || OWNER_OUT.on
         o.position.copy(w.pos)
+        o.position.y += genkanY(counters, w.pos)
         // (the facing shown eased to the way they're going, never more than a little a frame (turnSmooth, item 183))
         w.look = turnSmooth(w.look ?? w.yaw, w.yaw, step)
         o.rotation.y = w.look

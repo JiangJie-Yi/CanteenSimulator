@@ -80,7 +80,7 @@ import { plateFor } from '@/game/plateSize'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
-import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
+import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, SAY_SEATED, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -1208,6 +1208,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     const tr = commute.current!
     const pose = tripStep(tr, Math.min(dt, 0.1), 1.6, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
     o.position.copy(pose.p)
+    // (down on the genkan's stone as they cross it, in or out by the front door (item 203: a step's height over it, in their shoes))
+    o.position.y += genkanY(GRILL_COUNTERS, toBar(o.position)) * GRILL_SCALE
     if (pose.yaw !== null) o.rotation.y = turnToward(o.rotation.y, pose.yaw, Math.min(dt, 0.1))
     o.visible = pose.shown
     o.userData.fade = pose.vis
@@ -5590,6 +5592,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** the shop's seconds since the last takeaway order (game/takeout) */
   const takeoutClock = useRef(0)
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __roastGuests: guests })
+  SAY_SEATED.say = (id, text) => onSay?.('guest', text, id)
   // (a customer dragged to another stool (GuestBar3D asks): only while they're waiting with nothing cooked tied to their stool yet, and
   // the stool's nobody's)
   useFrame(() => {
@@ -6036,7 +6039,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (orders.length) {
           BENCH.up.add(id)
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
-          onSay?.('guest', L().order(id, said), id)
+          if (bar) SAY_SEATED.lines.set(id, L().order(id, said))
+          else onSay?.('guest', L().order(id, said), id)
         } else {
           BENCH.gone.add(id)
           onSay?.('guest', L().nothing(id), id)
@@ -6090,7 +6094,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           const seat = seatFor
           used.add(seat)
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat, partner: couple ? ids[1 - k] : undefined })
-          onSay?.('guest', L().order(id, said), id)
+          if (bar) SAY_SEATED.lines.set(id, L().order(id, said))
+          else onSay?.('guest', L().order(id, said), id)
         } else {
           onSay?.('guest', L().nothing(id), id)
           // (came in and found nothing they could have: a visit of its own, and not a happy one)
@@ -6161,6 +6166,20 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         onSay?.('guest', mood === 'dark' ? L().darkGone(g.id) : L().angry(g.id), g.id)
         report()
       }
+    }
+    // (and a takeaway or a delivery waited for as long as one sat in waits for their first, then given up: off without it, given back what
+    // they paid, a word left (item 203: they stood in the genkan all night for a box that never came))
+    for (const g of guests.current) {
+      if (!g.takeout || g.state !== 'waiting' || now - g.since <= PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * RATING_FLOW.patience) continue
+      const o = TAKEOUT.orders.find((x) => x.id === g.id)
+      if (o?.taken) continue
+      g.state = 'angry'
+      g.cleared = true
+      if (o) o.gone = true
+      onWalkOut?.([...g.orders], g.id)
+      onSay?.('guest', L().angry(g.id), g.id)
+      onVisit?.({ id: g.id, taste: null, waited: now - g.since, walkedOut: true, gripes: ['wait'] })
+      report()
     }
     // someone who's finished (or walked out): once the last piece is eaten they get up and their plate is taken away
     // (GuestBar3D: it's told when they're done, after that last piece, and clears the plate a moment later), and
@@ -7919,7 +7938,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             // left on the board))
             p.local.copy(p.toP).sub(containerAt('bar'))
             p.via = undefined
-            p.flight = 0.6
+            // (on the plate already, the plate put down: there at once (item 203: its flight restarted at 0.6, it jumped up 0.43 off the plate
+            // as the server set it down, and dropped back))
+            p.flight = 1
           } else if (SERVICE.carried.has(p.key)) {
             // (on the server's tray, where they hold it: its spot moved with it, as above; the bar hands it in its own frame)
             p.fromP.copy(SERVICE.carried.get(p.key)!).sub(FIRE_SHIFT)
@@ -7929,14 +7950,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           } else if (p.readyAt === undefined) {
             // (held by the fire: a slot on the plating place, and a plate in it, asked for again; with the owner at the grill, only once his
             // hands are free, and then he takes it there (it flew over by itself, the owner saw: the head chef takes everything off the fire))
+            // (with him away from it (washing up by hand, tasting, a drink), it waits by the fire till he's back (item 203: it went over to the
+            // plating place by itself, through the air, nobody at the fire))
             const owner = performance.now() - OWNER_GRILL.seenAt < 1000
-            if (!owner || CHEF_CARRY.key === null) {
-              if (plateReady(p) && owner) {
-                const C = CHEF_CARRY
-                C.key = p.key; C.kind = 'toPlate'; C.phase = 'reach'; C.t = 0
-                C.from.copy(p.node.position); C.fromQ.copy(p.node.quaternion)
-                footOf(p, C.foot)
-              }
+            if (owner && CHEF_CARRY.key === null && plateReady(p)) {
+              const C = CHEF_CARRY
+              C.key = p.key; C.kind = 'toPlate'; C.phase = 'reach'; C.t = 0
+              C.from.copy(p.node.position); C.fromQ.copy(p.node.quaternion)
+              footOf(p, C.foot)
             }
           } else if (!SERVICE.claimed.has(p.key) && PLATING.slots[p.readyAt]?.seat !== p.seat) {
             // (its slot taken up, or freed, without it: it goes to a slot of its own again, from where it is)

@@ -49,9 +49,10 @@ let made: THREE.Object3D | null = null
 /** where his hands hang at rest (as modelled, the node's own frame) */
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
 type Phase = { act: 'tongs' | 'walk' | 'fan' | 'run' | 'wave' | 'idle'; len: number }
-/** his round of the day, in seconds */
+/** his round of the day, in seconds: the fire fanned from his place, turned to it (item 203: he walked 1.7 off down the aisle and fanned the
+ * air there, facing the way he faces at home); the run home kept, last, for after a taste or a drink taken down the aisle */
 const ROUND: Phase[] = [
-  { act: 'tongs', len: 7 }, { act: 'walk', len: 0 }, { act: 'fan', len: 5 }, { act: 'run', len: 0 }, { act: 'wave', len: 4 }, { act: 'idle', len: 4 },
+  { act: 'tongs', len: 7 }, { act: 'fan', len: 5 }, { act: 'wave', len: 4 }, { act: 'idle', len: 4 }, { act: 'run', len: 0 },
 ]
 /** and while the shop's open, the head chef at his fire (his second cook at the board fetching and skewering): turning what's on it with
  * his tongs, a breath between; what he takes on and off it, and fans, is Roasting's (OWNER_GRILL) */
@@ -716,10 +717,14 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       BOSS_TASTE.tipOn = tasting
     }
     if (parts.tongs) {
-      parts.tongs.scale.setScalar(act === 'tongs' ? 1 : 0)
+      // (kept in his hand through the breath between turning things at his fire (item 203: put out of being every 8.5 s, at each change of
+      // his round, and back))
+      parts.tongs.scale.setScalar(act === 'tongs' || (grill && act === 'idle') ? 1 : 0)
       parts.tongs.position.copy(hand).add(new THREE.Vector3(-0.02, 0.0, 0.02))
       parts.tongs.rotation.set(0.5 - Math.max(0, Math.sin(s.t * 2.2)) ** 6 * 0.5, -0.25, 0)
     }
+    // (his uchiwa the one from the holder on the table: that one's not drawn there while it's in his hand (Decor's Fan))
+    OWNER_GRILL.fanning = act === 'fan'
     if (parts.fan) {
       parts.fan.scale.setScalar(act === 'fan' ? 1 : 0)
       parts.fan.position.copy(hand).add(new THREE.Vector3(0, 0.0, 0.02))

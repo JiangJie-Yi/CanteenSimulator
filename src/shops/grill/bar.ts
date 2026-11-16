@@ -95,6 +95,10 @@ export const CHOPS_UP = new Set<number>()
 /** the customers with food before them just now, on their own plate at the bar (Roasting keeps it): only they're drawn eating, chopsticks in
  * hand (the owner's: waiting for the next dish, they went on picking at an empty plate) */
 export const FED = new Set<number>()
+/** what a customer says they're having, said once they're on their stool (item 203: called out from the doorway as they came in, before
+ * they were even welcomed; the kitchen has the order from the door, as ever): their line kept by Roasting, said by GuestBar3D as they sit,
+ * through Roasting's own way of saying it */
+export const SAY_SEATED: { lines: Map<number, string>; say: (id: number, text: string) => void } = { lines: new Map(), say: () => {} }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __fed: FED })
 /** the customers whose stomachs something spoiled has upset (game/freshness sickChance): off to the toilet as soon as they can be */
 export const SICK = new Set<number>()
@@ -972,6 +976,9 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * seasoning something on the fire (`dabUntil`), how: a pinch of salt rubbed over it, a glaze brushed on, a powder tapped off a spoon (`dab`).
  */
 export const OWNER_GRILL = { on: false, stand: new THREE.Vector3(), face: new THREE.Vector3(), lean: 0, hold: false, hand: new THREE.Vector3(), seenAt: -1e9, fanUntil: 0,
+  /** his own uchiwa in his hand just now (Boss): the one in the holder on the table taken up for it, not drawn there meanwhile (item 203: two
+   * fans, his out of nothing and the table's still in its holder) */
+  fanning: false,
   dabUntil: 0, dab: 'pinch' as 'pinch' | 'brush' | 'spoon',
   /** the cook table's top, in the world (his hands at the fire work at its height: he stands on the kitchen's floor, it at his chest), and
    * where his hands are to be, up and down, while he carries (NaN: his own pose's) */

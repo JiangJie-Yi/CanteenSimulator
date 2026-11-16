@@ -15,7 +15,7 @@ import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
-import { ONIGIRI_TRAY, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf } from './bar'
+import { ONIGIRI_TRAY, OWNER_GRILL, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
@@ -302,6 +302,7 @@ function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number]
     if (!o) return
     const h = held.current
     if (h?.kind === 'fan') {
+      o.visible = true
       o.position.copy(h.at)
       swing.current += (Math.sin(h.wave * 6) * 0.55 - swing.current) * Math.min(1, dt * 14)
       // (the wrist's flick: the fan beats back and forth, harder the faster it's being waved, and settles when it's held still)
@@ -312,7 +313,8 @@ function Fan({ held, at }: { held: RefObject<Held>; at: [number, number, number]
       // face to the camera's side, handle down, rocking side to side as it fans
       o.rotation.set(1.45 + Math.sin(phase.current) * 0.35 * beat.current, -0.6, swing.current, 'XYZ')
     } else {
-      // (back in its holder)
+      // (back in its holder; not there while the owner has it in his hand, fanning (Boss, item 203))
+      o.visible = !OWNER_GRILL.fanning
       let k = hook.current
       if (!k || !k.mesh.parent) {
         const mesh = scene.getObjectByName('FanHolder') as THREE.Mesh | undefined
