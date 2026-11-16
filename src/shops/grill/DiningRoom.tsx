@@ -7702,35 +7702,51 @@ const CRATE_CAP = (() => {
 })()
 const CRATE_GLASS_MAT = new THREE.MeshToonMaterial({ color: '#5a3010' })
 const CRATE_CAP_MAT = new THREE.MeshToonMaterial({ color: '#c9a24a', side: THREE.DoubleSide })
-function BottleCrates() {
+/** the two crates of bottled beer, the top one a little askew on the lower (the bottles in them drawn apart: CrateBottles) */
+function CrateBoxes() {
+  return (
+    <group>
+      {[0, 1].map((k) => (
+        <group key={k} position={[k * 0.03 - 0.015, k * 0.272, 0]} rotation-y={k * 0.1}><CrateModel /></group>
+      ))}
+    </group>
+  )
+}
+/**
+ * The bottled beer in the two crates, as many as there are in the back stock (item 199, the owner's: 「庫存的東西沒對上」): twenty to a crate,
+ * the lower filled first, so the top one empties first as bottles are taken. Drawn outside the crates' batch: a batch doesn't take instanced
+ * meshes in and hides what it's merged, so they were never drawn at all.
+ */
+function CrateBottles() {
   const W = 0.36, D = 0.29
   const cols = 5, rows = 4
-  // (where each bottle stands: the lower crate full, the top one with a few gone; in the crates' frame)
+  // (where each bottle stands, the lower crate's twenty first; in the crates' frame)
   const at = useMemo(() => {
     const out: THREE.Matrix4[] = []
     for (const k of [0, 1]) {
       const crate = new THREE.Matrix4().compose(new THREE.Vector3(k * 0.03 - 0.015, k * 0.272, 0), new THREE.Quaternion().setFromAxisAngle(UP_AXIS, k * 0.1), new THREE.Vector3(1, 1, 1))
       for (let n = 0; n < cols * rows; n++) {
-        if (k === 1 && (n % 7 === 3 || n === 11)) continue
         const x = -W / 2 + (W / cols) * ((n % cols) + 0.5), z = -D / 2 + (D / rows) * (Math.floor(n / cols) + 0.5)
         out.push(crate.clone().multiply(new THREE.Matrix4().makeTranslation(x, 0.012, z)))
       }
     }
     return out
   }, [])
+  const necks = useRef<THREE.InstancedMesh>(null), caps = useRef<THREE.InstancedMesh>(null)
   const place = useCallback((m: THREE.InstancedMesh | null) => {
     if (!m) return
     at.forEach((mx, i) => m.setMatrixAt(i, mx))
     m.instanceMatrix.needsUpdate = true
     m.computeBoundingSphere()
   }, [at])
+  useFrame(() => {
+    const n = Math.max(0, Math.min(at.length, Math.floor(DRINK_BACK.back.beer ?? 0)))
+    for (const m of [necks.current, caps.current]) if (m && m.count !== n) m.count = n
+  })
   return (
     <group>
-      {[0, 1].map((k) => (
-        <group key={k} position={[k * 0.03 - 0.015, k * 0.272, 0]} rotation-y={k * 0.1}><CrateModel /></group>
-      ))}
-      <instancedMesh ref={place} args={[CRATE_NECK, CRATE_GLASS_MAT, at.length]} castShadow={false} />
-      <instancedMesh ref={place} args={[CRATE_CAP, CRATE_CAP_MAT, at.length]} castShadow={false} />
+      <instancedMesh ref={(m) => { necks.current = m; place(m) }} args={[CRATE_NECK, CRATE_GLASS_MAT, at.length]} castShadow={false} />
+      <instancedMesh ref={(m) => { caps.current = m; place(m) }} args={[CRATE_CAP, CRATE_CAP_MAT, at.length]} castShadow={false} />
     </group>
   )
 }
@@ -8352,11 +8368,14 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
       {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
       {fr && <Movable id="crates" label="酒箱"><group ref={stock}><StaticBatch plain>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
-          <BottleCrates />
+          <CrateBoxes />
           {/* (and beside them the cartons of canned drinks) */}
           <group position={CARTONS_AT} rotation-y={Math.PI / 2 + 0.04}><DrinkCartons /></group>
         </group>
-      </StaticBatch></group>
+      </StaticBatch>
+        {/* (the bottles in the crates, out of the batch, as many as the back stock has) */}
+        <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}><CrateBottles /></group>
+      </group>
         {/* (the back stock: pointed at, what's running low; a click opens the drinks' stock) */}
         <group name="look-crates" position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <BackStockHit lit={stockLit} />
