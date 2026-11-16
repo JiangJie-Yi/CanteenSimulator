@@ -22,7 +22,7 @@ import { atlasModel } from '@/scene/atlasMerge'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
 import { FLOWS, flowOf, wantOf, type FlowKind } from '@/game/flow'
-import { COAL_MAX, COAL_PER_ADD, crumble, standStick, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
+import { COAL_MAX, COAL_PER_ADD, crumble, glowingFor, standStick, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -671,6 +671,8 @@ function EmberBedImpl({ fuel }: { fuel: { current: number } }) {
 /** the most sticks of charcoal the bed holds at once, and how long one lasts once it's burning, in game seconds (it burns down to a third of its length, then it's ash) */
 const UP_AXIS = new THREE.Vector3(0, 1, 0)
 const COAL_LAST_S = 300
+/** how far through its life one the fire's level holds burning stays: glowing, short of where its ash coat starts (0.72) */
+const COAL_HOLD_S = 0.6 * COAL_LAST_S
 /** how long a fresh stick of charcoal takes to kindle to red-hot, in game seconds */
 const COAL_KINDLE_S = 22
 /** how much higher the salt is heaped in the pit than it was modelled */
@@ -4729,6 +4731,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     force?: number; hopY?: number; hopV?: number
     /** seconds since it landed, whether it's burnt out, and how long it's been going out when it's pushed out by the new */
     age: number; gone: boolean; dying: boolean; dyT: number
+    /** one of the newest the fire's level keeps burning (game/coalPile's glowingFor): it doesn't go to ash while it is */
+    held?: boolean
     /** where it lies in plan (its landing), the way it points, how steeply it tips, and the pose it settles to */
     tx: number; tz: number; yaw: number; slope: number; lx: number; lz: number; ly: number; qEnd: THREE.Quaternion
     /** which of the six sticks it is, and its size against the model's (its pose is `g`: the fire's drawn instanced, coalLayer) */
@@ -5729,8 +5733,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (call === 'ask-coal' || call === 'drop-coal') {
       // (a handful out of the crate, as many as the bed takes; paid for only those, and none at all when it's full)
       if (!roomForCoal()) return
-      // (no more than the sack has (and what's in the crate, for the third cook: he takes from it): none left, the chef says so now and then)
-      const left = SUPPLIES.coal() + (tend ? CRATE.left : 0)
+      // (no more than the sack and the crate have between them (both take from the crate, the crate filled from the sack): none left, the
+      // chef says so now and then)
+      const left = SUPPLIES.coal() + CRATE.left
       if (left < 1) { say(L().noCharcoal); return }
       if (call === 'ask-coal') {
         // (asked once; the grill gets on with the food while the third cook fetches it)
@@ -5739,8 +5744,13 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       } else {
         // (no one to send, or the one sent off on something long (the rice, the plates) with the fire nearly out: dropped in at once)
         if (FIRE_TEND.want === 'coal') FIRE_TEND.want = null
-        const placed = dropCoals(undefined, Math.min(left, coalPortion()))
-        if (!placed || onAddCharcoal?.(placed) === false) return
+        // (out of the crate, as it's thrown from it (item 199: thrown from the crate, the sticks came off the sack's count and the crate never
+        // emptied): the crate filled from the sack first if it's empty, paid for then, not again now)
+        takeFromCrate()
+        const placed = dropCoals(undefined, Math.min(CRATE.left, coalPortion()))
+        if (!placed) return
+        CRATE.left = Math.max(0, CRATE.left - placed)
+        if (onAddCharcoal?.(placed, false, true) === false) return
         say(L().addCharcoal)
         return
       }
@@ -7193,12 +7203,25 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   useFrame(({ clock: clk, camera: frameCam }, delta) => {
     const clock = clk.elapsedTime
     const cdt = Math.min(delta, 0.05)
+    // (as many of the newest sticks kept burning as the fire's level has on the bed (item 199: the gauge at 94% over a bed gone to grey ash,
+    // each stick ashing on its own five minutes while the gauge took ninety to fall): the rest go to ash as ever)
+    {
+      let keep = fire ? glowingFor(fire.current) : COAL_MAX
+      for (let i = coals.current.length - 1; i >= 0; i--) {
+        const c = coals.current[i]
+        if (!c || c.gone || c.dying) continue
+        c.held = keep > 0
+        if (keep > 0) keep--
+      }
+    }
     for (const c of coals.current) {
       if (!c || !c.g) continue
       // (the glow: black at first, then a deep red creeping in, orange, and the face going grey under it as it kindles)
       if (c.gone) continue
       if (c.bounced) {
-        c.age += delta * GAME_SPEED.value
+        // (held by the fire's level: burning on short of its ash, or kindled back to it (fanned up, the level up again); else burning down)
+        const d = delta * GAME_SPEED.value
+        c.age = c.held && !c.dying ? (c.age < COAL_HOLD_S ? Math.min(COAL_HOLD_S, c.age + d) : Math.max(COAL_HOLD_S, c.age - 2 * d)) : c.age + d
         // (burning down: a stick of binchotan keeps its length and shape as it goes, only a little slimmer, its glow dying back at the end as it
         // greys over with ash and lies there pale until it's pushed out; pushed out by new ones, it crumbles to a puff of ash, fading away in a second and a half)
         const burnt = c.dying ? (c.dyT += delta) / 1.5 : Math.min(1, c.age / COAL_LAST_S)

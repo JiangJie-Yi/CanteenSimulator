@@ -730,6 +730,9 @@ export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => numbe
 /** whether any of these foods is in stock (item 182, the owner's: "the things themselves don't match the interface": a store's contents drawn
  * only while there's something of it in stock); with no shop running (not known), as if there were */
 export const anyInStock = (ids: readonly string[]) => ids.some((id) => SUPPLIES.has(id) !== 0)
+/** how much of a pot's worth there's stock to cook (item 199, the owner's: 「庫存的東西沒對上」: the rice cooker and the soup pot were made
+ * full from nothing, the rice sacks bare): a full pot, or what's left in stock if that's less; a full pot with no shop running */
+export const batchOf = (id: string, full: number) => { const n = SUPPLIES.has(id); return n < 0 ? full : Math.max(0, Math.min(full, n)) }
 /** what a customer's ordered comes to (App's own books: the menu's prices, how many parts, the drink they took): rung up at the till as it
  * is (item 182: the till charged a flat 380 a dish whatever was ordered; item 195: and the whole of it for one given some of it back);
  * null for one not known */
@@ -897,14 +900,16 @@ export const SEAT_BONES = new Map<number, number>()
  * takes a portion for each rice ball)
  */
 // (empty when the day starts, the third cook to cook it (the owner's, 2026-11-11): it opened with a pot's worth cooked)
-export const RICE: { rice: number; kama: Kama; washing: boolean } = { rice: 0, kama: emptyKama(), washing: false }
+/** (`batch`: how many portions the pot on the stove was set on with, what it's full of once cooked (item 199)) */
+export const RICE: { rice: number; kama: Kama; washing: boolean; batch: number } = { rice: 0, kama: emptyKama(), washing: false, batch: 20 }
 /** the finished rice balls on the bamboo tray at the rice-ball counter's end (game/rice, item 129): the third cook shapes them ahead
  * (GuestBar3D's plater), the head chef's fetcher takes an order's off it first (Roasting); Decor shows as many. Full as the shop's first set out */
 export const ONIGIRI_TRAY = { n: TRAY_MAX }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __onigiri?: typeof ONIGIRI_TRAY }).__onigiri = ONIGIRI_TRAY
 /** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
  * plater; Decor draws it) */
-export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat } = { pot: emptyPot(), left: 0, served: 0, heat: 'auto' }
+/** (`batch`: how many bowls the pot was made with (item 199): the pot holds that many once hot, and its surface stands as high as they do) */
+export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat; batch: number } = { pot: emptyPot(), left: 0, served: 0, heat: 'auto', batch: 12 }
 /** the seats with a bowl of miso soup set at them (Roasting ladles it out to those who ordered it; GuestBar3D draws it; `SOUP.served` counts
  * each change, for the drawing to see) */
 export const SOUP_SEATS = new Set<number>()

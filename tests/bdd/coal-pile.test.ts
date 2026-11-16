@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { afterCharcoal, canAddCharcoal } from '@/game/economy'
-import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, MAX_LAYERS, placeStick, roomFor, standStick, STICK_HALF, STICK_R, surfaceY, throwForce, type Lay } from '@/game/coalPile'
+import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, glowingFor, MAX_LAYERS, placeStick, roomFor, standStick, STICK_HALF, STICK_R, surfaceY, throwForce, type Lay } from '@/game/coalPile'
 
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const lay = (s: NonNullable<ReturnType<typeof placeStick>>): Lay => ({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
@@ -187,5 +187,19 @@ feature('炭立著圍成一圈靠在一起（像爐端燒的炭火）', () => {
       for (const l of ls) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.42)
       for (let i = 0; i < ls.length; i++) for (let j = i + 1; j < ls.length; j++) expect(Math.hypot(ls[i].x - ls[j].x, ls[i].z - ls[j].z)).toBeGreaterThan(STICK_R * 1.8)
     })
+  })
+})
+
+// (item 199: the gauge at 94% over a bed of grey ash)
+feature('炭火量表多少，爐上就有幾根燒紅的炭（第 199 項）', () => {
+  scenario('滿火時大約一整床在燒，火小了燒紅的跟著變少', ({ then, and }) => {
+    then('滿火約 36 根，不超過炭床放得下的', () => { expect(glowingFor(1)).toBe(36); expect(glowingFor(1)).toBeLessThanOrEqual(COAL_MAX) })
+    and('94% 時 34 根，一半時 18 根', () => { expect(glowingFor(0.94)).toBe(34); expect(glowingFor(0.5)).toBe(18) })
+    and('熄了就一根都沒有，一點點火至少還有一根', () => { expect(glowingFor(0)).toBe(0); expect(glowingFor(0.02)).toBe(1) })
+  })
+  scenario('加一把炭，燒紅的就多一把', ({ given, when, then }) => {
+    given('火在一半', (w) => { w.f = 0.5 })
+    when('加一把炭', (w) => { w.g = glowingFor(afterCharcoal(w.f)) - glowingFor(w.f) })
+    then('多出約一把的根數（6～7 根）', (w) => { expect(w.g).toBeGreaterThanOrEqual(COAL_PER_ADD.min); expect(w.g).toBeLessThanOrEqual(COAL_PER_ADD.max) })
   })
 })

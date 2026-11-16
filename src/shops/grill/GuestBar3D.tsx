@@ -91,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -4839,12 +4839,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {
         const r = kamaTick(RICE.kama, step)
         RICE.kama = r.kama
-        if (r.cooked) { RICE.rice = RICE_FULL; onSay?.('chef', LINES[lang].riceDone) }
+        if (r.cooked) { RICE.rice = RICE.batch; onSay?.('chef', LINES[lang].riceDone) }
         // (the soup's pot heating up in its well, the same)
         // (as fast as the well's heat has it: not at all with it off)
         const s = potTick(SOUP.pot, step * heatRate(heatNow(SOUP.heat, SOUP.pot)))
         SOUP.pot = s.pot
-        if (s.hot) { SOUP.left = SOUP_BOWLS; onSay?.('chef', LINES[lang].soupDone) }
+        if (s.hot) { SOUP.left = SOUP.batch; onSay?.('chef', LINES[lang].soupDone) }
       }
       /** where they stand at the cooker; its top, where the rice goes in */
       const kamaSpot = () => { marks.current.delete('cooker-front'); return inBar('cooker-front', home()).setY(0) }
@@ -4940,8 +4940,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (open && PLATING.stock < STACK_CAP) {
           if (LOW_RACK.n > 0) { PLATING.stock += 1; LOW_RACK.n -= 1 } else if (PLATE_RACK.n > 0) { PLATING.stock += 1; PLATE_RACK.n -= 1 }
         }
-        if (open && riceGoes(RICE.kama)) RICE.kama = setOn()
-        if (open && soupGoes(SOUP.pot)) SOUP.pot = setSoup()
+        // (a pot set on only with rice (or the soup's makings) in stock, and only as much as there is (item 199: made full from nothing))
+        if (open && riceGoes(RICE.kama) && anyInStock(['Onigiri'])) { RICE.kama = setOn(); RICE.batch = batchOf('Onigiri', RICE_FULL) }
+        if (open && soupGoes(SOUP.pot) && anyInStock(['MisoSoup'])) { SOUP.pot = setSoup(); SOUP.batch = batchOf('MisoSoup', SOUP_BOWLS) }
         if (open && washGoes(SKEWERS.s)) SKEWERS.s = washAll(SKEWERS.s)
       } else if (pl.phase === 'idle') {
         // (the second cook, plating with no third cook to: not while he's fetching an order or skewering it at the board)
@@ -4983,13 +4984,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             pl.pos.copy(home())
             setOff(skTraySpot(), 'toSkTray')
             away(true)
-          } else if (open && !SHOP.leaving && soupGoes(SOUP.pot) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
+          } else if (open && !SHOP.leaving && soupGoes(SOUP.pot) && anyInStock(['MisoSoup']) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
             // (the soup's pot empty (the day's start): to it to make it, water and dashi in and the miso stirred in, then it heats in its well)
             pl.pos.copy(home())
             pl.making = true
             setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
             away(true)
-          } else if (open && !SHOP.leaving && riceGoes(RICE.kama) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
+          } else if (open && !SHOP.leaving && riceGoes(RICE.kama) && anyInStock(['Onigiri']) && !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
             // (the cooker's empty: to the open sack for the next pot's rice, over the kitchen's edge to it, then to the sink to wash it)
             pl.pos.copy(home())
             const sk = sackSpots()
@@ -5077,7 +5078,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       else if (pl.phase === 'toSoup') walk(() => { pl.phase = 'stir'; faceTo(soupPot()) })
       else if (pl.phase === 'stir' && pl.t > (pl.making ? MAKE_S : STIR_S)) {
         // (made: in its well heating up (the water for it metered as the rice's is))
-        if (pl.making) { SOUP.pot = setSoup(); meterWater('cooking', 10); pl.making = false; soupAt.current = performance.now() / 1000 }
+        if (pl.making) { SOUP.pot = setSoup(); SOUP.batch = batchOf('MisoSoup', SOUP_BOWLS); meterWater('cooking', 10); pl.making = false; soupAt.current = performance.now() / 1000 }
         setOff(home(), 'home')
       }
       else if (pl.phase === 'toRack') walk(() => {
@@ -5170,8 +5171,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         setOff(kamaSpot(), 'toKama')
       } else if (pl.phase === 'toKama') walk(() => { pl.phase = 'load'; faceTo(kamaTop()) })
       else if (pl.phase === 'load' && pl.t > 0.8) {
-        // (into the pot, its lid on, the fire under it: cooking)
+        // (into the pot, its lid on, the fire under it: cooking, as much as was in stock)
         RICE.kama = setOn()
+        RICE.batch = batchOf('Onigiri', RICE_FULL)
         setOff(home(), 'home')
       }
       else if (pl.phase === 'toShape') walk(() => { pl.phase = 'shape'; faceTo(prepBoard()) })

@@ -2,6 +2,8 @@
 // beneath it, tipped to rest on the two sides it touches, laid across them rather than along them, as a pile is built. Pure
 // numbers (in the pit's own frame, plan x / z and height y) so the pile can be worked out and tested apart from the drawing.
 
+import { CHARCOAL_BOOST, STICKS_PER_PORTION } from './economy'
+
 /** a stick lying in the pile: its middle in plan, the way it points (plan angle), its middle's height, and how steeply it rises along its length */
 export type Lay = { x: number; z: number; yaw: number; y: number; slope: number }
 /** half a stick's length, and its radius: as the sticks are drawn (about 0.3 long, 0.065 across), measured in the scene */
@@ -138,6 +140,12 @@ export const roomFor = (alive: number, ashed: number, max: number) => alive < ma
 /** the most sticks the bed holds at once, and how many one load of charcoal puts on (6 or 7: a fire is laid close, the sticks touching, or it
  * won't catch): six loads (what it takes to bring the fire to 100%) fit */
 export const COAL_MAX = 42
+/**
+ * How many of the sticks on the bed burn as the fire's level is (item 199, the owner's: 「庫存的東西沒對上」: the fire's gauge at 94% over a
+ * bed burnt to grey ash: each stick went to ash on its own five minutes, the gauge took ninety to fall): a handful's sticks for each
+ * handful the level holds (a full fire about 36); the newest that many kept burning, the rest going to ash as ever.
+ */
+export const glowingFor = (fire: number) => Math.max(0, Math.round(fire * STICKS_PER_PORTION / CHARCOAL_BOOST))
 export const COAL_PER_ADD = { min: 6, max: 7 }
 
 /** a broken-off piece of a stick that has burnt through: about this round (it's thinner than the stick it came from) */

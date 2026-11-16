@@ -8,7 +8,8 @@ import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { countedBatch, mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
-import { SACK_STICKS } from '@/game/supplies'
+import { SACK_STICKS, SEASON_GOODS } from '@/game/supplies'
+import { PAR } from '@/game/economy'
 import { askPantry, SUPPLIES, anyInStock, tipOver } from './bar'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
@@ -189,12 +190,16 @@ export function CubbyStock({ which }: { which: 'right' | 'left' }) {
   useStudio()
   const gltf = useGLTF(STOCK_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => partOf(gltf.scene, which === 'right' ? 'StockRight' : 'StockLeft', 0.0025), [gltf, which])
-  // (empty with none of the chilled foods in stock (item 182: its shelves full under a panel saying 0))
-  useFrame(() => { const v = anyInStock(CHILLED_FOODS); if (obj.visible !== v) obj.visible = v })
+  // (empty with none of the chilled foods in stock (item 182: its shelves full under a panel saying 0)); the right-hand one, all sauces, by
+  // the sauces (item 199: it went by the foods, full with no sauce left and empty with every bottle in stock)
+  const ids = which === 'right' ? CHILLED_SAUCES : CHILLED_FOODS
+  useFrame(() => { const v = anyInStock(ids); if (obj.visible !== v) obj.visible = v })
   return <primitive object={obj} />
 }
 /** the foods the cook table's cupboards hold (data/storage's chilled ones on the menu) */
 const CHILLED_FOODS = DISHES.flatMap((d) => d.items.map((x) => x.id)).filter((id) => storageOf(id) === 'chilled')
+/** the sauces kept chilled (the seasonings not kept dry: data/storage), the right-hand cupboard's */
+const CHILLED_SAUCES = SEASON_GOODS.map((g) => g.id).filter((id) => storageOf(id) === 'chilled')
 
 /**
  * The sacks of potatoes and sweet potatoes, their backs to the bar, along it: what's kept at room temperature, so pointed at they light and
@@ -203,9 +208,21 @@ const CHILLED_FOODS = DISHES.flatMap((d) => d.items.map((x) => x.id)).filter((id
 /** how far (in the model's own units, its 1.4 times in the room) the sacks stand to the right of where they were modelled */
 const SACKS_RIGHT = 0.2
 const SACK_PARTS = /^Produce(Sack|Potato|Sweet|Onion|Loose)/
+/** what's in each sack, as there's stock of it (item 199, the owner's: 「庫存的東西沒對上」: the sacks drawn full at 0): the potatoes (and the
+ * loose one by them), the sweet potatoes, the onions (and their roots, the loose one too) */
+const PILES = [
+  { id: 'Potato', re: /^Produce(Potato(Edge|Top)?\d+|Loose0)$/ },
+  { id: 'SweetPotato', re: /^ProduceSweet(Edge)?\d+$/ },
+  { id: 'Onion', re: /^Produce(Onion(Edge|Top)?\d+|LooseOnion)$/ },
+] as const
+/** the order the pieces in a sack go, deepest last: the loose one on the floor first, then the top, the rim, the body */
+const pileRank = (name: string) => (/Loose/.test(name) ? 0 : /Top/.test(name) ? 1 : /Edge/.test(name) ? 2 : 3)
+/** how many of a sack's pieces are shown for so much in stock: all of them at the usual stock (PAR) and over, none at none, at least one
+ * while there's any; all of them with no shop running */
+const pileShown = (have: number, all: number) => (have < 0 ? all : have <= 0 ? 0 : Math.max(1, Math.min(all, Math.round((all * have) / PAR))))
 export function ProduceSacks() {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => {
+  const { obj, piles } = useMemo(() => {
     // (the owner's, 2026-11-12: the sacks over to the right (the stepped stand of baskets they were moved toward is gone, the owner's, 11-15): each part of the model
     // moved as it stands in a copy of it BEFORE partOf draws its ink line (one welded line round all of them: moved after, it stayed where the parts
     // were, black scraps all about the sacks), the sacks (and what's in them) along the row)
@@ -215,10 +232,31 @@ export function ProduceSacks() {
     }
     const holder = new THREE.Group()
     if (moved) holder.add(moved)
-    const r = partOf(holder, 'ProduceSacks', 0.004)
+    const piled = (o: THREE.Object3D) => PILES.some((k) => k.re.test(o.name))
+    const r = partOf(holder, 'ProduceSacks', 0.004, piled)
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
-    return r
+    // (each sack's pieces one mesh and one ink line cut to as many as there's stock for, the topmost going first (countedBatch, as the
+    // charcoal sack's sticks); the onions' roots taken off them and done the same, in the same order)
+    const piles = PILES.map(({ id, re }) => {
+      const pieces: THREE.Mesh[] = []
+      r.traverse((o) => { if (re.test(o.name) && (o as THREE.Mesh).isMesh) pieces.push(o as THREE.Mesh) })
+      pieces.sort((a, b) => pileRank(b.name) - pileRank(a.name) || a.name.localeCompare(b.name))
+      const roots = pieces.map((q) => q.children.find((c) => (c as THREE.Mesh).isMesh && /Root$/.test(c.name)) as THREE.Mesh | undefined)
+      const kept = roots.filter((x): x is THREE.Mesh => !!x)
+      for (const x of kept) r.attach(x)
+      return { id, all: pieces.length, body: countedBatch(r, pieces), roots: kept.length === pieces.length ? countedBatch(r, kept) : null, shown: -1 }
+    })
+    return { obj: r, piles }
   }, [gltf])
+  useFrame(() => {
+    for (const p of piles) {
+      const n = pileShown(SUPPLIES.has(p.id), p.all)
+      if (n === p.shown) continue
+      p.shown = n
+      p.body.show(n)
+      p.roots?.show(n)
+    }
+  })
   // (the sacks of potatoes, sweet potatoes and onions, and the baskets of the summer vegetables and the burdock beside them: how many of each
   // (the carrots chilled now, the owner's))
   const says = () => {

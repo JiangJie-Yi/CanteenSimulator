@@ -15,13 +15,13 @@ import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
-import { ONIGIRI_TRAY, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock } from './bar'
+import { ONIGIRI_TRAY, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
-import { HEAT_S, heatNow, nextHeat } from '@/game/soup'
+import { HEAT_S, heatNow, nextHeat, SOUP_BOWLS } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
 import { SINK_SETS, SinkModel, SinkPart } from './Sink'
 import { CharcoalSack, ProduceSacks, VegBasket } from './KitchenStores'
@@ -962,6 +962,8 @@ useGLTF.preload(MISOPOT_URL)
 const MISO_AT = { along: 4.28, lay: -0.5 - 0.937 }
 const MISO_SCALE = 1.05
 const MISO_TOP = COUNTER_TOP
+/** the soup's surface in the miso pot's model, brim-full, and the lowest it's drawn (blender/misopot.py's SOUP; its inside straight to 0.03) */
+const SOUP_TOP = 0.31, SOUP_LOW = 0.05
 function MisoPot() {
   useStudio()
   const gltf = useGLTF(MISOPOT_URL) as unknown as { scene: THREE.Group }
@@ -1002,6 +1004,10 @@ function MisoPot() {
     const st = SOUP.pot.state
     const k = st === 'empty' ? 0.0001 : 1
     pot.soup.scale.set(k, 1, k)
+    // (its surface as high as the bowls left in it (item 199: drawn brim-full till the last bowl was ladled): the pot's twelve at the brim,
+    // from SOUP_TOP down to SOUP_LOW over the inside's straight walls (blender/misopot.py: the soup at 0.31, the walls straight to 0.03))
+    const full = st === 'hot' ? SOUP.left : SOUP.batch
+    pot.soup.position.y = pot.soupY - (SOUP_TOP - SOUP_LOW) * (1 - Math.min(1, full / SOUP_BOWLS))
     if (steam.current) {
       steam.current.visible = st !== 'empty'
       const s = st === 'hot' ? 1 : st === 'heating' ? 0.4 + 0.6 * (1 - SOUP.pot.left / HEAT_S) : 0
@@ -1074,10 +1080,12 @@ function DenkiNabe() {
   const open = useRef(false), openK = useRef(0)
   const say = () => (RICE.kama.state === 'cooking' ? `煮飯中⋯⋯還要 ${Math.ceil(RICE.kama.left)} 秒`
     : RICE.kama.state === 'done' ? `保溫中，還有 ${RICE.rice}/${RICE_FULL} 份飯｜點一下${open.current ? '蓋上' : '掀開鍋蓋'}`
-      : open.current ? '空了｜點一下蓋上' : '空了｜點一下洗米煮飯')
+      : open.current ? '空了｜點一下蓋上' : anyInStock(['Onigiri']) ? '空了｜點一下洗米煮飯' : '空了｜米袋沒米了，到庫存訂米')
   const click = () => {
-    if (riceGoes(RICE.kama) && !open.current && !RICE.washing) { RICE.kama = setOn(); lightSwitchSound(false) }
-    else open.current = !open.current
+    if (riceGoes(RICE.kama) && !open.current && !RICE.washing) {
+      // (set on with washed rice only with rice in stock, as much as there is (item 199: a full pot from an empty sack); else it says so)
+      if (anyInStock(['Onigiri'])) { RICE.kama = setOn(); RICE.batch = batchOf('Onigiri', RICE_FULL); lightSwitchSound(false) }
+    } else open.current = !open.current
     setTip({ title: '電鍋', hint: say() })
   }
   // (pointed at, its tag kept up to date as it counts down: it was set once, as the pointer came over it, and stood still)
