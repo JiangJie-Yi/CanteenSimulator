@@ -741,7 +741,10 @@ export function resetAll() {
   frozen = { o: {}, r: {}, s: {} }
   saveFrozen()
   beginChange(); state.offsets = {}; state.rotations = {}; state.scales = {}
-  state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [0, 0, 0] as V3, yaw: 0, s: 1, r: [0, 0, 0] as V3 }]))
+  // (each group back as the shop comes with it: its own move where it has one (item 219, the owner's 「我剛剛按下全部還原，怎招財貓台就跑掉了!!!
+  // 說好本來就Reset呢」: every group's move was put to nothing, and the door's cat stand and the shrine, set where they are by their groups' moves
+  // (DEFAULT_GROUPS' `t`, the owner's), went back to where they stood before they were moved along the wall); the owner's own groups, none
+  state.groups = Object.fromEntries(Object.entries(state.groups).map(([k, g]) => [k, { ...g, t: [...(DEFAULT_GROUPS[k]?.t ?? [0, 0, 0])] as V3, yaw: 0, s: 1, r: [0, 0, 0] as V3 }]))
   // (and how every piece is drawn, back as made)
   clearAllRenderPrefs()
   save(); emit()
@@ -1952,5 +1955,5 @@ if (typeof window !== 'undefined') {
   // (a hot update swaps this module for a new copy: the old one's key let go of (or G was heard by every copy left behind, each with its own
   // developer mode, one more with every edit), its panel and notice taken away)
   replaces(import.meta.hot, () => { window.removeEventListener('keydown', onKey); offRenderPrefs(); el?.remove(); toastEl?.remove() })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, resetAll, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
 }
