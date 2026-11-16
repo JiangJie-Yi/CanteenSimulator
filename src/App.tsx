@@ -1,5 +1,5 @@
 import { personName } from '@/data/people'
-import { solidHit } from '@/scene/pickable'
+import { pieceOf, solidHit } from '@/scene/pickable'
 import { setTip } from '@/scene/hoverTip'
 import { normalizeRenderer } from '@/scene/materialNormalize'
 import { useLowPower } from '@/scene/power'
@@ -56,10 +56,10 @@ import { BOARD_SLOTS } from '@/game/fireSlots'
 import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, payIn, RIDERS, setDrinkPanel, SHOP_PURSE, SIDE_SALE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { unitCost } from '@/game/drinkStock'
 import { RICE_SIDE, riceName } from '@/data/sides'
-import { getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
+import { deselectAll, getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
 import { EditorShell } from '@/shops/grill/EditorShell'
 import { TOOL_PAGE } from '@/scene/toolPage'
-import { EditBlock, GroupGizmo, Movable, ShadeView, WireView } from '@/shops/grill/Movable'
+import { EditBlock, GroupGizmo, Movable, SelectionDim, ShadeView, WireView } from '@/shops/grill/Movable'
 import { ROOM_TURN, type ViewCam } from '@/game/editGroups'
 import { cameraOneOf } from '@/scene/camera1'
 import { holdsCameraOne, modeOf } from '@/game/mode'
@@ -942,13 +942,26 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
     if (!editing) { c.enableRotate = true; c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }; return }
     c.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.DOLLY }
     const alt = (e: KeyboardEvent | PointerEvent) => { c.enabled = e.altKey }
+    // (a press with the left button on no piece and no handle (the empty space round the room, or a wall, the floor, the bar: the room itself),
+    // where and when; let go again without having moved, a click: nothing chosen any more (item 213, the owner's 「當我點選空白處時，要取消選取」;
+    // r3f's own click and missed click never come in edit mode: the 3D view's clicks are swallowed, below))
+    let blank: { x: number; y: number } | null = null
     const down = (e: PointerEvent) => {
       c.mouseButtons.RIGHT = e.altKey ? THREE.MOUSE.DOLLY : THREE.MOUSE.PAN
       // (only something solid, or a handle: a lamp's glow over the wall isn't something)
-      const onSomething = [...getThree().internal.hovered.values()].some((h) => h.object.userData.gizmo || solidHit(h.object))
+      const hits = [...getThree().internal.hovered.values()].filter((h) => h.object.userData.gizmo || solidHit(h.object))
+      const onSomething = hits.length > 0
       c.enabled = e.altKey || e.button === 1 || e.button === 2 || (e.button === 0 && !onSomething)
+      // (what's nearest under the pointer, solid: a piece or a handle, or the room)
+      const first = hits.sort((a, b) => a.distance - b.distance)[0]
+      const onPiece = !!first && (first.object.userData.gizmo || first.object.userData.editHandle || pieceOf(first.object) !== null)
+      blank = e.button === 0 && !e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey && !onPiece ? { x: e.clientX, y: e.clientY } : null
     }
-    const up = () => { c.enabled = false }
+    const up = (e: PointerEvent) => {
+      c.enabled = false
+      if (blank && Math.hypot(e.clientX - blank.x, e.clientY - blank.y) < 4) deselectAll()
+      blank = null
+    }
     const keyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') c.enabled = false }
     c.enabled = false
     window.addEventListener('keydown', alt)
@@ -1192,6 +1205,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
       <ShadeView />
       <FocusTracker />
       {editing && <AxisWidget />}
+      {/* (what's chosen in developer mode the only thing at full light, the rest darkened (item 213)) */}
+      {editing && <SelectionDim />}
       <OrbitControls
         ref={controls}
         // shared as the scene's controls so dragging a seasoning onto food can hold the camera still

@@ -765,6 +765,53 @@ export function EditBlock({ children, whole = true }: { children: ReactNode; who
   return <group userData={whole ? { editBlock: true } : {}} onPointerDown={h} onPointerOver={h} onPointerMove={h}>{children}</group>
 }
 
+/** each piece's group by its id (item 213: what's chosen found to be drawn over the veil) */
+const PIECE_GROUPS = new Map<string, Set<THREE.Object3D>>()
+/** how dark the rest of the room is while something's chosen (what it's multiplied by) */
+const DIM = 0.4
+/** the veil's place in the drawing (after everything solid in the room, before the handles: 1000 up) and how far what's chosen is lifted */
+const VEIL_ORDER = 999
+const LIFT = 1000
+/** the veil: the whole picture multiplied by DIM (drawn in clip space, wherever the camera is; no depth, nothing behind it hidden) */
+const VEIL_MAT = new THREE.ShaderMaterial({
+  vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `void main() { gl_FragColor = vec4(vec3(${DIM.toFixed(2)}), 1.0); }`,
+  depthTest: false, depthWrite: false, toneMapped: false,
+  blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.ZeroFactor, blendDst: THREE.SrcColorFactor,
+})
+const VEIL_GEO = new THREE.PlaneGeometry(2, 2)
+warmLater(new THREE.Mesh(VEIL_GEO, VEIL_MAT))
+/**
+ * While something's chosen in developer mode, the rest of the room darker (item 213, the owner's 「選取目標時，要很明確表示，旁邊的物體要變暗」):
+ * a veil over the whole picture, multiplied in, drawn after everything solid; what's chosen (a piece, every piece of a group, all those
+ * picked) drawn after it as it is, the only things at their full light (where they're hidden behind something, still hidden); the handles
+ * after both. Nothing chosen, the veil's gone and everything's put back as it was drawn.
+ */
+export function SelectionDim() {
+  const veil = useRef<THREE.Mesh>(null)
+  /** what's lifted over the veil, and the order it was drawn in before */
+  const lifted = useRef(new Map<THREE.Object3D, number>())
+  useFrame(() => {
+    const { on, selected, picked, groups } = getEdit()
+    const ids = new Set<string>(picked)
+    if (selected) ids.add(selected)
+    // (a group chosen: its pieces, and those of the groups in it)
+    for (let k = 0; k < 4; k++) for (const id of [...ids]) for (const m of groups[id]?.members ?? []) ids.add(m)
+    const roots: THREE.Object3D[] = []
+    if (on) for (const id of ids) for (const r of PIECE_GROUPS.get(id) ?? []) roots.push(r)
+    if (veil.current) veil.current.visible = roots.length > 0
+    const keep = new Set<THREE.Object3D>()
+    for (const r of roots) r.traverse((o) => {
+      keep.add(o)
+      if (!lifted.current.has(o)) { lifted.current.set(o, o.renderOrder); o.renderOrder += LIFT }
+    })
+    for (const [o, was] of lifted.current) if (!keep.has(o)) { o.renderOrder = was; lifted.current.delete(o) }
+  })
+  // (gone with developer mode: everything back as it was)
+  useEffect(() => () => { for (const [o, was] of lifted.current) o.renderOrder = was; lifted.current.clear() }, [])
+  return <mesh ref={veil} geometry={VEIL_GEO} material={VEIL_MAT} renderOrder={VEIL_ORDER} frustumCulled={false} visible={false} raycast={() => {}} />
+}
+
 export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0], ground }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3
   /** it stands on the floor, this high in its own frame: sized about the middle of its foot there, not about its own middle, so made bigger
    * it grows up from the floor and doesn't sink into it (the dish cabinet's and the freezer's feet went down through the kitchen's dais and
@@ -1263,6 +1310,15 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
   useEditBox(inner, on, selected === id || isPicked(id) ? 'chosen' : hover || listed ? 'hover' : 'idle', ready, inYaw)
   useEffect(() => { if (!on) { over.current.clear(); setHover(false) } }, [on])
 
+  // (its group known by its id, for the veil to leave it bright when it's chosen (item 213))
+  useLayoutEffect(() => {
+    const o = g.current
+    if (!o) return
+    const set = PIECE_GROUPS.get(id) ?? new Set<THREE.Object3D>()
+    set.add(o)
+    PIECE_GROUPS.set(id, set)
+    return () => { set.delete(o); if (!set.size) PIECE_GROUPS.delete(id) }
+  }, [id])
   return (
     <group ref={gw} matrixAutoUpdate={false} visible={!hiddenHere}>
     <group ref={g} position={o} userData={{ editId: id }}>

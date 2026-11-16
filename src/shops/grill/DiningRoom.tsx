@@ -7953,9 +7953,15 @@ function WallSpeaker() {
     reachAt.current = st.clock.elapsedTime
     const reach = model.root.getObjectByName('SpeakerArmReach'), mount = model.root.getObjectByName('SpeakerMount')
     if (!reach || !mount) return
+    // (an arm left broken by a look gone wrong (its stretch not a number) put back to as it's made first: from it, every look after went
+    // wrong the same way, and its mesh, everywhere at once, took every click in the editor (item 213: a click on empty space chose the speaker))
+    if (!Number.isFinite(reach.scale.z) || !Number.isFinite(mount.position.z)) { reach.scale.z = 1; mount.position.z = reach.position.z - SPEAKER_ARM; found.current.sure = false }
     reach.updateWorldMatrix(true, false)
     const from = reach.getWorldPosition(new THREE.Vector3())
-    const back = new THREE.Vector3(0, 0, -1).transformDirection(reach.matrixWorld)
+    // (straight back in the arm's parent's frame, not its own: its own has its stretch in it, and squashed to nothing as it's first laid out (the
+    // editor's pieces are), the way back came out of it as no way at all)
+    const back = new THREE.Vector3(0, 0, -1).transformDirection((reach.parent ?? reach).matrixWorld)
+    if (![from.x, from.y, from.z, back.x, back.y, back.z].every(Number.isFinite) || back.lengthSq() < 0.5) return
     const f = found.current
     const still = from.distanceToSquared(f.at) < 1e-6 && back.dot(f.dir) > 0.99999
     if (still && f.sure) return
@@ -7973,6 +7979,7 @@ function WallSpeaker() {
     // last, the arm long, then short, then long again every half second)
     const k = (reach.parent ?? reach).getWorldScale(new THREE.Vector3()).z || 1
     const len = Math.max(0.05, hit.distance / k)
+    if (!Number.isFinite(len)) return
     // (sure once the same wall's found twice from the same place)
     f.sure = still && Math.abs(len - f.len) < 0.002
     f.at.copy(from); f.dir.copy(back); f.len = len

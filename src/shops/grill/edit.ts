@@ -125,6 +125,17 @@ const loadGroups = (): Record<string, Group> => {
   } catch { /* storage blocked */ }
   // (the old rice tub's id left in a kept group: it's gone)
   for (const [k, x] of Object.entries(g)) if (x.members.includes('ricetub')) g[k] = { ...x, members: x.members.filter((m) => m !== 'ricetub') }
+  // (a group saved with its pivot or move not numbers (item 213: the rice corner's, measured empty): back to as it's made, its foot to be found
+  // again once there's something to measure (KEY_GFOOT's mark taken off it))
+  const bad = (v: unknown) => !Array.isArray(v) || !v.every(Number.isFinite)
+  for (const [k, x] of Object.entries(g)) {
+    if (!bad(x.pivot) && !bad(x.t) && Number.isFinite(x.s) && Number.isFinite(x.yaw) && (x.r === undefined || !bad(x.r))) continue
+    g[k] = { ...x, pivot: [0, 0, 0], t: bad(x.t) ? [0, 0, 0] : x.t, s: Number.isFinite(x.s) ? x.s : 1, yaw: Number.isFinite(x.yaw) ? x.yaw : 0, r: x.r && !bad(x.r) ? x.r : undefined }
+    try {
+      const done = new Set<string>(JSON.parse(localStorage.getItem('jgs-edit-group-foot-2') ?? '[]'))
+      if (done.delete(k)) localStorage.setItem('jgs-edit-group-foot-2', JSON.stringify([...done]))
+    } catch { /* storage blocked */ }
+  }
   for (const [id, d] of Object.entries(DEFAULT_GROUPS)) {
     // (not when the owner has already put any of its pieces in a group of their own, or broken it up; a view's area holding them gives them up
     // to it, and holds it in their place)
@@ -565,8 +576,11 @@ export function settleGroupFeet() {
     if (groupFootDone.has(gid) || unsettled.has(gid)) continue
     // (its pieces' boxes, every corner, in the group's own frame: the middle of all of them squared to the room, at their lowest foot)
     const boxes = leavesOf(state.groups, gid).map((m) => registry.get(m)?.corners?.() ?? null)
-    if (!boxes.length || boxes.some((v) => !v)) continue
+    // (not till every piece in it has something drawn to measure (item 213: the rice sacks all put away, no rice in stock, measured nothing,
+    // and the group's pivot and move came out not numbers, saved so: drawn nowhere and everywhere, it took every click in the editor))
+    if (!boxes.length || boxes.some((v) => !v || !v.length)) continue
     const pts = (boxes as V3[][]).flat().map((v) => intoGroup(gid, v))
+    if (pts.some((v) => !v.every(Number.isFinite))) continue
     const ra = ROOM_TURN * Math.PI / 180, ax = Math.cos(ra), az = -Math.sin(ra)
     let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity, y = Infinity
     for (const v of pts) {
@@ -575,6 +589,7 @@ export function settleGroupFeet() {
     }
     const um = (u0 + u1) / 2, wm = (w0 + w1) / 2
     const at: V3 = [um * ax - wm * az, y, um * az + wm * ax]
+    if (!at.every(Number.isFinite)) continue
     const d: V3 = [at[0] - g.pivot[0], at[1] - g.pivot[1], at[2] - g.pivot[2]]
     // (turned and sized about the old pivot, now about the new: the difference made up for in its move)
     const ad = applyGroup({ ...g, pivot: [0, 0, 0], t: [0, 0, 0] }, d)
@@ -732,6 +747,13 @@ export function resetAll() {
   save(); emit()
 }
 export const select = (id: string | null) => { state.selected = id; if (id && state.groups[id]) settleGroupFeet(); emit() }
+/** nothing chosen any more, nor picked: a click on empty space or on the room itself (item 213, the owner's 「當我點選空白處時，要取消選取」; App's
+ * editor press and let go), as Esc does */
+export function deselectAll() {
+  if (!state.on || (!state.selected && !state.picked.length)) return
+  state.picked = []
+  select(null)
+}
 /** which handles the selected piece shows: arrows to move it, rings to turn it, boxes to scale it */
 export function setTool(t: Tool) {
   if (!state.on || state.tool === t) return
