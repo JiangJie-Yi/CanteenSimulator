@@ -6405,6 +6405,9 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
 /* the day's closing sheet (ui/DaySummary; the owner's): in the middle over the shut shop, the panels' finish (the lacquered wood bar, pale
    paper half see-through, dark at night), the profit large, the books and the customers below; every label on one line */
 /* (the shop gone out of business (item 239): over everything, nothing behind it to press; in the day sheet's paper and wood) */
+/* (a drink's cases on their way from the liquor shop, beside what's in the back (item 243)) */
+.drink-coming { color: #3a7a4a; font-style: normal; font-weight: 700; white-space: nowrap; }
+:root[data-theme='dark'] .drink-coming { color: #8fd29a; }
 .closed-down-veil {
   position: fixed;
   inset: 0;

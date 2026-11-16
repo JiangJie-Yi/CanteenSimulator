@@ -95,9 +95,9 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { DRAIN_KINDS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack } from './bar'
+import { DRAIN_KINDS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
-import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
+import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
 /** where a sound's heard from, worked out in place */
 const SOUND_AT = new THREE.Vector3()
@@ -544,12 +544,13 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       if (g.current) { g.current.userData.lean = counting ? 0.18 : 0; g.current.userData.prep = undefined }
       if (s.check > 1) {
         s.check = 0
-        // (a case ordered in of whatever the back's running out of, one a look)
+        // (a case ordered from the liquor shop of whatever the back, with what's on its way, is running out of, one a look (item 243: it came
+        // that moment); brought round DELIVERY_MIN later, paid for then)
         const ids = FRIDGE_UNITS.flatMap((u) => u.shelves.flatMap((sh) => sh.ids))
-        const want = drinksToOrder(DRINK_BACK.back, ids)[0]
-        if (want) {
-          const r = buyCase(DRINK_BACK.back, want, SHOP_PURSE.cash())
-          if (r.ok) { DRINK_BACK.back = r.back; SHOP_PURSE.spend(caseCost(want)); DRINK_BACK.ver++ }
+        const want = drinksToOrder(DRINK_BACK.back, ids, DRINK_COMING.list)[0]
+        if (want && SHOP_PURSE.cash() >= caseCost(want)) {
+          DRINK_COMING.list = orderCase(DRINK_COMING.list, want, getClock().day * 1440 + getClock().minute)
+          DRINK_BACK.ver++
         }
         const busy = (w: 'm' | 'f') => TOILETS[w].passing > 0 || TOILETS[w].inside > 0
         const next = stockerChore({
@@ -3197,6 +3198,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** a customer waiting at the till with no cashier sat at it (item 203): who, since when (the bar's clock), the server on their way to ring
    * them up (their place in the line) and whether they're there behind it */
   const tillCall = useRef<{ who: number; since: number; staff: number; there: boolean }>({ who: -1, since: 0, staff: -1, there: false })
+  /** when the liquor shop's deliveries were last looked for (the bar's clock) */
+  const deliveryLook = useRef(0)
   /** where a server stands behind the till to ring someone up: the cashier's chair's place on the floor */
   const tillStaffSpot = () => {
     const fb = frame.current, m = seatMark.current
@@ -5180,6 +5183,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       TILL_STATE.tender = 0
       TILL_STATE.change = 0
       TILL_STATE.card = false
+    }
+    // (the liquor shop's deliveries come in (item 243): each case due paid for and put in the back; no cash for it, sent back; a word as they
+    // come, from the stocker if there's one)
+    if (clock.current - deliveryLook.current > 1) {
+      deliveryLook.current = clock.current
+      const { arrived, still } = arrivals(DRINK_COMING.list, getClock().day * 1440 + getClock().minute)
+      if (arrived.length) {
+        DRINK_COMING.list = still
+        for (const d of arrived) {
+          const r = buyCase(DRINK_BACK.back, d.id, SHOP_PURSE.cash())
+          if (r.ok) { DRINK_BACK.back = r.back; SHOP_PURSE.spend(caseCost(d.id)) }
+        }
+        DRINK_BACK.ver++
+        const names = [...new Set(arrived.map((d) => d.id))].map((id) => { const x = DRINKS.find((q) => q.id === id); return x ? (lang === 'ja' ? x.ja : lang === 'en' ? x.en : x.zh) : id })
+        if (stocker) STAFF_TALK.push({ key: performance.now() + 0.3, id: stocker.id, text: LINES[lang].deliveryIn(names.join('、'), arrived.length), until: performance.now() + 3200 })
+      }
     }
     TILL_STATE.queue = queue
     TILL_STATE.tablet = tabletActive(queue, TILL_STATE.k >= 0 && TILL_STATE.card)

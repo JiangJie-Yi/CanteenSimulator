@@ -19,7 +19,7 @@ import type { Flower } from '@/game/shrineFlowers'
 import { freshRoom } from '@/game/restroom'
 import { emptyBasin } from '@/game/basin'
 import { SOAP_FULL, TOWEL_FULL } from '@/game/washroom'
-import { emptyFridge, moveBetween, putInPlace, readDrinks, startBack, takeFromPlace, writeDrinks, type Back, type Places } from '@/game/drinkStock'
+import { emptyFridge, moveBetween, putInPlace, readDrinks, startBack, takeFromPlace, writeDrinks, type Back, type Places, type Delivery } from '@/game/drinkStock'
 import { emptyBins, type BinKind, type Bins } from '@/game/bins'
 import { replaces } from '@/scene/hot'
 import { ROLL_SLIPS } from '@/game/receipts'
@@ -467,6 +467,9 @@ const DRINK_HOMES = FRIDGE_UNITS.map((u) => u.shelves.map((sh) => [...sh.ids] as
 const keptDrinks = (() => { try { return readDrinks(localStorage.getItem(DRINKS_KEY), DRINK_HOMES) } catch { return null } })()
 /** the drinks kept in the back (the crates and cartons by the fridges, game/drinkStock): what's carried out to the fridges, bought by the case */
 export const DRINK_BACK: { back: Back; ver: number } = { back: keptDrinks?.back ?? startBack(), ver: 0 }
+/** the cases ordered from the liquor shop on their way (game/drinkStock's Delivery, item 243): the stocker's orders and the fridge panel's;
+ * brought in, paid for and put in the back as each comes (GuestBar3D) */
+export const DRINK_COMING: { list: Delivery[] } = { list: [] }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __drinkBack?: typeof DRINK_BACK }).__drinkBack = DRINK_BACK
 /** the shop's cash, for buying from the room itself (App fills it in): how much there is, and paying out (a purchase in the ledger) */
 export const SHOP_PURSE = { cash: () => Infinity as number, spend: (n: number) => { void n } }

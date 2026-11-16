@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { tl, type Lang } from '@/data/i18n'
-import { buyCase, caseCost, CASE_SIZE, drinkCounts, fillFromBack } from '@/game/drinkStock'
+import { caseCost, CASE_SIZE, comingOf, drinkCounts, fillFromBack, orderCase } from '@/game/drinkStock'
+import { getClock } from '@/ui/clockStore'
 import { FitLine } from '@/ui/FitLine'
 import { setTip } from '@/scene/hoverTip'
-import { DRINK_BACK, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, placesOf, SHOP_PURSE, type DrinkId } from './bar'
+import { DRINK_BACK, DRINK_COMING, DRINKS, FRIDGE_STOCK, FRIDGE_UNITS, placesOf, SHOP_PURSE, type DrinkId } from './bar'
 
 type Drink = (typeof DRINKS)[number]
 const HOMES = FRIDGE_UNITS.map((u) => u.shelves.map((sh) => sh.ids))
@@ -77,11 +78,10 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
   }, [])
   const cash = SHOP_PURSE.cash()
   const changed = () => { FRIDGE_STOCK.ver++; DRINK_BACK.ver++; tick((n) => n + 1) }
+  // (ordered from the liquor shop, brought round DELIVERY_MIN later and paid for then (item 243: a case came the moment it was bought))
   const buy = (id: DrinkId) => {
-    const r = buyCase(DRINK_BACK.back, id, SHOP_PURSE.cash())
-    if (!r.ok) return
-    DRINK_BACK.back = r.back
-    SHOP_PURSE.spend(caseCost(id))
+    if (SHOP_PURSE.cash() < caseCost(id)) return
+    DRINK_COMING.list = orderCase(DRINK_COMING.list, id, getClock().day * 1440 + getClock().minute)
     changed()
   }
   const fill = (only?: DrinkId) => {
@@ -98,7 +98,7 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
   const total = (id: DrinkId) => counts.reduce((t, c) => ({ have: t.have + (c[id]?.have ?? 0), places: t.places + (c[id]?.places ?? 0) }), { have: 0, places: 0 })
   useEffect(() => () => setTip(null), [])
   /** the drinks the back can't fill their empty places from: a case of each of those is what the foot's button orders */
-  const short = UNIT_DRINKS.flat().filter((id) => { const t = total(id); return (DRINK_BACK.back[id] ?? 0) < t.places - t.have })
+  const short = UNIT_DRINKS.flat().filter((id) => { const t = total(id); return (DRINK_BACK.back[id] ?? 0) + comingOf(DRINK_COMING.list, id) * CASE_SIZE[id] < t.places - t.have })
   const shortCost = short.reduce((n, id) => n + caseCost(id), 0)
   const anyToFill = UNIT_DRINKS.flat().some((id) => { const t = total(id); return t.have < t.places && (DRINK_BACK.back[id] ?? 0) > 0 })
   return (
@@ -130,7 +130,8 @@ export function DrinkStockBody({ lang }: { lang: Lang }) {
                           onPointerLeave={() => setTip(null)}>+{c.astray}</i>
                         )}
                       </b>
-                      <small>{tl(lang, '後場', 'バック', 'Back')} <em>{back}</em></small>
+                      <small>{tl(lang, '後場', 'バック', 'Back')} <em>{back}</em>{comingOf(DRINK_COMING.list, id) > 0 && (
+                        <i className="drink-coming" title={tl(lang, '酒屋送貨中', '配達待ち', 'On its way from the liquor shop')}> +{comingOf(DRINK_COMING.list, id) * CASE_SIZE[id]}</i>)}</small>
                     </span>
                     <span className="chiller-buy drink-bin-buy">
                       <span role="button" tabIndex={0} className={`chiller-btn${cash >= cost ? '' : ' is-off'}`}

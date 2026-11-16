@@ -25,6 +25,20 @@ export const unitCost = (id: string) => UNIT_COST[id] ?? 20
 /** what the back starts with: two cases of each */
 export const startBack = (): Back => Object.fromEntries(Object.keys(CASE_SIZE).map((id) => [id, CASE_SIZE[id] * 2]))
 
+/**
+ * Drinks are ordered from the liquor shop and brought round (item 243: a case bought came into the back that moment): an order's on its way
+ * DELIVERY_MIN of the shop's minutes, paid for as it comes in (no cash then: sent back). Kept in memory only, not in the drinks' save (its
+ * shape is the owner's fixed rule 1: a reload forgets what was on its way, and nothing was paid for it).
+ */
+export const DELIVERY_MIN = 40
+export type Delivery = { id: string; at: number }
+/** a case of a drink ordered at `now` (the shop's minutes since its first day began) */
+export const orderCase = (coming: readonly Delivery[], id: string, now: number): Delivery[] => [...coming, { id, at: now + DELIVERY_MIN }]
+/** how many cases of a drink are on their way */
+export const comingOf = (coming: readonly Delivery[], id: string) => coming.filter((d) => d.id === id).length
+/** what's come by `now`, and what's still on its way */
+export const arrivals = (coming: readonly Delivery[], now: number) => ({ arrived: coming.filter((d) => d.at <= now), still: coming.filter((d) => d.at > now) })
+
 /** one case bought in, if the cash runs to it */
 export function buyCase(back: Back, id: string, cash: number) {
   const cost = caseCost(id)

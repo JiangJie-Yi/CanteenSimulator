@@ -55,6 +55,7 @@ const ZH = {
   stickAway: '燙燙燙！竹籤俐落收掉！',
   noSkewer: '鐵串用光了！得先把髒鐵串洗好！',
   skewerWash: '把鐵串刷得亮晶晶！',
+  deliveryIn: (names: string, n: number): string => `酒屋送貨來了：${names}，共 ${n} 箱，我搬進後場！`,
   burntAway: '哎呀焦黑了！這份不能砸了招牌，丟掉重烤！',
   orphanAway: '客人等不及先走了…先放進大碗保溫，等下一位點的客人！',
   // (the shop shut for the day: there's no next customer to keep it for)
@@ -172,6 +173,7 @@ const JA: typeof ZH = {
   stickAway: 'アチチッ！串を手早く片付けるぞ！',
   noSkewer: '鉄串が切れた！使った串を先に洗わないと！',
   skewerWash: '鉄串をピカピカに磨くぞ！',
+  deliveryIn: (names: string, n: number) => `酒屋さんの配達です：${names}、${n}ケース。裏に運びます！`,
   burntAway: 'あちゃー、焦げちまった！店の看板に関わる、焼き直しだ！',
   orphanAway: 'お客さん帰っちゃったか…大鉢で保温して、次の注文に回そう！',
   orphanMeal: (n: string) => `お客さん帰っちゃったか…もう閉店だし、この${n}はまかないにしよう！`,
@@ -282,6 +284,7 @@ const EN: typeof ZH = {
   stickAway: 'Hot skewers cleared with chef speed!',
   noSkewer: 'Out of skewers! The used ones need washing first!',
   skewerWash: 'Scrubbing the skewers till they shine!',
+  deliveryIn: (names: string, n: number) => `The liquor shop's delivery: ${names}, ${n} case${n > 1 ? 's' : ''}. Taking it to the back!`,
   burntAway: 'Blast, it charred! Can’t serve this to valued guests—toss it and restart!',
   orphanAway: 'The patron left... Into the big bowl to keep warm for the next order!',
   orphanMeal: (n: string) => `They've gone, and we're closed: this ${n} is the staff's supper!`,

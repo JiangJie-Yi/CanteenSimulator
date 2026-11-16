@@ -43,6 +43,7 @@ export function stockerChore({ rolls, wcBusy, fridgeShort, boxes, seatTaken, spa
   return null
 }
 
-/** the drinks (of those the fridges are stocked with) a case of is ordered in: those the back's down to under half a case of */
-export const drinksToOrder = (back: Record<string, number>, ids: string[]) =>
-  [...new Set(ids)].filter((id) => (back[id] ?? 0) < (CASE_SIZE[id] ?? 24) / 2)
+/** the drinks (of those the fridges are stocked with) a case of is ordered in: those the back, with what's on its way, is down to under a
+ * case of (half a case once, when it came the moment it was bought; it takes the liquor shop DELIVERY_MIN to bring it now, item 243) */
+export const drinksToOrder = (back: Record<string, number>, ids: string[], coming: readonly { id: string }[] = []) =>
+  [...new Set(ids)].filter((id) => (back[id] ?? 0) + coming.filter((d) => d.id === id).length * (CASE_SIZE[id] ?? 24) < (CASE_SIZE[id] ?? 24))

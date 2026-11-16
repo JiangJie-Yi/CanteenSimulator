@@ -28,9 +28,11 @@ feature('倉儲員工：自己進貨、補貨，走去補飲料、吧台的衛�
       expect(stockerChore({ ...calm, rolls: { m: 0, f: 1 }, fridgeShort: [6, 0], boxes: [5, 200, 200] })).toEqual({ kind: 'roll', who: 'm' })
     })
   })
-  scenario('飲料後場不到半箱就叫一箱（只叫飲料櫃有賣的）', ({ then, and }) => {
+  scenario('飲料後場（連同送貨中的）不到一箱就叫一箱（只叫飲料櫃有賣的；要等酒屋送，第 243 項提早叫）', ({ then, and }) => {
     then('啤酒剩 5 瓶（一箱 20）：叫', () => { expect(drinksToOrder({ beer: 5, cola: 30 }, ['beer', 'cola'])).toEqual(['beer']) })
-    and(`可樂剛好半箱（${CASE_SIZE.cola / 2}）：不叫`, () => { expect(drinksToOrder({ cola: CASE_SIZE.cola / 2 }, ['cola'])).toEqual([]) })
+    and(`可樂半箱（${CASE_SIZE.cola / 2}）：也叫（送來要時間）`, () => { expect(drinksToOrder({ cola: CASE_SIZE.cola / 2 }, ['cola'])).toEqual(['cola']) })
+    and(`可樂剛好一箱（${CASE_SIZE.cola}）：不叫`, () => { expect(drinksToOrder({ cola: CASE_SIZE.cola }, ['cola'])).toEqual([]) })
+    and('啤酒剩 5 瓶但已經叫了一箱在路上：不再叫', () => { expect(drinksToOrder({ beer: 5 }, ['beer'], [{ id: 'beer' }])).toEqual([]) })
     and('同一種在櫃子裡好幾格，只叫一次', () => { expect(drinksToOrder({ beer: 0 }, ['beer', 'beer', 'beer'])).toEqual(['beer']) })
   })
 })
