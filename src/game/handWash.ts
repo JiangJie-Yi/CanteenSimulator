@@ -4,7 +4,7 @@
 // quarter full waited for, the liquid and the sponge were each a gate, in a fixed order. Now only water's needed, the tap running (the plug
 // in or not) or some standing in the basin; the rest is the player's to choose: the liquid washes faster (and with suds), the plug keeps the
 // water in (left running with it out, the water's metered all the while). Said as advice, not asked for.
-import { DRAIN_CAP, type Drain } from './plates'
+import { CLEAN_AT, DRAIN_CAP, type Drain } from './plates'
 
 /** how much standing water counts as some to wash in (0 empty .. 1 at the overflow): a little, no more (item 217: it was a quarter full) */
 export const WASH_WET = 0.02
@@ -29,12 +29,49 @@ export function handStep(s: HandSink): HandStep {
   if (s.drain.n >= DRAIN_CAP) return 'basketFull'
   return hasWater(s) ? 'scrub' : 'water'
 }
-/** advice on the washing as it's set up, not a step (item 217): with no liquid, slower; left running with the plug out, more water */
+/** advice on the washing as it's set up, not a step (item 217): without the sponge or the liquid, slower; left running with the plug out,
+ * more water */
 export function washTips(s: HandSink): string[] {
   const out: string[] = []
-  if (s.soap <= 0) out.push('沒擠洗碗精也能洗，擠一點刷得快')
+  if (!s.sponge) out.push('拿著菜瓜布刷得快一倍')
+  else if (s.soap <= 0) out.push('擠一點洗碗精刷得更快')
   if (s.tap && !s.plug) out.push('開著水沖著洗比較費水，塞住水槽可以存水')
   return out
+}
+
+/**
+ * Washing up by hand, the player's own (item 224, the owner's, 2026-11-16: 「自己洗盤子的時候老闆不用來，可以拖曳盤子泡水or給水龍頭直接沖，用菜瓜布+洗碗精清潔
+ * 更快」, and 「這個遊戲體驗要好、要直覺」): the top dirty plate taken up off the stack in the sink and held under the running tap or in the
+ * water standing in the basin comes clean as it's held there, a rinse the quicker; the sponge in the other hand twice as fast, washing-up
+ * liquid (on the sponge, or in the water the plate's in) faster again, scrubbed to and fro (the pointer moving) faster still; clean, stood in
+ * the draining basket. Rates: how much of a plate's dirt (0 clean .. 1) goes in a second of the shop's clock.
+ */
+export const RINSE_RATE = 0.2
+export const SOAK_RATE = 0.08
+export const SPONGE_X = 2
+export const SOAP_X = 1.6
+export const SCRUB_X = 0.6
+/** where the plate in hand is: under the running tap, in the water standing in the basin, or neither (dry) */
+export type HandAt = 'tap' | 'water' | null
+/** the plate in hand `dt` seconds on (`scrub`: how hard it's being scrubbed to and fro, 0..1) */
+export function handClean(dirt: number, dt: number, at: HandAt, o: { sponge: boolean; soap: boolean; scrub: number }) {
+  if (!at) return dirt
+  const rate = (at === 'tap' ? RINSE_RATE : SOAK_RATE) * (o.sponge ? SPONGE_X : 1) * (o.soap ? SOAP_X : 1) * (1 + SCRUB_X * Math.min(1, Math.max(0, o.scrub)))
+  return Math.max(0, dirt - rate * dt)
+}
+/** where a plate let go of goes: over the draining basket, clean (nothing to see on it) and room in it, into it; else back on the stack in
+ * the sink, as clean as it's got (it soaks there with the rest) */
+export function letGo(over: 'basket' | 'sink' | null, dirt: number, basketFull: boolean): 'basket' | 'stack' {
+  return over === 'basket' && dirt <= CLEAN_AT && !basketFull ? 'basket' : 'stack'
+}
+/** what's said of the plate in hand as it's washed: where it is and how dirty, and the one thing to do next */
+export function handSays(at: HandAt, dirt: number, o: { sponge: boolean; soap: boolean; over: 'basket' | 'sink' | null; basketFull: boolean }): string {
+  if (dirt <= CLEAN_AT) return o.basketFull ? '乾淨了｜瀝水籃滿了，先把乾的收回碗盤架' : o.over === 'basket' ? '乾淨了｜放開就放進瀝水籃' : '乾淨了｜拖到瀝水籃放下'
+  const left = `還有 ${Math.max(1, Math.round(Math.min(1, dirt) * 100))}% 髒`
+  if (!at) return `${left}｜拿到水龍頭下沖，或放進水裡泡`
+  const head = at === 'tap' ? `沖水中，${left}` : `泡在水裡，${left}`
+  const next = !o.sponge ? '拿著菜瓜布刷得快一倍' : !o.soap ? '擠一點洗碗精刷得更快' : '來回刷洗得更快'
+  return `${head}｜${next}`
 }
 /** a squeeze of the liquid into the water (what's in it so far kept, up to the most it holds) */
 export const pumpSoap = (soap: number) => Math.min(SOAP_MAX, soap + SOAP_PUMP)
@@ -49,8 +86,9 @@ export const soapWith = (soap: number, was: number, water: number) => (was >= WA
 export const HAND_STEP_SAYS: Record<HandStep, string> = {
   none: '沒有髒盤子',
   basketFull: '瀝水籃滿了，點瀝水籃把乾的收回碗盤架',
-  water: '洗碗：點亮起來的水龍頭開水就能洗',
-  scrub: '點這疊髒盤子，老闆就來洗',
+  // (item 224: washed by the player's own hand, not handed to the owner)
+  water: '先開水龍頭（亮起來的那支）沖著洗，或塞住水槽放水泡',
+  scrub: '按住最上面的盤子拿起來，拿到水龍頭下沖或放進水裡泡',
 }
 /** the thing that lights up for each step, to be clicked next (none: there's nothing to click, or it's the dirty plates themselves) */
 export const GUIDE_OF: Record<HandStep, 'tap' | 'basket' | null> = { none: null, basketFull: 'basket', water: 'tap', scrub: null }

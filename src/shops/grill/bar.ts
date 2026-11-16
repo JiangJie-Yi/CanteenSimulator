@@ -933,7 +933,10 @@ export const DRAIN: Drain = { n: 0, left: null }
 export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number; boss: boolean
   /** the owner washing (item 174): the sponge in his hand, off its dish (Sink hides the one on the dish; GuestBar3D draws his); and where the
    * tap's stream meets the plate he holds under it, in the world (Sink stops the stream there), or null */
-  spongeHeld: boolean; stream: THREE.Vector3 | null } = { ask: null, until: 0, boss: false, spongeHeld: false, stream: null }
+  spongeHeld: boolean; stream: THREE.Vector3 | null
+  /** a plate in the player's own hand, being washed (item 224): what's under the pointer meanwhile says nothing (the plate says how it's
+   * coming on) */
+  held: boolean } = { ask: null, until: 0, boss: false, spongeHeld: false, stream: null, held: false }
 /** where the shop's plates are just now, told over for the racks' and the basket's labels (the owner's: every plate counted): on the racks, in
  * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
 export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 }

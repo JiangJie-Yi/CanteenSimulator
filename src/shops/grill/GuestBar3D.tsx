@@ -31,7 +31,7 @@ import { makeTrip, through, tripStep, turnSmooth, turnToward, type Trip } from '
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
-import { HAND_WASH_LINES, SPONGE_S, beatLength, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
+import { HAND_WASH_LINES, SPONGE_S, beatLength, handClean, handSays, handStops, letGo, scrubbed, washBeat, washPlateS, type HandAt } from '@/game/handWash'
 import { POUR_TOTAL, SAKE_SET_S, SAKE_UP_S, pourBeat, pouredBy, streaming } from '@/game/sakePour'
 import { SAKE_BOTTLE_ML, STATION_GO, TOKKURI_ML, stationGo } from '@/game/sakeStand'
 import { newWashPose, spongePose, washPose, type WashPoints } from '@/scene/washMotion'
@@ -76,7 +76,7 @@ import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDes
 import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
 import { getEdit, offsetOf, setLocked } from './edit'
-import { basinHint, guideOff, guideOn, scrubOnce, useBinBags } from './Sink'
+import { basinHint, guideOff, guideOn, useBinBags } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { dishLines, paysAtTill, takeOut, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
@@ -2774,6 +2774,15 @@ const WORK_UP = 0.035
 const WASH_FWD = new THREE.Vector3()
 const SPOUT_AT = new THREE.Vector3()
 const STREAM_W = new THREE.Vector3()
+/** the player's plate in hand (item 224): how far over the sink's counter it's held (the world), and the scratch for finding it */
+const HAND_LIFT = 0.12
+const HAND_RAY = new THREE.Raycaster()
+const HAND_NDC = new THREE.Vector2()
+const HAND_PLANE = new THREE.Plane()
+const HAND_AT = new THREE.Vector3()
+const HAND_P = new THREE.Vector3()
+const HAND_TO = new THREE.Vector3()
+const HAND_STREAM = new THREE.Vector3()
 const DRIP_LOW = new THREE.Vector3()
 /** a smear's opacity by how dirty the plate is: as dark as it ever was (0.6) from a plate of two dishes on, a plate of one a little lighter,
  * fading smoothly to nothing as it soaks clean */
@@ -3960,6 +3969,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const washPlateIn = useRef<THREE.Group>(null)
   const washFoam = useRef<THREE.Group>(null)
   const washDrips = useRef<THREE.Group>(null)
+  /**
+   * The plate the player's washing by hand (item 224, the owner's, 2026-11-16: 「自己洗盤子的時候老闆不用來，可以拖曳盤子泡水or給水龍頭直接沖，用菜瓜布+洗碗精清潔
+   * 更快」): the top one taken up off the dirty stack in the sink by a press on it, and held at the pointer (`aim`, the world) over the sink's
+   * counter; held under the running tap or in the water standing in the basin, it comes clean (game/handWash's handClean); let go of over
+   * the draining basket clean, it stands in it, else back on the stack. How dirty it is, its pattern, where it is (`at`) and what it's over,
+   * how hard it's being scrubbed (the pointer's to and fro), whether it's had the liquid on it; the pointer's last place and time; when it
+   * was last said of, and whether it's been splashed into the water
+   */
+  const hand = useRef<{ dirt: number; design: number; aim: THREE.Vector3; at: HandAt; over: 'basket' | 'sink' | null; scrub: number; soaped: boolean
+    px: number; py: number; pt: number; said: number; wet: boolean; heard: number } | null>(null)
+  const handObj = useRef<THREE.Group>(null)
+  const handIn = useRef<THREE.Group>(null)
+  const handFoam = useRef<THREE.Group>(null)
+  /** the basin's and the draining basket's boxes in the bar's frame (measured as a plate's taken up: the sink's moved only in edit mode) */
+  const handZones = useRef<{ basin: THREE.Box3 | null; basket: THREE.Box3 | null }>({ basin: null, basket: null })
+  /** what's listened for while a plate's held, to be let go of if the bar's gone meanwhile */
+  const handListen = useRef<(() => void) | null>(null)
+  useEffect(() => () => handListen.current?.(), [])
+  const handCtl = useThree((st) => st.controls) as unknown as { enabled: boolean } | null
+  const handGl = useThree((st) => st.gl)
   /** the sponge for his hand: a copy of the sink's (its meshes, shared), made once; where it lies on its dish, measured as he takes it up */
   const washSponge = useRef<{ g: THREE.Group; q: THREE.Quaternion; home: THREE.Vector3 } | null>(null)
   /** where he stands to wash: before the sink, along its front toward the basket (from before the basin's middle the stack lay a metre off
@@ -4011,7 +4040,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // (dev: the washing as it's posed, for the probes (tests/e2e/_washanim.mjs, _washdbg.mjs))
   useEffect(() => {
     if (!import.meta.env.DEV) return
-    Object.assign(window, { __wash: { pose: WASH_POSE, hands: WASH_HANDS, state: () => bossWash.current, sponge: () => washSponge.current, frame: () => frame.current } })
+    Object.assign(window, { __wash: { pose: WASH_POSE, hands: WASH_HANDS, state: () => bossWash.current, sponge: () => washSponge.current, frame: () => frame.current, hand: () => hand.current } })
   }, [WASH_POSE, WASH_HANDS])
   /** everything of the washing put by: the plate, the drops, his copy of the sponge (the sink's shown on its dish again), the stream */
   const washDone = () => {
@@ -4052,6 +4081,86 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   }
   /** how near a sound is (as the restroom's): loud close by, gone 8.5 away */
   const nearCam = (at: THREE.Vector3) => Math.max(0, Math.min(1, 1 - (at.distanceTo(camera.position) - 1.5) / 7))
+  /** a piece of the sink's model as a box in the bar's frame (its eight corners taken in) */
+  const boxInBar = (name: string) => {
+    const o = markOf(name), f = frame.current
+    if (!o || !f) return null
+    f.updateWorldMatrix(true, false)
+    const w = new THREE.Box3().setFromObject(o)
+    if (w.isEmpty()) return null
+    const b = new THREE.Box3()
+    for (let i = 0; i < 8; i++) b.expandByPoint(f.worldToLocal(new THREE.Vector3(i & 1 ? w.max.x : w.min.x, i & 2 ? w.max.y : w.min.y, i & 4 ? w.max.z : w.min.z)))
+    return b
+  }
+  /** the pointer's place on the level a plate's held at, a little over the sink's counter (the world); and how fast it's going to and fro (the
+   * scrubbing) */
+  const aimHand = (x: number, y: number) => {
+    const h = hand.current
+    if (!h) return
+    const r = handGl.domElement.getBoundingClientRect()
+    HAND_RAY.setFromCamera(HAND_NDC.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera)
+    const top = markOf('SinkTop')
+    const yTop = top ? top.getWorldPosition(HAND_AT).y : h.aim.y - HAND_LIFT
+    HAND_PLANE.set(UP_Y, -(yTop + HAND_LIFT))
+    if (HAND_RAY.ray.intersectPlane(HAND_PLANE, HAND_AT)) h.aim.copy(HAND_AT)
+    const now = performance.now(), dt = Math.max(8, now - h.pt)
+    h.scrub = Math.min(1, h.scrub * 0.6 + (Math.hypot(x - h.px, y - h.py) / dt) * 0.5)
+    h.px = x; h.py = y; h.pt = now
+  }
+  /** the top dirty plate taken up in the player's hand (a press on the stack) */
+  const takeUp = (e: ThreeEvent<PointerEvent>) => {
+    if (getEdit().on || hand.current || dirty.current <= 0 || e.nativeEvent.button !== 0) return
+    e.stopPropagation()
+    const n = dirty.current
+    const dirt = SINK.dirt[n - 1] ?? DIRT_BASE
+    SINK.dirt.length = Math.min(SINK.dirt.length, n - 1)
+    dirty.current = n - 1
+    PILE.n = pileLeft(PILE.n, dirty.current)
+    handZones.current = { basin: boxInBar('SinkBasin'), basket: boxInBar('SinkBasketSet') }
+    const design = Math.min(n, SINK_SHOWN) - 1
+    hand.current = { dirt, design, aim: e.point.clone(), at: null, over: 'sink', scrub: 0, soaped: false, px: e.nativeEvent.clientX, py: e.nativeEvent.clientY,
+      pt: performance.now(), said: 0, wet: false, heard: 0 }
+    HAND_WASH.held = true
+    setPattern(handIn.current, design)
+    if (handObj.current) { const f = frame.current; if (f) handObj.current.position.copy(f.worldToLocal(e.point.clone())) }
+    if (handCtl) handCtl.enabled = false
+    document.body.style.cursor = 'grabbing'
+    document.body.classList.add('is-carrying')
+    guideOff()
+    const move = (ev: PointerEvent) => aimHand(ev.clientX, ev.clientY)
+    const up = () => { stop(); putDown() }
+    const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); handListen.current = null }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    handListen.current = stop
+    redraw()
+  }
+  /** the plate in hand let go of: into the draining basket, clean, over it; else back on the stack in the sink, as clean as it's got */
+  const putDown = () => {
+    const h = hand.current
+    if (!h) return
+    hand.current = null
+    HAND_WASH.held = false
+    if (handCtl) handCtl.enabled = true
+    document.body.style.cursor = ''
+    document.body.classList.remove('is-carrying')
+    const o = handObj.current
+    if (letGo(h.over, h.dirt, DRAIN.n >= DRAIN_CAP) === 'basket') {
+      const r = handOne(1, DRAIN)
+      DRAIN.n = r.drain.n
+      DRAIN.left = r.drain.left
+      setPattern(drainPlates.current?.children[DRAIN.n - 1], h.design)
+      if (o) plateClink(o.getWorldPosition(SOUND_AT))
+      setTip({ title: '盤子', hint: '放進瀝水籃了' })
+    } else {
+      SINK.dirt.push(h.dirt)
+      dirty.current += 1
+      setTip(null)
+    }
+    if (o) o.visible = false
+    if (!bossWash.current) HAND_WASH.stream = null
+    redraw()
+  }
   /** the washing's beats: the sponge taken up, then a plate after another (off the stack as it's taken up, into the basket as it's let go),
    * the sponge put back, and home */
   const washTick = (b: NonNullable<typeof bossWash.current>) => {
@@ -7074,6 +7183,53 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (smear) { (smear.material as THREE.MeshBasicMaterial).opacity = smearOpacity(D[i]); smear.visible = D[i] > CLEAN_AT }
       }
     }
+    // (the plate the player's washing by hand (item 224): held where the pointer has it, under the tap tipped to the stream, or in the water at
+    // its top; coming clean there, the faster with the sponge and the liquid, and scrubbed; its smear fading, its suds; heard and said of)
+    {
+      const h = hand.current, o = handObj.current, f = frame.current
+      if (h && o && f) {
+        const p = f.worldToLocal(HAND_P.copy(h.aim))
+        const z = handZones.current
+        const within = (b: THREE.Box3 | null, pad: number) => !!b && p.x > b.min.x - pad && p.x < b.max.x + pad && p.z > b.min.z - pad && p.z < b.max.z + pad
+        const floor = inBar('SinkBasinFloor', endOf(1)), wtop = inBar('SinkWaterTop', endOf(1)), spout = inBar('SinkSpoutTip', endOf(1))
+        const inBasin = within(z.basin, 0)
+        const running = SINK.tap || SINK.washing
+        const underTap = running && Math.hypot(p.x - spout.x, p.z - spout.z) < PLATE_R * IN_SINK * 1.3
+        const water = SINK.water > 0.12 && inBasin
+        h.at = underTap ? 'tap' : water ? 'water' : null
+        h.over = within(z.basket, 0.03) ? 'basket' : inBasin ? 'sink' : null
+        // (where it's held: under the tap halfway down to the basin's floor, tipped to the stream; in the water at its top; else at the pointer)
+        HAND_TO.copy(p)
+        if (h.at === 'tap') HAND_TO.set(spout.x, floor.y + (spout.y - floor.y) * 0.45, spout.z)
+        else if (h.at === 'water') HAND_TO.y = floor.y + (wtop.y - floor.y) * Math.min(1, Math.max(0, SINK.water)) - 0.004
+        if (!o.visible) o.position.copy(HAND_TO)
+        o.position.lerp(HAND_TO, Math.min(1, step * 16))
+        o.rotation.set(h.at === 'tap' ? 0.5 : 0, 0, h.at === 'tap' ? 0.15 * Math.sin(performance.now() / 160) * h.scrub : 0)
+        o.visible = true
+        // (coming clean; the washing-up liquid on the sponge, or in the water it's in, used once as a plate comes clean with it)
+        const soap = SINK.soap > 0 && (SINK.sponge || h.at === 'water')
+        const was = h.dirt
+        h.dirt = handClean(h.dirt, step, h.at, { sponge: SINK.sponge, soap, scrub: h.scrub })
+        if (soap && h.at) h.soaped = true
+        if (was > CLEAN_AT && h.dirt <= CLEAN_AT && h.soaped) SINK.soap = scrubbed(SINK.soap)
+        h.scrub *= Math.max(0, 1 - step * 2.5)
+        const sm = handIn.current?.getObjectByName('plate-smear') as THREE.Mesh | undefined
+        if (sm) { (sm.material as THREE.MeshBasicMaterial).opacity = smearOpacity(h.dirt); sm.visible = h.dirt > CLEAN_AT }
+        const suds = !!h.at && SINK.sponge && soap && h.dirt > CLEAN_AT
+        handFoam.current?.children.forEach((c, i) => { const k = suds ? FOAM_AT[i][2] * (0.65 + 0.35 * h.scrub) : 0; c.scale.set(k, k * 0.6, k); c.visible = k > 0.03 })
+        // (the tap's stream stopped on it, unless the owner's at the sink with his own)
+        if (!bossWash.current) HAND_WASH.stream = h.at === 'tap' ? f.localToWorld(HAND_STREAM.copy(o.position)) : null
+        // (heard: a splash as it goes into the water or under the stream, the sponge as it's scrubbed)
+        const now = performance.now()
+        if (!!h.at !== h.wet) { h.wet = !!h.at; if (h.wet) washSplash(o.getWorldPosition(SOUND_AT)) }
+        if (h.at && SINK.sponge && h.scrub > 0.25 && now - h.heard > 650) { h.heard = now; scrubSound(nearCam(o.getWorldPosition(SOUND_AT))) }
+        // (said of, a few times a second)
+        if (now - h.said > 200) {
+          h.said = now
+          setTip({ title: '盤子', hint: handSays(h.at, h.dirt, { sponge: SINK.sponge, soap, over: h.over, basketFull: DRAIN.n >= DRAIN_CAP }) })
+        }
+      }
+    }
     DRYER.open = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'unloadTake') ? 1 : 0
     SINK.washing = waiters.current.some((x) => x.phase === 'wash' || x.phase === 'handwash' || x.phase === 'skWash') || wash.current !== null || RICE.washing
     // (every plate told over: the racks', the sink's, the washer's, the basket's, and the rest out (at the plating place, on their way, at the
@@ -7283,11 +7439,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the dirty plates waiting in the sink, and the plates out: on their way to a seat, at it, cleared away, washed and going back */}
       {Array.from({ length: Math.min(dirty.current, SINK_SHOWN) }, (_, i) => (
         <group key={`d${i}`} name={`sink-dirty-${i}`} ref={(o) => { sinkPlates.current[i] = o }} position={dirtyAt(i)} rotation-y={i * 0.9} scale={IN_SINK}
-          // (the dirty plates can be clicked to wash one, as the basin can (the owner, 2026-11-15: "I can't wash up by hand": the stack did nothing))
+          // (the dirty plates taken up to wash one (the owner, 2026-11-15: "I can't wash up by hand": the stack did nothing))
           // (and the thing to click next for washing up by hand lit up while they're pointed at (item 215))
-          onPointerOver={(e) => { if (getEdit().on) return; e.stopPropagation(); tipOver('髒盤子', basinHint()).onPointerOver(e); guideOn() }}
-          onPointerOut={(e) => { if (getEdit().on) return; tipOver('髒盤子', '').onPointerOut(e); guideOff() }}
-          onClick={(e) => { if (getEdit().on) return; e.stopPropagation(); scrubOnce(); guideOff(); window.setTimeout(() => { tipOver('髒盤子', basinHint()).onPointerOver(e); guideOn() }, 80) }}><Plate dirty sticks={0} design={i} /></group>
+          onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; e.stopPropagation(); tipOver('髒盤子', basinHint()).onPointerOver(e); guideOn() }}
+          onPointerOut={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver('髒盤子', '').onPointerOut(e); guideOff() }}
+          // (a press takes the top one up in the player's own hand, to be washed under the tap or in the water (item 224))
+          onPointerDown={takeUp}><Plate dirty sticks={0} design={i} /></group>
       ))}
       {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
           of the shop's plates, it goes with the food) */}
@@ -7328,6 +7485,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           </group>
         </group>
       )}
+      {/* (the plate the player's washing by hand (item 224): at the pointer, under the tap or in the water; its suds) */}
+      <group ref={handObj} name="hand-plate" visible={false}>
+        <group ref={handIn} scale={IN_SINK}>
+          <Plate dirty sticks={0} design={0} />
+          <group ref={handFoam}>
+            {FOAM_AT.map(([x, z], i) => <mesh key={i} geometry={FOAM_GEO} material={FOAM_MAT} position={[x, 0.016, z]} visible={false} raycast={() => {}} />)}
+          </group>
+        </group>
+      </group>
       {given && (
         <group ref={washDrips} name="wash-drips">
           {[0, 1, 2].map((i) => <mesh key={i} geometry={DRIP_GEO} material={DRIP_MAT} visible={false} raycast={() => {}} />)}

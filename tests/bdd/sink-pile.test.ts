@@ -34,9 +34,9 @@ feature('手洗碗盤的步驟（店主要的，第 103 項）', () => {
     and('沒有洗碗精、沒拿菜瓜布也能洗', () => { expect(handStep({ ...base, tap: true, soap: 0, sponge: false })).toBe('scrub') })
   })
   scenario('洗碗精與塞子是建議，不擋人（第 217 項）', ({ then, and }) => {
-    then('沒擠洗碗精，提示擠一點刷得快', () => { expect(washTips({ ...base, tap: true }).join()).toContain('刷得快') })
+    then('沒拿菜瓜布、沒擠洗碗精，提示刷得快的辦法', () => { expect(washTips({ ...base, tap: true }).join()).toContain('刷得快') })
     and('開著水、沒塞住，提示比較費水', () => { expect(washTips({ ...base, tap: true, plug: false }).join()).toContain('費水') })
-    and('擠了洗碗精、塞住了，就沒有建議', () => { expect(washTips({ ...base, tap: true, plug: true, soap: SOAP_PUMP })).toEqual([]) })
+    and('拿著菜瓜布、擠了洗碗精、塞住了，就沒有建議', () => { expect(washTips({ ...base, tap: true, plug: true, soap: SOAP_PUMP, sponge: true })).toEqual([]) })
   })
   // (item 196: a squeeze washed three, and the owner was sent back to the bottle every three plates, the boss walking back to his fire
   // between; a squeeze into a basin of water does a sink-load)
@@ -48,7 +48,7 @@ feature('手洗碗盤的步驟（店主要的，第 103 項）', () => {
     then('洗碗精用完了，照樣能洗，只是建議再擠一點', (w) => {
       expect(SOAP_PUMP).toBe(10)
       expect(handStep({ ...base, dirty: 20, plug: true, water: 0.5, soap: w.soap })).toBe('scrub')
-      expect(washTips({ ...base, dirty: 20, plug: true, water: 0.5, soap: w.soap }).join()).toContain('刷得快')
+      expect(washTips({ ...base, dirty: 20, plug: true, water: 0.5, soap: w.soap, sponge: true }).join()).toContain('洗碗精')
     })
     and('多擠幾次，水裡最多存三十個的量', () => { expect(pumpSoap(pumpSoap(pumpSoap(pumpSoap(0))))).toBe(30) })
   })
