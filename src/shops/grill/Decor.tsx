@@ -1677,7 +1677,7 @@ function SakeStand() {
     full.current[i] = false
     const l = targets[i].liquid
     if (l) l.scale.y = 0.001
-    setTip({ title: '燒酒杯', hint: '空的｜拖一支酒到上方倒酒' })
+    setTip({ title: '燒酒杯', hint: '空的｜拖一支酒到上方倒酒｜自己試喝用，客人的酒杯在出餐口' })
   }
   // (the tokkuri on the step: full after a pour, a click empties it; pointed at, what it holds and what to do)
   const onJugClick = (e: { stopPropagation: () => void }) => {
@@ -1696,10 +1696,11 @@ function SakeStand() {
     const c = cupOf(e.object)
     if (c < 0 || getEdit().on || drag.current) return
     const i = targets.findIndex((t) => t.cup === c)
-    setTip({ title: '燒酒杯', hint: full.current[i] ? '倒滿了｜點一下喝掉' : '空的｜拖一支酒到上方倒酒' })
+    // (the owner's own glasses, for tasting (item 235, the owner's 「小酒杯放在那要怎到給客人?」): the customers' cups are at the sake station)
+    setTip({ title: '燒酒杯', hint: `${full.current[i] ? '倒滿了｜點一下喝掉' : '空的｜拖一支酒到上方倒酒'}｜自己試喝用，客人的酒杯在出餐口` })
   }
   return (
-    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '按住一支酒拖到德利或燒酒杯上方倒酒｜雪嶺錦、朝霞川、鶴汀、瑠璃灘、月汀桜、雲雀谷、楓霞、燒酒')}>
+    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '老闆自己試倒試喝用：按住一支酒拖到德利或燒酒杯上方倒酒｜客人的清酒在出餐口倒、用那裡的酒杯端出去｜雪嶺錦、朝霞川、鶴汀、瑠璃灘、月汀桜、雲雀谷、楓霞、燒酒')}>
       <primitive object={obj} onPointerDown={onDown} onPointerOver={onOver} onPointerOut={onOut} />
       <primitive object={shochu} onPointerDown={onDown} onPointerOver={(e: { stopPropagation: () => void; object: THREE.Object3D }) => { onOver(e); onCupOver(e) }}
         onPointerOut={onOut} onClick={onCupClick} />
