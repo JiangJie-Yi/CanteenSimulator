@@ -27,7 +27,11 @@ PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(_
 PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-LENGTH, DEPTH, SEAT_H, SEAT_T = 0.86, 0.28, 0.29, 0.036
+# (item 214, the owner's, 2026-11-16: 「後位長凳深度稍微窄一些，然後要褐木色」: 0.28 deep before; narrowed from its front, its back where it
+# was against the wall (BACK), those waiting sat where they were)
+LENGTH, DEPTH, SEAT_H, SEAT_T = 0.86, 0.24, 0.29, 0.036
+BACK = -0.14
+MID = BACK + DEPTH / 2
 
 
 def P(x, y, z):
@@ -45,8 +49,9 @@ v = np.linspace(0, 1, Hh)[:, None]
 u = np.linspace(0, 1, W)[None, :]
 grain = 0.5 + 0.5 * np.sin((v * 22 + np.sin(u * 7 + v * 2) * 0.9) * math.pi * 2)
 wood = np.clip(0.8 + 0.16 * grain - 0.2 * rng.random((Hh, 1)) + rng.normal(0, 0.025, (Hh, W)), 0, 1)
-seat_rgb = (wood[..., None] * np.array(lin("#c99a66"))[None, None, :] * 1.1).astype(np.float32)
-leg_rgb = (wood[..., None] * np.array(lin("#a8774a"))[None, None, :] * 1.1).astype(np.float32)
+# (a brown wood (item 214): it was a pale hinoki that the room's warm light turned orange-red)
+seat_rgb = (wood[..., None] * np.array(lin("#9c7552"))[None, None, :] * 1.1).astype(np.float32)
+leg_rgb = (wood[..., None] * np.array(lin("#79583d"))[None, None, :] * 1.1).astype(np.float32)
 M = {
     "seat": pbr("BenchSeat", (1, 1, 1), tex=image("bench_seat", seat_rgb), rough=0.6),
     "leg": pbr("BenchLeg", (1, 1, 1), tex=image("bench_leg", leg_rgb), rough=0.7),
@@ -85,7 +90,7 @@ def join(objs, name):
 
 
 # (the seat: one board, its edges eased)
-bench_seat = box("BenchSeat", -LENGTH / 2, LENGTH / 2, SEAT_H - SEAT_T, SEAT_H, -DEPTH / 2, DEPTH / 2, "seat", bev=0.008)
+bench_seat = box("BenchSeat", -LENGTH / 2, LENGTH / 2, SEAT_H - SEAT_T, SEAT_H, BACK, BACK + DEPTH, "seat", bev=0.008)
 legs = []
 UNDER = SEAT_H - SEAT_T + 0.002      # (the seat's underside, a hair into it)
 LEG_X = LENGTH / 2 - 0.07            # (each leg's middle, set in from the seat's ends)
@@ -99,8 +104,8 @@ def leg(name, x):
     hd = LEG_D / 2
     outline = [(-hd, 0), (-hd + FOOT, 0), (-hd + FOOT, ARCH), (hd - FOOT, ARCH), (hd - FOOT, 0), (hd, 0), (hd, UNDER), (-hd, UNDER)]
     bm_ = bmesh.new()
-    lo = [bm_.verts.new(P(x - LEG_T / 2, y, z)) for z, y in outline]
-    hi = [bm_.verts.new(P(x + LEG_T / 2, y, z)) for z, y in outline]
+    lo = [bm_.verts.new(P(x - LEG_T / 2, y, MID + z)) for z, y in outline]
+    hi = [bm_.verts.new(P(x + LEG_T / 2, y, MID + z)) for z, y in outline]
     bm_.faces.new(lo)
     bm_.faces.new(hi[::-1])
     for i in range(len(outline)):
@@ -135,10 +140,10 @@ for sx in (-1, 1):
     legs.append(leg(f"leg{sx}", sx * LEG_X))
 # (the aprons under the seat's long edges, between the legs, set in from its edges)
 for sz in (-1, 1):
-    z = sz * (DEPTH / 2 - 0.03)
+    z = MID + sz * (DEPTH / 2 - 0.03)
     legs.append(box(f"apron{sz}", -LEG_X + LEG_T / 2 - 0.002, LEG_X - LEG_T / 2 + 0.002, UNDER - 0.045, UNDER, z - 0.011, z + 0.011, "leg", bev=0.003))
 # (the stretcher low through both legs, its tenons showing a little through their outer faces)
-legs.append(box("stretcher", -LEG_X - LEG_T / 2 - 0.012, LEG_X + LEG_T / 2 + 0.012, ARCH + 0.03, ARCH + 0.062, -0.014, 0.014, "leg", bev=0.003))
+legs.append(box("stretcher", -LEG_X - LEG_T / 2 - 0.012, LEG_X + LEG_T / 2 + 0.012, ARCH + 0.03, ARCH + 0.062, MID - 0.014, MID + 0.014, "leg", bev=0.003))
 bench_legs = join(legs, "BenchLegs")
 
 root = bpy.data.objects.new("Bench", None)
