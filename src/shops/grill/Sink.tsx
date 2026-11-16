@@ -175,9 +175,9 @@ const RACK_OUT = 0.16
  * StepStoolTop empty kept, for GuestBar3D to stand those washing on it */
 const STEP_STOOL_URL = import.meta.env.BASE_URL + 'models/stepstool.glb'
 useGLTF.preload(STEP_STOOL_URL)
-/** where it stands in the sink's frame: its middle before the basin's (the basin's x from -0.71 to -0.09), its back against the cupboard's
- * face (0.425) a centimetre off it (blender/sink.py) */
-export const STEP_STOOL_AT: [number, number, number] = [-0.4, 0, 0.635]
+/** where it stands in the sink's frame: its middle before the basin's (the basin's x from -0.71 to -0.09), its back clear of the noren
+ * hung before the cupboard (its foot sways out to 0.415; at 0.435 a corner of the top went into it: clips.mjs) (blender/sink.py) */
+export const STEP_STOOL_AT: [number, number, number] = [-0.4, 0, 0.66]
 export function StepStoolModel() {
   const gltf = useGLTF(STEP_STOOL_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
