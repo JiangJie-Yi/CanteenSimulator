@@ -220,9 +220,14 @@ const pileRank = (name: string) => (/Loose/.test(name) ? 0 : /Top/.test(name) ? 
 /** how many of a sack's pieces are shown for so much in stock: all of them at the usual stock (PAR) and over, none at none, at least one
  * while there's any; all of them with no shop running */
 const pileShown = (have: number, all: number) => (have < 0 ? all : have <= 0 ? 0 : Math.max(1, Math.min(all, Math.round((all * have) / PAR))))
+/** an empty sack slumped down on its foot (item 222, the owner's 「這也超怪」: emptied, each stood as full as ever, its mouth a black hole, the
+ * dark floor set just inside it under what's heaped there): how tall it's left, how much wider it slumps, and how quickly it goes (per s) */
+const SLUMP_H = 0.3, SLUMP_W = 1.08, SLUMP_RATE = 3
+/** the dark floor inside a sack's mouth, and the cloth it turns to as the sack slumps empty (its mouth folded in over nothing: no hole) */
+const SACK_FLOOR = new THREE.Color('#2e2416'), SACK_FOLD = new THREE.Color('#9a7a50')
 export function ProduceSacks() {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
-  const { obj, piles } = useMemo(() => {
+  const { obj, piles, sacks } = useMemo(() => {
     // (the owner's, 2026-11-12: the sacks over to the right (the stepped stand of baskets they were moved toward is gone, the owner's, 11-15): each part of the model
     // moved as it stands in a copy of it BEFORE partOf draws its ink line (one welded line round all of them: moved after, it stayed where the parts
     // were, black scraps all about the sacks), the sacks (and what's in them) along the row)
@@ -233,7 +238,10 @@ export function ProduceSacks() {
     const holder = new THREE.Group()
     if (moved) holder.add(moved)
     const piled = (o: THREE.Object3D) => PILES.some((k) => k.re.test(o.name))
-    const r = partOf(holder, 'ProduceSacks', 0.004, piled)
+    // (each open sack's own pieces (its cloth, the dark floor inside it, its twine) kept out of the shop's merging, to be gathered and slumped
+    // as one when it's empty (item 222))
+    const ownSack = (o: THREE.Object3D) => /^ProduceSack\d/.test(o.name)
+    const r = partOf(holder, 'ProduceSacks', 0.004, (o) => piled(o) || ownSack(o))
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     // (each sack's pieces one mesh and one ink line cut to as many as there's stock for, the topmost going first (countedBatch, as the
     // charcoal sack's sticks); the onions' roots taken off them and done the same, in the same order)
@@ -246,16 +254,52 @@ export function ProduceSacks() {
       for (const x of kept) r.attach(x)
       return { id, all: pieces.length, body: countedBatch(r, pieces), roots: kept.length === pieces.length ? countedBatch(r, kept) : null, shown: -1 }
     })
-    return { obj: r, piles }
+    // (each open sack gathered into a group of its own, its origin at the middle of its foot, merged by material (its cloth, its floor, its
+    // twine); the piles' order is the sacks': potatoes, sweet potatoes, onions)
+    r.updateMatrixWorld(true)
+    const sacks = PILES.map((_, i) => {
+      const own: THREE.Object3D[] = []
+      r.traverse((o) => { if ((o as THREE.Mesh).isMesh && new RegExp(`^ProduceSack${i}(?!\\d)`).test(o.name) && !o.name.endsWith('_outline')) own.push(o) })
+      if (!own.length) return null
+      const box = new THREE.Box3()
+      for (const o of own) box.expandByObject(o)
+      const g = new THREE.Group()
+      g.name = `produce-sack-${i}`
+      const foot = box.getCenter(new THREE.Vector3()).setY(box.min.y)
+      g.position.copy(r.worldToLocal(foot.clone()))
+      r.add(g)
+      g.updateMatrixWorld(true)
+      for (const o of own) g.attach(o)
+      // (its floor a material of its own (the shop's plain colours had it in with the twine), to turn to cloth as it slumps)
+      let floor: THREE.MeshToonMaterial | null = null
+      for (const o of own) {
+        if (!/Inside$/.test(o.name)) continue
+        floor ??= new THREE.MeshToonMaterial({ color: SACK_FLOOR.clone() })
+        ;(o as THREE.Mesh).material = floor
+      }
+      mergeByMaterial(g)
+      return { g, k: 0, floor }
+    })
+    return { obj: r, piles, sacks }
   }, [gltf])
-  useFrame(() => {
-    for (const p of piles) {
+  useFrame((_, dt) => {
+    piles.forEach((p, i) => {
       const n = pileShown(SUPPLIES.has(p.id), p.all)
-      if (n === p.shown) continue
-      p.shown = n
-      p.body.show(n)
-      p.roots?.show(n)
-    }
+      if (n !== p.shown) {
+        p.shown = n
+        p.body.show(n)
+        p.roots?.show(n)
+      }
+      // (empty: the sack slumps down on its foot, a little wider; filled again, it stands up as it was)
+      const sk = sacks[i]
+      if (!sk) return
+      const want = n === 0 ? 1 : 0
+      if (sk.k === want) return
+      sk.k = want > sk.k ? Math.min(want, sk.k + dt * SLUMP_RATE) : Math.max(want, sk.k - dt * SLUMP_RATE)
+      const e = sk.k * sk.k * (3 - 2 * sk.k)
+      sk.g.scale.set(1 + (SLUMP_W - 1) * e, 1 - (1 - SLUMP_H) * e, 1 + (SLUMP_W - 1) * e)
+      sk.floor?.color.copy(SACK_FLOOR).lerp(SACK_FOLD, e)
+    })
   })
   // (the sacks of potatoes, sweet potatoes and onions, and the baskets of the summer vegetables and the burdock beside them: how many of each
   // (the carrots chilled now, the owner's))
