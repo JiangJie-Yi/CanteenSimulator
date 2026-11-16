@@ -936,7 +936,9 @@ export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number; boss: bool
   spongeHeld: boolean; stream: THREE.Vector3 | null
   /** a plate in the player's own hand, being washed (item 224): what's under the pointer meanwhile says nothing (the plate says how it's
    * coming on) */
-  held: boolean } = { ask: null, until: 0, boss: false, spongeHeld: false, stream: null, held: false }
+  held: boolean
+  /** a press on the sink's basin starts the washing as a press on the dirty stack does (item 234; GuestBar3D sets it): whether it started */
+  take: ((x: number, y: number) => boolean) | null } = { ask: null, until: 0, boss: false, spongeHeld: false, stream: null, held: false, take: null }
 /** where the shop's plates are just now, told over for the racks' and the basket's labels (the owner's: every plate counted): on the racks, in
  * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
 export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 }

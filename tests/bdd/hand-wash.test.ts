@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DRAIN_CAP, DRAIN_MIN, drainSays, drainTick, handOne, handWashSays, unbasket, type Drain } from '@/game/plates'
 import { MINUTES_PER_SECOND } from '@/game/clock'
-import { NO_SOAP_SLOW, RINSE_RATE, SOAK_RATE, WASH_BEATS, beatLength, handClean, handSays, handStops, letGo, scrubbed, washBeat, washPlateS } from '@/game/handWash'
+import { NO_SOAP_SLOW, RINSE_RATE, SOAK_RATE, WASH_BEATS, beatLength, handClean, handSays, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
 import { CLEAN_AT } from '@/game/plates'
 
 feature('玩家手動洗碗', () => {
@@ -103,15 +103,12 @@ feature('玩家自己拿盤子洗（第 224 項）', () => {
       expect(t).toBeLessThan(1.5)
     })
   })
-  scenario('洗乾淨拖到瀝水籃放開就放進去，沒洗乾淨回到那疊', ({ then, and, but }) => {
-    then('乾淨、在瀝水籃上：放進瀝水籃', () => { expect(letGo('basket', 0, false)).toBe('basket') })
-    and('還髒：回到水槽那疊', () => { expect(letGo('basket', 0.2, false)).toBe('stack') })
-    and('放在別處：回到那疊', () => { expect(letGo(null, 0, false)).toBe('stack') })
-    but('瀝水籃滿了：回到那疊', () => { expect(letGo('basket', 0, true)).toBe('stack') })
-  })
-  scenario('拿著的盤子說現在怎樣、下一步做什麼', ({ then, and }) => {
-    then('乾的：拿到水龍頭下或放進水裡', () => { expect(handSays(null, 0.5, { sponge: false, soap: false, over: 'sink', basketFull: false })).toContain('水龍頭下沖') })
-    and('沖水中沒拿菜瓜布：建議拿菜瓜布', () => { expect(handSays('tap', 0.5, { sponge: false, soap: false, over: 'sink', basketFull: false })).toContain('菜瓜布') })
-    and('乾淨了：拖到瀝水籃', () => { expect(handSays('tap', 0, { sponge: true, soap: true, over: 'sink', basketFull: false })).toContain('瀝水籃') })
+  // (item 234, the owner's 「流理台洗碗玩法還是很不順」: nothing to aim or carry; it says how it's coming on and what would go faster)
+  scenario('洗著的盤子說現在怎樣、怎樣更快', ({ then, and }) => {
+    then('沒水：說要開水龍頭', () => { expect(handSays(null, 0.5, { sponge: false, soap: false, basketFull: false })).toContain('水龍頭') })
+    and('沖水中沒拿菜瓜布：建議拿菜瓜布', () => { expect(handSays('tap', 0.5, { sponge: false, soap: false, basketFull: false })).toContain('菜瓜布') })
+    and('拿著菜瓜布、有洗碗精：建議來回刷', () => { expect(handSays('tap', 0.5, { sponge: true, soap: true, basketFull: false })).toContain('來回刷') })
+    and('乾淨了：放進瀝水籃', () => { expect(handSays('tap', 0, { sponge: true, soap: true, basketFull: false })).toContain('瀝水籃') })
+    and('乾淨了但瀝水籃滿了：先收乾的', () => { expect(handSays('tap', 0, { sponge: true, soap: true, basketFull: true })).toContain('收回碗盤架') })
   })
 })

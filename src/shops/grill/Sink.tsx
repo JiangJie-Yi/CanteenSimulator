@@ -18,7 +18,7 @@ import { EMPTY_AT } from '@/game/bins'
 import { DRAIN, DRYER, HAND_WASH, IN_USE, POINTER_HINT, SINK, SINK_BIN, SUPPLIES, squeezeSoap, tipOver } from './bar'
 import { DISH_SOAP } from '@/game/household'
 import { basinSays, waterTick } from '@/game/sinkWater'
-import { GUIDE_OF, HAND_STEP_SAYS, WASH_WET, handStep, pumpSoap, soapWith, washTips } from '@/game/handWash'
+import { GUIDE_OF, HAND_STEP_SAYS, WASH_FLOW_SAYS, WASH_WET, handStep, pumpSoap, soapWith, washTips } from '@/game/handWash'
 import { glowOff, glowOn } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
@@ -388,7 +388,8 @@ export function SinkModel() {
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
       <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused || HAND_WASH.held) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: basinHint() }); if (SINK.dirty > 0) guideOn() }}
         onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null); guideOff() }}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip({ title: '流理台', hint: basinHint() }); guideOn() }}>
+        onPointerDown={(e) => { if (getEdit().on || HAND_WASH.held || e.nativeEvent.button !== 0) return; if (SINK.dirty > 0 && HAND_WASH.take?.(e.nativeEvent.clientX, e.nativeEvent.clientY)) e.stopPropagation() }}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on || HAND_WASH.held) return; setTip({ title: '流理台', hint: basinHint() }); guideOn() }}>
         <primitive object={root} />
       </group>
       <primitive object={pool} />
@@ -464,7 +465,7 @@ export const basinHint = () => {
   if (HAND_WASH.boss) return `${basinSays(SINK.water, SINK.plug)}｜老闆在洗（髒盤 ${SINK.dirty}）`
   if (HAND_WASH.ask === 'wash') return `${basinSays(SINK.water, SINK.plug)}｜老闆忙完就來洗（髒盤 ${SINK.dirty}）`
   // (and, ready to wash, the player's choices said as advice (item 217): the liquid, the plug)
-  const tips = st === 'scrub' ? washTips(handSink()) : []
+  const tips = st === 'scrub' || st === 'water' ? [WASH_FLOW_SAYS, ...washTips(handSink())] : []
   return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}${tips.map((t) => `｜${t}`).join('')}`
 }
 /** how far a bin's lid lifts (rad); how far it stands open with the bin heaped over full (it won't shut on it) */
