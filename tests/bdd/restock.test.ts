@@ -3,6 +3,7 @@ import { expect } from 'vitest'
 import { TISSUE, TISSUE_PACK } from '@/game/tissues'
 import { ROLL, SOAP, TOWEL, WASHROOM_PACKS } from '@/game/washroom'
 import { RECEIPT } from '@/game/receipts'
+import { DISH_SOAP, HOUSEHOLD_PACK, TOILET_CLEANER } from '@/game/household'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
 import { PAR, REORDER_AT, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
@@ -24,21 +25,28 @@ feature('倉儲自動補貨', () => {
   })
 
   scenario('庫存還夠的品項不補', ({ given, when, then }) => {
-    given('庫存高於補貨門檻（木炭、衛生紙、發票紙也還夠）', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10 } as Stock })
+    given('庫存高於補貨門檻（木炭、衛生紙、發票紙也還夠）', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('什麼都不買', (w) => { expect(w.o.buy).toEqual({}); expect(w.o.cost).toBe(0) })
   })
 
   scenario('衛生紙備品少於 4 盒時叫一組（5 盒）', ({ given, when, then }) => {
-    given('食材、木炭、發票紙都夠，衛生紙備品只剩 2 盒', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 2, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10 } as Stock })
+    given('食材、木炭、發票紙都夠，衛生紙備品只剩 2 盒', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 2, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('只叫一組衛生紙', (w) => { expect(w.o.buy).toEqual({ [TISSUE]: TISSUE_PACK.boxes }) })
   })
 
   scenario('洗手間的捲筒衛生紙備品少於 4 捲時叫一包（12 捲）', ({ given, when, then }) => {
-    given('其他都夠，捲筒衛生紙只剩 2 捲', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 2, [TOWEL]: 10, [SOAP]: 10 } as Stock })
+    given('其他都夠，捲筒衛生紙只剩 2 捲', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 2, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 4, [TOILET_CLEANER]: 3 } as Stock })
     when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
     then('只叫一包捲筒衛生紙', (w) => { expect(w.o.buy).toEqual({ [ROLL]: WASHROOM_PACKS[ROLL].n }) })
+  })
+
+  // (item 203: they're used now, so they're ordered as they run low, as the washrooms' spares are)
+  scenario('洗碗精或廁所清潔劑剩不到 2 瓶時叫一組', ({ given, when, then }) => {
+    given('其他都夠，洗碗精剩 1 瓶、廁所清潔劑剩 3 瓶', (w) => { w.id = grill.items[0].id; w.menu = [entryOf(w.id)]; w.stock = { [w.id]: REORDER_AT + 2, [CHARCOAL]: 100, [RECEIPT]: 10, [TISSUE]: 10, [ROLL]: 20, [TOWEL]: 10, [SOAP]: 10, [DISH_SOAP]: 1, [TOILET_CLEANER]: 3 } as Stock })
+    when('倉儲員下單', (w) => { w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60) })
+    then('只叫一組洗碗精', (w) => { expect(w.o.buy).toEqual({ [DISH_SOAP]: HOUSEHOLD_PACK[DISH_SOAP].bottles }) })
   })
 
   scenario('錢不夠時不會下超過現金的單', ({ given, when, then }) => {

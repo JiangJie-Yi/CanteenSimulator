@@ -1,18 +1,20 @@
 /**
  * The day's takings, worked out as the shop shuts (the owner's: a closing-up sheet once the last customer's out of the door and the staff
  * have gone): what came in and what went out between opening and shutting (the books as they stood at each), the profit as the ledger
- * reckons it (takings less the food, the charcoal, the wages and the power and water), who came, how pleased they were, and the dish that
- * sold best.
+ * reckons it (takings less the food, the charcoal, the wages and the power and water, and the reviews bought and the shrine's offerings (item
+ * 203: they came out of the cash, never the profit)), who came, how pleased they were, and the dish that sold best.
  */
 import { satisfaction, starsOf, type Visit } from './reputation'
 
-export type Books = { revenue: number; food: number; fuel: number; wage: number; utility?: number
+export type Books = { revenue: number; food: number; fuel: number; wage: number; utility?: number; promo?: number; offering?: number
   /** of the wages, what was paid over the hour's pay for working past the hours (game/hours' overtimeRate): in `wage` already */
   overtime?: number }
 export type DaySummary = {
   revenue: number; food: number; fuel: number; wage: number; utility: number
   /** of the wages, the overtime's extra (the owner's, 2026-11-15) */
   overtime: number
+  /** the reviews bought and the shrine's offerings (item 203) */
+  other: number
   profit: number
   /** the profit over the takings (null with none) */
   margin: number | null
@@ -29,12 +31,13 @@ export type DaySummary = {
 export function daySummary(from: Books, to: Books, visits: Visit[], sold: Record<string, number>): DaySummary {
   const d = (k: keyof Books) => Math.max(0, (to[k] ?? 0) - (from[k] ?? 0))
   const revenue = d('revenue'), food = d('food'), fuel = d('fuel'), wage = d('wage'), utility = d('utility'), overtime = d('overtime')
-  const profit = revenue - food - fuel - wage - utility
+  const other = d('promo') + d('offering')
+  const profit = revenue - food - fuel - wage - utility - other
   const ate = visits.filter((v) => !v.walkedOut)
   const stars = ate.length ? ate.reduce((a, v) => a + starsOf(satisfaction(v)), 0) / ate.length : null
   let best: DaySummary['best'] = null
   for (const [key, n] of Object.entries(sold)) if (n > 0 && (!best || n > best.n)) best = { key, n }
-  return { revenue, food, fuel, wage, utility, overtime, profit, margin: revenue > 0 ? profit / revenue : null, guests: visits.length,
+  return { revenue, food, fuel, wage, utility, overtime, other, profit, margin: revenue > 0 ? profit / revenue : null, guests: visits.length,
     walkedOut: visits.length - ate.length, stars, best }
 }
 

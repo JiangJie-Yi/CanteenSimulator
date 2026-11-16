@@ -19,6 +19,9 @@ const UNIT_COST: Record<string, number> = {
   appleJuice: 16, barleyTea: 14, vegJuice: 18,
 }
 export const caseCost = (id: string) => (CASE_SIZE[id] ?? 24) * (UNIT_COST[id] ?? 20)
+/** what one bottle or can cost the shop: its case over how many are in it (item 203: a drink sold was costed at 35% of its price, a case
+ * costing about 40%) */
+export const unitCost = (id: string) => UNIT_COST[id] ?? 20
 /** what the back starts with: two cases of each */
 export const startBack = (): Back => Object.fromEntries(Object.keys(CASE_SIZE).map((id) => [id, CASE_SIZE[id] * 2]))
 

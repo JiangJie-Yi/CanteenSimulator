@@ -5391,6 +5391,9 @@ html[lang='en'] .heat-label { font-size: 13px; }
 .chiller-fresh.is-tired { color: #c0463a; }
 /* (spoiled: not fit to eat, said in words on a dark red) */
 .chiller-fresh.is-spoiled { color: #8e1b12; }
+/* (its spoiled thrown out at a click (item 203): a small dark red pill at the end of the line) */
+.chiller-toss { flex: none; padding: 1px 7px; border-radius: 999px; background: #8e1b12; color: #fff3ec; font-weight: 700; white-space: nowrap; cursor: pointer; user-select: none; }
+.chiller-toss:hover { background: #b0281c; }
 .chiller-lots { display: flex; align-items: center; gap: 4px; margin: -2px 0 4px; font-size: 9.5px; white-space: nowrap; }
 .chiller-lots-bar { flex: 1; display: flex; height: 3px; border-radius: 2px; overflow: hidden; background: rgb(0 0 0 / 0.1); }
 .chiller-lots-bar i { display: block; height: 100%; }

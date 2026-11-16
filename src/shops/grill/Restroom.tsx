@@ -5,10 +5,10 @@ import { glowOff, glowOn } from '@/scene/hoverGlow'
 import { tissuePull } from './paperSound'
 import * as THREE from 'three'
 import { setTip } from '@/scene/hoverTip'
-import { cleanRoom, FLIES_AT, DIRTY_AT, newRoll, pullSheet, ROLL_USES } from '@/game/restroom'
+import { FLIES_AT, DIRTY_AT, newRoll, pullSheet, ROLL_USES, scrubRoom } from '@/game/restroom'
 import { mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { toonOf } from './BarFurnish'
-import { handOver, TOILETS, meterWater, SUPPLIES } from './bar'
+import { handOver, TOILETS, meterWater, SUPPLIES, scrubDose } from './bar'
 import { ROLL, SOAP, SOAP_FULL, takeOne, TOWEL, TOWEL_FULL } from '@/game/washroom'
 import { getEdit } from './edit'
 import { roundMirror } from './mirror'
@@ -259,7 +259,8 @@ export function ToiletLive({ who, at }: { who: Who; at: [number, number, number]
         const near = nearOf(parts.root, e.camera)
         if (isArm(e.object)) t.washAt = now()
         else if (t.room.clean < 0.999) {
-          t.room = cleanRoom(t.room)
+          // (a dose of the cleaner from the bottle in use (item 203): none left, brushed with water, only so clean)
+          t.room = scrubRoom(t.room, scrubDose())
           t.scrubAt = now()
           scrubSound(near)
         } else t.flushAt = now()

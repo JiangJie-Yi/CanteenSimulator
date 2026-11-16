@@ -1,6 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { addLot, ageLots, lotGrades, lotsFrom, lotsTotal, settleLots, stalest, takeLots, type Lot } from '@/game/lots'
+import { addLot, ageLots, lotGrades, lotsFrom, lotsTotal, settleLots, stalest, takeLots, tossSpoiled, type Lot } from '@/game/lots'
+import { INEDIBLE } from '@/game/freshness'
 
 feature('食材分批：先進先出', () => {
   scenario('買新貨不會讓快壞的變新鮮', ({ given, when, then, and }) => {
@@ -46,5 +47,19 @@ feature('食材分批：先進先出', () => {
       expect(lotsTotal(s.lots)).toBe(6)
     })
     and('都沒有了，顯示 100（沒有東西會壞）', () => { expect(stalest(settleLots(lotsFrom(2, 20), 0).lots)).toBe(100) })
+  })
+
+  // (item 203: spoiled stock couldn't be thrown out: it sat in the fridge, counted as stock, and went on the fire before the fresh)
+  scenario('壞掉的丟掉：只丟不可食用的那幾批，其他的照舊', ({ given, when, then, and }) => {
+    given('冰箱裡 4 份壞了（鮮度 12）、3 份即期（鮮度 40）、5 份新的', (w) => {
+      w.lots = [{ n: 4, fresh: 12, day: 1 }, { n: 3, fresh: 40, day: 2 }, { n: 5, fresh: 100, day: 3 }] as Lot[]
+    })
+    when('把壞掉的丟掉', (w) => { w.r = tossSpoiled(w.lots) })
+    then('丟了 4 份', (w) => { expect(INEDIBLE).toBe(30); expect(w.r.n).toBe(4) })
+    and('剩 8 份，最舊的是鮮度 40 那批', (w) => {
+      expect(lotsTotal(w.r.lots)).toBe(8)
+      expect(stalest(w.r.lots)).toBe(40)
+    })
+    and('沒有壞掉的就什麼都不丟', (w) => { expect(tossSpoiled(w.r.lots).n).toBe(0) })
   })
 })

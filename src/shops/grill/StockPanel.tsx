@@ -80,6 +80,8 @@ type Props = {
   onRemove: (id: string) => void
   onClear: () => void
   onBuy: (id: string, n: number) => void
+  /** a food's spoiled portions thrown out (item 203) */
+  onToss?: (id: string) => void
   onRestock: (how: Restock) => void
   restockCost: Record<Restock, number>
   onBuyCharcoal: (sacks: number) => void
@@ -244,6 +246,15 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
             <svg viewBox="0 0 16 16"><path d="M13.5 2.5C7 2.5 3 5.5 3 10c0 1.3.4 2.4 1 3.2C5 9.5 7.5 7 11 5.5 8 7.5 6 10 5.2 13.6 6 14 7 14 8 14c4 0 5.5-4.5 5.5-11.5z" /></svg>
             <span className="chiller-fresh-bar"><i style={{ width: `${f}%` }} /></span>
             <em>{grade === 'spoiled' ? tl(lang, '不可食用', '食用不可', 'Spoiled') : `${f}%`}</em>
+            {/* (the spoiled thrown out, at a click (item 203: they couldn't be got rid of), their cost a loss in the food line) */}
+            {grade === 'spoiled' && p.onToss && (() => {
+              const bad = lotGrades(p.lots?.[x.id]).spoiled
+              return bad > 0 && (
+                <span role="button" tabIndex={-1} className="chiller-toss"
+                  title={tl(lang, `丟掉壞掉的 ${bad} 份（NT$${cost * bad} 記成食材損耗）`, `傷んだ ${bad} 個を処分（NT$${cost * bad} を食材の損失に）`, `Throw out the ${bad} spoiled (NT$${cost * bad}, a loss on food)`)}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); p.onToss?.(x.id) }}>{tl(lang, '丟掉', '処分', 'Toss')}</span>
+              )
+            })()}
           </span>
         )}
         {!out && !keepsDry(x.id) && <LotStrip lang={lang} lots={p.lots?.[x.id]} />}

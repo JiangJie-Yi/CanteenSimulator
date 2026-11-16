@@ -30,13 +30,17 @@ export function visitRoom(r: Room): { room: Room; complaint: Complaint } {
 export const penaltyOf = (c: Complaint) => (c === 'paper' ? 18 : c === 'dirty' ? 10 : 0)
 
 export const cleanRoom = (r: Room): Room => ({ ...r, clean: 1 })
+/** how clean a toilet's brushed with no cleaner (item 203): water and the brush only, not as clean */
+export const BRUSH_ONLY = 0.7
+/** a toilet scrubbed: clean with the cleaner, only so clean with none */
+export const scrubRoom = (r: Room, cleaner: boolean): Room => (cleaner ? cleanRoom(r) : { ...r, clean: Math.max(r.clean, BRUSH_ONLY) })
 /** how much of a roll one sheet pulled by hand takes (a guest takes a fifth: ROLL_USES) */
 export const SHEET = 0.02
 /** a sheet pulled off the roll by hand: a little less paper (never under none) */
 export const pullSheet = (r: Room): Room => ({ ...r, paper: Math.max(0, r.paper - SHEET) })
 export const newRoll = (r: Room): Room => ({ ...r, paper: 1 })
 /** the staff's sweep before opening: clean again, the paper as it was left */
-export const openRoom = (r: Room): Room => ({ ...r, clean: 1, uses: 0 })
+export const openRoom = (r: Room, cleaner = true): Room => ({ ...scrubRoom(r, cleaner), uses: 0 })
 
 /** how it looks: spotless, used, dirty (marks on the floor), filthy (flies) */
 export function looksOf(r: Room): 'fresh' | 'used' | 'dirty' | 'flies' {

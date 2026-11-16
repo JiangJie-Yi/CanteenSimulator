@@ -30,7 +30,7 @@ import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, cashInHand, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
-import { afterRefund, drawerFrom, drawerTotal, owedAtTill, refundOf, rollsFrom, rollsValue, type Tab } from '@/game/till'
+import { drawerFrom, drawerTotal, owedAtTill, refundFor, rollsFrom, rollsValue, type Tab } from '@/game/till'
 import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
@@ -52,6 +52,7 @@ import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { BOARD_SLOTS } from '@/game/fireSlots'
 import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, setDrinkPanel, SHOP_PURSE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
+import { unitCost } from '@/game/drinkStock'
 import { getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
 import { EditorShell } from '@/shops/grill/EditorShell'
 import { TOOL_PAGE } from '@/scene/toolPage'
@@ -119,7 +120,7 @@ import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
 import { startAdminLink, type AdminSnap } from '@/ui/admin/link'
 import { GameClock } from '@/ui/GameClock'
 import { ageFresh } from '@/game/freshness'
-import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, type Lot } from '@/game/lots'
+import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, tossSpoiled, type Lot } from '@/game/lots'
 import { RING_SLOTS } from '@/game/fireSlots'
 import { orderSaid, saidAgain, withOrder, type OrderSaid } from '@/game/orderTally'
 import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
@@ -468,7 +469,7 @@ type SceneProps = {
   onVisit: (v: Visit) => void
   /** (shop open) what's on each shop's menu, and a customer ordering one of them */
   entriesOf: (dishId: string) => Entry[]
-  onOrderEntry: (key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean) => boolean
+  onOrderEntry: (key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean, warm?: Record<string, number>) => boolean
   onGuests: (dishId: string, g: GuestView[]) => void
   spotOn: boolean
   guestsBy: Record<string, GuestView[]>
@@ -1637,6 +1638,11 @@ export default function App() {
   // freshness becomes a single lot.
   const [lots, setLots] = useState<Record<string, Lot[]>>(() => SAVED?.lots
     ?? Object.fromEntries(Object.entries(SAVED?.stock ?? {}).filter(([k]) => !isSupply(k) && !keepsDry(k)).map(([k, n]) => [k, lotsFrom(n, SAVED?.fresh?.[k] ?? 100)])))
+  const lotsNow = useRef(lots)
+  lotsNow.current = lots
+  // (dev: a food's lots looked at and set from the console, for checking what's spoiled: as many portions as its stock)
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __lotsNow: () => lotsNow.current,
+    __setLots: (id: string, l: Lot[]) => { lotsNow.current = { ...lotsNow.current, [id]: l }; setLots((all) => ({ ...all, [id]: l })) } })
   const stockWas = useRef(stock)
   useEffect(() => {
     stockWas.current = stock
@@ -1765,6 +1771,8 @@ export default function App() {
   const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>(() => SAVED?.menuBy ?? {})
   const menuByRef = useRef(menuBy)
   menuByRef.current = menuBy
+  // (dev: the menus put out, for checking what's ordered off them)
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __menuBy: () => menuByRef.current })
   const entriesOf = (id: string) => menuBy[id] ?? []
   // how many of each dish on the menu have been ordered (for the menu board while open)
   const [entryCount, setEntryCount] = useState<Record<string, number>>({})
@@ -1993,6 +2001,21 @@ export default function App() {
     book('bought', cost)
     setStock((st) => ({ ...st, [id]: (st[id] ?? 0) + n }))
   }
+  /** a food's portions gone off past eating thrown out (item 203: spoiled stock couldn't be got rid of; it was counted as stock, never
+   * reordered, and used first): out of the stock and its lots together (the dish next made not taken for made of them), what they cost
+   * booked as food, a loss on the day. How many went */
+  const tossFood = (id: string) => {
+    const r = tossSpoiled(lotsNow.current[id])
+    if (r.n <= 0) return 0
+    const it = ALL_ITEMS.get(id) ?? DISHES.flatMap((d) => d.bases).find((b) => b.id === id)
+    lotsNow.current = { ...lotsNow.current, [id]: r.lots }
+    setLots((all) => ({ ...all, [id]: r.lots }))
+    shiftStockRef.current({ [id]: -r.n })
+    book('food', costOf(it ?? { price: 0 }) * r.n)
+    return r.n
+  }
+  const tossRef = useRef(tossFood)
+  tossRef.current = tossFood
   /** the three ways to restock all at once: 補到平均 (whatever's under the average, up to it), 各補 5, 補滿 (everything up to PAR) */
   const restockOf = (d: DishInfo, how: Restock) => (how === 'avg' ? averageOrder(d, stock) : how === 'each' ? eachOrder(d, 5, stock) : topUpOrder(d, stock))
   /** everything out on the board to try put back: refunded (nothing was made) */
@@ -2340,6 +2363,15 @@ export default function App() {
   const sceneNotice = (what: 'notCooked' | 'burnt' | 'waste' | 'fireFull' | 'offTable' | 'heapFull' | 'needSkewer' | 'binBurnt') => say(what === 'fireFull' ? UI[lang].fireFull(FIRE_CAPACITY) : UI[lang][what])
   const sceneOrder = (id: string, guest?: number, reuse = false) => {
     const ok = changeQty(id, 1, reuse)
+    // (a customer's side (the miso soup or the sake with their dishes) on their bill, at its price, as their dishes are: paid at the till as
+    // they go, given back if it never came (item 203: booked into the takings, never on the bill))
+    if (ok && guest && ai) {
+      const price = (dish.bases.find((b) => b.id === id) ?? dish.items.find((i) => i.id === id))?.price ?? 0
+      const tabs = (bills.current[dish.id] ??= {})
+      let t = tabs[guest]
+      if (!t) { t = tabs[guest] = { paid: 0, parts: 0, atTill: true }; owing.current.add(t) }
+      if (price) (t.side ??= []).push({ id, price })
+    }
     // a customer's order is written onto the menu below, so you see it come in
     if (ok && guest) {
       const key = ++feedSeq.current
@@ -2470,6 +2502,12 @@ export default function App() {
         const now = Date.now()
         if (now - (lastRound.current[d.id] ?? 0) < (45 - keeper.speed * 0.3) * (1 + fatigue / 100) * 1000) continue
         lastRound.current[d.id] = now
+        // (what's gone off past eating thrown out first (item 203): counted as stock, it was never reordered, and went on the fire)
+        const tossed = Object.keys(stockRef.current).filter((k) => !isSupply(k) && !keepsDry(k)).map((k) => [k, tossRef.current(k)] as const).filter(([, n]) => n > 0)
+        if (tossed.length && DISHES[active].id === d.id) talk('stock', UI[lang].tossed(personName(keeper, lang), tossed.map(([k, n]) => {
+          const it = ALL_ITEMS.get(k) ?? d.bases.find((b) => b.id === k)
+          return `${(it ? nameIn(lang, it) : null) ?? k} ${n}`
+        }).join('、')))
         const { buy, cost, fuel } = restockOrder(d, menuBy[d.id] ?? [], stockRef.current, money, effective(keeper, fatigue, LATE.on) * 100)
         if (!cost && !fuel) continue
         money -= cost + fuel
@@ -2942,11 +2980,13 @@ export default function App() {
   /** a customer walked out: take back the price of what they didn't eat */
   const refund = (ids: string[], d: DishInfo, guest?: number) => {
     // (what they paid for the menu's dishes, in proportion to what of it they didn't get)
+    // (a side at its own price, the rest their share of what the dishes came to (item 203))
     const bill = guest !== undefined ? bills.current[d.id]?.[guest] : undefined
-    const total = bill ? refundOf(bill, ids.length)
+    const back = bill ? refundFor(bill, ids) : null
+    const total = back ? back.back
       : ids.reduce((n, id) => n + ((ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id))?.price ?? 0), 0)
     // (and off what they pay at the till: it rang up the whole bill all the same, into the drawer (item 195))
-    if (bill) Object.assign(bill, afterRefund(bill, ids.length))
+    if (bill && back) Object.assign(bill, back.tab)
     if (total) book('revenue', -total)
   }
   /**
@@ -2955,14 +2995,15 @@ export default function App() {
    */
   /** `reuse`: how many of each of its parts the kitchen makes from portions already put out and eaten (no new ones put out for those) */
   /** `atTill`: they pay at the till as they leave (sat in), not as they order (a takeaway) */
-  const orderEntry = (e: Entry, guest: number, reuse: Record<string, number> = {}, atTill = true): boolean => {
+  /** `warm`: so many of its parts' ids served from what's kept warm, cooked and paid for already: none taken from stock nor costed again
+   * (item 203) */
+  const orderEntry = (e: Entry, guest: number, reuse: Record<string, number> = {}, atTill = true, warm: Record<string, number> = {}): boolean => {
     const d = DISHES.find((x) => x.id === e.shop)!
-    const need = needOf(e)
-    if (!canServe(e, stockRef.current)) return false
-    if (d.roast) {
-      const skewers = Object.entries(partsOf(e)).reduce((n, [k, q]) => n + (isSkewer(k) ? q : 0), 0)
-      if (skewers && onTheFire() + skewers > FIRE_CAPACITY) return false
-    }
+    const need = needOf(e, warm)
+    if (!canServe(e, stockRef.current, warm)) return false
+    // (a full fire doesn't turn the order away (item 203: with its eight places taken, every skewer ordered was refused, and the customer
+    // went out with "nothing to be had"): the kitchen takes it all the same, and it waits its turn in the fridge, then on the board, till a
+    // place round the fire comes free (game/fireSlots); the test grill, the shop closed, still holds to the fire's room)
     stockRef.current = { ...stockRef.current }
     for (const [k, q] of Object.entries(need)) stockRef.current[k] = (stockRef.current[k] ?? 0) - q
     setStock((st) => {
@@ -2971,7 +3012,7 @@ export default function App() {
       return next
     })
     book('revenue', e.price)
-    book('food', entryCost(e))
+    book('food', entryCost(e, warm))
     setOrdersBy((b) => {
       const cur = { ...b.open[d.id] }
       for (const [k, q] of Object.entries(partsOf(e))) cur[k] = (cur[k] ?? 0) + Math.max(0, q - (reuse[k] ?? 0))
@@ -2991,12 +3032,12 @@ export default function App() {
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
   }
-  /** a customer helped themselves to a drink from the fridge: paid for at its price, a third of that its cost */
+  /** a customer helped themselves to a drink from the fridge: paid for at its price, its cost what the bottle cost (its case's share, item 203) */
   const sellDrink = (guest: number, id: DrinkId) => {
     const d = DRINKS.find((x) => x.id === id)
     if (!d) return
     book('revenue', d.price)
-    book('food', Math.round(d.price * 0.35))
+    book('food', unitCost(id))
     // (and on their bill, paid with their dishes at the till)
     const tabs = (bills.current[DISHES[active].id] ??= {})
     let t = tabs[guest]
@@ -3009,9 +3050,9 @@ export default function App() {
   const onDrink = useCallback((guest: number, id: DrinkId) => sellDrinkRef.current(guest, id), [])
   const orderEntryRef = useRef(orderEntry)
   orderEntryRef.current = orderEntry
-  const onOrderEntry = useCallback((key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean) => {
+  const onOrderEntry = useCallback((key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean, warm?: Record<string, number>) => {
     const e = Object.values(menuByRef.current).flat().find((x) => x.key === key)
-    return !!e && orderEntryRef.current(e, guest, reuse, atTill)
+    return !!e && orderEntryRef.current(e, guest, reuse, atTill, warm)
   }, [])
   return (
     <div className={`app${menuFolded || (owner !== null && !opened[dish.id]) ? ' menu-folded' : ''}${toolsOpen ? ' tools-open' : ''}${ai ? ' is-open-shop' : ''}${owner !== null && !opened[dish.id] ? ' is-unopened' : ''}${!opened[dish.id] ? ' is-hushed' : ''}${spotOn && !opened[dish.id] ? ' is-spotlit' : ''}${flatGrill ? ' is-flatgrill' : ''}${editOn ? ' is-editing' : ''}${!!dish.roast && !editOn ? ' has-fridge' : ''}${office || fridgeOpen ? ' is-docked' : ''} hud-rows-${hudRows}`} ref={appRef}>
@@ -3339,7 +3380,7 @@ export default function App() {
         <StockPanel lang={lang} tab={stockTab} onTab={setStockTab} dish={researchDish(dish)} stock={stock} fresh={fresh} lots={lots} cash={cash} focus={stockFocus} meter={meterShown}
           unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? { price: 0 })}
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
-          onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)}
+          onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)} onToss={(id) => { tossFood(id) }}
           restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
           onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onBuyReceipts={buyReceipts} onBuyHousehold={buyHousehold} onBuyWashroom={buyWashroom} onClose={() => setFridgeOpen(false)} />
       )}

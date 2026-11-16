@@ -49,6 +49,8 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
     [t('燃料（備長炭）', '燃料（備長炭）', 'Charcoal'), -s.fuel, false],
     [t('人事', '人件費', 'Wages') + overtime, -s.wage, false],
     [t('水電', '光熱費', 'Power & water'), -s.utility, false],
+    // (the reviews bought and the shrine's offerings, out of the profit too (item 203): a line only on a day there were any)
+    ...(s.other > 0 ? [[t('宣傳與供品', '宣伝・お供え', 'Promotion & offerings'), -s.other, false] as [string, number, boolean]] : []),
   ]
   const stars = s.stars === null ? null : Math.round(s.stars * 10) / 10
   return createPortal(

@@ -3,6 +3,7 @@
 import { TISSUE, TISSUE_LOW, tissueOrder } from './tissues'
 import { ROLL, SOAP, TOWEL, WASHROOM_LOW, washroomOrder } from './washroom'
 import { RECEIPT, RECEIPT_LOW, receiptOrder } from './receipts'
+import { HOUSEHOLD, HOUSEHOLD_LOW, householdOrder } from './household'
 import { DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, GARNISH, GARNISH_GOODS, NORI, NORI_PAR, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
@@ -90,17 +91,23 @@ export const takesOf = (d: Dish, id: string): Stock =>
 export const partCost = (d: Dish, p: Part) => costOf(findItem(d, p.id) ?? { price: 0 }) +
   p.dabs.reduce((n, k) => n + SEASON_COST[k as Seasoning], 0)
 
-/** what a dish on the menu costs to make */
-export const entryCost = (e: Entry) => {
+/** a dish's parts but so many of each part's id (`skip`), the first of each: what's made of them is one kept warm, already cooked and paid
+ * for when its first customer ordered it (item 203: sold again, it was taken out of stock and its food cost booked a second time) */
+const partsLeft = (e: Entry, skip: Stock) => {
+  const left: Stock = { ...skip }
+  return e.parts.filter((p) => { if ((left[p.id] ?? 0) > 0) { left[p.id] -= 1; return false } return true })
+}
+/** what a dish on the menu costs to make (but its parts kept warm, `skip`: made already) */
+export const entryCost = (e: Entry, skip: Stock = {}) => {
   const d = shopOf(e)
-  return e.parts.reduce((n, p) => n + partCost(d, p), 0)
+  return partsLeft(e, skip).reduce((n, p) => n + partCost(d, p), 0)
 }
 
 /** what a dish on the menu takes out of stock: its food, and a dose of each seasoning that goes on it */
-export const needOf = (e: Entry): Stock => {
+export const needOf = (e: Entry, skip: Stock = {}): Stock => {
   const d = shopOf(e)
   const need: Stock = {}
-  for (const p of e.parts) {
+  for (const p of partsLeft(e, skip)) {
     for (const [k, q] of Object.entries(takesOf(d, p.id))) {
       need[k] = (need[k] ?? 0) + q
       // (and what goes with it: a sheet of nori round each onigiri, in a set as on its own)
@@ -119,7 +126,7 @@ export const partsOf = (e: Entry): Stock => {
 }
 
 /** whether there's stock enough for one of a dish */
-export const canServe = (e: Entry, stock: Stock) => Object.entries(needOf(e)).every(([k, q]) => (stock[k] ?? 0) >= q)
+export const canServe = (e: Entry, stock: Stock, skip: Stock = {}) => Object.entries(needOf(e, skip)).every(([k, q]) => (stock[k] ?? 0) >= q)
 
 /** how many of a dish could be made from what's in stock */
 export const portionsLeft = (e: Entry, stock: Stock) =>
@@ -206,6 +213,13 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     const o = washroomOrder(id, 1)
     const c = Math.round(o.cost * off)
     if (cost + c <= cash) { buy[id] = o.n; cost += c }
+  }
+  // (and the dish soap and the toilet cleaner, a pack of each once the spare bottles are low: used now (item 203))
+  if (menu.length) for (const id of HOUSEHOLD) {
+    if ((stock[id] ?? 0) >= HOUSEHOLD_LOW[id]) continue
+    const o = householdOrder(id, 1)
+    const c = Math.round(o.cost * off)
+    if (cost + c <= cash) { buy[id] = o.bottles; cost += c }
   }
   // (and a pack of receipt paper once the spare rolls are low)
   if (menu.length && (stock[RECEIPT] ?? 0) < RECEIPT_LOW) {

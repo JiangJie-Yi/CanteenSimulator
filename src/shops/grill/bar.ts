@@ -21,6 +21,8 @@ import { SOAP_FULL, TOWEL_FULL } from '@/game/washroom'
 import { emptyFridge, moveBetween, putInPlace, readDrinks, startBack, takeFromPlace, writeDrinks, type Back, type Places } from '@/game/drinkStock'
 import { replaces } from '@/scene/hot'
 import { ROLL_SLIPS } from '@/game/receipts'
+import { CLEANER_SCRUBS, DISH_SOAP, DISH_SOAP_SQUEEZES, TOILET_CLEANER, takeDose } from '@/game/household'
+import { SOAP_PUMP } from '@/game/handWash'
 
 /*
  * Where the customers sit: one or more counters, each a straight run of stools. A counter is given by its middle
@@ -726,6 +728,33 @@ export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => numbe
   has: () => -1,
   // (n of something taken out of stock, if there are as many: a spare box of tissues, the stock keeper's)
   take: () => true,
+}
+/**
+ * The cleaning things' bottles in use (game/household; item 203: stocked and bought, and nothing ever used them): the dish soap by the sink,
+ * so many squeezes left in it, and how many plates the staff's last squeeze has still to wash; the toilet cleaner, so many scrubs left. A
+ * new one's opened from the spares in stock as each runs out (each a full one as the page loads).
+ */
+export const IN_USE = { soap: DISH_SOAP_SQUEEZES, plates: 0, cleaner: CLEANER_SCRUBS }
+/** a squeeze of the dish soap into the sink: false with the bottle empty and none in stock */
+export const squeezeSoap = () => {
+  const r = takeDose(IN_USE.soap, DISH_SOAP_SQUEEZES, () => SUPPLIES.take(DISH_SOAP, 1))
+  IN_USE.soap = r.left
+  return r.had
+}
+/** a plate (or a batch of skewers) washed by the staff: a squeeze each SOAP_PUMP of them, as the owner's own hand-washing has it */
+export const soapPlate = () => {
+  if (IN_USE.plates <= 0) {
+    if (!squeezeSoap()) return
+    IN_USE.plates = SOAP_PUMP
+  }
+  IN_USE.plates -= 1
+}
+/** a scrub's worth of the toilet cleaner: false with the bottle empty and none in stock (brushed with water then, game/restroom's
+ * scrubRoom) */
+export const scrubDose = () => {
+  const r = takeDose(IN_USE.cleaner, CLEANER_SCRUBS, () => SUPPLIES.take(TOILET_CLEANER, 1))
+  IN_USE.cleaner = r.left
+  return r.had
 }
 /** whether any of these foods is in stock (item 182, the owner's: "the things themselves don't match the interface": a store's contents drawn
  * only while there's something of it in stock); with no shop running (not known), as if there were */

@@ -14,7 +14,8 @@ import { plainColours, mergeByMaterial } from '@/scene/StaticBatch'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { Steam } from '@/scene/Steam'
 import { canOpen, DRY_S, DRYER_CAP, drainSays, dryerPhase, handWashSays, playerLoad, shutStarts, type DryerPhase } from '@/game/plates'
-import { DRAIN, DRYER, HAND_WASH, POINTER_HINT, SINK, SINK_BIN, tipOver } from './bar'
+import { DRAIN, DRYER, HAND_WASH, IN_USE, POINTER_HINT, SINK, SINK_BIN, SUPPLIES, squeezeSoap, tipOver } from './bar'
+import { DISH_SOAP } from '@/game/household'
 import { basinSays, waterTick } from '@/game/sinkWater'
 import { HAND_STEP_SAYS, handStep, pumpSoap, soapWith } from '@/game/handWash'
 import { aimTip, setTip } from '@/scene/hoverTip'
@@ -497,7 +498,8 @@ export function SinkPart({ node }: { node: string }) {
       onPointerOut={(e) => { if (getEdit().on) return; tipOver(name, '').onPointerOut(e) }}
       onClick={(e) => {
         e.stopPropagation(); if (getEdit().on) return
-        if (node === 'SinkDetergentSet') { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } else SINK.sponge = !SINK.sponge
+        // (out of the bottle in use, a new one opened from stock as it runs out: none at all, nothing comes (item 203))
+        if (node === 'SinkDetergentSet') { if (SINK.water > 0 && squeezeSoap()) { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } } else SINK.sponge = !SINK.sponge
         window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
       }}>
       <primitive object={obj} />
@@ -544,7 +546,8 @@ function partSays(node: string) {
     // (each its own short line: run together it broke onto two)
     case 'SinkBinSet': return (SINK_BIN.sticks > 0 ? `裡面有用過的竹籤 ${SINK_BIN.sticks} 根` : '用過的竹籤丟這裡，現在是空的') + '｜旁邊是資源回收桶'
       + (BIN_LID.open ? '｜點一下蓋上' : '｜點一下掀開蓋子')
-    case 'SinkDetergentSet': return SINK.water <= 0 ? '洗碗精｜水槽沒有水，先放水再擠' : `洗碗精｜點一下擠一點到水裡（水裡的夠洗 ${SINK.soap} 個）`
+    case 'SinkDetergentSet': return IN_USE.soap <= 0 && SUPPLIES.has(DISH_SOAP) === 0 ? '洗碗精｜用完了，庫存也沒有：到庫存的耗材訂洗碗精'
+      : SINK.water <= 0 ? '洗碗精｜水槽沒有水，先放水再擠' : `洗碗精｜點一下擠一點到水裡（水裡的夠洗 ${SINK.soap} 個；這瓶還能擠 ${IN_USE.soap} 次）`
     case 'SinkSpongeSet': return SINK.sponge ? '菜瓜布｜拿著，點水槽刷盤子；點一下放回去' : '菜瓜布，黃的那面軟，綠的那面刷｜點一下拿起來洗碗'
     default: return ''
   }

@@ -40,6 +40,10 @@ const TOTAL = KINDS.reduce((n, k) => n + k.weight, 0)
 export const RIDER_KINDS: ReadonlySet<GuestKind> = new Set(['collegeStudent', 'uncle', 'delinquent', 'bosozoku'])
 /** whether customer number `id` could come in as a rider */
 export const canRide = (id: number) => RIDER_KINDS.has(kindOf(id).kind)
+/** who's under age: sold no alcohol (item 203: a pupil or a high-schooler was poured a tokkuri of sake like anyone, 12% of those sat in;
+ * Taiwan's age is 18, Japan's 20). The delinquent (ヤンキー) is taken as a young adult: he rides the deliveries */
+export const MINORS: ReadonlySet<GuestKind> = new Set(['kid', 'schoolboy', 'schoolgirl'])
+export const isMinor = (id: number) => MINORS.has(kindOf(id).kind)
 /** each guest's kind, fixed by their id: drawn by weight, the ids scattered so neighbours seldom match */
 export const kindOf = (id: number) => {
   let h = Math.imul(id ^ (id >>> 16) ^ 0x2c1b3c6d, 0x45d9f3b)

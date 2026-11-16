@@ -2,7 +2,7 @@
 // freshness, the nearly spoiled with it, as no kitchen works): every purchase is a lot of its own at 100, each lot goes off on its own,
 // what's used comes out of the stalest first (first in, first out), and what's shown is the stalest lot (to be used up first) with how many
 // portions there are at each grade.
-import { freshGrade } from './freshness'
+import { freshGrade, INEDIBLE } from './freshness'
 
 export type Lot = {
   /** portions in it */
@@ -45,6 +45,13 @@ export function settleLots(lots: Lot[] = [], have: number, day = 0): { lots: Lot
   if (have > now) return { lots: addLot(lots, have - now, day), used: 0, fresh: 100 }
   if (have < now) { const t = takeLots(lots, now - have); return { lots: t.lots, used: now - have, fresh: t.fresh } }
   return { lots: live(lots), used: 0, fresh: 100 }
+}
+
+/** the lots with those gone off past eating thrown out (below INEDIBLE; item 203: spoiled stock couldn't be got rid of, and was used first),
+ * and how many portions went */
+export function tossSpoiled(lots: Lot[] = []): { lots: Lot[]; n: number } {
+  const keep = live(lots).filter((l) => l.fresh >= INEDIBLE)
+  return { lots: keep, n: lotsTotal(lots) - lotsTotal(keep) }
 }
 
 /** the freshness shown: the stalest lot's (it's the one to use up first); 100 with nothing in */

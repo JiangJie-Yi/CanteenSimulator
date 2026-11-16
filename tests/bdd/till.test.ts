@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { afterRefund, BUSY_QUEUE, breakDown, DENOMS, deposit, dishLines, drawerFrom, drawerOpens, drawerTotal, openingFloat, owedAtTill, paysAtTill, paysByCard,
-  refundOf, ROLL_COINS, rollsFrom, rollsValue, startingRolls, tabletActive, tabTotal, takeOut, takeRoll, type Tab } from '@/game/till'
+  refundFor, refundOf, ROLL_COINS, rollsFrom, rollsValue, startingRolls, tabletActive, tabTotal, takeOut, takeRoll, type Tab } from '@/game/till'
 import { cashInHand, SHOP_COST, type CashBooks } from '@/game/economy'
 
 feature('收銀櫃的平板與付款方式', () => {
@@ -159,6 +159,39 @@ feature('現金只算抽屜外的錢，抽屜裡的錢拿出來才加進現金�
       expect(dishLines(w.tab.paid, w.tab.parts).reduce((a: number, b: number) => a + b, 0)).toBe(600)
       expect(owedAtTill([w.tab])).toBe(600)
     })
+  })
+
+  // (item 203: the side miso soup and sake were booked straight into the takings and never put on the bill: never paid at the till, and
+  // one whose sake never came was refunded the fish they'd eaten)
+  scenario('加點的味噌湯、清酒寫進帳單，收銀台照收', ({ given, when, then, and }) => {
+    given('客人點了兩樣、共 760 元', (w) => { w.books = start(); w.books.revenue += 760; w.tab = { ...sat(), paid: 760, parts: 2 } })
+    when('又加點一碗 50 元的味噌湯、一壺 280 元的清酒', (w) => {
+      w.books.revenue += 50 + 280
+      w.tab.side = [{ id: 'MisoSoup', price: 50 }, { id: 'Sake', price: 280 }]
+    })
+    then('帳單是 1,090 元', (w) => { expect(tabTotal(w.tab)).toBe(1090) })
+    and('還沒付以前，現金跟開店時一樣', (w) => { expect(cashInHand(w.books, owedAtTill([w.tab]))).toBe(200000) })
+  })
+
+  scenario('加點的清酒沒來就走：退清酒的錢，吃到的菜照收', ({ given, when, then, and }) => {
+    given('客人點了兩樣共 760 元，加點一壺 280 元的清酒', (w) => {
+      w.tab = { ...sat(), paid: 760, parts: 2, side: [{ id: 'Sake', price: 280 }] }
+    })
+    when('兩樣菜都吃到了，清酒沒來就走了', (w) => { w.r = refundFor(w.tab, ['Sake']) })
+    then('退 280 元', (w) => { expect(w.r.back).toBe(280) })
+    and('收銀台收 760 元，兩道菜照打', (w) => {
+      expect(tabTotal(w.r.tab)).toBe(760)
+      expect(w.r.tab.parts).toBe(2)
+    })
+  })
+
+  scenario('菜沒來、加點的味噌湯喝了：退那道菜的錢，味噌湯照收', ({ given, when, then, and }) => {
+    given('客人點了兩樣共 760 元，加點一碗 50 元的味噌湯', (w) => {
+      w.tab = { ...sat(), paid: 760, parts: 2, side: [{ id: 'MisoSoup', price: 50 }] }
+    })
+    when('有一樣菜等不到就走了', (w) => { w.r = refundFor(w.tab, ['Saury']) })
+    then('退 380 元', (w) => { expect(w.r.back).toBe(380) })
+    and('收銀台收 430 元', (w) => { expect(tabTotal(w.r.tab)).toBe(430) })
   })
 
   scenario('外帶的客人不在收銀台付：點單時現金就增加', ({ given, when, then }) => {

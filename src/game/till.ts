@@ -56,12 +56,17 @@ export const rollsValue = (r: Rolls) => ROLL_KINDS.reduce((a, k) => a + (r[k] ? 
 
 /**
  * A customer's bill as the shop's books keep it (App's; item 195): what they've had at the menu's prices, less what was let go and given
- * back, for how many things; the drink they took from the fridge; whether they pay it at the till on the way out (those sat in: a takeaway's
- * paid as it's ordered), and whether they have.
+ * back, for how many things; the drink they took from the fridge; the sides ordered with the dishes, each at its own price (item 203: the
+ * miso soup or the sake, booked into the takings and never on the bill); whether they pay it at the till on the way out (those sat in: a
+ * takeaway's paid as it's ordered), and whether they have.
  */
-export type Tab = { paid: number; parts: number; drink?: number; atTill?: boolean; settled?: boolean }
-/** what a customer's bill comes to at the till: their dishes and their drink */
-export const tabTotal = (t: Tab) => t.paid + (t.drink ?? 0)
+export type Tab = { paid: number; parts: number; drink?: number; side?: Side[]; atTill?: boolean; settled?: boolean }
+/** a side on a bill: what it is and its price */
+export type Side = { id: string; price: number }
+/** what the sides on a bill come to */
+export const sideTotal = (t: Tab) => (t.side ?? []).reduce((a, s) => a + s.price, 0)
+/** what a customer's bill comes to at the till: their dishes, their sides and their drink */
+export const tabTotal = (t: Tab) => t.paid + sideTotal(t) + (t.drink ?? 0)
 /** what's still owed at the till, by those sat in who haven't paid yet: not in the shop's hand till it's paid (a card's comes in then, cash
  * goes into the drawer) */
 export function owedAtTill(tabs: Iterable<Tab>) {
@@ -74,6 +79,17 @@ export const refundOf = (t: Tab, things: number) => (t.parts > 0 ? Math.round((t
 /** their bill once that's given back: the refund off what they pay, the things off how many they had (item 195: the till rang up the whole
  * bill all the same, and the money went into the drawer) */
 export const afterRefund = (t: Tab, things: number): Tab => ({ ...t, paid: t.paid - refundOf(t, things), parts: Math.max(0, t.parts - things) })
+/** what one who walks out gets back for the things (`ids`) they didn't get, and their bill after: a side at its own price, the rest the
+ * dishes' share of what was paid for them (item 203: one whose sake never came was refunded the fish they'd eaten) */
+export function refundFor(t: Tab, ids: readonly string[]): { back: number; tab: Tab } {
+  const side = [...(t.side ?? [])]
+  let back = 0, dishes = 0
+  for (const id of ids) {
+    const k = side.findIndex((s) => s.id === id)
+    if (k >= 0) { back += side[k].price; side.splice(k, 1) } else dishes++
+  }
+  return { back: back + refundOf(t, dishes), tab: { ...afterRefund(t, dishes), side } }
+}
 /** whether one leaving has anything to pay at the till: one who'd nothing and drank nothing walks past it (one whose bill isn't known pays
  * as ever) */
 export const paysAtTill = (t: Tab | null) => !t || tabTotal(t) > 0

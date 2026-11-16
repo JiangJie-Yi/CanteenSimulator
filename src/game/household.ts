@@ -13,6 +13,24 @@ export const HOUSEHOLD_PACK: Record<Household, { bottles: number; cost: number; 
   [DISH_SOAP]: { bottles: 4, cost: 220, start: 4 },
   [TOILET_CLEANER]: { bottles: 3, cost: 270, start: 3 },
 }
+/** a bottle of dish soap: so many squeezes (each into a sinkful that washes game/handWash's SOAP_PUMP plates) */
+export const DISH_SOAP_SQUEEZES = 40
+/** a bottle of toilet cleaner: so many scrubs of a toilet */
+export const CLEANER_SCRUBS = 20
+/** the stock keeper orders a pack once the spare bottles are fewer than this (as the washrooms' spares, game/washroom's WASHROOM_LOW) */
+export const HOUSEHOLD_LOW: Record<Household, number> = { [DISH_SOAP]: 2, [TOILET_CLEANER]: 2 }
+/**
+ * A dose out of the bottle in use (item 203: the dish soap and the toilet cleaner were stocked and bought, and nothing ever used them): it
+ * has `left` doses in it; empty, a new one's opened from stock (`open` takes one out, false with none there), `doses` in a full one.
+ * Whether there was a dose to be had, and how many are left in the bottle after.
+ */
+export function takeDose(left: number, doses: number, open: () => boolean): { left: number; had: boolean } {
+  if (left <= 0) {
+    if (!open()) return { left: 0, had: false }
+    left = doses
+  }
+  return { left: left - 1, had: true }
+}
 /** packs of one bought in: how many bottles, what they cost */
 export const householdOrder = (id: Household, packs: number) => ({ bottles: packs * HOUSEHOLD_PACK[id].bottles, cost: packs * HOUSEHOLD_PACK[id].cost })
 /** what a new shop has of each */

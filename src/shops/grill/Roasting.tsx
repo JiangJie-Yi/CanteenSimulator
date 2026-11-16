@@ -40,6 +40,7 @@ import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from '.
 import { fireCall, HOT_AT } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
+import { pickOrders } from '@/game/orderPick'
 import { SHAPE_S, fromTray, takeRice } from '@/game/rice'
 import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
 import { SAKE_SERVE_S, SAKE_SIDE, SAKE_WAIT_S } from '@/game/sakeStand'
@@ -49,7 +50,7 @@ import { seasonSound, sprinkleTick } from './seasonSound'
 import { biteSound, chewSound } from './chewSound'
 import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
 import { getLights } from '@/scene/lightsStore'
-import { canRide, comesLate, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
+import { canRide, comesLate, isMinor, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
 import { RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
@@ -121,7 +122,7 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
   leftAt?: number; cleared?: boolean
   /** (shop clock) when they ate their first piece: how long they waited for it */
   firstAte?: number
-  /** when they last began a piece: waiting on the rest of their order from then */
+  /** when they last began a piece off the fire (the soup or sake don't count: item 203): waiting on the rest of their order from then */
   lastAte?: number
   /** a takeaway or a delivery (game/takeout): not sat anywhere, their food packed at the plating place, carried out to them at the till */
   takeout?: boolean }
@@ -4296,7 +4297,7 @@ type RoastingProps = {
   /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
   entries?: { key: string; name: string; ja?: string; parts: { id: string; dabs: string[]; name: string; ja?: string }[] }[]
   /** a customer orders this dish off the menu: false if it can't be had (out of stock, the fire's full) */
-  onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean) => boolean
+  onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean, warm?: Record<string, number>) => boolean
   /** how slowly customers come in (no cashier: fewer) */
   crowd?: number
   /** the omiki's been offered at the shrine: each customer orders a little more */
@@ -5953,47 +5954,50 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const placeOrders = (id: number, want: number, seated = true) => {
       const orders: string[] = []
       const said: string[] = []
-      for (let j = 0; j < (entries ? Math.min(want, blessed ? 3 : 2) : want); j++) {
-        if (entries) {
-          // a dish (or a set) off the menu, made the way it's listed
-          const e = entries[Math.floor(Math.random() * entries.length)]
-          // (the miso soup too, ladled from the pot (the owner's, 2026-11-11): it was left off, not grilled, and every set with it never ordered)
-          if (!e || !e.parts.every((pt) => pt.id in roast.times || pt.id === 'MisoSoup')) continue
-          wants.current.push(...e.parts)
-          // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
-          const again: Piece[] = [], warm: Piece[] = []
-          for (const pt of e.parts) {
-            const w = warmFor(pt.id, new Set(warm))
-            if (w) { warm.push(w); continue }
-            const q = recyclable(pt.id, new Set(again))
-            if (q) again.push(q)
-          }
-          const reuse: Record<string, number> = {}
-          for (const q of [...again, ...warm]) reuse[q.id] = (reuse[q.id] ?? 0) + 1
-          if (onOrderEntry?.(e.key, id, reuse, seated)) {
-            // (its prep: rice washed and cooked, the soup, what's rinsed)
-            meterWater('cooking', e.parts.length)
-            for (const q of again) revive(q)
-            // (the bowl's held for them: carried over to them from there (the stray's way, next))
-            for (const q of warm) { q.guest = id; q.keepWarm = false }
-            orders.push(...e.parts.map((pt) => pt.id))
-            said.push(lang === 'ja' ? e.ja ?? e.name : lang === 'en' ? e.parts.map((pt) => partName({ name: pt.name, en: nameOf(pt.id) }, nameOf(pt.id), pt.id, pt.dabs as Dab[], 'en')).join(' & ') : e.name)
-          } else {
-            wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
-          }
-          continue
+      // (each dish they want picked among what can still be had (game/orderPick, item 203: two picks at random, two sold out, and they went
+      // out with "nothing to be had", one star, the menu still with dishes to be had): one that can't be had now tried once, another picked)
+      if (entries) pickOrders(entries, Math.min(want, blessed ? 3 : 2), (e) => {
+        // a dish (or a set) off the menu, made the way it's listed
+        // (the miso soup too, ladled from the pot (the owner's, 2026-11-11): it was left off, not grilled, and every set with it never ordered)
+        if (!e.parts.every((pt) => pt.id in roast.times || pt.id === 'MisoSoup')) return false
+        wants.current.push(...e.parts)
+        // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
+        const again: Piece[] = [], warm: Piece[] = []
+        for (const pt of e.parts) {
+          const w = warmFor(pt.id, new Set(warm))
+          if (w) { warm.push(w); continue }
+          const q = recyclable(pt.id, new Set(again))
+          if (q) again.push(q)
         }
-        const orderable = itemIds.filter((x) => x in roast.times || x === 'MisoSoup')
-        const pick = orderable[Math.floor(Math.random() * orderable.length)]
-        const warm = pick ? warmFor(pick, new Set()) : undefined
-        const again = pick && !warm ? recyclable(pick, new Set()) : undefined
-        if (pick && onOrder?.(pick, id, !!(again || warm))) {
-          if (again) revive(again)
-          if (warm) { warm.guest = id; warm.keepWarm = false }
-          orders.push(pick)
-          said.push(nameOf(pick))
+        const reuse: Record<string, number> = {}
+        for (const q of [...again, ...warm]) reuse[q.id] = (reuse[q.id] ?? 0) + 1
+        // (those kept warm are cooked and paid for already: none taken from stock or costed again (item 203); the ones made again from a
+        // piece cleared away are new portions, as ever)
+        const kept: Record<string, number> = {}
+        for (const q of warm) kept[q.id] = (kept[q.id] ?? 0) + 1
+        if (onOrderEntry?.(e.key, id, reuse, seated, kept)) {
+          // (its prep: rice washed and cooked, the soup, what's rinsed)
+          meterWater('cooking', e.parts.length)
+          for (const q of again) revive(q)
+          // (the bowl's held for them: carried over to them from there (the stray's way, next))
+          for (const q of warm) { q.guest = id; q.keepWarm = false }
+          orders.push(...e.parts.map((pt) => pt.id))
+          said.push(lang === 'ja' ? e.ja ?? e.name : lang === 'en' ? e.parts.map((pt) => partName({ name: pt.name, en: nameOf(pt.id) }, nameOf(pt.id), pt.id, pt.dabs as Dab[], 'en')).join(' & ') : e.name)
+          return true
         }
-      }
+        wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
+        return false
+      })
+      else pickOrders(itemIds.filter((x) => x in roast.times || x === 'MisoSoup'), want, (pick) => {
+        const warm = warmFor(pick, new Set())
+        const again = !warm ? recyclable(pick, new Set()) : undefined
+        if (!onOrder?.(pick, id, !!(again || warm))) return false
+        if (again) revive(again)
+        if (warm) { warm.guest = id; warm.keepWarm = false }
+        orders.push(pick)
+        said.push(nameOf(pick))
+        return true
+      })
       // (a bowl of miso soup alongside, as many have (the owner's, 2026-11-11: the soup ordered): charged and taken from the stock as any
       // order is, ladled from the pot)
       if (orders.length && !orders.includes('MisoSoup') && Math.random() < SOUP_SIDE && onOrder?.('MisoSoup', id, false)) {
@@ -6002,7 +6006,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       // (and some a tokkuri of sake, sat at the bar (item 89, the owner's: "it's on the menu, the customers order it"; they never did): charged
       // and taken from the stock as any order is, poured from the stand)
-      if (seated && orders.length && Math.random() < SAKE_SIDE && onOrder?.('Sake', id, false)) {
+      // (never to one under age (item 203: a pupil was poured one like anyone))
+      if (seated && orders.length && !isMinor(id) && Math.random() < SAKE_SIDE && onOrder?.('Sake', id, false)) {
         orders.push('Sake')
         said.push(nameOf('Sake'))
       }
@@ -6143,9 +6148,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       o.tier = k
       for (const p of pieces.current) if (p.guest === o.id && p.container === 'takeout' && !p.eaten) { p.local.y -= d; p.toP.y -= d; p.fromP.y -= d }
     })
-    // someone kept waiting too long goes
+    // someone kept waiting too long goes: till something off the fire's come, a soup or a sake before it no reason to wait longer for the rest
+    // (item 203: a bowl of soup started the between-dishes clock, half an hour, and a fish that takes three quarters of an hour at a middling
+    // fire never reached them: up and off mid-meal, refunded, a bad word left)
     for (const g of seated) {
-      if (g.eaten.length === 0 && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience) {
+      if (g.lastAte === undefined && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience) {
         g.state = 'angry'
         if (mood === 'dark') gripe(g.id, 'dark')
         const owed = [...g.orders]
@@ -6230,8 +6237,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         SOUP.pot = b.pot
         SOUP.left = b.left
         if (!g.takeout) { SOUP_SEATS.add(g.seat); SOUP.served++ }
+        // (something to start on, but not a dish off the fire: the wait for the rest goes on from when they sat down (item 203))
         g.firstAte ??= now
-        g.lastAte = now
         g.eaten.push(Math.max(0, SOUP_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
         g.ate.push('MisoSoup')
         g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
@@ -6245,7 +6252,6 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         SAKE_SEATS.add(g.seat)
         SAKE.served++
         g.firstAte ??= now
-        g.lastAte = now
         g.eaten.push(Math.max(0, SOUP_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
         g.ate.push('Sake')
         g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'

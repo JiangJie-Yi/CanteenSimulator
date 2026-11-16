@@ -91,7 +91,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2384,7 +2384,9 @@ function billFor(x: { id: number; items?: number; drink?: DrinkId }) {
   const n = Math.max(1, x.items ?? 2), owed = GUEST_BILLS.of(x.id)
   const each = owed ? dishLines(owed.paid, n) : Array.from({ length: n }, () => billOf(1))
   const drink = owed ? owed.drink ?? 0 : x.drink ? (DRINKS.find((d) => d.id === x.drink)?.price ?? billOf(1, x.drink) - billOf(1)) : 0
-  const parts = drink ? [...each, drink] : each
+  // (and a line each side: the miso soup or the sake with their dishes, item 203)
+  const sides = owed?.side?.map((q) => q.price) ?? []
+  const parts = drink ? [...each, ...sides, drink] : [...each, ...sides]
   return { parts, items: each.length, bill: parts.reduce((a, b) => a + b, 0) }
 }
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
@@ -3765,6 +3767,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       DRAIN.n = r.drain.n
       DRAIN.left = r.drain.left
       if (b.manual) SINK.soap = scrubbed(SINK.soap)
+      else soapPlate()
       meterWater('dish')
       setPattern(drainPlates.current?.children[DRAIN.n - 1], b.design ?? 0)
       if (f) plateClink(f.localToWorld(SOUND_AT.copy(WASH_POSE.plate)))
@@ -4013,7 +4016,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     PLATES_SET.clear()
     for (const f of FRIDGE_STATE) { f.passing = 0; f.stocker = false }
     // (the toilets swept before the day, nobody in them; the paper as it was left)
-    for (const w of [TOILETS.m, TOILETS.f]) { w.passing = 0; w.inside = 0; w.room = openRoom(w.room) }
+    // (both scrubbed before the day, a dose of the cleaner each that was used at all (item 203; one clean already, as on a new page, isn't
+    // scrubbed again): none left, brushed with water)
+    for (const w of [TOILETS.m, TOILETS.f]) { w.passing = 0; w.inside = 0; w.room = openRoom(w.room, w.room.clean < 0.999 ? scrubDose() : true) }
     WC_GRUMBLE.clear()
     redraw()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5150,7 +5155,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       })
       else if (pl.phase === 'washSk' && pl.t > SKEWER_WASH_S) {
         SINK.washing = false
-        meterWater('dish')
+        soapPlate(); meterWater('dish')
         setOff(skHolderSpot(), 'toHolder')
       } else if (pl.phase === 'toHolder') walk(() => { pl.phase = 'putSk'; faceTo(inBar('skewer-holder', pl.pos)) })
       else if (pl.phase === 'putSk' && pl.t > 0.5) {
@@ -5750,7 +5755,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const id = ownerServes ? 'owner' : servers[wi]?.id
         if (id) STAFF_TALK.push({ key: performance.now() + 0.7 + wi, id, text: LINES[lang].skewerWash, until: performance.now() + 2400 })
       })
-      else if (w.phase === 'skWash' && w.t > SKEWER_WASH_S) { meterWater('dish'); go(kitchenRoute(w.pos, skewerSpot('skewer-holder', w.pos)), 'skHolderGo') }
+      else if (w.phase === 'skWash' && w.t > SKEWER_WASH_S) { soapPlate(); meterWater('dish'); go(kitchenRoute(w.pos, skewerSpot('skewer-holder', w.pos)), 'skHolderGo') }
       else if (w.phase === 'skHolderGo') walk(() => { w.phase = 'skPut'; face(inBar('skewer-holder', w.pos)) })
       // ('back' walks its way from its end to its start, so it's given from their place to where they are, as every other way back is: given the
       // other way round, they were at their place the moment they set off, walked back out to the holder and were at their place again)
@@ -6003,7 +6008,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           dirty.current = r.dirty
           DRAIN.n = r.drain.n
           DRAIN.left = r.drain.left
-          meterWater('dish')
+          soapPlate(); meterWater('dish')
           const o = waiterObjs.current[wi]
           if (o) { washSplash(o.getWorldPosition(SOUND_AT)); window.setTimeout(() => plateClink(SOUND_AT), 520) }
           redraw()
@@ -6028,7 +6033,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (r.dirty !== before) {
           dirty.current = r.dirty
           DRYER.n = r.dryer.n
-          meterWater('dish')
+          soapPlate(); meterWater('dish')
           // (heard: the splash and scrub in the soapy water, the plate stood in the dryer with a clink)
           const o = waiterObjs.current[wi]
           if (o) { washSplash(o.getWorldPosition(SOUND_AT)); window.setTimeout(() => plateClink(SOUND_AT), 330) }
@@ -6215,7 +6220,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (wash.current >= WASH_EACH && staffSink(dirty.current, PILE.n) > 0) {
           wash.current = 0
           dirty.current -= 1
-          meterWater('dish')
+          soapPlate(); meterWater('dish')
           const going = runs.current.filter((r) => r.phase === 'home').length
           runs.current.push({ key: ++runSeq.current, seat: -1, guest: -1, phase: 'home', t: 0, from: dirtyAt(dirty.current), to: rackTop(rackNow(PLATE_RACK.n + going + 1)) })
           redraw()

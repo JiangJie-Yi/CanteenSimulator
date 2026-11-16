@@ -2,6 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { addDay, daySummary, KEEP_DAYS, soldBetween } from '@/game/daySummary'
 import type { Visit } from '@/game/reputation'
+import { caseCost, CASE_SIZE, unitCost } from '@/game/drinkStock'
 
 const open = { revenue: 10000, food: 4000, fuel: 500, wage: 3000, utility: 100 }
 const shut = { revenue: 16000, food: 6000, fuel: 800, wage: 4200, utility: 160 }
@@ -14,6 +15,21 @@ feature('打烊的日結算', () => {
     and('利潤照帳簿的算法：營業額扣掉食材、燃料、人事、水電', (w) => {
       expect(w.s.profit).toBe(6000 - 2000 - 300 - 1200 - 60)
       expect(w.s.margin).toBeCloseTo(w.s.profit / 6000)
+    })
+  })
+  // (item 203: the reviews bought and the shrine's offerings came out of the cash, never out of the day's profit)
+  scenario('買的評論與神棚的供品也從利潤扣掉', ({ given, then, and }) => {
+    given('今天花了 400 元買評論、60 元供品', (w) => {
+      w.s = daySummary({ ...open, promo: 0, offering: 100 }, { ...shut, promo: 400, offering: 160 }, [], {})
+    })
+    then('利潤再少 460 元', (w) => { expect(w.s.profit).toBe(6000 - 2000 - 300 - 1200 - 60 - 460) })
+    and('結算單上有這一行', (w) => { expect(w.s.other).toBe(460) })
+  })
+  scenario('一瓶飲料的成本是整箱的價錢除以瓶數', ({ then }) => {
+    then('瓶裝啤酒一箱 20 瓶、960 元，一瓶 48 元', () => {
+      expect(CASE_SIZE.beer).toBe(20)
+      expect(caseCost('beer')).toBe(960)
+      expect(unitCost('beer')).toBe(48)
     })
   })
   scenario('來客、生氣走掉的與平均星數', ({ given, then, and }) => {
