@@ -60,6 +60,8 @@ const ZH = {
   // (the shop shut for the day: there's no next customer to keep it for)
   orphanMeal: (n: string) => `客人先走了…已經打烊囉，這份${n}就當員工餐吧！`,
   staffMeal: (n: number) => `打烊了，大碗裡剩下的 ${n} 份當大家的員工餐！`,
+  // (a customer would have had a bowl of rice or miso soup with it, and there was none in stock (item 229): said, for it to be ordered in)
+  noSide: (kind: 'rice' | 'soup'): string => kind === 'rice' ? '客人想加一碗白飯，可是米沒了！到庫存訂米。' : '客人想加一碗味噌湯，可是味噌湯沒了！到庫存訂味噌湯。',
   // (takeout, the owner's: someone at the till for a takeaway, a delivery rider for an order; the last half hour, only these)
   takeoutOrder: (items: string[], rider: boolean) => rider ? `外送單進來了：${tallyNames(items).join('、')}，外送員在收銀台等！` : `外帶一份：${tallyNames(items).join('、')}，客人在收銀台等！`,
   takeoutHand: (rider: boolean): string => rider ? '外送的餐好了，路上小心！' : '久等了！您的外帶，請慢用～',
@@ -174,6 +176,7 @@ const JA: typeof ZH = {
   orphanAway: 'お客さん帰っちゃったか…大鉢で保温して、次の注文に回そう！',
   orphanMeal: (n: string) => `お客さん帰っちゃったか…もう閉店だし、この${n}はまかないにしよう！`,
   staffMeal: (n: number) => `閉店だ、大鉢に残った ${n} 人前はみんなのまかないに！`,
+  noSide: (kind: 'rice' | 'soup') => kind === 'rice' ? 'お客さんがご飯を頼みたかったのに、米がない！在庫で米を注文して。' : 'お客さんが味噌汁を頼みたかったのに、切れてる！在庫で味噌汁を注文して。',
   takeoutOrder: (items: string[], rider: boolean) => rider ? `デリバリー注文：${tallyNames(items).join('、')}、配達員さんがレジで待ってます！` : `お持ち帰り：${tallyNames(items).join('、')}、お客さんがレジでお待ちです！`,
   takeoutHand: (rider: boolean) => rider ? 'お待たせしました、配達お気をつけて！' : 'お待たせしました！お持ち帰りです、どうぞ～',
   lastCall: 'ラストオーダーです！この後はお持ち帰りのみです。' as string,
@@ -283,6 +286,7 @@ const EN: typeof ZH = {
   orphanAway: 'The patron left... Into the big bowl to keep warm for the next order!',
   orphanMeal: (n: string) => `They've gone, and we're closed: this ${n} is the staff's supper!`,
   staffMeal: (n: number) => `Closing time: the ${n} left in the big bowl make the staff's supper!`,
+  noSide: (kind: 'rice' | 'soup') => kind === 'rice' ? "A customer wanted a bowl of rice, but we're out of rice! Order some in from the stock." : "A customer wanted miso soup, but we're out! Order some in from the stock.",
   takeoutOrder: (items: string[], rider: boolean) => rider ? `Delivery order: ${tallyNames(items, ' ×').join(', ')}. The rider's waiting at the till!` : `Takeaway: ${tallyNames(items, ' ×').join(', ')}. They're waiting at the till!`,
   takeoutHand: (rider: boolean) => rider ? 'Here you go. Ride safe!' : 'Thanks for waiting! Your takeaway, enjoy~',
   lastCall: 'Last orders! Takeaway only from now.' as string,

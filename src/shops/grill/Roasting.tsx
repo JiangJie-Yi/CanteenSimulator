@@ -693,6 +693,8 @@ export const PIT_LIFT = 0
 /** the way the charcoal's rows run in its bed: along the table, as the hearth's frame does (item 211) */
 const BED_TURN = Math.atan2(ALONG.z, ALONG.x)
 const PIT_PARTS = /^(FirePit|Stone|Robuchi|Charcoal|BinchotanHeap)/
+/** how often the kitchen says a side couldn't be had (real ms): once, then not again for a while (item 229) */
+const SIDE_SAY_MS = 90000
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE
 /** the square hearth's frame (炉縁, blender/grilledfish.py IRORI_IN + IRORI_W), its outer half-width as drawn: square to the table, along
@@ -5634,6 +5636,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** when each customer's tokkuri was asked for (the shop's clock): poured at the sake station and carried out to them (GuestBar3D), or with no
    * station set at their place after SAKE_WAIT_S */
   const sakeAsked = useRef(new Map<number, number>())
+  /** when the kitchen last said a bowl of rice or soup couldn't be had for want of it in stock (item 229) */
+  const sideSaid = useRef<Partial<Record<'rice' | 'soup', number>>>({})
   const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
     rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner, big: plateFor(g.orders) === 'big' })))
   const chefSaid = useRef(0)
@@ -5980,6 +5984,14 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     /** what someone (number `id`) orders, `want` dishes at most: off the menu as listed (each charged and its stock taken), a portion kept
      * warm in the bowl or one cleared away made again where there is (the dine-in's and the takeaway's alike) */
+    /** a bowl of rice or miso soup a customer would have had, and none in stock (item 229, the owner's 「明明有白飯 卻沒人點，味僧湯也是」: there was
+     * none to be had, and nothing said why): said in the kitchen's log, once in a while, for it to be ordered in */
+    const missedSide = (kind: 'rice' | 'soup') => {
+      const now = performance.now()
+      if (now - (sideSaid.current[kind] ?? -1e9) < SIDE_SAY_MS) return
+      sideSaid.current[kind] = now
+      onSay?.('chef', L().noSide(kind))
+    }
     const placeOrders = (id: number, want: number, seated = true) => {
       const orders: string[] = []
       const said: string[] = []
@@ -6034,14 +6046,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // order is, ladled from the pot; sat at the bar, most of those having fish (item 205: one in three, whatever they had, and it was
       // never seen ladled or carried, so the owner never saw it ordered))
       const fishy = seated && bar
-      if (orders.length && !orders.includes('MisoSoup') && Math.random() < (fishy ? sideChance('soup', orders) : SOUP_SIDE) && onOrder?.('MisoSoup', id, false)) {
-        orders.push('MisoSoup')
-        said.push(nameOf('MisoSoup'))
+      if (orders.length && !orders.includes('MisoSoup') && Math.random() < (fishy ? sideChance('soup', orders) : SOUP_SIDE)) {
+        if (onOrder?.('MisoSoup', id, false)) {
+          orders.push('MisoSoup')
+          said.push(nameOf('MisoSoup'))
+        } else if (SUPPLIES.has('MisoSoup') === 0) missedSide('soup')
       }
       // (and a bowl of rice, sat at the bar (item 205: there was none to be had): scooped from the cooker and carried out as the soup is)
-      if (fishy && orders.length && Math.random() < sideChance('rice', orders) && SIDE_SALE.sell(RICE_SIDE.id, id)) {
-        orders.push(RICE_SIDE.id)
-        said.push(riceName(lang))
+      if (fishy && orders.length && Math.random() < sideChance('rice', orders)) {
+        if (SIDE_SALE.sell(RICE_SIDE.id, id)) {
+          orders.push(RICE_SIDE.id)
+          said.push(riceName(lang))
+        } else if (SUPPLIES.has(RICE_SIDE.stock) === 0) missedSide('rice')
       }
       // (and some a tokkuri of sake, sat at the bar (item 89, the owner's: "it's on the menu, the customers order it"; they never did): charged
       // and taken from the stock as any order is, poured from the stand)

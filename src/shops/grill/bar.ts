@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
-import { TRAY_MAX, emptyKama, type Kama } from '@/game/rice'
+import { emptyKama, type Kama } from '@/game/rice'
 import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
 import { fullStand } from '@/game/sakeStand'
 import type { Gripe } from '@/game/reputation'
@@ -981,8 +981,9 @@ export const RICE_SEATS = new Set<number>()
 export const SIDE_SALE: { sell: (id: string, guest: number) => boolean } = { sell: () => false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bowls: BOWLS, __riceSeats: RICE_SEATS })
 /** the finished rice balls on the bamboo tray at the rice-ball counter's end (game/rice, item 129): the third cook shapes them ahead
- * (GuestBar3D's plater), the head chef's fetcher takes an order's off it first (Roasting); Decor shows as many. Full as the shop's first set out */
-export const ONIGIRI_TRAY = { n: TRAY_MAX }
+ * (GuestBar3D's plater), the head chef's fetcher takes an order's off it first (Roasting; with none on it, he shapes them); Decor shows as
+ * many. Empty as the shop's first set out (item 229: three stood on it with no rice in stock or cooked; they're shaped from the cooker's) */
+export const ONIGIRI_TRAY = { n: 0 }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __onigiri?: typeof ONIGIRI_TRAY }).__onigiri = ONIGIRI_TRAY
 /** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
  * plater; Decor draws it) */
