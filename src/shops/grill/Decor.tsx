@@ -23,7 +23,7 @@ import { Movable } from './Movable'
 import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
 import { HEAT_S, heatNow, nextHeat, SOUP_BOWLS } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
-import { SINK_SETS, SinkModel, SinkPart } from './Sink'
+import { SINK_SETS, STEP_STOOL_AT, SinkModel, SinkPart, StepStoolModel } from './Sink'
 import { CharcoalSack, ProduceSacks, VegBasket } from './KitchenStores'
 import { coolerDoorSound, lightSwitchSound } from './restroomSound'
 import { getEdit } from './edit'
@@ -859,6 +859,8 @@ function SinkAt() {
       <Movable id="sink" label="流理台" ground={floor}><group name="look-sink" {...place}><SinkModel /></group></Movable>
       {/* (what stands on it, each a piece of its own, where it stands on it) */}
       {SINK_SETS.map((set) => <Movable key={set.id} id={set.id} label={set.label}><group {...place}><SinkPart node={set.node} /></group></Movable>)}
+      {/* (the step stool before the basin, those washing stood on it (item 221)) */}
+      <Movable id="stepstool" label="踏台" ground={floor}><group {...place}><group position={STEP_STOOL_AT}><StepStoolModel /></group></group></Movable>
     </>
   )
 }

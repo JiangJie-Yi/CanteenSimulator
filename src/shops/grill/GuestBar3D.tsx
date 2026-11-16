@@ -2765,6 +2765,10 @@ const WASH_EACH = 0.5
 const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegbasket', 'coalsack', 'servecounter'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
+/** the step stool's half its width and its depth, in its own frame (blender/stepstool.py: 0.66 by 0.40), and the ramp at its edges over
+ * which one stepping onto it comes up to its top (the bar's units) */
+const STOOL_HALF = [0.33, 0.2] as const
+const STOOL_STEP = 0.045
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
 const PLATE_R = 0.13
 const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
@@ -3664,6 +3668,44 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     return f.worldToLocal(o.getWorldPosition(new THREE.Vector3()))
   }
   const endOf = (sd: number) => counters[0].at.clone().addScaledVector(ALONG, sd * (counters[0].length / 2 - 0.25)).addScaledVector(LAY, 0.11).setY(top)
+  /** the step stool before the basin (item 221; Sink's StepStoolModel): its top's middle on the kitchen's floor (the bar's frame), its own
+   * across and depth there, its half sizes and its height, looked at again a second at a time (it's moved in edit mode); none drawn, null */
+  const stool = useRef<{ at: number; mid: THREE.Vector3; ax: THREE.Vector3; az: THREE.Vector3; hx: number; hz: number; h: number } | null>(null)
+  const stoolAt = useRef(-1e9)
+  const stoolNow = () => {
+    const now = performance.now()
+    if (now - stoolAt.current < 1000) return stool.current
+    stoolAt.current = now
+    const o = markOf('StepStoolTop'), f = frame.current
+    if (!o || !f || !o.parent) return (stool.current = null)
+    f.updateWorldMatrix(true, false)
+    o.updateWorldMatrix(true, false)
+    const m = f.matrixWorld.clone().invert().multiply(o.matrixWorld)
+    const topAt = new THREE.Vector3().setFromMatrixPosition(m), foot = f.worldToLocal(o.parent.getWorldPosition(new THREE.Vector3()))
+    const ex = new THREE.Vector3().setFromMatrixColumn(m, 0), ez = new THREE.Vector3().setFromMatrixColumn(m, 2)
+    return (stool.current = { at: now, mid: topAt.clone().setY(0), ax: ex.clone().setY(0).normalize(), az: ez.clone().setY(0).normalize(),
+      hx: ex.length() * STOOL_HALF[0], hz: ez.length() * STOOL_HALF[1], h: Math.max(0, topAt.y - foot.y) })
+  }
+  /** how high one standing there (the bar's frame, on the kitchen's floor) stands: up on the stool's top over it, a step's ramp at its edges
+   * (stepping up onto it and down off it, not a jump) */
+  const stoolY = (p: THREE.Vector3) => {
+    const st = stoolNow()
+    if (!st) return 0
+    const d = p.clone().sub(st.mid).setY(0)
+    const e = Math.max(Math.abs(d.dot(st.ax)) - (st.hx - STOOL_STEP), Math.abs(d.dot(st.az)) - (st.hz - STOOL_STEP)) / STOOL_STEP
+    if (e >= 1) return 0
+    const k = Math.min(1, Math.max(0, e))
+    return st.h * (1 - k * k * (3 - 2 * k))
+  }
+  /** a place before the sink brought onto the stool's top, clear of its edges (where those washing stand: up on it, item 221) */
+  const ontoStool = (p: THREE.Vector3) => {
+    const st = stoolNow()
+    if (!st) return p
+    const d = p.clone().sub(st.mid).setY(0)
+    const x = THREE.MathUtils.clamp(d.dot(st.ax), -(st.hx - STOOL_STEP * 1.5), st.hx - STOOL_STEP * 1.5)
+    const z = THREE.MathUtils.clamp(d.dot(st.az), -(st.hz - STOOL_STEP * 1.5), st.hz - STOOL_STEP * 1.5)
+    return st.mid.clone().addScaledVector(st.ax, x).addScaledVector(st.az, z).setY(p.y)
+  }
   /** where a plate's lifted off rack `i`, and where a server stands for it */
   const rackTop = (i: number) => inBar(`rack-top-${i}`, endOf(-1))
   const rackFront = (i: number) => inBar(`rack-front-${i}`, endOf(-1)).setY(0)
@@ -3980,7 +4022,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   }
   /** (every second) the plates out at seats looked over for any left where nobody sits */
   const sweep = useRef(0)
-  const sinkFront = () => inBar('SinkFront', endOf(1)).setY(0)
+  const sinkFront = () => ontoStool(inBar('SinkFront', endOf(1)).setY(0))
   /**
    * The owner going to wash the stack of dirty plates left on the sink's counter (game/sinkPile, item 103, the owner's, 2026-11-14): nobody
    * washes it but the player, till the third day; then, a few seconds into the day, if it's still there, he says so (over his head and in
@@ -4053,7 +4095,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const off = side.sub(mid)
     off.addScaledVector(fwd, -off.dot(fwd))
     const d = off.length()
-    return d > 1e-3 ? s0.addScaledVector(off.divideScalar(d), Math.min(WASH_SHIFT, d * 0.5)) : s0
+    // (kept up on the stool's top (item 221))
+    return ontoStool(d > 1e-3 ? s0.addScaledVector(off.divideScalar(d), Math.min(WASH_SHIFT, d * 0.5)) : s0)
   }
   /** the sponge's copy (made the first time) and where it lies now on its dish (taken up off it by the player: a little over it) */
   const spongeHome = () => {
@@ -4383,6 +4426,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     if (o) {
       o.position.copy(b.pos)
+      // (up on the kitchen's dais, as the servers are over it (he stood its height down in it, his feet under its boards), and on the sink's
+      // step stool over that (item 221))
+      const d = b.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
+      const dais = KITCHEN_DROP < 0 && a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1] ? -KITCHEN_DROP / scale : 0
+      o.position.y += dais + stoolY(b.pos)
       o.rotation.y = b.yaw
       o.userData.scrub = undefined
       o.userData.washHands = b.phase === 'wash' ? WASH_HANDS : undefined
@@ -5790,7 +5838,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.visible = pl.phase !== 'idle'
         o.position.copy(pl.pos)
         // (down on the genkan's stone where their way crosses it, item 203)
-        o.position.y += genkanY(counters, pl.pos)
+        o.position.y += genkanY(counters, pl.pos) + stoolY(pl.pos)
         o.rotation.y = pl.yaw
         // (never the idle fanning of a cook at his place: his hands are full with the work here; bent forward to it: well down to the
         // sack on the floor, over the bucket on the table and the hearth to tip the coals in or splash the water, a little over the crate and
@@ -5936,8 +5984,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       w.pos.copy(pose.p)
       if (pose.yaw !== null) w.yaw = turnToward(w.yaw, pose.yaw, Math.min(dt, 0.1))
       o.position.copy(w.pos)
-      // (down on the genkan's stone crossing it, item 203)
-      o.position.y += genkanY(counters, w.pos)
+      // (down on the genkan's stone crossing it, item 203; up on the sink's step stool over it, item 221)
+      o.position.y += genkanY(counters, w.pos) + stoolY(w.pos)
       o.rotation.y = w.yaw
       ;(w as { look?: number }).look = w.yaw
       o.visible = pose.shown
@@ -6982,7 +7030,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // this one was shown whenever he was out for anything, a second owner standing by the pass while he washed at the sink))
         o.visible = !ownerServes || OWNER_OUT.by === 'serve'
         o.position.copy(w.pos)
-        o.position.y += genkanY(counters, w.pos)
+        o.position.y += genkanY(counters, w.pos) + stoolY(w.pos)
         // (the facing shown eased to the way they're going, never more than a little a frame (turnSmooth, item 183))
         w.look = turnSmooth(w.look ?? w.yaw, w.yaw, step)
         o.rotation.y = w.look

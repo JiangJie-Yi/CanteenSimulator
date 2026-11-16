@@ -170,6 +170,36 @@ const RACK_OUT = 0.16
 
 /** the sink itself (what stands on it is SinkPart's), its tap's handle turned to run the water by hand (the owner's); the washer worked by hand
  * too (its door and its basket) */
+/** the step stool before the basin (blender/stepstool.py, item 221, the owner's, 2026-11-16: 「在流理台前面加一張小矮凳，供給使用者洗碗盤用」):
+ * in the sink's own frame (its metres), stood before the basin; toon-shaded and inked as the room's things are, one batch by material. Its
+ * StepStoolTop empty kept, for GuestBar3D to stand those washing on it */
+const STEP_STOOL_URL = import.meta.env.BASE_URL + 'models/stepstool.glb'
+useGLTF.preload(STEP_STOOL_URL)
+/** where it stands in the sink's frame: its middle before the basin's (the basin's x from -0.71 to -0.09), its back against the cupboard's
+ * face (0.425) a centimetre off it (blender/sink.py) */
+export const STEP_STOOL_AT: [number, number, number] = [-0.4, 0, 0.635]
+export function StepStoolModel() {
+  const gltf = useGLTF(STEP_STOOL_URL) as unknown as { scene: THREE.Group }
+  const model = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('StepStool') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      m.material = t
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.008, weld: true })
+    return mergeByMaterial(r, (o) => o.name === 'StepStoolTop')
+  }, [gltf])
+  return <primitive object={model} />
+}
+
 export function SinkModel() {
   useStudio()
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }

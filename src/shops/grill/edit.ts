@@ -75,7 +75,7 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   // counter as one): the warmer with its miso pot and the rice ball counter with its cooker, side by side between the cook table and the till)
   'grp-ricestation': { zh: '料理台組', ja: '調理台一式', members: ['warmer', 'misopot', 'prepcounter', 'denkinabe'] },
   // (the sink and all that's on it and by it)
-  'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge'] },
+  'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge', 'stepstool'] },
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
   // (the rice sacks in the kitchen's corner, and the old rice tub and stove set aside by them)
   // (the old rice tub gone from it: it's the warming tub on the takeaway table now)
