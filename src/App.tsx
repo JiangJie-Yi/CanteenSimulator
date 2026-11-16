@@ -31,7 +31,7 @@ import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/
 import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, cashInHand, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
-  keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
+  keepsDry, portionsLeft, SHOP_COST, takesOf, bankrupt, savingsOf, warningsDue } from '@/game/economy'
 import { drawerFrom, drawerTotal, owedAtTill, paysByCard, refundFor, tabTotal, tenderOf, type Tab } from '@/game/till'
 import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
@@ -101,6 +101,7 @@ import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/R
 import { PhoneClosed } from '@/ui/PhoneClosed'
 import { stampSound, usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
+import { ClosedDown } from '@/ui/ClosedDown'
 import { Glyph, StarIcon } from '@/ui/GameIcons'
 import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
@@ -2775,6 +2776,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ai, stock, guestsBy, active, opened, closing])
 
+  // (the shop's savings watched (item 239, the owner's, 2026-11-17: 「存款-10w就直接收店」): said once each on the way down, under nought and
+  // under -50,000; at -100,000 the business stopped at once (those in the room gone with it, as stopping it by hand does), the closing-down
+  // sheet over everything, and only starting over goes on)
+  const [bust, setBust] = useState<{ day: number; savings: number } | null>(null)
+  const warnedAt = useRef<number[]>([])
+  const savings = savingsOf(cash, ledger)
+  useEffect(() => {
+    if (bust) return
+    for (const w of warningsDue(savings, warnedAt.current)) {
+      warnedAt.current = [...warnedAt.current, w]
+      say(w === 0
+        ? tl(lang, '存款見底了：跌到 NT$-100,000 就得收店', '貯金が底をつきました：NT$-100,000 で閉店です', 'Savings gone: at NT$-100,000 the shop closes for good')
+        : tl(lang, '存款跌破 NT$-50,000：再少 5 萬就得收店', '貯金が NT$-50,000 を割りました：あと 5 万で閉店です', 'Savings under NT$-50,000: 50,000 more and the shop closes'))
+    }
+    if (!bankrupt(savings)) return
+    setBust({ day: Math.max(1, SHOP.day), savings })
+    setAuto(false)
+    setClosing(false)
+    setLeaving(false)
+    setAi(false)
+    SHOP.walking.clear()
+    SHOP.hurry = false
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savings, bust])
+  usePanelSound(!!bust)
+
   // 自動營運: the whole shop runs itself — hiring whoever's missing, buying in, having the kitchen work out a menu,
   // opening, ordering more as it sells, and shutting for a rest when the staff are worn out — one step every few
   // seconds (each step acts on the state as it is then, so it does one thing at a time)
@@ -2934,6 +2961,24 @@ export default function App() {
   const [loose, setLoose] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimer = useRef(0)
+  /** the game started over: every save cleared, the page loaded fresh (the shop menu's 重新開始 after it asks; the closing-down sheet's
+   * button, item 239: the player's own press either way, the only thing that clears the drinks' save) */
+  const startOver = () => {
+    try {
+      localStorage.removeItem(SAVE_KEY)
+      localStorage.removeItem(DRINKS_KEY)
+      localStorage.removeItem(METER_KEY)
+      localStorage.removeItem(VISITS_KEY)
+      localStorage.removeItem(DAYS_KEY)
+      localStorage.removeItem(TISSUES_KEY)
+      // (and this tab's kept progress, from a lost 3D view: never brought back over the fresh start)
+      sessionStorage.removeItem(RESUME_KEY)
+    } catch {
+      // storage blocked
+    }
+    saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, tillIn: 0, utility: 0, overtime: 0, night: 0, rent: 0, platform: 0, cardFee: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
+    window.location.replace(window.location.pathname + '?v=' + Date.now())
+  }
   const say = (text: string) => {
     setNotice(text)
     window.clearTimeout(noticeTimer.current)
@@ -3348,20 +3393,7 @@ export default function App() {
             )}
             onReset={() => {
               if (!window.confirm(tl(lang, '確定要重新開始？資金、庫存、員工和試吃筆記都會清空。', '資金・在庫・スタッフ・ノートを全部リセットしますか？', 'Start over? Money, stock, staff and tasting notes will all be cleared.'))) return
-              try {
-                localStorage.removeItem(SAVE_KEY)
-                localStorage.removeItem(DRINKS_KEY)
-                localStorage.removeItem(METER_KEY)
-                localStorage.removeItem(VISITS_KEY)
-                localStorage.removeItem(DAYS_KEY)
-                localStorage.removeItem(TISSUES_KEY)
-                // (and this tab's kept progress, from a lost 3D view: never brought back over the fresh start)
-                sessionStorage.removeItem(RESUME_KEY)
-              } catch {
-                // storage blocked
-              }
-              saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, tillIn: 0, utility: 0, overtime: 0, night: 0, rent: 0, platform: 0, cardFee: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
-              window.location.replace(window.location.pathname + '?v=' + Date.now())
+              startOver()
             }}
             hired={hired[dish.id] ?? {}}
             rollsLeft={rolls.left} onRoll={rollApplicants}
@@ -3572,6 +3604,7 @@ export default function App() {
         {speed > 1 ? '×2' : <Glyph id="fast" size="1.15em" />}
       </button>
       <Bgm />
+      {bust && <ClosedDown lang={lang} day={bust.day} savings={bust.savings} takings={ledger.revenue} spent={CAPITAL + ledger.revenue - bust.savings} onRestart={startOver} />}
       {daySum && <DaySummary s={daySum.s} day={daySum.day} hours={[daySum.from, daySum.to]} lang={lang} onClose={dayDone}
         nameOf={(key) => { const e = Object.values(menuByRef.current).flat().find((x) => x.key === key); return e ? nameIn(lang, e) : key }} />}
       <HoverTip hidden={editOn} />

@@ -6404,6 +6404,81 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
 
 /* the day's closing sheet (ui/DaySummary; the owner's): in the middle over the shut shop, the panels' finish (the lacquered wood bar, pale
    paper half see-through, dark at night), the profit large, the books and the customers below; every label on one line */
+/* (the shop gone out of business (item 239): over everything, nothing behind it to press; in the day sheet's paper and wood) */
+.closed-down-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: rgb(20 14 10 / 0.62);
+  animation: day-sum-in 260ms ease-out both;
+}
+.closed-down {
+  width: min(360px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 3px solid #5a3d28;
+  border-radius: 10px;
+  background: rgb(251 246 234 / 0.95);
+  box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.6);
+  color: #3b2a20;
+}
+:root[data-theme='dark'] .closed-down {
+  background: rgb(34 26 20 / 0.95);
+  color: #f3ead8;
+}
+.closed-down > header {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  background: var(--wood-bar);
+  box-shadow: var(--wood-bar-lip);
+  border-bottom: 2px solid #8a6a44;
+  color: #f6e8cc;
+}
+.closed-down > header h2 {
+  margin: 0;
+  min-width: 0;
+  font: 700 16px/1 var(--brush);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.closed-down-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+.closed-down-why {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  text-align: center;
+}
+.closed-down-books {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.closed-down-books dt { color: #8a7562; }
+.closed-down-books dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.closed-down-books dd.is-loss { color: #b0452c; font-weight: 700; }
+.closed-down-go {
+  justify-self: center;
+  min-width: 140px;
+  padding: 8px 18px;
+  border: 2px solid #5a3d28;
+  border-radius: 8px;
+  background: var(--wood-bar);
+  color: #f6e8cc;
+  font: 700 15px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+}
 .day-sum-veil {
   position: fixed;
   inset: 0;

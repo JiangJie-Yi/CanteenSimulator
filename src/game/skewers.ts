@@ -1,8 +1,10 @@
-// The shop's iron skewers (the owner's: fifty, washed and used again, never made out of nothing): clean in their holder by the board, on the
-// food from the board to the plate (in use: counted from the food itself), pulled out as it's plated and laid in the used skewers' tray
-// (dirty), carried to the sink and washed (carrying), back into the holder. Clean + in use + dirty + carrying is always the pool.
+// The shop's iron skewers (the owner's: eighty (2026-11-17, 「加到 80 支」; fifty before, and on a busy evening most of those were on food at
+// the board, at the fire or on a plate, and the clean ones ran out: tests/e2e/flowhealth.mjs, item 220), washed and used again, never made
+// out of nothing): clean in their holder by the board, on the food from the board to the plate (in use: counted from the food itself),
+// pulled out as it's plated and laid in the used skewers' tray (dirty), carried to the sink and washed (carrying), back into the holder.
+// Clean + in use + dirty + carrying is always the pool.
 
-export const SKEWER_POOL = 50
+export const SKEWER_POOL = 80
 /** when the used ones go to be washed: this many dirty, or the holder down to this few (15, item 220: at 5 the holder ran dry on an
  * ordinary evening, the servers always serving first and the grill waiting on a skewer (tests/e2e/flowhealth.mjs: clean 0..50, both runs)) */
 export const WASH_AT = 10

@@ -5645,9 +5645,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               setOff(b.rice ? riceStand() : soupFillAt().stand, b.rice ? 'toRiceBowl' : 'toSoupBowl')
               away(true)
             }
-          } else if (open && !SHOP.leaving && !waiters.current.length && washGoes(SKEWERS.s) && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
-            // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server to wash them (theirs, the owner's): to the used
-            // bucket by the plating place for all of them)
+          } else if (open && !SHOP.leaving && washGoes(SKEWERS.s) && !waiters.current.some((x) => SK_PHASES.has(x.phase))
+            && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
+            // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server already on it: to the used bucket by the plating
+            // place for all of them. The skewers are the third cook's to wash (CLAUDE.md's kitchen crew: 三廚…洗串); it was only with no server
+            // hired, and the servers, always serving first, never got to them: on an ordinary evening 38 lay dirty and none were washed in 200 s,
+            // and the bucket ran dry (item 237, tests/e2e/_skewerflow220.mjs))
             pl.pos.copy(home())
             setOff(skTraySpot(), 'toSkTray')
             away(true)

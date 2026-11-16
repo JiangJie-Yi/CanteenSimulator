@@ -32,6 +32,18 @@ export type CashBooks = { revenue: number; bought: number; fuel: number; wage: n
  * of the takings has gone into the till's drawer, and with what the owner's taken out of the drawer. The drawer's money is the shop's, but
  * not in hand till it's taken out (a cash customer's bill was counted twice before: as they ordered, and again as it was taken out).
  */
+/** the shop's savings at or under which it goes out of business (the owner's, 2026-11-17: 「存款-10w就直接收店」): the business stopped at
+ * once, no further day, only starting over */
+export const BANKRUPT_AT = -100_000
+/** the warnings on the way down, each said once a game as the savings go under it: under nought, and half way to closing */
+export const BANKRUPT_WARN: readonly number[] = [0, -50_000]
+/** whether the shop's gone out of business: its savings at or under BANKRUPT_AT */
+export const bankrupt = (savings: number) => savings <= BANKRUPT_AT
+/** the warnings due now: those the savings are under that haven't been said yet, highest first */
+export const warningsDue = (savings: number, said: readonly number[]) => BANKRUPT_WARN.filter((w) => savings < w && !said.includes(w))
+/** the shop's savings: the money in hand and what's in the till's drawer not yet taken out (cashInHand leaves the drawer out till it's
+ * taken: a shop with its takings in the drawer isn't broke for that) */
+export const savingsOf = (cash: number, b: Pick<CashBooks, 'tillIn' | 'till'>) => cash + Math.max(0, (b.tillIn ?? 0) - (b.till ?? 0))
 export const cashInHand = (b: CashBooks, owed = 0) => CAPITAL + b.revenue - b.bought - b.fuel - b.wage - (b.utility ?? 0) - (b.setup ?? 0)
   - (b.offering ?? 0) - (b.promo ?? 0) - (b.rent ?? 0) - (b.platform ?? 0) - (b.cardFee ?? 0) - owed - (b.tillIn ?? 0) + (b.till ?? 0)
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
