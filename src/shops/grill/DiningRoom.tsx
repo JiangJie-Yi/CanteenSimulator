@@ -1,10 +1,13 @@
 import { blessingChime, pourSake, shrineDoor } from './shrineSound'
 import { TISSUE } from '@/game/tissues'
+import { ROLL } from '@/game/washroom'
+import { HOUSEHOLD } from '@/game/household'
+import { cornerStack } from '@/game/cornerStock'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
 import { bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { landingOf } from '@/game/spills'
-import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { SWITCH_SPOT } from '@/game/shopState'
 import * as THREE from 'three'
@@ -3159,7 +3162,14 @@ export function clearTape() {
  * The supplies in the corner by the drinks fridge (the owner's: tissue cartons and cleaning things, for the toilets and about the shop;
  * blender/supplies.py): the cartons of spare tissue boxes (the stock's), a pack of toilet rolls on them, a bucket and a carton of cleaning
  * things (the mop and the broom gone, the detergents boxed: the owner's); their tape clear, glossy and see-through. Pointed at, the cartons say how many spare boxes there are; clicked, the stock opens on its supplies.
+ * As much of it there as there is in stock (item 199, game/cornerStock): the tissue cartons by the spare boxes, the cleaning things' carton
+ * while there's a spare bottle, the pack of rolls a layer at a time; what's left dropped onto what's under it.
  */
+/** the stack's layers, by their parts' names in the model */
+const CORNER_LAYERS = ['t0', 't1', 'clean', 'rollsLo', 'rollsHi'] as const
+const cornerLayerOf = (name: string): (typeof CORNER_LAYERS)[number] | null =>
+  /^SupplyCarton0/.test(name) ? 't0' : /^SupplyCarton1/.test(name) ? 't1' : /^Supply(Carton2|Spray|Trigger)/.test(name) ? 'clean'
+    : /^SupplyRoll(Core)?\d\d0$/.test(name) ? 'rollsLo' : /^SupplyRoll(Core)?\d\d1$|^SupplyWrapBand/.test(name) ? 'rollsHi' : null
 function CornerSupplies() {
   const gltf = useGLTF(SUPPLIES_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -3184,17 +3194,48 @@ function CornerSupplies() {
       m.receiveShadow = true
     })
     inkModel(r, (m) => /Strand|Core|Bail|Label|Tape/.test(m.name), { width: 0.002, weld: true })
-    // (folded together by material: seventy small parts and their ink lines were each a draw of their own)
     plainColours(r)
-    mergeByMaterial(r)
-    return r
+    // (each layer of the stack a group of its own, to be hidden and dropped by the stock (item 199); each folded together by material within
+    // it, and the rest together: seventy small parts and their ink lines were each a draw of their own)
+    const layers = Object.fromEntries(CORNER_LAYERS.map((k) => { const g = new THREE.Group(); g.name = `corner-${k}`; r.add(g); return [k, g] })) as Record<(typeof CORNER_LAYERS)[number], THREE.Group>
+    const moves: [THREE.Object3D, THREE.Group][] = []
+    r.traverse((o) => { const k = cornerLayerOf(o.name); if (k && !(o.parent && cornerLayerOf(o.parent.name))) moves.push([o, layers[k]]) })
+    for (const [o, g] of moves) g.attach(o)
+    const groups = new Set<THREE.Object3D>(Object.values(layers))
+    mergeByMaterial(r, (o) => groups.has(o))
+    for (const g of groups) mergeByMaterial(g)
+    return { r, layers }
   }, [gltf])
+  // (looked at twice a second: the stock's counts, the stack laid out by them; the layers reached through a ref of their own, the model's
+  // made once)
+  const seen = useRef({ at: -1, key: '' })
+  const layersRef = useRef<typeof obj.layers | null>(null)
+  useLayoutEffect(() => { layersRef.current = obj.layers; seen.current.key = '' }, [obj])
+  useFrame(() => {
+    const now = performance.now()
+    if (now - seen.current.at < 500) return
+    seen.current.at = now
+    const has = (id: string) => SUPPLIES.has(id)
+    const cleanN = HOUSEHOLD.some((id) => has(id) < 0) ? -1 : HOUSEHOLD.reduce((n, id) => n + has(id), 0)
+    const st = cornerStack({ tissue: has(TISSUE), clean: cleanN, rolls: has(ROLL) })
+    const key = JSON.stringify(st)
+    const L = layersRef.current
+    if (!L || key === seen.current.key) return
+    seen.current.key = key
+    L.t0.visible = st.tissue[0]
+    L.t1.visible = st.tissue[1]
+    L.clean.visible = st.clean
+    L.clean.position.y = -st.dropClean
+    L.rollsLo.visible = st.rolls[0]
+    L.rollsHi.visible = st.rolls[1]
+    L.rollsLo.position.y = L.rollsHi.position.y = -st.dropRolls
+  })
   const says = () => { const n = SUPPLIES.has(TISSUE); return n < 0 ? '衛生紙與清潔用品・點一下看耗材' : `衛生紙備品 ${n} 盒・點一下看耗材` }
   return (
     <group onPointerOver={(e) => { if (getEdit().on) return; tipOver('衛生紙與清潔用品', says()).onPointerOver(e) }}
       onPointerOut={(e) => { tipOver('衛生紙與清潔用品', '').onPointerOut(e) }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; askPantry('supplies', 'sack') }}>
-      <primitive object={obj} />
+      <primitive object={obj.r} />
     </group>
   )
 }

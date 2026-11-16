@@ -219,6 +219,8 @@ const BOWL_PUT_S = 0.5, BOWL_UP_S = 0.45, BOWL_SET_S = 0.6
  * each customer's to be carried out before he could fill the next, and in a rush those who'd asked for rice and soup sat on half an hour
  * after their fish, waiting for them */
 const PASS_MAX = 2
+/** (item 207) how long (the shop's minutes) customers' bowls wait at the counter before they're taken ahead of food ready at the plating place */
+const BOWLS_LATE = 6
 const PASS_Z = [-0.07, 0.08]
 const TRAY_SETS = 2
 const SAKE_TRAY = new THREE.Vector3()
@@ -790,10 +792,33 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const W = 1.05, H = 2.14, DX = -0.12
   // (the rod and cloth hung out toward the doorway's own line, not back in the room)
   const NZ = 0.27
-  useFrame(({ clock }) => {
+  // (pushed aside by whoever walks through under it, the panels they pass swung away from them and back after (item 203: it hung on, still,
+  // as they went through it); which way each was pushed kept while someone's under it, set by the side they came from)
+  const swing = useRef([0, 0, 0])
+  const side = useRef([0, 0, 0])
+  const at3 = useMemo(() => new THREE.Vector3(), [])
+  useFrame(({ clock }, dt0) => {
     const t = clock.elapsedTime
+    const dt = Math.min(dt0, 0.1)
     panels.current.forEach((m, i) => {
-      if (m) m.rotation.x = Math.sin(t * 1.3 + i * 0.9) * 0.05
+      if (!m) return
+      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
+      const bb = m.geometry.boundingBox!
+      // (in the panel's own frame: across it, and out in front of it or behind; how near the nearest one under it is)
+      let near = 0, from = 0
+      for (const o of FIGURES.keys()) {
+        if (!o.visible) continue
+        const q = m.worldToLocal(o.getWorldPosition(at3))
+        if (q.x < bb.min.x - NOREN_REACH * 0.5 || q.x > bb.max.x + NOREN_REACH * 0.5) continue
+        const k = 1 - Math.min(1, Math.abs(q.z) / NOREN_REACH)
+        if (k > near) { near = k; from = q.z }
+      }
+      if (near <= 0) side.current[i] = 0
+      else if (side.current[i] === 0) side.current[i] = from >= 0 ? 1 : -1
+      // (pushed the way they're going, the hem swung away from them: quickly as they come, slowly falling back)
+      const want = side.current[i] * NOREN_PUSH * near
+      swing.current[i] += (want - swing.current[i]) * Math.min(1, dt * (Math.abs(want) > Math.abs(swing.current[i]) ? 9 : 2.5))
+      m.rotation.x = Math.sin(t * 1.3 + i * 0.9) * 0.05 + swing.current[i]
     })
   })
   return (
@@ -922,17 +947,24 @@ function NorenModel({ tex, panels, pole = 'lacquer' }: { tex: THREE.Texture | nu
       const k = /NorenPanel(\d)/.exec(m.name)
       if (k) {
         m.material = new THREE.MeshToonMaterial({ map: panelTex(tex, +k[1]), side: THREE.DoubleSide })
-        panels.current[+k[1]] = m
       } else if (pole === 'wood') m.material = new THREE.MeshToonMaterial({ color: '#ffffff', map: POLE_WOOD })
       else m.material = src.name === 'NorenBrass' ? new THREE.MeshStandardMaterial({ color: '#c9a04a', metalness: 1, roughness: 0.3 })
         : new THREE.MeshToonMaterial({ color: src.color.clone() })
     })
     return r
-  }, [gltf, tex, panels, pole])
+  }, [gltf, tex, pole])
+  // (the panels handed over from the model as it's drawn, not as it's made: made twice in development (React's strict mode), the second copy
+  // was the one handed over and the one drawn never swung (item 203))
+  useLayoutEffect(() => {
+    model.traverse((o) => { const k = /NorenPanel(\d)/.exec(o.name); if (k && (o as THREE.Mesh).isMesh) panels.current[+k[1]] = o as THREE.Mesh })
+  }, [model, panels])
   return <primitive object={model} />
 }
 
 
+/** how near (the panel's own units, out from its face) someone walking through comes before they push it, and how far they push its hem (rad) */
+const NOREN_REACH = 0.5
+const NOREN_PUSH = 1.0
 /** how much longer the way in's noren is drawn than it was made, and how much wider (kept to the doorway's width) */
 const NOREN_BIG = 1.3
 const NOREN_WIDE = 1.0
@@ -3133,6 +3165,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'sweepGo' | 'sweep' | 'wipeFloor'
     | 'toSakePass' | 'sakePour' | 'sakeUp' | 'sakeGo' | 'sakeSet'
     | 'toBowlPass' | 'bowlUp' | 'toRiceFill' | 'bowlRice' | 'toSoupFill' | 'bowlSoup' | 'bowlGo' | 'bowlSet'
+    | 'toBowlWith' | 'bowlWith'
   const waiters = useRef<{ phase: WaiterPhase
     t: number; seat: number; keys: string[]; run: number | null
     /** the way they're drawn facing, turned toward `yaw` a frame at a time (set at once, they spun round at each corner of their way, by as
@@ -3253,6 +3286,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** (item 207) customers' bowls filled and set at the counter (each in its `row` there), or out on a server's tray (`server`; `up`, how far
    * they're lifted onto it, `down`, how far set down at the place; `row` -1: filled by the server and taken straight out): the oldest first */
   type PassBowls = { guest: number; seat: number; rice: boolean; soup: boolean; row: number; server?: number; up: number; down: number
+    /** taken out with their food, on the same tray beside its plate (item 207) */
+    with?: boolean
     /** how long they've waited at the counter for a server (as the plating place's slots count it: readyFor) */
     wait: number }
   const passQ = useRef<PassBowls[]>([])
@@ -6008,7 +6043,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const face = (at: THREE.Vector3) => { w.yaw = Math.atan2(at.x - w.pos.x, at.z - w.pos.z) }
       w.t += step * paceOfStaff(servers[wi]?.id)
       // (the customer gone meanwhile: what was being carried to them put down, and the server goes back)
-      if ((w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set') && !sitting(w.seat)) {
+      if ((w.phase === 'fetch' || w.phase === 'pickup' || w.phase === 'go' || w.phase === 'set' || w.phase === 'toBowlWith' || w.phase === 'bowlWith') && !sitting(w.seat)) {
+        passQ.current = passQ.current.filter((b) => !(b.server === wi && b.with))
         for (const k of w.keys) {
           SERVICE.carried.delete(k)
           SERVICE.claimed.delete(k)
@@ -6079,7 +6115,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const ready = SHOP.leaving ? -1 : readySlot()
           const bowlsWait = SHOP.leaving || !STATION_OBJ.group ? -1
             : passQ.current.reduce((m, b) => (b.server === undefined && guestSits(b.guest, b.seat) ? Math.max(m, b.wait) : m), -1)
-          if (bowlsWait >= 0 && (ready < 0 || bowlsWait > readyFor.current[ready]) && takeBowls()) return
+          // (the food first, as long as the bowls haven't waited BOWLS_LATE: a calm evening's food waited behind the bowls (item 207))
+          if (bowlsWait >= 0 && (ready < 0 || (bowlsWait >= BOWLS_LATE && bowlsWait > readyFor.current[ready])) && takeBowls()) return
           if (ready >= 0) {
             w.slot = ready
             w.seat = PLATING.slots[ready]!.seat
@@ -6407,18 +6444,46 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
         if (k >= 0) PLATING.slots[k] = null
         w.slot = undefined
-        const rt = routeTo(w.seat, wi)
-        rt.path[0] = w.pos.clone()
-        go(rt.path, 'go')
+        // (that customer's bowls waiting at the counter taken out with it, on the same tray beside the plate: a meal goes out together (item
+        // 207: a trip of their own each, the bowls had both servers going all evening, the food left waiting at the plating place behind them))
+        const withIt = passQ.current.find((b) => b.server === undefined && b.seat === w.seat && guestSits(b.guest, b.seat))
+        if (withIt) {
+          withIt.server = wi
+          withIt.with = true
+          const to = passSpot(), path = kitchenRoute(w.pos, to)
+          if (!path.length || path[path.length - 1].distanceTo(to) > 0.02) path.push(to.clone())
+          go(path, 'toBowlWith')
+        } else {
+          const rt = routeTo(w.seat, wi)
+          rt.path[0] = w.pos.clone()
+          go(rt.path, 'go')
+        }
+      } else if (w.phase === 'toBowlWith') walk(() => {
+        const b = passQ.current.find((x) => x.server === wi && x.with)
+        w.phase = 'bowlWith'
+        w.t = 0
+        if (b && b.row >= 0) face(passAt(b.row, 'rice').lerp(passAt(b.row, 'soup'), 0.5))
+      })
+      else if (w.phase === 'bowlWith') {
+        const b = passQ.current.find((x) => x.server === wi && x.with)
+        if (b) b.up = Math.min(1, w.t / BOWL_UP_S)
+        if (!b || w.t >= BOWL_UP_S) {
+          // (on the tray with the food: out through their gate, along the aisle, in beside the customer)
+          const h = homeOf(wi)
+          const out = h.way.length < 2 ? [seats[w.seat].aisle.clone(), besideSeat(w.seat)] : backPath(wi, w.seat).slice(1)
+          go([...kitchenRoute(w.pos, h.at), ...out], 'go')
+        }
       } else if (w.phase === 'go') walk(() => {
         w.phase = 'set'; face(plateAt(w.seat))
         const id = servers[wi]?.id
         if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].serveSay(Math.floor(Math.random() * 3)), until: performance.now() + 2600 })
       })
       else if (w.phase === 'set' && w.t > 0.4) {
-        // (down at their place: the plate, and what's on it with it)
+        // (down at their place: the plate, and what's on it with it; their bowls brought with it too (item 207))
         const r = run()
         if (r && r.phase === 'carry') r.phase = 'set'
+        for (const b of passQ.current) if (b.server === wi && b.with && guestSits(b.guest, b.seat)) setBowls(b)
+        passQ.current = passQ.current.filter((b) => !(b.server === wi && b.with))
         for (const k of w.keys) {
           SERVICE.carried.delete(k)
           SERVICE.claimed.delete(k)
@@ -6609,7 +6674,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       const plateTo = w.seat >= 0 ? plateAt(w.seat) : tray
       const hold = tray.clone().lerp(plateTo, k * k * (3 - 2 * k))
       hold.y += Math.sin(Math.PI * k) * 0.04
-      if (w.phase === 'go' || w.phase === 'set') {
+      // (their bowls, brought with the food, set down as it is)
+      if (w.phase === 'set') for (const b of passQ.current) if (b.server === wi && b.with) b.down = Math.min(1, w.t / 0.4)
+      if (w.phase === 'go' || w.phase === 'set' || w.phase === 'toBowlWith' || w.phase === 'bowlWith') {
         const pr = runObjs.current.get(w.run ?? -1)
         // (the plate, carried on the tray; what's on it with it)
         if (pr && run()?.phase === 'carry') pr.position.copy(hold.clone().setY(hold.y + 0.006))
@@ -6894,7 +6961,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const pass = b.row >= 0 ? passAt(b.row, kind) : null
           if (!tray) return pass
           const sideV = new THREE.Vector3(Math.cos(tray.yaw), 0, -Math.sin(tray.yaw)), fwdV = new THREE.Vector3(Math.sin(tray.yaw), 0, Math.cos(tray.yaw))
-          const onTray = tray.at.clone().addScaledVector(sideV, kind === 'rice' ? -0.06 : 0.06).addScaledVector(fwdV, nth === 0 ? 0.045 : -0.045).setY(tray.at.y + 0.006)
+          // (two sets side by side, or with the food's plate the bowls either side of it, a little behind (item 207))
+          const onTray = b.with ? tray.at.clone().addScaledVector(sideV, kind === 'rice' ? -0.11 : 0.11).addScaledVector(fwdV, -0.04).setY(tray.at.y + 0.006)
+            : tray.at.clone().addScaledVector(sideV, kind === 'rice' ? -0.06 : 0.06).addScaledVector(fwdV, nth === 0 ? 0.045 : -0.045).setY(tray.at.y + 0.006)
           if (b.down > 0) {
             const k = ez(b.down), at = onTray.lerp(kind === 'rice' ? riceSpotOf(b.seat) : soupSpotOf(b.seat), k)
             at.y += Math.sin(Math.PI * k) * 0.03
