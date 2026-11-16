@@ -2321,6 +2321,8 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   /** (in a toilet) sat on it just now; whether they switched its light on going in (and so put it out after, if they're the last); their
    * way out from it to the washstand once they're up (and how far along it, in seconds walked) */
   wcSit?: boolean; wcLit?: boolean; wcOut?: { path: THREE.Vector3[]; len: number; t: number }
+  /** past the toilet's door on the way in (its light's switch on the post between the two doors, outside: item 203) */
+  wcPast?: boolean
   /** done eating, a tissue to their mouth a moment before they get up (the owner's): since when */
   wipeAt?: number
   /** their drink, sipped now and then as they sit (the bar's clock): when this sip began (none under way: undefined), when the next is
@@ -3539,6 +3541,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // the plates: those out at the seats (or on their way), and the two stacks
   const [, setTick] = useState(0)
   const redraw = () => setTick((n) => n + 1)
+  /** the places with soy in their dish just now, a bit a seat (seatSoys) */
+  const soyMask = useRef(0)
   const runs = useRef<PlateRun[]>([])
   if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __plateRuns: runs })
   /** the plating place's carrier dishes (one a slot) */
@@ -4273,6 +4277,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const { p, dir } = alongPath(w.path, s.phase === 'wcGo' ? d : w.len - d)
         g?.position.copy(p)
         if (g) g.rotation.y = turnToward(g.rotation.y, s.phase === 'wcGo' ? Math.atan2(dir.x, dir.z) : Math.atan2(-dir.x, -dir.z), dt * 1.5)
+        // (the light switched at its switch, on the post between the two doors outside, as they pass the door: on going in if it's off, off
+        // coming out if they put it on and nobody else is in there (item 203: on as they got to the toilet, off as they dried their hands,
+        // inside, in the dark either side of it))
+        if (w.who !== 'drink' && wcs) {
+          const who = w.who as 'm' | 'f'
+          const front = pathLength(w.path.slice(0, w.path.length - (s.phase === 'wcGo' ? 3 : 2)))
+          if (s.phase === 'wcGo' && !s.wcPast && d >= front) {
+            s.wcPast = true
+            if (!getLights().wc[who]) { setLightSwitch(who === 'm' ? 'wcM' : 'wcF', true); lightSwitchSound(true); s.wcLit = true }
+          } else if (s.phase === 'wcBack' && s.wcPast && w.len - d <= front) {
+            s.wcPast = false
+            if (s.wcLit && !shown.some((x) => x !== s && x.wc?.who === who && (x.phase === 'wcIn' || x.phase === 'wcWash' || (x.phase === 'wcGo' && x.wcPast)))) {
+              setLightSwitch(who === 'm' ? 'wcM' : 'wcF', false)
+              lightSwitchSound(false)
+            }
+            s.wcLit = false
+          }
+        }
         // (into the stall round the corner, faded out over the last step: put out of sight there at once, they went in a blink, seen from above
         // through the slats of its ceiling)
         // (to a third of themselves at the stall's door, the rest just inside it (below): at x2 the last step was two or three frames, and
@@ -4391,13 +4413,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if (g) g.rotation.y = w.basinYaw + Math.atan2(Math.sin(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw), Math.cos(Math.atan2(dry.x - w.basin.x, dry.z - w.basin.z) - w.basinYaw)) * k
         }
         if (s.t > HAND_S + HAND_DRY_S) {
-          // (out of the toilet: its light put out behind them if they switched it on and nobody else is in it)
-          const who = s.wc!.who as 'm' | 'f'
-          if (s.wcLit && !shown.some((x) => x !== s && x.wc?.who === who && (x.phase === 'wcIn' || x.phase === 'wcWash'))) {
-            setLightSwitch(who === 'm' ? 'wcM' : 'wcF', false)
-            lightSwitchSound(false)
-          }
-          s.wcLit = false
+          // (out of the toilet: its light put out at the switch outside as they pass it, above)
           s.phase = 'wcBack'; s.t = 0; s.still = false; s.fade = undefined
         }
       } else {
@@ -6221,6 +6237,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (r.phase === 'set' || r.phase === 'clear' && r.t < 0) PLATES_SET.add(r.seat)
       if (r.phase === 'set' || r.phase === 'carry') PLATES_OUT.add(r.seat)
     }
+    // (the places with soy in their dish: one sat at it, or their plate still down after they've gone, till it's cleared (item 203: it came
+    // as they sat and went as they stood, the plate still there)); drawn again only as that changes
+    {
+      let mask = 0
+      for (const x of shown) if (x.seat >= 0 && x.phase !== 'enter' && x.phase !== 'leave') mask |= 1 << x.seat
+      for (const n of PLATES_SET) if (n >= 0) mask |= 1 << n
+      if (mask !== soyMask.current) { soyMask.current = mask; redraw() }
+    }
     if (finished || homed) {
       // (those come to the sink by themselves (no one on the floor), each as dirty as it was left)
       for (const r of runs.current) if (r.t === Infinity && r.phase !== 'home') SINK.dirt.push(r.dirt ?? DIRT_BASE)
@@ -6441,15 +6465,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   })
 
   // (the customers' shoes at the door and the soy at their places, for SeatBits: worked out again only when who's in, and where, changes)
-  const seatSoys = useMemo(() => shown.filter((s) => s.phase !== 'enter' && s.phase !== 'leave').map((s) => {
-      const st = seats[s.seat], c = counters[st.counter]
+  const seatSoys = useMemo(() => seats.map((_, n) => n).filter((n) => soyMask.current & (1 << n)).map((n) => {
+      const st = seats[n], c = counters[st.counter]
       // (into the dish where it stands (it may have been moved in edit mode: Roasting's BarTableware notes it), else where it's laid)
-      const dish = SOY_DISH_AT.get(s.seat), f = frame.current
+      const dish = SOY_DISH_AT.get(n), f = frame.current
       if (dish && f) return f.worldToLocal(dish.clone()).setY(top + 0.013)
       const x = st.mid.clone().sub(c.at).dot(c.along)
       return st.mid.clone().addScaledVector(c.along, sauceSide(c, BAR_GATES[st.counter], x)).addScaledVector(c.lay, PLACE.sauce[1]).setY(top + 0.013)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [shown.map((s) => (s.phase !== 'enter' && s.phase !== 'leave' ? s.seat : -1)).join(), seats, counters, top])
+    }), [soyMask.current, seats, counters, top])
 
   // (the bowls of miso soup set at their places (bar.ts's SOUP_SEATS: Roasting ladles them out): on the other side of their plate from the soy)
   const [soupVer, setSoupVer] = useState(SOUP.served)
