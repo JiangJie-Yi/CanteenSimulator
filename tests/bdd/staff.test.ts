@@ -2,6 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { IDLE_TIRE, LATE_TIRE, ROLES, SKILLS, SLACK_AFTER, TIER_ODDS, TIRED_AT, activityOf, effective, fair, paceBoost, paceOf, restPerHour, tireNow, tirePerHour, workFatigue, type SkillId, type Worker } from '@/data/staff'
 import { STAFF_IDLE, idleTick } from '@/game/shopState'
+import { MIN_WAGE, MIN_WAGE_YEN } from '@/data/osaka'
 import { CANDIDATES, ROLLS_PER_DAY, canDismiss, canHire, makeCandidates, pickHires, refreshApplicants, replaceOf, seeded, skillDraw, statScore, valueOf, wageOf } from '@/game/hiring'
 
 feature('員工與徵人', () => {
@@ -116,12 +117,16 @@ feature('員工與徵人', () => {
     })
   })
 
-  scenario('合理薪資不低於基本工資，技能越高越貴', ({ when, then }) => {
+  scenario('合理薪資不低於大阪的最低工資，技能越高越貴（店在大阪，店主 2026-11-16）', ({ when, then, and }) => {
     when('求各職位技能 0 與 100 的合理時薪', (w) => {
       w.rows = (['chef', 'sous', 'server', 'stock', 'cashier'] as const).map((r) => [fair(r, 0), fair(r, 100)])
     })
-    then('技能 0 時接近基本工資 196，技能 100 時更高', (w) => {
-      for (const [lo, hi] of w.rows as [number, number][]) { expect(lo).toBeGreaterThanOrEqual(195); expect(hi).toBeGreaterThan(lo) }
+    then(`技能 0 時就是最低工資（¥${MIN_WAGE_YEN.toLocaleString('en-US')} ≈ NT$${MIN_WAGE}），技能 100 時更高`, (w) => {
+      for (const [lo, hi] of w.rows as [number, number][]) { expect(lo).toBeGreaterThanOrEqual(MIN_WAGE); expect(lo).toBeLessThan(MIN_WAGE + 10); expect(hi).toBeGreaterThan(lo) }
+    })
+    and('應徵的人開的價（上下 3%）也不會低於最低工資', () => {
+      for (const role of ['chef', 'sous', 'server', 'stock', 'cashier'] as const) expect(wageOf(role, { skill: 1, speed: 1, stamina: 1 }, 0.97)).toBeGreaterThanOrEqual(MIN_WAGE)
+      for (const ws of Object.values(CANDIDATES)) for (const x of ws) expect(x.wage).toBeGreaterThanOrEqual(MIN_WAGE)
     })
   })
 

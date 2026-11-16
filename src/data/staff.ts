@@ -10,6 +10,8 @@
 // the shop is open they tire (faster with less stamina), and a tired worker works worse; with the shop closed they
 // rest.
 
+import { MIN_WAGE } from './osaka'
+
 export type Role = 'chef' | 'sous' | 'cashier' | 'server' | 'stock'
 /** how someone looks, for their picture: a woman or a man, young, middle-aged or older */
 export type Look = { female: boolean; age: 'young' | 'middle' | 'old' }
@@ -47,9 +49,13 @@ export const ROLES: Record<string, { role: Role; max: number; zh: string; ja: st
   grilledfish: STAFFING('二廚（取料・穿串）', '三廚（擺盤・顧火・收拾）', '二番手', '追い回し'),
 }
 
-// a fair wage for someone this good at this job (NT$/h): from about minimum wage (NT$196) up
-export const fair = (role: Role, skill: number) =>
-  Math.round((role === 'chef' ? 200 + skill * 4.2 : role === 'sous' ? 196 + skill * 2.4 : role === 'server' ? 196 + skill * 1.4 : role === 'stock' ? 196 + skill * 1.2 : 196 + skill * 1.1) / 5) * 5
+/** what each point of skill is worth over Osaka's minimum wage (NT$ an hour), by job, as Osaka's part-time going rates run (item 210): a
+ * cook's skill dearest (the best second cook about ¥2,000 an hour), the junior cook's about ¥1,500 at best, the floor, the stock and the till
+ * about ¥1,400 to ¥1,450 */
+const PER_SKILL: Record<Role, number> = { chef: 1.6, sous: 0.55, server: 0.45, stock: 0.45, cashier: 0.35 }
+// a fair wage for someone this good at this job (NT$/h): from Osaka's minimum wage (data/osaka, the owner's, 2026-11-16: the shop's in Osaka)
+// up, never under it
+export const fair = (role: Role, skill: number) => Math.max(MIN_WAGE, Math.round((MIN_WAGE + (role === 'chef' ? 5 : 0) + skill * PER_SKILL[role]) / 5) * 5)
 
 /**
  * Special skills (the owner's): now and then an applicant has one, at random, of a quality: 特殊 green, 菁英 blue, 稀有 purple, 極品 a dark

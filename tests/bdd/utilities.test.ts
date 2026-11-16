@@ -1,5 +1,6 @@
 import { expect } from 'vitest'
-import { drawOf, energyOver, freshMeter, LOADS, meterAdd, nextDay, POWER_TIERS, tierCost, WATER_BASE, WATER_TIERS, BILL_DAYS, type Conditions } from '@/game/utilities'
+import { drawOf, energyOver, freshMeter, LOADS, meterAdd, MONTH_BASE, nextDay, POWER_BASE, POWER_TIERS, tierCost, WATER_TIERS, BILL_DAYS, type Conditions } from '@/game/utilities'
+import { YEN } from '@/data/osaka'
 import { feature, scenario } from './bdd'
 
 const shut: Conditions = { open: false, lights: false, fire: false, music: false, freezerSet: -20, freezerOpen: false, fridgeOpen: false }
@@ -13,10 +14,10 @@ feature('水電：營業的消耗開支（沒有瓦斯，全靠炭火）', () =>
     then('只有全天候的那幾樣', (w) => { expect(w.on).toEqual(['drinks', 'exit', 'freezer', 'fridges', 'washlet']) })
     and('沒有瓦斯這一項', () => { expect(LOADS.some((l) => /gas/.test(l.id))).toBe(false) })
   })
-  scenario('營業、開燈、生火、放音樂時，排煙機、保溫、收銀、燈、音箱、門口燈籠、廁所燈都算進去', ({ given, when, then }) => {
+  scenario('營業、開燈、生火、放音樂時，排煙機、冷氣、保溫、收銀、燈、音箱、門口燈籠、廁所燈都算進去', ({ given, when, then }) => {
     given('店開著、所有的燈都亮、火在燒、音樂在播', (w) => { w.c = busy })
     when('算一小時的用電', (w) => { w.kwh = Object.values(energyOver(3600, w.c as Conditions)).reduce((a: number, b: number) => a + b, 0) })
-    then('每一樣的瓦數加起來（約 1.64 度）', (w) => { expect(w.kwh).toBeCloseTo(LOADS.reduce((n, l) => n + l.watts, 0) / 1000, 3) })
+    then('每一樣的瓦數加起來（約 2.35 度）', (w) => { expect(w.kwh).toBeCloseTo(LOADS.reduce((n, l) => n + l.watts, 0) / 1000, 3); expect(w.kwh).toBeCloseTo(2.347, 3) })
   })
   scenario('門口燈籠與廁所的燈只在它們自己的開關開著時耗電', ({ given, then, and }) => {
     given('閉店時', () => {})
@@ -35,14 +36,16 @@ feature('水電：營業的消耗開支（沒有瓦斯，全靠炭火）', () =>
     then('設 -25℃ 時多兩成', (w) => { expect(drawOf(load('freezer'), { ...shut, freezerSet: -25 })).toBeCloseTo((w.base as number) * 1.2, 5) })
     and('蓋子打開時是兩倍', (w) => { expect(drawOf(load('freezer'), { ...shut, freezerOpen: true })).toBeCloseTo((w.base as number) * 2, 5) })
   })
-  scenario('電費照累進的級距：跨過 330 度的那幾度用下一段的單價', ({ given, when, then }) => {
-    given('這個月已經用了 320 度', (w) => { w.from = 320 })
+  scenario('電費照關西電力的從量電燈 A（店在大阪）：跨過 120 度的那幾度用下一段的單價', ({ given, when, then, and }) => {
+    given('這個月已經用了 110 度', (w) => { w.from = 110 })
     when('再用 20 度', (w) => { w.cost = tierCost(POWER_TIERS, w.from as number, (w.from as number) + 20) })
-    then('10 度算第一段、10 度算第二段', (w) => { expect(w.cost).toBeCloseTo(10 * POWER_TIERS[0].rate + 10 * POWER_TIERS[1].rate, 5) })
+    then('10 度算第二段、10 度算第三段', (w) => { expect(w.cost).toBeCloseTo(10 * POWER_TIERS[1].rate + 10 * POWER_TIERS[2].rate, 5) })
+    and('第二段每度 ¥20.21 加再生能源附加費 ¥4.18，換成台幣', () => { expect(POWER_TIERS[1].rate).toBeCloseTo((20.21 + 4.18) * YEN, 2) })
+    and('前 15 度在每月的最低電費裡（¥522.58），只收附加費', () => { expect(POWER_BASE).toBeCloseTo(522.58 * YEN, 2); expect(POWER_TIERS[0].rate).toBeCloseTo(4.18 * YEN, 2) })
   })
-  scenario('水費照台水四段：10 度以下 7.35 元、11 到 30 度 9.45 元', ({ when, then }) => {
-    when('一個月用了 12 度水', (w) => { w.cost = tierCost(WATER_TIERS, 0, 12) })
-    then('10 × 7.35 + 2 × 9.45', (w) => { expect(w.cost).toBeCloseTo(10 * 7.35 + 2 * 9.45, 5) })
+  scenario('水費照大阪市的上下水道：每立方公尺約 ¥169（20 立方公尺一個月 ¥3,388）', ({ when, then }) => {
+    when('一個月用了 20 度水', (w) => { w.cost = tierCost(WATER_TIERS, 0, 20) })
+    then('¥3,388 換成台幣（單價取到分）', (w) => { expect(w.cost).toBeCloseTo(3388 * YEN, 0) })
   })
   scenario('洗一個盤子用熱水：用水也用電；沖一次馬桶 6 公升', ({ given, when, then, and }) => {
     given('這個月剛開始', (w) => { w.m = freshMeter() })
@@ -57,16 +60,16 @@ feature('水電：營業的消耗開支（沒有瓦斯，全靠炭火）', () =>
     and('分開記在兩項', (w) => { const r = w.r as ReturnType<typeof meterAdd>; expect(r.meter.water.wcTap).toBeCloseTo(15, 6); expect(r.meter.water.handwash).toBeCloseTo(6, 6) })
     and('要付水費', (w) => { expect((w.r as ReturnType<typeof meterAdd>).cost).toBeGreaterThan(0) })
   })
-  scenario('一個月是 30 個營業日：第 31 天重新起算，再收一次水表基本費', ({ given, when, then, and }) => {
+  scenario('一個月是 30 個營業日：第 31 天重新起算，再收一次每月的基本費', ({ given, when, then, and }) => {
     given(`第 ${BILL_DAYS} 天，已經用了 500 度電`, (w) => { w.m = { ...freshMeter(), day: BILL_DAYS, kwh: 500 } })
     when('隔天開店', (w) => { w.n = nextDay(w.m as ReturnType<typeof freshMeter>) })
     then('新的一個月從第 1 天、0 度開始', (w) => { const n = w.n as ReturnType<typeof nextDay>; expect(n.meter.day).toBe(1); expect(n.meter.kwh).toBe(0) })
-    and('收水表基本費', (w) => { expect((w.n as ReturnType<typeof nextDay>).charge).toBe(WATER_BASE) })
+    and('收每月的基本費（最低電費）', (w) => { expect((w.n as ReturnType<typeof nextDay>).charge).toBe(MONTH_BASE) })
   })
-  scenario('新開的店第一次開店就是這個月的第 1 天，收水表基本費', ({ given, when, then, and }) => {
+  scenario('新開的店第一次開店就是這個月的第 1 天，收每月的基本費', ({ given, when, then, and }) => {
     given('還沒開過店的電表', (w) => { w.m = freshMeter() })
     when('第一次開店', (w) => { w.n = nextDay(w.m as ReturnType<typeof freshMeter>) })
     then('第 1 天', (w) => { expect((w.n as ReturnType<typeof nextDay>).meter.day).toBe(1) })
-    and('收水表基本費', (w) => { expect((w.n as ReturnType<typeof nextDay>).charge).toBe(WATER_BASE) })
+    and('收每月的基本費（最低電費）', (w) => { expect((w.n as ReturnType<typeof nextDay>).charge).toBe(MONTH_BASE) })
   })
 })

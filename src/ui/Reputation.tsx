@@ -60,9 +60,9 @@ const REMARK: Record<Remark, [string, string, string][]> = {
     ['餓到不行才上菜', '腹ペコで待たされた', 'Starving by the time it came'],
   ],
   receipt: [
-    ['結帳沒拿到發票', 'レシートをもらえなかった', 'No receipt when I paid'],
-    ['發票紙用完了也不補', 'レシートの紙が切れたまま', 'Out of receipt paper, and nobody refilled it'],
-    ['付了錢，連張發票都沒有', '払ったのにレシートもない', 'Paid, and not even a receipt'],
+    ['結帳沒拿到收據', 'レシートをもらえなかった', 'No receipt when I paid'],
+    ['收據紙用完了也不補', 'レシートの紙が切れたまま', 'Out of receipt paper, and nobody refilled it'],
+    ['付了錢，連張收據都沒有', '払ったのにレシートもない', 'Paid, and not even a receipt'],
   ],
   tissue: [
     ['桌上衛生紙盒空了沒人補', '席のティッシュが空なのに誰も補充しない', 'The tissue box was empty and nobody refilled it'],
@@ -85,6 +85,12 @@ const REMARK: Record<Remark, [string, string, string][]> = {
   nothing: [
     ['沒有想吃的', '食べたいものがなかった', 'Nothing I wanted'],
     ['菜單上沒有我要的', 'メニューに欲しいのがない', 'Nothing on the menu for me'],
+  ],
+  // (the prices put them off (item 210))
+  dear: [
+    ['價格太貴了', '値段が高すぎる', 'Too expensive'],
+    ['這個價錢吃不起', 'この値段は手が出ない', "Couldn't run to these prices"],
+    ['CP 值太低', 'コスパが悪い', 'Poor value'],
   ],
 }
 /** which of a remark's ways a visit says it: by who they were and how long they waited and how it tasted, so the same kind of visit isn't

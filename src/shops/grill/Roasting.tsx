@@ -21,7 +21,7 @@ import { bakeable, colourVertices, homeCopy, StaticBatch, type BatchParts } from
 import { atlasModel } from '@/scene/atlasMerge'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
-import { FLOWS, flowOf, wantOf, type FlowKind } from '@/game/flow'
+import { FLOWS, flowOf, hourGap, wantOf, type FlowKind } from '@/game/flow'
 import { COAL_MAX, COAL_PER_ADD, crumble, glowingFor, standStick, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
@@ -40,7 +40,9 @@ import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from '.
 import { fireCall, fireLow, HOT_AT, roastRate } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
-import { pickOrders } from '@/game/orderPick'
+import { pickOrders, takesAt } from '@/game/orderPick'
+import { fairPrice } from '@/game/economy'
+import { getClock } from '@/ui/clockStore'
 import { sideChance } from '@/game/sides'
 import { overstayed } from '@/game/stay'
 import { RICE_SIDE, riceName } from '@/data/sides'
@@ -57,13 +59,13 @@ import { canRide, comesLate, isMinor, kindOf, LATE_MORE, type GuestKind } from '
 import { RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
-import { partName, type Seasoning as Dab } from '@/data/recipes'
+import { partName, type Entry, type Seasoning as Dab } from '@/data/recipes'
 import { tipIn } from '@/data/tipText'
 import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss } from '@/game/taste'
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FREEZER, FRIDGE_KICK, backToCrate, liftFromCrate, takeFromCrate, type Held } from './Decor'
-import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, TAKEOUT_SPOT, TAKEOUT_STAND, SERVE_COUNTER, barToFire, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, RIDERS, TAKEOUT_SPOT, TAKEOUT_STAND, SERVE_COUNTER, barToFire, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -4305,7 +4307,8 @@ type RoastingProps = {
   /** a customer's visit, scored as they go (game/reputation): App keeps them for the shop's rating */
   onVisit?: (v: Visit) => void
   /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
-  entries?: { key: string; name: string; ja?: string; parts: { id: string; dabs: string[]; name: string; ja?: string }[] }[]
+  /** the menu as put out (its prices too: item 210, a dish dearer than it's worth passed over) */
+  entries?: Entry[]
   /** a customer orders this dish off the menu: false if it can't be had (out of stock, the fire's full) */
   onOrderEntry?: (key: string, guest: number, reuse?: Record<string, number>, atTill?: boolean, warm?: Record<string, number>) => boolean
   /** how slowly customers come in (no cashier: fewer) */
@@ -5978,12 +5981,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const placeOrders = (id: number, want: number, seated = true) => {
       const orders: string[] = []
       const said: string[] = []
+      // (passed over for its price (game/orderPick's takesAt, item 210): if that's all they passed over, it was the prices that sent them off)
+      let dear = 0
       // (each dish they want picked among what can still be had (game/orderPick, item 203: two picks at random, two sold out, and they went
       // out with "nothing to be had", one star, the menu still with dishes to be had): one that can't be had now tried once, another picked)
       if (entries) pickOrders(entries, Math.min(want, blessed ? 3 : 2), (e) => {
         // a dish (or a set) off the menu, made the way it's listed
         // (the miso soup too, ladled from the pot (the owner's, 2026-11-11): it was left off, not grilled, and every set with it never ordered)
         if (!e.parts.every((pt) => pt.id in roast.times || pt.id === 'MisoSoup')) return false
+        if (Math.random() > takesAt(e.price, fairPrice(e))) { dear++; return false }
         wants.current.push(...e.parts)
         // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
         const again: Piece[] = [], warm: Piece[] = []
@@ -6042,7 +6048,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         orders.push('Sake')
         said.push(nameOf('Sake'))
       }
-      return { orders, said }
+      return { orders, said, dear: !orders.length && dear > 0 }
     }
     // the bench in the genkan (bar.ts's BENCH, the owner's): the first sat waiting called to a stool that's come free (ordering then, as anyone
     // coming in does); one who's waited too long there, or with the shop closing or past its last call, off out of the door again
@@ -6063,7 +6069,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const id = BENCH.ids.shift()!
         BENCH.since.delete(id)
         const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0) + (LATE.on && Math.random() < LATE_MORE ? 1 : 0)
-        const { orders, said } = placeOrders(id, want)
+        const { orders, said, dear } = placeOrders(id, want)
         if (orders.length) {
           BENCH.up.add(id)
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
@@ -6071,15 +6077,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           else onSay?.('guest', L().order(id, said), id)
         } else {
           BENCH.gone.add(id)
-          onSay?.('guest', L().nothing(id), id)
-          onVisit?.({ id, taste: null, waited: 0, walkedOut: true, gripes: ['nothing'] })
+          onSay?.('guest', dear ? L().dear(id) : L().nothing(id), id)
+          onVisit?.({ id, taste: null, waited: 0, walkedOut: true, gripes: [dear ? 'dear' : 'nothing'] })
         }
         report()
       }
     }
     // (no one more sat down in the last half hour before closing (game/hours' lastCall): takeaways only then, below)
     // (every stool taken, still one comes in if there's room on the bench to wait)
-    if (onOrder && !SHOP.closing && !LAST_CALL.on && comesIn(mood) && (seated.length < MAX_SEATED || (bar && BENCH.ids.length < BENCH_SEATS)) && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK) / RATING_FLOW.more) {
+    if (onOrder && !SHOP.closing && !LAST_CALL.on && comesIn(mood) && (seated.length < MAX_SEATED || (bar && BENCH.ids.length < BENCH_SEATS)) && guestClock.current > (7 + Math.random() * 6) * crowd * fl.gap(dayK) * hourGap(getClock().minute) / RATING_FLOW.more) {
       guestClock.current = 0
       // (someone still getting up counts as there: the stool's not free till they've gone and their plate's cleared)
       const used = new Set(guests.current.filter((g) => g.state === 'waiting' || g.state === 'eating' || !g.cleared).map((g) => g.seat))
@@ -6116,7 +6122,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (seatFor === undefined || used.has(seatFor)) continue
         // (the deep night's crowd orders more (the owner's: a different class of customer then))
         const want = Math.max(1, wantOf(flow.current, Math.random(), Math.random())) + (blessed && Math.random() < 0.6 ? 1 : 0) + (LATE.on && Math.random() < LATE_MORE ? 1 : 0)
-        const { orders, said } = placeOrders(id, want)
+        const { orders, said, dear } = placeOrders(id, want)
         guestSeq.current = Math.max(guestSeq.current, id)
         if (orders.length) {
           const seat = seatFor
@@ -6125,9 +6131,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           if (bar) SAY_SEATED.lines.set(id, L().order(id, said))
           else onSay?.('guest', L().order(id, said), id)
         } else {
-          onSay?.('guest', L().nothing(id), id)
+          onSay?.('guest', dear ? L().dear(id) : L().nothing(id), id)
           // (came in and found nothing they could have: a visit of its own, and not a happy one)
-          onVisit?.({ id, taste: null, waited: 0, walkedOut: true, gripes: ['nothing'] })
+          onVisit?.({ id, taste: null, waited: 0, walkedOut: true, gripes: [dear ? 'dear' : 'nothing'] })
         }
       }
       // (a couple only if both of them stayed: one who found nothing to order went, and the other sits alone)
@@ -6151,7 +6157,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       let id = guestSeq.current + 1
       while (rider && !canRide(id) && id < guestSeq.current + 400) id++
       guestSeq.current = id
+      // (a rider's order is the platform's: it keeps its cut (bar's RIDERS, item 210))
+      if (rider) RIDERS.add(id)
       const { orders, said } = placeOrders(id, takeoutSize(rider, Math.random()), false)
+      if (!orders.length) RIDERS.delete(id)
       if (orders.length) {
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat: -1, takeout: true })
         // (its soup in a cup of its own, not in the box: only what's grilled is packed there)
@@ -6163,7 +6172,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // with; gone out of the door, the order let go)
     for (const o of TAKEOUT.orders) {
       const g = guests.current.find((x) => x.id === o.id)
-      if (!g) { o.gone = true; continue }
+      if (!g) { o.gone = true; RIDERS.delete(o.id); continue }
       const mine = pieces.current.filter((p) => p.guest === o.id && p.container === 'takeout' && !p.eaten)
       o.packed = mine.filter((p) => p.flight >= 1 && !p.carried).length
       o.ready = o.packed >= o.items
@@ -6173,6 +6182,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         g.cleared = true
       }
     }
+    for (const o of TAKEOUT.orders) if (o.gone) RIDERS.delete(o.id)
     TAKEOUT.orders = TAKEOUT.orders.filter((o) => !o.gone)
     // (a box under another taken away: those over it come down onto the table, their food with them)
     TAKEOUT.orders.filter((o) => !o.taken && o.tier !== undefined).sort((a, b) => a.tier! - b.tier!).forEach((o, k) => {

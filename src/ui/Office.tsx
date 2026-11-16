@@ -12,6 +12,7 @@ import { DiceIcon, Glyph, SkillIcon, StatusIcon } from './GameIcons'
 import { usePanelSound } from './uiSound'
 import { setTip } from '@/scene/hoverTip'
 import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts'
+import { dayPay } from '@/game/hours'
 import { Avatar } from './Avatar'
 
 /** the office's tabs: the kitchen's notebook, the staff, the books */
@@ -191,7 +192,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
           </div>
           <p className="ofc-today">{t3(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`, `Day ${today} on duty: ${shiftLabel(crewOf(today))} (and those on both)`)}</p>
           <div className="ofc-wages">
-            <span>{t3(`今天這班的人事成本 ${money(wages)}/小時（營業時才計薪）`, `本日の人件費 ${money(wages)}/時（営業中）`, `This shift: ${money(wages)}/h while open`)}</span>
+            {/* (and what a whole day of it comes to, the night's and the overtime's premiums in (game/hours' dayPay, item 210)) */}
+            {/* (two lines of their own, neither broken: the hour's, and the day's under it) */}
+            <span className="ofc-wages-sum" title={t3('營業時才計薪；一天照 16:30–04:30 算：22 點後加 25% 深夜加給，做滿 8 小時後再加 25%（日本勞動基準法）',
+              '営業中のみ。1 日は 16:30–04:30：22 時以降は深夜割増 25%、8 時間を超えるとさらに 25%（労働基準法）',
+              'Paid while open. A day is 16:30 to 04:30: 25% more after 22:00, 25% more again past 8 hours (the Labour Standards Act of Japan)')}>
+              <b>{t3(`今天這班的人事成本 ${money(wages)}/小時`, `本日の人件費 ${money(wages)}/時`, `This shift: ${money(wages)}/h`)}</b>
+              <small>{t3(`一天約 ${money(dayPay(wages))}（含深夜、加班加給）`, `1 日 約 ${money(dayPay(wages))}（深夜・残業割増込み）`,
+                `About ${money(dayPay(wages))} a day, night and overtime pay in`)}</small></span>
             {/* every open job filled at once, by who's the best value for their pay */}
             <button type="button" className="ofc-hireall" disabled={!pickHires(people, shiftRoles, hired).length}
               onClick={() => { for (const w of pickHires(people, shiftRoles, hired)) onHire(w) }}

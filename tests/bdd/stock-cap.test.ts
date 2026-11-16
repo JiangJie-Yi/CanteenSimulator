@@ -15,9 +15,9 @@ feature('庫存容量', () => {
     and('以前沒有上限、超過的（691 份）也一樣放不下，但不會被拿走', () => { expect(roomFor(fish, 691)).toBe(0) })
   })
 
-  scenario('白米以袋計，只放得下整袋', ({ then, and }) => {
-    then('還有 85 份（空 15 份）時放得下一袋 10 份', () => { expect(roomFor('Onigiri', 85)).toBe(10) })
-    and('還有 95 份時一袋也放不下', () => { expect(roomFor('Onigiri', 95)).toBe(0) })
+  scenario('白米以袋計，只放得下整袋（一袋 5 公斤 60 份）', ({ then, and }) => {
+    then('還有 40 份（空 60 份）時放得下一袋 60 份', () => { expect(roomFor('Onigiri', 40)).toBe(60) })
+    and('還有 41 份時一袋也放不下', () => { expect(roomFor('Onigiri', 41)).toBe(0) })
   })
 
   scenario('調味料、海苔、木炭不算在這個上限裡', ({ then }) => {

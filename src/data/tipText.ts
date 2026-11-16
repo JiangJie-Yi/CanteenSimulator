@@ -60,7 +60,7 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   清酒杯: ['盃', 'Sake cups'],
   溫控旋鈕: ['温度調節つまみ', 'Thermostat knob'],
   炭堆已滿: ['炭がいっぱい', 'The fire’s full'],
-  發票: ['レシート', 'Receipt'],
+  收據: ['レシート', 'Receipt'],
   神棚: ['神棚', 'Kamidana shrine'],
   神棚門: ['神棚の扉', 'Shrine doors'],
   經書: ['経本', 'Sutra book'],

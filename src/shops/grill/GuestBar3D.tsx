@@ -71,7 +71,7 @@ import { StoolModel, TillStoolModel } from './BarFurnish'
 /** the boxes on the till's low shelf, each its own piece, and its name in the developer panel */
 const TILL_BOXES = [['bags', '紙袋'], ['napkins', '紙巾'], ['rolls', '收銀紙捲'], ['coasters', '杯墊'], ['chopsticks', '割箸']] as const
 import { TillCounter } from './TillCounter'
-import { drawerOpens, paysByCard, tabletActive } from '@/game/till'
+import { drawerOpens, paysByCard, tabletActive, tenderOf } from '@/game/till'
 import { CAT_STAND_H, TillBellLive, TillDeskPiece, TillMatLive } from './TillDesk'
 import { beep, behindBody, chime, DRAWER_FRONT, DRAWER_KEY, showKeyTip, turnKey, liftOn, rattle, RECEIPT_TEX, REGISTER, RegisterBody, RegisterDrawer, RegisterKeys, registerTag, registerText, useRegisterModel } from './cashRegister'
 import { Movable } from './Movable'
@@ -88,7 +88,7 @@ import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soup
 import { RICE_BEATS, SOUP_BEATS, beatsLength } from '@/game/sides'
 import { SeatBowls, fillRice, fillSoup, ladleRest, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
 import { bottleClink, lightSwitchSound, plateClink, scrubSound, stoolSound, washSplash } from './restroomSound'
-import { SHOP } from '@/game/shopState'
+import { LAST_CALL, SHOP } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
@@ -1785,7 +1785,7 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
         <RegisterKeys lang={lang} />
         {/* the receipt (clicked, it's torn off) */}
         <mesh ref={slip} geometry={slipGeo} visible={false} position={[-0.025, 0.2185, 0.076]} rotation={[0.2, Math.PI, 0]}
-          {...tipOver(tl(lang, '發票', 'レシート', 'Receipt'), tl(lang, '點一下撕下', 'クリックで切り取る', 'Click to tear it off'))}
+          {...tipOver(tl(lang, '收據', 'レシート', 'Receipt'), tl(lang, '點一下撕下', 'クリックで切り取る', 'Click to tear it off'))}
           onClick={(e) => { e.stopPropagation(); if (!getEdit().on && TILL_STATE.k < 0) REGISTER.printAt = -1 }}>
           <meshBasicMaterial map={RECEIPT_TEX} toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
@@ -2462,6 +2462,8 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   /** their drink, sipped now and then as they sit (the bar's clock): when this sip began (none under way: undefined), when the next is
    * due; how much of it's gone (0 to 1) */
   sipAt?: number; sipNext?: number; drunk?: number
+  /** how many drinks they've had from the fridge (item 210: another when one's drunk, up to DRINKS_MAX) */
+  drinks?: number
   /** at their stool: seconds into pulling it out and stepping up onto it (coming in), into sliding in with it (sat) */
   pullT?: number; slideT?: number; pulledSound?: boolean
   /** called to their stool off the genkan's bench: where they sat, and their way in from there */
@@ -2648,8 +2650,11 @@ const wcStayOf = (id: number) => WC_STAY - 2 + ((id * 7919) % 100) / 50
 const HAND_S = HAND_MS / 1000
 /** after washing, their hands held under the hand dryer on the wall by the washstand (the owner's: no towel; Restroom's WcDryer blows) */
 const HAND_DRY_S = 1.5
-/** and to go and get themselves a drink from the fridge (once), and how long they stand choosing */
-const DRINK_RATE = 1 / 70
+/** and to go and get themselves a drink from the fridge: soon after they've sat down, waiting or eating (item 210: an izakaya in Osaka, とりあえず
+ * ビール: about half of them had one, once), and another once it's drunk, up to DRINKS_MAX; how long they stand choosing */
+const DRINK_RATE = 1 / 12
+const REFILL_RATE = 1 / 10
+const DRINKS_MAX = 3
 /** (in development, `__drinkRate` in the console makes them thirstier, for watching it) */
 const drinkRate = () => (import.meta.env.DEV ? (window as unknown as { __drinkRate?: number }).__drinkRate : undefined) ?? DRINK_RATE
 /** (and `__wcRate` readier for the toilet) */
@@ -2797,7 +2802,8 @@ const TISSUE_ON: [number, number, number] = [-0.035, 0.006, 0.025]
 const WIPE_MOUTH_MS = 900
 /** a sip of their drink: how long (the bar's clock), about how long between sips, how many to a drink */
 const SIP_S = 2.4
-const SIP_GAP = 11
+/** (item 210: a drink went down in about fifty minutes, so few had a second; an izakaya's customers have two or three in an evening) */
+const SIP_GAP = 6
 const SIPS = 4
 // (a done-with plate's bones, and the plater's rice bowl, first shown mid-shift: their shaders made with the rest at load (scene/Prewarm))
 {
@@ -4554,7 +4560,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (guest) s.items = guest.items
         // (not once the shop's shut for the day (the owner's item 40: a customer helped themselves to a drink, and paid for it, past closing
         // time); what they've got they drink up)
-        if (fridges && !SHOP.closing && guest?.state === 'waiting' && !s.drink && Math.random() < drinkRate() * flowerBuffs(SHRINE_FLOWERS).drinks * Math.min(dt, 0.1)) {
+        // (their first soon after they've sat down, waiting or eating; another once that's drunk, up to three, not after last orders (item 210))
+        const thirsty = !s.drink ? drinkRate() : (s.drunk ?? 0) >= 1 && (s.drinks ?? 1) < DRINKS_MAX && !s.wipeAt && !LAST_CALL.on ? REFILL_RATE : 0
+        if (fridges && !SHOP.closing && (guest?.state === 'waiting' || guest?.state === 'eating') && thirsty > 0
+          && Math.random() < thirsty * flowerBuffs(SHRINE_FLOWERS).drinks * Math.min(dt, 0.1)) {
           // (they choose what they want, and go to the fridge it's in)
           const pick = drinkFor(kindOf(s.id).kind, s.id)
           const fr = fridges[fridgeUnitOf(pick)]
@@ -4681,8 +4690,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             else if (was === 'fresh' && Math.random() < 0.4) onSay?.('guest', L.wcNice(s.id), s.id)
             else onSay?.('guest', L.wcBack(s.id, s.id + Math.floor(performance.now() / 5000)), s.id)
           }
-          if (s.wc?.who === 'drink' && !s.drink) {
+          // (the empty, brought back, put in the crate of empties by the fridges; the next taken (item 210))
+          if (s.wc?.who === 'drink' && (!s.drink || (s.drunk ?? 0) >= 1)) {
             s.drink = s.wc.pick ?? drinkFor(kindOf(s.id).kind, s.id)
+            s.drunk = 0
+            s.sipAt = undefined
+            s.sipNext = undefined
+            s.drinks = (s.drinks ?? 0) + 1
             // (taken from among the others on its shelf: its clink, glass or a can, heard at the fridge)
             const u = takeDrink(s.drink)
             if (u >= 0) bottleClink(isCan(s.drink), FRIDGE_AT[u])
@@ -4738,7 +4752,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (one with nothing to pay (gone before anything came, and nothing drunk) goes by the till without stopping (item 195: they paid the
         // whole bill, given back to them, into the drawer)); the money taken as the cash key's pressed, once
         const payD = lp.payD && paysAtTill(GUEST_BILLS.of(s.id)) ? lp.payD : 0
-        if (payD && raw >= payAt + 0.44 * PAY_S * v && !TILL_CASH.paid.has(s.id)) payIn(s.id, billFor(s).bill, paysByCard(s.id))
+        if (payD && raw >= payAt + 0.44 * PAY_S * v && !TILL_CASH.paid.has(s.id)) payIn(s.id, billFor(s).bill, paysByCard(s.id), tenderOf(billFor(s).bill, s.id))
         // (in the queue for the till (the owner's): someone else at it paying, they wait a body's length back till it's free)
         // (or the cashier handing a takeaway's bag over it, item 203)
         if (lp.payD && ((TILL_STATE.k >= 0 && TILL_STATE.payer !== s.id) || TAKEOUT_STAND.handing) && raw >= payAt - QUEUE_GAP && raw < payAt) s.hold = (s.hold ?? 0) + dt
@@ -4837,7 +4851,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (paying) {
       const { s: x, k } = paying
       const { parts, items, bill } = billFor(x)
-      const given = Math.min(10000, Math.ceil(bill / 1000) * 1000)
+      // (the note they hand over (game/till's tenderOf, item 210: it went no higher than ten thousand, a bill over it short))
+      const given = tenderOf(bill, x.id)
       const rung = Math.min(parts.length, Math.floor(k / 0.32 * parts.length) + 1)
       TILL_STATE.text = yen(k < 0.32 ? parts.slice(0, rung).reduce((a, b) => a + b, 0) : k < 0.62 ? bill : Math.max(0, given - bill))
       // (a card: rung up and paid on the reader, the drawer staying shut and no money changing hands; cash: the cashier presses the cash key
@@ -7943,7 +7958,9 @@ function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s
   const cup = !!s.drink && cupped(s.drink)
   const sipK = () => (s.sipAt === undefined ? -1 : (clock.current - s.sipAt) / SIP_S)
   const sat = s.phase === 'sit'
-  const inHand = s.drink && (s.phase === 'wcBack' || sat) ? (
+  // (and the empty taken along to the fridge for the next one (item 210))
+  const refill = s.phase === 'wcGo' && s.wc?.who === 'drink'
+  const inHand = s.drink && (s.phase === 'wcBack' || sat || refill) ? (
     <group scale={1 / (1.1 * STAFF_SCALE * folkSpec(s.id).size)}>
       <group position-y={cup && sat ? -0.012 : -0.07}>{cup && sat ? <SakeCup level={0.8} /> : <DrinkBottle id={s.drink as DrinkId} wet level={1 - (s.drunk ?? 0)} />}</group>
     </group>
@@ -7952,7 +7969,7 @@ function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s
   // (their own boundary: a customer still loading shows nothing a moment, never blanks the shop round them)
   return <Suspense fallback={null}><FolkFigure id={s.id} eating={eating} walking={s.phase !== 'sit' && !s.wcSit} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : s.phase === 'sit' && s.wipeAt ? 'Wipe' : undefined} fit={FOLK_FIT}
-    held={inHand} heldShown={() => s.phase === 'wcBack' || (sipK() >= 0.2 && sipK() < 0.86)} cup={cup}
+    held={inHand} heldShown={() => s.phase === 'wcBack' || (s.phase === 'wcGo' && s.wc?.who === 'drink') || (sipK() >= 0.2 && sipK() < 0.86)} cup={cup}
     sip={() => (s.phase === 'sit' && s.drink ? sipK() : -1)} drinkAt={() => (s.drink ? drinkOf(s.seat, cup) : null)}
     plate={() => (s.phase === 'sit' ? plateOf(s.seat) : null)} /></Suspense>
 }

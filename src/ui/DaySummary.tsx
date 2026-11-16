@@ -41,16 +41,23 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
     window.addEventListener('keydown', key, true)
     return () => { window.clearInterval(tick); window.removeEventListener('keydown', key, true) }
   }, [])
-  // (the wages with what of them was overtime, when there was any (the owner's, 2026-11-15: past the hours the staff are paid more))
-  const overtime = s.overtime > 0.5 ? t(`（含加班費 ${nt(s.overtime)}）`, `（残業代 ${nt(s.overtime)} 込み）`, ` (incl. overtime ${nt(s.overtime)})`) : ''
-  const rows: [string, number, boolean][] = [
+  // (each line: its label, the sum, whether it came in; `sub`, a part of the line above it, already in it (the wages' premiums))
+  type Row = [string, number, boolean, boolean?]
+  const rows: Row[] = [
     [t('營業額', '売上', 'Takings'), s.revenue, true],
     [t('食材', '食材', 'Food'), -s.food, false],
     [t('燃料（備長炭）', '燃料（備長炭）', 'Charcoal'), -s.fuel, false],
-    [t('人事', '人件費', 'Wages') + overtime, -s.wage, false],
+    [t('人事', '人件費', 'Wages'), -s.wage, false],
+    // (of the wages, what was paid over the hour's pay, as Japan's labour law has it (game/hours, item 210): past eight hours, and the night's)
+    ...(s.overtime > 0.5 ? [[t('其中加班費（超過 8 小時）', 'うち残業代（8 時間超）', 'of which overtime (past 8 h)'), -s.overtime, false, true] as Row] : []),
+    ...(s.night > 0.5 ? [[t('其中深夜加給（22 點後）', 'うち深夜割増（22 時以降）', 'of which night pay (after 22:00)'), -s.night, false, true] as Row] : []),
     [t('水電', '光熱費', 'Power & water'), -s.utility, false],
+    // (the rent, the delivery platform's cut and the card company's fee (item 210): a line each, on a day there was any)
+    ...(s.rent > 0 ? [[t('房租', '家賃', 'Rent'), -s.rent, false] as Row] : []),
+    ...(s.platform > 0.5 ? [[t('外送平台抽成', 'デリバリー手数料', 'Delivery platform'), -s.platform, false] as Row] : []),
+    ...(s.cardFee > 0.5 ? [[t('刷卡手續費', 'カード決済手数料', 'Card fees'), -s.cardFee, false] as Row] : []),
     // (the reviews bought and the shrine's offerings, out of the profit too (item 203): a line only on a day there were any)
-    ...(s.other > 0 ? [[t('宣傳與供品', '宣伝・お供え', 'Promotion & offerings'), -s.other, false] as [string, number, boolean]] : []),
+    ...(s.other > 0 ? [[t('宣傳與供品', '宣伝・お供え', 'Promotion & offerings'), -s.other, false] as Row] : []),
   ]
   const stars = s.stars === null ? null : Math.round(s.stars * 10) / 10
   return createPortal(
@@ -73,11 +80,13 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
           <p className={`day-sum-profit${s.profit < 0 ? ' is-loss' : ''}`}>
             <span>{t('今日利潤', '本日の利益', "Today's profit")}</span>
             <strong>{s.profit < 0 ? '−' : ''}{nt(Math.abs(s.profit))}</strong>
-            {s.margin !== null && <small>{t('利潤率', '利益率', 'Margin')} {Math.round(s.margin * 100)}%</small>}
+            {s.margin !== null && <small>{t('利潤率', '利益率', 'Margin')} {Math.round(s.margin * 100)}%
+              {/* (and the wages over the takings (人件費率, item 210)) */}
+              {s.labour !== null && t(`・人事費率 ${Math.round(s.labour * 100)}%`, `・人件費率 ${Math.round(s.labour * 100)}%`, ` · Labour ${Math.round(s.labour * 100)}%`)}</small>}
           </p>
           <dl className="day-sum-books">
-            {rows.map(([label, n, plus]) => (
-              <div key={label}><dt>{label}</dt><dd className={plus ? 'is-in' : 'is-out'}>{plus ? '' : '−'}{nt(Math.abs(n))}</dd></div>
+            {rows.map(([label, n, plus, sub]) => (
+              <div key={label} className={sub ? 'is-sub' : undefined}><dt>{label}</dt><dd className={plus ? 'is-in' : 'is-out'}>{plus || sub ? '' : '−'}{nt(Math.abs(n))}</dd></div>
             ))}
           </dl>
           <dl className="day-sum-guests">

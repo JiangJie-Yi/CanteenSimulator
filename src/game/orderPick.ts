@@ -18,3 +18,11 @@ export const pickOrders = <T>(menu: readonly T[], n: number, tryOne: (t: T) => b
   }
   return got
 }
+
+/**
+ * How the price puts a customer off (item 210: whatever was asked was paid, a dish at any price ordered as often): at the dish's going price
+ * (its parts' own prices, game/economy's fairPrice) or under it, they'll have it; dearer, the likelier they pass it over (one in five more
+ * than it's worth, three in ten pass it by; half again, three in four; two thirds over, nobody has it)
+ */
+export const PRICE_SHY = 1.5
+export const takesAt = (price: number, fair: number) => (fair <= 0 ? 1 : Math.max(0, Math.min(1, 1 - PRICE_SHY * (price / fair - 1))))

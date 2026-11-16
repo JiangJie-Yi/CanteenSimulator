@@ -3,13 +3,15 @@
 // waited for it, and what put them out (no tissues at their place, a dirty toilet, the lights off, an upset stomach, nothing on the menu
 // they could have); the shop's stars are the recent visits' average, the newer counting more; and what each said.
 
-export type Gripe = 'wait' | 'tissue' | 'toilet' | 'dark' | 'sick' | 'nothing' | 'receipt'
+export type Gripe = 'wait' | 'tissue' | 'toilet' | 'dark' | 'sick' | 'nothing' | 'receipt' | 'dear'
 /** one customer's visit, as they leave: what they thought of what they ate (0..100, none if they ate nothing), how long they waited for
  * their first piece (seconds), whether they walked out, and what put them out; the game's day it was, and whether it's a review bought
  * (no customer behind it) */
-export type Visit = { id: number; taste: number | null; waited: number; walkedOut: boolean; gripes: Gripe[]; day?: number; bought?: boolean }
+export type Visit = { id: number; taste: number | null; waited: number; walkedOut: boolean; gripes: Gripe[]; day?: number; bought?: boolean
+  /** whether they wrote a review of it (item 210: only some do; one kept before it was asked, as if they had) */
+  wrote?: boolean }
 /** how much each kind of upset takes off a visit's satisfaction */
-export const GRIPE_COST: Record<Gripe, number> = { wait: 12, tissue: 8, toilet: 10, dark: 18, sick: 35, nothing: 25, receipt: 6 }
+export const GRIPE_COST: Record<Gripe, number> = { wait: 12, tissue: 8, toilet: 10, dark: 18, sick: 35, nothing: 25, receipt: 6, dear: 20 }
 /** how long a wait for the first piece is taken in good part (seconds); after that, a point off every six seconds, up to twenty */
 export const WAIT_OK = 90
 
@@ -155,3 +157,20 @@ export function boughtVisits(n: number, first: number, day: number): Visit[] {
     return { id, taste: 78 + Math.round(h * 21), waited: 20 + Math.round(h * 40), walkedOut: false, gripes: [], day, bought: true }
   })
 }
+
+/**
+ * Who writes a review (item 210: every customer wrote one, as no shop's do): those put out the likeliest (a walk-out, a gripe that cost them
+ * dear, a poor meal), the delighted next, a middling visit the least. The rating and the reviews are of those written; the day's sheet
+ * counts every customer.
+ */
+export const REVIEW_ODDS = { cross: 0.35, delighted: 0.3, middling: 0.12 } as const
+export function reviewChance(v: Visit) {
+  if (v.bought) return 1
+  if (v.walkedOut || v.gripes.some((g) => GRIPE_COST[g] >= 18)) return REVIEW_ODDS.cross
+  const t = v.taste ?? 0
+  return t >= 80 ? REVIEW_ODDS.delighted : t < 40 ? REVIEW_ODDS.cross : REVIEW_ODDS.middling
+}
+/** whether this visit's written up, by a roll `r` (0..1) */
+export const writesReview = (v: Visit, r: number) => r < reviewChance(v)
+/** the visits written up: the reviews */
+export const reviewsOf = (visits: readonly Visit[]) => visits.filter((v) => v.wrote !== false)

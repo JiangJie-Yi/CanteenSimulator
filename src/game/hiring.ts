@@ -5,6 +5,7 @@
 import { BACKGROUNDS, INTRO, JP_GIVEN, JP_SURNAMES, PAY, TO_JA, TRAITS, TW_GIVEN, TW_SURNAMES } from '@/data/people'
 import { DISHES } from '@/data/menu'
 import { fair, SKILLS, TIER_ODDS, type Look, type Role, type SkillId, type Tier, type Worker } from '@/data/staff'
+import { MIN_WAGE } from '@/data/osaka'
 
 export type Rand = () => number
 
@@ -90,7 +91,7 @@ function noteOf(rand: Rand, shop: string, role: Role, age: Look['age'], w: { ski
  */
 export const statScore = (w: { skill: number; speed: number; stamina: number }) => 0.6 * w.skill + 0.2 * w.speed + 0.2 * w.stamina
 export const wageOf = (role: Role, w: { skill: number; speed: number; stamina: number }, jitter = 1) =>
-  Math.round((fair(role, statScore(w)) * jitter) / 5) * 5
+  Math.max(MIN_WAGE, Math.round((fair(role, statScore(w)) * jitter) / 5) * 5)
 /** how many times a day the applicants can be drawn again by hand (the dice, the owner's), on top of the new lot each day brings */
 export const ROLLS_PER_DAY = 2
 

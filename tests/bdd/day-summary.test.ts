@@ -49,7 +49,7 @@ feature('打烊的日結算', () => {
   scenario('每天的結算記進帳本', ({ given, when, then, and }) => {
     given('今天的結算', (w) => { w.s = daySummary(open, shut, [visit(1, 90)], { a: 2 }) })
     when('打烊時記進帳本', (w) => { w.days = addDay([], 3, w.s) })
-    then('帳本多一天：第 3 天的營業額、利潤、來客、最暢銷', (w) => { expect(w.days).toEqual([{ day: 3, revenue: 6000, profit: w.s.profit, guests: 1, stars: w.s.stars, best: { key: 'a', n: 2 } }]) })
+    then('帳本多一天：第 3 天的營業額、利潤、來客、最暢銷，與人事（算人事費率）', (w) => { expect(w.days).toEqual([{ day: 3, revenue: 6000, profit: w.s.profit, guests: 1, stars: w.s.stars, best: { key: 'a', n: 2 }, ...(w.s.wage > 0 ? { wage: w.s.wage } : {}) }]) })
     and('同一天開關兩次，兩次加在一起', (w) => { const again = addDay(w.days, 3, w.s); expect(again.length).toBe(1); expect(again[0].revenue).toBe(12000); expect(again[0].guests).toBe(2); expect(again[0].stars).toBeCloseTo(w.s.stars!) })
     and(`只留最近 ${KEEP_DAYS} 天`, (w) => { let d = [] as typeof w.days; for (let i = 1; i <= KEEP_DAYS + 5; i++) d = addDay(d, i, w.s); expect(d.length).toBe(KEEP_DAYS); expect(d[0].day).toBe(6) })
   })

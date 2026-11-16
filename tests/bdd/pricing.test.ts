@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
 import { suggestPrice, MENU_MAX, MENU_MIN } from '@/data/recipes'
-import { buyAllCost, CAPITAL, costOf, goodsOf, SHOP_COST, supplierDiscount } from '@/game/economy'
+import { buyAllCost, CAPITAL, costOf, goodsOf, packOf, SHOP_COST, supplierDiscount } from '@/game/economy'
 
 feature('成本與定價', () => {
   scenario('開店後老闆手上有 NT$200,000', ({ given, when, then }) => {
@@ -29,7 +29,7 @@ feature('成本與定價', () => {
     given('日式烤魚店', (w) => { w.d = DISHES.find((d) => d.id === 'grilledfish')! })
     when('分別全買 1 份和 3 份', (w) => { w.one = buyAllCost(w.d, 1); w.three = buyAllCost(w.d, 3) })
     then('3 份是 1 份的 3 倍（白米整袋買，1 份、3 份都是一袋）', (w) => {
-      const rice = costOf(w.d.items.find((g: { id: string }) => g.id === 'Onigiri')!) * 10
+      const rice = costOf(w.d.items.find((g: { id: string }) => g.id === 'Onigiri')!) * packOf('Onigiri')
       expect(w.three - rice).toBe((w.one - rice) * 3)
     })
   })

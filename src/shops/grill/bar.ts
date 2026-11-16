@@ -11,7 +11,7 @@ import type { Use } from '@/game/utilities'
 import type { HearthRole } from '@/game/hearthGuard'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
-import { deposit, openingFloat, type DrawerCash, type Tab } from '@/game/till'
+import { openingFloat, payCash, type DrawerCash, type Tab } from '@/game/till'
 import { LOW_FULL, RACK_FULL, type Dryer, type Drain } from '@/game/plates'
 import { PILE_START } from '@/game/sinkPile'
 import type { Flower } from '@/game/shrineFlowers'
@@ -693,11 +693,12 @@ export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void)
 /** a customer's bill paid at the till, once: cash into the drawer, and the shop's books told (GuestBar3D: as the cash key's pressed, or
  * as they're by the till if a frame went past that moment; item 195: the register put it in the drawer only on the frame the key went
  * down) */
-export function payIn(guest: number, amount: number, card: boolean) {
+export function payIn(guest: number, amount: number, card: boolean, tender = amount) {
   if (TILL_CASH.paid.has(guest)) return
   TILL_CASH.paid.add(guest)
   if (TILL_CASH.paid.size > 64) TILL_CASH.paid.delete(TILL_CASH.paid.values().next().value as number)
-  if (!card) TILL_CASH.drawer = deposit(TILL_CASH.drawer, amount)
+  // (cash: the note they handed over into the drawer, their change out of it (game/till's payCash, item 210))
+  if (!card) TILL_CASH.drawer = payCash(TILL_CASH.drawer, amount, tender)
   TILL_CASH.onPaid?.(guest, amount, card)
 }
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
@@ -841,6 +842,9 @@ export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_
  * a server carry the box out to them (`taken`, `handed`) and walks them out (`gone`, then Roasting lets it go)
  */
 export const TAKEOUT = { orders: [] as TakeoutOrder[] }
+/** the numbers of the delivery riders' orders still about (item 210): their food's ordered through the platform they ride for, which keeps its
+ * cut of it (App's orderEntry, game/costs' platformCut); put in as the order's placed, let go as it's gone */
+export const RIDERS = new Set<number>()
 /**
  * The takeaway stand behind the cashier's chair (the owner's, 2026-11-11): with a cashier at the till, a server sets the bagged takeaway down on
  * it (`bags`, the orders' ids), and the cashier turns round in their chair, takes it up and hands it over the till to its customer (`handing`:

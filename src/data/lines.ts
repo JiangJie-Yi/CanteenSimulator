@@ -69,10 +69,11 @@ const ZH = {
   // 客人點餐與反應（移除前置編號 #ID）
   order: (id: number, names: string[]) => { const l = spokenZh(names); return pick(id, [`老闆，${l}！`, `麻煩給我${l}。`, `我要${l}，謝謝！`]) },
   nothing: (_id: number) => `看了一圈沒有特別對胃口的…下次路過再來試試！`,
+  dear: (_id: number) => `價錢有點高…今天先不點了。`,
   wcDirty: (_id: number) => `哇…這洗手間地板跟馬桶有點嚇人，該打掃啦！`,
   wcPaper: (_id: number) => `救命啊！廁所裡居然連一張衛生紙都沒有了？！`,
   noTissue: (_id: number) => `咦？桌邊抽屜裡的紙巾全空了，擦不了嘴呀…`,
-  noReceipt: (_id: number) => `發票機沒紙了嗎？沒關係啦，心意收到就好！`,
+  noReceipt: (_id: number) => `收據機沒紙了嗎？沒關係啦，心意收到就好！`,
   wcNice: (_id: number) => `這家店連洗手間都香香的、擦得發亮，細節真用心！`,
   wcGo: (_id: number, k: number) => [
     '喝太暢快了，先去洗手間釋放一下～',
@@ -181,6 +182,7 @@ const JA: typeof ZH = {
   // 客の注文と反応（ID番号除去）
   order: (id: number, names: string[]) => { const l = spokenJa(names); return pick(id, [`すみません、${l}！`, `${l}お願いします。`, `${l}ください！`]) },
   nothing: (_id) => `うーん、今日はピンとくるものがないな…また寄らせてもらうよ！`,
+  dear: (_id) => `うーん、ちょっと高いな…今日はやめとくよ。`,
   wcDirty: (_id) => `おっと…トイレの床がちょっと汚れてるな。掃除した方がいいかも。`,
   wcPaper: (_id) => `大変だ！トイレットペーパーが完全に切れてるぞ？！`,
   noTissue: (_id) => `あれ？引き出しのティッシュが空っぽだ、口が拭けないや…`,
@@ -289,6 +291,7 @@ const EN: typeof ZH = {
   // Customer Ordering & Feedback (Stripped #ID prefix)
   order: (id: number, names: string[]) => { const l = spokenEn(names); return pick(id, [`Excuse me, ${l}!`, `${l}, please.`, `Could I get ${l}?`]) },
   nothing: (_id) => `Nothing catching my eye right now... Catch you next time!`,
+  dear: (_id) => `A bit pricey for me... maybe another time.`,
   wcDirty: (_id) => `Yikes... the restroom floor is rather grimy. Needs a scrub!`,
   wcPaper: (_id) => `Emergency! There is not a single scrap of toilet paper in here?!`,
   noTissue: (_id) => `Wait, the napkin drawer on the table is bone dry... Can’t wipe up!`,

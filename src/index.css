@@ -5741,6 +5741,12 @@ html[lang='en'] .menu-title-en { display: none; }
 .office > header .panel-x { margin-left: auto; }
 /* the staff tab's foot of the team: what the staff costs, and every open job filled at once */
 .office .ofc-wages { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* (what it costs: the hour's on one line, the whole day's under it (item 210), neither broken) */
+.ofc-wages-sum { display: grid; gap: 1px; min-width: 0; }
+.ofc-wages-sum > b,
+.ofc-wages-sum > small { white-space: nowrap; }
+.ofc-wages-sum > b { font-weight: 600; }
+.ofc-wages-sum > small { font-size: 11px; opacity: 0.85; }
 .ofc-hireall {
   flex: none;
   padding: 4px 12px;
@@ -6511,6 +6517,10 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
   font-variant-numeric: tabular-nums;
 }
 .day-sum-books dd.is-out { color: var(--ds-soft); font-weight: 600; }
+/* (a part of the line above, already in it: the wages' overtime and night pay (item 210)) */
+.day-sum-books > div.is-sub { padding-left: 14px; }
+.day-sum-books > div.is-sub dt,
+.day-sum-books > div.is-sub dd { font-size: 12px; font-weight: 500; }
 .day-sum-guests { padding-top: 12px; border-top: 1px solid var(--ds-rule); }
 .day-sum-guests small { margin-left: 4px; color: var(--ds-soft); font-size: 12px; font-weight: 500; }
 .day-sum-stars { color: #e0a72e; letter-spacing: 1px; }

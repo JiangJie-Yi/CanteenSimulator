@@ -20,7 +20,7 @@ const bump = (k: number, at: number, w: number) => Math.exp(-(((k - at) / w) ** 
 export const FLOWS: Record<FlowKind, Flow> = {
   steady: { say: { zh: '今天是平常日，客人會穩穩地來。', ja: '今日は普段どおり、お客さんは途切れず来るよ。', en: 'An ordinary day: customers will come steadily.' },
     pairs: 0.2, appetite: 0, gap: () => 1 },
-  lunchRush: { say: { zh: '中午的上班族要來了，一開店就會很忙！', ja: '昼のサラリーマンが来るぞ、開店からすぐ忙しくなる！', en: 'The lunch crowd is coming: busy from the start!' },
+  lunchRush: { say: { zh: '附近公司的人提早下班，一開店就會很忙！', ja: '近くの会社員が早上がりだ、開店からすぐ忙しくなるぞ！', en: 'The offices nearby are out early: busy from the start!' },
     pairs: 0.15, appetite: -0.2, gap: (k) => 1 - 0.6 * bump(k, 0.2, 0.18) + 0.25 * (k > 0.5 ? 1 : 0) },
   eveningRush: { say: { zh: '晚上下班時間，後半段會越來越多人。', ja: '夕方の帰り時、後半ほど混んでくるよ。', en: 'The evening after work: busier and busier as it goes.' },
     pairs: 0.3, appetite: 0.3, gap: (k) => 1.3 - 0.75 * Math.min(1, k * 1.4) },
@@ -45,3 +45,24 @@ export function flowOf(n: number): FlowKind {
 
 /** how many dishes a customer wants, from a roll `r` (0..1) and a second roll `r2` for the day's appetite */
 export const wantOf = (flow: FlowKind, r: number, r2: number) => 1 + Math.floor(r * 3) + (r2 < Math.max(0, FLOWS[flow].appetite) ? 1 : 0) - (r2 > 1 + FLOWS[flow].appetite ? 1 : 0)
+
+/**
+ * How busy the night is by the clock (item 210: an izakaya off Osaka's Tenjinbashi-suji, open 16:30 to 04:30): a few as the shop opens, the
+ * crowd after work from six, busiest from seven to nine, quieter from ten, a second round of them come on from other bars about midnight,
+ * then fewer and fewer till the last. The gap between customers at this minute of the day, against the day's usual (under 1 busier), the
+ * day's own pattern (FLOWS) on top of it; between its hours, the way from one to the next (outside the hours, 1).
+ */
+export const HOUR_GAP: [number, number][] = [
+  [16 * 60 + 30, 1.3], [18 * 60, 1], [19 * 60, 0.7], [21 * 60, 0.7], [22 * 60, 1], [23 * 60, 1.15], [24 * 60, 0.95], [25 * 60, 1.1],
+  [26 * 60, 1.5], [27 * 60, 1.8], [28 * 60 + 30, 1.9],
+]
+export function hourGap(minute: number) {
+  let m = ((Math.floor(minute) % 1440) + 1440) % 1440
+  if (m < HOUR_GAP[0][0]) m += 1440
+  if (m > HOUR_GAP[HOUR_GAP.length - 1][0]) return 1
+  for (let i = 1; i < HOUR_GAP.length; i++) {
+    const [a, ga] = HOUR_GAP[i - 1], [b, gb] = HOUR_GAP[i]
+    if (m <= b) return ga + ((gb - ga) * (m - a)) / (b - a)
+  }
+  return 1
+}

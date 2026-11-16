@@ -32,7 +32,32 @@ export function breakDown(sum: number): DrawerCash {
   return out
 }
 
-/** a cash customer's bill put into the drawer (what they handed over less their change comes to the bill) */
+/** what a cash customer hands over for a bill (item 210), laid on the tray: mostly the next thousand up, now and then a five thousand note
+ * (or the next ten thousand, the bill over five), by their number; a bill over ten thousand, the next ten thousand */
+export function tenderOf(bill: number, id: number) {
+  const b = Math.max(0, Math.ceil(bill))
+  if (b > 10000) return Math.ceil(b / 10000) * 10000
+  const big = ((id * 2246822519) >>> 0) % 100 < 25
+  return big ? (b > 5000 ? 10000 : 5000) : Math.max(1000, Math.ceil(b / 1000) * 1000)
+}
+/** change of `due` out of the drawer, the biggest first as far as what's in it goes; null if it can't be made up */
+export function changeFrom(d: DrawerCash, due: number): DrawerCash | null {
+  const out = Object.fromEntries(DENOMS.map((k) => [k, 0])) as DrawerCash
+  let left = Math.max(0, Math.round(due))
+  for (const k of DENOMS) { const n = Math.min(d[k], Math.floor(left / k)); out[k] = n; left -= n * k }
+  return left === 0 ? out : null
+}
+/** a cash bill paid at the till (item 210): what they handed over into the drawer, their change out of it (the drawer's float for it); the
+ * drawer short of the coins for the change, they find the money exactly */
+export function payCash(d: DrawerCash, bill: number, tender: number): DrawerCash {
+  const due = Math.round(bill), given = Math.max(due, Math.round(tender))
+  const add = breakDown(given)
+  const withIt = Object.fromEntries(DENOMS.map((k) => [k, d[k] + add[k]])) as DrawerCash
+  const ch = changeFrom(withIt, given - due)
+  if (!ch) return deposit(d, bill)
+  return Object.fromEntries(DENOMS.map((k) => [k, withIt[k] - ch[k]])) as DrawerCash
+}
+/** a cash customer's bill put into the drawer exactly (what they handed over less their change comes to the bill) */
 export const deposit = (d: DrawerCash, bill: number): DrawerCash => {
   const add = breakDown(bill)
   return Object.fromEntries(DENOMS.map((k) => [k, d[k] + add[k]])) as DrawerCash

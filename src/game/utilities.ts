@@ -1,10 +1,14 @@
 // The shop's water and electricity (the owner's: what keeping it open costs, worked out in as much detail as it can be; no gas, everything's
-// cooked over charcoal). What draws power, how much and when, piece by piece; what uses water, use by use; and the bills on Taiwan's tariffs,
-// counted against the month so far (a month being thirty opening days), so the tiers bite as they do on a real bill.
+// cooked over charcoal). What draws power, how much and when, piece by piece; what uses water, use by use; and the bills on Osaka's tariffs
+// (item 210: the shop's in Tenma, data/story; they were Taiwan's), taken into the books' NT$ at data/osaka's rate, counted against the month so
+// far (a month being thirty opening days), so the tiers bite as they do on a real bill.
 //
-// The tariffs: 台電 表燈非時間電價 營業用 (commercial lighting, not time-of-use), the non-summer rates, four tiers a month: the first tier's rate
-// as published (2.18 a kWh; 2.61 in summer); the higher tiers approximate (the shape of the published table, not its figures checked).
-// 台灣自來水: four tiers a month (7.35, 9.45, 11.55, 12.075 a 度, 1 度 = 1 m³), and a 20 mm meter's basic charge, 35.7 a month.
+// The tariffs: 関西電力 従量電灯A, the minimum charge for the first 15 kWh a month (¥522.58), then three tiers (¥20.21 a kWh to 120, ¥25.61
+// to 300, ¥28.59 past it), each with the renewable energy surcharge on it (再エネ賦課金, ¥4.18 a kWh for 2026-27; the fuel cost adjustment,
+// up and down month by month, left out). 大阪市 water and sewerage (上下水道) as one rate a m³: the big cities' comparison's 20 m³ month
+// (water ¥2,112 and sewerage ¥1,276, tax in, 2025-10-01) over its 20 m³; the tiers of the city's own table not taken in.
+
+import { yen } from '@/data/osaka'
 
 /** when something draws power: all day and night (the fridges), while the shop's open, while the room's lights are on, while the fire's
  * lit (the extractor over it), while the music's playing, while the door's lanterns or a toilet's lights are on (their own switches) */
@@ -22,6 +26,8 @@ export const LOADS: Load[] = [
   { id: 'wcM', zh: '男廁電燈', ja: '男性トイレの照明', en: "Men's toilet lights", watts: 14, when: 'wcM' },
   { id: 'wcF', zh: '女廁電燈', ja: '女性トイレの照明', en: "Women's toilet lights", watts: 14, when: 'wcF' },
   { id: 'hood', zh: '排煙機', ja: '排煙機', en: 'Smoke extractor', watts: 420, when: 'fire' },
+  // (a shop's packaged air conditioner, cooling against the fire and the room's people, its compressor's cycling averaged in (item 210))
+  { id: 'aircon', zh: '冷暖氣（業務用）', ja: '業務用エアコン', en: 'Air conditioner', watts: 650, when: 'open' },
   { id: 'warmer', zh: '味噌湯與飯的保溫', ja: '味噌汁・ご飯の保温', en: 'Soup and rice warmers', watts: 260, when: 'open' },
   { id: 'pos', zh: '收銀機・平板・刷卡機・印表機', ja: 'レジ・タブレット・端末・プリンター', en: 'Till, tablet, card reader, printer', watts: 55, when: 'open' },
   { id: 'music', zh: '音箱', ja: 'スピーカー', en: 'Speaker', watts: 20, when: 'music' },
@@ -71,12 +77,19 @@ export const USES: Record<Use, { zh: string; ja: string; en: string; litres: num
 
 /** a tier of a tariff: the rate for what's used up to `upTo` this month */
 export type Tier = { upTo: number; rate: number }
-/** 台電 表燈營業用, non-summer (NT$ a kWh) */
-export const POWER_TIERS: Tier[] = [{ upTo: 330, rate: 2.18 }, { upTo: 700, rate: 2.95 }, { upTo: 1500, rate: 3.45 }, { upTo: Infinity, rate: 5.55 }]
-/** 台灣自來水 (NT$ a m³) */
-export const WATER_TIERS: Tier[] = [{ upTo: 10, rate: 7.35 }, { upTo: 30, rate: 9.45 }, { upTo: 50, rate: 11.55 }, { upTo: Infinity, rate: 12.075 }]
-/** the water meter's basic charge a month (20 mm) */
-export const WATER_BASE = 35.7
+/** the renewable energy surcharge, every kWh (yen) */
+const SURCHARGE_YEN = 4.18
+/** 関西電力 従量電灯A (NT$ a kWh): the first 15 kWh in the month's minimum charge (POWER_BASE), the surcharge on them only; then the tiers */
+export const POWER_TIERS: Tier[] = [{ upTo: 15, rate: yen(SURCHARGE_YEN) }, { upTo: 120, rate: yen(20.21 + SURCHARGE_YEN) },
+  { upTo: 300, rate: yen(25.61 + SURCHARGE_YEN) }, { upTo: Infinity, rate: yen(28.59 + SURCHARGE_YEN) }]
+/** the minimum charge a month (最低料金, the first 15 kWh) */
+export const POWER_BASE = yen(522.58)
+/** 大阪市 water and sewerage (NT$ a m³): the 20 m³ month's ¥3,388 over its 20 m³ */
+export const WATER_TIERS: Tier[] = [{ upTo: Infinity, rate: yen((2112 + 1276) / 20) }]
+/** the water meter's basic charge a month (in the one rate above) */
+export const WATER_BASE = 0
+/** what a month's first day costs before anything's used: the electricity's minimum charge and the water's basic one */
+export const MONTH_BASE = POWER_BASE + WATER_BASE
 /** a month of the shop's bills: thirty opening days */
 export const BILL_DAYS = 30
 
@@ -96,10 +109,10 @@ export function tierCost(tiers: Tier[], from: number, to: number) {
 export type Meter = { day: number; kwh: number; m3: number; power: Record<string, number>; water: Record<string, number>; cost: number }
 export const freshMeter = (): Meter => ({ day: 0, kwh: 0, m3: 0, power: {}, water: {}, cost: 0 })
 /** a new opening day: the next day of the month, or the first of a new one (the totals back to nothing); and what that day's start costs
- * (the water meter's basic charge, on a month's first day) */
+ * (the month's basic charges, on its first day) */
 export function nextDay(m: Meter): { meter: Meter; charge: number } {
-  if (m.day >= BILL_DAYS) return { meter: { ...freshMeter(), day: 1, cost: WATER_BASE }, charge: WATER_BASE }
-  if (m.day === 0) return { meter: { ...m, day: 1, cost: m.cost + WATER_BASE }, charge: WATER_BASE }
+  if (m.day >= BILL_DAYS) return { meter: { ...freshMeter(), day: 1, cost: MONTH_BASE }, charge: MONTH_BASE }
+  if (m.day === 0) return { meter: { ...m, day: 1, cost: m.cost + MONTH_BASE }, charge: MONTH_BASE }
   return { meter: { ...m, day: m.day + 1 }, charge: 0 }
 }
 /** power drawn (kWh by load) and water used (litres by use, with the power heating it) added to the month: the new meter, and what it cost

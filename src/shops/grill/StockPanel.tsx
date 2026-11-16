@@ -5,7 +5,8 @@ import { ROLL_LOW } from '@/game/stocker'
 import { RECEIPT, RECEIPT_PACK, ROLL_SLIPS } from '@/game/receipts'
 import { HOUSEHOLD, HOUSEHOLD_PACK, householdName, type Household } from '@/game/household'
 import { tablewareList } from '@/game/tableware'
-import { LOADS, USES, POWER_TIERS, WATER_TIERS, WATER_BASE, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
+import { LOADS, USES, POWER_BASE, POWER_TIERS, WATER_TIERS, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
+import { YEN } from '@/data/osaka'
 import { createPortal } from 'react-dom'
 import { nameIn, tl, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
@@ -551,7 +552,7 @@ function ReceiptZone(p: Props) {
           </span>
         </div>
       </div>
-      <p className="stock-note">{tl(lang, `每位客人結帳印一張發票（一捲 ${ROLL_SLIPS} 張）；印表機的紙用完，收銀員會換上一捲備品；沒有備品就開不出發票，客人會不滿（影響店家評價）。`,
+      <p className="stock-note">{tl(lang, `每位客人結帳印一張收據（一捲 ${ROLL_SLIPS} 張）；印表機的紙用完，收銀員會換上一捲備品；沒有備品就開不出收據，客人會不滿（影響店家評價）。`,
         `お会計ごとにレシートを1枚（1巻 ${ROLL_SLIPS} 枚）。紙が切れるとレジ係が予備に交換。予備がないとレシートが出せず、お客さんの評価が下がる。`,
         `A receipt for every customer who pays (${ROLL_SLIPS} to a roll); when the printer runs out the cashier puts in a spare, and with none spare there's no receipt, which costs the shop its rating.`)}</p>
     </section>
@@ -592,9 +593,9 @@ function MeterChip({ lang, meter: m }: { lang: Lang; meter: Meter }) {
           <h5>{tl(lang, '用水（公升）', '水（L）', 'Water (litres)')}</h5>
           <ul>{water.length ? water.map(([u, l]) => <li key={u}><span>{tl(lang, USES[u].zh, USES[u].ja, USES[u].en)}</span><b>{l.toFixed(1)}</b></li>) : <li><span>—</span></li>}</ul>
           <p className="stock-meter-note">{tl(lang,
-            `電費：台電表燈營業用（非夏月）累進 ${tiers(POWER_TIERS, '度')} 元。水費：台水累進 ${tiers(WATER_TIERS, '度')} 元，水表基本費每期 ${WATER_BASE} 元。沒有瓦斯（全靠炭火）。`,
-            `電気：台電の従量制（営業用・夏季以外）${tiers(POWER_TIERS, 'kWh')} 元。水道：台水 ${tiers(WATER_TIERS, 'm³')} 元、基本料金 ${WATER_BASE} 元／期。ガスなし（炭火のみ）。`,
-            `Power: Taipower commercial, non-summer, tiered ${tiers(POWER_TIERS, 'kWh')} NT$. Water: Taiwan Water ${tiers(WATER_TIERS, 'm³')} NT$, a ${WATER_BASE} NT$ meter charge a bill. No gas (it's all charcoal).`)}</p>
+            `電費：關西電力（從量電燈 A），每月最低電費 ${POWER_BASE} 元，每度另照累進 ${tiers(POWER_TIERS, '度')} 元（含再生能源附加費）。水費：大阪市上下水道每度 ${WATER_TIERS[0].rate} 元。日圓以 1 圓 NT$${YEN} 換算。沒有瓦斯（全靠炭火）。`,
+            `電気：関西電力（従量電灯A）、最低料金 ${POWER_BASE} 元／月、従量 ${tiers(POWER_TIERS, 'kWh')} 元（再エネ賦課金込み）。上下水道：大阪市 ${WATER_TIERS[0].rate} 元／m³。1 円 = NT$${YEN} で換算。ガスなし（炭火のみ）。`,
+            `Power: Kansai Electric (Juryo Dento A), a ${POWER_BASE} NT$ minimum a month, then tiered ${tiers(POWER_TIERS, 'kWh')} NT$, the renewables surcharge in. Water and sewerage: Osaka City, ${WATER_TIERS[0].rate} NT$ a m³. Yen at NT$${YEN}. No gas (it's all charcoal).`)}</p>
         </div>
       )}
     </span>

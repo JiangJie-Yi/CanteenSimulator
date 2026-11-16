@@ -88,7 +88,7 @@ export interface RegState {
 export type RegTag = '' | 'ITEM' | 'ST' | 'CG' | 'QTY' | 'TIME' | 'TAX' | 'CALC' | 'ERR' | 'RF' | 'X' | 'Z' | 'CLERK' | 'RCPT' | 'RA' | 'PO'
 /** the tags as the display spells them */
 export const REG_TAG_TEXT: Record<RegTag, string> = { '': '', ITEM: '品項', ST: '小計', CG: '找零', QTY: '數量', TIME: '時刻', TAX: '稅',
-  CALC: '計算', ERR: '錯誤', RF: '退貨', X: 'X 點檢', Z: 'Z 精算', CLERK: '店員', RCPT: '發票', RA: '入金', PO: '出金' }
+  CALC: '計算', ERR: '錯誤', RF: '退貨', X: 'X 點檢', Z: 'Z 精算', CLERK: '店員', RCPT: '收據', RA: '入金', PO: '出金' }
 
 export const newRegister = (): RegState => ({
   mode: 'REG', entry: '', qty: 1, refund: false, lines: [], done: false, display: '0', receiptOn: true, clerk: 1, calc: null,

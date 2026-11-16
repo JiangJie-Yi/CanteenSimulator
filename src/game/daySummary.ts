@@ -1,18 +1,27 @@
 /**
  * The day's takings, worked out as the shop shuts (the owner's: a closing-up sheet once the last customer's out of the door and the staff
  * have gone): what came in and what went out between opening and shutting (the books as they stood at each), the profit as the ledger
- * reckons it (takings less the food, the charcoal, the wages and the power and water, and the reviews bought and the shrine's offerings (item
- * 203: they came out of the cash, never the profit)), who came, how pleased they were, and the dish that sold best.
+ * reckons it (takings less the food, the charcoal, the wages and the power and water, the rent, the delivery platform's cut and the card
+ * company's fee (item 210: a shop in Osaka), and the reviews bought and the shrine's offerings (item 203: they came out of the cash, never the
+ * profit)), who came, how pleased they were, and the dish that sold best.
  */
 import { satisfaction, starsOf, type Visit } from './reputation'
 
 export type Books = { revenue: number; food: number; fuel: number; wage: number; utility?: number; promo?: number; offering?: number
-  /** of the wages, what was paid over the hour's pay for working past the hours (game/hours' overtimeRate): in `wage` already */
-  overtime?: number }
+  /** of the wages, what was paid over the hour's pay for the hours past eight in the day's work (game/hours' payFor): in `wage` already */
+  overtime?: number
+  /** of the wages, what was paid over the hour's pay for the night's hours, 22:00 to 05:00 (深夜): in `wage` already */
+  night?: number
+  /** the rent (game/costs' rentDue), the delivery platform's cut of the riders' orders, the card company's fee (item 210) */
+  rent?: number; platform?: number; cardFee?: number }
 export type DaySummary = {
   revenue: number; food: number; fuel: number; wage: number; utility: number
-  /** of the wages, the overtime's extra (the owner's, 2026-11-15) */
-  overtime: number
+  /** of the wages, the overtime's extra (the owner's, 2026-11-15), and the night's (item 210) */
+  overtime: number; night: number
+  /** the rent, the delivery platform's cut, the card company's fee (item 210) */
+  rent: number; platform: number; cardFee: number
+  /** the wages over the takings (人件費率; null with none): with the food's, what a shop's run on (FL) */
+  labour: number | null
   /** the reviews bought and the shrine's offerings (item 203) */
   other: number
   profit: number
@@ -31,14 +40,15 @@ export type DaySummary = {
 export function daySummary(from: Books, to: Books, visits: Visit[], sold: Record<string, number>): DaySummary {
   const d = (k: keyof Books) => Math.max(0, (to[k] ?? 0) - (from[k] ?? 0))
   const revenue = d('revenue'), food = d('food'), fuel = d('fuel'), wage = d('wage'), utility = d('utility'), overtime = d('overtime')
+  const night = d('night'), rent = d('rent'), platform = d('platform'), cardFee = d('cardFee')
   const other = d('promo') + d('offering')
-  const profit = revenue - food - fuel - wage - utility - other
+  const profit = revenue - food - fuel - wage - utility - rent - platform - cardFee - other
   const ate = visits.filter((v) => !v.walkedOut)
   const stars = ate.length ? ate.reduce((a, v) => a + starsOf(satisfaction(v)), 0) / ate.length : null
   let best: DaySummary['best'] = null
   for (const [key, n] of Object.entries(sold)) if (n > 0 && (!best || n > best.n)) best = { key, n }
-  return { revenue, food, fuel, wage, utility, overtime, other, profit, margin: revenue > 0 ? profit / revenue : null, guests: visits.length,
-    walkedOut: visits.length - ate.length, stars, best }
+  return { revenue, food, fuel, wage, utility, overtime, night, rent, platform, cardFee, labour: revenue > 0 ? wage / revenue : null, other, profit,
+    margin: revenue > 0 ? profit / revenue : null, guests: visits.length, walkedOut: visits.length - ate.length, stars, best }
 }
 
 /** each dish's orders between two counts of them (orders only ever added) */
@@ -52,7 +62,9 @@ export function soldBetween(from: Record<string, number>, to: Record<string, num
 export type DayRecord = { day: number; revenue: number; profit: number; guests: number; stars: number | null; best: { key: string; n: number } | null
   /** when it opened and shut ("HH:MM"), how many minutes past the hours' end it shut, and the overtime paid for it (the owner's, 2026-11-15:
    * "the hours must be kept too", "as past them the staff's pay goes up"); none on a day kept before they were */
-  open?: string; close?: string; late?: number; overtime?: number }
+  open?: string; close?: string; late?: number; overtime?: number
+  /** the day's wages, for its wages over its takings (item 210) */
+  wage?: number }
 /** a day's hours as it went: opened, shut, minutes past the hours' end */
 export type DayHours = { open: string; close: string; late: number }
 /** how many days the books keep */
@@ -70,10 +82,12 @@ export function addDay(days: DayRecord[], day: number, s: DaySummary, hours?: Da
   // (each only when there's one: a day without them reads as it always did)
   const open = was?.open ?? hours?.open, close = hours?.close ?? was?.close, late = hours ? hours.late : was?.late
   const overtime = (was?.overtime ?? 0) + s.overtime
+  const wage = (was?.wage ?? 0) + s.wage
   if (open !== undefined) rec.open = open
   if (close !== undefined) rec.close = close
   if (late !== undefined) rec.late = late
   if (overtime > 0) rec.overtime = overtime
+  if (wage > 0) rec.wage = wage
   const next = [...days.filter((d) => d.day !== day), rec]
   return next.length > KEEP_DAYS ? next.slice(-KEEP_DAYS) : next
 }

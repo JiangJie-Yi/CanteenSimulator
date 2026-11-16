@@ -9,7 +9,7 @@ export type Complaint = null | 'dirty' | 'paper'
 
 /** how much one visit dirties it (of 1), and how many visits a roll lasts */
 export const DIRT_PER_USE = 0.13
-export const ROLL_USES = 5
+export const ROLL_USES = 30
 /** below this, a guest notices it's dirty; below FLIES_AT, flies come */
 export const DIRTY_AT = 0.45
 export const FLIES_AT = 0.2
@@ -34,7 +34,7 @@ export const cleanRoom = (r: Room): Room => ({ ...r, clean: 1 })
 export const BRUSH_ONLY = 0.7
 /** a toilet scrubbed: clean with the cleaner, only so clean with none */
 export const scrubRoom = (r: Room, cleaner: boolean): Room => (cleaner ? cleanRoom(r) : { ...r, clean: Math.max(r.clean, BRUSH_ONLY) })
-/** how much of a roll one sheet pulled by hand takes (a guest takes a fifth: ROLL_USES) */
+/** how much of a roll one sheet pulled by hand takes (a guest takes a thirtieth: ROLL_USES; item 210: a roll lasted five) */
 export const SHEET = 0.02
 /** a sheet pulled off the roll by hand: a little less paper (never under none) */
 export const pullSheet = (r: Room): Room => ({ ...r, paper: Math.max(0, r.paper - SHEET) })

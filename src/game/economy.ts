@@ -23,7 +23,9 @@ export type CashBooks = { revenue: number; bought: number; fuel: number; wage: n
   /** what the owner's taken out of the till's drawer (a compartment's or a coin roll's worth at a click) */
   till?: number
   /** what of the takings has gone into the drawer: the cash customers' bills, paid in as they leave */
-  tillIn?: number }
+  tillIn?: number
+  /** the rent, the delivery platform's cut, the card company's fee (item 210: game/costs) */
+  rent?: number; platform?: number; cardFee?: number }
 /**
  * The shop's cash in hand, the money at the top of the screen (item 195; the owner's, item 182: "the things themselves don't match the
  * interface"): the capital, the takings and the spending, less what those sat in still owe (`owed`: paid at the till as they leave) and what
@@ -31,7 +33,7 @@ export type CashBooks = { revenue: number; bought: number; fuel: number; wage: n
  * not in hand till it's taken out (a cash customer's bill was counted twice before: as they ordered, and again as it was taken out).
  */
 export const cashInHand = (b: CashBooks, owed = 0) => CAPITAL + b.revenue - b.bought - b.fuel - b.wage - (b.utility ?? 0) - (b.setup ?? 0)
-  - (b.offering ?? 0) - (b.promo ?? 0) - owed - (b.tillIn ?? 0) + (b.till ?? 0)
+  - (b.offering ?? 0) - (b.promo ?? 0) - (b.rent ?? 0) - (b.platform ?? 0) - (b.cardFee ?? 0) - owed - (b.tillIn ?? 0) + (b.till ?? 0)
 /** running costs, NT$: a bag's worth of charcoal added, and a cassette gas canister's worth burnt per hour at full */
 export const CHARCOAL_COST = 18
 /** how much one load of charcoal raises the fire (0..1), and whether more can go on: at 100% the bed is full, so no more is added (nor paid for) */
@@ -66,24 +68,29 @@ export function coalCharge(placed: number, byHand = false) {
 }
 
 /**
- * What the ingredients of something on the menu cost, as a share of its price, roughly as in small eateries in
- * Taiwan: fish and seafood dear (around half), meat a little less, vegetables, tofu and mushrooms cheap, rice and
- * miso soup cheapest.
+ * What the ingredients of something on the menu cost, as a share of its price, as in Osaka's izakaya (item 210: the shop's in Tenma; they were
+ * Taiwan's small eateries', the fish about half its price): a menu's food about three tenths of the takings (原価率), the fish and seafood
+ * dearer (a third and more, the nodoguro dearest), meat about three tenths, vegetables and mushrooms a fifth or so, rice and miso soup the
+ * cheapest.
  */
 export const COST_SHARE: Record<string, number> = {
-  ExtraFish: 0.48, Saury: 0.46, Mackerel: 0.48, Aji: 0.45, Iwashi: 0.4, Shishamo: 0.42, Salmon: 0.5, Hokke: 0.48,
-  Buri: 0.5, Gindara: 0.52, Nodoguro: 0.56, ShrimpSkewer: 0.52, Scallop: 0.55, Squid: 0.5, Yakitori: 0.4,
-  PorkBelly: 0.42, Sausage: 0.38, BloodCake: 0.3, GrilledCorn: 0.28, GrilledShiitake: 0.3, Shishito: 0.25,
-  KingOyster: 0.3, Asparagus: 0.32, Okra: 0.28, Potato: 0.22, SweetPotato: 0.22, Onigiri: 0.22, NetMochi: 0.24,
-  Rice: 0.18, MisoSoup: 0.2, Sake: 0.4, Onion: 0.24, Negi: 0.26, Carrot: 0.24, Gobo: 0.3, Daikon: 0.24,
-  Tomato: 0.28, Cucumber: 0.24, Eggplant: 0.28, Piman: 0.26, Paprika: 0.32,
+  ExtraFish: 0.36, Saury: 0.35, Mackerel: 0.36, Aji: 0.34, Iwashi: 0.3, Shishamo: 0.32, Salmon: 0.38, Hokke: 0.36,
+  Buri: 0.38, Gindara: 0.39, Nodoguro: 0.42, ShrimpSkewer: 0.39, Scallop: 0.41, Squid: 0.38, Yakitori: 0.3,
+  PorkBelly: 0.32, Sausage: 0.29, BloodCake: 0.23, GrilledCorn: 0.21, GrilledShiitake: 0.23, Shishito: 0.19,
+  KingOyster: 0.23, Asparagus: 0.24, Okra: 0.21, Potato: 0.17, SweetPotato: 0.17, Onigiri: 0.17, NetMochi: 0.18,
+  Rice: 0.14, MisoSoup: 0.15, Sake: 0.3, Onion: 0.18, Negi: 0.2, Carrot: 0.18, Gobo: 0.23, Daikon: 0.18,
+  Tomato: 0.21, Cucumber: 0.18, Eggplant: 0.21, Piman: 0.2, Paprika: 0.24,
 }
+/** the share for anything not in the list */
+export const COST_SHARE_ELSE = 0.29
 
 /** what one of something costs to buy in */
 export const costOf = (x: { id?: string; price: number; cost?: number }) =>
-  x.cost ?? Math.round(x.price * (COST_SHARE[x.id ?? ''] ?? 0.38))
+  x.cost ?? Math.round(x.price * (COST_SHARE[x.id ?? ''] ?? COST_SHARE_ELSE))
 
 const shopOf = (e: Entry) => DISHES.find((x) => x.id === e.shop)!
+/** what a dish on the menu is worth (item 210): its parts at their own prices (menuPrice), a set at all of them */
+export const fairPrice = (e: Entry) => e.parts.reduce((n, p) => n + menuPrice(shopOf(e), p), 0)
 
 /** what a thing takes out of stock (a set: its parts; it isn't bought as a set) */
 export const takesOf = (d: Dish, id: string): Stock =>
@@ -145,9 +152,10 @@ export const takeStock = (e: Entry, stock: Stock): Stock | null => {
 /** everything a shop buys in (not its ready-made sets: those are made up from the rest) */
 export const goodsOf = (d: Dish) => [...d.bases.filter((b) => !b.includes), ...d.items]
 
-/** what's bought in packs, not portions: the rice by the 10 kg bag (the owner's: a kitchen buys polished rice by the sack and cooks it, it
- * doesn't buy onigiri): one bag cooks one pot, ten portions; stock keeps portions, an order is whole bags */
-export const PACK: Record<string, number> = { Onigiri: 10 }
+/** what's bought in packs, not portions: the rice by the sack (the owner's: a kitchen buys polished rice by the sack and cooks it, it
+ * doesn't buy onigiri): a 5 kg bag, about 33 合, cooks about sixty portions (item 210: it was ten to a bag), three pots and more; stock keeps
+ * portions, an order is whole bags */
+export const PACK: Record<string, number> = { Onigiri: 60 }
 export const packOf = (id: string) => PACK[id] ?? 1
 /** n portions wanted, as whole packs' worth (none for none) */
 export const inPacks = (id: string, n: number) => n <= 0 ? 0 : Math.ceil(n / packOf(id)) * packOf(id)
@@ -178,8 +186,8 @@ export const REORDER_AT = 3
 /** the rice and the miso soup had alongside the dishes, whatever's on the menu board (items 205, 207: kept to PAR, ten portions, like any good,
  * a pot of rice was cooked with what rice there was, three bowls' worth, the cooker holding twenty; and the miso, not on the board, was never
  * ordered at all: in a rush three of twenty-one who'd asked for rice had it, one of ten their soup): kept to a day's worth, two pots of rice
- * and three of soup, and ordered once there's less than a pot's */
-export const SIDE_PAR: Record<string, number> = { Onigiri: 2 * RICE_FULL, MisoSoup: 3 * SOUP_BOWLS }
+ * and three of soup, and ordered once there's less than a pot's; the rice by its bag (item 210: a 5 kg bag, more than two pots), a bag kept */
+export const SIDE_PAR: Record<string, number> = { Onigiri: Math.max(2 * RICE_FULL, PACK.Onigiri), MisoSoup: 3 * SOUP_BOWLS }
 export const SIDE_LOW: Record<string, number> = { Onigiri: RICE_FULL, MisoSoup: SOUP_BOWLS }
 /** a good's standard stock: PAR, or the sides' day's worth */
 export const parOf = (id: string) => Math.max(PAR, SIDE_PAR[id] ?? 0)

@@ -86,7 +86,7 @@ export function supplyName(id: string, lang: Lang): string | null {
   if (k) return SEASON_NAME[lang][k]
   if (id === NORI) return lang === 'ja' ? '焼き海苔' : lang === 'en' ? 'nori' : '海苔'
   if (id === TISSUE) return lang === 'ja' ? 'ティッシュ（箱）' : lang === 'en' ? 'tissues (boxes)' : '衛生紙（盒）'
-  if (id === RECEIPT) return lang === 'ja' ? 'レシート用紙（巻）' : lang === 'en' ? 'receipt paper (rolls)' : '發票紙（捲）'
+  if (id === RECEIPT) return lang === 'ja' ? 'レシート用紙（巻）' : lang === 'en' ? 'receipt paper (rolls)' : '收據紙（捲）'
   if (id === ROLL) return lang === 'ja' ? 'トイレットペーパー' : lang === 'en' ? 'toilet rolls' : '捲筒衛生紙'
   if (id === TOWEL) return lang === 'ja' ? 'ペーパータオル' : lang === 'en' ? 'paper towels' : '擦手紙'
   if (id === SOAP) return lang === 'ja' ? 'ハンドソープ（詰め替え）' : lang === 'en' ? 'hand soap refills' : '洗手乳補充包'

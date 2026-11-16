@@ -10,7 +10,7 @@ import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, signature, suggestPr
 import { ROLES } from '@/data/staff'
 import { KINDS, kindOf } from '@/data/guests'
 import { SAY_CHUNK, sayChunks } from '@/game/say'
-import { buyAllCost, canServe, costOf, entryCost, goodsOf, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder, SIDE_PAR, parOf } from '@/game/economy'
+import { buyAllCost, canServe, costOf, entryCost, goodsOf, inPacks, needOf, PAR, partCost, partsOf, portionsLeft, REORDER_AT, restockOrder, supplierDiscount, takeStock, topUpOrder, SIDE_PAR, parOf } from '@/game/economy'
 import { SEASON_GOODS, SEASON_PAR } from './supplies'
 import { trialIdeas } from '@/game/research'
 import { APPLICANTS, makeCandidates, pickHires, seeded, valueOf } from '@/game/hiring'
@@ -84,8 +84,8 @@ describe('recipes: names and keys', () => {
 
 describe('economy: cost and stock', () => {
   it('costs a share of the price, or the cost given', () => {
-    expect(costOf({ id: 'Rice', price: 100 })).toBe(18)
-    expect(costOf({ id: 'unknown', price: 100 })).toBe(38)
+    expect(costOf({ id: 'Rice', price: 100 })).toBe(14)
+    expect(costOf({ id: 'unknown', price: 100 })).toBe(29)
     expect(costOf({ price: 100, cost: 7 })).toBe(7)
   })
   it('adds the seasonings to a part’s cost', () => {
@@ -109,7 +109,7 @@ describe('economy: cost and stock', () => {
   })
   it('prices buying in everything as the sum of its goods', () => {
     const d = shop('grilledfish')
-    expect(buyAllCost(d, 10)).toBe(goodsOf(d).reduce((n, g) => n + costOf(g) * 10, 0))
+    expect(buyAllCost(d, 10)).toBe(goodsOf(d).reduce((n, g) => n + costOf(g) * inPacks(g.id, 10), 0))
     expect(goodsOf(d).some((g) => g.id === 'ayu')).toBe(false) // (sets aren't bought)
   })
 })
