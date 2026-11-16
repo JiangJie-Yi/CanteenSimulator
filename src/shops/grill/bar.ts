@@ -1,3 +1,4 @@
+import type { PlateKind } from '@/game/plateSize'
 import * as THREE from 'three'
 import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
@@ -247,6 +248,9 @@ export const SERVICE = {
   walkers: [] as THREE.Vector3[],
   /** what a server has gone to fetch from the pass (no longer waiting there for another to take) */
   claimed: new Set<string>(),
+  /** how far the plate under each piece being carried has been turned from the way it stood at the plating place (radians about up), as the
+   * server sets it down before its customer (item 228: seatTurn); what's on it turns with it (Roasting) */
+  turn: new Map<string, number>(),
 }
 // (in development, to be watched from the console)
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __service?: typeof SERVICE }).__service = SERVICE
@@ -729,6 +733,9 @@ export const LOW_RACK = { n: LOW_FULL, coming: 0 }
 /** (`dirt`: each dirty plate in the sink, how dirty (game/plates), the bottom one first: GuestBar3D keeps it, soaking them; Sink reads the
  * top one's for how long a scrub by hand takes) */
 export const SINK = { washing: false, tap: false, dirty: 0, plug: false, water: 0, dirt: [] as number[],
+  /** each of the sink's plates' kind (game/plateSize, item 228), as `dirt` has how dirty: a long plate cleared into the sink is a long plate
+   * there, in hand and in the basket */
+  kinds: [] as PlateKind[],
   /** washing by hand (game/handWash, item 103): the plates' worth of washing-up liquid in the water, and the sponge taken up */
   soap: 0, sponge: false }
 /** the stack of dirty plates on the sink's counter as the shop's taken over (game/sinkPile, item 103): how many are left of it (a new game
@@ -852,6 +859,19 @@ export type ReadyPlate = { seat: number; plate: boolean; flying: number; landed:
  * seat's food on it; GuestBar3D draws the plate and has a server come for it, the slot freed as it's taken up)
  */
 export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_SLOTS }, () => null as ReadyPlate | null) }
+/** which end of a plated piece its head is at (Roasting's flatQ lays its stick's top end toward the way it's laid, 1, or its foot, -1) */
+const HEAD_END = 1
+/**
+ * A plate set down before its customer (item 228): turned from the way it stood at the plating place (what's on it lying back across the
+ * cook table, the plating place's `dir`) to lie along their counter, a fish's head on their left (the place's +along: PLACE), as a long
+ * plate is set before a customer at a Japanese counter. How far it's turned (radians about up) for each place; what's on it turns with it.
+ */
+export const seatTurn = (seat: number) => {
+  const st = GRILL_SEATS[seat]
+  if (!st) return 0
+  const a = LAY.clone().normalize(), b = GRILL_COUNTERS[st.counter].along.clone().normalize().multiplyScalar(HEAD_END)
+  return Math.atan2(a.z * b.x - a.x * b.z, a.dot(b))
+}
 /**
  * The takeaways and deliveries waiting (game/takeout, the owner's): Roasting takes the order, packs its food into the box at the plating place
  * (TAKEOUT_SPOT: the plating place's second slot, toward the chef, free) and marks it ready; GuestBar3D walks the one waiting to the till, has
@@ -928,6 +948,8 @@ export const DRYER: Dryer & { open: number; manual: boolean; ask: number } = { n
 /** the draining basket on the sink's counter (game/plates' Drain: the plates washed by hand while the washer's busy, and how long till
  * they're dry); GuestBar3D runs it, draws its plates */
 export const DRAIN: Drain = { n: 0, left: null }
+/** the kind of plate standing in each of the draining basket's slots (item 228), as it was washed */
+export const DRAIN_KINDS: PlateKind[] = []
 /** the player's own washing up, asked of the sink (Sink) and done where the sink's plates are counted (GuestBar3D): one plate washed by hand into
  * the basket, or the basket's dry plates taken back to the racks; `until`: not again before the last one's washed */
 export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number; boss: boolean

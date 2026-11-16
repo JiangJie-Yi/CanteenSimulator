@@ -81,11 +81,11 @@ import { tissuePull } from './paperSound'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { ColdMist } from '@/scene/ColdMist'
 import { EditBlock, Movable } from './Movable'
-import { plateFor } from '@/game/plateSize'
+import { PLATE_SPREAD, plateFor, plateSide, type PlateKind } from '@/game/plateSize'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
-import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, type Counter } from './bar'
+import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -178,10 +178,18 @@ const PLATING_TOP = PLATING_FRAME.top * GRILL_SCALE + GRILL_OFFSET.y
  * (the plating place is near the table's end: lying along the table, a fish ran off it) */
 const PLATING_DIR = PLATING_FRAME.dir.clone()
 /** where a piece goes at the plating place: side by side in its slot (on the plate laid there, or loose on the table, for a plate already out),
- * three to a row, a full row with another on top; in this one's frame, the fire FIRE_SHIFT along from the bar's (fromBar, below) */
-const readyFoodAt = (slot: number, row: number, plate: boolean) => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, readyAlong(slot))).sub(FIRE_SHIFT)
-  .addScaledVector(PLATING_FRAME.across, sideOf(row) * 0.035 * GRILL_SCALE)
-  .setY(PLATING_TOP + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + Math.floor(row / 3) * 0.06)
+ * three to a row, a full row with another on top, as far apart as the plate's kind has them (game/plateSize, item 228); in this one's frame,
+ * the fire FIRE_SHIFT along from the bar's (fromBar, below) */
+const readyFoodAt = (slot: number, row: number, plate: boolean, kind: PlateKind) => toGrillScene(PLATING_FRAME.at.clone().addScaledVector(PLATING_FRAME.dir, readyAlong(slot))).sub(FIRE_SHIFT)
+  .addScaledVector(PLATING_FRAME.across, plateSide(row).across * PLATE_SPREAD[kind] * GRILL_SCALE)
+  .setY(PLATING_TOP + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + plateSide(row).layer * 0.06)
+/** a turn about up (scratch, for what's on a plate turned with it) */
+const TURN_Q = new THREE.Quaternion()
+/** where the n-th piece on a seat's plate lies once it's set down before its customer (item 228): the plate's middle, and across it as the
+ * plate's turned to lie along their counter (seatTurn), as far apart as its kind has them */
+const seatFoodAt = (seat: number, row: number, kind: PlateKind, out: THREE.Vector3) => out.copy(barSeat(seat))
+  .addScaledVector(PLATING_FRAME.across.clone().applyAxisAngle(UP_AXIS, seatTurn(seat)), plateSide(row).across * PLATE_SPREAD[kind] * GRILL_SCALE)
+  .add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + plateSide(row).layer * 0.06, 0))
 /** where the n-th piece put on a plate lies across it: the first in the middle, the next to one side of it, the third to the other (the owner
  * saw a dish alone on its plate lying by the rim: they were laid left, middle, right) */
 const sideOf = (row: number) => [0, -1, 1][row % 3]
@@ -4105,6 +4113,8 @@ function crumpleFoil(mesh: THREE.Mesh, rand: () => number) {
 
 type Piece = {
   key: string
+  /** the way it lay on its plate at the plating place (item 228): turned from that as its plate's set down before its customer */
+  passQ?: THREE.Quaternion
   /** cooked for nobody (its customer gone) and kept warm in the big bowl for the next who orders one, never binned */
   keepWarm?: boolean
   /** its iron skewer (game/skewers): pushed through it on the board (when, performance.now()), pulled out as it's plated (when); none before
@@ -5124,6 +5134,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
    * if the seat's plate isn't out yet (else the piece goes loose, to be added to the plate at the seat). None to be had (no slot free, or no
    * plate stacked there yet: the kitchen's gone for some), false: it stays held where it is, and is asked for again
    */
+  /** the kind of plate a seat's order is served on (game/plateSize): its customer's order, sat there just now */
+  const plateOfSeat = (seat: number): PlateKind => plateFor(guests.current.find((g) => g.seat === seat && (g.state === 'waiting' || g.state === 'eating'))?.orders ?? [])
   const plateReady = (p: Piece) => {
     let k = PLATING.slots.findIndex((sl) => sl?.seat === p.seat)
     if (k < 0) {
@@ -5139,7 +5151,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.readyAt = k
     // (a plate under it always: the seat's own, or for a later dish (the seat's plate gone out) a carrier dish (GuestBar3D's), never the bare
     // table (the owner saw a skewer lying on the wood))
-    p.toP.copy(readyFoodAt(k, row, true))
+    p.toP.copy(readyFoodAt(k, row, true, plateOfSeat(p.seat)))
     p.local.copy(p.toP).sub(containerAt('bar'))
     return true
   }
@@ -5172,14 +5184,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     p.guest = owner.id
     p.seat = seat
     const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === seat && present(q) && !q.eaten).length
-    p.toP.copy(barSeat(seat)).addScaledVector(GRILL_SEATS[seat].along, sideOf(row) * 0.05 * GRILL_SCALE).add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
+    seatFoodAt(seat, row, plateOfSeat(seat), p.toP)
     p.container = 'bar'
     p.body = null
     // (on the plate at the plating place lying back across the table, side by side, in its middle: never over the table's end; on a
-    // customer's plate along it)
-    if (SERVICE.servers && bar) flatQ(p, p.toQ, PLATING_DIR)
-    else if (p.loose) flatQ(p, p.toQ, LAY_DIR)
-    else flatQ(p, p.toQ, STACK_DIR)
+    // customer's plate as it lies before them, along their counter, a fish's head on their left (item 228: seatTurn), as it's turned to
+    // once a server sets it down)
+    flatQ(p, p.toQ, PLATING_DIR)
+    p.passQ = p.toQ.clone()
+    if (!(SERVICE.servers && bar)) p.toQ.premultiply(TURN_Q.setFromAxisAngle(UP_AXIS, seatTurn(seat)))
     p.local.copy(p.toP).sub(containerAt('bar'))
     if (SERVICE.servers && bar) {
       p.via = 'plated'
@@ -5639,7 +5652,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** when the kitchen last said a bowl of rice or soup couldn't be had for want of it in stock (item 229) */
   const sideSaid = useRef<Partial<Record<'rice' | 'soup', number>>>({})
   const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
-    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner, big: plateFor(g.orders) === 'big' })))
+    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner, plate: plateFor(g.orders) })))
   const chefSaid = useRef(0)
   /** when the chef last said there's no clean skewer */
   const noSkewerSaid = useRef(-1e9)
@@ -8024,8 +8037,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             const row = pieces.current.filter((q) => q !== p && q.collected && q.container === 'bar' && q.seat === p.seat && !q.via && present(q) && !q.eaten).length
             p.fromP.copy(p.node.position)
             p.fromQ.copy(p.node.quaternion)
-            p.toP.copy(barSeat(p.seat)).addScaledVector(GRILL_SEATS[p.seat].along, sideOf(row) * 0.05 * GRILL_SCALE)
-              .add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + Math.floor(row / 3) * 0.06, 0))
+            // (on the seat's plate as it lies before its customer, turned along their counter (item 228))
+            seatFoodAt(p.seat, row, plateOfSeat(p.seat), p.toP)
+            if (!p.passQ) p.passQ = p.toQ.clone()
+            p.toQ.copy(p.passQ).premultiply(TURN_Q.setFromAxisAngle(UP_AXIS, seatTurn(p.seat)))
+            SERVICE.turn.delete(p.key)
             // (its spot is kept as where it is from the bar (the frame below puts it there each frame): moved to the plate, or it went back to
             // the plating place every frame, and lay there, on the plating place, while its customer's plate went out empty (the owner saw two skewers
             // left on the board))
@@ -8038,6 +8054,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             // (on the server's tray, where they hold it: its spot moved with it, as above; the bar hands it in its own frame)
             p.fromP.copy(SERVICE.carried.get(p.key)!).sub(FIRE_SHIFT)
             p.toP.copy(p.fromP)
+            // (and turned as its plate's turned, set down before its customer (item 228))
+            if (!p.passQ) p.passQ = p.toQ.clone()
+            p.toQ.copy(p.passQ).premultiply(TURN_Q.setFromAxisAngle(UP_AXIS, SERVICE.turn.get(p.key) ?? 0))
             p.local.copy(p.toP).sub(containerAt('bar'))
             p.flight = 1
           } else if (p.readyAt === undefined) {

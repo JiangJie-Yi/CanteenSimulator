@@ -1,4 +1,5 @@
 // Shapes of game state shared between the shops, the screens and App.
+import type { PlateKind } from './plateSize'
 
 /** an AI customer as App shows them: seated and waiting, eating, or gone (with their rating) */
 export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'angry'; rating: number | null; items: number;
@@ -8,8 +9,8 @@ export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'an
   seat?: number
   /** the one they came in with, if they're a couple */
   partner?: number
-  /** what they've ordered has a big dish on it (game/plateSize, item 169): their plate's the big one, else the small */
-  big?: boolean }
+  /** the plate their order's served on (game/plateSize, item 228): the long one, a round one or a little one */
+  plate?: PlateKind }
 
 /** how one try at a food went: how good, how far cooked, what went on it */
 /** one try at a dish: how good it was, how done, what went on it — and, at the grill, when each went on — and when */
