@@ -58,7 +58,7 @@ import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
 import { designOf, longDesign, wareDesign } from './wareDesigns'
 import { HAND_MS } from './Restroom'
-import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps, SakeCup, cupped } from './DiningRoom'
+import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps, SakeCup, DrinkCup, cupped } from './DiningRoom'
 import { Tokkuri } from './Tokkuri'
 import { SakeStation, SERVE_TOP, STATION, STATION_OBJ, newStationPose, stationPose, STATION_STREAM_TO } from './SakeStation'
 import { Koban } from './Koban'
@@ -1946,6 +1946,34 @@ function ShoeCupboard() {
     </group>
   )
 }
+/** the shoes of those waiting on the bench, on the genkan's stone where they stepped up (item 203): a pair each, their colour, at the
+ * cupboard's shoes' size; placed each frame from the sitters' own (nothing re-rendered for it) */
+function BenchShoes({ sitters }: { sitters: { current: Map<number, { id: number; shoes?: { at: THREE.Vector3; yaw: number } }> } }) {
+  const pairs = useRef<(THREE.Group | null)[]>([])
+  const mats = useMemo(() => Array.from({ length: BENCH_SEATS }, () => new THREE.MeshToonMaterial({ color: '#444444' })), [])
+  useEffect(() => () => { for (const m of mats) m.dispose() }, [mats])
+  useFrame(() => {
+    const shod = [...sitters.current.values()].filter((v) => v.shoes)
+    pairs.current.forEach((p, i) => {
+      if (!p) return
+      const v = shod[i]
+      p.visible = !!v
+      if (!v?.shoes) return
+      p.position.copy(v.shoes.at)
+      p.rotation.y = v.shoes.yaw
+      mats[i].color.set(SHOE_COLOURS[v.id % 5])
+    })
+  })
+  return (
+    <>
+      {mats.map((m, i) => (
+        <group key={i} name={`bench-shoes-${i}`} ref={(o) => { pairs.current[i] = o }} visible={false}>
+          {[-1, 1].map((sd) => <mesh key={sd} geometry={SHOE_PAIR_GEO} material={m} position={[sd * 0.045, 0.026, 0]} castShadow raycast={() => {}} />)}
+        </group>
+      ))}
+    </>
+  )
+}
 /**
  * The cats at the door, on their stand just inside it against the wall (the entrance's +x side; the till is on the
  * other), facing across the way in at those coming through
@@ -2752,8 +2780,10 @@ const WIPE_STAND = [0.34, 0.53] as const
 /** the cloth they wipe it with: a folded white towel */
 const RAG_GEO = new RoundedBoxGeometry(0.085, 0.007, 0.05, 1, 0.003)
 const PASS_STACK_SHOWN = STACK_CAP + 3
-/** a plate's size in the sink, against its own */
-const IN_SINK = 0.78
+/** a plate's size in the sink, against its own: its own (item 203, the owner's 「盤子進水槽變小」: 0.78 when every plate was the one big round
+ * plate and the sink's stack had to fit; the plates sized to what's on them since (item 228), none shrinks on its way in or grows on its way
+ * out) */
+const IN_SINK = 1
 /** the most of the sink's dirty plates drawn stacked in it: as many as stand clear under the tap's spout (cleared on the way back (item 53),
  * the sink took up to twenty-five on an ordinary evening, a stack up through the tap); the rest are counted and washed, the stack no higher */
 const SINK_SHOWN = 12
@@ -2765,10 +2795,20 @@ const WASH_EACH = 0.5
 const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegbasket', 'coalsack', 'servecounter'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
+/** where a takeaway waits in the genkan, off the line those paying walk out along (item 203): this far to its side, toward the till, and a
+ * second this much further (the genkan's stone reaches 0.6 that way: tests/e2e/_genkan203.mjs) */
+const TAKEOUT_ASIDE = -0.25, TAKEOUT_NEXT = -0.3
+/** those waiting for a stool, at the genkan's step: how long they stop there to step out of their shoes (or into them going), and how far
+ * the pair's left on the stone back from where they stepped up, toes out (item 203: the bench is on the room's boards, and they walked up
+ * onto them in their shoes) */
+const SHOE_OFF_S = 0.8
+const SHOES_BACK = 0.13
 /** the step stool's half its width and its depth, in its own frame (blender/stepstool.py: 0.66 by 0.40), and the ramp at its edges over
  * which one stepping onto it comes up to its top (the bar's units) */
 const STOOL_HALF = [0.33, 0.2] as const
 const STOOL_STEP = 0.045
+/** how fast one goes up onto it or down off it (the bar's units a second: its 0.16 in about a quarter of a second) */
+const STOOL_CLIMB = 0.6
 // (the same shape as the big plate by the fire, smaller: a foot, a shallow well, a lifted rim)
 const PLATE_R = 0.13
 const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
@@ -2904,7 +2944,7 @@ function PlateImpl({ kind = 'round', dirty = false, dirt = 1, design = 0, sticks
           {glass && drink && (
             <group name="plate-glass" position={[glass[0], glass[1], glass[2]]}>
               <DrinkBottle id={drink} level={level} />
-              {cupped(drink) && <group position={[0.05, 0, -0.03]}><SakeCup level={0} /></group>}
+              {cupped(drink) && <group position={[0.05, 0, -0.03]}><DrinkCup id={drink} level={0} /></group>}
             </group>
           )}
         </>
@@ -3132,9 +3172,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const line = [door, spot], len = pathLength(line)
     let edge = 0
     for (let d = 0; d < len; d += 0.02) if (!inGenkan(counters, alongPath(line, d).p)) { edge = d; break }
-    const wait = alongPath(line, Math.max(0.3, edge - 0.32)).p.setY(0), hand = alongPath(line, Math.min(len, edge + 0.3)).p.setY(0)
     // (across the line in, for a second one waiting beside the first)
     const side = new THREE.Vector3(-(spot.z - door.z), 0, spot.x - door.x).normalize()
+    // (to one side of it, the till's (item 203: they stood on it, those paying and going out walking into them); the genkan's stone runs
+    // 0.6 that way from it, and the shoe cupboard is the other way)
+    const wait = alongPath(line, Math.max(0.3, edge - 0.32)).p.setY(0).addScaledVector(side, TAKEOUT_ASIDE), hand = alongPath(line, Math.min(len, edge + 0.3)).p.setY(0)
     // (the waiting bench (BENCH): against the wall by the genkan, where BENCH_PLACE has it; its places along it, those sat there facing into the room)
     // (and the second along the wall from it (BENCH2_ALONG); three places on each, the first bench's filled first)
     const bench = new THREE.Vector3(BENCH_PLACE.x, 0, BENCH_PLACE.z), u = new THREE.Vector3(Math.cos(BENCH_PLACE.yaw), 0, -Math.sin(BENCH_PLACE.yaw))
@@ -3274,8 +3316,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** their place on the bench and the way it faces, as last found from its marks: kept while the marks aren't there for a frame */
     at?: THREE.Vector3; face?: THREE.Vector3
     /** sent away (the shop shutting) before they'd sat: where they were on their way in, the way out from there */
-    outFrom?: THREE.Vector3; outVia?: boolean }
+    outFrom?: THREE.Vector3; outVia?: boolean
+    /** at the genkan's step (item 203): how far through stepping out of (or into) their shoes, 0..1, -1 not at it; and their pair left on the
+     * stone, where and which way */
+    bow?: number; shoes?: { at: THREE.Vector3; yaw: number }
+    /** how far along their way in, and their way out, the genkan's step is (found once each, not every frame) */
+    stepIn?: number; stepOut?: number }
   const sitters = useRef(new Map<number, Sitter>())
+  /** where the bench's sitters leave their shoes on the genkan's stone (item 203): found from the first one's way up the step, kept */
+  const shoeRow = useRef<{ at: THREE.Vector3; toes: THREE.Vector3; across: THREE.Vector3 } | null>(null)
+  /** those called off the bench whose shoes have been put in their place's cubby (item 203), for their seated self to take out going */
+  const benchShoesIn = useRef(new Set<number>())
   const [sitterList, setSitterList] = useState<{ id: number; sat: boolean }[]>([])
   const sitterObjs = useRef(new Map<number, THREE.Group>())
   const benchFrom = useRef(new Map<number, THREE.Vector3>())
@@ -3696,6 +3747,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (e >= 1) return 0
     const k = Math.min(1, Math.max(0, e))
     return st.h * (1 - k * k * (3 - 2 * k))
+  }
+  /** how high a figure stands for the stool, eased (the day's audit, item 221: at x2, a frame a tenth of a second, a server crossed its edge's
+   * ramp in a frame and went 0.32 up in it, 46 times a day): toward what stoolY has there, no faster than a step's climb (STOOL_CLIMB), kept
+   * on the figure */
+  const stoolLift = (o: THREE.Object3D, p: THREE.Vector3, dt: number) => {
+    const want = stoolY(p)
+    const was = o.userData.stoolLift as number | undefined
+    const now = was === undefined ? want : was + THREE.MathUtils.clamp(want - was, -STOOL_CLIMB * dt, STOOL_CLIMB * dt)
+    o.userData.stoolLift = now
+    return now
   }
   /** a place before the sink brought onto the stool's top, clear of its edges (where those washing stand: up on it, item 221) */
   const ontoStool = (p: THREE.Vector3) => {
@@ -4302,7 +4363,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const washPoints = (b: NonNullable<typeof bossWash.current>) => {
     const p = washPts.current ?? (washPts.current = { stack: new THREE.Vector3(), stackSpin: 0, work: new THREE.Vector3(), waterY: 0, spout: null,
       slot: new THREE.Vector3(), along: new THREE.Vector3(), toward: new THREE.Vector3(), left: new THREE.Vector3(), spongeHome: new THREE.Vector3(),
-      fromL: new THREE.Vector3(), restL: new THREE.Vector3(), restR: new THREE.Vector3(), r: PLATE_R * IN_SINK })
+      fromL: new THREE.Vector3(), restL: new THREE.Vector3(), restR: new THREE.Vector3(), r: (PLATE_DIMS.round.w / 2) * IN_SINK })
     const top = inBar('SinkWaterTop', endOf(1)), floor = inBar('SinkBasinFloor', endOf(1))
     p.waterY = floor.y + (top.y - floor.y) * Math.min(1, Math.max(0, SINK.water))
     p.toward.copy(b.pos).sub(top).setY(0).normalize()
@@ -4430,7 +4491,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // step stool over that (item 221))
       const d = b.pos.clone().sub(counters[0].at), a = d.dot(counters[0].along), l = d.dot(counters[0].lay)
       const dais = KITCHEN_DROP < 0 && a > kitchen.along[0] && a < kitchen.along[1] && l > kitchen.lay[0] && l < kitchen.lay[1] ? -KITCHEN_DROP / scale : 0
-      o.position.y += dais + stoolY(b.pos)
+      o.position.y += dais + stoolLift(o, b.pos, Math.min(step, 0.1))
       o.rotation.y = b.yaw
       o.userData.scrub = undefined
       o.userData.washHands = b.phase === 'wash' ? WASH_HANDS : undefined
@@ -4484,7 +4545,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __sakeJob: sakeJob, __sakeSpot: (n: number) => sakeSpotOf(n), __sakeAround: (n: number) => { const st = seats[n], c = counters[st.counter], x = st.mid.clone().sub(c.at).dot(c.along); return { plate: st.plate.clone(), soup: st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]), drink: new THREE.Vector3(...drinkSpot(n, false)), cup: new THREE.Vector3(...drinkSpot(n, true)) } }, __runs: runs, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __sakeJob: sakeJob, __sakeSpot: (n: number) => sakeSpotOf(n), __sakeAround: (n: number) => { const st = seats[n], c = counters[st.counter], x = st.mid.clone().sub(c.at).dot(c.along); return { plate: st.plate.clone(), soup: st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]), drink: new THREE.Vector3(...drinkSpot(n, false)), cup: new THREE.Vector3(...drinkSpot(n, true)) } }, __runs: runs, __sitters: sitters, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
 
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
@@ -4595,7 +4656,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (called this moment, the bench's walk not yet round to it: from where they sit there now)
           const from = benchFrom.current.get(g.id) ?? (BENCH.up.has(g.id) ? sitters.current.get(g.id)?.pos.clone() : undefined)
           if (from) benchFrom.current.delete(g.id)
-          if (seat !== undefined) next = [...next, from ? { id: g.id, seat, phase: 'enter', t: 0, from, welcomed: true } : { id: g.id, seat, phase: 'enter', t: 0 }]
+          const shod = benchShoesIn.current.delete(g.id)
+          if (seat !== undefined) next = [...next, from ? { id: g.id, seat, phase: 'enter', t: 0, from, welcomed: true, ...(shod ? { shoesIn: true } : {}) } : { id: g.id, seat, phase: 'enter', t: 0 }]
         }
       }
       return next
@@ -5838,7 +5900,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         o.visible = pl.phase !== 'idle'
         o.position.copy(pl.pos)
         // (down on the genkan's stone where their way crosses it, item 203)
-        o.position.y += genkanY(counters, pl.pos) + stoolY(pl.pos)
+        o.position.y += genkanY(counters, pl.pos) + stoolLift(o, pl.pos, Math.min(dt, 0.1))
         o.rotation.y = pl.yaw
         // (never the idle fanning of a cook at his place: his hands are full with the work here; bent forward to it: well down to the
         // sack on the floor, over the bucket on the table and the hearth to tip the coals in or splash the water, a little over the crate and
@@ -5985,7 +6047,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (pose.yaw !== null) w.yaw = turnToward(w.yaw, pose.yaw, Math.min(dt, 0.1))
       o.position.copy(w.pos)
       // (down on the genkan's stone crossing it, item 203; up on the sink's step stool over it, item 221)
-      o.position.y += genkanY(counters, w.pos) + stoolY(w.pos)
+      o.position.y += genkanY(counters, w.pos) + stoolLift(o, w.pos, Math.min(dt, 0.1))
       o.rotation.y = w.yaw
       ;(w as { look?: number }).look = w.yaw
       o.visible = pose.shown
@@ -6007,7 +6069,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (!way || !open) { if (o.ready) { o.taken = true; o.handed = true; o.gone = true } continue }
         const taken = new Set([...visitors.current.values()].filter((v) => v.phase !== 'out').map((v) => v.wait.distanceTo(way.wait) > 0.1 ? 1 : 0))
         // (a second one beside the first, on the side away from the bench)
-        const wait = way.wait.clone().addScaledVector(way.side, taken.has(0) ? 0.42 : 0)
+        const wait = way.wait.clone().addScaledVector(way.side, taken.has(0) ? TAKEOUT_NEXT : 0)
         visitors.current.set(o.id, { id: o.id, rider: o.rider, order: o, phase: 'in', t: 0, fade: 0, fadeT: 0, pos: way.door.clone(), yaw: 0, wait })
         changed = true
       }
@@ -6163,6 +6225,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (called: up off the bench and on in to their stool from here (setShown's way in starts where they sat))
           BENCH.up.delete(v.id)
           benchFrom.current.set(v.id, v.pos.clone())
+          // (their shoes off the stone into the cubby of the place they're called to, put away for them (item 203))
+          const seat = guestsNow.current.find((x) => x.id === v.id)?.seat
+          if (v.shoes && seat !== undefined) { SHOE_CELLS.shoes.set(seat % SHOE_CUBBIES, SHOE_COLOURS[v.id % 5]); benchShoesIn.current.add(v.id) }
+          v.shoes = undefined
           v.handed = true; v.t = 0
         }
         // (kept, sat as they were, till the one walking in to the stool is there in their place: let go at once, there was a frame or two of
@@ -6179,11 +6245,30 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           v.phase = 'out'; v.t = 0; v.fadeT = 0
         }
         if (v.phase === 'in') {
-          const len = pathLength(walk), d = Math.min(len, v.t * sp), { p, dir } = alongPath(walk, d)
+          // (stopped at the genkan's step a moment, out of their shoes and up onto the boards in their socks, the pair left on the stone toes out
+          // (item 203: the bench is on the room's boards))
+          const len = pathLength(walk), hold = SHOE_OFF_S * sp, at0 = (v.stepIn ??= stepAt(walk)), raw = v.t * sp
+          const d = Math.min(len, withPause(raw, at0, hold)), { p, dir } = alongPath(walk, d)
+          v.bow = at0 > 0 && raw >= at0 && raw < at0 + hold ? (raw - at0) / hold : -1
+          if (at0 > 0 && raw >= at0 + hold * 0.55 && !v.shoes) {
+            // (a neat row of them, not each pair where the last was (three at one spot, one in another): two side by side along the step's edge,
+            // two more behind them toward the door, the fifth and sixth squeezed between; all on the stone and away from the shoe cupboard
+            // (its front a step from where they cross: tests/e2e/_shoerow203.mjs))
+            if (!shoeRow.current) {
+              const back = alongPath(walk, Math.max(0, at0 - SHOES_BACK)), toes = back.dir.clone().negate().setY(0).normalize()
+              const across = new THREE.Vector3(-toes.z, 0, toes.x), fr = frame.current
+              const cab = fr && SHOE_CELLS.ready ? fr.worldToLocal(SHOE_CELLS.at.clone()) : null
+              if (cab && across.dot(cab.setY(0).sub(back.p.clone().setY(0))) > 0) across.negate()
+              shoeRow.current = { at: back.p.clone().setY(0), toes, across }
+            }
+            const r = shoeRow.current, k = v.spot
+            v.shoes = { at: r.at.clone().addScaledVector(r.across, 0.1 + 0.17 * (k % 2) + (k >= 4 ? 0.085 : 0))
+              .addScaledVector(r.toes, 0.18 * (Math.floor(k / 2) % 2) + (k >= 4 ? 0.09 : 0)), yaw: Math.atan2(r.toes.x, r.toes.z) }
+          }
           v.pos.copy(p)
           v.yaw = turnSmooth(v.yaw, Math.atan2(dir.x, dir.z), Math.min(step, 0.1))
           v.fade = Math.min(1, d / 0.6 + v.t / FADE_S)
-          if (d >= len) { v.phase = 'sit'; v.t = 0; benchChanged = true }
+          if (raw >= len + hold) { v.phase = 'sit'; v.t = 0; v.bow = -1; benchChanged = true }
         } else if (v.phase === 'sit') {
           v.fade = 1
           v.pos.copy(at)
@@ -6191,12 +6276,22 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const yaw = Math.atan2(BENCH_B.x, BENCH_B.z)
           v.yaw += Math.atan2(Math.sin(yaw - v.yaw), Math.cos(yaw - v.yaw)) * Math.min(1, step * 6)
         } else {
-          const back = v.outFrom ? (v.outVia ? [v.outFrom, before, way.door] : [v.outFrom, way.door]) : [at, before, way.door], len = pathLength(back), d = Math.min(len, v.t * sp), { p, dir } = alongPath(back, d)
+          // (going: at the step a moment, back into their shoes off the stone)
+          const back = v.outFrom ? (v.outVia ? [v.outFrom, before, way.door] : [v.outFrom, way.door]) : [at, before, way.door], len0 = pathLength(back)
+          if (v.stepOut === undefined) {
+            v.stepOut = len0
+            for (let k = 0; k < len0; k += 0.02) if (inGenkan(counters, alongPath(back, k).p)) { v.stepOut = k; break }
+          }
+          const on = v.stepOut
+          const hold = v.shoes ? SHOE_OFF_S * sp : 0, raw = v.t * sp, len = len0 + hold
+          const d = Math.min(len0, withPause(raw, on, hold)), { p, dir } = alongPath(back, d)
+          v.bow = hold > 0 && raw >= on && raw < on + hold ? (raw - on) / hold : -1
+          if (v.shoes && raw >= on + hold * 0.55) v.shoes = undefined
           v.pos.copy(p)
           v.yaw = turnSmooth(v.yaw, Math.atan2(dir.x, dir.z), Math.min(step, 0.1))
-          if (len - d < 0.9) v.fadeT += step
-          v.fade = Math.max(0, Math.min(1, Math.max((len - d) / 0.9, 1 - v.fadeT / FADE_S)))
-          if (d >= len && v.fade <= 0) { BENCH.gone.delete(v.id); sitters.current.delete(v.id); benchChanged = true }
+          if (len - raw < 0.9) v.fadeT += step
+          v.fade = Math.max(0, Math.min(1, Math.max((len - raw) / 0.9, 1 - v.fadeT / FADE_S)))
+          if (raw >= len && v.fade <= 0) { BENCH.gone.delete(v.id); sitters.current.delete(v.id); benchChanged = true }
         }
         const g = sitterObjs.current.get(v.id)
         if (g) {
@@ -6204,6 +6299,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           g.position.y = genkanY(counters, v.pos)
           // (and those on the bench as they sit down, get up and go)
           g.rotation.y = turnToward(g.rotation.y, v.yaw, step * 1.5)
+          // (a little bow at the step, down to their shoes)
+          g.rotation.x = v.bow !== undefined && v.bow >= 0 ? 0.16 * Math.sin(Math.PI * v.bow) : 0
         }
       }
       if (benchChanged) setSitterList([...sitters.current.values()].map((v) => ({ id: v.id, sat: v.phase === 'sit' })))
@@ -7030,7 +7127,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // this one was shown whenever he was out for anything, a second owner standing by the pass while he washed at the sink))
         o.visible = !ownerServes || OWNER_OUT.by === 'serve'
         o.position.copy(w.pos)
-        o.position.y += genkanY(counters, w.pos) + stoolY(w.pos)
+        o.position.y += genkanY(counters, w.pos) + stoolLift(o, w.pos, Math.min(dt, 0.1))
         // (the facing shown eased to the way they're going, never more than a little a frame (turnSmooth, item 183))
         w.look = turnSmooth(w.look ?? w.yaw, w.yaw, step)
         o.rotation.y = w.look
@@ -7871,6 +7968,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           </group>
         </group>
       ))}
+      {/* (the shoes of those waiting on the bench, left on the genkan's stone at the step, toes out (item 203)) */}
+      {people && given && <BenchShoes sitters={sitters} />}
       {/* takeaway customers and riders waiting in the genkan, and the boxes the servers carry out to them */}
       {people && visitorList.map((v) => (
         <group key={`takeout${v.id}`} ref={(o) => { if (o) { visitorObjs.current.set(v.id, o); FIGURES.set(o, 'other') } else visitorObjs.current.delete(v.id) }}>
@@ -8296,7 +8395,7 @@ const SeatDrink = memo(function SeatDrink({ s, id, at, cupAt, clock, level }: { 
   return (
     <>
       <group ref={bottle} position={at}><DrinkBottle id={id} wet level={level} /></group>
-      {cupAt && <group ref={cup} position={cupAt}><SakeCup level={level > 0.01 ? 0.8 : 0} /></group>}
+      {cupAt && <group ref={cup} position={cupAt}><DrinkCup id={id} level={level > 0.01 ? 0.8 : 0} /></group>}
     </>
   )
 }, (a, b) => a.s === b.s && a.id === b.id && a.level === b.level && a.at.every((v, i) => v === b.at[i]) && (a.cupAt === null) === (b.cupAt === null))
@@ -8317,7 +8416,7 @@ function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s
   const refill = s.phase === 'wcGo' && s.wc?.who === 'drink'
   const inHand = s.drink && (s.phase === 'wcBack' || sat || refill) ? (
     <group scale={1 / (1.1 * STAFF_SCALE * folkSpec(s.id).size)}>
-      <group position-y={cup && sat ? -0.012 : -0.07}>{cup && sat ? <SakeCup level={0.8} /> : <DrinkBottle id={s.drink as DrinkId} wet level={1 - (s.drunk ?? 0)} />}</group>
+      <group position-y={cup && sat ? (s.drink === 'beer' ? -0.04 : -0.012) : -0.07}>{cup && sat ? <DrinkCup id={s.drink!} level={0.8} /> : <DrinkBottle id={s.drink as DrinkId} wet level={1 - (s.drunk ?? 0)} />}</group>
     </group>
   ) : undefined
   const atFridge = s.phase === 'wcIn' && s.wc?.who === 'drink'

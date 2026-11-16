@@ -6395,8 +6395,41 @@ export const SakeCup = memo(function SakeCup({ level = 1 }: { level?: number }) 
     </group>
   )
 })
-/** whether a drink's poured into a cup to be drunk (sake, umeshu and the like, from their slim bottles) */
-export const cupped = (id: string) => id === 'sake' || id === 'umeshu'
+/**
+ * A beer glass (コップ, item 203: bottled beer was drunk from the bottle, the owner's 「啤酒對瓶喝」; at an izakaya a 瓶ビール comes with a
+ * small glass to pour it into): a plain tumbler a little wider at its lip, clear, the beer in it amber under a white head, as high as `level`.
+ * Turned from a profile (12 round), its middle at its foot; its glass a plain see-through toon (no transmission: CLAUDE.md's rendering rule)
+ */
+const KOPPU_PTS: [number, number][] = [[0.009, 0.004], [0.0225, 0.004], [0.0235, 0.0], [0.0245, 0.003], [0.03, 0.088], [0.0285, 0.0895],
+  [0.0235, 0.008], [0.009, 0.007]]
+const KOPPU_GEO = (() => {
+  const g = new THREE.LatheGeometry(KOPPU_PTS.map(([r, y]) => new THREE.Vector2(r, y)), 12)
+  g.computeVertexNormals()
+  return g
+})()
+/** the beer in it: a short column inside the glass, its top the beer's face; the head a thin disc of foam on it */
+const KOPPU_BEER = new THREE.CylinderGeometry(0.0262, 0.0238, 1, 12, 1).translate(0, 0.5, 0)
+const KOPPU_HEAD = new THREE.CylinderGeometry(0.0268, 0.0264, 0.008, 12, 1)
+// (the glass a warm clear (a cool one over the head turned it lilac), the head a cream white)
+const KOPPU_MAT = new THREE.MeshToonMaterial({ color: '#f6f4ee', transparent: true, opacity: 0.26, side: THREE.DoubleSide, depthWrite: false })
+const KOPPU_BEER_MAT = new THREE.MeshToonMaterial({ color: '#e0a330', transparent: true, opacity: 0.88 })
+const KOPPU_HEAD_MAT = new THREE.MeshToonMaterial({ color: '#fff2d8' })
+export const BeerGlass = memo(function BeerGlass({ level = 1 }: { level?: number }) {
+  const h = 0.072 * Math.min(1, Math.max(0, level))
+  return (
+    <group>
+      {h > 0.004 && <mesh geometry={KOPPU_BEER} material={KOPPU_BEER_MAT} position-y={0.008} scale-y={h} />}
+      {h > 0.004 && <mesh geometry={KOPPU_HEAD} material={KOPPU_HEAD_MAT} position-y={0.008 + h + 0.004} />}
+      <mesh geometry={KOPPU_GEO} material={KOPPU_MAT} />
+    </group>
+  )
+})
+/** whether a drink's poured into a cup or a glass to be drunk (sake, umeshu and the like from their slim bottles; bottled beer, item 203) */
+export const cupped = (id: string) => id === 'sake' || id === 'umeshu' || id === 'beer'
+/** what a drink's poured into: the beer's glass, else the sake cup */
+export const DrinkCup = memo(function DrinkCup({ id, level = 1 }: { id: string; level?: number }) {
+  return id === 'beer' ? <BeerGlass level={level} /> : <SakeCup level={level} />
+})
 /**
  * A drink as it stands on a fridge's shelf among the hundred and sixty (the owner's: the fridges were the heaviest thing in the room): its
  * bottle or can in a few turned rings, opaque, its glass's and its drink's colour in its points; its label, and its cap. Two materials for
