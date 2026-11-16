@@ -11,7 +11,7 @@ import type { Use } from '@/game/utilities'
 import type { HearthRole } from '@/game/hearthGuard'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
-import { deposit, openingFloat, startingRolls, type DrawerCash, type Rolls, type Tab } from '@/game/till'
+import { deposit, openingFloat, type DrawerCash, type Tab } from '@/game/till'
 import { LOW_FULL, RACK_FULL, type Dryer, type Drain } from '@/game/plates'
 import { PILE_START } from '@/game/sinkPile'
 import type { Flower } from '@/game/shrineFlowers'
@@ -686,9 +686,9 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * compartment's worth out by clicking it, and `onTake` (set by App) puts it to the shop's cash. `onPaid` (App's too): a bill paid at the
  * till, by card or into the drawer; `paid`, the last few who've paid, so each pays once
  */
-export const TILL_CASH: { drawer: DrawerCash; rolls: Rolls; onTake: ((amount: number) => void) | null
+export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null
   onPaid: ((guest: number, amount: number, card: boolean) => void) | null; paid: Set<number> } =
-  { drawer: openingFloat(), rolls: startingRolls(), onTake: null, onPaid: null, paid: new Set() }
+  { drawer: openingFloat(), onTake: null, onPaid: null, paid: new Set() }
 /** a customer's bill paid at the till, once: cash into the drawer, and the shop's books told (GuestBar3D: as the cash key's pressed, or
  * as they're by the till if a frame went past that moment; item 195: the register put it in the drawer only on the frame the key went
  * down) */

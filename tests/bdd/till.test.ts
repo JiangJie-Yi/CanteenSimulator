@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { afterRefund, BUSY_QUEUE, breakDown, DENOMS, deposit, dishLines, drawerFrom, drawerOpens, drawerTotal, openingFloat, owedAtTill, paysAtTill, paysByCard,
-  refundFor, refundOf, ROLL_COINS, rollsFrom, rollsValue, startingRolls, tabletActive, tabTotal, takeOut, takeRoll, type Tab } from '@/game/till'
+  refundFor, refundOf, tabletActive, tabTotal, takeOut, type Tab } from '@/game/till'
 import { cashInHand, SHOP_COST, type CashBooks } from '@/game/economy'
 
 feature('收銀櫃的平板與付款方式', () => {
@@ -62,19 +62,6 @@ feature('老闆從收銀機抽屜拿錢', () => {
     when('老闆點空的萬元鈔那格', (w) => { w.r = takeOut(openingFloat(), 10000) })
     then('拿到 0 元', (w) => { expect(w.r.amount).toBe(0) })
   })
-
-  scenario('抽屜裡的棒金也能拿：一捲 50 枚，拿到面額的 50 倍', ({ given, when, then, and }) => {
-    given('開店時抽屜裡有 100、10、1 圓的棒金各一捲', (w) => { w.r = startingRolls(); expect(Object.values(w.r).every(Boolean)).toBe(true) })
-    when('老闆點 100 圓那捲', (w) => { const t = takeRoll(w.r, 100); w.r2 = t.rolls; w.amount = t.amount })
-    then('拿到 5,000 圓', (w) => { expect(w.amount).toBe(100 * ROLL_COINS) })
-    and('那捲沒了，其他兩捲還在', (w) => { expect(w.r2[100]).toBe(false); expect(w.r2[10]).toBe(true); expect(w.r2[1]).toBe(true) })
-  })
-
-  scenario('拿走的棒金不會再拿到一次', ({ given, when, then }) => {
-    given('100 圓那捲已經拿走', (w) => { w.r = takeRoll(startingRolls(), 100).rolls })
-    when('再點一次', (w) => { w.t = takeRoll(w.r, 100) })
-    then('拿到 0 圓', (w) => { expect(w.t.amount).toBe(0) })
-  })
 })
 
 // (item 195, the owner's: the drawer's money was counted twice, as the customer ordered and again as it was taken out; and "面額是日元才對":
@@ -124,15 +111,15 @@ feature('現金只算抽屜外的錢，抽屜裡的錢拿出來才加進現金�
     })
   })
 
-  scenario('零用金與棒金拿出來加進現金，但不算營收', ({ given, when, then, and }) => {
-    given('開店時的抽屜與棒金', (w) => { w.books = start(); w.drawer = openingFloat(); w.rolls = startingRolls() })
-    when('老闆拿走千元鈔那格和 100 圓那捲', (w) => {
-      const a = takeOut(w.drawer, 1000), b = takeRoll(w.rolls, 100)
-      w.drawer = a.drawer; w.rolls = b.rolls; w.books.till += a.amount + b.amount
+  // (item 204, the owner's: 「棒金可以不用」: no coin rolls in the drawer any more)
+  scenario('零用金拿出來加進現金，但不算營收', ({ given, when, then, and }) => {
+    given('開店時的抽屜', (w) => { w.books = start(); w.drawer = openingFloat() })
+    when('老闆拿走千元鈔那格', (w) => {
+      const a = takeOut(w.drawer, 1000)
+      w.drawer = a.drawer; w.books.till += a.amount
     })
-    then('現金多了 8,000 + 5,000 元', (w) => { expect(cashInHand(w.books)).toBe(213000) })
+    then('現金多了 8,000 元', (w) => { expect(cashInHand(w.books)).toBe(208000) })
     and('營收還是 0', (w) => { expect(w.books.revenue).toBe(0) })
-    and('剩下的棒金是 10 圓與 1 圓各一捲', (w) => { expect(rollsValue(w.rolls)).toBe(10 * ROLL_COINS + ROLL_COINS) })
   })
 
   scenario('等太久生氣走掉、什麼都沒吃的客人：全部退款，不用到收銀台付錢', ({ given, when, then, and }) => {
@@ -205,17 +192,15 @@ feature('現金只算抽屜外的錢，抽屜裡的錢拿出來才加進現金�
     and('什麼都沒有就沒有菜的那幾道', () => { expect(dishLines(0, 2)).toEqual([]) })
   })
 
-  scenario('畫面掉了接著玩：抽屜與棒金照存下來的樣子，不對的就不用', ({ then, and }) => {
+  scenario('畫面掉了接著玩：抽屜照存下來的樣子，不對的就不用', ({ then, and }) => {
     then('存下來的抽屜照樣讀回來', () => {
       const d = deposit(openingFloat(), 1140)
       expect(drawerFrom(JSON.parse(JSON.stringify(d)))).toEqual(d)
-      expect(rollsFrom(JSON.parse(JSON.stringify(takeRoll(startingRolls(), 10).rolls)))).toEqual({ 100: true, 10: false, 1: true })
     })
     and('少一格、負數或不是數字的不用', () => {
       expect(drawerFrom({ ...openingFloat(), 500: -1 })).toBeNull()
       expect(drawerFrom({ 10000: 1 })).toBeNull()
       expect(drawerFrom(null)).toBeNull()
-      expect(rollsFrom({ 100: true })).toBeNull()
     })
   })
 })

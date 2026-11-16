@@ -30,7 +30,7 @@ import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, cashInHand, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf } from '@/game/economy'
-import { drawerFrom, drawerTotal, owedAtTill, refundFor, rollsFrom, rollsValue, type Tab } from '@/game/till'
+import { drawerFrom, drawerTotal, owedAtTill, refundFor, type Tab } from '@/game/till'
 import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
@@ -142,8 +142,8 @@ type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number;
   /** (kept across a lost 3D view only) the menus put out, the game's clock (the day and the time of day), the language, and the people who'd
    * applied for the jobs (made at random each visit: the staff taken on are some of them) */
   menuBy?: Record<string, Entry[]>; clock?: Clock; lang?: Lang; candidates?: typeof CANDIDATES; rolls?: { day: number; left: number }
-  /** (kept across a lost 3D view only) the till's drawer and its coin rolls, as they were */
-  till?: { drawer: unknown; rolls: unknown } }
+  /** (kept across a lost 3D view only) the till's drawer, as it was (an older one's coin rolls let go: item 204, there are none now) */
+  till?: { drawer: unknown; rolls?: unknown } }
 // Nothing is kept between visits: a reload starts everything over (the name, the money, the shops, the staff). The one exception is a page
 // brought back because its 3D view was lost (game/resume): it goes on from where it was, once.
 // (Any save left by an older version is cleared.)
@@ -172,9 +172,8 @@ const SAVED: Saved | null = (() => {
   if (back?.clock && typeof back.clock.day === 'number' && typeof back.clock.minute === 'number') setClock(back.clock)
   // (and the till's drawer and coin rolls as they were (item 195): they were back to the day's float, the money in them not taken out yet
   // lost, and the float and the rolls there to be taken again)
-  const drawer = drawerFrom(back?.till?.drawer), tillRolls = rollsFrom(back?.till?.rolls)
+  const drawer = drawerFrom(back?.till?.drawer)
   if (drawer) TILL_CASH.drawer = drawer
-  if (tillRolls) TILL_CASH.rolls = tillRolls
   return back
 })()
 
@@ -2263,7 +2262,7 @@ export default function App() {
   // (what's kept if the 3D view is lost: read from here the moment it happens)
   const resumeRef = useRef<() => Omit<Saved, 'v'>>(() => ({ ledger, stock, hired, notes, owner, opened, fresh, lots }))
   resumeRef.current = () => ({ ledger, stock, hired, notes, owner, opened, fresh, lots, menuBy, clock: getClock(), lang, candidates: CANDIDATES, rolls,
-    till: { drawer: TILL_CASH.drawer, rolls: TILL_CASH.rolls } })
+    till: { drawer: TILL_CASH.drawer } })
   const lostTimer = useRef(0)
   // (brought back after it was lost: said so, once)
   useEffect(() => {
@@ -3209,7 +3208,7 @@ export default function App() {
                 <p><span>{tl(lang, '收銀機取款', 'レジから取り出し', 'Taken from till')}</span><b className="money">+{Math.round(ledger.till ?? 0).toLocaleString()}</b></p>
                 {/* (and what's in its drawer, the float and the cash customers' bills, not in the cash till it's taken out (item 195)) */}
                 <p><span>{tl(lang, '收銀機裡（還沒取出）', 'レジの中（未回収）', 'In the till, not taken')}</span>
-                  <b className="money">{Math.round(drawerTotal(TILL_CASH.drawer) + rollsValue(TILL_CASH.rolls)).toLocaleString()}</b></p>
+                  <b className="money">{Math.round(drawerTotal(TILL_CASH.drawer)).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '供品費用', 'お供え', 'Offerings')}</span><b className="money">−{Math.round(ledger.offering ?? 0).toLocaleString()}</b></p>
                 <p><span>{tl(lang, '宣傳費（買評價）', '宣伝費（クチコミ）', 'Promotion (reviews)')}</span><b className="money">−{Math.round(ledger.promo ?? 0).toLocaleString()}</b></p>
                 {([['revenue', ledger.revenue], ['foodCost', -ledger.food], ['fuel', -ledger.fuel], ['utility', -(ledger.utility ?? 0)], ['wage', -ledger.wage]] as const)

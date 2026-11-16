@@ -76,7 +76,7 @@ import { Movable } from './Movable'
 import { getEdit, offsetOf, setLocked } from './edit'
 import { basinHint, scrubOnce } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
-import { dishLines, paysAtTill, ROLL_COINS, takeOut, takeRoll, type Denom } from '@/game/till'
+import { dishLines, paysAtTill, takeOut, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
 import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
@@ -1463,25 +1463,6 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
     TILL_CASH.onTake?.(r.amount)
     beep('ok')
   }
-  const { rolls, rollNodes } = useRegisterModel()
-  // (the rolls taken are gone from the drawer, as drawn: kept in TILL_CASH, so a register built again shows them so)
-  const [rollsIn, setRollsIn] = useState(TILL_CASH.rolls)
-  useEffect(() => { for (const [k, o] of rollNodes) o.visible = !!rollsIn[k] }, [rollNodes, rollsIn])
-  /** the owner takes a coin roll (棒金), as a compartment's money: only with the drawer out, its fifty coins to the shop's cash */
-  const takeCoinRoll = (e: { stopPropagation: () => void }, k: number) => {
-    e.stopPropagation()
-    if (getEdit().on || open.current < 0.5) return
-    const r = takeRoll(TILL_CASH.rolls, k)
-    if (!r.amount) return
-    TILL_CASH.rolls = r.rolls
-    setRollsIn(r.rolls)
-    setTip(null)
-    TILL_CASH.onTake?.(r.amount)
-    beep('ok')
-  }
-  const rollTip = (k: number) => tipOver(tl(lang, `棒金・${k} 円`, `棒金・${k}円`, `Coin roll, ¥${k}`),
-    tl(lang, `${k} 円硬幣 50 枚一捲・點一下取出 ¥${(k * ROLL_COINS).toLocaleString()}，加進現金`, `${k}円玉50枚の棒金・クリックで ¥${(k * ROLL_COINS).toLocaleString()} を取り出す`,
-      `Fifty ¥${k} coins rolled by the bank: click to take ¥${(k * ROLL_COINS).toLocaleString()} into cash`))
   const cashTip = (k: Denom) => tipOver(
     tl(lang, `${k.toLocaleString()} 円${k >= 1000 ? '鈔' : '硬幣'}`, `${k.toLocaleString()} 円${k >= 1000 ? '札' : '玉'}`, `¥${k.toLocaleString()} ${k >= 1000 ? 'notes' : 'coins'}`),
     inDrawer[k] ? tl(lang, `點一下取出 ¥${(k * inDrawer[k]).toLocaleString()}，加進現金`, `クリックで ¥${(k * inDrawer[k]).toLocaleString()} を取り出す`, `Click to take ¥${(k * inDrawer[k]).toLocaleString()} into cash`)
@@ -1628,13 +1609,6 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
         }} onPointerOut={(e) => { setDrawerHover(false, e.nativeEvent); setDrawerKeyHover(false, e.nativeEvent) }}>
           {/* (its front and its tray, from the model) */}
           <RegisterDrawer />
-          {/* (the coin rolls (棒金) in the 2000s' place: each named when pointed at (the owner asked what the three were), and taken like a
-              compartment's money (the owner's: it's money too), each worth its fifty coins; only while the drawer's out) */}
-          {rolls.filter((r) => rollsIn[r.kind]).map((r) => (
-            <mesh key={r.kind} name={`coinroll-${r.kind}`} position={r.at} visible={false} {...rollTip(r.kind)} onClick={(e) => takeCoinRoll(e, r.kind)}>
-              <boxGeometry args={[r.size.x + 0.002, r.size.y + 0.002, r.size.z]} />
-            </mesh>
-          ))}
           {/* (the insert: each compartment and cup where the model has it, the money in it at the till's own scale) */}
           <group ref={cash} visible={false}>
             {/* the money in the insert (the insert itself is the model's): the notes face up in their compartments under the weights, a stray one

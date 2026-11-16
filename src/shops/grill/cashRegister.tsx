@@ -70,11 +70,7 @@ function realFinish(src: THREE.MeshStandardMaterial): THREE.Material {
   return new THREE.MeshPhysicalMaterial({ color: src.color.clone(), map: src.map, roughness: Math.max(0.45, src.roughness), metalness: 0, sheen: 0.2 })
 }
 let regModel: { body: THREE.Object3D; drawer: THREE.Object3D; keys: THREE.Object3D; keysAll: THREE.Object3D; modeKey: THREE.Object3D; drawerKey: THREE.Object3D
-  solid: THREE.Mesh[]; inner: THREE.Object3D[]
-  /** the coin rolls (棒金) in the drawer: each one's coin, middle and size, in the drawer's frame */
-  rolls: { kind: number; at: THREE.Vector3; size: THREE.Vector3 }[]
-  /** each coin roll as drawn, by its coin: hidden once it's been taken */
-  rollNodes: Map<number, THREE.Object3D> } | null = null
+  solid: THREE.Mesh[]; inner: THREE.Object3D[] } | null = null
 /** what's inside the drawer, behind its front: the tray, the insert, the coin rolls, the notes' rollers and weights */
 const DRAWER_INNER = /^Reg(Tray|Roll|Coin|Bill|Insert)/
 export function useRegisterModel() {
@@ -160,25 +156,16 @@ export function useRegisterModel() {
   drawer.add(inside)
   drawer.updateMatrixWorld(true)
   for (const o of [...drawer.children]) if (DRAWER_INNER.test(o.name)) inside.attach(o)
-  // (where each coin roll lies in the drawer, before they're merged away: each its own place to point at)
-  const rolls: { kind: number; at: THREE.Vector3; size: THREE.Vector3 }[] = []
-  const toDrawer = drawer.matrixWorld.clone().invert()
-  inside.traverse((o) => {
-    const k = /^RegCoinRoll(\d+)$/.exec(o.name)
-    if (!k) return
-    const b = new THREE.Box3().setFromObject(o).applyMatrix4(toDrawer)
-    rolls.push({ kind: Number(k[1]), at: b.getCenter(new THREE.Vector3()), size: b.getSize(new THREE.Vector3()) })
-  })
-  // (each roll folded together on its own, not with the rest of the inside: taken out of the drawer, it goes, and the rest stays)
-  const rollNodes = new Map<number, THREE.Object3D>()
-  inside.traverse((o) => { const k = /^RegCoinRoll(\d+)$/.exec(o.name); if (k) rollNodes.set(Number(k[1]), o) })
-  for (const o of rollNodes.values()) mergeByMaterial(o)
-  mergeByMaterial(inside, (o) => [...rollNodes.values()].includes(o))
+  // (no coin rolls (棒金) in the drawer (item 204, the owner's: 「棒金可以不用」): the model's taken out of it)
+  const rollsOut: THREE.Object3D[] = []
+  inside.traverse((o) => { if (/^RegCoinRoll\d+$/.test(o.name)) rollsOut.push(o) })
+  for (const o of rollsOut) o.removeFromParent()
+  mergeByMaterial(inside)
   mergeByMaterial(drawer, (o) => o === inside || o.name === 'RegDrawerKey')
   mergeByMaterial(get('RegDrawerKey'))
   mergeByMaterial(get('RegModeKey'))
   const inner: THREE.Object3D[] = [inside]
-  regModel = { body: get('RegBody'), drawer, keys: get('RegKeys'), keysAll, modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid, inner, rolls, rollNodes }
+  regModel = { body: get('RegBody'), drawer, keys: get('RegKeys'), keysAll, modeKey: get('RegModeKey'), drawerKey: get('RegDrawerKey'), solid, inner }
   return regModel
 }
 /** the model once it's loaded (for handlers, outside of rendering), or null before */
