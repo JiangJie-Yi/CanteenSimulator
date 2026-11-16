@@ -15,7 +15,7 @@ import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
-import { ONIGIRI_TRAY, OWNER_GRILL, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf } from './bar'
+import { ONIGIRI_TRAY, OWNER_GRILL, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf, DRINK_BACK } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
@@ -30,7 +30,7 @@ import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
 import { reflectStudio, useStudio } from '@/scene/studio'
-import { pour, SAKE_BOTTLE_ML } from '@/game/sakeStand'
+import { bottleFrom, goOf, pour, poursLeft, SAKE_BOTTLE_ML } from '@/game/sakeStand'
 import { Tokkuri, TOKKURI_H } from './Tokkuri'
 import { AnchoredLight } from '@/scene/AnchoredLight'
 
@@ -1416,8 +1416,31 @@ const POUR_S = 1.2
 const CARRY_Y = 0.16
 const TIP_MAX = 1.9
 const SHOCHU_CUPS = 8
-/** the shochu left in its bottle (1 full); a new one put out when it's empty */
+/** the shochu left in its bottle (1 full); a new one put out when it's empty, from the spares in the back (item 199) */
 const SHOCHU_LEVEL = { v: 1 }
+/** the shochu's bottle among the stand's (after the sake's) */
+const SHOCHU_K = SAKE_BOTTLE_ML.length
+/** a new bottle of sake for the stand from the stock (item 199, the owner's 「庫存的東西沒對上」: poured empty, it stood full again, sake in
+ * stock or none): as full as there's sake for, a bottle at most, that much taken out of the stock; how full (0: there's none) */
+const standBottle = (k: number) => {
+  const n = bottleFrom(k, SUPPLIES.has('Sake'))
+  return n > 0 && SUPPLIES.take('Sake', n) ? n / goOf(k) : 0
+}
+/** a bottle of shochu for the tray from the spares in the back (game/drinkStock's back stock, item 199): whether there was one */
+const spareShochu = () => {
+  const have = DRINK_BACK.back.shochu ?? 0
+  if (have <= 0) return false
+  DRINK_BACK.back = { ...DRINK_BACK.back, shochu: have - 1 }
+  DRINK_BACK.ver++
+  return true
+}
+/** a bottle on the stand that's empty: it pours nothing */
+const dryAt = (k: number) => (k === SHOCHU_K ? SHOCHU_LEVEL.v <= 0.01 : poursLeft(k, SAKE.levels[k]) === 0)
+/** what's said of a bottle poured empty, or taken up empty (item 199): a new one opened (`fresh`), or none to be had */
+const dryTip = (shochu: boolean, fresh: boolean, done: boolean) => ({
+  title: shochu ? '燒酒' : '清酒',
+  hint: `${done ? '倒完了' : '空瓶'}｜${fresh ? (shochu ? '從後場拿了一瓶新的' : '從庫存開了一瓶新的') : shochu ? '後場沒有燒酒了，到飲料庫存訂貨' : '清酒沒有庫存了，到庫存訂貨'}`,
+})
 function SakeStand() {
   useStudio()
   const gltf = useGLTF(SAKESTAND_URL) as unknown as { scene: THREE.Group }
@@ -1522,10 +1545,12 @@ function SakeStand() {
         if (d.back >= 1) drag.current = null
         return
       }
-      // (over the tokkuri (sake only) or a glass not yet full: tipped and poured, the drink in it rising; done, it's full)
+      // (over the tokkuri (sake only) or a glass not yet full: tipped and poured, the drink in it rising; done, it's full; an empty bottle
+      // pours nothing (item 199))
       let over = -1, best = Infinity
+      const dry = dryAt(d.b)
       targets.forEach((t, i) => {
-        if (full.current[i] || (t.cup < 0 && b.shochu)) return
+        if (dry || full.current[i] || (t.cup < 0 && b.shochu)) return
         // (judged by how near the pointer's ray passes the lip, not where it meets the carrying height: looked at from the side, that was
         // well off the lip of a low glass)
         const dd = d.ray ? d.ray.distanceToPoint(t.top) : Math.hypot(d.aim.x - t.top.x, d.aim.z - t.top.z)
@@ -1543,10 +1568,20 @@ function SakeStand() {
         if (b.liquid) b.liquid.scale.y = Math.max(0.02, (b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[d.b]) - (d.t / POUR_S) * (b.shochu ? 1 / SHOCHU_CUPS : 0.1))
         if (d.t >= POUR_S) {
           full.current[over] = true
-          if (b.shochu) SHOCHU_LEVEL.v = SHOCHU_LEVEL.v - 1 / SHOCHU_CUPS > 0.01 ? SHOCHU_LEVEL.v - 1 / SHOCHU_CUPS : 1
-          else {
-            const r = pour(SAKE.levels, d.b)
+          // (poured empty: a new one in its place only from the stock (item 199: it stood full again, sake in stock or none), the sake's
+          // as full as there's sake for, the shochu a bottle from the spares in the back; none, it's left standing empty)
+          if (b.shochu) {
+            const left = SHOCHU_LEVEL.v - 1 / SHOCHU_CUPS
+            if (left > 0.01) SHOCHU_LEVEL.v = left
+            else {
+              const fresh = spareShochu()
+              SHOCHU_LEVEL.v = fresh ? 1 : 0
+              setTip(dryTip(true, fresh, true))
+            }
+          } else {
+            const r = pour(SAKE.levels, d.b, () => standBottle(d.b))
             SAKE.levels = r.levels
+            if (r.opened || dryAt(d.b)) setTip(dryTip(false, r.opened, true))
           }
           if (b.liquid) b.liquid.scale.y = Math.max(0.02, b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[d.b])
           d.over = -1; d.t = 0
@@ -1589,6 +1624,17 @@ function SakeStand() {
     if (k < 0 || !bottles[k]) return
     e.stopPropagation()
     const b = bottles[k]
+    // (an empty one taken up: a new one in its place from the stock, if there's any now (item 199); none, it's carried empty, pouring nothing)
+    if (dryAt(k)) {
+      let fresh = false
+      if (b.shochu) { fresh = spareShochu(); if (fresh) SHOCHU_LEVEL.v = 1 } else {
+        const n = standBottle(k)
+        fresh = n > 0
+        if (fresh) SAKE.levels = SAKE.levels.map((l, i) => (i === k ? n : l))
+      }
+      if (b.liquid) b.liquid.scale.y = Math.max(0.02, b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[k])
+      setTip(dryTip(b.shochu, fresh, false))
+    }
     const aim = b.pos.clone().add(b.off).setY(CARRY_Y)
     drag.current = { b: k, aim, ray: null, tip: 0, over: -1, t: 0, back: -1, from: new THREE.Vector3(), fromQ: new THREE.Quaternion() }
     if (controls) controls.enabled = false
@@ -1613,8 +1659,11 @@ function SakeStand() {
     if (k >= 0) {
       e.stopPropagation()
       document.body.style.cursor = 'grab'
-      const shochu_ = k === SAKE_BOTTLE_ML.length
-      setTip({ title: shochu_ ? '燒酒' : '清酒', hint: shochu_ ? '按住拖到燒酒杯上方倒酒' : '按住拖到德利或燒酒杯上方倒酒' })
+      const shochu_ = k === SHOCHU_K
+      // (an empty one: whether there's a new one to be had (item 199))
+      const more = shochu_ ? (DRINK_BACK.back.shochu ?? 0) > 0 : SUPPLIES.has('Sake') !== 0
+      setTip(dryAt(k) ? { title: shochu_ ? '燒酒' : '清酒', hint: more ? `空瓶｜${shochu_ ? '拿起來從後場拿一瓶新的' : '拿起來從庫存開一瓶新的'}` : dryTip(shochu_, false, false).hint }
+        : { title: shochu_ ? '燒酒' : '清酒', hint: shochu_ ? '按住拖到燒酒杯上方倒酒' : '按住拖到德利或燒酒杯上方倒酒' })
     }
   }
   const onOut = () => { if (!drag.current) { document.body.style.cursor = ''; setTip(null) } }

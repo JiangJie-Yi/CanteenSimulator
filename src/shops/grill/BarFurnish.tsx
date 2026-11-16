@@ -31,7 +31,8 @@ const FINISH: Record<string, { color?: string; roughness: number; metalness: num
   TowelAbs: { color: '#f8fafc', roughness: 0.35, metalness: 0, clearcoat: 0.1 },
 }
 /** parts too thin or small for an ink line */
-const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d|Vent|Lamp|Acrylic|Slit|Seam|Window|Slot|Grille|Nozzle|Sensor|Lock|TowelKey)/
+// (and the hand soap's glass and the soap in it, item 199: a black shell would be seen through the glass)
+const UNINKED = /(Piping|Button|WcSeat|Wand|Screen|ArmFace|Leaves|Pebble|Moss|Node|Branch|Rail|Water|Mirror|Spout|Lever|Tap|Handle|Ring|Kumiko|Shoe|FootBrass|Rush|Panel|Slat|Drain|Pump|Pull|Pad\d|Vent|Lamp|Acrylic|Slit|Seam|Window|Slot|Grille|Nozzle|Sensor|Lock|TowelKey|SoapGlass|SoapLiquid)/
 
 const made = new Map<string, THREE.Object3D>()
 function toonOf(url: string, scene: THREE.Group) {

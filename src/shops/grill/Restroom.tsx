@@ -1007,6 +1007,11 @@ diffuseColor.a = mix( diffuseColor.a, 0.9 * opacity, wFres );
 }
 const BASIN_LOOK = { m: basinLooks(), f: basinLooks() }
 const WASH_STREAM = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.62, depthWrite: false, toneMapped: false })
+/** the hand soap's bottle (item 199, the owner's 「庫存的東西沒對上」: celadon china, how much was in it never seen): celadon-tinted glass,
+ * the soap in it seen through it, the studio's gleams on it; no transmission */
+const SOAP_GLASS = new THREE.MeshStandardMaterial({ color: '#a9c7b4', transparent: true, opacity: 0.4, depthWrite: false, roughness: 0.06, metalness: 0.1,
+  envMapIntensity: 1.4, emissive: '#1e3a2c' })
+reflectStudio(SOAP_GLASS)
 /**
  * The washroom's washstand (blender/wc.py: its back to +x, against the back wall facing the door, so it's the first thing seen as the door
  * slides open; the owner's): its tap's cross handle turned a quarter round at a click to run the water, and back to stop it (left running,
@@ -1052,8 +1057,12 @@ export function WashstandLive({ who }: { who: Who }) {
     soap.name = 'WashSoap'
     root.add(soap)
     const soapBits: THREE.Object3D[] = []
-    root.traverse((o) => { if (/^Wash(SoapBottle|Pump)/.test(o.name) && (o as THREE.Mesh).isMesh) soapBits.push(o) })
+    root.traverse((o) => { if (/^Wash(Soap(Glass|Liquid)|Pump)/.test(o.name) && (o as THREE.Mesh).isMesh) soapBits.push(o) })
     for (const o of soapBits) soap.attach(o)
+    // (its glass seen through, and the soap in it a piece of its own, stood as high as there's soap left (item 199: celadon china, how much
+    // was in it never seen))
+    const liquid = soapBits.find((o) => o.name.startsWith('WashSoapLiquid')) ?? null
+    for (const o of soapBits) if (o.name.startsWith('WashSoapGlass')) { (o as THREE.Mesh).material = SOAP_GLASS; o.castShadow = false }
     // (its pump's head and nozzle a piece of their own, pressed down as it's used (the owner's, 2026-11-10: it can be pressed, and it's used
     // up): by a click, or by a guest as they wash their hands)
     const pump = new THREE.Group()
@@ -1063,7 +1072,7 @@ export function WashstandLive({ who }: { who: Who }) {
     if (who === 'f') soap.scale.z = -1
     plainColours(root)
     mergeByMaterial(root, (o) => doors.includes(o as THREE.Group) || o === soap)
-    mergeByMaterial(soap, (o) => o === pump)
+    mergeByMaterial(soap, (o) => o === pump || o === liquid)
     mergeByMaterial(pump)
     // (where the bottle stands, in the stand's own frame: what takes the pointer for it, a little bigger)
     root.updateMatrixWorld(true)
@@ -1076,7 +1085,7 @@ export function WashstandLive({ who }: { who: Who }) {
     const mirror = roundMirror((box.max.y - box.min.y) / 2)
     mirror.glass.position.copy(face).add(new THREE.Vector3(-0.0006, 0, 0))
     mirror.glass.rotation.y = -Math.PI / 2
-    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null, doors, pump, soapAt, soapSize }
+    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null, doors, pump, soapAt, soapSize, liquid }
   }, [gltf, who])
   const cab = useRef({ open: false, k: 0 })
   useEffect(() => () => { parts.mirror.glass.getRenderTarget().dispose(); (parts.mirror.glass.material as THREE.Material).dispose() }, [parts])
@@ -1120,6 +1129,12 @@ export function WashstandLive({ who }: { who: Who }) {
     if (t.pumpAt !== s.pumped) { s.pumped = t.pumpAt; pumpSound(nearOf(parts.root, camera)) }
     const pu = (now() - t.pumpAt) / 1000
     parts.pump.position.y = pu >= 0 && pu < 0.32 ? -0.005 * Math.sin(Math.PI * Math.min(1, pu / 0.32)) : 0
+    // (the soap in the bottle as high as there's soap left (item 199): seen through the glass going down as it's pressed, full again when a
+    // refill's put in)
+    if (parts.liquid) {
+      const lv = Math.max(0.02, Math.min(1, t.soap / SOAP_FULL))
+      if (parts.liquid.scale.y !== lv) parts.liquid.scale.y = lv
+    }
     const k = clock.elapsedTime
     // (the bowl's water (the owner's: it was always empty, the stream straight down the drain): risen or let go a moment on (game/basin),
     // as wide as the bowl is at its height, shimmering)

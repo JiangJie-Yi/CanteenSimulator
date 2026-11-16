@@ -584,7 +584,10 @@ def washstand():
          "brass": pbr("WashBrass", lin("#c9a04a"), rough=0.22, metal=1.0),
          "mirror": pbr("WashMirror", lin("#d8e2e6"), rough=0.02, metal=1.0),
          "frame": pbr("WashFrame", lin("#1c1410"), rough=0.3, coat=0.6),
-         "celadon": pbr("WashSoap", lin("#a9c7b4"), rough=0.2, coat=0.7),
+         # (the soap's bottle celadon-tinted glass, the soap in it a pale cream, its dip tube a milky plastic (item 199))
+         "soapglass": pbr("WashSoapGlass", lin("#a9c7b4"), rough=0.08, coat=0.6),
+         "soap": pbr("WashSoapLiquid", lin("#efe7d2"), rough=0.3),
+         "tube": pbr("WashTube", lin("#e6e8e2"), rough=0.4),
          "outlet": pbr("WashOutlet", lin("#2a2620"), rough=0.6),
          "hole": pbr("WashOverflowHole", lin("#0d0a08"), rough=0.9)}
     parts = []
@@ -747,11 +750,18 @@ def washstand():
         mw = o.matrix_world.copy()
         o.parent = handle
         o.matrix_world = mw
-    # ---- the soap bottle, celadon, a brass pump on it
+    # ---- the soap bottle, a brass pump on it
     # (on the bowl's left, the plant on its right (the owner's: swapped))
+    # (item 199, the owner's 「庫存的東西沒對上」: celadon china before, how much soap was in it never seen. Now celadon-tinted glass (the game
+    # draws it see-through), the soap in it a piece of its own, its origin at its foot for the game to stand it as high as there's soap left
+    # (9/10 of the glass's inside, a millimetre in, from 4 mm over the foot up to under the shoulder), and the pump's dip tube down to the foot)
     sx, sz = -0.1, -0.215
-    fin(lathe_oval("WashSoapBottle", [(0.0, T), (0.026, T), (0.03, T + 0.008), (0.031, T + 0.058), (0.027, T + 0.078), (0.013, T + 0.09),
-                                      (0.012, T + 0.098), (0.0, T + 0.098)], 1, 1, 16, sx, sz), "WashSoapBottle", M["celadon"], parts)
+    fin(lathe_oval("WashSoapGlass", [(0.0, T), (0.026, T), (0.03, T + 0.008), (0.031, T + 0.058), (0.027, T + 0.078), (0.013, T + 0.09),
+                                     (0.012, T + 0.098), (0.0, T + 0.098)], 1, 1, 16, sx, sz), "WashSoapGlass", M["soapglass"], parts)
+    liq = lathe_oval("WashSoapLiquid", [(0.0242, 0.0), (0.026, 0.004), (0.0269, 0.054), (0.0244, 0.068)], 1, 1, 12, 0.0, 0.0)
+    liq.location = P(sx, T + 0.004, sz)
+    fin(liq, "WashSoapLiquid", M["soap"], parts)
+    fin(tube("WashPumpTube", [(sx, T + 0.007, sz), (sx, T + 0.1, sz)], 0.0018, caps=True, res=1, ru=1), "WashPumpTube", M["tube"], parts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.007, depth=0.02, location=P(sx, T + 0.106, sz))
     fin(active(), "WashPumpNeck", M["brass"], parts)
     fin(rbox("WashPumpHead", (0.024, 0.01, 0.016), (sx - 0.006, T + 0.12, sz), 0.003, 2), "WashPumpHead", M["brass"], parts)

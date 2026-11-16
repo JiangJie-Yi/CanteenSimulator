@@ -33,7 +33,7 @@ import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
 import { HAND_WASH_LINES, SPONGE_S, beatLength, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
 import { POUR_TOTAL, SAKE_SET_S, SAKE_UP_S, pourBeat, pouredBy, streaming } from '@/game/sakePour'
-import { pour as pourTokkuri, SAKE_BOTTLE_ML, TOKKURI_ML } from '@/game/sakeStand'
+import { SAKE_BOTTLE_ML, STATION_GO, TOKKURI_ML, stationGo } from '@/game/sakeStand'
 import { newWashPose, spongePose, washPose, type WashPoints } from '@/scene/washMotion'
 import { PLATE_SCALE } from '@/game/plateSize'
 import { PathMap } from './PathMap'
@@ -95,7 +95,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD } from './bar'
+import { ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { buyCase, caseCost, emptyFillable, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -3936,7 +3936,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
      * how dirty, its pattern, how it lay turned on the stack and where it was taken from; the left hand where the last plate left it (the bar's
      * frame); the way he faces the basin; the beats' sounds made */
     sub?: 'grab' | 'plate' | 'stow'; dirt?: number; design?: number; spin?: number; inHand?: boolean; from?: THREE.Vector3; fromL?: THREE.Vector3
-    base?: number; sounds?: number } | null>(null)
+    base?: number; sounds?: number
+    /** whether the plate in hand's washed with the liquid (item 217: without, scrubbed longer and no suds) */
+    soapy?: boolean } | null>(null)
   const bossObj = useRef<THREE.Group | null>(null)
   /** where the owner is just now, in the bar's frame: his own figure's place (at the fire while the shop's shut, along the aisle while it's
    * open), so he walks off from where he's seen and comes back there */
@@ -4019,7 +4021,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     washDrips.current?.children.forEach((c) => { c.visible = false })
     if (washSponge.current) washSponge.current.g.visible = false
   }
-  const sinkNow = () => ({ dirty: dirty.current, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: true })
+  const sinkNow = () => ({ dirty: dirty.current, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: true, tap: SINK.tap })
   /** a plate's pattern put on a drawn plate (its first mesh with one): the plate in hand takes the stack's top plate's, the basket's slot the
    * one let go of in it, so neither changes as it moves from one to the other */
   const setPattern = (g: THREE.Object3D | null | undefined, design: number) => {
@@ -4042,6 +4044,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (why) { b.sub = 'stow'; if (b.manual) STAFF_SAY.say('owner', HAND_WASH_LINES[why]); return }
     const n = Math.min(dirty.current, SINK_SHOWN)
     b.sub = 'plate'
+    // (washing up for the player with no liquid in the water or on the sponge: scrubbed longer, no suds (item 217))
+    b.soapy = !b.manual || SINK.soap > 0
     b.dirt = SINK.dirt.at(-1) ?? 1
     b.design = n - 1
     b.spin = (n - 1) * 0.9
@@ -4071,11 +4075,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       setPattern(washPlateIn.current, b.design ?? 0)
       redraw()
     }
-    const { beat } = washBeat(b.t, dirt)
+    const { beat } = washBeat(b.t, dirt, b.soapy ?? true)
     const at = washPts.current?.work
     if (f && at && beat === 'scrub' && !((b.sounds ?? 0) & 1)) { b.sounds = (b.sounds ?? 0) | 1; f.localToWorld(SOUND_AT.copy(at)); washSplash(SOUND_AT); scrubSound(nearCam(SOUND_AT)) }
     if (f && at && beat === 'rinse' && !((b.sounds ?? 0) & 2)) { b.sounds = (b.sounds ?? 0) | 2; washSplash(f.localToWorld(SOUND_AT.copy(at))) }
-    if (b.t >= washPlateS(dirt)) {
+    if (b.t >= washPlateS(dirt, b.soapy ?? true)) {
       // (let go of, standing in the basket's next slot: the basket's plate there drawn with its pattern)
       const r = handOne(1, DRAIN)
       DRAIN.n = r.drain.n
@@ -4118,7 +4122,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const washShow = (b: NonNullable<typeof bossWash.current>, step: number) => {
     const f = frame.current
     const p = washPoints(b), P = WASH_POSE, dirt = b.dirt ?? 1
-    const beat = b.sub === 'plate' ? washBeat(b.t, dirt) : null
+    const beat = b.sub === 'plate' ? washBeat(b.t, dirt, b.soapy ?? true) : null
     if (!beat) spongePose(Math.min(1, b.t / SPONGE_S), b.sub === 'stow', p, P)
     else washPose(beat.beat, beat.k, p, P)
     if (f) { f.localToWorld(WASH_HANDS.left.copy(P.left)); f.localToWorld(WASH_HANDS.right.copy(P.right)) }
@@ -4131,7 +4135,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         washPlateIn.current?.scale.set(IN_SINK, IN_SINK * (0.3 + 0.7 * P.deep), IN_SINK)
         const sm = washPlateIn.current?.getObjectByName('plate-smear') as THREE.Mesh | undefined
         if (sm) { const d = dirt * P.smear; (sm.material as THREE.MeshBasicMaterial).opacity = smearOpacity(d); sm.visible = d > CLEAN_AT }
-        washFoam.current?.children.forEach((c, i) => { const k = FOAM_AT[i][2] * P.foam; c.scale.set(k, k * 0.6, k); c.visible = k > 0.03 })
+        washFoam.current?.children.forEach((c, i) => { const k = FOAM_AT[i][2] * P.foam * (b.soapy === false ? 0 : 1); c.scale.set(k, k * 0.6, k); c.visible = k > 0.03 })
       }
     }
     // (the drops running off its lowest edge down into the water, three, one after another)
@@ -6870,8 +6874,17 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (j0 && j0.server === undefined && j0.t >= POUR_TOTAL && !guestSits(j0.guest, j0.seat)) sakeJob.current = null
       const j = sakeJob.current
       if (j && j.t >= 0 && j.was === undefined) j.was = SAKE.open
-      if (j && j.t >= POUR_TOTAL && !j.poured) { j.poured = true; SAKE.open = pourTokkuri([j.was ?? SAKE.open], 0).levels[0] }
+      // (poured: a tokkuri's worth out of the open bottle; finished, a new one opened only with sake left (item 199: it stood full again
+      // whether there was sake in stock or none))
+      if (j && j.t >= POUR_TOTAL && !j.poured) {
+        j.poured = true
+        SAKE.unpoured.delete(j.guest)
+        SAKE.open = stationGo(Math.round((j.was ?? SAKE.open) * STATION_GO) - 1, sakeLeft()) / STATION_GO
+      }
       const pouring = !!j && j.t >= 0 && j.t < POUR_TOTAL
+      // (and between pours, the open bottle as there's sake for: sold out, the bottle poured empty stands empty; sake bought, a new one's
+      // opened; stock thrown out, never more in it than there is)
+      if (!pouring) SAKE.open = stationGo(Math.round(SAKE.open * STATION_GO), sakeLeft()) / STATION_GO
       const beat = pouring ? pourBeat(j!.t) : null
       const P = STATION_POSE
       if (beat) stationPose(beat.beat, beat.k, P)

@@ -6049,6 +6049,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (seated && orders.length && !isMinor(id) && Math.random() < SAKE_SIDE && onOrder?.('Sake', id, false)) {
         orders.push('Sake')
         said.push(nameOf('Sake'))
+        // (theirs till it's poured: out of the stock, still in the bottle (item 199))
+        SAKE.unpoured.add(id)
       }
       return { orders, said, dear: !orders.length && dear > 0 }
     }
@@ -6246,6 +6248,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (wi >= 0) SAKE.want.splice(wi, 1)
       SAKE.ready.delete(g.id)
       sakeAsked.current.delete(g.id)
+      SAKE.unpoured.delete(g.id)
       // (their visit, scored: the food, the wait for it, what put them out (the tissues, the toilet, the dark, their stomach))
       const gr = GRIPES.get(g.id) ?? new Set<Gripe>()
       if (SICK.has(g.id)) gr.add('sick')
@@ -6262,6 +6265,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     // (who has food before them: drawn eating only then (bar.ts's FED))
     FED.clear()
+    // (a tokkuri sold to someone no longer here (the shop shut on them, the day over): not to be poured (item 199))
+    if (SAKE.unpoured.size) for (const id of SAKE.unpoured) if (!guests.current.some((g) => g.id === id)) SAKE.unpoured.delete(id)
     for (const p of pieces.current) if (p.container === 'bar' && p.guest >= 0 && p.collected && p.flight >= 1 && !p.eaten && !p.stickOnly && p.via !== 'plated' && present(p)) FED.add(p.guest)
     /** a customer's tokkuri: asked for the first time (SAKE.want: poured by hand at the sake station on the serving counter and carried out to
      * them on a server's tray, GuestBar3D, item 177); whether it's been set at their place now (SAKE.ready); with no station or nobody to pour
@@ -6274,6 +6279,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (!done && !(queued >= 0 && !SAKE.station && now - asked > SAKE_WAIT_S)) return false
       if (!done) SAKE.want.splice(queued, 1)
       sakeAsked.current.delete(id)
+      SAKE.unpoured.delete(id)
       return true
     }
     // a guest eats a piece of what they ordered, if it's ready (each one piece at a time: the whole shop waited on one mouthful at a time

@@ -18,7 +18,7 @@ import { EMPTY_AT } from '@/game/bins'
 import { DRAIN, DRYER, HAND_WASH, IN_USE, POINTER_HINT, SINK, SINK_BIN, SUPPLIES, squeezeSoap, tipOver } from './bar'
 import { DISH_SOAP } from '@/game/household'
 import { basinSays, waterTick } from '@/game/sinkWater'
-import { GUIDE_OF, HAND_STEP_SAYS, handStep, pumpSoap, soapWith } from '@/game/handWash'
+import { GUIDE_OF, HAND_STEP_SAYS, WASH_WET, handStep, pumpSoap, soapWith, washTips } from '@/game/handWash'
 import { glowOff, glowOn } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
@@ -281,9 +281,10 @@ export function SinkModel() {
     else if (hov.current === 'basin') setTip({ title: '流理台', hint: basinHint() })
     const on = SINK.washing || SINK.tap
     // (the basin's water: filled by the tap with the plug in, let out by the drain without it, never over the overflow (game/sinkWater))
+    const waterWas = SINK.water
     SINK.water = waterTick(SINK.water, on, SINK.plug, Math.min(dt, 0.1))
-    // (the washing-up liquid goes with the water: the basin emptied, none left in it)
-    SINK.soap = soapWith(SINK.soap, SINK.water)
+    // (the washing-up liquid goes with the water: the basin let out, none left in it (squeezed onto the sponge, with none standing, it stays))
+    SINK.soap = soapWith(SINK.soap, waterWas, SINK.water)
     pool.position.y = poolY + rise * SINK.water
     POOL.opacity = SINK.water > 0.002 ? 0.38 : 0
     // (the plug lifted out and laid by the drain, or back in: up out of the hole first, then over)
@@ -468,7 +469,9 @@ export const basinHint = () => {
   // (the owner at it: say so, not the next step)
   if (HAND_WASH.boss) return `${basinSays(SINK.water, SINK.plug)}｜老闆在洗（髒盤 ${SINK.dirty}）`
   if (HAND_WASH.ask === 'wash') return `${basinSays(SINK.water, SINK.plug)}｜老闆忙完就來洗（髒盤 ${SINK.dirty}）`
-  return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}`
+  // (and, ready to wash, the player's choices said as advice (item 217): the liquid, the plug)
+  const tips = st === 'scrub' ? washTips(handSink()) : []
+  return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}${tips.map((t) => `｜${t}`).join('')}`
 }
 /** how far a bin's lid lifts (rad); how far it stands open with the bin heaped over full (it won't shut on it) */
 const BIN_LID_OPEN = 1.75
@@ -579,7 +582,7 @@ export function SinkPart({ node }: { node: string }) {
       onClick={(e) => {
         e.stopPropagation(); if (getEdit().on) return
         // (out of the bottle in use, a new one opened from stock as it runs out: none at all, nothing comes (item 203))
-        if (node === 'SinkDetergentSet') { if (SINK.water > 0 && squeezeSoap()) { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } } else SINK.sponge = !SINK.sponge
+        if (node === 'SinkDetergentSet') { if (squeezeSoap()) { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } } else SINK.sponge = !SINK.sponge
         guideOff()
         window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
       }}>
@@ -632,9 +635,10 @@ function partSays(node: string) {
     case 'SinkTowelSet': return '擦乾碗盤的布巾'
     // (each its own short line: run together it broke onto two)
     case 'SinkBinSet': return binSays()
-    case 'SinkDetergentSet': return IN_USE.soap <= 0 && SUPPLIES.has(DISH_SOAP) === 0 ? '洗碗精｜用完了，庫存也沒有：到庫存的耗材訂洗碗精'
-      : SINK.water <= 0 ? '洗碗精｜水槽沒有水，先放水再擠' : `洗碗精｜點一下擠一點到水裡（水裡的夠洗 ${SINK.soap} 個；這瓶還能擠 ${IN_USE.soap} 次）`
-    case 'SinkSpongeSet': return SINK.sponge ? '菜瓜布｜拿著，點水槽刷盤子；點一下放回去' : '菜瓜布，黃的那面軟，綠的那面刷｜點一下拿起來洗碗'
+    // (the name's the tip's title already: not said again at the head of its hint)
+    case 'SinkDetergentSet': return IN_USE.soap <= 0 && SUPPLIES.has(DISH_SOAP) === 0 ? '用完了，庫存也沒有：到庫存的耗材訂洗碗精'
+      : `點一下擠一點${SINK.water >= WASH_WET ? '到水裡' : '在菜瓜布上'}（夠洗 ${SINK.soap} 個；這瓶還能擠 ${IN_USE.soap} 次）`
+    case 'SinkSpongeSet': return SINK.sponge ? '拿著，點水槽刷盤子；點一下放回去' : '黃的那面軟，綠的那面刷｜點一下拿起來'
     default: return ''
   }
 }

@@ -21,6 +21,26 @@ export const fullStand = () => SAKE_BOTTLE_ML.map(() => 1)
 
 /** how many tokkuri a bottle still gives at this level */
 export const poursLeft = (k: number, level: number) => Math.floor((level * SAKE_BOTTLE_ML[k]) / TOKKURI_ML + 1e-9)
+/** how many tokkuri a bottle gives full: a 1.8 l one ten, a 720 ml one four */
+export const goOf = (k: number) => Math.round(SAKE_BOTTLE_ML[k] / TOKKURI_ML)
+/** the sake station's open bottle (item 177): a 1.8 l one, ten tokkuri */
+export const STATION_GO = goOf(0)
+
+/**
+ * The sake station's open bottle (item 199, the owner's 「庫存的東西沒對上」: poured empty, it stood full again at once, whether there was
+ * sake in stock or none): how many tokkuri it holds, from what it held and the shop's sake not yet poured (`sake`: what's in stock and
+ * what's been sold and is still to be poured, in tokkuri; Infinity with no shop running). Never more than there is (stock thrown out, sold
+ * to someone gone before it was poured); finished, a new one's opened only with sake left, as full as there's sake for (a bottle at most);
+ * with none, it stands empty.
+ */
+export function stationGo(open: number, sake: number): number {
+  const left = Math.max(0, sake)
+  return open > 0 ? Math.min(open, left) : Math.min(STATION_GO, left)
+}
+
+/** a new bottle for the stand from the stock (item 199): how many tokkuri it's filled with, as many as the stock has, a bottle at most
+ * (`have`: the stock's; below 0, not known, no shop running: a full one) */
+export const bottleFrom = (k: number, have: number) => (have < 0 ? goOf(k) : Math.max(0, Math.min(goOf(k), Math.floor(have))))
 
 /** which bottle the next tokkuri comes from: the one already open (the least full that still gives one), so one's finished before the
  * next's opened; none open, the first */
@@ -31,14 +51,19 @@ export function pourFrom(levels: readonly number[]) {
 }
 
 /**
- * A tokkuri poured from bottle k: its level down by one gō; if it then can't give another, it's finished and a new one stands in its place,
- * full (`opened`). What it was before, for the pour to be drawn going down from.
+ * A tokkuri poured from bottle k: its level down by one gō; if it then can't give another, it's finished, and a new one's opened in its
+ * place (`opened`) as full as `open` says there's sake in stock for (0..1; item 199: it stood full again, sake in stock or none); with
+ * none, it's left standing empty. What it was before, for the pour to be drawn going down from.
  */
-export function pour(levels: readonly number[], k: number): { levels: number[]; k: number; was: number; opened: boolean } {
+export function pour(levels: readonly number[], k: number, open: () => number = () => 1): { levels: number[]; k: number; was: number; opened: boolean } {
   const out = [...levels]
   const was = out[k]
   out[k] = Math.max(0, was - TOKKURI_ML / SAKE_BOTTLE_ML[k])
-  const opened = poursLeft(k, out[k]) === 0
-  if (opened) out[k] = 1
+  let opened = false
+  if (poursLeft(k, out[k]) === 0) {
+    const n = open()
+    opened = n > 0
+    out[k] = opened ? n : 0
+  }
   return { levels: out, k, was, opened }
 }

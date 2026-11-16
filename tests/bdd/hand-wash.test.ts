@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DRAIN_CAP, DRAIN_MIN, drainSays, drainTick, handOne, handWashSays, unbasket, type Drain } from '@/game/plates'
 import { MINUTES_PER_SECOND } from '@/game/clock'
-import { WASH_BEATS, WASH_WATER, beatLength, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
+import { NO_SOAP_SLOW, WASH_BEATS, beatLength, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
 
 feature('玩家手動洗碗', () => {
   scenario('點水槽洗一個盤子，放進瀝水籃', ({ given, when, then, and }) => {
@@ -34,15 +34,21 @@ feature('手洗交給老闆（店主 2026-11-15：不是會有老闆接手來洗
     given('水槽備好，6 個髒盤，洗碗精夠 3 個', (w) => { w.s = ready() })
     then('他不停手', (w) => { expect(handStops(w.s)).toBeNull() })
   })
-  scenario('每刷一個用掉一份洗碗精，用完就停手說一聲', ({ given, when, then }) => {
+  // (item 217, the owner's 「這洗碗的流程定的太死」: he stopped when the liquid ran out, and the basin had to be a quarter full)
+  scenario('洗碗精用完了，他照樣洗，只是刷得慢', ({ given, when, then, and }) => {
     given('洗碗精夠 3 個', (w) => { w.s = ready({ soap: 3 }) })
     when('他刷了 3 個', (w) => { for (let k = 0; k < 3; k++) { const r = handOne(w.s.dirty, w.s.drain); w.s = { ...w.s, dirty: r.dirty, drain: r.drain, soap: scrubbed(w.s.soap) } } })
-    then('洗碗精沒了，他停手', (w) => { expect(w.s.dirty).toBe(3); expect(handStops(w.s)).toBe('soap') })
+    then('洗碗精沒了，他不停手', (w) => { expect(w.s.dirty).toBe(3); expect(handStops(w.s)).toBeNull() })
+    and('沒有洗碗精的盤子刷得久', () => {
+      expect(beatLength('scrub', 0.5, false)).toBeCloseTo(beatLength('scrub', 0.5) * NO_SOAP_SLOW)
+      expect(washPlateS(0.5, false)).toBeGreaterThan(washPlateS(0.5))
+    })
   })
-  scenario('全部洗完、瀝水籃滿了、水不夠，各自停手', ({ then, and }) => {
+  scenario('全部洗完、瀝水籃滿了、沒水，各自停手', ({ then, and, but }) => {
     then('沒有髒盤：洗好了', () => { expect(handStops(ready({ dirty: 0 }))).toBe('done') })
     and('瀝水籃滿了', () => { expect(handStops(ready({ drain: { n: DRAIN_CAP, left: 3 } as Drain }))).toBe('basketFull') })
-    and('水不到可以洗的高度', () => { expect(handStops(ready({ water: WASH_WATER / 2 }))).toBe('water') })
+    and('水龍頭關著、水槽也沒水', () => { expect(handStops(ready({ water: 0 }))).toBe('water') })
+    but('水龍頭開著，水槽空的也照洗（沖著洗）', () => { expect(handStops({ ...ready({ water: 0 }), tap: true })).toBeNull() })
   })
 })
 

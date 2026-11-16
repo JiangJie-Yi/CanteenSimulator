@@ -979,11 +979,15 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * odd, and not professional"): Roasting puts the customer on `want`; at the sake station on the serving counter (GuestBar3D's SakeStation: the
  * open bottle kept at the pass, in reach; the stand on the cook table is out of everyone's) the third cook, or with none a server, pours it
  * by hand, and a server carries it out on their tray and sets it at the customer's place; then they're on `ready` and Roasting has them
- * drink it. `open`: how full the station's open bottle is (a new one opened when it can't give another); `station`: whether there's a
- * station and someone to pour at it (none, Roasting sets it at their place itself after SAKE_WAIT_S)
+ * drink it. `open`: how full the station's open bottle is (a new one opened when it can't give another, only with sake left: item 199);
+ * `station`: whether there's a station and someone to pour at it (none, Roasting sets it at their place itself after SAKE_WAIT_S);
+ * `unpoured`: who's been sold a tokkuri that's still to be poured (its sake, taken from the stock as it was ordered, still in the bottle)
  */
-export const SAKE: { levels: number[]; served: number; want: number[]; ready: Set<number>; open: number; station: boolean } =
-  { levels: fullStand(), served: 0, want: [], ready: new Set(), open: 1, station: false }
+export const SAKE: { levels: number[]; served: number; want: number[]; ready: Set<number>; open: number; station: boolean; unpoured: Set<number> } =
+  { levels: fullStand(), served: 0, want: [], ready: new Set(), open: 1, station: false, unpoured: new Set() }
+/** the shop's sake not yet poured, in tokkuri (item 199): what's in stock, and what's been sold and is still to be poured; Infinity with no
+ * shop running */
+export const sakeLeft = () => { const have = SUPPLIES.has('Sake'); return have < 0 ? Infinity : have + SAKE.unpoured.size }
 /** the seats with a tokkuri of sake and its cup set at them (Roasting pours it for those who ordered it; GuestBar3D draws it; `SAKE.served`
  * counts each change, for the drawing to see) */
 export const SAKE_SEATS = new Set<number>()
