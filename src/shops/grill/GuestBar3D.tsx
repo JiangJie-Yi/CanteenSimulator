@@ -2795,6 +2795,12 @@ const WASH_EACH = 0.5
 const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegbasket', 'coalsack', 'servecounter'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
+/** with no cashier at the till (item 203: the register rang them up by itself): how long (the bar's clock, s) one waits there for a server to
+ * come round to it before paying as before (no one stuck at the door all night: the shop closing, every server tied up). At 30, on an
+ * ordinary evening x2 a server came for 12 of 20 (4 to 27 s); 45, a busy shop's wait */
+const TILL_WAIT_MAX = 45
+/** (the till's call taken by the third cook, not a server: tillCall's `staff`) */
+const TILL_BY_PLATER = 99
 /** where a takeaway waits in the genkan, off the line those paying walk out along (item 203): this far to its side, toward the till, and a
  * second this much further (the genkan's stone reaches 0.6 that way: tests/e2e/_genkan203.mjs) */
 const TAKEOUT_ASIDE = -0.25, TAKEOUT_NEXT = -0.3
@@ -3188,6 +3194,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** the cashier's chair (its seat's mark, Register's: it may be moved) in the bar's frame: where their hands are, turned round `turn` of the
    * way to the takeaway stand behind them (0: facing the till) */
   const seatMark = useRef<THREE.Object3D | null>(null)
+  /** a customer waiting at the till with no cashier sat at it (item 203): who, since when (the bar's clock), the server on their way to ring
+   * them up (their place in the line) and whether they're there behind it */
+  const tillCall = useRef<{ who: number; since: number; staff: number; there: boolean }>({ who: -1, since: 0, staff: -1, there: false })
+  /** where a server stands behind the till to ring someone up: the cashier's chair's place on the floor */
+  const tillStaffSpot = () => {
+    const fb = frame.current, m = seatMark.current
+    if (m && fb) { m.updateWorldMatrix(true, false); return fb.worldToLocal(m.getWorldPosition(new THREE.Vector3())).setY(0) }
+    return cashierHands(0).setY(0)
+  }
   const cashierHands = (turn: number) => {
     const fb = frame.current
     if (!seatMark.current?.parent && fb) { let root: THREE.Object3D = fb; while (root.parent) root = root.parent; seatMark.current = root.getObjectByName('cashier-seat') ?? null }
@@ -3273,6 +3288,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     | 'washGo' | 'wash' | 'unloadGo' | 'unloadTake' | 'unloadCarry' | 'unloadPut' | 'handGo' | 'handwash' | 'basketGo' | 'basketTake'
     | 'toBox' | 'boxTake' | 'toTill' | 'hand' | 'toStand' | 'standPut'
     | 'skTrayGo' | 'skTake' | 'skSinkGo' | 'skWash' | 'skHolderGo' | 'skPut'
+    | 'tillGo' | 'tillAt'
     | 'sweepGo' | 'sweep' | 'wipeFloor'
     | 'toSakePass' | 'sakePour' | 'sakeUp' | 'sakeGo' | 'sakeSet'
     | 'toBowlPass' | 'bowlUp' | 'toRiceFill' | 'bowlRice' | 'toSoupFill' | 'bowlSoup' | 'bowlGo' | 'bowlSet'
@@ -3339,6 +3355,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const platerRun = useRef<{ phase: 'idle' | 'toRack' | 'take' | 'toPass' | 'put' | 'home' | 'settle' | 'toSack' | 'scoopRaw' | 'toSink' | 'wash' | 'toKama' | 'load'
     | 'toRackLow' | 'takeLow' | 'toLow' | 'putLow'
     | 'toSkTray' | 'takeSk' | 'toSkSink' | 'washSk' | 'toHolder' | 'putSk'
+    | 'toTillBack' | 'atTill'
     | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir' | 'rake'
     | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate' | 'toSake' | 'pourSake' | 'toShape' | 'shape'
     | 'toRiceBowl' | 'riceBowl' | 'toSoupBowl' | 'soupBowl' | 'toBowlPass' | 'bowlPut'
@@ -4548,7 +4565,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __sakeJob: sakeJob, __sakeSpot: (n: number) => sakeSpotOf(n), __sakeAround: (n: number) => { const st = seats[n], c = counters[st.counter], x = st.mid.clone().sub(c.at).dot(c.along); return { plate: st.plate.clone(), soup: st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]), drink: new THREE.Vector3(...drinkSpot(n, false)), cup: new THREE.Vector3(...drinkSpot(n, true)) } }, __runs: runs, __sitters: sitters, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __sakeJob: sakeJob, __sakeSpot: (n: number) => sakeSpotOf(n), __sakeAround: (n: number) => { const st = seats[n], c = counters[st.counter], x = st.mid.clone().sub(c.at).dot(c.along); return { plate: st.plate.clone(), soup: st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]), drink: new THREE.Vector3(...drinkSpot(n, false)), cup: new THREE.Vector3(...drinkSpot(n, true)) } }, __runs: runs, __sitters: sitters, __tillCall: tillCall, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
 
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
@@ -5031,6 +5048,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (one with nothing to pay (gone before anything came, and nothing drunk) goes by the till without stopping (item 195: they paid the
         // whole bill, given back to them, into the drawer)); the money taken as the cash key's pressed, once
         const payD = lp.payD && paysAtTill(GUEST_BILLS.of(s.id)) ? lp.payD : 0
+        // (no cashier sat at the till: they wait at it, a server called round to ring them up (item 203: the register took their money by itself),
+        // and pay once one's behind it; at most TILL_WAIT_MAX, then as before)
+        {
+          const tc = tillCall.current
+          if (payD && raw >= payAt && raw < payAt + PAY_S * v && !cashierIn()) {
+            if (tc.who < 0) { tc.who = s.id; tc.since = clock.current; tc.there = false }
+            if (tc.who === s.id && !tc.there && clock.current - tc.since < TILL_WAIT_MAX) s.hold = (s.hold ?? 0) + dt
+          } else if (tc.who === s.id) { tc.who = -1; tc.there = false }
+        }
         if (payD && raw >= payAt + 0.44 * PAY_S * v && !TILL_CASH.paid.has(s.id)) payIn(s.id, billFor(s).bill, paysByCard(s.id), tenderOf(billFor(s).bill, s.id))
         // (in the queue for the till (the owner's): someone else at it paying, they wait a body's length back till it's free)
         // (or the cashier handing a takeaway's bag over it, item 203)
@@ -5070,7 +5096,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           if ((s.said ?? 0) < 2 && k > 0.12 && TILL_STATE.payer === s.id) {
             s.said = 2
             const bill = TILL_STATE.bill
-            STAFF_TALK.push({ key: performance.now() + s.id, id: 'role:cashier', text: LINES[lang].cashierThanks(`NT$${yen(bill)}`, Math.floor(getClock().minute / 60)), until: performance.now() + 3800 })
+            const tcs = tillCall.current.staff
+            const by = cashierIn() || tcs < 0 ? 'role:cashier' : tcs === TILL_BY_PLATER ? plater?.id ?? 'role:cashier' : ownerServes ? 'owner' : servers[tcs]?.id ?? 'role:cashier'
+            STAFF_TALK.push({ key: performance.now() + s.id, id: by, text: LINES[lang].cashierThanks(`NT$${yen(bill)}`, Math.floor(getClock().minute / 60)), until: performance.now() + 3800 })
           }
           if ((s.said ?? 0) < 3 && k > 0.62 && TILL_STATE.payer === s.id) {
             s.said = 3
@@ -5645,6 +5673,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               setOff(b.rice ? riceStand() : soupFillAt().stand, b.rice ? 'toRiceBowl' : 'toSoupBowl')
               away(true)
             }
+          } else if (tillCall.current.who >= 0 && tillCall.current.staff < 0 && !cashierIn() && given) {
+            // (someone waiting at the till with no cashier sat at it, no server free for it: round to the back of it to ring them up (item 203);
+            // the till's back reached from the kitchen as the takeaway stand behind it is (standSpots))
+            tillCall.current.staff = TILL_BY_PLATER
+            pl.pos.copy(home())
+            setOff(standSpots().edge, 'toTillBack')
+            pl.path.push(tillStaffSpot())
+            pl.len = pathLength(pl.path)
+            away(true)
           } else if (open && !SHOP.leaving && washGoes(SKEWERS.s) && !waiters.current.some((x) => SK_PHASES.has(x.phase))
             && (SKEWERS.s.clean <= WASH_LOW || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
             // (the used skewers piling up, or the clean ones' bucket nearly empty, and no server already on it: to the used bucket by the plating
@@ -5861,6 +5898,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         soapPlate(); meterWater('dish')
         setOff(skHolderSpot(), 'toHolder')
       } else if (pl.phase === 'toHolder') walk(() => { pl.phase = 'putSk'; faceTo(inBar('skewer-holder', pl.pos)) })
+      // (ringing someone up at the till (item 203): behind it, facing them, till they've paid; then home)
+      else if (pl.phase === 'toTillBack') walk(() => { pl.phase = 'atTill'; tillCall.current.there = tillCall.current.who >= 0; faceTo(payOf(counters).spot) })
+      else if (pl.phase === 'atTill') {
+        const tc = tillCall.current
+        if (tc.who >= 0 && !tc.there) tc.there = true
+        if (tc.who < 0 && pl.t > 0.6) { tc.staff = -1; tc.there = false; setOff(home(), 'home') }
+      }
       else if (pl.phase === 'putSk' && pl.t > 0.5) {
         SKEWERS.s = putBackClean(SKEWERS.s)
         rattleSound()
@@ -5897,7 +5941,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         else setOff(home(), 'home')
       }
       const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'toRackLow' || pl.phase === 'toLow' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama'
-        || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder'
+        || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder' || pl.phase === 'toTillBack'
         || pl.phase === 'toCrate' || pl.phase === 'toBucket' || pl.phase === 'toHearth' || pl.phase === 'toSoup' || pl.phase === 'toCoalSack' || pl.phase === 'toFill'
         || pl.phase === 'toShape'
       if (mv !== platerMoving) setPlaterMoving(mv)
@@ -6517,6 +6561,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // ready to carry out; the counter's stack in with the rest)
           const asked = open && ownerServes && HAND_WASH.ask === 'wash' && slot < 0 && dirty.current > 0 && !SHOP.leaving
           if (asked) { HAND_WASH.ask = null; PILE.n = 0 }
+          // (someone waiting at the till with no cashier: round to the back of it to ring them up, before anything else (item 203))
+          const tc = tillCall.current
+          if (tc.who >= 0 && tc.staff < 0 && !cashierIn() && given) {
+            tc.staff = wi
+            const st = standSpots(), to = tillStaffSpot()
+            const path = [...kitchenRoute(home.at, st.edge), to]
+            path[0] = w.pos.clone()
+            go(path, 'tillGo')
+            return
+          }
           const chore = SHOP.leaving ? null : asked ? 'handwash' : nextChore({ duty, serve: slot >= 0, dirty: dirtyNow.length, sink: atSink ? 0 : staffSink(dirty.current, PILE.n), rack: PLATE_RACK.n,
             // (the draining basket left as it is till the shop opens (the owner, 2026-11-15: "four clean ones in the basket to start, right?":
             // the day's first four, dry already, were carried off to the racks the moment the page came up, the basket bare); the player may)
@@ -6547,6 +6601,24 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
         }
       } else if (w.phase === 'fetch') walk(() => { w.phase = 'pickup'; face(plating.at) })
+      // ---- ringing up at the till with no cashier (item 203): behind it facing the customer, the register theirs till the customer's paid
+      else if (w.phase === 'tillGo') walk(() => {
+        w.phase = 'tillAt'
+        const tc = tillCall.current
+        tc.there = tc.who >= 0
+        face(payOf(counters).spot)
+      })
+      else if (w.phase === 'tillAt') {
+        const tc = tillCall.current
+        if (tc.who >= 0 && !tc.there) tc.there = true
+        // (paid and gone, or no one waiting any more: back the way they came)
+        if (tc.who < 0 && w.t > 0.6) {
+          tc.staff = -1
+          tc.there = false
+          const st = standSpots()
+          go([...kitchenRoute(home.at, st.edge), w.pos.clone()], 'back')
+        }
+      }
       // ---- the iron skewers (game/skewers): the used bucket emptied into their hands, washed at the sink, put back in the clean ones' bucket
       else if (w.phase === 'skTrayGo') walk(() => { w.phase = 'skTake'; face(inBar('skewer-tray', w.pos)) })
       else if (w.phase === 'skTake' && w.t > 0.6) { SKEWERS.s = pickUpDirty(SKEWERS.s); go(kitchenRoute(w.pos, sinkFront()), 'skSinkGo') }
