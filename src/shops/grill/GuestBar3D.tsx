@@ -40,7 +40,7 @@ import { PathMap } from './PathMap'
 import { ServeCounter } from './ServeCounter'
 import { PathVias, PathZones } from './PathZone'
 import { unlitShade } from '@/game/roomLights'
-import { StaffFigure, TRAY_AT as HELD_AT, WIPE_HAND, SHAPE_HAND, SweepBroom, ownerSweepPose, floorWipePose, OWNER_BEND } from '@/scene/StaffFigure'
+import { StaffFigure, TRAY_AT as HELD_AT, wipeStroke, SHAPE_HAND, SweepBroom, ownerSweepPose, floorWipePose, OWNER_BEND } from '@/scene/StaffFigure'
 import { CRATE, CRATE_FULL, useRiceTub } from './Decor'
 import { COAL_PER_ADD } from '@/game/coalPile'
 import { BossModel, drawnCentre } from './Boss'
@@ -2731,7 +2731,21 @@ const DIP_NEAR = 0.7, DIP_REACH = 0.21
 const RICE_BOWL_GEO = new THREE.CylinderGeometry(0.1, 0.07, 0.07, 16, 1, true).translate(0, 0.035, 0)
 const RICE_IN_GEO = new THREE.CylinderGeometry(0.092, 0.08, 0.025, 16)
 /** how long a server wipes the bar down where a plate was cleared: two strokes along and back */
-const WIPE_S = 1.1
+const WIPE_S = 1.6
+/**
+ * Clearing a place by hand (item 231, the owner's 「收東西跟擦桌子的動畫都還很不OK」: the plate slid off the bar onto the tray by itself, no hand
+ * near it, and the bar was wiped on one line twice in a second): from their arriving at the seat, the right hand goes out to the plate's
+ * rim and the left to the tray's side (CLEAR_REACH), the plate's lifted with the hand in a little arc onto the tray (CLEAR_LIFT) and let go
+ * (CLEAR_SET); then the cloth's out and the place wiped where it stood (WIPE_S), the tray still in the left hand. The shop's seconds.
+ */
+const CLEAR_REACH = 0.35, CLEAR_LIFT = 0.4, CLEAR_SET = 0.15
+const CLEAR_WIPE_AT = CLEAR_REACH + CLEAR_LIFT + CLEAR_SET
+/** each server's two hands while clearing (the world), and the scratch for finding them */
+const CLEAR_HANDS = [0, 1, 2, 3].map(() => ({ left: new THREE.Vector3(), right: new THREE.Vector3() }))
+const CLEAR_SIDE = new THREE.Vector3()
+/** how far out in front the wiping hand is in the figure's frame (StaffFigure's WIPE_HAND.z): the stroke's middle, for the cloth over the place */
+const WIPE_HAND_Z = 0.44
+const CLEAR_TOWARD = new THREE.Vector3()
 /** where they stand to wipe it: along the bar from the seat's middle (between its stool and the next), and back from the bar's middle line
  * (a step back from its edge, reaching to it: right up against it, their face was just over the top, at their shoulders) */
 const WIPE_STAND = [0.34, 0.53] as const
@@ -6661,7 +6675,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           w.phase = 'drop'
         }
       })
-      else if (w.phase === 'clearTake' && w.t > 0.45 + WIPE_S) {
+      else if (w.phase === 'clearTake' && w.t > CLEAR_WIPE_AT + WIPE_S) {
         // (another dirty plate at this counter still to take: on along the aisle to it; or back in through their gate, across to the sink)
         const next = runs.current.find((x) => (w.carry ?? []).includes(x.key) && x.phase === 'dirty')
         const st = seats[w.seat]
@@ -6779,8 +6793,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           const on = tray.clone().setY(tray.y + 0.006 + i * STACK_GAP)
           // (lifted off the bar onto the tray; and at the sink, down off it into the basin)
           if (w.phase === 'clearTake' && key === runs.current.find((x) => x.key === key && x.seat === w.seat)?.key) {
-            const k = Math.min(1, w.t / 0.4)
-            o.position.lerpVectors(r.from, on, k * k * (3 - 2 * k))
+            // (lifted with the right hand once it's reached it, in a little arc onto the tray (item 231))
+            const k = Math.min(1, Math.max(0, (w.t - CLEAR_REACH) / CLEAR_LIFT))
+            const sm = k * k * (3 - 2 * k)
+            o.position.lerpVectors(r.from, on, sm)
+            o.position.y += Math.sin(Math.PI * sm) * 0.05
           } else if (w.phase === 'drop') {
             const k = Math.min(1, w.t / 0.45)
             o.position.lerpVectors(on, dirtyAt(dirty.current + i), k * k * (3 - 2 * k))
@@ -6816,8 +6833,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (out on the floor, or gone to wash up for the player while the shop's shut (item 166): out either way, not at his place)
       if (ownerServes) ownerAway('serve', w.phase !== 'idle')
       // (the plate up on the tray, the bar where it was wiped down with a cloth, twice along and back (the owner's))
-      const wiping = w.phase === 'clearTake' && w.t > 0.45 && w.t < 0.45 + WIPE_S && w.seat >= 0
-      if (o) o.userData.wipe = wiping ? (w.t - 0.45) / WIPE_S : undefined
+      const wiping = w.phase === 'clearTake' && w.t > CLEAR_WIPE_AT && w.t < CLEAR_WIPE_AT + WIPE_S && w.seat >= 0
+      if (o) o.userData.wipe = wiping ? (w.t - CLEAR_WIPE_AT) / WIPE_S : undefined
       // (sweeping up broken glass: how long into it; the broom in hand there and back (StaffFigure, the owner's SweepBroom))
       // (wiping the floor after: stooped as they sweep, the broom put by, the cloth in their hand on the floor (item 116))
       // (wiping the floor its own: stooped as for the sweep, but the broom and the dustpan put by and the cloth in hand (item 164: the three
@@ -6826,8 +6843,25 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (washing up at the sink, by hand or into the washer: the scrubbing motion (StaffFigure's scrub))
       if (o) o.userData.scrub = w.phase === 'wash' || w.phase === 'handwash' ? w.t : undefined
       // (pouring a customer's sake themself (no plater): both hands where the pour has them (item 177)); and the tray it's carried out on
+      // (clearing a place: the right hand on the plate's rim as it's taken up and set on the tray, the left on the tray (item 231))
+      const clearHands = () => {
+        const f = frame.current
+        if (!f || wi >= CLEAR_HANDS.length) return false
+        const r = runs.current.find((x) => (w.carry ?? []).includes(x.key) && x.seat === w.seat && x.phase === 'taken')
+        const po = r ? runObjs.current.get(r.key) : undefined
+        if (!po) return false
+        const yaw = w.look ?? w.yaw
+        CLEAR_SIDE.set(Math.cos(yaw), 0, -Math.sin(yaw))
+        CLEAR_TOWARD.copy(w.pos).sub(po.position).setY(0)
+        if (CLEAR_TOWARD.lengthSq() < 1e-8) CLEAR_TOWARD.set(-Math.sin(yaw), 0, -Math.cos(yaw)); else CLEAR_TOWARD.normalize()
+        const H = CLEAR_HANDS[wi], tr = trayAt()
+        f.localToWorld(H.right.copy(po.position).addScaledVector(CLEAR_TOWARD, PLATE_R * 0.8 * (po.scale.x || 1)).setY(po.position.y + 0.012))
+        f.localToWorld(H.left.copy(tr).addScaledVector(CLEAR_SIDE, -0.11 * STAFF_SCALE).setY(tr.y + 0.01))
+        return true
+      }
       if (o) o.userData.handsAt = w.phase === 'sakePour' && SAKE_HANDS_ON.v ? SAKE_HANDS
-        : (w.phase === 'bowlRice' || w.phase === 'bowlSoup') && BOWL_HANDS_ON.v ? BOWL_HANDS : undefined
+        : (w.phase === 'bowlRice' || w.phase === 'bowlSoup') && BOWL_HANDS_ON.v ? BOWL_HANDS
+        : w.phase === 'clearTake' && w.t < CLEAR_WIPE_AT && clearHands() ? CLEAR_HANDS[wi] : undefined
       if (sakeJob.current?.server === wi) { SAKE_TRAY.copy(trayAt()); SAKE_TRAY_YAW.v = w.look ?? w.yaw }
       if (passQ.current.some((b) => b.server === wi)) bowlTrays.current.set(wi, { at: trayAt(), yaw: w.look ?? w.yaw })
       else bowlTrays.current.delete(wi)
@@ -6852,15 +6886,26 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         }
       }
       if (wiping) {
-        const st = seats[w.seat], c = counters[st.counter], p = (w.t - 0.45) / WIPE_S
+        const st = seats[w.seat], c = counters[st.counter], p = (w.t - CLEAR_WIPE_AT) / WIPE_S
         const stand = st.mid.clone().addScaledVector(c.lay, -WIPE_STAND[1]).addScaledVector(c.along, WIPE_STAND[0]).setY(w.pos.y)
         const yaw = Math.atan2(c.lay.x, c.lay.z)
         const k = Math.min(1, p / 0.15, (1 - p) / 0.15)
         wipeAt = { p: stand, yaw, k: k * k * (3 - 2 * k) }
         if (rag) {
-          const hand = new THREE.Vector3(0.06 + Math.sin(p * Math.PI * 4) * 0.12, 0, WIPE_HAND.z).multiplyScalar(STAFF_SCALE).applyAxisAngle(UP_Y, yaw)
-          rag.position.copy(stand).add(hand).setY(top + 0.006)
-          rag.rotation.y = yaw + Math.PI / 2 + Math.sin(p * Math.PI * 4) * 0.25
+          // (the cloth over where the plate stood (item 231: it wiped the bar in front of where they stood, beside the place), worked along it
+          // and in toward them (StaffFigure's wipeStroke), the right hand on it, the left on the tray)
+          const [wx, wz] = wipeStroke(p)
+          const place = plateAt(w.seat)
+          rag.position.copy(place).addScaledVector(c.along, (wx - 0.06) * STAFF_SCALE * 1.15).addScaledVector(c.lay, (wz - WIPE_HAND_Z) * STAFF_SCALE * 1.15).setY(top + 0.006)
+          rag.rotation.y = yaw + Math.PI / 2 + Math.cos(p * Math.PI * 3 - Math.PI / 2) * 0.3
+          const f = frame.current
+          if (f && wi < CLEAR_HANDS.length) {
+            const H = CLEAR_HANDS[wi], tr = trayAt()
+            f.localToWorld(H.right.copy(rag.position).setY(top + 0.03))
+            CLEAR_SIDE.set(Math.cos(yaw), 0, -Math.sin(yaw))
+            f.localToWorld(H.left.copy(tr).addScaledVector(CLEAR_SIDE, -0.11 * STAFF_SCALE).setY(tr.y + 0.01))
+            if (o) o.userData.handsAt = H
+          }
         }
       }
       // (going home only once what's in hand is put down: a plate carried to the sink, a stack to the racks; the owner saw the plates of a

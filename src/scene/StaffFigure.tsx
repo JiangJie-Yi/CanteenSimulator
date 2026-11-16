@@ -212,6 +212,10 @@ const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.3
 const REACH_A = new THREE.Vector3(), REACH_B = new THREE.Vector3()
 /** the hand wiping the bar down: up on the cloth, out in front (GuestBar3D lays the cloth under it, from the same reach) */
 export const WIPE_HAND = { y: 0.83, z: 0.44 }
+/** where the hand (and the cloth under it) is `p` (0..1) into a wipe of the bar, in the figure's own frame (x across, z out in front): three
+ * strokes side to side, worked in from the far side of the place toward them, as crumbs are wiped (item 231, the owner's 「收東西跟擦桌子的動畫都還
+ * 很不OK」: it went to and fro on one line, twice, in a second) */
+export const wipeStroke = (p: number): [number, number] => [0.06 + 0.13 * Math.sin(p * Math.PI * 3 - Math.PI / 2), WIPE_HAND.z + 0.06 - 0.12 * Math.min(1, Math.max(0, p))]
 /** the hands shaping a rice ball at the rice-ball counter: out over its board (GuestBar3D holds the ball between them, from the same reach) */
 // (the counter's top is up at the chest: the board's at 0.98 of a figure's height units, a step out before them)
 export const SHAPE_HAND = { y: 0.96, z: 0.55 }
@@ -642,7 +646,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       if (job?.wipe !== undefined && sd > 0) {
         // (wiping the bar down: the hand out in front, its palm down on the cloth on the bar's top (0.79 the cloth at a server's height, the
         // hand's middle a hand's thickness up from it: at 0.79 half of it was in the bar), along and back twice)
-        hand.position.set(0.06 + Math.sin(job.wipe * Math.PI * 4) * 0.12, WIPE_HAND.y, WIPE_HAND.z)
+        const [wx, wz] = wipeStroke(job.wipe)
+        hand.position.set(wx, WIPE_HAND.y, wz)
         hand.rotation.x = -1.3
       }
       if (cook && fanning && sd > 0) {
