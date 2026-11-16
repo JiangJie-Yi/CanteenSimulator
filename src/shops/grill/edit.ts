@@ -296,6 +296,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-26', ['sake', 'lantern']],
   ['jgs-edit-relaid-27', ['shrinelamp-1', 'shrinelamp1']],
   ['jgs-edit-relaid-28', Array.from({ length: 8 }, (_, n) => [`chopsticks${n}`, `chopstickpair${n}`]).flat()],
+  // (the side bar's four sets set along it as the long bar's are (item 198))
+  ['jgs-edit-relaid-29', Array.from({ length: 4 }, (_, n) => [`chopsticks${n + 4}`, `chopstickpair${n + 4}`]).flat()],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -377,8 +379,11 @@ export const useListHot = (id: string) =>
  */
 export const BASES: Record<string, V3> = {
   // (every place's chopsticks and their rest along the bar together (item 157, the owner's, 2026-11-15: Z 0.3125 in the chopsticks' own frame,
-  // the rest going with them): the long bar's places along their parent's x, the side bar's along its z)
-  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [[`chopsticks${n}`, n < 4 ? [0.3125, 0, 0] : [0, 0, 0.3125]], [`chopstickpair${n}`, n < 4 ? [0.3125, 0, 0] : [0, 0, 0.3125]]]).flat()) as Record<string, V3>,
+  // the rest going with them): along the bar at both bars, each set 0.40 beside its place and away from the corner, the long bar's toward
+  // its door, the side bar's toward its gate (item 198, the owner's: 「客人桌檯的規畫有夠隨便」: the side bar's were put along its z, which there
+  // runs across the bar: its four sets 0.31 deeper than the long bar's, the two bars set two ways; and along it the same way as the long
+  // bar's, the corner place's set went off the bar's end, its place 0.19 from it)
+  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [[`chopsticks${n}`, [n < 4 ? 0.3125 : -0.4925, 0, 0]], [`chopstickpair${n}`, [n < 4 ? 0.3125 : -0.4925, 0, 0]]]).flat()) as Record<string, V3>,
   // (the helmet's stand and the helmet on it moved along the wall from beside the staff's door to under the round window's left half, just
   // left of the lucky cats' red stand, 4 cm clear of it (item 92, the owner's, 2026-11-14, its arrow's end): 2.83 m along the wall, measured;
   // both their parents count two to one)
