@@ -22,7 +22,7 @@ import { atlasModel } from '@/scene/atlasMerge'
 import { glowOnly } from '@/scene/hoverGlow'
 import { canCookByHand, modeOf, showsProgress } from '@/game/mode'
 import { FLOWS, flowOf, hourGap, wantOf, type FlowKind } from '@/game/flow'
-import { COAL_MAX, COAL_PER_ADD, crumble, glowingFor, standStick, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
+import { bedStick, COAL_MAX, COAL_PER_ADD, crumble, glowingFor, roomFor, surfaceY, type Lay, throwForce } from '@/game/coalPile'
 import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
@@ -690,6 +690,8 @@ const COAL_KINDLE_S = 22
 const PIT_SALT_RISE = 2.4
 /** how much higher the pit (its stones, coals and net) stands than it was modelled, with the flames and smoke over it */
 export const PIT_LIFT = 0
+/** the way the charcoal's rows run in its bed: along the table, as the hearth's frame does (item 211) */
+const BED_TURN = Math.atan2(ALONG.z, ALONG.x)
 const PIT_PARTS = /^(FirePit|Stone|Robuchi|Charcoal|BinchotanHeap)/
 /** the stone ring's outer edge: nothing can be pushed into the fire */
 const RING_CLEAR = 1.15 * PIT_SCALE
@@ -4797,7 +4799,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     if (sparkPts.current.length > SPARKS * 2) sparkPts.current.splice(0, sparkPts.current.length - SPARKS * 2)
   }
-  /** each stick's pose as it stands in the bundle (game/coalPile's standStick: upright, its foot on the bed, leaning in) */
+  /** each stick's pose as it lies in the bed (game/coalPile's bedStick: flat, side by side, the next layer across) */
   const restack = () => {
     for (const c of coals.current) {
       if (!c || c.gone || c.dying) continue
@@ -4826,7 +4828,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (!roomForCoal()) return false
     const lying: Lay[] = []
     for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
-    return !!standStick(lying, Math.random, PIT_LIFT) || coals.current.some((c) => c && !c.gone && !c.dying && ashedOut(c))
+    return !!bedStick(lying, Math.random, PIT_LIFT, BED_TURN) || coals.current.some((c) => c && !c.gone && !c.dying && ashedOut(c))
   }
   /** charcoal onto the fire: a load (the chef, the button), or `count` sticks (one, dragged from the crate by hand) */
   /** a handful of charcoal: six or seven sticks */
@@ -4847,21 +4849,21 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     for (const c of coals.current) if (c && !c.gone && !c.dying) lying.push({ x: c.tx, z: c.tz, yaw: c.yaw, y: c.top, slope: c.slope })
     let placed = 0
     for (let k = 0; k < n; k++) {
-      // (each stood in its own place in the bundle, one after another, from the middle out, as charcoal's built round a robatayaki's fire;
-      // when every place is taken, the oldest stick that's burnt to ash is cleared to make one, and when even that leaves none, the rest stay
-      // in the crate)
-      let spot = standStick(lying, Math.random, PIT_LIFT)
+      // (each laid in its own place in the bed, one after another, from the middle out, as a robatayaki's binchotan is laid (item 211: they
+      // were stood up in rings, a campfire under the net); when every place is taken, the oldest stick that's burnt to ash is cleared to make
+      // one, and when even that leaves none, the rest stay in the crate)
+      let spot = bedStick(lying, Math.random, PIT_LIFT, BED_TURN)
       for (let tries = 0; !spot && tries < 3; tries++) {
         const oldest = coals.current.find((c) => c && !c.gone && !c.dying && ashedOut(c))
         if (!oldest) break
         oldest.dying = true
         const at = lying.findIndex((l) => l.x === oldest.tx && l.z === oldest.tz)
         if (at >= 0) lying.splice(at, 1)
-        spot = standStick(lying, Math.random, PIT_LIFT)
+        spot = bedStick(lying, Math.random, PIT_LIFT, BED_TURN)
       }
       if (!spot) break
       const { x: tx, z: tz, yaw, rest } = spot
-      // (stood straight into its place in the bundle)
+      // (laid straight into its place in the bed)
       const ly = rest.y
       lying.push({ x: tx, z: tz, yaw, y: rest.y, slope: rest.slope })
       // (the charcoal as it came from the crate; the cracks light up only as it heats (the emissive map))

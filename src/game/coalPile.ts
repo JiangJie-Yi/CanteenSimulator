@@ -199,42 +199,67 @@ export function throwForce(speed: number, stillFor: number) {
   return Math.min(1, speed / 3.5)
 }
 
-/** the standing charcoal's places: rings round the middle of the fire (their radii, and how many each holds), the inner filled first */
-export const STAND_RINGS: [number, number][] = [[0.09, 6], [0.19, 10], [0.29, 14], [0.39, 18]]
-/** how far in each one's top comes, of where its foot is: they lean in together, their tops gathering over the fire */
-const STAND_TOP = 0.6
 /**
- * The next stick stood up round the fire, the way charcoal's built at a robatayaki: upright pieces in rings round the middle, each leaning in
- * so its top comes in toward the others' (the outer rings more), like the sticks of a fire laid in a cone, the flames coming up between
- * them; the inner rings filled first, each ring's places set between the last ring's. Returns its middle (as a Lay's: the way it leans as
- * yaw, how steeply it rises along it as slope), or null when every place is taken.
+ * The bed the charcoal's laid in (item 211, the owner's 202 A: a real robatayaki's binchotan laid flat, side by side, not stood up as a
+ * campfire under the net): rows of sticks across the hearth's middle, `PER_ROW` end to end in each, the rows a stick's width and a hair
+ * apart; the next layer laid across the first. The middle first, then out to either side, so a small fire's a compact bed under the net.
+ * Kept clear of the trivet's feet (`FEET`) so its legs stand in the ash between the rows.
  */
-export function standStick(stood: Lay[], rnd: () => number = Math.random, lift = 0) {
-  const feet = stood.map((l) => {
-    const k = 1 / Math.hypot(1, l.slope)
-    return { x: l.x - Math.cos(l.yaw) * STICK_HALF * k, z: l.z - Math.sin(l.yaw) * STICK_HALF * k }
-  })
-  for (let r = 0; r < STAND_RINGS.length; r++) {
-    const [rad, n] = STAND_RINGS[r]
-    // (each ring turned half a place from the last, so the pieces stand staggered, not in lines)
-    const free: number[] = []
-    for (let i = 0; i < n; i++) {
-      const a = ((i + (r % 2) * 0.5) / n) * Math.PI * 2
-      const x = Math.cos(a) * rad, z = Math.sin(a) * rad
-      if (!feet.some((f) => Math.hypot(f.x - x, f.z - z) < (Math.PI * 2 * rad) / n * 0.5)) free.push(a)
+export const BED_ROWS = 13
+export const BED_PER_ROW = 3
+const BED_GAP = 0.008
+/** where the trivet's three feet stand in the bed (plan x, z: blender/grilledfish.py's FOOT_R, its legs at 90, 210 and 330 degrees, the model's
+ * y the plan's -z), and how much room each needs */
+export const FEET: [number, number][] = [0, 1, 2].map((k) => {
+  const a = Math.PI / 2 + (k * 2 * Math.PI) / 3
+  return [Math.cos(a) * 0.4, -Math.sin(a) * 0.4] as [number, number]
+})
+const FOOT_ROOM = 0.06
+
+/** the places of a layer, the middle first: each one's middle in plan and the way it lies (`turn`: the way the hearth's frame runs, its rows
+ * along it) */
+function bedPlaces(layer: number, turn: number) {
+  const pitch = 2 * STICK_R + BED_GAP, len = 2 * STICK_HALF + BED_GAP
+  const rows = Array.from({ length: BED_ROWS }, (_, i) => i - (BED_ROWS - 1) / 2).sort((a, b) => Math.abs(a) - Math.abs(b) || a - b)
+  const along = Array.from({ length: BED_PER_ROW }, (_, j) => j - (BED_PER_ROW - 1) / 2).sort((a, b) => Math.abs(a) - Math.abs(b) || a - b)
+  const out: { x: number; z: number; yaw: number }[] = []
+  // (the first layer along the hearth's length, the next across it)
+  const yaw = turn + (layer % 2 === 1 ? Math.PI / 2 : 0)
+  const dx = Math.cos(yaw), dz = Math.sin(yaw)
+  for (const r of rows) for (const a of along) {
+    const u = a * len, v = r * pitch
+    out.push({ x: dx * u - dz * v, z: dz * u + dx * v, yaw })
+  }
+  return out
+}
+
+/** whether a stick lying here would stand on one of the trivet's feet */
+function onFoot(x: number, z: number, yaw: number) {
+  const dx = Math.cos(yaw), dz = Math.sin(yaw)
+  for (const [fx, fz] of FEET) {
+    const u = Math.max(-STICK_HALF, Math.min(STICK_HALF, (fx - x) * dx + (fz - z) * dz))
+    if (Math.hypot(fx - (x + dx * u), fz - (z + dz * u)) < FOOT_ROOM + STICK_R) return true
+  }
+  return false
+}
+
+/**
+ * The next stick laid in the bed: the first free place of the lowest layer that has one (the middle first), resting on the salt or across
+ * the layer under it (restOf), a little off square; null when the bed's full (MAX_BED_LAYERS deep).
+ */
+export const MAX_BED_LAYERS = 2
+export function bedStick(laid: Lay[], rnd: () => number = Math.random, lift = 0, turn = 0) {
+  for (let layer = 0; layer < MAX_BED_LAYERS; layer++) {
+    for (const p of bedPlaces(layer, turn)) {
+      if (onFoot(p.x, p.z, p.yaw)) continue
+      if (laid.some((l) => Math.hypot(l.x - p.x, l.z - p.z) < STICK_R * 1.4 && Math.abs(Math.sin(l.yaw - p.yaw)) < 0.5)) continue
+      const x = p.x + (rnd() - 0.5) * 0.008, z = p.z + (rnd() - 0.5) * 0.008, yaw = p.yaw + (rnd() - 0.5) * 0.06
+      // (held up only by the layer under it, laid across it: not by its neighbours end to end in its own row, the ends a hair apart)
+      const rest = restOf(x, z, yaw, laid.filter((l) => Math.abs(Math.sin(l.yaw - yaw)) > 0.5), lift)
+      // (the second layer only where there's the first under it: never a stick of it down on the salt)
+      if (layer > 0 && rest.y - surfaceY(x, z, lift) < STICK_R * 2.5) continue
+      return { x, z, from: { x, z }, yaw, rest }
     }
-    if (!free.length) continue
-    const a = free[Math.floor(rnd() * free.length)] + (rnd() - 0.5) * 0.08
-    const fr = rad + (rnd() - 0.5) * 0.01
-    const fx = Math.cos(a) * fr, fz = Math.sin(a) * fr
-    // (leaning in: its top a little in from over its foot, the length of a stick up)
-    const inward = fr * (1 - STAND_TOP)
-    const lean = Math.atan2(inward, STICK_HALF * 2)
-    const yaw = a + Math.PI + (rnd() - 0.5) * 0.12
-    const c = Math.sin(lean), up = Math.cos(lean)
-    const x = fx + Math.cos(yaw) * STICK_HALF * c, z = fz + Math.sin(yaw) * STICK_HALF * c
-    const y = surfaceY(fx, fz, lift) + STICK_HALF * up
-    return { x, z, from: { x, z }, yaw, rest: { y, slope: up / c } }
   }
   return null
 }

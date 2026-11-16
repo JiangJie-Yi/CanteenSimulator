@@ -3444,7 +3444,15 @@ dw.matrix_parent_inverse = dipper.matrix_world.inverted()
 
 # ---------------------------------------------------------------------------------------------------------
 # a wire grill net (焼き網) over the coals for toasting mochi (切り餅) on, sat on a cast-iron trivet (五徳)
-NET_Z = 0.82          # (set up high over the coals, clear of the charcoal stood under it)
+# (item 211, the owner's 202 A: the charcoal laid flat in a bed (game/coalPile's bedStick, two layers at most: their top 0.34 at the middle),
+# the net on a low trivet a hand over it; it was set up high (0.82) over charcoal stood up in rings, a campfire through the net)
+NET_Z = 0.46
+# (the bed's salt at a place, as the game has it (game/coalPile's surfaceY: the pit drawn bigger and its salt heaped higher there), for the
+# trivet's feet to stand on it, neither in the air nor sunk)
+def bed_salt(r):
+    return 0.212 * max(0.0, 1 - (r / 1.15) ** 2) ** 0.85
+# (where the trivet's three feet stand: game/coalPile's FEET, the bed kept clear round them)
+FOOT_R = 0.4
 NET_R = 0.34
 wires = []
 # (the net's woven wires: one flat disc, the wires a picture on it cut out by its alpha (item 85, the owner's, 2026-11-14: "far too many
@@ -3491,9 +3499,9 @@ for sd in (-1, 1):
     pts = [(sd * (NET_R + 0.05 * math.sin(math.pi * u)), 0.06 * math.cos(math.pi * u), NET_Z + 0.012 * math.sin(math.pi * u)) for u in [k / 4 for k in range(5)]]
     for q0, q1 in zip(pts, pts[1:]):
         wires.append(stick_between(q0, q1, 0.005, M["net"], "Handle", sides=4))
-# (the trivet under it: an iron ring a little below the net, three claws up from it holding the net, three legs bowing out from it to the
-# salt, each with a little round foot)
-TRZ = NET_Z - 0.07
+# (the trivet under it: an iron ring a little below the net, three claws up from it holding the net, three short legs out and down from it to
+# the salt between the bed's rows (item 211), each with a little round foot on it)
+TRZ = NET_Z - 0.06
 ring(NET_R * 0.86, TRZ, 0.009, 24, "Trivet")
 for k in range(3):
     a = math.radians(90 + 120 * k)
@@ -3502,14 +3510,15 @@ for k in range(3):
     # (claw: up from the ring and hooked over the net's rim)
     wires.append(stick_between((r0 * ca, r0 * sa, TRZ), (r0 * ca, r0 * sa, NET_Z - 0.006), 0.007, M["net"], "Claw"))
     wires.append(stick_between((r0 * ca, r0 * sa, NET_Z - 0.006), ((NET_R + 0.012) * ca, (NET_R + 0.012) * sa, NET_Z + 0.008), 0.006, M["net"], "Claw"))
-    # (leg: out and down in a bow, three straight pieces)
+    # (leg: out and down, a little bowed, two straight pieces, to its foot on the salt)
+    fz = bed_salt(FOOT_R) + 0.01
     pts = [(r0 * ca, r0 * sa, TRZ)]
-    for u in (0.35, 0.7, 1.0):
-        rr = r0 + NET_R * 0.42 * math.sin(u * math.pi / 2)
-        pts.append((rr * ca, rr * sa, TRZ * (1 - u) ** 1.3))
+    for u in (0.5, 1.0):
+        rr = r0 + (FOOT_R - r0) * math.sin(u * math.pi / 2)
+        pts.append((rr * ca, rr * sa, TRZ + (fz - TRZ) * u ** 1.2))
     for q0, q1 in zip(pts, pts[1:]):
         wires.append(stick_between(q0, q1, 0.009, M["net"], "Leg"))
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.02, depth=0.01, location=(pts[-1][0], pts[-1][1], 0.005))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.02, depth=0.01, location=(pts[-1][0], pts[-1][1], fz - 0.005))
     wires.append(finish(active(), "Foot", M["net"]))
 # (its mesh named as it is: the game finds its parts (a group, two materials) by it, to draw no ink line round them nor shadow)
 join(wires, "GrillNet").data.name = "GrillNet"

@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { afterCharcoal, canAddCharcoal } from '@/game/economy'
-import { CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, glowingFor, MAX_LAYERS, placeStick, roomFor, standStick, STICK_HALF, STICK_R, surfaceY, throwForce, type Lay } from '@/game/coalPile'
+import { bedStick, CHUNK_R, COAL_MAX, COAL_PER_ADD, crumble, FEET, glowingFor, MAX_BED_LAYERS, MAX_LAYERS, placeStick, roomFor, STICK_HALF, STICK_R, surfaceY, throwForce, type Lay } from '@/game/coalPile'
 
 const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const lay = (s: NonNullable<ReturnType<typeof placeStick>>): Lay => ({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
@@ -152,40 +152,47 @@ feature('炭貼著鹽床，不會浮空', () => {
   })
 })
 
-feature('炭立著圍成一圈靠在一起（像爐端燒的炭火）', () => {
-  scenario('一根根放上去的炭都立著，腳貼著炭床，往中間靠，一圈圈由內往外圍', ({ given, when, then, and }) => {
-    given('空的炭床', (w) => { w.stood = [] as Lay[] })
-    when('立上三十根炭', (w) => {
-      let seed = 9
-      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-      for (let i = 0; i < 30; i++) {
-        const s = standStick(w.stood, rnd)
-        if (!s) break
-        w.stood.push({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
+feature('炭平鋪成一床（像真的爐端燒，第 211 項：店主 202 選 A）', () => {
+  const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const fill = (n: number) => {
+    const rnd = seeded(9), laid: Lay[] = []
+    for (let i = 0; i < n; i++) {
+      const s = bedStick(laid, rnd)
+      if (!s) break
+      laid.push({ x: s.x, z: s.z, yaw: s.yaw, y: s.rest.y, slope: s.rest.slope })
+    }
+    return laid
+  }
+  scenario('一根根放上去的炭都平躺，一排排並排，由中間往兩邊鋪', ({ given, then, and }) => {
+    given(`鋪上 ${COAL_MAX} 根`, (w) => { w.laid = fill(COAL_MAX) })
+    then(`${COAL_MAX} 根都鋪得上去`, (w) => { expect((w.laid as Lay[]).length).toBe(COAL_MAX) })
+    and('每一根都是躺著的（斜度不超過 15°）', (w) => { for (const l of w.laid as Lay[]) expect(Math.abs(Math.atan(l.slope))).toBeLessThan((15 * Math.PI) / 180) })
+    and(`不超過 ${MAX_BED_LAYERS} 層`, (w) => {
+      for (const l of w.laid as Lay[]) expect(l.y - surfaceY(l.x, l.z)).toBeLessThanOrEqual(STICK_R + (MAX_BED_LAYERS - 1) * 2 * STICK_R + 0.02)
+    })
+    and('前幾根在床的中間', () => { for (const l of fill(6)) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.36) })
+  })
+  scenario('炭不浮空、不陷進鹽床，彼此不重疊', ({ given, then, and }) => {
+    given('鋪滿的床', (w) => { w.laid = fill(COAL_MAX) })
+    then('第一層貼著鹽床', (w) => {
+      for (const l of (w.laid as Lay[]).filter((x) => x.y - surfaceY(x.x, x.z) < STICK_R * 2)) expect(Math.abs(l.y - (surfaceY(l.x, l.z) + STICK_R))).toBeLessThan(0.03)
+    })
+    and('同一層的兩根中心至少隔一根炭的寬度', (w) => {
+      const ls = w.laid as Lay[]
+      for (let i = 0; i < ls.length; i++) for (let j = i + 1; j < ls.length; j++) {
+        if (Math.abs(ls[i].y - ls[j].y) > STICK_R) continue
+        expect(Math.hypot(ls[i].x - ls[j].x, ls[i].z - ls[j].z)).toBeGreaterThan(STICK_R * 1.8)
       }
     })
-    then('三十根都立得上去', (w) => { expect(w.stood.length).toBe(30) })
-    and('每一根都是立著的（離垂直不超過 30°）', (w) => {
-      for (const l of w.stood as Lay[]) expect(Math.atan(1 / l.slope)).toBeLessThan((30 * Math.PI) / 180)
-    })
-    and('每一根的腳都踩在炭床上（不浮空、不陷進去）', (w) => {
-      for (const l of w.stood as Lay[]) {
-        const k = 1 / Math.hypot(1, l.slope)
-        const foot = { x: l.x - Math.cos(l.yaw) * STICK_HALF * k, z: l.z - Math.sin(l.yaw) * STICK_HALF * k, y: l.y - l.slope * STICK_HALF * k }
-        expect(Math.abs(foot.y - surfaceY(foot.x, foot.z))).toBeLessThan(0.02)
+  })
+  scenario('五德的三隻腳站的地方留空，炭不會壓在腳上', ({ given, then }) => {
+    given('鋪滿的床', (w) => { w.laid = fill(COAL_MAX) })
+    then('每一根離五德的腳都有一隻腳的空間', (w) => {
+      for (const l of w.laid as Lay[]) for (const [fx, fz] of FEET) {
+        const dx = Math.cos(l.yaw), dz = Math.sin(l.yaw)
+        const u = Math.max(-STICK_HALF, Math.min(STICK_HALF, (fx - l.x) * dx + (fz - l.z) * dz))
+        expect(Math.hypot(fx - (l.x + dx * u), fz - (l.z + dz * u))).toBeGreaterThan(STICK_R)
       }
-    })
-    and('每一根都往中間靠（頂端比腳更靠近中央）', (w) => {
-      for (const l of w.stood as Lay[]) {
-        if (Math.hypot(l.x, l.z) < 0.03) continue
-        const top = { x: l.x + Math.cos(l.yaw) * 0.1, z: l.z + Math.sin(l.yaw) * 0.1 }
-        expect(Math.hypot(top.x, top.z)).toBeLessThan(Math.hypot(l.x, l.z))
-      }
-    })
-    and('圍在火的中央：腳都在火床中間，彼此不重疊', (w) => {
-      const ls = w.stood as Lay[]
-      for (const l of ls) expect(Math.hypot(l.x, l.z)).toBeLessThan(0.42)
-      for (let i = 0; i < ls.length; i++) for (let j = i + 1; j < ls.length; j++) expect(Math.hypot(ls[i].x - ls[j].x, ls[i].z - ls[j].z)).toBeGreaterThan(STICK_R * 1.8)
     })
   })
 })
