@@ -3751,11 +3751,14 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** how high a figure stands for the stool, eased (the day's audit, item 221: at x2, a frame a tenth of a second, a server crossed its edge's
    * ramp in a frame and went 0.32 up in it, 46 times a day): toward what stoolY has there, no faster than a step's climb (STOOL_CLIMB), kept
    * on the figure */
+  // (kept in a map of its own, not on the figure's userData: React hands a waiter's group a new userData each time the bar redraws, and the
+  // second day's audit still saw seven of them go 0.32 up in a frame)
+  const stoolLifts = useRef(new WeakMap<THREE.Object3D, number>())
   const stoolLift = (o: THREE.Object3D, p: THREE.Vector3, dt: number) => {
     const want = stoolY(p)
-    const was = o.userData.stoolLift as number | undefined
+    const was = stoolLifts.current.get(o)
     const now = was === undefined ? want : was + THREE.MathUtils.clamp(want - was, -STOOL_CLIMB * dt, STOOL_CLIMB * dt)
-    o.userData.stoolLift = now
+    stoolLifts.current.set(o, now)
     return now
   }
   /** a place before the sink brought onto the stool's top, clear of its edges (where those washing stand: up on it, item 221) */
