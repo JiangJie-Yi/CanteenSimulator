@@ -1144,6 +1144,12 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       out.push(grp.localToWorld(new THREE.Vector3(x * co + z * si, y, -x * si + z * co)).toArray() as V3)
     }
     return out
+  }, () => {
+    // (the frame its offset is kept in, in the world: a move of the others picked with it goes by it (item 280))
+    const par = gw.current
+    if (!par) return null
+    par.updateWorldMatrix(true, false)
+    return par.matrixWorld.elements.slice()
   }), [id, label, camera, controls, parentPiece])
 
   // (the groups this piece is in, if any has been moved, turned or sized: their moves, turns and sizes laid over the piece as one, each about its

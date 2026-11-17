@@ -733,10 +733,37 @@ export function redo() {
   save()
   emit()
 }
-/** a piece moved (live, while it's dragged) */
+/** a direction (not a point) through a world matrix's turn and size (its 3x3, three's column-major elements), and back through its inverse */
+const dirOut = (e: number[], d: V3): V3 => [e[0] * d[0] + e[4] * d[1] + e[8] * d[2], e[1] * d[0] + e[5] * d[1] + e[9] * d[2], e[2] * d[0] + e[6] * d[1] + e[10] * d[2]]
+function dirIn(e: number[], w: V3): V3 {
+  const [a, d, g] = [e[0], e[1], e[2]], [b, ee, h] = [e[4], e[5], e[6]], [c, f, i] = [e[8], e[9], e[10]]
+  const A = ee * i - f * h, B = f * g - d * i, C = d * h - ee * g
+  const det = a * A + b * B + c * C
+  if (Math.abs(det) < 1e-12) return [0, 0, 0]
+  const D = c * h - b * i, E = a * i - c * g, F = b * g - a * h, G = b * f - c * ee, H = c * d - a * f, I = a * ee - b * d
+  return [(A * w[0] + D * w[1] + G * w[2]) / det, (B * w[0] + E * w[1] + H * w[2]) / det, (C * w[0] + F * w[1] + I * w[2]) / det]
+}
+/** the others picked along with the one chosen (Ctrl- or Shift-clicked in the list): what's done to it is done to them too (item 280, the
+ * owner's 「沒法shift group」: the pieces Shift-picked stayed where they were while the one chosen was moved; only grouped did they go along) */
+const alongWith = (id: string) => (id === state.selected ? state.picked.filter((x) => x !== id && !state.groups[x] && registry.has(x)) : [])
+/** a piece moved (live, while it's dragged); the others picked with it moved the same way in the world, each in its own parent's frame */
 export function moveTo(id: string, v: V3) {
   if (state.groups[id]) state.groups = { ...state.groups, [id]: { ...state.groups[id], t: v } }
-  else state.offsets = { ...state.offsets, [id]: v }
+  else {
+    const others = alongWith(id), m = others.length ? registry.get(id)?.frame?.() : null
+    const was = offsetOf(id), d: V3 = [v[0] - was[0], v[1] - was[1], v[2] - was[2]]
+    const next = { ...state.offsets, [id]: v }
+    if (m && d.some((x) => Math.abs(x) > 1e-9)) {
+      const w = dirOut(m, d)
+      for (const o of others) {
+        const mo = registry.get(o)?.frame?.()
+        if (!mo) continue
+        const l = dirIn(mo, w), oo = offsetOf(o)
+        next[o] = [oo[0] + l[0], oo[1] + l[1], oo[2] + l[2]]
+      }
+    }
+    state.offsets = next
+  }
   state.selected = id; emit()
 }
 /** a piece's place put right to where it's ended up (the cook table's nudged things, pushed clear of what they'd go through): its box and handles
@@ -744,7 +771,12 @@ export function moveTo(id: string, v: V3) {
 export function settleOffset(id: string, v: V3) { state.offsets = { ...state.offsets, [id]: v }; emit() }
 export function turnTo(id: string, v: V3) {
   if (state.groups[id]) state.groups = { ...state.groups, [id]: { ...state.groups[id], yaw: v[1], r: v } }
-  else state.rotations = { ...state.rotations, [id]: v }
+  else {
+    // (the others picked with it turned as much, each about itself (item 280))
+    const was = rotationOf(id), next = { ...state.rotations, [id]: v }
+    for (const o of alongWith(id)) { const r = rotationOf(o); next[o] = [r[0] + v[0] - was[0], r[1] + v[1] - was[1], r[2] + v[2] - was[2]] }
+    state.rotations = next
+  }
   state.selected = id; emit()
 }
 export function scaleTo(id: string, v: V3) {
@@ -755,7 +787,16 @@ export function scaleTo(id: string, v: V3) {
     const was = g.s
     const s = v.find((x) => Math.abs(x - was) > 1e-9) ?? was
     state.groups = { ...state.groups, [id]: { ...g, s: Math.max(0.05, Math.min(20, s)) } }
-  } else state.scales = { ...state.scales, [id]: v }
+  } else {
+    // (the others picked with it grown or shrunk as much, each about itself (item 280))
+    const was = scaleOf(id), next = { ...state.scales, [id]: v }
+    for (const o of alongWith(id)) {
+      if (FIXED_SIZE.has(o)) continue
+      const s = scaleOf(o)
+      next[o] = [0, 1, 2].map((k) => Math.max(0.05, Math.min(20, s[k] * (was[k] ? v[k] / was[k] : 1)))) as V3
+    }
+    state.scales = next
+  }
   state.selected = id; emit()
 }
 export const commitOffsets = () => save()
@@ -832,7 +873,9 @@ export function setScaleAxis(a: 0 | 1 | 2 | null) {
 /** what can be moved: each piece says what it's called and how to bring the camera to it */
 // (kept on the window, so a live code update in development (which loads this module afresh) doesn't lose the pieces that weren't remounted: the
 // panel would list only some of them)
-type Entry = { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null; foot?: () => V3 | null; corners?: () => V3[] | null }
+type Entry = { label: string; focus: () => void; center?: () => V3 | null; parent?: string | null; foot?: () => V3 | null; corners?: () => V3[] | null
+  /** the world matrix of the frame its offset is kept in (its handles' parent): what a move of the others picked with it goes by (item 280) */
+  frame?: () => number[] | null }
 const registry: Map<string, Entry> = typeof window !== 'undefined'
   ? ((window as unknown as { __editRegistry?: Map<string, Entry> }).__editRegistry ??= new Map())
   : new Map()
@@ -845,8 +888,9 @@ export function frameSelected() {
   const target = leavesOf(state.groups, id).find((m) => registry.has(m)) ?? id
   registry.get(target)?.focus()
 }
-export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null, foot?: () => V3 | null, corners?: () => V3[] | null) {
-  registry.set(id, { label, focus, center, parent, foot, corners })
+export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null, foot?: () => V3 | null, corners?: () => V3[] | null,
+  frame?: () => number[] | null) {
+  registry.set(id, { label, focus, center, parent, foot, corners, frame })
   panel()
   return () => { registry.delete(id); panel() }
 }
@@ -859,6 +903,18 @@ export const groupable = () => {
   const ids = [...new Set([...state.picked, ...(state.selected && !isGroup(state.selected) ? [state.selected] : [])])].filter((id) => registry.get(id)?.center)
   const home = ids.length ? groupOf(ids[0]) : null
   return ids.filter((id) => groupOf(id) === home)
+}
+/** the row clicked last without Shift: a Shift-click picks the run of pieces from it to the one clicked (item 280) */
+let anchor: string | null = null
+/** the pieces listed from `a` to `b` (as the list shows them, opened groups' pieces too), picked together, `a` the one chosen: a file list's
+ * Shift-click (item 280, the owner's 「沒法shift group」) */
+function pickRange(a: string, b: string) {
+  const shown = [...rows].filter(([k, r]) => !state.groups[k] && registry.has(k) && r.isConnected && r.offsetParent !== null).map(([k]) => k)
+  const i = shown.indexOf(a), j = shown.indexOf(b)
+  if (i < 0 || j < 0) { pickToggle(b); return }
+  state.selected = a
+  state.picked = shown.slice(Math.min(i, j), Math.max(i, j) + 1).filter((x) => x !== a)
+  emit()
 }
 export function pickToggle(id: string) {
   state.picked = state.picked.includes(id) ? state.picked.filter((x) => x !== id) : [...state.picked, id]
@@ -1712,7 +1768,10 @@ function panel() {
       row.title = kind === 'area' ? T().rowArea : group ? T().rowGroup : T().rowPiece
       row.onclick = (e) => {
         const ev = e as MouseEvent
-        if (!group && (ev.ctrlKey || ev.metaKey || ev.shiftKey)) { pickToggle(id); return }
+        // (Shift: the run from the row clicked last; Ctrl: this one added or taken off (item 280))
+        if (!group && ev.shiftKey && anchor && anchor !== id && registry.has(anchor)) { pickRange(anchor, id); return }
+        if (!group && (ev.ctrlKey || ev.metaKey || ev.shiftKey)) { pickToggle(id); anchor = id; return }
+        anchor = group ? null : id
         // (a piece hidden by hand (H), chosen from the list: shown again)
         if (state.hidden.includes(id)) state.hidden = state.hidden.filter((x) => x !== id)
         if (!group) registry.get(id)?.focus()
@@ -1955,6 +2014,9 @@ function panel() {
     info.innerHTML = id ? `${state.groups[id] ? glyphSvg('group', 11) + ' ' + pieceName(state.groups[id].name, lang) + T().groupMark : r ? pieceName(r.label, lang) : id}` : `<em>${T().nothing}</em>`
     const st = id ? statsOf(id) : null
     if (st) info.innerHTML += `<div class="be-stats">${T().stats(st.tris, st.verts, st.meshes)}</div>`
+    // (the others picked with it, moved, turned and sized along with it (item 280))
+    const along = id ? alongWith(id).length : 0
+    if (along) info.innerHTML += `<div class="be-stats">${T().alongWith(along)}</div>`
     const values = id ? [...readLoc(id), ...readRot(id), ...readScale(id)] : []
     fields.forEach((f, k) => {
       f.disabled = !id
