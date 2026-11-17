@@ -2152,5 +2152,5 @@ if (typeof window !== 'undefined') {
   // (a hot update swaps this module for a new copy: the old one's key let go of (or G was heard by every copy left behind, each with its own
   // developer mode, one more with every edit), its panel and notice taken away)
   replaces(import.meta.hot, () => { window.removeEventListener('keydown', onKey); offRenderPrefs(); el?.remove(); toastEl?.remove() })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, setPivot, resetPivot, resetAllPivots, select, toggle: toggleEdit, resetAll, areaCheck, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, setPivot, resetPivot, resetAllPivots, select, toggle: toggleEdit, resetAll, areaCheck, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, setPaths, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
 }

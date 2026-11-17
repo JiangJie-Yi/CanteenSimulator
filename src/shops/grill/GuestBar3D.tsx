@@ -81,7 +81,7 @@ import { basinHint, guideOff, guideOn, useBinBags } from './Sink'
 import { changeOf, CoinPile, CoinStack, isNote, NoteStack, type CoinKind, type Note } from './Cash'
 import { dishLines, paysAtTill, takeOut, type Denom } from '@/game/till'
 import { DRY_S, DRYER_CAP, LOW_FULL, PLATES_ALL, STACK_CAP, dryerStarts, dryerTick, dutyOf, lowGoes, lowToBring, nextChore, onTheWay, plateSource, platerGoes, platesToBring, playerLoad, putBack, rackAtStart, START_DIRTY, START_DRAIN, unload, washOne, DRAIN_CAP, drainTick, handOne, unbasket, CLEAN_AT, DIRT_BASE, handTime, plateDirt, soakStep } from '@/game/plates'
-import { kitchenPath, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
+import { kitchenPath, outOfPieces, reachSpot, standClear, type Rect } from '@/game/kitchenPath'
 import { PER_RACK } from './PlateRack'
 import { RICE_FULL, SCOOP_S, SHAPE_EACH, TRAY_MAX, WASH_S, emptyKama, kamaTick, riceGoes, setOn, takeRice, trayWants } from '@/game/rice'
 import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
@@ -4124,7 +4124,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const c0 = counters[0], k = kitchenOf(counters)
     const back = ([a, l]: [number, number]) => c0.at.clone().addScaledVector(c0.along, a).addScaledVector(c0.lay, l).setY(0)
     const area = { x0: k.along[0], z0: k.lay[0], x1: k.along[1], z1: k.lay[1] }, blocks = kitchenBlocks()
-    const stops = [from, ...viaStops(from, to), to]
+    // (its two ends, where one's set inside a piece itself, moved out to stand up against it (game/kitchenPath's outOfPieces, item 333): no
+    // way walks into or out of the middle of the warmer, the low rack or the cook table)
+    const end = (v: THREE.Vector3) => { const q = flat(v), o = outOfPieces(q, blocks, PASS_ROOM); return o === q ? v : back(o) }
+    const stops = [end(from), ...viaStops(from, to), end(to)]
     let out: THREE.Vector3[] = []
     for (let i = 1; i < stops.length; i++) {
       const way = kitchenPath(flat(stops[i - 1]), flat(stops[i]), area, blocks)
@@ -4156,7 +4159,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       placesMemo.current.at = -1e9
       const pl = platingOf()
       // (each named: whose, from where to where (item 189))
-      const from = [...homes.map((h, i) => ({ who: `server-${i}`, at: h.at })), { who: 'owner', at: ownerAt() }]
+      // (from where each server really stands: their place stepped clear of what's on the floor (clearHome), as they walk from it; the place
+      // as set (under the warmer, item 333) drew a way through it that nobody walked)
+      const from = [...homes.map((h, i) => ({ who: `server-${i}`, at: (clearHome(i) ?? h).at })), { who: 'owner', at: ownerAt() }]
       const to = [{ key: 'sink', at: sinkFront() }, { key: 'rack-0', at: rackFront(0) }, { key: 'rack-1', at: rackFront(1) }, { key: 'plate-out', at: pl.out }, { key: 'plate-in', at: pl.in }]
       pathsMap.current.staff = from.flatMap((a) => to.map((b): PathRoute => ({ kind: 'staff', who: a.who, from: a.who, to: b.key, key: `${a.who}>${b.key}`, pts: kitchenRoute(a.at, b.at) })))
     }

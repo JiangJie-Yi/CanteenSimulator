@@ -17,6 +17,23 @@ function clear(a: P, b: P, blocks: Rect[], step: number) {
   return true
 }
 
+/**
+ * A place inside a piece itself (its block less the room left round it for passers-by, `margin`), moved out past that piece's nearest side
+ * into the room round it (`gap` past the side): where one going to it stands, up against it, not in it (item 333, the owner's, 2026-11-18:
+ * 「外場路線有問題，可否設置碰撞點?」: a place set inside a piece (a server's under the warmer, the plater's at the low rack, a spot on the
+ * cook table) had every way to or from it walk straight through that piece). A place in the room round it, or clear, is as it was.
+ */
+export function outOfPieces(p: P, blocks: Rect[], margin: number, gap = 0.03): P {
+  let q = p
+  for (const r of blocks) {
+    const core = { x0: r.x0 + margin, z0: r.z0 + margin, x1: r.x1 - margin, z1: r.z1 - margin }
+    if (!inside(core, q[0], q[1])) continue
+    const d = [q[0] - core.x0, core.x1 - q[0], q[1] - core.z0, core.z1 - q[1]], m = Math.min(...d)
+    q = m === d[0] ? [core.x0 - gap, q[1]] : m === d[1] ? [core.x1 + gap, q[1]] : m === d[2] ? [q[0], core.z0 - gap] : [q[0], core.z1 + gap]
+  }
+  return q
+}
+
 /** a place standing inside a block (in the room left round it for passers-by, say: someone stepped up to it) stepped out of it the
  * shortest way, past its nearest edge (and on out of any it comes into then) */
 function stepOut(p: P, blocks: Rect[], cell: number): P {
