@@ -50,6 +50,7 @@ export const paceOfStaff = (id: string | null | undefined) =>
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }
 export const STAFF_TALK: StaffWord[] = keep(import.meta.hot, 'STAFF_TALK', [])
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffTalk: STAFF_TALK })
 /** a word from one of the staff or the owner from inside the scene, over their head and in the day's log (App sets it to its own sayStaff) */
 export const STAFF_SAY: { say: (id: string, pool: { zh: readonly string[]; ja: readonly string[]; en: readonly string[] }) => void } = { say: () => {} }
 /** the room's light switch by the way in (DiningRoom's, the world's: where it is and the way its face looks out into the room), and who's

@@ -90,6 +90,7 @@ import { GUIDE_KEY } from '@/game/firstDay'
 import { FirstDayGuide } from '@/ui/FirstDayGuide'
 import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
+import { crewChatTick } from '@/shops/grill/crewTalk'
 import { atmosphere, bondAfter, bondOf, bondPace, dayBond, dayPairs, givesNotice, LOW_BOND, MEAL_COST, moodPace, pairKey, QUIT_AFTER, WORN_AT } from '@/game/affinity'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
@@ -2700,6 +2701,8 @@ export default function App() {
         }
         return changed ? next : h
       })
+      // (open and not busy (few waiting for their food): now and then two of the crew have a word, as they get on (crewTalk, item 324))
+      if (aiRef.current.ai) crewChatTick(langRef.current, 1, (guestsRef.current[aiRef.current.shop] ?? []).filter((g) => g.state === 'waiting').length > 5, pairsNow.current)
       // (the game's clock: a minute of the game's for each second (the owner's), sped up with the game; only its face redraws, and the page
       // at dusk, at dawn and at midnight)
       const was = getClock().minute

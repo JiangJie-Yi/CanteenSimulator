@@ -43,6 +43,7 @@ import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { pickOrders, takesAt } from '@/game/orderPick'
 import { fairPrice } from '@/game/economy'
 import { getClock, minutesNow } from '@/ui/clockStore'
+import { crewEcho } from './crewTalk'
 import { sideChance } from '@/game/sides'
 import { overstayed } from '@/game/stay'
 import { RICE_SIDE, riceName } from '@/data/sides'
@@ -4480,6 +4481,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
   // pieces by node, found by scanning the model root; rescanned whenever Dish adds a cloned portion
   const pieces = useRef<Piece[]>([])
+  /** the owner's last dish-up call and when (said once for a dish however many pieces of it come off together (item 324)) */
+  const lastCall = useRef({ text: '', at: -1e9 })
   /** the chef's long chopsticks (CHEF_CARRY: out while he reaches further than his arm) */
   const tongs = useRef<THREE.Mesh>(null)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __pieces?: typeof pieces }).__pieces = pieces
@@ -5960,7 +5963,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (handLive && ready.collected && !inBasket(ready) && (ready.via === 'plated' ? ready.readyAt !== undefined : !!ready.container)) carry(ready, 'toPlate')
       say(L().done(nameOfP(ready)))
       // (and called out over his head, as a real kitchen calls a dish ready (item 180, the owner's: "the owner's words don't sound natural"))
-      STAFF_TALK.push({ key: performance.now(), id: 'owner', text: L().callDone(nameOfP(ready)), until: performance.now() + 2400 })
+      // (once for a dish however many of its pieces come off together: the same called three times running in two seconds (item 324))
+      {
+        const text = L().callDone(nameOfP(ready)), now = performance.now()
+        if (text !== lastCall.current.text || now - lastCall.current.at > 3500) STAFF_TALK.push({ key: now, id: 'owner', text, until: now + 2400 })
+        lastCall.current = { text, at: now }
+      }
       for (const k of planOf(ready)) if (!ready.dabs[k] && bestStage(k) === 'after') dab(ready, k)
       return
     }
@@ -6152,6 +6160,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat })
           if (bar) SAY_SEATED.lines.set(id, L().order(id, said))
           else onSay?.('guest', L().order(id, said), id)
+          // (said back as it's taken, by the owner (crewTalk, item 324))
+          crewEcho(lang, said.slice(0, 2).join(lang === 'en' ? ', ' : '、'))
         } else {
           BENCH.gone.add(id)
           onSay?.('guest', dear ? L().dear(id) : L().nothing(id), id)
@@ -6207,6 +6217,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat, partner: couple ? ids[1 - k] : undefined })
           if (bar) SAY_SEATED.lines.set(id, L().order(id, said))
           else onSay?.('guest', L().order(id, said), id)
+          // (said back as it's taken, by the owner (crewTalk, item 324))
+          crewEcho(lang, said.slice(0, 2).join(lang === 'en' ? ', ' : '、'))
         } else {
           onSay?.('guest', dear ? L().dear(id) : L().nothing(id), id)
           // (came in and found nothing they could have: a visit of its own, and not a happy one)

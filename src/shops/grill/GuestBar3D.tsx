@@ -3,6 +3,7 @@ import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes, 
 import { rattleSound } from './skewerSound'
 import { useSaid } from '@/ui/speechStore'
 import { getClock, minutesNow } from '@/ui/clockStore'
+import { crewCall, crewThanks, crewWelcome } from './crewTalk'
 import { NO_RAY } from '@/scene/pickable'
 import { nextClean, sweeps, SWEEP_S, WIPE_S as FLOOR_WIPE_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
@@ -5061,12 +5062,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         g?.position.copy(p)
         // (turned to their way quickly but not at once: at each corner of it they snapped round in a frame)
         if (g) g.rotation.y = s.t < dt * 1.5 ? Math.atan2(dir.x, dir.z) : turnToward(g.rotation.y, d < stand ? Math.atan2(dir.x, dir.z) : st.yaw, dt * 1.5)
-        // (welcomed in as they come through the noren: the servers and the owner)
+        // (welcomed in as they come through the noren: the owner's call passed along by those in (crewTalk, item 324: only the owner and
+        // the first server had said it))
         if (!s.welcomed && s.t > 0.5) {
           s.welcomed = true
-          const now = performance.now()
-          STAFF_TALK.push({ key: now + s.id, id: 'owner', text: LINES[lang].welcome, until: now + 2600 })
-          if (servers[0]) STAFF_TALK.push({ key: now + s.id + 0.5, id: servers[0].id, text: LINES[lang].welcome, until: now + 2600 })
+          crewWelcome(lang)
         }
         // (at the step: their shoes off and into a cubby of the cupboard, turned to it, a little bow)
         shoeStep(s, g, (raw - stepAt(path)) / (SHOES_S * v), true)
@@ -5350,6 +5350,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             const tcs = tillCall.current.staff
             const by = cashierIn() || tcs < 0 ? 'role:cashier' : tcs === TILL_BY_PLATER ? plater?.id ?? 'role:cashier' : ownerServes ? 'owner' : servers[tcs]?.id ?? 'role:cashier'
             STAFF_TALK.push({ key: performance.now() + s.id, id: by, text: LINES[lang].cashierThanks(`NT$${yen(bill)}`, Math.floor(getClock().minute / 60)), until: performance.now() + 3800 })
+            // (and thanks from one or two more of those in (item 324))
+            crewThanks(lang, by)
           }
           if ((s.said ?? 0) < 3 && k > 0.62 && TILL_STATE.payer === s.id) {
             s.said = 3
@@ -5874,6 +5876,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       /** off for plates for the plating place's stack: off the low rack by the table while it has any (a few steps), else across the kitchen
        * to the racks */
       const goPlates = () => {
+        // (called out as they go: the plates short (item 324))
+        if (plater) crewCall(lang, 'plates', plater.id)
         pl.pos.copy(home())
         pl.src = plateSource(LOW_RACK.n)
         pl.path = kitchenRoute(pl.pos, pl.src === 'low' ? lowFront() : rackFront(rackNow()))
@@ -5912,6 +5916,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               // owner's); with too little in it for a handful, first out to the sack on the floor for an armful to fill it)
               if (CRATE.left >= COAL_PER_ADD.max || SUPPLIES.coal() < 1) { pl.path = []; pl.len = 0; pl.phase = 'turnCrate' }
               else setOff(sackReach(), 'toCoalSack')
+              // (called out: the fire wanting coal (item 324))
+              if (plater) crewCall(lang, 'coal', plater.id)
             } else { const near = dipFrom(); if (near) stepTo(near, 'toBucket'); else setOff(reachOf(bucketAt()), 'toBucket') }
           } else if (open && !SHOP.leaving && SAKE.want.length && !sakeJob.current && STATION_OBJ.group) {
             // (a customer's tokkuri of sake (item 177, the owner's: "the way it goes looks odd, and not professional"): over to the sake station
