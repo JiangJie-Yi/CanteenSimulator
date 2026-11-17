@@ -261,6 +261,12 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * App sets it; gone in two). Fire draws its flames low and see-through, and taller and bright as these are up.
  */
 export const FIRE_FLARE = keep(import.meta.hot, 'FIRE_FLARE', { fat: 0, catch: 0 })
+/**
+ * The menu as it stands, for the boards over the way in (item 300: 「兩側掛直式的發光菜單招牌（本店真的菜名與價格，跟菜單連動）」): App puts
+ * each change of it here, each dish's names and its price, and counts `v` on, so the boards know to write themselves out again.
+ */
+export type FrontDish = { name: string; ja: string; price: number }
+export const SHOP_MENU = keep(import.meta.hot, 'SHOP_MENU', { dishes: [] as FrontDish[], v: 0 })
 /** (item 317) the open shop's square iron tray by the fire: whether it's out (the shop open), and how many pieces lie on it just now (waiting
  * there for their plates, or kept warm); Roasting counts them each frame, the stock's tableware tab and the back office show them */
 export const KAKUBAT = keep(import.meta.hot, 'KAKUBAT', { out: false, n: 0 })

@@ -98,7 +98,7 @@ import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
 import { plateGoes } from '@/game/tray'
-import { DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
+import { DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING, SHOP_MENU } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -799,6 +799,229 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
 }
 
 /**
+ * The shop's front over the way in (item 300, the owner's, 2026-11-17: 「玄關門的門改成，這樣。」「指屋頂」, after a picture of an izakaya's
+ * front: a wooden eave over its door, a big red lantern hung under it in the middle, lit menu boards either side, wooden lattice). The
+ * model (blender/facade.py, in the doorway's own frame): the head beam over the doorway on a post (the noren's rod just under it); the eave
+ * low over it, tiled, its eave-end tiles along its edge, its rafters out from the wall, a strip of lattice along the wall under it; the band
+ * of the menu's boards on the wall over the eave (over it and not under it, as the picture's are: this camera never looks up, and from over
+ * it an eave hides what's under it), its middle bay lattice; the bar the red and the grill's lanterns hang from. And here, in the band's
+ * bays, the boards: each a dish off the menu as it stands and its price, written down it in a brush hand, lit from inside as the lanterns are
+ * and with them (the door's switch: no light of their own, their paper as bright as the lanterns' (rule 6)). Read right to left from the
+ * street, as such boards are: the menu's first four right of the middle, its next seven left of it; while it's short of them, the shop's
+ * standing words.
+ */
+const FACADE_URL = import.meta.env.BASE_URL + 'models/facade.glb'
+useGLTF.preload(FACADE_URL)
+/** the boards' middles along the front (the model's bays), right to left from the street */
+const BOARD_X = [0.595, 0.46, 0.325, 0.19, -0.43, -0.565, -0.7, -0.835, -0.97, -1.105, -1.24]
+/** each board's width, its foot and top, how far out (in its bay, between the stiles), and its picture's size on the boards' one canvas */
+const BOARD_W = 0.1, BOARD_Y: [number, number] = [2.69, 3.01], BOARD_Z = 0.3
+const BOARD_PX: [number, number] = [92, 294]
+/** the title board in the band's middle bay (over the doorway's middle: お品書き, the menu), its width, and its picture's width on the canvas (the
+ * boards' row over it) */
+const TITLE_X: [number, number] = [-0.32, 0.08]
+const TITLE_PX = 368
+/** the boards' hand: LXGW WenKai, the brush (楷書) the menu's own tags are in, every character there (the shop's lettering has only its own) */
+const BOARD_FONT = '"LXGW WenKai TC", "Noto Serif TC", serif'
+/** what the boards say while the menu's short of them: the shop's standing words, its fire and its drink */
+const BOARD_SPARE: Record<'zh' | 'ja', string[]> = {
+  zh: ['炭火燒', '當季鮮魚', '生啤酒', '日本酒', '燒酎', '威士忌蘇打', '白飯', '味噌湯', '醬菜', '今日推薦', '定食'],
+  ja: ['炭火焼', '旬の魚', '生ビール', '日本酒', '焼酎', 'ハイボール', 'ご飯', '味噌汁', '香の物', '本日のおすすめ', '定食'],
+}
+type BoardRow = { name: string; price?: number }
+/** a vertical line's dash (ー and its kin) turned to run down it, as written down a board */
+const DOWN_TURN = /[ー－—―〜～…]/
+function paintBoards(g: CanvasRenderingContext2D, rows: BoardRow[], title: string) {
+  const [w, h] = BOARD_PX
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.clearRect(0, 0, w * BOARD_X.length, h * 2)
+  // (the title board, the canvas's second row: the same lit paper, the word across it in a bigger hand between two fine red rules)
+  {
+    const gr = g.createLinearGradient(0, h, 0, h * 2)
+    gr.addColorStop(0, '#eadbb8'); gr.addColorStop(0.5, '#fffaee'); gr.addColorStop(1, '#eadbb8')
+    g.fillStyle = gr
+    g.fillRect(0, h, TITLE_PX, h)
+    g.strokeStyle = 'rgba(70,36,16,0.6)'
+    g.lineWidth = 3
+    g.strokeRect(7, h + 7, TITLE_PX - 14, h - 14)
+    g.fillStyle = '#b02218'
+    g.fillRect(28, h + 52, TITLE_PX - 56, 4)
+    g.fillRect(28, h * 2 - 56, TITLE_PX - 56, 4)
+    const chars = [...title]
+    const size = Math.min(88, Math.floor((TITLE_PX - 60) / Math.max(1, chars.length)))
+    g.fillStyle = '#1b0f08'
+    g.font = `700 ${size}px ${BOARD_FONT}`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    chars.forEach((ch, i) => g.fillText(ch, TITLE_PX / 2 + (i - (chars.length - 1) / 2) * size, h * 1.5))
+  }
+  rows.forEach((r, k) => {
+    const x0 = k * w
+    // (the paper lit from behind: warm white, brightest down its middle; a fine dark rule round it inside its frame)
+    const gr = g.createLinearGradient(x0, 0, x0 + w, 0)
+    gr.addColorStop(0, '#eadbb8'); gr.addColorStop(0.5, '#fffaee'); gr.addColorStop(1, '#eadbb8')
+    g.fillStyle = gr
+    g.fillRect(x0, 0, w, h)
+    g.strokeStyle = 'rgba(70,36,16,0.6)'
+    g.lineWidth = 3
+    g.strokeRect(x0 + 7, 7, w - 14, h - 14)
+    // (the dish down it in black, as big as fits over its price, its price at its foot in red; a long one in two columns, read right then
+    // left, as a board's written: split where its seasoning starts (佐…, …焼き), or in half)
+    const room = h - 26 - (r.price != null ? 50 : 0)
+    const cols = boardColumns(r.name)
+    const most = Math.max(...cols.map((c) => c.length))
+    const size = Math.min(cols.length > 1 ? 38 : 56, Math.floor(room / Math.max(1, most)))
+    g.fillStyle = '#1b0f08'
+    g.font = `700 ${size}px ${BOARD_FONT}`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    cols.forEach((col, j) => {
+      const cx = x0 + (cols.length > 1 ? (j === 0 ? 0.7 : 0.3) : 0.5) * w
+      const top = 14 + (j === 0 ? (room - size * col.length) / 2 : (room - size * most) / 2 + size * 0.5)
+      col.forEach((ch, i) => {
+        const y = top + size * (i + 0.5)
+        if (!DOWN_TURN.test(ch)) { g.fillText(ch, cx, y); return }
+        g.save()
+        g.translate(cx, y)
+        g.rotate(Math.PI / 2)
+        g.fillText(ch, 0, 0)
+        g.restore()
+      })
+    })
+    if (r.price != null) {
+      g.fillStyle = '#b02218'
+      g.font = `700 28px ${BOARD_FONT}`
+      g.fillText(String(r.price), x0 + w / 2, h - 38)
+    }
+  })
+}
+/** a dish's name as written down a board: one column, or two if it's long (more than 6) */
+function boardColumns(name: string): string[][] {
+  const chars = [...name]
+  if (chars.length <= 6) return [chars]
+  const at = name.indexOf('佐') > 1 ? [...name.slice(0, name.indexOf('佐'))].length
+    : name.indexOf('焼き') > 1 ? [...name.slice(0, name.indexOf('焼き'))].length : Math.ceil(chars.length / 2)
+  return [chars.slice(0, at), chars.slice(at)]
+}
+let BOARD_ROWS: BoardRow[] = []
+let BOARD_TITLE = ''
+const BOARD_TEX = signTexture(BOARD_PX[0] * BOARD_X.length, BOARD_PX[1] * 2, (g) => paintBoards(g, BOARD_ROWS, BOARD_TITLE))
+/** the boards' own canvas, painted on (the texture's picture may be a smaller copy of it: scene/textureCap, which draws this into it again
+ * each time it's marked changed) */
+const BOARD_CANVAS = BOARD_TEX?.image as HTMLCanvasElement | undefined
+const BOARD_MAT = new THREE.MeshBasicMaterial({ map: BOARD_TEX, toneMapped: false })
+/** the boards: a square each in its bay, and the title board in the middle one, all one mesh on the one canvas (the boards its top row, the
+ * title its second) */
+const BOARD_GEO = (() => {
+  const pos: number[] = [], uv: number[] = [], idx: number[] = []
+  const quad = (x0: number, x1: number, u0: number, u1: number, v0: number, v1: number) => {
+    const b = pos.length / 3
+    pos.push(x0, BOARD_Y[0], BOARD_Z, x1, BOARD_Y[0], BOARD_Z, x1, BOARD_Y[1], BOARD_Z, x0, BOARD_Y[1], BOARD_Z)
+    uv.push(u0, v0, u1, v0, u1, v1, u0, v1)
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
+  }
+  BOARD_X.forEach((x, k) => quad(x - BOARD_W / 2, x + BOARD_W / 2, k / BOARD_X.length, (k + 1) / BOARD_X.length, 0.5, 1))
+  quad(TITLE_X[0], TITLE_X[1], 0, TITLE_PX / (BOARD_PX[0] * BOARD_X.length), 0, 0.5)
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  g.setIndex(idx)
+  g.computeVertexNormals()
+  return g
+})()
+/** what the boards say now: the menu's dishes in its order, in the page's language (the shop's Japanese in English), the rest the spare words */
+function boardRows(lang: string): BoardRow[] {
+  const ja = lang === 'ja' || lang === 'en'
+  // (each dish once: the menu may hold one with two seasonings under the same name)
+  const rows: BoardRow[] = []
+  for (const d of SHOP_MENU.dishes) {
+    const name = ja ? d.ja || d.name : d.name
+    if (rows.length < BOARD_X.length && !rows.some((r) => r.name === name)) rows.push({ name, price: d.price })
+  }
+  for (const s of BOARD_SPARE[ja ? 'ja' : 'zh']) {
+    if (rows.length >= BOARD_X.length) break
+    if (!rows.some((r) => r.name === s)) rows.push({ name: s })
+  }
+  return rows
+}
+/** write the boards out again (the menu or the language changed); again once the brush font's letters for them are in */
+function writeBoards(lang: string) {
+  const rows = boardRows(lang)
+  const title = lang === 'ja' || lang === 'en' ? 'お品書き' : '御品書'
+  BOARD_ROWS = rows
+  BOARD_TITLE = title
+  const c = BOARD_CANVAS
+  if (!BOARD_TEX || !c) return
+  const g = c.getContext('2d')!
+  paintBoards(g, rows, title)
+  BOARD_TEX.needsUpdate = true
+  const text = title + rows.map((r) => r.name + (r.price ?? '')).join('')
+  void document.fonts?.load(`700 40px "LXGW WenKai TC"`, text).then(() => {
+    if (BOARD_ROWS !== rows) return
+    paintBoards(g, rows, title)
+    BOARD_TEX.needsUpdate = true
+  }).catch(() => {})
+}
+function FacadeModel() {
+  const gltf = useGLTF(FACADE_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    const made = new Map<THREE.Material, THREE.Material>()
+    const toon = (src0: THREE.Material) => {
+      const src = src0 as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        // (the lattice's gaps cut out (tested, not blended), seen from either side, as the other lattices are)
+        t = /Lattice/.test(src.name) ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, alphaTest: 0.5, side: THREE.DoubleSide })
+          : new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color.clone(), map: src.map ?? null })
+        t.name = src.name
+        made.set(src, t)
+      }
+      return t
+    }
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      m.material = Array.isArray(m.material) ? m.material.map(toon) : toon(m.material)
+      // (the eave throws its shadow down on the step; the rest, under it, none)
+      m.castShadow = /Roof/.test(m.name)
+      m.receiveShadow = !/Roof|EaveTiles/.test(m.name)
+    })
+    inkModel(r, (m) => !/Lattice|EaveTiles|Roof/.test(m.name), { width: 0.002, weld: true })
+    return r
+  }, [gltf])
+  return <primitive object={obj} />
+}
+function ShopFrontImpl() {
+  const said = useRef({ v: -1, lang: '' })
+  const lit = useRef(getLights().door ? 1 : 0)
+  useFrame(({ clock }, dt) => {
+    const lang = typeof document === 'undefined' ? 'zh-Hant' : document.documentElement.lang
+    if (said.current.v !== SHOP_MENU.v || said.current.lang !== lang) {
+      said.current = { v: SHOP_MENU.v, lang }
+      writeBoards(lang)
+    }
+    // (lit with the door lanterns, their switch's way over some 0.4 s; their light breathing a little as theirs does)
+    lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
+    paperColour(BOARD_MAT, lit.current, 0.95 + 0.03 * Math.sin(clock.elapsedTime * 1.9), '#fff3dc')
+  })
+  return (
+    <>
+      <StaticBatch><FacadeModel /></StaticBatch>
+      <mesh geometry={BOARD_GEO} material={BOARD_MAT} raycast={NO_RAY} />
+    </>
+  )
+}
+const ShopFront = memo(ShopFrontImpl)
+// (dev: what the boards say, and the menu they read it from)
+if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __boards: { rows: () => BOARD_ROWS, menu: SHOP_MENU } })
+/** the big red lantern under the eave: hung in the doorway's middle, out in front of the noren, from the eave's boards (its cord's top: the
+ * eave's underside there, blender/facade.py's `under`) */
+const BIG_HANG: [number, number] = [2.469, 0.64]
+/** the big one's size against the door lanterns': fat and round, a little shorter */
+const BIG_CHOCHIN: [number, number, number] = [1.8, 0.95, 1.8]
+
+/**
  * What's seen out through the doorway (item 306, the owner's: 「光照跟陰影感還不行，尤其是白天，不太真實」: the open doorway showed the dark
  * behind the shop, black under the noren at noon): the street's light out there, a card past the doorway facing in (from outside it isn't
  * there), pale sky over it and the street's warm stone under; and the day spilling in on the genkan's stones, brightest at the sill. Both
@@ -892,6 +1115,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   })
   return (
     <group name="look-door" position={at} rotation-y={yaw}>
+      {/* the shop's front over the way in: its eave, the beam and post, the band of the menu's lit boards, the lanterns' bar (item 300) */}
+      <Movable id="facade" label="門面"><ShopFront /></Movable>
       {/* (in edit mode the cats' stand, the shoe cupboard and the like can each be moved: each its own batch inside its own Movable) */}
       <Movable id="doorcats" label="門口招財貓台"><StaticBatch plain>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
@@ -953,6 +1178,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (and the grill's own, cream, 炭火 on it, hung right beside the red one, on its far side from the doorway (the owner's: it hung on the
           doorway's other side)) */}
       <Movable id="chochin2" label="燒烤燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
+      {/* (and under the eave in the doorway's middle the big one, the shop's name 聞野 on it (item 300)) */}
+      <Movable id="chochin-big" label="大紅燈籠"><group position={[0.26, BIG_HANG[0] - 2.25, BIG_HANG[1]]}><Chochin mark={mark} big /></group></Movable>
       {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
       {/* (turned a quarter round, its fish's side to the street, and a little bigger: 1.15 times (the owner's: 1.3, then a little smaller)) */}
       <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]} baseScale={1.15}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
@@ -1190,7 +1417,7 @@ const NOREN_CORD = 0.18
  * was tried: the owner had it taken off); `cream`: the grill's, cream paper, 炭火 in black (the owner had its 焼 taken off: the red one
  * beside it says it) with a red band top and bottom.
  */
-const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTexture(512, 512, (g) => {
+const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red', wide = 1) => signTexture(512, 512, (g) => {
   const cream = style === 'cream'
   const grad = g.createLinearGradient(0, 0, 512, 0)
   // (brightest down the middle of each face, where the lamp's behind it)
@@ -1224,10 +1451,16 @@ const chochinTexture = (mark: string, style: 'red' | 'cream' = 'red') => signTex
   const chars = [...(cream ? '炭火' : mark)]
   const size = (chars.length === 1 ? 230 : chars.length === 2 ? 168 : 124) * (cream ? 0.82 : 1)
   const gap = chars.length === 1 ? 0 : size * 1.02
-  for (const u of [128, 384]) chars.forEach((ch, i) =>
-    brushText(g, ch, u, 256 + (i - (chars.length - 1) / 2) * gap, size, cream
+  // (on a lantern drawn wider round than tall (the big one, `wide`), each character narrowed by as much, to stand true on it)
+  for (const u of [128, 384]) chars.forEach((ch, i) => {
+    g.save()
+    g.translate(u, 256 + (i - (chars.length - 1) / 2) * gap)
+    g.scale(1 / wide, 1)
+    brushText(g, ch, 0, 0, size, cream
       ? { fill: '#160a06', shadow: 'rgba(255,200,120,0.3)' }
-      : { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' }))
+      : { fill: '#160a06', edge: 'rgba(245,200,110,0.55)', shadow: 'rgba(255,170,90,0.35)' })
+    g.restore()
+  })
 })
 /**
  * A door lantern's paper (items 120, 125, the owner's, 2026-11-15): drawn as the room's own lamps are (lampShades): not shaded by the room's
@@ -1271,8 +1504,10 @@ useGLTF.preload(NOREN_URL)
  * A red paper lantern (赤提灯) hung at the door on a little arm off a post, the shop's name on it, lit from inside:
  * it sways a touch and its glow breathes like the flame in it.
  */
-function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream' }) {
-  const tex = useMemo(() => chochinTexture(mark, style), [mark, style])
+function Chochin({ mark, style = 'red', big = false }: { mark: string; style?: 'red' | 'cream'
+  /** the big one under the eave (item 300): fat and round, BIG_CHOCHIN its size against these */
+  big?: boolean }) {
+  const tex = useMemo(() => chochinTexture(mark, style, big ? BIG_CHOCHIN[0] / BIG_CHOCHIN[1] : 1), [mark, style, big])
   const hang = useRef<THREE.Group>(null)
   // (blender/genkan.py's lantern: its paper lit from within and painted with the name, its caps lacquer, its bands and bail gold; its paper's
   // material handed back with it, the one that's drawn (kept aside in a ref while it was made, it was a copy made and thrown away by React's
@@ -1310,7 +1545,7 @@ function Chochin({ mark, style = 'red' }: { mark: string; style?: 'red' | 'cream
   return (
     <group>
       {/* hung straight from above on a long cord (no post) */}
-      <group ref={hang} name="look-chochin" position={[-0.26, 2.25, 0]}>
+      <group ref={hang} name="look-chochin" position={[-0.26, 2.25, 0]} scale={big ? BIG_CHOCHIN : 1}>
         <mesh position-y={-0.075}>
           <cylinderGeometry args={[0.003, 0.003, 0.15, 4]} />
           <meshBasicMaterial color="#1a0d08" />
