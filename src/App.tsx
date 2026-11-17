@@ -3411,7 +3411,20 @@ export default function App() {
         {/* (the full house's stamp, come down over the room and gone (item 209)) */}
         {ooiri > 0 && (
           <div key={ooiri} className="ooiri" aria-hidden="true" onAnimationEnd={(e) => { if (e.target === e.currentTarget) setOoiri(0) }}>
-            <b>大入</b><small>{tl(lang, '滿座', '満席', 'Full house')}</small>
+            {/* (as an ooiri-bukuro (大入袋, item 319, the owner's: 「稍微優化精美下」): a tall red card in a gold double line, gold knots at its
+                corners, 大入 down it in the brush; under it a little seal; stamped down with a puff of dust) */}
+            <span className="ooiri-card">
+              <svg className="ooiri-corners" viewBox="0 0 84 124" aria-hidden="true">
+                {[[8, 8, 1, 1], [76, 8, -1, 1], [8, 116, 1, -1], [76, 116, -1, -1]].map(([x, y, sx, sy]) => (
+                  <g key={`${x}-${y}`} transform={`translate(${x} ${y}) scale(${sx} ${sy})`}>
+                    <path d="M0 13 V0 H13" />
+                    <path d="M4 4 l3.2 -3.2 l3.2 3.2 l-3.2 3.2 z" transform="translate(-0.6 3.6)" />
+                  </g>
+                ))}
+              </svg>
+              <b>大入</b>
+            </span>
+            <small>{tl(lang, '滿座', '満席', 'Full house')}</small>
           </div>
         )}
         {/* (counting up as money comes in, what came in floating out of it: item 209) */}
