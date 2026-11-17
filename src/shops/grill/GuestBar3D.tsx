@@ -4783,6 +4783,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   useEffect(() => {
     if (open) return
     setShown([])
+    // (the benches emptied as the shop's shut: no one left sat there into the next day (item 328))
+    BENCH.ids = []
+    BENCH.since.clear()
+    BENCH.up.clear()
+    BENCH.gone.clear()
+    sitters.current.clear()
+    setSitterList([])
     runs.current = []
     runObjs.current.clear()
     waiting.current = []
@@ -6510,6 +6517,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (v.handed) {
           if (shownRef.current.some((x) => x.id === v.id) || v.t > 3) { sitters.current.delete(v.id); benchChanged = true }
           continue
+        }
+        // (sat there, or on their way to it, on none of the bench's lists (its list made afresh under them: a live update of the code, or lost),
+        // or the shop shutting or past its last call: sent out, not left sat there for good (item 328, the owner's, 2026-11-18: 「還一堆客人坐著?」:
+        // six still sat on the benches the next day, the shop kept from shutting by them till its last minute))
+        if ((v.phase === 'sit' || v.phase === 'in') && !BENCH.gone.has(v.id) && !BENCH.up.has(v.id) &&
+          (!BENCH.ids.includes(v.id) || SHOP.closing || LAST_CALL.on)) {
+          BENCH.ids = BENCH.ids.filter((x) => x !== v.id)
+          BENCH.since.delete(v.id)
+          BENCH.gone.add(v.id)
         }
         // (sent away still on their way in: out from where they are, not from the place they never reached (the day's audit, 2026-11-15: one
         // 2.22 across in a frame at 04:01, the shop shutting, back to their place on the bench and out from there))

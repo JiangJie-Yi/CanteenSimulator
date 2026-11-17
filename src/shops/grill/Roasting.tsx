@@ -5264,7 +5264,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     }
     p.slot = slot
     p.collected = true
-    p.netSpot = null           // its place on the grill net goes to the next one waiting
+    // (its place on the grill net goes to the next one waiting only once it's off the net (the release below): done, and waiting there for a
+    // place at the plating place, it still lies on it, and the next one put on in its place lay in it (item 332, the owner's 「我又重現這個經典
+    // 場面」: in a rush, the net's three places heaped with what had been done and what had gone on since))
     // tells Dish to stop driving this node's position (its pop-in would pull it back up to skewer height)
     p.node.userData.onPlate = true
     p.flight = instant ? 1 : 0
@@ -7749,8 +7751,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     const spots = roast.netSpots ?? []
     if (spots.length) {
       const onNet = (p: Piece) => roast.net?.includes(p.id) && present(p) && !p.collected && !p.staged
-      // (one spot, one piece: should two hold the same, the one that's been on longest keeps it and the other waits its turn off the net)
+      // (one spot, one piece: should two hold the same, the one that's been on longest keeps it and the other waits its turn off the net;
+      // and what's done but still lying on it, waiting to be taken to the plating place, keeps its own (item 332))
       const taken = new Set<number>()
+      for (const p of pieces.current) if (p.collected && p.netSpot !== null && roast.net?.includes(p.id)) taken.add(p.netSpot)
       for (const p of pieces.current.filter((q) => onNet(q) && q.netSpot !== null).sort((a, b) => b.progress - a.progress)) {
         if (taken.has(p.netSpot!)) p.netSpot = null
         else taken.add(p.netSpot!)
@@ -7797,9 +7801,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // by itself, done with, or back on the board; every piece, a fish's rod its own or not (held by those without one, a rush's fire was
     // taken up whole by what had long been eaten, and nothing more went on)
     for (const p of pieces.current) {
-      if (p.ringSlot === undefined) continue
-      if (!present(p) || p.trash >= 0 || p.eaten || p.staged || p.fetching ||
-        (p.collected && (CHEF_CARRY.key === p.key ? CHEF_CARRY.phase !== 'reach' : p.flight > 0))) p.ringSlot = undefined
+      if (p.ringSlot === undefined && p.netSpot === null) continue
+      const gone = !present(p) || p.trash >= 0 || p.eaten || p.staged || p.fetching ||
+        (p.collected && (CHEF_CARRY.key === p.key ? CHEF_CARRY.phase !== 'reach' : p.flight > 0))
+      if (gone) { p.ringSlot = undefined; p.netSpot = null }
     }
     // ---- the iron skewers (the owner's: fifty of them, game/skewers): a piece's pushed onto one from the holder in the last of its preparing on
     // the board (none clean: it waits there, said once); pulled out as it lands on its plate (the shop open) into the used tray; its rod drawn
