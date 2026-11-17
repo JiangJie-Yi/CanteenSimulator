@@ -3649,25 +3649,57 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     }
     return { top, face, right: new THREE.Vector3(-face.z, 0, face.x), r, low: foot.y, stand }
   }
-  /** the soup pot: its rim's middle, how wide, its soup's face (the pot's own model: the steam over it isn't the pot (its box with the
-   * steam had the rim up in the air, and the ladle there)) */
+  /** the soup pot: its rim's middle, how wide it is inside, its floor, its soup's face; how wide it is over all (its lid too) (the pot's own
+   * model: the steam over it isn't the pot (its box with the steam had the rim up in the air, and the ladle there)) */
   const potAt = () => {
     // (the one in the miso pot's own group on the counter (another of the name stands elsewhere))
     marks.current.delete('miso-pot')
     const o = markOf('miso-pot')?.getObjectByName('MisoPot') ?? null, f = frame.current
     if (!o || !f) return null
     f.updateWorldMatrix(true, false)
-    const box = new THREE.Box3()
-    o.traverse((m) => { if ((m as THREE.Mesh).isMesh && m.name !== 'MisoSoup') box.expandByObject(m) })
-    const lo = f.worldToLocal(box.min.clone()), hi = f.worldToLocal(box.max.clone())
-    const top = lo.clone().add(hi).multiplyScalar(0.5).setY(Math.max(lo.y, hi.y))
+    const all = new THREE.Box3()
+    o.traverse((m) => { if ((m as THREE.Mesh).isMesh && m.name !== 'MisoSoup') all.expandByObject(m) })
+    // (its rim and its width from its inside alone (item 253: from everything in it, the lid pushed half over and the pot's own ladle
+    // standing up out of it, the rim was put in the air over the lid, and the ladle rested there)), measured along the pot's own two axes
+    // from its vertices in the bar's frame: it's oval and stands turned, and a box of it square to the world was wider than it is (the
+    // ladle went through its wall)
+    o.updateWorldMatrix(true, true)
+    const toBar = new THREE.Matrix4().copy(f.matrixWorld).invert()
+    const o0 = o.localToWorld(new THREE.Vector3()).applyMatrix4(toBar)
+    const ux = o.localToWorld(new THREE.Vector3(1, 0, 0)).applyMatrix4(toBar).sub(o0).setY(0).normalize()
+    const uz = o.localToWorld(new THREE.Vector3(0, 0, 1)).applyMatrix4(toBar).sub(o0).setY(0).normalize()
+    const span = (mesh: THREE.Object3D | undefined) => {
+      const g = (mesh as THREE.Mesh | undefined)?.geometry?.attributes.position
+      if (!mesh || !g) return null
+      const m4 = new THREE.Matrix4().multiplyMatrices(toBar, mesh.matrixWorld), v = new THREE.Vector3()
+      const s = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity, y0: Infinity, y1: -Infinity }
+      for (let i = 0; i < g.count; i++) {
+        v.fromBufferAttribute(g, i).applyMatrix4(m4)
+        const d = v.clone().sub(o0), px = d.dot(ux), pz = d.dot(uz)
+        s.x0 = Math.min(s.x0, px); s.x1 = Math.max(s.x1, px); s.z0 = Math.min(s.z0, pz); s.z1 = Math.max(s.z1, pz); s.y0 = Math.min(s.y0, v.y); s.y1 = Math.max(s.y1, v.y)
+      }
+      return s
+    }
+    const ins = span(o.getObjectByName('MisoPotInside')), body = span(o.getObjectByName('MisoPotBody'))
+    const alo = f.worldToLocal(all.min.clone()), ahi = f.worldToLocal(all.max.clone())
+    if (!ins) return null
+    const ax = (ins.x1 - ins.x0) / 2, az = (ins.z1 - ins.z0) / 2
+    const top = o0.clone().addScaledVector(ux, (ins.x0 + ins.x1) / 2).addScaledVector(uz, (ins.z0 + ins.z1) / 2).setY(ins.y1)
+    const lo = { y: ins.y0 }, hi = { x: ax * 2, z: az * 2 }
+    /** how far its inside wall is from its middle the way `dir` points (an oval's) */
+    const rimR = (dir: THREE.Vector3) => { const c = dir.dot(ux), s = dir.dot(uz); return (ax * az) / Math.max(1e-6, Math.hypot(az * c, ax * s)) }
+    // (the soup's face where it's drawn (its node's origin is the pot's floor: the soup's at its height in the model))
     const soupFace = o.getObjectByName('MisoSoup')
+    const soupBox = soupFace ? new THREE.Box3().setFromObject(soupFace) : null
     // (its lid's pushed half off toward its own -z (blender/misopot.py): the open half its +z, in the bar's frame)
     o.updateWorldMatrix(true, false)
     const open = f.worldToLocal(o.localToWorld(new THREE.Vector3(0, 0, 1))).sub(f.worldToLocal(o.localToWorld(new THREE.Vector3()))).setY(0).normalize()
-    return { top, r: Math.min(Math.abs(hi.x - lo.x), Math.abs(hi.z - lo.z)) / 2 * 0.92, open,
-      surface: soupFace ? f.worldToLocal(soupFace.getWorldPosition(new THREE.Vector3())).y : top.y - 0.03 }
+    return { top, r: Math.min(hi.x, hi.z) / 2, floor: lo.y, open, rimR, rimTop: body ? body.y1 : undefined,
+      outer: Math.min(Math.abs(ahi.x - alo.x), Math.abs(ahi.z - alo.z)) / 2 * 0.92,
+      surface: soupBox && !soupBox.isEmpty() ? f.worldToLocal(soupBox.max.clone()).y : top.y - 0.03 }
   }
+  // (in development, `__potAt()`: the soup pot as measured, in the bar's frame (item 253))
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __potAt: () => potAt() })
   /** a bowl's place on the counter beside something round (`at`, `r` across), on the side away from its neighbour (`other`) */
   const counterTops = useRef<{ at: number; boxes: THREE.Box3[] }>({ at: -1e9, boxes: [] })
   const onPrepTop = (p: THREE.Vector3) => {
@@ -3705,7 +3737,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   /** the cooker's places for filling a bowl of rice (SideBowls' FillAt) */
   const riceFillAt = (): FillAt => {
     const c = cookerAt(), p = potAt()
-    return { ...c, put: besideOf(c.top, c.r, c.right, c.face, c.low, p?.top ?? null, p?.r ?? 0) }
+    // (the paddle's holder kept clear of the pot's body, its rolled rim (item 253))
+    return { ...c, put: besideOf(c.top, c.r, c.right, c.face, c.low, p?.top ?? null, p?.outer ?? 0), keepOff: p ? [{ at: p.top, r: p.r * 1.06 }] : [] }
   }
   /** the soup pot's, and where one stands at it: in front of it as one stands at the cooker */
   const soupFillAt = (): FillAt => {
@@ -3713,7 +3746,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     if (!p) return { ...c, put: besideOf(c.top, c.r, c.right, c.face, c.low, null) }
     const stand = p.top.clone().addScaledVector(c.face, -(c.top.clone().sub(c.stand).setY(0).length())).setY(0)
     // (the counter's top the one it stands in: the cooker's (one counter, the two joined))
-    return { top: p.top, face: c.face, right: c.right, r: p.r, surface: p.surface, stand, low: c.low, open: p.open, put: besideOf(p.top, p.r, c.right, c.face, c.low, c.top, c.r) }
+    return { top: p.top, face: c.face, right: c.right, r: p.r, surface: p.surface, floor: p.floor, rimR: p.rimR, rimTop: p.rimTop, stand, low: c.low, open: p.open,
+      put: besideOf(p.top, p.outer, c.right, c.face, c.low, c.top, c.r) }
   }
   /** a customer's bowls' place at the counter in its row (the bar's frame) */
   const passAt = (row: number, kind: 'rice' | 'soup') => stationIn((kind === 'rice' ? BOWL_PASS.rice : BOWL_PASS.soup).clone().setZ(PASS_Z[row] ?? BOWL_PASS.rice.z))
@@ -7621,8 +7655,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (now - restsAt.current.at > 1000 && STATION_OBJ.group) {
         restsAt.current.at = now
         const R = riceFillAt(), S = soupFillAt()
-        restsAt.current.paddle = paddleRest(R)
+        const pr = paddleRest(R)
+        restsAt.current.paddle = pr
         restsAt.current.ladle = ladleRest(S)
+        // (the paddle's holder where it stands in it (item 253))
+        side.holder.position.copy(pr.holder)
+        side.holder.visible = true
       }
       let pose: FillPose | null = null
       if (j && j.W && (j.stage === 'rice' || j.stage === 'soup')) {
@@ -8014,7 +8052,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {given && <SeatBowls rice={seatBowls.rice} soup={seatBowls.soup} />}
       {/* (the bowls at the counter and out on the trays (item 207): the same lists every frame, refilled) */}
       {given && <SeatBowls rice={movingBowls.current.rice} soup={movingBowls.current.soup} />}
-      {given && <><primitive object={side.chawan} /><primitive object={side.wan} /><primitive object={side.shamoji} /><primitive object={side.otama} /><primitive object={side.stream} /></>}
+      {given && <><primitive object={side.chawan} /><primitive object={side.wan} /><primitive object={side.shamoji} /><primitive object={side.holder} /><primitive object={side.otama} /><primitive object={side.stream} /></>}
       {given && seatSakes.map((k, i) => (
         <group key={i} position={k.at}><Tokkuri /><group position={k.cup}><SakeCup level={0.8} /></group></group>
       ))}

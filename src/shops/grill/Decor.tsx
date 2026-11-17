@@ -979,6 +979,13 @@ function MisoPot() {
   const pot = useMemo(() => {
     const r = gltf.scene.getObjectByName('MisoPot')!.clone(true)
     r.position.set(0, 0, 0)
+    // (one ladle in it: the one taken up to fill the bowls and put back (SideBowls' Otama), lying on its floor with its handle over the rim;
+    // the one made standing in the model (blender/misopot.py's MisoLadleBowl and its handle) was a second ladle beside it (item 253))
+    r.getObjectByName('MisoLadleBowl')?.removeFromParent()
+    // (its lid a little further back over its far side: the open half wide enough for the ladle's cup to go in and out past its edge
+    // (it was 0.42 of the pot's radius back; 0.56 now) (item 253))
+    const lid = r.getObjectByName('MisoPotLid')
+    if (lid) lid.position.z -= 0.042
     const made = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
       const m = o as THREE.Mesh

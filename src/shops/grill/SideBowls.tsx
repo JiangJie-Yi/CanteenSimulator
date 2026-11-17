@@ -10,6 +10,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
 import { warmLater } from '@/scene/Prewarm'
+import { rimmedTray } from '@/scene/trayGeometry'
 import { GAME_SPEED } from '@/scene/speed'
 import { beatAt, fillAt, RICE_BEATS, SOUP_BEATS } from '@/game/sides'
 import { BOWLS } from './bar'
@@ -24,6 +25,23 @@ const UP = new THREE.Vector3(0, 1, 0)
 export const PADDLE_SCALE = 1.8, LADLE_SCALE = 1.6
 const BLADE = 0.058 * PADDLE_SCALE
 const CUP = new THREE.Vector3(-0.185, -0.106, 0).multiplyScalar(LADLE_SCALE)
+/** the ladle's handle as made (blender/sidebowls.py's OtamaHandle: from its cup's rim up and out to the grip), in the ladle's own frame
+ * with its cup's bottom's middle at the origin (x out along the handle, y up), at the size it's drawn; the cup's radius and height; half
+ * the handle's thickness; how steeply the line from its cup to its grip rises as made (rad) (item 253: where it lies on the pot's rim is
+ * found along it) */
+const HANDLE = ([[0.028, 0.02], [0.06, 0.06], [0.17, 0.11], [0.185, 0.106]] as const).map(([x, y]) => [x * LADLE_SCALE, y * LADLE_SCALE] as const)
+const CUP_R = 0.028 * LADLE_SCALE, CUP_H = 0.022 * LADLE_SCALE, HANDLE_T = 0.003 * LADLE_SCALE
+const HANDLE_LIFT = Math.atan2(0.106, 0.185)
+/** how far round from the pot's open half's middle toward the one filling its handle lies as it rests in the pot (rad: past the lid's edge) */
+const LADLE_TURN = 0.52
+/** the paddle as made (blender/sidebowls.py): grip to its blade's tip, and half its blade's width, at the size it's drawn */
+const PADDLE_LEN = 0.094 * PADDLE_SCALE, PADDLE_HALF_W = 0.028 * PADDLE_SCALE
+/** the paddle's holder (しゃもじ立て, item 253, the owner's 「這個?」: the paddle hung beside the cooker from nothing, its blade's tip at the
+ * counter's edge): a little indigo-glazed cup stood on the counter against the cooker's side, the paddle stood in it blade down; its
+ * radius (its blade fits in it, a hair to spare), its height, how thick its wall and floor are */
+export const HOLDER_R = PADDLE_HALF_W + 0.01, HOLDER_H = 0.07, HOLDER_T = 0.005
+/** how far the paddle leans back toward the one filling as it stands in its holder (rad) */
+const PADDLE_LEAN = 0.2
 /** how long a bowl lasts a customer eating it (ms at the shop's own pace, as fast again at x2: Roasting's SIDE_EAT_S, they get up after),
  * and how much is left when they're done */
 const EAT_MS = 12000
@@ -55,6 +73,8 @@ function dress(root: THREE.Object3D) {
 export type SideProps = {
   chawan: THREE.Group; rice: THREE.Object3D; wan: THREE.Group; soup: THREE.Object3D
   shamoji: THREE.Group; lump: THREE.Object3D; otama: THREE.Group; ladleSoup: THREE.Object3D; stream: THREE.Mesh
+  /** the paddle's holder by the cooker (item 253) */
+  holder: THREE.Group
 }
 /** one set of the props for the one filling bowls and carrying them out: a rice bowl and its rice, a soup bowl and its soup, the paddle and
  * its lump of rice, the ladle and the soup in it, the soup's stream as it's poured; each a group at its origin, inked, made ready to draw */
@@ -76,16 +96,21 @@ export function useSideProps(): SideProps {
     const shamoji = group(part('Shamoji'), lump), otama = group(part('Otama'), ladleSoup)
     shamoji.scale.setScalar(PADDLE_SCALE)
     otama.scale.setScalar(LADLE_SCALE)
+    // (the paddle's holder (item 253): an indigo glaze against the terrazzo and the cooker's pastel green; 16 round, its floor closed by rungs)
+    const cupMesh = new THREE.Mesh(rimmedTray(HOLDER_R, HOLDER_H, HOLDER_T, 16), new THREE.MeshToonMaterial({ color: '#3b4a6b' }))
+    cupMesh.name = 'ShamojiHolder'
+    cupMesh.receiveShadow = true
+    const holder = group(cupMesh)
     const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0025, 1, 6, 1, true).translate(0, -0.5, 0),
       new THREE.MeshToonMaterial({ color: '#a8713a' }))
-    for (const g of [chawan, wan, shamoji, otama]) {
+    for (const g of [chawan, wan, shamoji, otama, holder]) {
       inkModel(g, () => false, { width: 0.0012, weld: true })
       g.visible = false
       warmLater(g)
     }
     stream.visible = false
     warmLater(stream)
-    return { chawan, rice, wan, soup, shamoji, lump, otama, ladleSoup, stream }
+    return { chawan, rice, wan, soup, shamoji, lump, otama, ladleSoup, stream, holder }
   }, [gltf])
 }
 
@@ -99,7 +124,15 @@ export type FillAt = { top: THREE.Vector3; face: THREE.Vector3; right: THREE.Vec
    * against the counter's edge: no room there) */
   put: THREE.Vector3
   /** the soup pot: which way its open half lies (its lid's pushed half off across it): the ladle dips there and rests there */
-  open?: THREE.Vector3 }
+  open?: THREE.Vector3
+  /** the soup pot: how high its floor is inside (the ladle rests on it, item 253) */
+  floor?: number
+  /** the soup pot: how far its inside wall is from its middle, the way `dir` points (it's oval, not round: `r` is its narrowest), and how
+   * high its rolled rim stands (item 253: the ladle set by the narrowest, or the widest, went through its wall) */
+  rimR?: (dir: THREE.Vector3) => number
+  rimTop?: number
+  /** (the rice cooker) what stands beside it, the paddle's holder kept clear of: where, how wide (item 253) */
+  keepOff?: { at: THREE.Vector3; r: number }[] }
 /** where a bowl's carried in front of one walking (GuestBar3D's: their hands out in front at a tray's height), from where they stand */
 const carryAt = (W: FillAt) => W.stand.clone().addScaledVector(W.face, 0.315).setY(W.stand.y + 0.3)
 /** a filling's pose at a moment: where each hand's to be, the bowl (shown or not, and how full), the tool's grip and how it's turned, what's
@@ -127,23 +160,85 @@ function along(dir: THREE.Vector3, ref: THREE.Vector3, roll: number) {
   return q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll))
 }
 
-/** where the paddle hangs from the cooker's handle, on the side away from where the bowl's set down, blade down; the grip a hand takes */
-export function paddleRest(W: FillAt) {
+/** where the paddle's holder stands (on the counter's top): against the cooker's side, on the side away from where the bowl's set down,
+ * turned toward the one filling as far as the counter's front leaves room (the gap between the cooker and the miso pot there is widest
+ * nearer the front); clear of what stands beside it (W.keepOff) (item 253) */
+export function holderAt(W: FillAt) {
   const sd = W.put.clone().sub(W.top).dot(W.right) > 0 ? -1 : 1
-  const out = W.right.clone().multiplyScalar(sd)
-  const grip = W.top.clone().addScaledVector(out, W.r + 0.03).setY(W.low + (W.top.y - W.low) * 0.62 + BLADE)
-  return { grip, q: along(UP.clone().negate(), out, 0) }
+  const side = W.right.clone().multiplyScalar(sd), toward = W.face.clone().negate()
+  const d = W.r + HOLDER_R + 0.004
+  const at = (deg: number) => {
+    const a = (deg * Math.PI) / 180
+    return W.top.clone().addScaledVector(side, d * Math.cos(a)).addScaledVector(toward, d * Math.sin(a)).setY(W.low)
+  }
+  const clear = (p: THREE.Vector3) => !(W.keepOff ?? []).some((o) => Math.hypot(p.x - o.at.x, p.z - o.at.z) < o.r + HOLDER_R + 0.01)
+  return [35, 25, 45, 15, 0].map(at).find(clear) ?? at(35)
 }
-/** where the ladle rests, its cup in the pot by its right wall, its handle up over the rim toward the one filling */
+/** where the paddle stands in its holder (item 253: it hung beside the cooker from nothing): its blade's tip on the holder's floor a little
+ * to the far side, leaning back toward the one filling, through the holder's middle; the grip a hand takes and how it's turned, its blade's
+ * middle, which way it points (grip to tip), its face, and where its holder stands */
+export function paddleRest(W: FillAt) {
+  const holder = holderAt(W)
+  const dir = W.face.clone().multiplyScalar(Math.sin(PADDLE_LEAN)).addScaledVector(UP, -Math.cos(PADDLE_LEAN))
+  const tip = holder.clone().addScaledVector(W.face, HOLDER_H * 0.5 * Math.tan(PADDLE_LEAN)).setY(W.low + HOLDER_T + 0.002)
+  const grip = tip.clone().addScaledVector(dir, -PADDLE_LEN)
+  const face = W.face.clone().negate()
+  return { grip, q: along(dir, face, 0), blade: grip.clone().addScaledVector(dir, BLADE), dir, face, holder }
+}
+/** which way the ladle's handle runs as it's held (level): back toward the one filling, a little to their right */
+const ladleBack = (W: FillAt) => W.face.clone().negate().addScaledVector(W.right, 0.35).normalize()
+/** where the ladle's cup goes in and out of the pot: in its open half, its cup clear of the wall and past the lid's edge (item 253) */
+const mouthOf = (W: FillAt) => { const d = W.open ?? W.right; return W.top.clone().addScaledVector(d, rimOf(W, d) - CUP_R - 0.012) }
+/** how far the pot's inside wall is from its middle the way `dir` points (its oval's; round, `r`) */
+const rimOf = (W: FillAt, dir: THREE.Vector3) => W.rimR?.(dir) ?? W.r
+/** how high the ladle's handle is (over its cup's bottom) where it's `D` out from its cup, its handle's line rising `lift`; the lowest of
+ * where it crosses there (its end hooks down), or null: none of it reaches out that far */
+function handleAt(D: number, lift: number) {
+  const phi = lift - HANDLE_LIFT, c = Math.cos(phi), s = Math.sin(phi)
+  let lo: number | null = null
+  for (let i = 0; i < HANDLE.length - 1; i++) {
+    const [ax, ay] = HANDLE[i], [bx, by] = HANDLE[i + 1]
+    const x1 = ax * c - ay * s, y1 = ax * s + ay * c, x2 = bx * c - by * s, y2 = bx * s + by * c
+    if ((x1 - D) * (x2 - D) > 0 || x1 === x2) continue
+    const y = y1 + ((y2 - y1) * (D - x1)) / (x2 - x1)
+    lo = lo === null ? y : Math.min(lo, y)
+  }
+  return lo
+}
+/** how steeply the ladle's handle must rise (ladleAt's `lift`) with its cup at `cup` and its handle running out along `back` for it to clear
+ * the pot's rim, lying on it; never less than `min` (item 253: dipped in the soup its handle at 0.35 ran through the pot's side) */
+function clearLift(W: FillAt, cup: THREE.Vector3, back: THREE.Vector3, min: number) {
+  // (how far out along `back` from the cup the rim is, past its inside edge, its oval's wherever it's crossed; the cup out of the pot
+  // (pouring): nothing to clear)
+  const out = (p: THREE.Vector3) => { const d = p.clone().sub(W.top).setY(0); const l = d.length(); return l > rimOf(W, l > 1e-6 ? d.divideScalar(l) : back) + 0.004 }
+  if (out(cup) || W.open === undefined) return min
+  let D = 0
+  while (D < 0.5 && !out(cup.clone().addScaledVector(back, D))) D += 0.002
+  // (over its rolled rim, where there is one, not its inside's top)
+  const over = (W.rimTop ?? W.top.y + 0.004) + 0.003 + HANDLE_T - cup.y
+  for (let lift = min; lift < 1.55; lift += 0.02) {
+    const h = handleAt(D, lift)
+    if (h === null || h >= over) return lift
+  }
+  return 1.55
+}
+/** where the ladle rests (item 253, the owner's 「這個?」: it was set from a height worked out with the lid and the pot's own ladle in the
+ * pot's box, and hung in the air over the lid): in the soup on the pot's floor in its open half, its handle out over the rim toward the one
+ * filling, lying on it, tipped up just so far as that; its grip and how it's turned, where its cup is, which way its handle runs, how steeply */
 export function ladleRest(W: FillAt) {
-  const cup = W.top.clone().addScaledVector(W.open ?? W.right, W.r * 0.5).addScaledVector(UP, -0.03)
-  return ladleAt(W, cup, 0.35, 0)
+  const open = W.open ?? W.right, toward = W.face.clone().negate()
+  const across = new THREE.Vector3(-open.z, 0, open.x)
+  if (across.dot(toward) < 0) across.negate()
+  const back = open.clone().multiplyScalar(Math.cos(LADLE_TURN)).addScaledVector(across, Math.sin(LADLE_TURN)).normalize()
+  // (its cup a little up off the floor: tipped as it lies, its far edge goes down)
+  const cup = W.top.clone().addScaledVector(back, rimOf(W, back) - CUP_R - 0.012).setY((W.floor ?? W.top.y - 0.15) + 0.016)
+  const lift = clearLift(W, cup, back, HANDLE_LIFT - 0.3)
+  return { ...ladleAt(W, cup, lift, 0, back), cup, lift, back }
 }
-/** the ladle with its cup's middle at `cup`, its handle rising back toward the one filling (`lift`, rad up from level), tipped over its
- * handle's line by `tip` (rad: pouring); its grip */
-function ladleAt(W: FillAt, cup: THREE.Vector3, lift: number, tip: number) {
-  // (the model's handle runs from the cup up and along +x to the grip: turned so it runs back and a little right, toward the one filling)
-  const back = W.face.clone().negate().addScaledVector(W.right, 0.35).normalize()
+/** the ladle with its cup's middle at `cup`, its handle rising back toward the one filling (`lift`, rad up from level, along `back`), tipped
+ * over its handle's line by `tip` (rad: pouring); its grip */
+function ladleAt(W: FillAt, cup: THREE.Vector3, lift: number, tip: number, back = ladleBack(W)) {
+  // (the model's handle runs from the cup up and along +x to the grip: turned so it runs along `back`)
   const yaw = Math.atan2(-back.z, back.x)
   const q = new THREE.Quaternion().setFromAxisAngle(UP, yaw)
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), lift - 0.52))
@@ -166,6 +261,8 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
   const restL = carryAt(W).addScaledVector(r, -0.08), restR = carryAt(W).addScaledVector(r, 0.1)
   const hang = paddleRest(W)
   const held = { grip: hang.grip.clone(), q: hang.q.clone(), held: false }
+  // (its blade's middle just out of the holder, drawn up along its own length (its blade was through the holder's side, item 253))
+  const outOfHolder = hang.blade.clone().addScaledVector(hang.dir, -(HOLDER_H + 0.015))
   let left = restL, right = restR, bowl: THREE.Vector3 | null = B.clone(), lid = 1, load = 0
   // (the paddle held: its blade's middle at `blade`, pointing along `dir`, its face toward `face`, rolled `roll`)
   const hold = (blade: THREE.Vector3, dir: THREE.Vector3, face: THREE.Vector3, roll = 0) => {
@@ -191,8 +288,11 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
     case 'paddle':
       left = rim
       if (k < 0.5) right = keyed(k, [[0, at(W.r * 0.7, -W.r - 0.06, 0).setY(W.low + 0.1)], [0.5, hang.grip]])
-      else hold(keyed((k - 0.5) / 0.5, [[0, hang.grip.clone().addScaledVector(UP.clone().negate(), BLADE)], [1, outPot]]),
-        down.clone().lerp(level, sm((k - 0.5) / 0.5)), r.clone().negate())
+      else {
+        // (drawn straight up out of its holder, then over the cooker's mouth, turning to lie level)
+        const kk = (k - 0.5) / 0.5, e = sm((kk - 0.3) / 0.7)
+        hold(keyed(kk, [[0, hang.blade], [0.3, outOfHolder], [1, outPot]]), hang.dir.clone().lerp(level, e), hang.face.clone().lerp(r.clone().negate(), e))
+      }
       break
     case 'scoop': {
       left = rim
@@ -211,9 +311,11 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
       break
     case 'paddleBack':
       left = rim
-      if (k < 0.75) hold(keyed(k / 0.75, [[0, B.clone().addScaledVector(UP, 0.09)], [1, hang.grip.clone().addScaledVector(UP.clone().negate(), BLADE)]]),
-        level.clone().lerp(UP.clone().negate(), sm(k / 0.75)), UP.clone().lerp(r, sm(k / 0.75)))
-      else right = hang.grip.clone()
+      // (over the holder, stood up as it goes, and down into it)
+      if (k < 0.75) {
+        const kk = k / 0.75, e = sm(kk / 0.7)
+        hold(keyed(kk, [[0, B.clone().addScaledVector(UP, 0.09)], [0.7, outOfHolder], [1, hang.blade]]), level.clone().lerp(hang.dir, e), UP.clone().lerp(hang.face, e))
+      } else right = hang.grip.clone()
       break
     case 'lidOn':
       // (the bowl taken up off the counter as the lid goes on, into their hands to carry)
@@ -237,19 +339,20 @@ export function soupFillPose(W: FillAt, t: number): FillPose {
   const shelf = carryAt(W).addScaledVector(r, -0.08).setY(W.low - 0.32)
   const restL = carryAt(W).addScaledVector(r, -0.08), restR = carryAt(W).addScaledVector(r, 0.1)
   const surf = (W.surface ?? Q.y - 0.04) - Q.y
-  const rest = ladleRest(W)
+  const rest = ladleRest(W), BACK = ladleBack(W)
   const tool = { grip: rest.grip.clone(), q: rest.q.clone(), held: false }
   let left = restL, right = restR, bowl: THREE.Vector3 | null = B.clone(), load = 0
   let stream: [THREE.Vector3, THREE.Vector3] | null = null
-  const hold = (cup: THREE.Vector3, lift: number, tip: number) => {
-    const p = ladleAt(W, cup, lift, tip)
+  // (held: its cup at `cup`, its handle along `back`, rising `lift`, or as steeply as it must to clear the pot's rim (item 253))
+  const hold = (cup: THREE.Vector3, lift: number, tip: number, back = BACK) => {
+    const p = ladleAt(W, cup, clearLift(W, cup, back, lift), tip, back)
     tool.grip.copy(p.grip); tool.q.copy(p.q); tool.held = true
     right = p.grip.clone()
   }
-  // (in the open half of the pot, its lid pushed half off over the other)
-  const open = W.open ?? r
-  const restCup = Q.clone().addScaledVector(open, W.r * 0.5).addScaledVector(UP, -0.03), above = Q.clone().addScaledVector(open, W.r * 0.45).addScaledVector(UP, 0.09)
-  const inSoup = Q.clone().addScaledVector(open, W.r * 0.45).addScaledVector(UP, surf - 0.012), overBowl = B.clone().addScaledVector(UP, 0.085)
+  // (in and out through the pot's open half, past its lid's edge; dipped till the soup's over its cup (on the floor when there's little):
+  // its surface where it is now (item 253: it was the soup's own origin, the pot's floor))
+  const mouth = mouthOf(W), above = mouth.clone().setY(Q.y + 0.09)
+  const inSoup = mouth.clone().setY(Math.max((W.floor ?? Q.y - 0.15) + 0.016, Q.y + surf - CUP_H * 0.9)), overBowl = B.clone().addScaledVector(UP, 0.085)
   switch (beat) {
     case 'bowl':
       left = keyed(k, [[0, restL], [0.4, shelf], [0.85, rim], [1, rim]])
@@ -258,7 +361,11 @@ export function soupFillPose(W: FillAt, t: number): FillPose {
     case 'ladle':
       left = rim
       if (k < 0.5) right = keyed(k / 0.5, [[0, restR], [1, rest.grip]])
-      else hold(keyed((k - 0.5) / 0.5, [[0, restCup], [1, above]]), 0.35, 0)
+      else {
+        // (drawn straight up out of the soup off the pot's floor as it lay, then its handle laid back toward the one filling over the rim)
+        const kk = (k - 0.5) / 0.5, e = sm((kk - 0.45) / 0.55)
+        hold(keyed(kk, [[0, rest.cup], [0.55, above]]), rest.lift + (0.35 - rest.lift) * e, 0, rest.back.clone().lerp(BACK, e).normalize())
+      }
       break
     case 'dip':
       left = rim
@@ -280,8 +387,11 @@ export function soupFillPose(W: FillAt, t: number): FillPose {
       // (the bowl taken up off the counter as the ladle goes back, into their hands to carry)
       left = keyed(k, [[0, rim], [0.4, rim], [1, carryAt(W).addScaledVector(r, -0.03)]])
       bowl = k < 0.4 ? B.clone() : left.clone().addScaledVector(UP, -0.05).addScaledVector(r, 0.05)
-      if (k < 0.75) hold(keyed(k / 0.75, [[0, above], [1, restCup]]), 0.35, 0)
-      else right = rest.grip.clone()
+      // (its handle turned out over the rim the way it lies, and down onto the pot's floor)
+      if (k < 0.75) {
+        const kk = k / 0.75, e = sm(kk / 0.45)
+        hold(keyed(kk, [[0, above], [0.45, above], [1, rest.cup]]), 0.35 + (rest.lift - 0.35) * e, 0, BACK.clone().lerp(rest.back, e).normalize())
+      } else right = rest.grip.clone()
       break
   }
   return { beat, left, right, bowl, fill: fillAt(SOUP_BEATS, 'pour', t), tool, load, lid: 0, stream }
