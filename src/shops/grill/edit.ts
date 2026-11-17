@@ -65,7 +65,9 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   // (the samurai helmet on its own little stand by the staff's door (the owner's, 2026-11-12): moved together)
   'grp-kabuto': { zh: '頭盔與木台', ja: '兜と飾り台', members: ['kabutostand', 'kabuto'] },
   // (the owner's, 2026-11-15: in the panel, its own frame, X -3.401 to -3 and Y 0.125: back toward the door 0.4, up 12.5 cm)
-  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-2.4249, 0.125, 1.7663] },
+  // (and the owner's, 2026-11-17 (item 288): 「小神龕區整組位移個X:2.2」「然後Reset」: its view's area moved X 2.2 in its own frame (the
+  // shrine's, the same way along its wall), made its place: X -0.8 now, 2.2 back toward the door)
+  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-0.6466, 0.125, 0.4712] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
     'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
@@ -180,6 +182,14 @@ const loadGroups = (): Record<string, Group> => {
     if (!localStorage.getItem('jgs-edit-groupshift-4')) {
       if (g['grp-altar']) g['grp-altar'] = { ...g['grp-altar'], t: [...DEFAULT_GROUPS['grp-altar'].t!] as V3 }
       localStorage.setItem('jgs-edit-groupshift-4', '1'); localStorage.setItem(KEY_G, JSON.stringify(g))
+    }
+  } catch { /* storage blocked */ }
+  // (and again where the owner moved it on (item 288): its place kept in a browser, and a move of its view's area, given way to it once)
+  try {
+    if (!localStorage.getItem('jgs-edit-groupshift-5')) {
+      if (g['grp-altar']) g['grp-altar'] = { ...g['grp-altar'], t: [...DEFAULT_GROUPS['grp-altar'].t!] as V3 }
+      if (g['grp-view-altar']) g['grp-view-altar'] = { ...g['grp-view-altar'], t: [0, 0, 0] }
+      localStorage.setItem('jgs-edit-groupshift-5', '1'); localStorage.setItem(KEY_G, JSON.stringify(g))
     }
   } catch { /* storage blocked */ }
   // (the rice corner's group a browser kept under its old name (item 156): named for what's in it)
