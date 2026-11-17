@@ -222,7 +222,10 @@ const SEIGAIHA_TILE = 0.8
 const SEIGAIHA = canvasTex(2048, 512, (g) => {
   const W = 2048, H = 512, R = 512, COLS = W / (2 * R)
   const GROUND = '#ece2c9'
-  const INDIGO = ['#1d3253', '#223a5f', '#283f66', '#1a2d4a', '#243d63']
+  // (a clear indigo, as sometsuke's blue (item 304, the owner's, 2026-11-17: 「加入一些藍色」: its navy read as black at a distance), and between
+  // a wave's outer rings and its inner two a band of pale blue each, a wash as the dye's layered)
+  const INDIGO = ['#24508f', '#2a5a9c', '#1f4a86', '#2d5fa3', '#264f8d']
+  const PALE = ['rgba(118,160,214,0.42)', 'rgba(150,186,228,0.34)']
   let seed = 1
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
   g.fillStyle = GROUND; g.fillRect(0, 0, W, H)
@@ -238,13 +241,19 @@ const SEIGAIHA = canvasTex(2048, 512, (g) => {
       const half = new Path2D(); half.moveTo(cx - R, cy); half.arc(cx, cy, R, Math.PI, 0); half.closePath()
       g.fillStyle = GROUND; g.fill(half)
       const wash = g.createRadialGradient(cx, cy, R * 0.12, cx, cy, R)
-      wash.addColorStop(0, 'rgba(34,58,95,0.16)'); wash.addColorStop(0.65, 'rgba(34,58,95,0.05)'); wash.addColorStop(1, 'rgba(34,58,95,0)')
+      wash.addColorStop(0, 'rgba(36,80,143,0.16)'); wash.addColorStop(0.65, 'rgba(36,80,143,0.05)'); wash.addColorStop(1, 'rgba(36,80,143,0)')
       g.fillStyle = wash; g.fill(half)
+      // (the pale blue bands: between its outer two rings, and between its inner two (item 304))
+      for (const [[f0, f1], fill] of [[[0.93, 0.72], PALE[0]], [[0.52, 0.33], PALE[1]]] as const) {
+        const band = new Path2D()
+        band.arc(cx, cy, R * f0, Math.PI, 0); band.arc(cx, cy, R * f1, 0, Math.PI, true); band.closePath()
+        g.fillStyle = fill; g.fill(band)
+      }
       // (its rings, each drawn twice: a faint wide one where the dye's bled, then its line)
       for (const [f, w] of [[0.93, 20], [0.72, 13], [0.52, 12], [0.33, 11]] as const) {
         const r = R * f + (rnd() - 0.5) * 5, lw = w + (rnd() - 0.5) * 3
         g.beginPath(); g.arc(cx, cy, r, Math.PI, 0)
-        g.strokeStyle = 'rgba(34,58,95,0.12)'; g.lineWidth = lw + 8; g.stroke()
+        g.strokeStyle = 'rgba(36,80,143,0.12)'; g.lineWidth = lw + 8; g.stroke()
         g.strokeStyle = ink; g.lineWidth = lw; g.stroke()
       }
       g.beginPath(); g.moveTo(cx - R * 0.12, cy); g.arc(cx, cy, R * 0.12, Math.PI, 0); g.closePath()
