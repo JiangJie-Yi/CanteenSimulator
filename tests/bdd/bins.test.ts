@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { bagOut, binOf, binToEmpty, EMPTY_AT, emptyBins, OVER, TAKES, toss, wantsEmptying } from '@/game/bins'
+import { bagGoes, bagOut, binOf, binToEmpty, EMPTY_AT, emptyBins, OVER, TAKES, toss, wantsEmptying } from '@/game/bins'
 import { stockerChore } from '@/game/stocker'
 
 // (item 208, the owner's, 2026-11-16: 「垃圾桶及資源回收桶不好看，然後它們也得運作」: the bins by the sink took only the sticks, never
@@ -58,5 +58,17 @@ feature('垃圾桶與資源回收桶（第 208 項）', () => {
       expect(stockerChore({ ...base, rolls: { m: 0.1, f: 1 }, bin: 'rubbish' })).toEqual({ kind: 'roll', who: 'm' })
     })
     and('沒有要倒的就照舊', () => { expect(stockerChore({ ...base, bin: null })).toBeNull() })
+  })
+})
+
+// (item 318, the owner's, 2026-11-18: 「我發現營業時，有人跑去開員工專用門」)
+feature('營業中不從員工門倒垃圾（第 318 項）', () => {
+  scenario('還有客人時，滿的垃圾袋綁好收進水槽下', ({ given, then }) => {
+    given('店裡還有客人', (w) => { w.about = true })
+    then('袋子收進水槽下，不從員工門拿出去', (w) => { expect(bagGoes(w.about)).toBe('underSink') })
+  })
+  scenario('客人都走了才從員工門拿出去', ({ given, then }) => {
+    given('客人都走了', (w) => { w.about = false })
+    then('從員工門拿出去', (w) => { expect(bagGoes(w.about)).toBe('out') })
   })
 })

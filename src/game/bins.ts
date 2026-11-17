@@ -32,6 +32,12 @@ export function toss(b: Bins, w: Waste, n = 1): Bins {
 export const wantsEmptying = (b: Bins, k: BinKind) => b[k] >= EMPTY_AT
 /** a bin's bag taken out and a new one put in */
 export const bagOut = (b: Bins, k: BinKind): Bins => (k === 'rubbish' ? { ...b, rubbish: 0 } : { ...b, recycle: 0, cans: 0, bottles: 0 })
+/**
+ * Where a bin's full bag goes (item 318, the owner's, 2026-11-18: 「我發現營業時，有人跑去開員工專用門」: the stock keeper carried each one out
+ * through the staff door and up the stair while customers ate): while there are customers about, tied up and stowed in the cupboard under
+ * the sink beside the bins (a new bag taken out of it), to be put out after closing with the rest; with none, out by the staff door
+ */
+export const bagGoes = (customersAbout: boolean): 'underSink' | 'out' => (customersAbout ? 'underSink' : 'out')
 /** the bin that wants emptying first (the fuller), or none */
 export const binToEmpty = (b: Bins): BinKind | null => {
   const r = wantsEmptying(b, 'rubbish'), c = wantsEmptying(b, 'recycle')

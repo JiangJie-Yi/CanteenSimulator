@@ -990,8 +990,11 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * the owner's: thrown away there), how full each is and the bottles and cans in the recycling one; each lid asked open (a click) or
  * lifted till then (something thrown in, the stock keeper at it); and the bin whose bag is out just now (being carried off by the stock
  * keeper: none in it till he's back with a new one) */
-export const SINK_BIN: { sticks: number; b: Bins; lids: Record<BinKind, { open: boolean; until: number }>; out: BinKind | null } = {
-  sticks: 0, b: emptyBins(), lids: { rubbish: { open: false, until: 0 }, recycle: { open: false, until: 0 } }, out: null }
+export const SINK_BIN: { sticks: number; b: Bins; lids: Record<BinKind, { open: boolean; until: number }>; out: BinKind | null
+  /** the full bags tied up and stowed under the sink while customers are about, to be put out after closing (item 318) */
+  stowed: Record<BinKind, number> } = {
+  sticks: 0, b: emptyBins(), lids: { rubbish: { open: false, until: 0 }, recycle: { open: false, until: 0 } }, out: null, stowed: { rubbish: 0, recycle: 0 } }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __sinkBin: SINK_BIN, __staffDoorHold: STAFF_DOOR_HOLD })
 /** how many raw pieces wait on the cook table's board now (Roasting writes it every frame; App won't let more be taken out of the freezer
  * past its BOARD_SLOTS while researching: item 115) */
 export const BOARD = { n: 0 }

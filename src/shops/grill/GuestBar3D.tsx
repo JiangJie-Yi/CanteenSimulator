@@ -9,7 +9,7 @@ import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, ROLL_LOW, stockerChore, type StockChore } from '@/game/stocker'
-import { bagOut, binToEmpty, toss, type BinKind, type Waste } from '@/game/bins'
+import { bagGoes, bagOut, binToEmpty, toss, type BinKind, type Waste } from '@/game/bins'
 import { ROLL, SOAP, SOAP_FULL, SOAP_REFILL_AT, takeOne, takesTowel, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT } from '@/game/washroom'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
@@ -649,9 +649,22 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
             SINK_BIN.out = c.which
             s.bag = c.which
           }
-          if (s.leg === 0 && s.t > 1.4) { s.leg = 1; set(w.toDoor); s.phase = 'go'; setMoving(true) }
+          // (with customers about, not out through the staff door with it (item 318): turned to the sink's cupboard beside the bins, the bag
+          // stowed in it and a new one taken out; with none, out by the staff door as before)
+          if (s.leg === 0 && s.t > 1.4) {
+            if (bagGoes(!SHOP.leaving) === 'underSink') { s.leg = 4; s.t = 0 }
+            else { s.leg = 1; set(w.toDoor); s.phase = 'go'; setMoving(true) }
+          }
           if (s.leg === 3 && s.t > 0.7 && s.bag) { s.bag = null; SINK_BIN.out = null }
           if (s.leg === 3 && s.t > 1.3) { if (g.current) g.current.userData.lean = 0; set(w.toBin); s.phase = 'back' }
+        } else if (s.leg === 4) {
+          // (bent to the cupboard under the sink, the other side of the bins from the recycling's (the rubbish bin stands against the sink): the
+          // full bag in, a new one out of the roll kept there; then back to the bin to set it in (leg 3))
+          const toSink = w.mouths.rubbish.clone().sub(w.mouths.recycle).setY(0)
+          if (toSink.lengthSq() > 1e-6) s.yaw += Math.atan2(Math.sin(Math.atan2(toSink.x, toSink.z) - s.yaw), Math.cos(Math.atan2(toSink.x, toSink.z) - s.yaw)) * Math.min(1, dt * 8)
+          if (g.current) g.current.userData.lean = 0.5 * Math.sin(Math.min(1, s.t / 1.1) * Math.PI)
+          if (s.t > 0.55 && s.bag && s.bag !== 'new') { SINK_BIN.stowed[s.bag] += 1; s.bag = 'new' }
+          if (s.t > 1.1) { if (g.current) g.current.userData.lean = 0; s.leg = 3; s.t = 0 }
         } else if (s.leg === 1) {
           // (through the staff door with it and down the stair behind, to put it out with the shop's rubbish)
           s.leg = 2
@@ -729,6 +742,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         : c?.kind === 'roll' ? (rolling(c.who) ? tl3('更換衛生紙', 'トイレ紙交換', 'Changing the toilet roll') : tl3('補充洗手間用品', 'トイレ用品の補充', 'Restocking the washroom'))
           + (s.phase === 'work' ? pct(s.t / 2.8) : '')
         : c?.kind === 'bin' ? (s.leg === 3 ? tl3('換新垃圾袋', 'ゴミ袋の交換', 'Putting in a new bag')
+          : s.leg === 4 ? tl3('垃圾袋收到水槽下', 'ゴミ袋をシンク下へ', 'Stowing the bag under the sink')
           : c.which === 'rubbish' ? tl3('倒垃圾', 'ゴミ出し', 'Taking out the rubbish') : tl3('倒資源回收', '資源ごみ出し', 'Taking out the recycling'))
         : tl3('補充面紙', 'ティッシュ補充', 'Refilling tissues') + (s.phase === 'work' ? pct(s.t / 2.0) : '')
       if (el.textContent !== text) el.textContent = text
@@ -4800,6 +4814,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     SINK_BIN.sticks = 0
     SINK_BIN.b = { rubbish: 0, recycle: 0, cans: 0, bottles: 0 }
     SINK_BIN.out = null
+    // (the bags stowed under the sink through the evening put out after closing (item 318))
+    SINK_BIN.stowed = { rubbish: 0, recycle: 0 }
     platerRun.current = { phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 }
     PLATER_OUT.id = null
     ownerHome.current = null

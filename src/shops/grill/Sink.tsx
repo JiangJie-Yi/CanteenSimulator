@@ -527,8 +527,11 @@ function binSays() {
   const b = SINK_BIN.b
   const r = b.rubbish <= 0 ? '一般垃圾：空的' : b.rubbish >= EMPTY_AT ? `一般垃圾滿了 ${pctOf(b.rubbish)}%，等倉儲來倒` : `一般垃圾 ${pctOf(b.rubbish)}%（竹籤、魚骨、衛生紙）`
   const c = b.recycle <= 0 ? '資源回收：空的' : b.recycle >= EMPTY_AT ? `資源回收滿了 ${pctOf(b.recycle)}%，等倉儲來倒` : `資源回收 ${pctOf(b.recycle)}%（空罐 ${b.cans}、空瓶 ${b.bottles}）`
-  const out = SINK_BIN.out === 'rubbish' ? '｜倉儲正在倒一般垃圾' : SINK_BIN.out === 'recycle' ? '｜倉儲正在倒資源回收' : ''
-  return `${r}｜${c}${out}｜${SINK_BIN.lids.rubbish.open || SINK_BIN.lids.recycle.open ? '點一下蓋上' : '點一下掀開蓋子'}`
+  const out = SINK_BIN.out === 'rubbish' ? '｜倉儲正在換一般垃圾的袋子' : SINK_BIN.out === 'recycle' ? '｜倉儲正在換資源回收的袋子' : ''
+  // (the full bags stowed under the sink while customers are about, put out after closing (item 318))
+  const n = SINK_BIN.stowed.rubbish + SINK_BIN.stowed.recycle
+  const stowed = n ? `｜綁好的 ${n} 袋收在水槽下，打烊後拿出去` : ''
+  return `${r}｜${c}${out}${stowed}｜${SINK_BIN.lids.rubbish.open || SINK_BIN.lids.recycle.open ? '點一下蓋上' : '點一下掀開蓋子'}`
 }
 /** the sponge taken up: lifted off its dish this far */
 const SPONGE_UP = 0.05
