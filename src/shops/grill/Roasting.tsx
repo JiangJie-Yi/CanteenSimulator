@@ -2528,6 +2528,105 @@ const LIP_JOIN = 0.29
 /** a unit slab with rounded edges (scaled to each top), its grain still running the long way */
 const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
 /**
+ * The lip between the customers and the fire made over in the Edo way, wood and bamboo (item 313, the owner's, 2026-11-18: 「客人區與灶台的
+ * 小木板可以升級，我的想法是參考剛剛的江戶風與木竹做搭配」, after a woodblock's 衝立): in its same 15 cm and 6 cm, a wooden rail along its top
+ * (the condiment rack's hooks still over it, item 334), a band of bamboo lattice under it open to the fire (the customers see what's grilling
+ * through it), and a low panel (腰板) at its foot, dark wood carved with the hemp-leaf (麻の葉) in fine lines; each place's number hung on the
+ * lattice. The lattice and the carving in their pictures, laid at one scale along it (a repeat every 0.3): three slabs and a sheet.
+ */
+const KOSHI_H = 0.05, RAIL_H = 0.03
+const LIP_TILE = 0.3
+const EDO_LATTICE = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 64
+  const g = c.getContext('2d')!
+  g.clearRect(0, 0, 256, 64)
+  let seed = 5
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  // (split bamboo stood side by side, a gap between each: each its own straw green-gold, lighter down its middle, a node at its own height)
+  for (let k = 0; k < 12; k++) {
+    const x = k * (256 / 12) + 3, w = 256 / 12 - 6
+    const tone = 0.86 + 0.14 * rnd()
+    const gr = g.createLinearGradient(x, 0, x + w, 0)
+    gr.addColorStop(0, `rgb(${Math.round(150 * tone)},${Math.round(118 * tone)},${Math.round(66 * tone)})`)
+    gr.addColorStop(0.45, `rgb(${Math.round(214 * tone)},${Math.round(186 * tone)},${Math.round(122 * tone)})`)
+    gr.addColorStop(1, `rgb(${Math.round(132 * tone)},${Math.round(102 * tone)},${Math.round(56 * tone)})`)
+    g.fillStyle = gr; g.fillRect(x, 0, w, 64)
+    const ny = 10 + rnd() * 44
+    g.fillStyle = 'rgba(70,48,22,0.55)'; g.fillRect(x, ny, w, 2)
+  }
+  // (a pair of bamboo rails across, tied to each upright with dark palm cord)
+  for (const y of [14, 48]) {
+    g.fillStyle = '#7a5a30'; g.fillRect(0, y - 3, 256, 6)
+    g.fillStyle = 'rgba(255,240,200,0.35)'; g.fillRect(0, y - 2, 256, 1)
+    for (let k = 0; k < 12; k++) { g.fillStyle = '#2a1a10'; g.fillRect(k * (256 / 12) + 256 / 24 - 3, y - 4, 6, 8) }
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = THREE.RepeatWrapping
+  return t
+})()
+const EDO_KOSHI = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 64
+  const g = c.getContext('2d')!
+  g.fillStyle = '#5a3520'; g.fillRect(0, 0, 256, 64)
+  // (its grain, faint)
+  for (let y = 0; y < 64; y += 3) { g.fillStyle = `rgba(${y % 2 ? '30,16,8' : '110,72,40'},0.18)`; g.fillRect(0, y, 256, 1) }
+  // (the hemp-leaf carved in fine pale lines: a six-pointed star of lines in each cell of a triangular grid)
+  g.strokeStyle = 'rgba(232,192,130,0.9)'; g.lineWidth = 1.7
+  const s = 32, h = s * Math.sqrt(3) / 2
+  for (let row = -1; row < 4; row++) for (let col = -1; col < 10; col++) {
+    const cx = col * s + (row % 2 ? s / 2 : 0), cy = row * h + 8
+    for (let k = 0; k < 6; k++) {
+      const a = (k * Math.PI) / 3 + Math.PI / 6
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * s * 0.58, cy + Math.sin(a) * s * 0.58); g.stroke()
+    }
+    g.beginPath()
+    for (let k = 0; k <= 6; k++) { const a = (k * Math.PI) / 3; const x = cx + Math.cos(a) * s * 0.5, y = cy + Math.sin(a) * s * 0.5; if (k) g.lineTo(x, y); else g.moveTo(x, y) }
+    g.stroke()
+  }
+  // (a fine bead along its top and foot)
+  g.fillStyle = 'rgba(20,10,4,0.7)'; g.fillRect(0, 0, 256, 3); g.fillRect(0, 61, 256, 3)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = THREE.RepeatWrapping
+  return t
+})()
+const EDO_LATTICE_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_LATTICE, alphaTest: 0.5, side: THREE.DoubleSide })
+const EDO_KOSHI_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_KOSHI })
+const LIP_INK = new THREE.MeshBasicMaterial({ color: '#3b2a20', side: THREE.BackSide })
+/** the carved panel: a slab `len` long whose picture repeats every LIP_TILE along its two long faces, at one height up them (made once a
+ * length; a rounded slab's faces each take the whole picture, and along the bar it was drawn out into streaks) */
+const KOSHI_GEO = new Map<string, THREE.BoxGeometry>()
+function koshiBox(len: number) {
+  const key = len.toFixed(3)
+  let g = KOSHI_GEO.get(key)
+  if (!g) {
+    g = new THREE.BoxGeometry(len, KOSHI_H, 0.06)
+    const uv = g.attributes.uv as THREE.BufferAttribute
+    // (BoxGeometry's faces four vertices each, +x, -x, +y, -y, +z, -z: the long faces (+y, -y, +z, -z) tiled along their length)
+    for (let f = 2; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setX(i, uv.getX(i) * (len / LIP_TILE)) }
+    KOSHI_GEO.set(key, g)
+  }
+  return g
+}
+/** a sheet `len` long and `h` high whose picture repeats every LIP_TILE along it (made once a length) */
+const LIP_SHEETS = new Map<string, THREE.PlaneGeometry>()
+function lipSheet(len: number, h: number) {
+  const key = `${len.toFixed(3)}|${h.toFixed(3)}`
+  let g = LIP_SHEETS.get(key)
+  if (!g) {
+    g = new THREE.PlaneGeometry(len, h)
+    const uv = g.attributes.uv as THREE.BufferAttribute
+    for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (len / LIP_TILE))
+    LIP_SHEETS.set(key, g)
+  }
+  return g
+}
+/**
  * One counter of the bar: a long plank of pale hinoki with rounded edges on a dark base, a raised lip on the cook's
  * side, and at each seat the chopsticks on their rest and a dish of sauce. With a gate, the base stops short of one end
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
@@ -2677,12 +2776,16 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
         // (where the two counters' lips meet at the corner, each runs a little into the other: no notch between their
         // rounded ends)
         // (the first counter's lip starts where the side counter's now stands, drawn in from the wall by SIDE_PULL)
-        const [x0, x1] = lipSpan
+        const [x0, x1] = lipSpan, L = x1 - x0, LAT = LIP_H - KOSHI_H - RAIL_H
+        // (in the Edo way, wood and bamboo (item 313): its carved panel at the foot, the bamboo lattice open over it, the rail along its top;
+        // the lattice's sheet just behind the customers' face, both its sides seen)
         return (
-          // (a tall one, a screen of wood between the customers and the kitchen, its top rounded)
-          <group position={[(x0 + x1) / 2, BAR_TOP + LIP_H / 2, 0.28]}>
-            <mesh geometry={ROUNDED_SLAB} scale={[x1 - x0, LIP_H, 0.06]} castShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
-            <mesh geometry={ROUNDED_SLAB} scale={[(x1 - x0) * 1.003, LIP_H * 1.06, 0.07]}><meshBasicMaterial color="#3b2a20" side={THREE.BackSide} /></mesh>
+          <group position={[(x0 + x1) / 2, BAR_TOP, 0.28]}>
+            <mesh geometry={koshiBox(L)} position-y={KOSHI_H / 2} castShadow material={EDO_KOSHI_MAT!} />
+            <mesh geometry={ROUNDED_SLAB} position-y={KOSHI_H / 2} scale={[L * 1.003, KOSHI_H * 1.1, 0.07]} material={LIP_INK} />
+            <mesh geometry={lipSheet(L - 0.01, LAT + 0.004)} position={[0, KOSHI_H + LAT / 2, -0.027]} material={EDO_LATTICE_MAT!} castShadow />
+            <mesh geometry={ROUNDED_SLAB} position-y={LIP_H - RAIL_H / 2} scale={[L, RAIL_H, 0.06]} castShadow><meshToonMaterial color="#ffffff" map={TRAY_WOOD} /></mesh>
+            <mesh geometry={ROUNDED_SLAB} position-y={LIP_H - RAIL_H / 2} scale={[L * 1.003, RAIL_H * 1.14, 0.07]} material={LIP_INK} />
           </group>
         )
       })()}
