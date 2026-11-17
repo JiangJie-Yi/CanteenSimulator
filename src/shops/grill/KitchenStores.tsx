@@ -211,12 +211,13 @@ const SACK_PARTS = /^Produce(Sack|Potato|Sweet|Onion|Loose)/
 /** what's in each sack, as there's stock of it (item 199, the owner's: 「庫存的東西沒對上」: the sacks drawn full at 0): the potatoes (and the
  * loose one by them), the sweet potatoes, the onions (and their roots, the loose one too) */
 const PILES = [
-  { id: 'Potato', re: /^Produce(Potato(Edge|Top)?\d+|Loose0)$/ },
-  { id: 'SweetPotato', re: /^ProduceSweet(Edge)?\d+$/ },
-  { id: 'Onion', re: /^Produce(Onion(Edge|Top)?\d+|LooseOnion)$/ },
+  { id: 'Potato', re: /^Produce(Potato(Edge|Top)?\d+|Loose0|PotatoHeap)$/ },
+  { id: 'SweetPotato', re: /^ProduceSweet((Edge)?\d+|Heap)$/ },
+  { id: 'Onion', re: /^Produce(Onion(Edge|Top)?\d+|LooseOnion|OnionHeap)$/ },
 ] as const
-/** the order the pieces in a sack go, deepest last: the loose one on the floor first, then the top, the rim, the body */
-const pileRank = (name: string) => (/Loose/.test(name) ? 0 : /Top/.test(name) ? 1 : /Edge/.test(name) ? 2 : 3)
+/** the order the pieces in a sack go, deepest last: the loose one on the floor first, then the top, the rim, the body, and last of all the heap
+ * that fills its mouth (blender/produce.py's ProducePotatoHeap and the rest, item 261: the mouth was a flat brown disc) */
+const pileRank = (name: string) => (/Heap$/.test(name) ? 4 : /Loose/.test(name) ? 0 : /Top/.test(name) ? 1 : /Edge/.test(name) ? 2 : 3)
 /** how many of a sack's pieces are shown for so much in stock: all of them at the usual stock (PAR) and over, none at none, at least one
  * while there's any; all of them with no shop running */
 const pileShown = (have: number, all: number) => (have < 0 ? all : have <= 0 ? 0 : Math.max(1, Math.min(all, Math.round((all * have) / PAR))))
@@ -252,7 +253,10 @@ export function ProduceSacks() {
       const roots = pieces.map((q) => q.children.find((c) => (c as THREE.Mesh).isMesh && /Root$/.test(c.name)) as THREE.Mesh | undefined)
       const kept = roots.filter((x): x is THREE.Mesh => !!x)
       for (const x of kept) r.attach(x)
-      return { id, all: pieces.length, body: countedBatch(r, pieces), roots: kept.length === pieces.length ? countedBatch(r, kept) : null, shown: -1 }
+      // (the roots of the first so many pieces shown: the heap has none, so not one for every piece any more)
+      const rooted = roots.map((x) => !!x)
+      const rootsOf = (n: number) => rooted.slice(0, n).filter(Boolean).length
+      return { id, all: pieces.length, body: countedBatch(r, pieces), roots: kept.length ? countedBatch(r, kept) : null, rootsOf, shown: -1 }
     })
     // (each open sack gathered into a group of its own, its origin at the middle of its foot, merged by material (its cloth, its floor, its
     // twine); the piles' order is the sacks': potatoes, sweet potatoes, onions)
@@ -288,7 +292,7 @@ export function ProduceSacks() {
       if (n !== p.shown) {
         p.shown = n
         p.body.show(n)
-        p.roots?.show(n)
+        p.roots?.show(p.rootsOf(n))
       }
       // (empty: the sack slumps down on its foot, a little wider; filled again, it stands up as it was)
       const sk = sacks[i]
@@ -317,24 +321,64 @@ export function ProduceSacks() {
     </group>
   )
 }
-/** what's in each of the two baskets of vegetables in front of the sacks (item 133) */
-const VEG_SAYS: Record<string, [string, string]> = {
-  VegCrate: ['蔬菜木箱', '高麗菜、甜椒、南瓜、青花菜｜點一下看常溫區的庫存'],
-  VegBasket: ['蔬菜提籃', '高麗菜、青花菜、櫻桃蘿蔔、小黃瓜、櫛瓜｜點一下看常溫區的庫存'],
+/** what's in each of the baskets of vegetables in front of the sacks (item 133; item 262: two crates and the basket, each its own vegetables) */
+const VEG_SAYS: Record<VegNode, [string, string]> = {
+  VegCrate: ['蔬菜木箱', '番茄、甜椒、茄子、青椒｜點一下看常溫區的庫存'],
+  VegCrate2: ['根菜木箱', '紅蘿蔔、牛蒡、白蘿蔔、大蔥｜點一下看常溫區的庫存'],
+  VegBasket: ['蔬菜提籃', '小黃瓜、櫛瓜、白菜、高麗菜、青花菜、櫻桃蘿蔔｜點一下看常溫區的庫存'],
 }
+export type VegNode = 'VegCrate' | 'VegCrate2' | 'VegBasket'
+/** the stock each kind of vegetable in them shows (item 262: as many as there are, the first so many, bottom up; none at none); null, a kind
+ * that isn't on the menu (the basket's cabbage, napa, broccoli, radishes, zucchini): there while the larder has anything at all */
+const VEG_STOCK: Record<string, string | null> = { Tomato: 'Tomato', Paprika: 'Paprika', Eggplant: 'Eggplant', Piman: 'Piman', Carrot: 'Carrot',
+  Gobo: 'Gobo', Daikon: 'Daikon', Negi: 'Negi', Cucumber: 'Cucumber', Zucchini: null, Napa: null, Cabbage: null, Broccoli: null, Radish: null }
+const LARDER = ['Potato', 'SweetPotato', 'Onion', ...Object.values(VEG_STOCK).filter((x): x is string => !!x)]
 /**
  * One of the two baskets of vegetables on the floor in front of the sacks (blender/produce.py's VegCrate, a slatted wooden crate, or
  * VegBasket, a wicker basket with a handle; item 133, the owner's): inked, folded by material; pointed at, what's in it; clicked, the stock
  * opens on the room-temperature tab, as the sacks' does.
  */
-export function VegBasket({ node }: { node: 'VegCrate' | 'VegBasket' }) {
+export function VegBasket({ node }: { node: VegNode }) {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => {
+  const { obj, kinds } = useMemo(() => {
+    // (each vegetable its own piece in the model, <node>_<Kind>_<i>, the first at the bottom (blender/produce.py, item 262): kept out of the
+    // container's merging, to be counted out as there's stock)
+    const vegRe = new RegExp(`^${node}_(?!Frame)([A-Za-z]+)_(\\d+)$`)
+    const vegOf = (o: THREE.Object3D) => { for (let q: THREE.Object3D | null = o; q; q = q.parent) { const x = vegRe.exec(q.name); if (x) return { kind: x[1], i: +x[2] } } return null }
     // (a fine ink line: the room's 4 mm round vegetables this small drew a thick black ring round each, a cartoon's blobs (item 153))
-    const r = partOf(gltf.scene, node, 0.0015)
+    const r = partOf(gltf.scene, node, 0.0015, (o) => !!vegOf(o))
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
-    return r
+    // (each kind's pieces by material (a tomato's red and its green calyx), in the vegetables' order: one mesh and one line each, cut to the
+    // first so many (countedBatch, as the sacks' potatoes))
+    const byKind = new Map<string, Map<THREE.Material, { m: THREE.Mesh; i: number }[]>>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || (m.material as THREE.Material).side === THREE.BackSide) return
+      const v = vegOf(o)
+      if (!v) return
+      const mats = byKind.get(v.kind) ?? new Map<THREE.Material, { m: THREE.Mesh; i: number }[]>()
+      byKind.set(v.kind, mats)
+      const list = mats.get(m.material as THREE.Material) ?? []
+      mats.set(m.material as THREE.Material, list)
+      list.push({ m, i: v.i })
+    })
+    const kinds = [...byKind].map(([kind, mats]) => {
+      const lists = [...mats.values()].map((list) => list.sort((a, b) => a.i - b.i))
+      const all = Math.max(...lists.flatMap((l) => l.map((x) => x.i))) + 1
+      return { stock: VEG_STOCK[kind] ?? null, all, shown: -1, batches: lists.map((l) => ({ at: l.map((x) => x.i), b: countedBatch(r, l.map((x) => x.m)) })) }
+    })
+    return { obj: r, kinds }
   }, [gltf, node])
+  useFrame(() => {
+    // (none of anything in the larder: the kinds that aren't on the menu go too; no shop running: all of them there)
+    const any = LARDER.some((id) => SUPPLIES.has(id) !== 0)
+    for (const k of kinds) {
+      const n = pileShown(k.stock ? SUPPLIES.has(k.stock) : any ? -1 : 0, k.all)
+      if (n === k.shown) continue
+      k.shown = n
+      for (const bt of k.batches) bt.b.show(bt.at.filter((i) => i < n).length)
+    }
+  })
   const [title, hint] = VEG_SAYS[node]
   return (
     <group onPointerOver={(e) => { if (getEdit().on) return; tipOver(title, hint).onPointerOver(e) }}

@@ -869,7 +869,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <Movable id="shoecab" label="鞋櫃">
       {/* the shoe cupboard (下駄箱) against the wall in the genkan (blender/shoecab.py; the owner's: low, broad, walnut, louvred doors that
           open, sunk pulls): its doors swing open at a click to its empty cubbies; a vase of a sprig on its top */}
-      <group position={[SHOE_CAB_X, -GENKAN.depth, SHOE_CAB_Z]}>
+      {/* (7 mm up: the genkan's stones are domed now (item 265), their tops 6 mm over their joints, and its foot sat into them) */}
+      <group position={[SHOE_CAB_X, -GENKAN.depth + 0.007, SHOE_CAB_Z]}>
         <group rotation-y={-Math.PI / 2}><ShoeCupboard /></group>
         <StaticBatch plain>
         <mesh position={[0, SHOE_TOP + 0.06, 0]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
@@ -2833,7 +2834,7 @@ const IN_DRAIN: [number, number, number] = [IN_SINK, IN_SINK * 0.3, IN_SINK]
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegbasket', 'coalsack', 'servecounter'])
+const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegcrate2', 'vegbasket', 'coalsack', 'servecounter'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 /** with no cashier at the till (item 203: the register rang them up by itself): how long (the bar's clock, s) one waits there for a server to

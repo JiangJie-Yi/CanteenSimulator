@@ -24,7 +24,7 @@ import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
 import { HEAT_S, heatNow, nextHeat, SOUP_BOWLS } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
 import { SINK_SETS, STEP_STOOL_AT, SinkModel, SinkPart, StepStoolModel } from './Sink'
-import { CharcoalSack, ProduceSacks, VegBasket } from './KitchenStores'
+import { CharcoalSack, ProduceSacks, VegBasket, type VegNode } from './KitchenStores'
 import { coolerDoorSound, lightSwitchSound } from './restroomSound'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
@@ -880,18 +880,23 @@ function SacksAt() {
 /** the two baskets of vegetables on the floor in front of the potatoes' and sweet potatoes' sacks (item 133, the owner's, 2026-11-15: in the
  * circle drawn there), in the sacks' own frame (x along the row, +z out toward the room, the model's units, 1.4 times in the room): the crate
  * in front of the potatoes, the wicker basket in front of the sweet potatoes, each turned a little */
-const VEG_AT: { id: string, label: string, node: 'VegCrate' | 'VegBasket', x: number, z: number, turn: number }[] = [
-  { id: 'vegcrate', label: '蔬菜木箱', node: 'VegCrate', x: -0.27, z: 0.37, turn: 0.12 },
-  { id: 'vegbasket', label: '蔬菜提籃', node: 'VegBasket', x: 0.19, z: 0.41, turn: -0.22 },
+// (item 262, the owner's: 「菜籃要像一點…蔬菜木箱也是，大一點、多一個、品質提升些，然後都要裝不同的蔬菜」 and 「太大了! 然後比例很怪，我的木箱要兩個」:
+// two crates and the basket, made at their real size (metres: a tomato 7 cm, the basket 0.4 across), side by side along the sacks, 6.5 cm
+// apart, their backs 2 cm clear of the loose potatoes on the floor (measured, blender/produce.py))
+const VEG_AT: { id: string, label: string, node: VegNode, x: number, z: number, turn: number }[] = [
+  { id: 'vegcrate', label: '蔬菜木箱', node: 'VegCrate', x: -0.72, z: 0.7, turn: 0.04 },
+  { id: 'vegcrate2', label: '根菜木箱', node: 'VegCrate2', x: -0.1, z: 0.7, turn: -0.04 },
+  { id: 'vegbasket', label: '蔬菜提籃', node: 'VegBasket', x: 0.46, z: 0.72, turn: -0.15 },
 ]
 function VegAt() {
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, SACKS_AT.along).addScaledVector(LAY, SACKS_AT.lay)
   return <>{VEG_AT.map((v) => (
-    // (1.9 times as made (the owner's, 2026-11-15: "too small" at 1.4, beside sacks of a metre))
-    <Movable key={v.id} id={v.id} label={v.label} baseScale={1.9} ground={floor}>
+    // (as made, at their real size (item 262: they were made small and drawn 1.9 times, "too small" at 1.4 beside sacks of a metre; made at
+    // their size now, 1.9 times over they were far too big)), placed in metres
+    <Movable key={v.id} id={v.id} label={v.label} baseScale={1} ground={floor}>
       <group position={[p.x, floor, p.z]} rotation-y={Math.atan2(ALONG.x, ALONG.z)}>
-        <group position={[v.x * 1.4, 0, v.z * 1.4]} rotation-y={v.turn}><VegBasket node={v.node} /></group>
+        <group position={[v.x, 0, v.z]} rotation-y={v.turn}><VegBasket node={v.node} /></group>
       </group>
     </Movable>
   ))}</>

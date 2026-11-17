@@ -950,7 +950,7 @@ const known = (): Set<string> => { try { return new Set([...JSON.parse(localStor
  * out of it, and nearer what the till's or the shrine's camera looks at */
 const AREA_OF: Record<string, string> = { noren: 'genkan', chochin: 'genkan', chochin2: 'genkan', fishlantern: 'genkan', shoecab: 'genkan',
   // (the door's cat stand by the round window since it was moved along the wall (item 218, the owner's 「招財貓台應該在圓窗?」))
-  'grp-doorcats': 'window', koban: 'window', bench: 'genkan', bench2: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', vegcrate: 'back', vegbasket: 'back', coalsack: 'back',
+  'grp-doorcats': 'window', koban: 'window', bench: 'genkan', bench2: 'genkan', takeoutstand: 'till', lowrack: 'back', produce: 'back', vegcrate: 'back', vegcrate2: 'back', vegbasket: 'back', coalsack: 'back',
   // (the kitchen's back: the rice station between the cook table and the till was nearer the till's camera; the rice corner and the sake
   // barrel by it in no view's sight at all)
   'grp-ricestation': 'back', 'grp-sink': 'back', 'grp-racks': 'back', 'grp-ricecorner': 'back', sake: 'back', freezer: 'back',
