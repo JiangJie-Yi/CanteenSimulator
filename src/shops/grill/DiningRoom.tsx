@@ -5,7 +5,7 @@ import { HOUSEHOLD } from '@/game/household'
 import { cornerStack } from '@/game/cornerStock'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
-import { bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
+import { blindSound, bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { landingOf } from '@/game/spills'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -1224,15 +1224,36 @@ function RoundWood() {
 }
 useGLTF.preload(ROUND_URL)
 /**
- * The round window's bamboo blind (簾, blender/sudare.py; item 301, the owner's, 2026-11-17: 「圓窗加上日式窗簾注意面數」): half rolled up, hung
- * from a bamboo pole just over the frame, in front of it (by 1.6 cm: nothing touches it), its slats' gaps cut out of its picture so the window's
- * view shows through them, the rest rolled up at its foot on two cords. About a hundred triangles; its weave and its cloth in its picture.
- * Not pointed at: a click through it is the shoji's, as it was
+ * The round window's bamboo blind (簾, blender/sudare.py; item 301, the owner's, 2026-11-17: 「圓窗加上日式窗簾注意面數」): hung from a bamboo pole
+ * just over the frame, in front of it (by 1.6 cm: nothing touches it), its slats' gaps cut out of its picture so the window's view shows
+ * through them, the rest rolled up at its foot on two cords. About a hundred triangles; its weave and its cloth in its picture.
+ * And it's worked (item 338, the owner's, 2026-11-18: 「圓窗的窗簾亦可互動，注意光源」): a click takes it on to its next way, half rolled up (as
+ * it was hung) to let right down over the window, to rolled up under its pole, to half again, as a blind's cords would, its slats ticking as
+ * it goes. Let down, its slats stay as they are (its picture runs on down it), its roll grows thinner and goes down with its foot; rolled
+ * up, the roll fattens under the pole. And the window's light goes as it covers it (`BLIND`): the shaft, the glow round the window and the
+ * glow under its sill, the dust in the moon's beam, dimmed by how much of the window it's over (a quarter of the light comes through a
+ * sudare's gaps), and the sun's patch on the floor striped with its slats' shadows over as much of it. No light of its own (rule 6).
  */
 const SUDARE_URL = import.meta.env.BASE_URL + 'models/sudare.glb'
+type BlindWay = 'half' | 'down' | 'up'
+/** each way's foot (its height in the window's frame, the window's paper -0.4..0.4); the way after each; what a click will do */
+const BLIND_FOOT: Record<BlindWay, number> = { half: 0.05, down: -0.44, up: 0.4 }
+const BLIND_NEXT: Record<BlindWay, BlindWay> = { half: 'down', down: 'up', up: 'half' }
+const BLIND_SAYS: Record<BlindWay, string> = { half: '點一下放下', down: '點一下捲起', up: '點一下放到一半' }
+/** the model's measures (blender/sudare.py): the hanging part's top (under its head), its picture's repeat, its plane, the cords' knot at the
+ * pole; how thick a slat is (the roll grows by it as it takes more), the roll's least radius (let right down) */
+const BLIND_TOP = 0.53 - 0.012 - 0.03, BLIND_PERIOD = 0.585, BLIND_X = -0.105, BLIND_KNOT = 0.53 - 0.004
+const SLAT_T = 0.004, ROLL_MIN = 0.012
+/** the roll's radius for its foot where it is: the bamboo that's not hanging wound on it */
+const rollR = (foot: number) => Math.sqrt(ROLL_MIN * ROLL_MIN + (SLAT_T * (foot - BLIND_FOOT.down)) / Math.PI)
+/** the blind as it hangs now (its foot), and how much of the window's round (-0.4..0.4) it's over, and of the window's lower half */
+const blindCover = (foot: number) => ({ all: THREE.MathUtils.clamp((0.4 - foot) / 0.8, 0, 1), low: THREE.MathUtils.clamp(-foot / 0.4, 0, 1) })
+const BLIND = { foot: BLIND_FOOT.half, cover: blindCover(BLIND_FOOT.half).all, coverLow: blindCover(BLIND_FOOT.half).low, drawn: -1 }
+/** what of the window's light gets through it over what it covers */
+const BLIND_PASS = 0.25
 function Sudare() {
   const gltf = useGLTF(SUDARE_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => {
+  const parts = useMemo(() => {
     const r = gltf.scene.clone(true)
     const made = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
@@ -1243,7 +1264,7 @@ function Sudare() {
       if (!t) {
         // (the slats: their picture's gaps cut out (tested, not blended), seen from either side, as the chair back's kumiko is)
         t = /Slats/.test(src.name) ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, alphaTest: 0.5, side: THREE.DoubleSide })
-          : new THREE.MeshToonMaterial({ color: src.color.clone() })
+          : new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color.clone(), map: src.map ?? null })
         t.name = src.name
         made.set(src, t)
       }
@@ -1252,9 +1273,96 @@ function Sudare() {
       m.castShadow = false
     })
     inkModel(r, (m) => !/SudarePole/.test(m.name), { width: 0.002, weld: true })
-    return r
+    // (the hanging part's own copy of its square, its foot's two points and their place down its picture moved as it's let down)
+    const blind = r.getObjectByName('SudareBlind') as THREE.Mesh | undefined
+    if (blind) blind.geometry = blind.geometry.clone()
+    const pos = blind?.geometry.attributes.position as THREE.BufferAttribute | undefined
+    const feet: number[] = [], tops: number[] = []
+    if (pos) for (let i = 0; i < pos.count; i++) (pos.getY(i) < BLIND_TOP - 0.05 ? feet : tops).push(i)
+    // (the roll about its own axis, each cord from its knot at the pole: their pictures moved so they're turned and stretched about those)
+    const centre = (m: THREE.Mesh | undefined, at: (b: THREE.Box3) => THREE.Vector3) => {
+      if (!m) return null
+      m.geometry = m.geometry.clone()
+      m.geometry.computeBoundingBox()
+      const c = at(m.geometry.boundingBox!)
+      m.geometry.translate(-c.x, -c.y, 0)
+      m.position.set(c.x, c.y, 0)
+      return { m, h: m.geometry.boundingBox!.min.y - c.y }
+    }
+    const roll = centre(r.getObjectByName('SudareRoll') as THREE.Mesh | undefined, (b) => b.getCenter(new THREE.Vector3()))
+    const rollMade = roll ? -roll.h : 0.028
+    const cords = [0, 1].map((k) => centre(r.getObjectByName(`SudareCord${k}`) as THREE.Mesh | undefined,
+      (b) => new THREE.Vector3(0, b.max.y, 0))).filter((x): x is NonNullable<typeof x> => !!x)
+    // (a cord's drop as it was made, from its knot to its foot under the roll)
+    const cordDrop = cords.length ? -cords[0].h : 0.54
+    return { r, blind, pos, feet, tops, roll: roll?.m ?? null, rollMade, cords: cords.map((c) => c.m), cordDrop }
   }, [gltf])
-  return <primitive object={obj} />
+  const st = useRef<{ way: BlindWay; from: number; t: number; dur: number }>({ way: 'half', from: BLIND_FOOT.half, t: 1, dur: 1 })
+  const pick = useRef<THREE.Mesh>(null)
+  /** the blind hung at `foot`: its square's foot and its picture, the roll under it, the cords round the roll, the place to point at */
+  const hang = (foot: number) => {
+    const { pos, feet, tops, blind, roll, rollMade, cords, cordDrop } = parts
+    if (pos && blind) {
+      const uv = blind.geometry.attributes.uv as THREE.BufferAttribute
+      for (const i of feet) { pos.setY(i, foot); uv.setY(i, (BLIND_TOP - foot) / BLIND_PERIOD) }
+      for (const i of tops) uv.setY(i, 0)
+      pos.needsUpdate = true
+      uv.needsUpdate = true
+      blind.geometry.computeBoundingSphere()
+    }
+    const rr = rollR(foot)
+    if (roll) {
+      roll.position.set(BLIND_X - 0.003 - rr, foot - rr, 0)
+      roll.scale.set(rr / rollMade, rr / rollMade, 1)
+    }
+    const drop = BLIND_KNOT - (foot - 2 * rr - 0.004)
+    for (const c of cords) c.scale.y = drop / cordDrop
+    if (pick.current) {
+      const lo = foot - 2 * rr - 0.01, hi = BLIND_KNOT + 0.02
+      pick.current.position.set(BLIND_X - 0.03, (lo + hi) / 2, 0)
+      pick.current.scale.set(1, hi - lo, 1)
+    }
+  }
+  useLayoutEffect(() => { hang(BLIND.foot) })
+  useFrame((_, dt) => {
+    const s = st.current
+    // (let down or rolled up over a time as far as it goes, eased: a hand on its cord)
+    s.t = Math.min(1, s.t + Math.min(dt, 0.1) / s.dur)
+    const e = s.t * s.t * (3 - 2 * s.t)
+    const foot = s.from + (BLIND_FOOT[s.way] - s.from) * e
+    if (Math.abs(foot - BLIND.foot) > 1e-5 || BLIND.drawn < 0) {
+      BLIND.foot = foot
+      hang(foot)
+      const c = blindCover(foot)
+      BLIND.cover = c.all
+      BLIND.coverLow = c.low
+      // (the window's light as much of it's let through: at once on its glows, and the floor's patch painted again now and then as it moves)
+      applySkyGlows()
+      if (Math.abs(c.all - BLIND.drawn) > 0.01 || s.t >= 1) { BLIND.drawn = c.all; paintFall(c.all) }
+    }
+  })
+  const says = () => BLIND_SAYS[st.current.way]
+  const go = () => {
+    const s = st.current
+    s.from = BLIND.foot
+    s.way = BLIND_NEXT[s.way]
+    s.t = 0
+    s.dur = 0.35 + 1.1 * Math.abs(BLIND_FOOT[s.way] - s.from)
+    blindSound(BLIND_FOOT[s.way] < s.from, 0.5, s.dur)
+  }
+  return (
+    <group>
+      <primitive object={parts.r} />
+      {/* (where it's pointed at and clicked: an unseen square over all of it as it hangs, a little in front of it (the shoji's click is
+          behind it, where the window's not under the blind)) */}
+      <mesh ref={pick} name="sudare-pick" rotation-y={-Math.PI / 2} visible={false}
+        onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; go(); setTip({ title: '竹簾', hint: says() }) }}
+        onPointerOver={(ev) => { if (getEdit().on) return; ev.stopPropagation(); glowOnly(parts.r); tipOver('竹簾', says()).onPointerOver(ev) }}
+        onPointerOut={(ev) => { glowLeave(parts.r); tipOver('竹簾', '').onPointerOut(ev) }}>
+        <planeGeometry args={[1.04, 1]} />
+      </mesh>
+    </group>
+  )
 }
 useGLTF.preload(SUDARE_URL)
 /** the round window's frame's tint over its keyaki: a deep walnut */
@@ -1799,7 +1907,9 @@ function RoundShoji() {
       const want = SILL_LIGHT[skyNow()]
       const m = sill.current.material as THREE.MeshBasicMaterial
       m.color.lerp(want.c, Math.min(1, dt * 2))
-      m.opacity += (want.a - m.opacity) * Math.min(1, dt * 2)
+      // (as little of it as the blind lets through, over the window's lower half it's let down over (item 338))
+      const a = want.a * (1 - (1 - BLIND_PASS) * BLIND.coverLow)
+      m.opacity += (a - m.opacity) * Math.min(1, dt * 2)
       sill.current.visible = m.opacity > 0.01
     }
     const want = s.open ? 1 : 0
@@ -1851,7 +1961,7 @@ const ROUND_AT = -1.36
 /** the daylight that comes in through it (by day only, gone at night): a cool glow round it on the plaster, and a faint shaft of it slanting
  * down into the room, soft at its edges and fading as it goes */
 const DAYLIGHT = (() => {
-  if (typeof document === 'undefined') return { halo: null, beam: null, fall: null }
+  if (typeof document === 'undefined') return { halo: null, beam: null, fall: null, fallCanvas: null }
   const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
   const halo = document.createElement('canvas')
   halo.width = halo.height = 128
@@ -1872,10 +1982,27 @@ const DAYLIGHT = (() => {
     row.addColorStop(0, 'rgba(255,255,255,0)'); row.addColorStop(0.5, `rgba(255,255,255,${k})`); row.addColorStop(1, 'rgba(255,255,255,0)')
     b.fillStyle = row; b.fillRect(0, y, 64, 1)
   }
-  // (the sun's patch on the floor (item 306): the round window's shape, soft at its edge, its lattice's bars dark across it)
+  // (the sun's patch on the floor (item 306): painted by paintFall, the blind's shadows on it as it's let down (item 338))
   const fall = document.createElement('canvas')
-  fall.width = fall.height = 128
-  const f = fall.getContext('2d')!
+  fall.width = 256; fall.height = 128
+  return { halo: tex(halo), beam: tex(beam), fall: tex(fall), fallCanvas: fall }
+})()
+/**
+ * The sun's patch on the floor (item 306): the round window's shape, soft at its edge, its lattice's bars dark across it; and over as much of it
+ * as the blind covers of the window (item 338: `cover`, from the patch's far end, where the window's top throws its light, the way the
+ * shaft slants in) the blind's slats' shadows across it, fine stripes letting a quarter of it through, soft at the blind's foot
+ */
+function paintFall(cover: number) {
+  const c = DAYLIGHT.fallCanvas
+  if (!c || !DAYLIGHT.fall) return
+  const f = c.getContext('2d')!
+  const W = c.width, H = c.height
+  f.setTransform(1, 0, 0, 1, 0, 0)
+  f.globalCompositeOperation = 'source-over'
+  f.filter = 'none'
+  f.clearRect(0, 0, W, H)
+  f.save()
+  f.scale(W / 128, 1)
   f.filter = 'blur(5px)'
   f.fillStyle = 'rgba(255,255,255,0.95)'
   f.beginPath(); f.arc(64, 64, 52, 0, Math.PI * 2); f.fill()
@@ -1884,19 +2011,40 @@ const DAYLIGHT = (() => {
   f.fillStyle = 'rgba(0,0,0,0.75)'
   for (const x of [46, 82]) f.fillRect(x - 3, 0, 6, 128)
   for (const y of [38, 64, 90]) f.fillRect(0, y - 2.5, 128, 5)
-  return { halo: tex(halo), beam: tex(beam), fall: tex(fall) }
-})()
+  f.restore()
+  if (cover > 0.002) {
+    // (the slats' shadows: lines along the wall, every 3 pixels two dark and one let through, over the covered stretch, fading in at its edge)
+    const x1 = cover * W
+    f.globalCompositeOperation = 'destination-out'
+    f.filter = 'none'
+    for (let x = 0; x < Math.min(W, x1 + 8); x += 3) {
+      const edge = THREE.MathUtils.clamp((x1 + 8 - x) / 16, 0, 1)
+      f.fillStyle = `rgba(0,0,0,${0.9 * edge})`
+      f.fillRect(x, 0, 2, H)
+    }
+    f.globalCompositeOperation = 'source-over'
+  }
+  DAYLIGHT.fall.needsUpdate = true
+}
+// (painted once at the start, as the blind hangs then)
+if (typeof document !== 'undefined') paintFall(BLIND.cover)
 /** the light from outside about the round window, by the part of the day: its colour, and how strong (none by day, the sky's light all
  * over then) */
-const SKY_GLOWS: { m: THREE.MeshBasicMaterial; looks: Record<Sky, [string, number]> }[] = []
-function skyGlow(m: THREE.MeshBasicMaterial, looks: Record<Sky, [string, number]>) {
-  SKY_GLOWS.push({ m, looks })
+const SKY_GLOWS: { m: THREE.MeshBasicMaterial; looks: Record<Sky, [string, number]>; blinded: boolean }[] = []
+/** a glow of the window's light, by the part of the day, and (`blinded`) dimmed as the blind covers the window (item 338) */
+function skyGlow(m: THREE.MeshBasicMaterial, looks: Record<Sky, [string, number]>, blinded = true) {
+  SKY_GLOWS.push({ m, looks, blinded })
   const [c, o] = looks[skyNow()]
   m.color.set(c)
   m.opacity = o
   return m
 }
-if (typeof document !== 'undefined') onSky(() => { const s = skyNow(); for (const { m, looks } of SKY_GLOWS) { m.color.set(looks[s][0]); m.opacity = looks[s][1] } })
+/** every glow as the part of the day and the blind have it now */
+function applySkyGlows() {
+  const s = skyNow(), k = 1 - (1 - BLIND_PASS) * BLIND.cover
+  for (const { m, looks, blinded } of SKY_GLOWS) { m.color.set(looks[s][0]); m.opacity = looks[s][1] * (blinded ? k : 1) }
+}
+if (typeof document !== 'undefined') onSky(applySkyGlows)
 // (by night the moon's faint blue glow round the window and its shaft slanting in, dust drifting in it (WindowDust); at dusk the evening
 // sun's, orange and stronger; at dawn only a faint rose glow round it (the morning sun's on the room's other side); by day none)
 // (and by day (item 306, the owner's: 「光照跟陰影感還不行，尤其是白天，不太真實」): the plaster round it a little lit, a faint warm shaft of the
@@ -1905,8 +2053,9 @@ const WINDOW_HALO = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, tr
   toneMapped: false }), { day: ['#fff4dc', 0.14], dawn: ['#ffc6d4', 0.12], dusk: ['#ffc07c', 0.3], night: ['#8fc4ff', 0.22] })
 const SUNBEAM = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   toneMapped: false, side: THREE.DoubleSide }), { day: ['#fff1d6', 0.1], dawn: ['#ffd6de', 0], dusk: ['#ffb872', 0.22], night: ['#78b2ff', 0.15] })
+// (the patch on the floor not dimmed as a whole: the blind's shadows are painted on it, over as much of it as it covers (paintFall))
 const SUNFALL = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.fall, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false }), { day: ['#ffeccc', 0.3], dawn: ['#ffd6c8', 0.1], dusk: ['#ffb46e', 0.34], night: ['#9cc0ff', 0.1] })
+  toneMapped: false }), { day: ['#ffeccc', 0.3], dawn: ['#ffd6c8', 0.1], dusk: ['#ffb46e', 0.34], night: ['#9cc0ff', 0.1] }, false)
 /** the dust in the moon's shaft by night, in the evening sun's at dusk: specks drifting slowly down it and about, catching its light (in the
  * window's frame, as the shaft) */
 // (24 of them, the owner's: fewer specks; they were 46)
@@ -1928,25 +2077,33 @@ function WindowDust() {
     if (!o.visible) return
     mat.color.set(sky === 'dusk' ? '#ffd8a8' : '#cfe4ff')
     const t = clock.elapsedTime, a = geo.attributes.position as THREE.BufferAttribute
-    const tilt = 0.62, R = 0.4
+    const tilt = SHAFT_TILT, R = 0.4
     for (let i = 0; i < DUST_N; i++) {
       const [u0, sx, sz, ph, sp] = seeds[i]
       // (along the shaft, slowly on down it and round again; across it, a lazy wander)
-      const u = (u0 + t * 0.012 * sp) % 1, L = 0.2 + u * 1.9
+      const u = (u0 + t * 0.012 * sp) % 1, L = 0.2 + u * (SHAFT_L - 0.35)
       const w = R * (0.7 + u * 0.4)
       const x = -0.07 - Math.cos(tilt) * L + Math.sin(tilt) * sx * w * 0.6 + Math.sin(t * 0.3 * sp + ph) * 0.03
       const y = -Math.sin(tilt) * L - Math.cos(tilt) * sx * w * 0.6 + Math.cos(t * 0.23 * sp + ph) * 0.03
       a.setXYZ(i, x, y, sz * w * 0.8 + Math.sin(t * 0.17 + ph) * 0.04)
     }
     a.needsUpdate = true
-    // (each speck fading in and out of the light: the whole lot's opacity breathing a little)
-    mat.opacity = 0.42 + Math.sin(t * 0.5) * 0.08
+    // (each speck fading in and out of the light: the whole lot's opacity breathing a little; as little of it as the blind lets through)
+    mat.opacity = (0.42 + Math.sin(t * 0.5) * 0.08) * (1 - (1 - BLIND_PASS) * BLIND.cover)
   })
   return <points ref={pts} geometry={geo} material={mat} frustumCulled={false} renderOrder={3} />
 }
+/** how steeply the window's light comes down into the room (rad below level) and how far it reaches (item 338: 0.62, its patch fell 2 m in,
+ * under the bar's counter and the hearth's rim, out of sight; at 60 degrees, the sun high as the owner has it by day (11-01), it lands on the
+ * open floor between the wall's stands and the bar, 0.58 to 1.04 out) */
+const SHAFT_TILT = Math.PI / 3, SHAFT_L = 1.75
+/** where its patch lies on the floor (1.4 under the window's middle): its middle out from the wall, and its size (the round's 0.8 laid along
+ * the floor 0.8 / tan of the tilt, and as wide along the wall, a little more for its soft edge) */
+const SUNFALL_AT = -1.4 / Math.tan(SHAFT_TILT) - 0.07
+const SUNFALL_SIZE: [number, number] = [0.8 / Math.tan(SHAFT_TILT) * 1.22, 0.98]
 /** the shaft's two crossed sheets, in the window's frame (the room toward -x): from the window's face, slanting down and in */
 const SUNBEAM_GEO = (() => {
-  const R = 0.4, L = 2.3, tilt = 0.62
+  const R = 0.4, L = SHAFT_L, tilt = SHAFT_TILT
   const d = new THREE.Vector3(-Math.cos(tilt), -Math.sin(tilt), 0)
   const up = new THREE.Vector3(-Math.sin(tilt), Math.cos(tilt), 0)
   const at = new THREE.Vector3(-0.07, 0, 0)
@@ -1972,12 +2129,11 @@ function RoundWindow() {
       <mesh position-x={-0.075} rotation-y={-Math.PI / 2} material={WINDOW_HALO} renderOrder={2}><planeGeometry args={[R * 4.2, R * 4.2]} /></mesh>
       <mesh geometry={SUNBEAM_GEO} material={SUNBEAM} renderOrder={2} />
       {/* (where the shaft meets the floor (1.4 under the window's middle), drawn long the way it slants in) */}
-      <mesh position={[-2.05, -1.4 + 0.006, 0]} rotation-x={-Math.PI / 2} material={SUNFALL} renderOrder={2}><planeGeometry args={[1.5, 0.86]} /></mesh>
+      <mesh position={[SUNFALL_AT, -1.4 + 0.006, 0]} rotation-x={-Math.PI / 2} material={SUNFALL} renderOrder={2}><planeGeometry args={SUNFALL_SIZE} /></mesh>
       {/* (the paper is the shoji's: RoundShoji, outside the batch, as it slides open) */}
       {/* (the reveal, the frame and its bead) */}
       <Suspense fallback={null}><RoundWood /></Suspense>
-      {/* (its bamboo blind, half rolled up (item 301)) */}
-      <Suspense fallback={null}><Sudare /></Suspense>
+      {/* (its bamboo blind (item 301) is outside the batch, with the shoji: it's let down and rolled up (item 338)) */}
     </group>
   )
 }
@@ -4689,7 +4845,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
             </group>
           </StaticBatch>
           {/* (the moon's dust in its shaft by night, outside the batch: it drifts, and a batch's pieces stand still) */}
-          {a.round && <group position={[0, 1.4, a.z + nudgeArt(a.z)]}><WindowDust /><RoundShoji /></group>}
+          {a.round && <group position={[0, 1.4, a.z + nudgeArt(a.z)]}><WindowDust /><RoundShoji /><Suspense fallback={null}><Sudare /></Suspense></group>}
           {/* (the beauty with her shamisen: only to look at (the owner's), named when pointed at, the cursor left an arrow) */}
           {/* (the koi print: only to look at, named when pointed at (the owner's, 2026-11-11)) */}
           {!a.round && !a.scroll && a.print === 'koi' && (

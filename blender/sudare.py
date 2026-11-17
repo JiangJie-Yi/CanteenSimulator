@@ -3,9 +3,11 @@ round window's own frame (blender/roundwindow.py: x the wall's normal, the room 
 origin, 0.8 across, its frame's face at x = -0.089 and its outer edge 0.478 out):
 
 - "SudarePole": the bamboo pole it hangs from, just over the frame's top, a little wider than the frame (6 round, its ends closed).
-- "SudareBlind": what hangs down: one square, 1.0 wide, from the pole to just over the window's middle; its picture the slats (fine split
-  bamboo laid across, each its own straw tone, a node here and there), the gaps between them cut out (the window seen through them), the
-  dark threads woven down through them, and the indigo cloth bound along both sides and the top.
+- "SudareBlind": what hangs down: one square, 1.0 wide, from under its head to just over the window's middle; its picture the slats (fine
+  split bamboo laid across, each its own straw tone, a node here and there), the gaps between them cut out (the window seen through them),
+  the dark threads woven down through them, and the indigo cloth bound along both sides. Its picture repeats down it (every PERIOD), so the
+  game lets it down or rolls it up (item 338) with its slats the same size: the square's foot and how far down its picture runs moved.
+- "SudareHead": the indigo cloth bound along its top, a fine pale line in it: its own strip, so the slats' picture can repeat.
 - "SudareRoll": the rest of it rolled up at its foot: a roll of the same slats (8 round, its ends closed), the slats running along it.
 - "SudareCord0", "SudareCord1": the two cords that hold it up, down from the pole in front of it and round under the roll.
 
@@ -39,6 +41,8 @@ def P(x, y, z):
 W = 1.0                 # its width along the wall
 X = -0.105              # the hanging blind's plane (the frame's face is at -0.089)
 TOP, FOOT = 0.53, 0.05  # the pole's height, and where the hanging part ends at the roll
+HEAD = 0.03             # the cloth along its top
+PERIOD = 0.585          # how much of the blind one repeat of its picture covers (64 slats)
 ROLL_R = 0.028          # the roll's radius
 POLE_R = 0.011
 
@@ -61,16 +65,17 @@ def tris(objs):
 # =====================================================================
 # The blind's picture
 # =====================================================================
-def blind_picture(N=256):
-    """u across it (0..1 along the wall), v down it (0 at its top): the slats, their gaps clear, the threads, the cloth along the sides and top"""
+def blind_picture(N=256, NV=320):
+    """u across it (0..1 along the wall), v down it: the slats (64 of them, 5 rows each, so it repeats down without a seam), their gaps
+    clear, the threads, the cloth along the sides"""
     rng_ = np.random.default_rng(7)
-    rgb = np.zeros((N, N, 3), np.float32)
-    a = np.ones((N, N), np.float32)
-    v = np.arange(N)
+    rgb = np.zeros((NV, N, 3), np.float32)
+    a = np.ones((NV, N), np.float32)
+    v = np.arange(NV)
     # (a slat every 5 pixels: 4 of split bamboo, 1 a gap between, see-through)
     slat = (v % 5) < 4
     tones = np.array([[0.80, 0.66, 0.42], [0.75, 0.60, 0.37], [0.84, 0.71, 0.48], [0.72, 0.57, 0.35]], np.float32)
-    for row in range(0, N, 5):
+    for row in range(0, NV, 5):
         t = tones[rng_.integers(len(tones))] * (0.94 + 0.08 * rng_.random())
         rgb[row:row + 4, :] = t
         # (the slat's own sheen down its middle, a little darker at its edges)
@@ -87,15 +92,21 @@ def blind_picture(N=256):
         c = int(u0 * N)
         rgb[:, c - 1:c + 2] = (0.24, 0.15, 0.09)
         a[:, c - 1:c + 2] = 1.0
-    # (the cloth bound along both sides and the top: indigo, a fine pale line in it)
+    # (the cloth bound along both sides: indigo, a fine pale line in it)
     cloth = np.array([0.17, 0.22, 0.38], np.float32)
-    for sl in (np.s_[:, :9], np.s_[:, N - 9:], np.s_[:10, :]):
+    for sl in (np.s_[:, :9], np.s_[:, N - 9:]):
         rgb[sl] = cloth
         a[sl] = 1.0
     rgb[:, 6] = rgb[:, N - 7] = (0.78, 0.74, 0.62)
-    rgb[7, 9:N - 9] = (0.78, 0.74, 0.62)
     # (image rows go up from the bottom: v down the blind is the picture's top to its foot)
     return rgb[::-1].copy(), a[::-1].copy()
+
+
+def head_picture():
+    """the cloth along its top: indigo, a fine pale line along it near its foot"""
+    rgb = np.zeros((16, 64, 3), np.float32) + np.array([0.17, 0.22, 0.38], np.float32)
+    rgb[4:6, :] = (0.78, 0.74, 0.62)
+    return rgb
 
 
 # =====================================================================
@@ -104,7 +115,25 @@ def blind_picture(N=256):
 def blind(name):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    vs = [bm.verts.new(P(X, y, z)) for (y, z) in ((FOOT, -W / 2), (FOOT, W / 2), (TOP - 0.012, W / 2), (TOP - 0.012, -W / 2))]
+    top = TOP - 0.012 - HEAD
+    vs = [bm.verts.new(P(X, y, z)) for (y, z) in ((FOOT, -W / 2), (FOOT, W / 2), (top, W / 2), (top, -W / 2))]
+    f = bm.faces.new(vs)
+    # (its picture from its top down, as far as it hangs: one repeat every PERIOD)
+    v0 = 1 - (top - FOOT) / PERIOD
+    for lp, uv in zip(f.loops, ((0, v0), (1, v0), (1, 1), (0, 1))):
+        lp[uvl].uv = uv
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    if f.normal.x > 0:
+        f.normal_flip()
+    return mesh_obj(name, bm, smooth_shade=False)
+
+
+def head(name):
+    """the cloth along its top, a hair in front of the blind's plane"""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    y0, y1 = TOP - 0.012 - HEAD, TOP - 0.012
+    vs = [bm.verts.new(P(X - 0.0006, y, z)) for (y, z) in ((y0, -W / 2), (y0, W / 2), (y1, W / 2), (y1, -W / 2))]
     f = bm.faces.new(vs)
     for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
         lp[uvl].uv = uv
@@ -160,9 +189,10 @@ M = {
     "slats": pbr("SudareSlats", (1, 1, 1), tex=image("sudareslats", rgb, alpha=alpha), rough=0.7, blend=True),
     "pole": pbr("SudarePole", (0.62, 0.48, 0.28), rough=0.5),
     "cord": pbr("SudareCord", (0.2, 0.12, 0.07), rough=0.8),
+    "head": pbr("SudareHead", (1, 1, 1), tex=image("sudarehead", head_picture()), rough=0.8),
 }
 parts = []
-for o, mat in ((blind("SudareBlind"), M["slats"]), (rod("SudareRoll", X - ROLL_R - 0.003, FOOT - ROLL_R, ROLL_R, 8, 0.45), M["slats"]),
+for o, mat in ((blind("SudareBlind"), M["slats"]), (head("SudareHead"), M["head"]), (rod("SudareRoll", X - ROLL_R - 0.003, FOOT - ROLL_R, ROLL_R, 8, 0.45), M["slats"]),
                (rod("SudarePole", X - 0.004, TOP, POLE_R, 6), M["pole"]), (cord("SudareCord0", -W * 0.3), M["cord"]),
                (cord("SudareCord1", W * 0.3), M["cord"])):
     o.data.materials.append(mat)

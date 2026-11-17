@@ -168,6 +168,23 @@ export function slideDoorSound(opening: boolean, near = 1, seconds = 0.55) {
   o.stop(at + 0.16)
 }
 
+/** a bamboo blind let down or rolled up (item 338): its slats ticking past each other as it goes, the cord's low rustle under them, and its
+ * foot coming to rest, a light hollow knock */
+export function blindSound(down: boolean, near = 1, seconds = 0.8) {
+  const a = ctx()
+  if (!a || near < 0.02 || !gate(`blind${down}`)) return
+  const t = a.currentTime
+  const tick = noise(a, seconds, (x) => Math.sin(Math.PI * Math.min(1, x * 1.1)) ** 0.7 * (0.45 + 0.55 * Math.max(0, Math.sin(x * (down ? 95 : 75)))), 0.25)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = down ? 1750 : 1500; bp.Q.value = 1.4
+  tick.connect(bp).connect(out(a, 0.2 * near))
+  tick.start(t)
+  const rus = noise(a, seconds, (x) => 0.6 * Math.sin(Math.PI * x), 0.7)
+  const lo = a.createBiquadFilter(); lo.type = 'bandpass'; lo.frequency.value = 420; lo.Q.value = 0.8
+  rus.connect(lo).connect(out(a, 0.12 * near))
+  rus.start(t)
+  ping(a, t + seconds * 0.96, down ? 260 : 340, 0.16 * near, 0.08, a.destination, 'triangle')
+}
+
 /** a new roll on the holder: a papery rustle and the bar's click */
 export function rollSound(near: number) {
   const a = ctx()
