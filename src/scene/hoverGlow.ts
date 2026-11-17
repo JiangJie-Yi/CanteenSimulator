@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { replaces } from './hot'
+import { tapSound } from './tapSound'
 
 /**
  * The "you're pointing at this" glow for anything that can be clicked or carried: while the pointer is over it, the object
@@ -70,6 +72,38 @@ export function glowOnly(root: THREE.Object3D | null | undefined) {
   current = root ?? null
   glowOn(current)
 }
+/**
+ * Pressed (item 320, the owner's: 「整體的回饋感需要提升」: 點 3D 物件時的小反應): what's lit under the pointer flashes brighter a moment, its
+ * glow up and easing back over a fifth of a second, and a soft tick's heard; nothing moved (what's clicked is often moved by its own
+ * frame's code, and would fight a press)
+ */
+const FLASH_MS = 220
+let flashAt = -1
+const FLASHED = new Map<THREE.Material, number>()
+function flashStep() {
+  const k = (performance.now() - flashAt) / FLASH_MS
+  for (const [m, base] of FLASHED) (m as THREE.MeshToonMaterial).emissiveIntensity = base + 1.1 * Math.max(0, 1 - k) ** 2
+  if (k < 1) requestAnimationFrame(flashStep)
+  else FLASHED.clear()
+}
+function flash() {
+  if (!LIT.size || HOVER.paused) return
+  for (const root of LIT) root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh || !WAS.has(m)) return
+    for (const x of ([] as THREE.Material[]).concat(m.material)) if ('emissiveIntensity' in x && !FLASHED.has(x)) FLASHED.set(x, (x as THREE.MeshToonMaterial).emissiveIntensity)
+  })
+  const was = flashAt
+  flashAt = performance.now()
+  if (performance.now() - was >= FLASH_MS) requestAnimationFrame(flashStep)
+  tapSound('thing')
+}
+if (typeof window !== 'undefined') {
+  const down = (e: PointerEvent) => { if (e.button === 0 && (e.target as Element | null)?.tagName === 'CANVAS') flash() }
+  window.addEventListener('pointerdown', down, { passive: true })
+  replaces(import.meta.hot, () => window.removeEventListener('pointerdown', down))
+}
+
 /** the pointer has left this one: put it out, and only it (what's lit now may be something else, lit since, that stays lit) */
 export function glowLeave(root: THREE.Object3D | null | undefined) {
   if (!root) return

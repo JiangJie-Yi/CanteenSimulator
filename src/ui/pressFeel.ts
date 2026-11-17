@@ -4,6 +4,7 @@
 // page's own animations, not in each button's CSS: most of them carry transitions of their own, which a shared rule can't join (it would
 // override them, or go unseen). With reduced motion asked for, a press dims instead of sinking.
 import { replaces } from '@/scene/hot'
+import { tapSound } from '@/scene/tapSound'
 
 /** what can be pressed */
 const PRESSABLE = 'button, [role="button"], a[href], summary, label[for], select, .brand'
@@ -26,6 +27,8 @@ function press(e: PointerEvent) {
     ? el.animate([{ filter: 'brightness(1)' }, { filter: 'brightness(0.86)' }], { duration: 70, fill: 'forwards', easing: 'ease-out' })
     : el.animate([{ scale: '1' }, { scale: String(sinkOf(r)) }], { duration: 80, fill: 'forwards', easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' })
   held = { el, anim }
+  // (and heard: a soft tick under the finger (item 320))
+  tapSound('ui')
 }
 
 function letGo() {

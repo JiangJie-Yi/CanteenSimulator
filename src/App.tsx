@@ -76,7 +76,8 @@ import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET
 import { traysAt } from '@/game/tableware'
 import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
-import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, reviewsOf, writesReview, type Visit } from '@/game/reputation'
+import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, reviewsOf, visitStars, writesReview, type Visit } from '@/game/reputation'
+import { ReviewPop } from '@/ui/ReviewPop'
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
 import { SOAP, SOAP_FULL, SOAP_REFILL_AT, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT, washroomOrder } from '@/game/washroom'
 import { RECEIPT, receiptOrder } from '@/game/receipts'
@@ -102,7 +103,7 @@ import { MOBILE } from '@/scene/flatGate'
 import { platerOf } from '@/game/kitchenCrew'
 import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { PhoneClosed } from '@/ui/PhoneClosed'
-import { dayTurnSound, stampSound, usePanelSound } from '@/ui/uiSound'
+import { boxesSound, dayTurnSound, stampSound, usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
 import { ClosedDown } from '@/ui/ClosedDown'
 import { Glyph, StarIcon } from '@/ui/GameIcons'
@@ -1678,6 +1679,23 @@ export default function App() {
   }), [])
   // (the reviews: the visits written up; the rating's of them (item 210))
   const shopReviews = useMemo(() => reviewsOf(shopVisits), [shopVisits])
+  // (a review just written: shown dropping in under the sign, its stars and a sound by how it went, for three seconds (item 320); none for
+  // those there when the game's opened, nor bought ones)
+  const [reviewPop, setReviewPop] = useState<{ key: number; stars: number } | null>(null)
+  const reviewsSeen = useRef(shopReviews.length)
+  useEffect(() => {
+    const was = reviewsSeen.current
+    reviewsSeen.current = shopReviews.length
+    if (shopReviews.length <= was) return
+    const v = shopReviews[shopReviews.length - 1]
+    if (v.bought) return
+    setReviewPop({ key: performance.now(), stars: visitStars(v) })
+  }, [shopReviews])
+  useEffect(() => {
+    if (!reviewPop) return
+    const t = window.setTimeout(() => setReviewPop(null), 3300)
+    return () => window.clearTimeout(t)
+  }, [reviewPop])
   const shopRating = useMemo(() => rateShop(shopReviews), [shopReviews])
   const shopRatingRef = useRef(shopRating)
   shopRatingRef.current = shopRating
@@ -1700,6 +1718,7 @@ export default function App() {
   }, [])
   const [showRating, setShowRating] = useState(false)
   const closeRating = useCallback(() => setShowRating(false), [])
+  const openRating = useCallback(() => setShowRating(true), [])
   // (reviews bought (the owner's, 2026-11-10): a pack's worth of four and five stars, numbered below every real customer's, dated today, paid
   // as promotion; the drawer's handler the same every render (its memo), calling the latest)
   const buyReviews = (pack: number) => {
@@ -2147,6 +2166,8 @@ export default function App() {
     const { buy, cost } = restockOf(d, how)
     if (!cost || cost > cash) return
     book('bought', cost)
+    // (the boxes heard set down as they come in (item 320))
+    boxesSound()
     setStock((st) => {
       const next = { ...st }
       for (const [k, n] of Object.entries(buy)) next[k] = (next[k] ?? 0) + n
@@ -3403,6 +3424,7 @@ export default function App() {
         {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars; a drawer out from the left, kept
             drawn so it slides back in as it slid out) */}
         {!editOn && <Reputation open={showRating} lang={lang} rating={shopRating} visits={shopReviews} today={clockDay} cash={cash} onBuy={onBuyReviews} onClose={closeRating} />}
+        {!editOn && !showRating && <ReviewPop pop={reviewPop} lang={lang} onOpen={openRating} />}
         {/* (the fire is the grill's own (research, at the grill's view); how full is the owner's own, on his view: the rest of the time they're
             out of the way, and the buttons under them move up into the room left) */}
         {showFire && <FireControl onAdd={() => addCharcoal(COAL_BRIDGE.place ? COAL_BRIDGE.place() : undefined)} lang={lang} />}
@@ -3523,11 +3545,16 @@ export default function App() {
                 partCost={(p) => partCost(dish, p)}
                 chef={(() => { const c = staffOf(dish.id, 'chef')[0]; return c ? personName(c, lang) : null })()}
                 talk={talkBy[dish.id] ?? []} onTalk={(text) => chefChat(dish, text)}
-                onPublish={(e) => setMenuBy((m) => {
-                  const cur = m[e.shop] ?? []
-                  if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m
-                  return { ...m, [e.shop]: [...cur, e] }
-                })}
+                onPublish={(e) => {
+                  // (put on the menu: stamped on, heard (item 320))
+                  const cur = menuBy[e.shop] ?? []
+                  if (cur.length < MENU_MAX && !cur.some((x) => x.key === e.key)) stampSound()
+                  setMenuBy((m) => {
+                    const cur = m[e.shop] ?? []
+                    if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m
+                    return { ...m, [e.shop]: [...cur, e] }
+                  })
+                }}
                 onUnpublish={(key) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).filter((x) => x.key !== key) }))}
                 onReprice={(key, price) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).map((x) => (x.key === key ? { ...x, price } : x)) }))} />
             )}

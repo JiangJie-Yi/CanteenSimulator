@@ -159,3 +159,53 @@ export function stampSound() {
   bell(a, t + 0.3, 1046.5, 0.035, 0.9)
   bell(a, t + 0.42, 1568, 0.03, 1.1)
 }
+
+/**
+ * Stock bought in (item 320, the owner's: 補貨 heard): two cardboard boxes set down one on the other, a dull thump and a lighter one after
+ */
+export function boxesSound() {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  for (const [k, at, f] of [[0, 0, 160], [1, 0.13, 210]] as const) {
+    const n = Math.max(1, Math.floor(a.sampleRate * 0.09))
+    const buf = a.createBuffer(1, n, a.sampleRate)
+    const d = buf.getChannelData(0)
+    let last = 0
+    for (let i = 0; i < n; i++) { last = last * 0.6 + (Math.random() * 2 - 1) * 0.4; d[i] = last * (1 - i / n) ** 3 }
+    const s = a.createBufferSource(); s.buffer = buf
+    const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700
+    const g = a.createGain(); g.gain.value = k ? 0.22 : 0.3
+    s.connect(lp).connect(g).connect(a.destination)
+    s.start(t + at)
+    const o = a.createOscillator(), og = a.createGain()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(f, t + at); o.frequency.exponentialRampToValueAtTime(f * 0.6, t + at + 0.08)
+    og.gain.setValueAtTime(0.0001, t + at); og.gain.linearRampToValueAtTime(k ? 0.08 : 0.12, t + at + 0.004)
+    og.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.12)
+    o.connect(og).connect(a.destination); o.start(t + at); o.stop(t + at + 0.14)
+  }
+}
+
+/**
+ * A review come in (item 320), heard by how it went: a good one (4 stars and up) the bright two-note bell; a middling one a single soft bell;
+ * a poor one a low pair falling, a sigh in two notes
+ */
+export function reviewSound(stars: number) {
+  if (stars >= 4) { joySound(); return }
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  if (stars >= 2.75) { bell(a, t, 880, 0.03, 0.4); return }
+  for (const [k, hz] of [[0, 392], [1, 330]] as const) {
+    const o = a.createOscillator(), g = a.createGain()
+    o.type = 'triangle'
+    o.frequency.setValueAtTime(hz, t + k * 0.16)
+    g.gain.setValueAtTime(0.0001, t + k * 0.16)
+    g.gain.linearRampToValueAtTime(0.05, t + k * 0.16 + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + k * 0.16 + 0.28)
+    o.connect(g).connect(a.destination)
+    o.start(t + k * 0.16)
+    o.stop(t + k * 0.16 + 0.3)
+  }
+}

@@ -694,6 +694,20 @@ export function gateSound(at: THREE.Vector3, kind: 'push' | 'tap') {
   ping(a, t, kind === 'push' ? 180 : 240, 0.25, 0.08, o)
 }
 
+/** a plate set down before its customer (item 320, the owner's: 端菜上桌 heard): porcelain on the counter's wood, a short knock and the
+ * plate's own small ring over a low tap */
+export function plateDownSound(at: THREE.Vector3) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate(`plate${at.x.toFixed(1)}${at.z.toFixed(1)}`, 250)) return
+  const t = a.currentTime, o = out(a, 0.16 * near, pan)
+  const k = noise(a, 0.03, (x) => (1 - x) ** 3, 0.1)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 1.6
+  k.connect(bp).connect(o); k.start(t)
+  ping(a, t, 2650, 0.22, 0.09, o)
+  ping(a, t, 4100, 0.08, 0.05, o)
+  ping(a, t, 210, 0.3, 0.06, o)
+}
 /** a bar stool pulled out over the boards: a short wooden scrape, low, its feet's rub dying away */
 export function stoolSound(at: THREE.Vector3) {
   const a = ctx()

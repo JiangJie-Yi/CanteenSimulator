@@ -89,7 +89,7 @@ import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
 import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes, soupReady, takeBowl, topUpGoes } from '@/game/soup'
 import { RICE_BEATS, SOUP_BEATS, beatsLength } from '@/game/sides'
 import { SeatBowls, fillRice, fillSoup, ladleRest, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
-import { bottleClink, lightSwitchSound, plateClink, scrubSound, stoolSound, tapTurnSound, washSplash } from './restroomSound'
+import { bottleClink, lightSwitchSound, plateClink, plateDownSound, scrubSound, stoolSound, tapTurnSound, washSplash } from './restroomSound'
 import { LAST_CALL, SHOP, clockIn } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
@@ -7197,8 +7197,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (id) STAFF_TALK.push({ key: performance.now() + wi, id, text: LINES[lang].serveSay(Math.floor(Math.random() * 3)), until: performance.now() + 2600 })
       })
       else if (w.phase === 'set' && w.t > 0.4) {
-        // (down at their place: the plate, and what's on it with it; their bowls brought with it too (item 207))
+        // (down at their place: the plate, and what's on it with it; their bowls brought with it too (item 207)); heard as it's set down (item 320)
         const r = run()
+        if (r && frame.current) plateDownSound(frame.current.localToWorld(plateAt(w.seat).clone()))
         if (r && r.phase === 'carry') r.phase = 'set'
         for (const b of passQ.current) if (b.server === wi && b.with && guestSits(b.guest, b.seat)) setBowls(b)
         passQ.current = passQ.current.filter((b) => !(b.server === wi && b.with))

@@ -6499,6 +6499,30 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
    moment, then gone */
 /* (the full house's stamp as an ooiri-bukuro (item 319): a tall red card, its paper's fine fibres, a gold double line round it and gold
    knots at its corners, 大入 down it in the brush with a gold edge; under it a small seal; it comes down hard with a puff of dust) */
+/* (a review just written (item 320): a little card under the sign, its stars filling, then rising away; gold for a good one, plain for a
+   middling one, a dusk blue for a poor one) */
+.review-pop {
+  position: absolute; top: 92px; left: 26px; z-index: 11;
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; border-radius: 999px;
+  background: #fff8ec; border: 1.5px solid #3b2a20; color: #3b2a20; white-space: nowrap; cursor: pointer;
+  font: 700 13px/1 var(--ui-font, inherit); box-shadow: 0 6px 16px -6px rgb(40 20 0 / 0.55);
+  animation: review-pop 3.2s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.review-pop.is-good { border-color: #b8860b; box-shadow: 0 0 0 3px rgb(232 196 90 / 0.35), 0 6px 16px -6px rgb(40 20 0 / 0.55); }
+.review-pop.is-poor { background: #eef1f6; border-color: #4a5a72; color: #34425a; }
+.review-pop small { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.review-pop-stars { position: relative; display: inline-flex; font-size: 13px; line-height: 1; }
+.review-pop-base { color: #d6ccb8; display: inline-flex; }
+.review-pop-fill { position: absolute; inset: 0 auto 0 0; overflow: hidden; color: #e0a526; display: inline-flex; animation: review-pop-fill 0.7s 0.25s ease-out both; }
+.review-pop.is-poor .review-pop-fill { color: #7a8aa6; }
+@keyframes review-pop {
+  0% { opacity: 0; transform: translateY(-10px) scale(0.6); }
+  9% { opacity: 1; transform: translateY(0) scale(1.08); }
+  15% { transform: scale(1); }
+  82% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+@keyframes review-pop-fill { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 .ooiri {
   position: fixed; left: 50%; top: 86px; z-index: 12; pointer-events: none;
   display: grid; justify-items: center; gap: 6px;
