@@ -311,6 +311,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-29', Array.from({ length: 4 }, (_, n) => [`chopsticks${n + 4}`, `chopstickpair${n + 4}`]).flat()],
   // (the helmet turned about to face the room and a quarter bigger, made its default: what was kept for it reset (item 212))
   ['jgs-edit-relaid-30', ['kabuto']],
+  // (every place's chopsticks and rest where the owner put one set, made their defaults (item 282))
+  ['jgs-edit-relaid-31', Array.from({ length: 8 }, (_, n) => [`chopsticks${n}`, `chopstickpair${n}`]).flat()],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -396,7 +398,9 @@ export const BASES: Record<string, V3> = {
   // its door, the side bar's toward its gate (item 198, the owner's: 「客人桌檯的規畫有夠隨便」: the side bar's were put along its z, which there
   // runs across the bar: its four sets 0.31 deeper than the long bar's, the two bars set two ways; and along it the same way as the long
   // bar's, the corner place's set went off the bar's end, its place 0.19 from it)
-  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [[`chopsticks${n}`, [n < 4 ? 0.3125 : -0.4925, 0, 0]], [`chopstickpair${n}`, [n < 4 ? 0.3125 : -0.4925, 0, 0]]]).flat()) as Record<string, V3>,
+  // (and every place's set moved where the owner put one (item 282, the owner's, 2026-11-17: 「每組筷子跟筷架幫我移到這位置」, X -0.325, Z 0.325
+  // from the long bar's 0.3125): across its place's middle, at the back of the bar's top before the cook's ledge, both bars alike)
+  ...Object.fromEntries(Array.from({ length: 8 }, (_, n) => [[`chopsticks${n}`, [-0.0125, 0, 0.325]], [`chopstickpair${n}`, [-0.0125, 0, 0.325]]]).flat()) as Record<string, V3>,
   // (the helmet's stand and the helmet on it moved along the wall from beside the staff's door to under the round window's left half, just
   // left of the lucky cats' red stand, 4 cm clear of it (item 92, the owner's, 2026-11-14, its arrow's end): 2.83 m along the wall, measured;
   // both their parents count two to one)
@@ -654,7 +658,15 @@ export function setSpace(s: Space) { if (state.space === s) return; state.space 
 // doesn't move: only what the panel reads and takes is counted from there (kept in the browser, with the rest of the edits)
 const KEY_F = 'jgs-edit-frozen-1'
 type Frozen = { o: Record<string, V3>; r: Record<string, V3>; s: Record<string, V3> }
-let frozen: Frozen = (() => { try { return { o: {}, r: {}, s: {}, ...JSON.parse(localStorage.getItem(KEY_F) ?? '{}') } } catch { return { o: {}, r: {}, s: {} } } })()
+let frozen: Frozen = (() => {
+  try {
+    const f: Frozen = { o: {}, r: {}, s: {}, ...JSON.parse(localStorage.getItem(KEY_F) ?? '{}') }
+    // (a piece's place made a default (RELAIDS): its frozen zero goes with what was kept for it, or its readings would count from the old)
+    for (const [, ids] of relaidDue) for (const id of ids) { delete f.o[id]; delete f.r[id]; delete f.s[id] }
+    if (relaidDue.length) localStorage.setItem(KEY_F, JSON.stringify(f))
+    return f
+  } catch { return { o: {}, r: {}, s: {} } }
+})()
 const saveFrozen = () => { try { localStorage.setItem(KEY_F, JSON.stringify(frozen)) } catch { /* storage blocked */ } }
 /** the zero a piece's readings are counted from */
 export const zeroOf = (id: string) => ({ o: frozen.o[id] ?? [0, 0, 0] as V3, r: frozen.r[id] ?? [0, 0, 0] as V3, s: frozen.s[id] ?? [1, 1, 1] as V3 })
