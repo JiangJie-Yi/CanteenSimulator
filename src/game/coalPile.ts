@@ -223,15 +223,22 @@ function bedPlaces(layer: number, turn: number) {
   const rows = Array.from({ length: BED_ROWS }, (_, i) => i - (BED_ROWS - 1) / 2).sort((a, b) => Math.abs(a) - Math.abs(b) || a - b)
   const along = Array.from({ length: BED_PER_ROW }, (_, j) => j - (BED_PER_ROW - 1) / 2).sort((a, b) => Math.abs(a) - Math.abs(b) || a - b)
   const out: { x: number; z: number; yaw: number }[] = []
-  // (the first layer along the hearth's length, the next across it)
-  const yaw = turn + (layer % 2 === 1 ? Math.PI / 2 : 0)
+  // (the first layer along the hearth's length, the next across it; each layer turned a little its own way and its rows shifted a little, so
+  // the layers don't cross square and in step, a joiner's lattice (item 270: 「木炭擺這麼整齊??!!」))
+  const yaw = turn + (layer % 2 === 1 ? Math.PI / 2 : 0) + (bedHash(layer, 0, 0, 5) - 0.5) * 0.44
+  const shift = (bedHash(layer, 0, 0, 6) - 0.5) * pitch
   const dx = Math.cos(yaw), dz = Math.sin(yaw)
+  // (laid by a hand, not a machine (the owner's, 2026-11-17, item 270: 「木炭擺這麼整齊??!!」): each row's end sticks pushed out along it by a
+  // little or a lot, so the rows' ends don't line up, each a hair askew (never into the next: its ends move less than the gap between the
+  // rows); the same each time, from its place. None left out: a stick of the next layer across a gap tipped down into it, steeper than lying)
   for (const r of rows) for (const a of along) {
-    const u = a * len, v = r * pitch
-    out.push({ x: dx * u - dz * v, z: dz * u + dx * v, yaw })
+    const u = a * len + a * bedHash(layer, r, a, 1) * 0.16 * len, v = r * pitch + shift
+    out.push({ x: dx * u - dz * v, z: dz * u + dx * v, yaw: yaw + (bedHash(layer, r, a, 4) - 0.5) * 0.05 })
   }
   return out
 }
+/** a number in 0..1 from a bed place (its layer, row, place along it) and what it's for, the same each time */
+const bedHash = (layer: number, r: number, a: number, k: number) => { const s = Math.sin(layer * 127.1 + r * 311.7 + a * 74.7 + k * 19.3) * 43758.5453; return s - Math.floor(s) }
 
 /** whether a stick lying here would stand on one of the trivet's feet */
 function onFoot(x: number, z: number, yaw: number) {

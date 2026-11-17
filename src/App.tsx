@@ -2380,9 +2380,12 @@ export default function App() {
     setFireGauge(heat.current, fire.current)
     lastSpace.current = space
   }, [space])
+  /** the fire put out once the shop's shut up for the night (item 270, the owner's: 「這有點誇張都關店了」: it burned on, red, all night): down to
+   * nothing in about 40 s, the sticks left to go to ash; charcoal put on again (to cook something to try out) or the shop opened, and not */
+  const dousing = useRef(false)
   useEffect(() => {
     const id = window.setInterval(() => {
-      fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK * GAME_SPEED.value)
+      fire.current = Math.max(0, fire.current - FIRE_BURN_PER_TICK * GAME_SPEED.value - (dousing.current ? 0.005 : 0))
       heat.current = heatStep(heat.current, fire.current, 0.2 * GAME_SPEED.value)
       setFireGauge(heat.current, fire.current)
     }, 200)
@@ -2403,6 +2406,7 @@ export default function App() {
       shiftStock({ [CHARCOAL]: -n })
     }
     const { boost } = coalCharge(sticks ?? STICKS_PER_PORTION, byHand)
+    dousing.current = false
     fire.current = afterCharcoal(fire.current, boost)
     setFireGauge(heat.current, fire.current)
     return true
@@ -2856,6 +2860,8 @@ export default function App() {
         setAi(false)
         setClosing(false)
         setLeaving(false)
+        // (the night's done: the fire put out (item 270))
+        dousing.current = true
         // (the night's rest won't take all of a run of days' tiredness away (game/shifts))
         setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, r]) => [id, shutDay(r, SHOP.day)]))])))
         // (a bill still not paid with the last customer gone (their figure gone some way without getting to the till): paid on their way out
