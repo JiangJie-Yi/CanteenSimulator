@@ -67,7 +67,9 @@ export const AISLE = 1.15
  * lay: + toward the cook): the plate a little back from the middle, the chopsticks across before it, the soy dish behind on the left
  * (the owner's), what they drink behind on the right, and the soy bottle and wasabi that each two places share, at the back between them.
  */
-export const PLACE = { plate: 0.04, chop: -0.135, sauce: [0.21, 0.13] as const, drink: [-0.2, 0.08] as const, shared: 0.17, basket: 0.0 }
+// (`rack`: the soy pot and wasabi each two places share hung on the lip's face over the counter (its customer side, the lip 0.28 and 0.06
+// thick), their little basket under it (`basket`) (item 334, the owner's, 2026-11-18: 「醬料用掛的、垃圾桶在它下面」))
+export const PLACE = { plate: 0.04, chop: -0.135, sauce: [0.21, 0.13] as const, drink: [-0.2, 0.08] as const, shared: 0.17, rack: 0.25, basket: 0.155 }
 /** along the counter, from its middle: where each pair of places' soy bottle and wasabi stand (between the two; an odd last place has its
  * own, on its right) */
 export const sharedAlong = (c: Counter) => Array.from({ length: Math.ceil(c.seats / 2) }, (_, k) =>

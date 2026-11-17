@@ -2752,7 +2752,10 @@ const BarTableware = memo(function BarTableware() {
                     </group>
                   </Movable>
                   <Movable id={`soydish${seat}`} label={`醬油碟（座位 ${no}）`}>
-                    <group ref={keep(k++)} userData={{ soySeat: seat }} position={[sauceSide(c, gate, x), BAR_TOP + 0.001, PLACE.sauce[1]]}
+                    {/* (at its own seat: sauceSide is the dish's offset from the seat's middle; drawn at the offset alone since the tableware
+                        became pieces of their own (2026-11-10), every counter's dishes lay heaped by its middle (item 335, the owner's: 「醬油碟
+                        分配不均?」)) */}
+                    <group ref={keep(k++)} userData={{ soySeat: seat }} position={[x + sauceSide(c, gate, x), BAR_TOP + 0.001, PLACE.sauce[1]]}
                       {...nameOver('醬油碟', '染付的小碟，客人坐下時倒醬油、放一點蘿蔔泥')}>
                       <StaticBatch plain><BarPiece name="BarSoyDish" design={n} flat /></StaticBatch>
                     </group>
@@ -2760,14 +2763,15 @@ const BarTableware = memo(function BarTableware() {
                 </group>
               )
             })}
-            {/* the soy pot and the wasabi that each two places share, at the back between them */}
+            {/* the soy pot and the wasabi that each two places share, at the back between them: hung on the lip on a little shelf, their bin
+                under it on the counter (item 334) */}
             {sharedAlong(c).map((x, j) => {
               const a = seatLabel(base + 2 * j), b = 2 * j + 1 < c.seats ? seatLabel(base + 2 * j + 1) : null
               return (
                 <group key={`shared${j}`}>
-                <Movable id={`condiments${base}-${j}`} label={`醬油壺與山葵（座位 ${b === null ? a : `${Math.min(a, b)}・${Math.max(a, b)}`}）`}>
-                  <group ref={keep(k++)} position={[x, BAR_TOP + 0.001, PLACE.shared]} {...nameOver('醬油壺與山葵', '兩個座位共用的染付醬油壺與青瓷山葵罐')}>
-                    <StaticBatch plain><BarPiece name="BarCondiments" /></StaticBatch>
+                <Movable id={`condiments${base}-${j}`} label={`醬料吊架（座位 ${b === null ? a : `${Math.min(a, b)}・${Math.max(a, b)}`}）`}>
+                  <group ref={keep(k++)} position={[x, BAR_TOP + 0.001, PLACE.rack]} {...nameOver('醬料吊架', '掛在吧台內側木板上的小木架，兩個座位共用的染付醬油壺與青瓷山葵罐')}>
+                    <StaticBatch plain><BarPiece name="BarCondRack" /></StaticBatch>
                   </group>
                 </Movable>
                 {/* (the little waste basket the two places share, in front of their soy pot and wasabi: a piece of its own to be moved (the
@@ -3102,7 +3106,9 @@ function BarPiece({ name, design, grain, fade, flat }: { name: string; design?: 
         const m = o as THREE.Mesh
         if (!m.isMesh) return
         const was = m.material as THREE.MeshStandardMaterial
-        const map = design !== undefined && /Dish/.test(was.name) ? wareDesign(design) : swatch && /Walnut/.test(was.name) ? swatch : was.map
+        // (the hung condiment shelf in the bar's lip's own wood (item 334))
+        const map = design !== undefined && /Dish/.test(was.name) ? wareDesign(design) : swatch && /Walnut/.test(was.name) ? swatch
+          : /RackWood/.test(was.name) ? TRAY_WOOD : was.map
         // (the walnut glowing a little with its own grain: under the bar's top it's in shadow, and it went a dark brown block there)
         const wood = /Walnut/.test(was.name)
         m.material = /Brass/.test(was.name) ? barBrassOf()

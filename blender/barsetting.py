@@ -706,6 +706,33 @@ def condiments(name, M, ps):
     return out
 
 
+def cond_rack(name, M, ps):
+    """the soy pot and the wasabi hung on the bar's raised lip (item 334, the owner's, 2026-11-18: 「醬料用掛的、垃圾桶在它下面」): a little
+    shelf of the lip's own wood on two flat hooks over its top, a low rail along its front, the pot and the jar stood on it (no tray); the
+    origin on the lip's customer face at the bar's top, +z into the lip (toward the cook), -z out over the counter. The lip stands 0 to 0.06
+    in z and up to 0.149; its ink a few millimetres round it: the hooks kept clear of both, the shelf high enough for the table bin under it"""
+    out = []
+    wood = []
+    # (the shelf: 16 by 7 cm, 1.2 cm thick, its top 10.4 cm over the counter; the bin's rim 8.7 cm, under its front)
+    wood.append(board(f"{name}Shelf", -0.08, 0.08, 0.092, 0.104, -0.085, -0.013, ease=0.0012))
+    wood.append(board(f"{name}Rail", -0.08, 0.08, 0.104, 0.116, -0.085, -0.079, ease=0))
+    for k, hx in enumerate((-0.06, 0.06)):
+        # (each hook: a strip up in front of the lip, over its top, a short way down its back)
+        wood.append(board(f"{name}HookFront{k}", hx - 0.008, hx + 0.008, 0.092, 0.158, -0.013, -0.008, ease=0))
+        wood.append(board(f"{name}HookTop{k}", hx - 0.008, hx + 0.008, 0.158, 0.164, -0.013, 0.073, ease=0))
+        wood.append(board(f"{name}HookBack{k}", hx - 0.008, hx + 0.008, 0.128, 0.158, 0.068, 0.073, ease=0))
+    out.append(fin(joined(f"{name}Wood", wood), M["rackwood"], ps))
+    # (the pot and the jar as on the tray, without it: stood on the shelf, set back from its rail)
+    pots = condiments(f"{name}Cond", M, [])
+    for o in pots:
+        if o.name.endswith("Tray"):
+            bpy.data.objects.remove(o, do_unlink=True)
+            continue
+        o.location = o.location + P(0, 0.104 - 0.012, -0.046)
+        out.append(fin(o, o.data.materials[0], ps))
+    return out
+
+
 def swatch(name):
     """a little square (the walnut's boards are kept on these, for the game to take)"""
     bm = bmesh.new()
@@ -746,6 +773,8 @@ M = {
     # (the four boards the game gives the drawers and their cases, seat by seat: the old walnut (drawer_walnut); the tissue box the new one)
     **{f"walnut{k}": pbr(f"BarWalnut{k}", (1, 1, 1), tex=image(f"barwalnut{k}", drawer_walnut(k)), rough=0.45, coat=0.2) for k in range(4)},
     "tray": pbr("BarCondTray", (0.06, 0.045, 0.04), rough=0.25, coat=0.6),
+    # (the hung shelf's wood: the game lays the bar's lip's own wood on it, BarRackWood)
+    "rackwood": pbr("BarRackWood", (0.86, 0.7, 0.5), rough=0.6),
     "shoyu": pbr("BarShoyuGlaze", (1, 1, 1), tex=image("barshoyu", shoyu_glaze()), rough=0.2, coat=0.5),
     "celadon": pbr("BarWasabiGlaze", (1, 1, 1), tex=image("barwasabi", celadon()), rough=0.2, coat=0.5),
     "spoon": pbr("BarWasabiSpoon", (0.72, 0.56, 0.36), rough=0.6),
@@ -768,6 +797,7 @@ for name, build, offset in (
         ("BarDrawerCase", lambda ps: [fin(drawer_case("BarDrawerCaseBody"), M["walnut"], ps)], (0.1, 0.2, 0.3)),
         ("BarDrawer", lambda ps: [fin(drawer_body("BarDrawerBody"), M["walnut"], ps), fin(drawer_pull("BarDrawerPull"), M["brass"], ps)], (0.5, 0.2, 0.3)),
         ("BarCondiments", lambda ps: condiments("BarCond", M, ps), (0.3, 0, -0.3)),
+        ("BarCondRack", lambda ps: cond_rack("BarRack", M, ps), (0.6, 0, -0.3)),
         *[(f"BarWalnutSwatch{k}", (lambda k: lambda ps: [fin(swatch(f"BarWalnutSwatchMesh{k}"), M[f"walnut{k}"], ps)])(k), (1.2 + 0.05 * k, 0, 0))
           for k in range(4)]):
     parts = []

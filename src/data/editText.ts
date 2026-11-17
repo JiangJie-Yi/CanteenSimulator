@@ -313,11 +313,11 @@ const WORDS_JA: [string, string][] = [
   ['圓窗', '丸窓'], ['掛軸', '掛け軸'], ['男廁', '男性用'], ['女廁', '女性用'], ['中途點', '経由点'],
   // (the pictures' names (item 156): before 畫, which is in 三味線美人圖)
   ['三味線美人圖', '三味線美人図'], ['富士山', '富士山'], ['浪花', '波'], ['書法', '書'], ['梅花', '梅'], ['雨中橋', '雨の橋'], ['畫', '絵'],
-  ['筷子與筷架', '箸と箸置き'], ['筷架', '箸置き'], ['筷子', '箸'], ['醬油碟', '醤油皿'], ['醬油壺與山葵', '醤油差しと山葵'], ['桌上垃圾桶', '卓上のごみ箱'],
+  ['筷子與筷架', '箸と箸置き'], ['筷架', '箸置き'], ['筷子', '箸'], ['醬油碟', '醤油皿'], ['醬油壺與山葵', '醤油差しと山葵'], ['醬料吊架', '薬味の吊り棚'], ['桌上垃圾桶', '卓上のごみ箱'],
 ]
 /** and in English: the made-up names' words, and their brackets (the rest keep their Chinese) */
 const WORDS_EN: [string, string][] = [
-  ['筷子與筷架', 'Chopsticks and rest'], ['筷架', 'Chopstick rest'], ['筷子', 'Chopsticks'], ['醬油碟', 'Soy dish'], ['醬油壺與山葵', 'Soy pot and wasabi'], ['桌上垃圾桶', 'Table waste basket'], ['座位', 'seat'], ['（', ' ('], ['）', ')'], ['・', ', '],
+  ['筷子與筷架', 'Chopsticks and rest'], ['筷架', 'Chopstick rest'], ['筷子', 'Chopsticks'], ['醬油碟', 'Soy dish'], ['醬油壺與山葵', 'Soy pot and wasabi'], ['醬料吊架', 'Hung condiment shelf'], ['桌上垃圾桶', 'Table waste basket'], ['座位', 'seat'], ['（', ' ('], ['）', ')'], ['・', ', '],
 ]
 /** the pictures by name (item 156) */
 for (const [zh, en] of [['富士山', 'Mt Fuji'], ['浪花', 'Waves'], ['錦鯉', 'Koi'], ['赤富士', 'Red Fuji'], ['雨中橋', 'Bridge in the rain'], ['書法', 'Calligraphy'],
