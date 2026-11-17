@@ -1020,6 +1020,8 @@ reflectStudio(SOAP_GLASS)
  */
 /** the cabinet's doors: how long they take to swing open or shut (s), and how far (a little past square) */
 const CAB_S = 0.35, CAB_SWING = 1.75
+/** the eye, in the stand's own frame (each frame: whether it's behind the back wall) */
+const EYE = new THREE.Vector3()
 export function WashstandLive({ who }: { who: Who }) {
   const gltf = useGLTF(WASH_URL) as unknown as { scene: THREE.Group }
   const parts = useMemo(() => {
@@ -1070,8 +1072,17 @@ export function WashstandLive({ who }: { who: Who }) {
     soap.add(pump)
     for (const o of soapBits) if (/^WashPump(Head|Nozzle)/.test(o.name)) pump.attach(o)
     if (who === 'f') soap.scale.z = -1
+    // (the mirror, its frame and its brass ring a piece of their own (item 308): they hang on the back wall, the one cut away for the view
+    // from outside; from there, behind it, the wall isn't drawn and the frame's black-lacquered back hung in the air over the stand, two
+    // black discs (the owner's: 「奇怪的黑影」); so they go with the wall, seen from behind it)
+    const mirrorSet = new THREE.Group()
+    mirrorSet.name = 'WashMirrorSet'
+    root.add(mirrorSet)
+    const mirrorBits: THREE.Object3D[] = []
+    root.traverse((o) => { if (/^WashMirror/.test(o.name) && (o as THREE.Mesh).isMesh) mirrorBits.push(o) })
+    for (const o of mirrorBits) mirrorSet.attach(o)
     plainColours(root)
-    mergeByMaterial(root, (o) => doors.includes(o as THREE.Group) || o === soap)
+    mergeByMaterial(root, (o) => doors.includes(o as THREE.Group) || o === soap || o === mirrorSet)
     mergeByMaterial(soap, (o) => o === pump || o === liquid)
     mergeByMaterial(pump)
     // (where the bottle stands, in the stand's own frame: what takes the pointer for it, a little bigger)
@@ -1080,12 +1091,13 @@ export function WashstandLive({ who }: { who: Who }) {
     const soapAt = soapBox.getCenter(new THREE.Vector3()), soapSize = soapBox.getSize(new THREE.Vector3()).addScalar(0.012)
     for (const d of doors) mergeByMaterial(d)
     mergeByMaterial(handle)
-    let plain: THREE.Object3D | null = null
-    root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && (m.material as THREE.Material).name === 'WashMirror') plain = m })
+    // (the plain glass, by its mesh's name: its material's a copy made for the room's light, without the model's name (looked for by that,
+    // it was never found, and drawn behind the live mirror all along))
+    const plain = mirrorSet.getObjectByName('WashMirror') ?? null
     const mirror = roundMirror((box.max.y - box.min.y) / 2)
     mirror.glass.position.copy(face).add(new THREE.Vector3(-0.0006, 0, 0))
     mirror.glass.rotation.y = -Math.PI / 2
-    return { root, handle, tip, floor, mirror, plain: plain as THREE.Object3D | null, doors, pump, soapAt, soapSize, liquid }
+    return { root, handle, tip, floor, mirror, plain, mirrorSet, doors, pump, soapAt, soapSize, liquid }
   }, [gltf, who])
   const cab = useRef({ open: false, k: 0 })
   useEffect(() => () => { parts.mirror.glass.getRenderTarget().dispose(); (parts.mirror.glass.material as THREE.Material).dispose() }, [parts])
@@ -1106,8 +1118,12 @@ export function WashstandLive({ who }: { who: Who }) {
   })())
   const len = parts.tip.y - parts.floor.y
   useFrame(({ clock, camera, scene }, dt) => {
-    // (the mirror showing the room while the eye's near it; the plain glass (the studio's blur in it) when not)
-    const showing = parts.mirror.tick(scene, camera, frame.current++)
+    // (the eye behind the back wall (outside, where the wall's cut away: the stand's back is its +x): the mirror on it not there, as the
+    // wall isn't; else the mirror showing the room while the eye's near it, the plain glass (the studio's blur in it) when not)
+    const behind = parts.root.worldToLocal(camera.getWorldPosition(EYE)).x > 0.01
+    parts.mirrorSet.visible = !behind
+    const showing = !behind && parts.mirror.tick(scene, camera, frame.current++)
+    if (behind) parts.mirror.glass.visible = false
     if (parts.plain) parts.plain.visible = !showing
     const t = TOILETS[who]
     const s = st.current
