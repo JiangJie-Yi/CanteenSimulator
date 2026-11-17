@@ -2,9 +2,10 @@
 (luckycat3.glb, the one the owner circled, 2026-11-15: "the shape's still far off"), as the owner wants the shop's figures made: a clean
 low-poly mesh of quads over its shape, its colour baked into a picture (as the beckoning cats and the Ebisu are), not built up of balls.
 
-How: the door cat's mesh, turned to face -y and brought to 0.30 tall, is fused whole (a voxel remesh), retopologised into an even grid of quads
-(a coarse voxel remesh) and the quads shrunk back onto its surface; unwrapped, and its colours baked from the original into a 1024 picture (Cycles,
-selected to active). The raised paw stays still (item 223, the owner's, 2026-11-16: 「你手別動好了，會不會比較好看」; it beckoned by a shape
+How: the door cat's mesh, turned to face -y and brought to 0.30 tall, is fused whole (a fine voxel remesh) and retopologised by QuadriFlow into
+quads that run with its shape (item 246, the owner's, 2026-11-17: 「這貓怎了?」 over a wireframe of it: a coarse voxel grid before, its quads
+lined up with the voxels' axes and not the cat's, read as a tangle of skewed triangles, 2,184 of them); unwrapped, and its colours baked from
+the original into a 1024 picture (Cycles, selected to active), where the bake finds nothing filled from round about. The raised paw stays still (item 223, the owner's, 2026-11-16: 「你手別動好了，會不會比較好看」; it beckoned by a shape
 key before, items 97 and 163). The koban is made: a pillow-edged oval plate as thick as a coin should look, where the door cat's own was.
 
 Run:
@@ -28,7 +29,10 @@ PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 TALL = 0.30
-VOXEL = 0.018
+# (the fusing's voxel: fine, so the shape QuadriFlow lays its quads over is the door cat's own; and how many quads it lays: the silhouette
+# and the face's planes kept (ears, raised paw, the paw on the coin), the rest in the picture)
+FUSE_VOXEL = 0.003
+QUADS = 650
 
 
 # ---- the koban's picture: gold, 千万両 written down it by hand, as the door cat's is (the owner's, 2026-11-15: "the words on the coin:
@@ -158,17 +162,11 @@ KN = Vector(_V[:, 0] if _V[1, 0] < 0 else -_V[:, 0])
 KUP = Vector(_V[:, 2] if _V[2, 2] > 0 else -_V[:, 2])
 KSIDE = KUP.cross(KN)
 print("COIN_FRAME", tuple(round(c, 4) for c in KC), "front", tuple(round(c, 3) for c in KN), "up", tuple(round(c, 3) for c in KUP))
-# (the body's own rim round the coin goes with it: a wall that hugged the coin's side, painted gold, left standing in front of the bib once
-# the coin was off; fused, a thin white sliver beside the made coin, its edge in ragged ink (the owner's circled shot, item 223). Every face
-# of the body within 7 mm of the coin and not in front of its face (the paw that holds it is) is taken off with it)
-from mathutils.bvhtree import BVHTree  # noqa: E402
-bm.verts.index_update()
-ctree = BVHTree.FromPolygons([v.co.copy() for v in bm.verts], [[v.index for v in f.verts] for f in max(groups_, key=len)])
-coin_set = set(coin_f)
-lip_f = [f for f in bm.faces if f not in coin_set and ctree.find_nearest(f.calc_center_median(), 0.007)[0] is not None
-         and -(f.calc_center_median() - KC).dot(KN) > -0.010]
-print("COIN_LIP", len(lip_f))
-bmesh.ops.delete(bm, geom=coin_f + lip_f, context="FACES")
+# (only the coin's own faces go: the body behind it stays whole (item 246). Item 223 took off every face of the body within 7 mm of the coin
+# as well (the "wall" beside it, 117 faces), which was the body's own surface behind the coin: the jagged hole it left, closed by one face
+# across it, came out a twisted flap the mesh followed, a white patch on the collar by the bell and white shards with ragged ink round the
+# paw on the coin (the owner's 「這貓怎了?」). The made koban, as wide as the old one, stands over where the coin hung)
+bmesh.ops.delete(bm, geom=coin_f, context="FACES")
 # (two copies of what's left: one baked from, as it is; one fused and shrunk onto, its open edges (the model has many: inside its ears, the
 # coin's own) all closed, or the fusing can't tell inside from out and keeps a scrap of the cat; baked from that one, the closing faces,
 # with no place in the picture, came out streaks on the ear)
@@ -186,19 +184,46 @@ bm.to_mesh(shape_src.data)
 bm.free()
 print("COIN_FACES", len(coin_f))
 
-# ---- the new mesh: fused, quads over it, shrunk back onto its surface
+# ---- the new mesh: fused whole, QuadriFlow's quads laid over it along its shape, shrunk back onto its surface
 lp = shape_src.copy()
 lp.data = shape_src.data.copy()
 lp.name = "OwnCatBody"
 bpy.context.collection.objects.link(lp)
 lp.data.materials.clear()
 select_only(lp)
-# (a coarse voxel remesh: whole, and quads already, an even grid of them over it (QuadriFlow does nothing run in the background))
-m_ = lp.modifiers.new("fuse", "REMESH"); m_.mode = "VOXEL"; m_.voxel_size = VOXEL
+m_ = lp.modifiers.new("fuse", "REMESH"); m_.mode = "VOXEL"; m_.voxel_size = FUSE_VOXEL
 bpy.ops.object.modifier_apply(modifier="fuse")
-m_ = lp.modifiers.new("onto", "SHRINKWRAP"); m_.target = shape_src; m_.wrap_method = "NEAREST_SURFACEPOINT"
-bpy.ops.object.modifier_apply(modifier="onto")
-print('QUADS', len(lp.data.polygons))
+# (QuadriFlow turns down a mesh with an edge of next to no length (its "needs to be manifold" warning; a voxel surface has a few, and that's
+# why it seemed to do nothing in the background before): those points merged first, and anything left not a closed surface (a loose point,
+# an edge with no face or three) cut out and closed again; then done at 100 times the size, its tolerances being for a metre-sized thing)
+bm = bmesh.new()
+bm.from_mesh(lp.data)
+bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=2e-6)
+for _ in range(6):
+    bad_e = [e for e in bm.edges if not e.is_manifold]
+    bad_v = [v for v in bm.verts if not v.is_manifold]
+    if not bad_e and not bad_v:
+        break
+    bmesh.ops.delete(bm, geom=list({f for e in bad_e for f in e.link_faces} | {f for v in bad_v for f in v.link_faces}), context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+print("FUSED", len(bm.faces), "faces; not closed:", sum(1 for e in bm.edges if not e.is_manifold), "edges,", sum(1 for v in bm.verts if not v.is_manifold), "points")
+for v in bm.verts:
+    v.co *= 100
+bm.to_mesh(lp.data)
+bm.free()
+lp.data.update()
+r_ = bpy.ops.object.quadriflow_remesh(mode="FACES", target_faces=QUADS, use_mesh_symmetry=False, use_preserve_sharp=False,
+                                     use_preserve_boundary=False, smooth_normals=False, seed=0)
+assert r_ == {"FINISHED"}, r_
+for v in lp.data.vertices:
+    v.co *= 0.01
+lp.data.update()
+# (left where QuadriFlow lays them, on the 3 mm fused surface: shrunk back onto the door cat's own, points along the paw on the coin and the
+# collar's crease were drawn onto the surface behind and the faces folded, ink showing through)
+print('QUADS', len(lp.data.polygons), 'of them quads', sum(1 for p in lp.data.polygons if len(p.vertices) == 4))
 for p in lp.data.polygons:
     p.use_smooth = True
 
@@ -220,12 +245,51 @@ sc.cycles.samples = 4
 sc.cycles.device = "CPU"
 select_only(fuse_src, lp, active=lp)
 bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, cage_extrusion=0.012, max_ray_distance=0.06, margin=8)
-# (where its baked rays found nothing (what was behind the door cat's coin): painted as the cat's white)
+# (where its baked rays found nothing (the holes the door cat's coin and the wall round it left): filled from the colours round about in
+# the picture, which are the surface's round about (painted the cat's white before, a white patch on the red collar by the bell and white
+# shards round the paw on the coin, item 246))
 px = np.array(img.pixels[:], dtype=np.float32).reshape(1024, 1024, 4)
-dark = px[..., :3].max(axis=2) < 0.015   # (no colour found at all: the black ear's black is lighter than this)
-# (gold, the koban's own (the owner's, 2026-11-15: painted white, the source's thin plate showed as a white sliver beside the made coin and
-# a white lump over the bell): the made koban below covers the plate, so what shows of it reads as the coin's own edge)
-px[dark, :3] = np.median(px[(px[..., :3].min(axis=2) > 0.5) & ~dark][:, :3], axis=0)
+valid = px[..., :3].max(axis=2) >= 0.015   # (no colour found at all: the black ear's black is lighter than this)
+# (and the body just behind where the coin hung: the door cat's picture there was never painted (its coin always hid it), dark with flecks,
+# and a strip of it shows beside the made koban (item 246): the texels of every face within the coin's outline (a fifth to a third wider) and
+# from 3.5 cm behind its middle to 6 mm in front of it taken as empty too, so they're filled from the fur and the bib round them)
+uvd_ = lp.data.uv_layers.active.data
+hid_ = 0
+for poly_ in lp.data.polygons:
+    d_ = poly_.center - KC
+    a_, u_, w_ = d_.dot(KN), d_.dot(KSIDE) / (0.031 * 1.3), d_.dot(KUP) / (0.043 * 1.2)
+    if not (-0.035 < a_ < 0.006 and u_ * u_ + w_ * w_ < 1):
+        continue
+    hid_ += 1
+    uv_ = [np.array(uvd_[li_].uv) * 1024 for li_ in poly_.loop_indices]
+    for t_ in range(1, len(uv_) - 1):
+        A_, B_, C_ = uv_[0], uv_[t_], uv_[t_ + 1]
+        x0_, x1_ = int(max(0, min(A_[0], B_[0], C_[0]) - 2)), int(min(1023, max(A_[0], B_[0], C_[0]) + 2))
+        y0_, y1_ = int(max(0, min(A_[1], B_[1], C_[1]) - 2)), int(min(1023, max(A_[1], B_[1], C_[1]) + 2))
+        yy_, xx_ = np.mgrid[y0_:y1_ + 1, x0_:x1_ + 1].astype(np.float32) + 0.5
+        den_ = (B_[1] - C_[1]) * (A_[0] - C_[0]) + (C_[0] - B_[0]) * (A_[1] - C_[1])
+        if abs(den_) < 1e-9:
+            continue
+        l1_ = ((B_[1] - C_[1]) * (xx_ - C_[0]) + (C_[0] - B_[0]) * (yy_ - C_[1])) / den_
+        l2_ = ((C_[1] - A_[1]) * (xx_ - C_[0]) + (A_[0] - C_[0]) * (yy_ - C_[1])) / den_
+        m_in = (l1_ > -0.02) & (l2_ > -0.02) & (1 - l1_ - l2_ > -0.02)
+        valid[y0_:y1_ + 1, x0_:x1_ + 1] &= ~m_in
+print("BEHIND_COIN", hid_, "faces")
+col_ = px[..., :3].copy()
+print("BAKE_EMPTY", int((~valid).sum()))
+for _ in range(48):
+    acc_ = np.zeros_like(col_)
+    cnt_ = np.zeros(valid.shape, np.float32)
+    for sh_ in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        sv_ = np.roll(valid, sh_, axis=(0, 1))
+        acc_ += np.roll(col_, sh_, axis=(0, 1)) * sv_[..., None]
+        cnt_ += sv_
+    grow_ = ~valid & (cnt_ > 0)
+    if not grow_.any():
+        break
+    col_[grow_] = acc_[grow_] / cnt_[grow_][:, None]
+    valid |= grow_
+px[..., :3] = col_
 img.pixels.foreach_set(px.ravel())
 img.pack()
 # (the picture into the colour only once it's baked: wired in before, it was read while it was being written)
