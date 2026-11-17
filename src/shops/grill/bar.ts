@@ -91,6 +91,14 @@ export const PLATES_SET = new Set<number>()
  * still getting up and going. Nobody new is given one of these, though the shop's done with whoever had it.
  */
 export const SEATS_TAKEN = new Set<number>()
+/** the stools someone's sitting on just now (GuestBar3D): their drawer's theirs, not to be pulled out under them; one taken by someone away at
+ * the toilet or the fridge, or on their way in or out, isn't (item 269, the owner's: 「可是沒人啊，不能開」) */
+export const SEATS_SAT = new Set<number>()
+/** a customer gone to their drawer for a tissue (item 269: 「我都沒看到有客人打開抽屜用衛生紙」): the seat, and when (performance.now()); the
+ * drawer slides out, a tissue's drawn up out of the box, and it's pushed back */
+export const DRAWER_KICK = new Map<number, number>()
+/** how long a customer's reach to their drawer for a tissue takes (ms), before they wipe their mouth with it */
+export const TISSUE_REACH_MS = 800
 /** the places whose chopsticks are up: their customer's eating (GuestBar3D fills it each frame; Roasting's BarChopsticks takes those pairs
  * off their rests, FolkFigure has them in the hand) */
 export const CHOPS_UP = new Set<number>()

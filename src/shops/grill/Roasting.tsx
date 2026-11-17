@@ -85,7 +85,7 @@ import { PLATE_SPREAD, plateFor, plateSide, type PlateKind } from '@/game/plateS
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
-import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, EAT_PHASE, PLATE_FACES, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
+import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -2820,14 +2820,19 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
   const inside = useRef<THREE.Group>(null)
   const sheet = useRef<THREE.Group>(null)
   const box = useRef<THREE.Group>(null)
-  const st = useRef({ open: false, at: 0, pulled: -1, used: false, sheets: null as null | { flat: THREE.Object3D; up: THREE.Object3D } })
+  const st = useRef({ open: false, at: 0, pulled: -1, used: false, kicked: -1, sheets: null as null | { flat: THREE.Object3D; up: THREE.Object3D } })
   // (how many are left in its box, out of a new box's (the owner's: shown as 200/200))
   const left = () => `${tissuesAt(seat)}/${BOX_SHEETS}`
   const says = () => (st.current.open ? `衛生紙 ${left()}・點衛生紙抽一張・點抽屜推回去` : `一個座位一盒衛生紙（${left()}）・點一下拉開`)
   const tissueSays = () => (tissuesAt(seat) > 0 ? `剩 ${left()}・點一下抽一張` : `${left()}・空了，開店前會換新的一盒`)
   useFrame((_, dt) => {
     const s = st.current
-    if (s.open && SEATS_TAKEN.has(seat)) { s.open = false; drawerSound(true) }
+    // (pushed back in as its customer sits down again; away at the toilet or on their way, it can be out (item 269))
+    if (s.open && SEATS_SAT.has(seat)) { s.open = false; drawerSound(true) }
+    // (its customer's own pull for a tissue (item 269): out a moment, a tissue drawn up out of the box as their hand's at it, and back in)
+    const kick = DRAWER_KICK.get(seat)
+    const kicked = kick !== undefined && performance.now() - kick < TISSUE_REACH_MS + 150
+    if (kick !== undefined && s.kicked !== kick && performance.now() - kick > TISSUE_REACH_MS * 0.45) { s.kicked = kick; s.pulled = 0; s.used = true; tissuePull() }
     // (a box that's been pulled from shows it: the next tissue left standing up out of the slot, the flat one only in a new box)
     if (s.at > 0.02 && box.current) {
       if (!s.sheets) {
@@ -2863,7 +2868,7 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
       }
     }
     // (out while the stock keeper changes its box of tissues, too)
-    const want = s.open || DRAWER_HELD.has(seat) ? 1 : 0
+    const want = s.open || kicked || DRAWER_HELD.has(seat) ? 1 : 0
     if (inside.current && want) inside.current.visible = true
     // (drawn on its own while it's anything but home and shut, the batch's copy of it put away meanwhile; the batch not made yet, on its own)
     const alone = want > 0 || s.at > 0 || hov.current || !batch.current
@@ -2901,7 +2906,7 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
   }
   /** the drawer clicked: out, or back in */
   const toggle = () => {
-    if (SEATS_TAKEN.has(seat)) { setTip({ title: '抽屜', hint: '客人坐著，等他走了再開' }); return }
+    if (SEATS_SAT.has(seat)) { setTip({ title: '抽屜', hint: '客人坐著，等他走了再開' }); return }
     st.current.open = !st.current.open
     drawerSound(!st.current.open)
     setTip({ title: '抽屜', hint: says() })
@@ -2909,7 +2914,7 @@ function BarDrawer({ x, seat, grain, batch, part }: { x: number; seat: number; g
   return (
     <group position={[x, BAR_TOP - 0.06, DRAWER.z]}>
       {/* (handlers on a group round it: a primitive's own aren't attached) */}
-      <group ref={slider}
+      <group ref={slider} name={`drawer-slider-${seat}`}
         onPointerMove={(e) => hover(e, '抽屜', says)}
         onPointerOut={unhover}
         onClick={(e) => {

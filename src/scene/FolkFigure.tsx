@@ -148,6 +148,8 @@ const X_AXIS = new THREE.Vector3(1, 0, 0)
 export const SEAT = 0.31
 /** how long getting up onto a stool's seat or down off it takes (s) (item 242) */
 const SIT_T = 0.32
+/** (their wipe's first part, the reach down to the drawer for a tissue (ms): the bar's TISSUE_REACH_MS, which scene/ can't import) */
+const WIPE_REACH_MS = 800
 /** how tall the figure stands, to the top of its head (blender/folk.py: the head's top), in its own frame */
 export const FOLK_HEIGHT = 1.07
 /** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers; the
@@ -479,6 +481,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const outer = useRef<THREE.Group>(null)
   /** how far up they're lifted, eased to the seat's height as they sit (null till first drawn) */
   const lifted = useRef<number | null>(null)
+  /** when their wipe began (performance.now()): its first part the reach down to their drawer for the tissue (item 269) */
+  const wipeFrom = useRef<number | null>(null)
   /** up onto the stool or down off it under way: from what height to what, how far through (0..1) (item 242) */
   const sitMove = useRef<{ from: number; to: number; t: number } | null>(null)
   const exprNow = useRef<Expr | null>('neutral')
@@ -606,6 +610,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         if (idle === 'chin' && !eating && !talk) { yaw *= 0.4; pitch = 0.06 }
         if (talk && !eating) { yaw = talk * 0.25; pitch = 0.05 + Math.sin(t * 7 + id) * 0.05 * (Math.sin(t * 1.3 + id) > 0 ? 1 : 0) }
         if (sipping && sipK > 0.36 && sipK < 0.72) { yaw *= 0.2; pitch = sipCup ? 0.12 : 0.28 }
+        if (pose === 'Wipe' && wipeFrom.current !== null && performance.now() - wipeFrom.current < WIPE_REACH_MS) { yaw *= 0.2; pitch = -0.42 }
       }
       const ease = 1 - Math.exp(-dt * 3)
       look.current.yaw += (yaw - look.current.yaw) * ease
@@ -668,8 +673,18 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         lp.set(-0.045 + r, 0.5 + q, 0.4); rp.set(0.045 - r, 0.5 - q, 0.4)
         lr = rr = -1.25
       }
-      // (done eating: a tissue to the mouth in both hands, wiped side to side a few times)
-      if (pose === 'Wipe') {
+      // (done eating: first the right hand down under the bar's edge to their drawer for a tissue, the head bowed to it (item 269: the drawer
+      // slides out to it, GuestBar3D's DRAWER_KICK); then a tissue to the mouth in both hands, wiped side to side a few times)
+      if (pose === 'Wipe') wipeFrom.current ??= performance.now()
+      else wipeFrom.current = null
+      const reachK = pose === 'Wipe' ? (performance.now() - (wipeFrom.current ?? 0)) / WIPE_REACH_MS : 1
+      if (pose === 'Wipe' && reachK < 1) {
+        const dip = Math.sin(reachK * Math.PI)
+        lp.set(-0.06, 0.34 - 0.13 * dip, 0.42 + 0.1 * dip)
+        rp.set(0.12, 0.33, 0.38)
+        lr = -0.5 * dip
+        rr = -0.3
+      } else if (pose === 'Wipe') {
         const w = Math.sin(t * 13 + id) * 0.03
         lp.set(-0.03 + w, 0.64, 0.34); rp.set(0.05 + w, 0.62, 0.34)
         lr = rr = -1.4
