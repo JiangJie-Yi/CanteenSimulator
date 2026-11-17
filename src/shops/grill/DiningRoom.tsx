@@ -8237,7 +8237,9 @@ const SWITCH_SLIM_URL = import.meta.env.BASE_URL + 'models/lightswitch-slim.glb'
  */
 /** how far from the wall's end by the way in the room's switch is (the door lanterns' a plate's width nearer the way in; the owner moved
  * the pair 0.54 further in along the wall) */
-const GENKAN_SWITCH = 0.86
+// (and 0.5 further along the wall, toward the round window (item 298, the owner's, 2026-11-17: 「店內電燈與門口燈籠 都X:-0.5 然後 Reset」: the
+// panel's X runs along the wall the other way, its parent's z))
+const GENKAN_SWITCH = 1.36
 const SWITCH_STEP = 0.11
 /** how far out from the wall the post between the toilets' doors stands (its face): the toilets' switch plate on it */
 const WC_POST_FACE = 0.06

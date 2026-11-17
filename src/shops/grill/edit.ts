@@ -325,6 +325,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-31', Array.from({ length: 8 }, (_, n) => [`chopsticks${n}`, `chopstickpair${n}`]).flat()],
   // (the shoe cupboard where the owner moved it on, made its default (item 291))
   ['jgs-edit-relaid-32', ['shoecab']],
+  // (the way-in switches where the owner moved them on, made their defaults (item 298))
+  ['jgs-edit-relaid-33', ['lightswitch-room', 'lightswitch-door']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
