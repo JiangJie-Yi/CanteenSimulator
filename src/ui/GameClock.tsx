@@ -7,6 +7,7 @@ import { hhmm, nextSky, skyAt, type Sky } from '@/game/clock'
 import { isLate } from '@/game/hours'
 import { tl, type Lang } from '@/data/i18n'
 import { setTip } from '@/scene/hoverTip'
+import { Glyph } from './GameIcons'
 import { setSfxMuted, useSfxMuted } from '@/scene/sfx'
 import { getClock, setClock, useClock } from './clockStore'
 
@@ -62,6 +63,34 @@ function GameClockImpl({ lang }: { lang: Lang }) {
   )
 }
 export const GameClock = memo(GameClockImpl)
+
+/**
+ * The shop shut and its day done: on to the next business day's getting ready, a button under the clock (item 327, the owner's, 2026-11-18:
+ * 「下班後就直接馬上轉到下一個上班日(做個button)作為切換使用」: putting away the day's sheet no longer moves the clock on by itself). Not in the
+ * half hour of getting ready, when the shop's to be opened (there it would only skip the day); its label says where it goes
+ */
+function NextDayButtonImpl({ lang, shown, prepAt, openAt, onGo }: { lang: Lang; shown: boolean; prepAt: number; openAt: number; onGo: () => void }) {
+  const inPrep = useClock((c) => c.minute >= prepAt && c.minute < openAt)
+  const to = useClock((c) => (c.minute < prepAt ? c.day : c.day + 1))
+  const hovered = useRef(false)
+  const tip = () => setTip({ title: tl(lang, `前往第 ${to} 天`, `${to} 日目へ`, `On to day ${to}`),
+    hint: tl(lang, `快轉到 ${hhmm(prepAt)} 開店準備｜員工這段時間休息`, `${hhmm(prepAt)} の開店準備まで進める｜その間スタッフは休む`,
+      `On to ${hhmm(prepAt)}, getting ready to open｜The staff rest till then`) })
+  const off = !shown || inPrep
+  useEffect(() => { if (hovered.current) { if (off) { hovered.current = false; setTip(null) } else tip() } })
+  useEffect(() => () => { if (hovered.current) setTip(null) }, [])
+  if (off) return null
+  return (
+    <button type="button" className="game-clock-next" onClick={onGo}
+      aria-label={tl(lang, `前往下一個營業日（第 ${to} 天）`, `次の営業日へ（${to} 日目）`, `To the next business day (day ${to})`)}
+      onPointerEnter={() => { hovered.current = true; tip() }} onPointerLeave={() => { hovered.current = false; setTip(null) }}>
+      <Glyph id="calendar" size="14px" />
+      <span>{tl(lang, '前往下一個營業日', '次の営業日へ', 'Next business day')}</span>
+      <Glyph id="chevR" size="11px" className="game-clock-next-go" />
+    </button>
+  )
+}
+export const NextDayButton = memo(NextDayButtonImpl)
 
 /** all the sound on or off, the music with the effects (the owner's), a little speaker at the clock's end, its waves while it sounds, struck
  * through while it's muted; no hover label (the owner's) */

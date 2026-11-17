@@ -129,6 +129,15 @@ export function coinSound() {
   bell(a, t, 2349, 0.022, 0.18)
   bell(a, t + 0.055, 3136, 0.02, 0.25)
 }
+/** on to the next business day (item 327): three soft bells rising, a morning's chime */
+export function dayTurnSound() {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  bell(a, t, 784, 0.03, 0.6)
+  bell(a, t + 0.11, 988, 0.03, 0.7)
+  bell(a, t + 0.22, 1318.5, 0.032, 1.1)
+}
 /** the full house's stamp: a soft drum's thump as it comes down, the stamp's knock on the paper, then a little bell */
 export function stampSound() {
   const a = ctx()

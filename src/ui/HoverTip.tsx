@@ -48,7 +48,11 @@ export function HoverTip({ hidden = false }: { hidden?: boolean }) {
       n.style.transform = `translate(${x - w / 2}px, ${y}px)`
     } else {
       n.classList.remove('is-anchored')
-      n.style.transform = `translate(${pointer.current.x}px, ${pointer.current.y}px)`
+      // (kept inside the window: by its right edge (the clock's buttons, the next business day's), slid left over the pointer, not run out
+      // past the edge (item 327: the next day's tag cut off by the window); 16 px: the tag's own offset from the pointer (.tool-tag's left))
+      const tag = n.firstElementChild as HTMLElement | null
+      const x = Math.min(pointer.current.x, window.innerWidth - EDGE - 16 - (tag?.offsetWidth ?? 0))
+      n.style.transform = `translate(${x}px, ${pointer.current.y}px)`
     }
   }
   useEffect(() => {

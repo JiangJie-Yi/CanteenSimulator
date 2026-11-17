@@ -99,7 +99,7 @@ import { MOBILE } from '@/scene/flatGate'
 import { platerOf } from '@/game/kitchenCrew'
 import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { PhoneClosed } from '@/ui/PhoneClosed'
-import { stampSound, usePanelSound } from '@/ui/uiSound'
+import { dayTurnSound, stampSound, usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
 import { ClosedDown } from '@/ui/ClosedDown'
 import { Glyph, StarIcon } from '@/ui/GameIcons'
@@ -123,7 +123,7 @@ import { tl } from '@/data/i18n'
 import { hhmm, skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
 import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
 import { startAdminLink, type AdminSnap } from '@/ui/admin/link'
-import { GameClock } from '@/ui/GameClock'
+import { GameClock, NextDayButton } from '@/ui/GameClock'
 import { ageFresh } from '@/game/freshness'
 import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, tossSpoiled, type Lot } from '@/game/lots'
 import { RING_SLOTS } from '@/game/fireSlots'
@@ -1382,19 +1382,30 @@ export default function App() {
   const lateNow = useClock((c) => isLate(c.minute))
   const [closing, setClosing] = useState(false)
   /**
-   * The day's sheet put away (收工, or its own countdown): the clock on to the next day's getting ready (PREP_AT, half an hour before opening),
-   * not the hours of the morning sat through (the owner's); the staff rested those hours as they would have, no more than a run of days lets
-   * them (game/shifts' floor: the owner keeps that rule)
+   * The day's sheet put away (收工, or its own countdown): only that, the clock going on (item 327, the owner's, 2026-11-18: 「然後我發現下班後
+   * 就直接馬上轉到下一個上班日?」「下班後就直接馬上轉到下一個上班日(做個button)作為切換使用」: it went on to the next day's getting ready by
+   * itself; the button under the clock does that now, toNextWorkday)
    */
-  const dayDone = () => {
-    setDaySum(null)
+  const dayDone = () => setDaySum(null)
+  /**
+   * On to the next business day's getting ready (PREP_AT, half an hour before opening), not the hours sat through (the owner's): the button
+   * under the clock while the shop's shut (item 327); today's if it's still to come, else tomorrow's. The staff rested those hours as they
+   * would have, no more than a run of days lets them (game/shifts' floor: the owner keeps that rule); past midnight, the new day's applicants
+   */
+  const toNextWorkday = () => {
     const c = getClock()
-    if (c.minute >= PREP_AT) return
-    const hours = (PREP_AT - c.minute) / 60
-    setClock({ day: c.day, minute: PREP_AT })
+    const next = c.minute < PREP_AT ? { day: c.day, minute: PREP_AT } : { day: c.day + 1, minute: PREP_AT }
+    const hours = ((next.day - c.day) * 1440 + next.minute - c.minute) / 60
+    setClock(next)
+    if (next.day !== c.day) newDay.current(next.day)
     setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, st]) =>
       [id, { ...st, fatigue: Math.max(Math.min(st.fatigue, st.floor ?? 0), st.fatigue - restPerHour * hours) }]))])))
+    dayTurnSound()
   }
+  // (one function for the button through every redraw of the app: it doesn't redraw with it)
+  const nextDayRef = useRef(toNextWorkday)
+  nextDayRef.current = toNextWorkday
+  const onNextDay = useCallback(() => nextDayRef.current(), [])
   /** when closing up began (the game's minutes from day 0: gameMinutes) */
   const closingAt = useRef(0)
   useEffect(() => { if (closing) closingAt.current = gameMinutes(); else SHOP.hurry = false }, [closing])
@@ -3562,6 +3573,9 @@ export default function App() {
       </button>
       {/* (the game's day and time, under the round buttons (the owner's): day and night come round with it) */}
       <GameClock lang={lang} />
+      {/* (the shop shut and its day done: on to the next business day, under the clock (item 327)) */}
+      <NextDayButton lang={lang} shown={!ai && !closing && !leaving && !daySum && !editOn && !guide && !bust} prepAt={PREP_AT} openAt={OPEN_AT}
+        onGo={onNextDay} />
       {/* (a little fridge, top right, always there: opens and shuts the stock panel (the owner's)) */}
       {!!dish.roast && !editOn && (
         <button type="button" className={`fridge-toggle${fridgeOpen ? ' is-on' : ''}`} onClick={() => setFridgeOpen((v) => !v)} aria-pressed={fridgeOpen}
