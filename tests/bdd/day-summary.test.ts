@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { addDay, daySummary, KEEP_DAYS, soldBetween } from '@/game/daySummary'
+import { addDay, adviceOf, daySummary, KEEP_DAYS, soldBetween } from '@/game/daySummary'
 import type { Visit } from '@/game/reputation'
 import { caseCost, CASE_SIZE, unitCost } from '@/game/drinkStock'
 
@@ -67,5 +67,30 @@ feature('營業時間記進帳本（店主 2026-11-15：營業時間也得記錄
     given('第 5 天先開 16:30–20:00', (w) => { w.days = addDay([], 5, sum({ overtime: 0 }), { open: '16:30', close: '20:00', late: 0 }) })
     when('又開到 05:00（晚 30 分），加班費 25', (w) => { w.days = addDay(w.days, 5, sum({ overtime: 25 }), { open: '21:00', close: '05:00', late: 30 }) })
     then('記成 16:30–05:00、晚 30 分、加班費 25', (w) => { expect(w.days[0]).toMatchObject({ open: '16:30', close: '05:00', late: 30, overtime: 25 }) })
+  })
+})
+
+// (item 329, the owner's, 2026-11-18: 「帳簿變扣得比較快，原因是?」: the sheet said a day lost money, not why)
+feature('結算單指出可以改進的地方（第 329 項）', () => {
+  const day = (to: Record<string, number>) => daySummary({ revenue: 0, food: 0, fuel: 0, wage: 0 }, { revenue: 0, food: 0, fuel: 0, wage: 0, ...to }, [], {})
+  scenario('人事費比營業額的一半還多', ({ given, then }) => {
+    given('營業額 26,000、人事 29,000', (w) => { w.s = day({ revenue: 26000, wage: 29000, food: 9000 }) })
+    then('提醒人事費率太高', (w) => { expect(adviceOf(w.s).map((a) => a.kind)).toEqual(['labour']) })
+  })
+  scenario('丟掉的食材佔了四分之一', ({ given, then }) => {
+    given('食材 12,500，其中丟掉 3,200', (w) => { w.s = day({ revenue: 40000, wage: 9000, food: 12500, tossed: 3200 }) })
+    then('提醒丟掉的食材，說出金額', (w) => {
+      const a = adviceOf(w.s)
+      expect(a.map((x) => x.kind)).toEqual(['tossed'])
+      expect(a[0].amount).toBe(3200)
+    })
+  })
+  scenario('一成的菜沒上完客人就走了', ({ given, then }) => {
+    given('點了 28,400，退了 2,850', (w) => { w.s = day({ revenue: 25550, wage: 7000, food: 8000, refunds: 2850 }) })
+    then('提醒出菜太慢', (w) => { expect(adviceOf(w.s).map((x) => x.kind)).toEqual(['refunds']) })
+  })
+  scenario('一般店家的水準就不提', ({ given, then }) => {
+    given('人事三成、丟一成、退兩趴', (w) => { w.s = day({ revenue: 40000, wage: 12000, food: 12000, tossed: 1200, refunds: 800 }) })
+    then('什麼都不提醒', (w) => { expect(adviceOf(w.s)).toEqual([]) })
   })
 })

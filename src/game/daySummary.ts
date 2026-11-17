@@ -13,13 +13,18 @@ export type Books = { revenue: number; food: number; fuel: number; wage: number;
   /** of the wages, what was paid over the hour's pay for the night's hours, 22:00 to 05:00 (深夜): in `wage` already */
   night?: number
   /** the rent (game/costs' rentDue), the delivery platform's cut of the riders' orders, the card company's fee (item 210) */
-  rent?: number; platform?: number; cardFee?: number }
+  rent?: number; platform?: number; cardFee?: number
+  /** of the food, what was thrown away gone off (in `food` already); of what was ordered, what was given back to those who left before
+   * it all came (out of `revenue` already) (item 329) */
+  tossed?: number; refunds?: number }
 export type DaySummary = {
   revenue: number; food: number; fuel: number; wage: number; utility: number
   /** of the wages, the overtime's extra (the owner's, 2026-11-15), and the night's (item 210) */
   overtime: number; night: number
   /** the rent, the delivery platform's cut, the card company's fee (item 210) */
   rent: number; platform: number; cardFee: number
+  /** of the food, what was thrown away; given back to those who left before it all came (item 329) */
+  tossed: number; refunds: number
   /** the wages over the takings (人件費率; null with none): with the food's, what a shop's run on (FL) */
   labour: number | null
   /** the reviews bought and the shrine's offerings (item 203) */
@@ -40,15 +45,33 @@ export type DaySummary = {
 export function daySummary(from: Books, to: Books, visits: Visit[], sold: Record<string, number>): DaySummary {
   const d = (k: keyof Books) => Math.max(0, (to[k] ?? 0) - (from[k] ?? 0))
   const revenue = d('revenue'), food = d('food'), fuel = d('fuel'), wage = d('wage'), utility = d('utility'), overtime = d('overtime')
-  const night = d('night'), rent = d('rent'), platform = d('platform'), cardFee = d('cardFee')
+  const night = d('night'), rent = d('rent'), platform = d('platform'), cardFee = d('cardFee'), tossed = d('tossed'), refunds = d('refunds')
   const other = d('promo') + d('offering')
   const profit = revenue - food - fuel - wage - utility - rent - platform - cardFee - other
   const ate = visits.filter((v) => !v.walkedOut)
   const stars = ate.length ? ate.reduce((a, v) => a + starsOf(satisfaction(v)), 0) / ate.length : null
   let best: DaySummary['best'] = null
   for (const [key, n] of Object.entries(sold)) if (n > 0 && (!best || n > best.n)) best = { key, n }
-  return { revenue, food, fuel, wage, utility, overtime, night, rent, platform, cardFee, labour: revenue > 0 ? wage / revenue : null, other, profit,
+  return { revenue, food, fuel, wage, utility, overtime, night, rent, platform, cardFee, tossed, refunds, labour: revenue > 0 ? wage / revenue : null, other, profit,
     margin: revenue > 0 ? profit / revenue : null, guests: visits.length, walkedOut: visits.length - ate.length, stars, best }
+}
+
+/**
+ * What the day's sheet points out could be done better (item 329, the owner's, 2026-11-18: 「帳簿變扣得比較快，原因是?」: a day with every
+ * job filled lost money, the books said so, and not why): past where a shop's usually run, each with what it came to and its share.
+ * The wages over a third and a half of the takings (a shop's run on about a third: the staff on for the hours, for the customers there
+ * were); what was thrown away over a sixth of the food (bought more than's sold); what was given back to those who left before it all came
+ * over a twentieth of what was ordered (the food too slow for them)
+ */
+export const ADVICE_AT = { labour: 0.45, tossed: 0.15, refunds: 0.05 }
+export type Advice = { kind: 'labour' | 'tossed' | 'refunds'; share: number; amount: number }
+export function adviceOf(s: DaySummary): Advice[] {
+  const out: Advice[] = []
+  if (s.labour !== null && s.labour > ADVICE_AT.labour) out.push({ kind: 'labour', share: s.labour, amount: s.wage })
+  if (s.food > 0 && s.tossed / s.food > ADVICE_AT.tossed) out.push({ kind: 'tossed', share: s.tossed / s.food, amount: s.tossed })
+  const ordered = s.revenue + s.refunds
+  if (ordered > 0 && s.refunds / ordered > ADVICE_AT.refunds) out.push({ kind: 'refunds', share: s.refunds / ordered, amount: s.refunds })
+  return out
 }
 
 /** each dish's orders between two counts of them (orders only ever added) */

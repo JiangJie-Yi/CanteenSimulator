@@ -138,7 +138,7 @@ const SAVE_KEY = 'canteen-save'
 /** the game as it was the moment its 3D view was lost, kept for the page brought back (this tab only, read once) */
 const RESUME_KEY = 'jgs-resume-1'
 type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number; wage: number; bought: number; setup?: number; offering?: number; till?: number; tillIn?: number; utility?: number; promo?: number
-    overtime?: number; night?: number; rent?: number; platform?: number; cardFee?: number }
+    overtime?: number; night?: number; rent?: number; platform?: number; cardFee?: number; tossed?: number; refunds?: number }
   /** the last of the game's days the rent's been paid for (game/costs' rentDue) */
   rentPaid?: number
   stock: Record<string, number>; hired: Record<string, Record<string, Rota>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
@@ -470,7 +470,7 @@ type SceneProps = {
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
   crewOf: (dishId: string) => CrewMember[]
-  onWalkOut: (ids: string[], dish: DishInfo, guest?: number) => void
+  onWalkOut: (ids: string[], dish: DishInfo, guest?: number, why?: string) => void
   /** a customer's visit scored as they go (game/reputation): for the shop's rating */
   onVisit: (v: Visit) => void
   /** (shop open) what's on each shop's menu, and a customer ordering one of them */
@@ -1135,7 +1135,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
                   onNotice={onNotice} smoke={grillSmoke} blackSmoke={grillBlackSmoke}
                   ai={ai} research={research} onOrder={onOrder} onAddCharcoal={onAddCharcoal} onSay={onSay} chef={chefOf(dish.id)} onGuests={(g) => onGuests(dish.id, g)} crowd={crowdOf(dish.id)} blessed={blessed} onDrink={onDrink}
                   crew={crewOf(dish.id)} bar={!phone}
-                  onWalkOut={(ids, g) => onWalkOut(ids, dish, g)} onVisit={onVisit} lang={lang}
+                  onWalkOut={(ids, g, why) => onWalkOut(ids, dish, g, why)} onVisit={onVisit} lang={lang}
                   entries={ai ? entriesOf(dish.id) : undefined} onOrderEntry={onOrderEntry}
                   names={Object.fromEntries(dish.items.map((x) => [x.id, nameIn(lang, x)]))}
                   space={ai ? 'open' : 'closed'} locked={editing}
@@ -1597,7 +1597,7 @@ export default function App() {
   const [toolsOpen, setToolsOpen] = useState(false)
   // (a new game starts with the grill already set up: its opening cost is already paid)
   const [ledger, setLedger] = useState(() => ({ revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, tillIn: 0, utility: 0, overtime: 0,
-    night: 0, rent: 0, platform: 0, cardFee: 0, setup: SAVED ? 0 : SHOP_COST,
+    night: 0, rent: 0, platform: 0, cardFee: 0, tossed: 0, refunds: 0, setup: SAVED ? 0 : SHOP_COST,
     ...SAVED?.ledger }))
   // the water and power: the month so far on the meter (game/utilities), kept in the browser; shown in the stock panel every few seconds
   const meterRef = useRef<Meter>((() => {
@@ -1858,7 +1858,7 @@ export default function App() {
     }
     if (!made.length) return made
     setStock(left)
-    book('food', spent)
+    book('food', spent, 'research')
     setNotes((all) => {
       const next = { ...all }
       for (const tr of made) {
@@ -2058,7 +2058,9 @@ export default function App() {
     lotsNow.current = { ...lotsNow.current, [id]: r.lots }
     setLots((all) => ({ ...all, [id]: r.lots }))
     shiftStockRef.current({ [id]: -r.n })
-    book('food', costOf(it ?? { price: 0 }) * r.n)
+    book('food', costOf(it ?? { price: 0 }) * r.n, 'tossed')
+    // (and kept apart, for the day's sheet: what was thrown away (item 329))
+    book('tossed', costOf(it ?? { price: 0 }) * r.n)
     return r.n
   }
   const tossRef = useRef(tossFood)
@@ -2091,7 +2093,11 @@ export default function App() {
       return next
     })
   }
-  const book = (k: keyof typeof ledger, amount: number) => setLedger((l) => ({ ...l, [k]: l[k] + amount }))
+  // (in development, what each booking was for, tallied by kind and what (`__bookWhy`): where a day's food cost comes from (item 329))
+  const book = (k: keyof typeof ledger, amount: number, why?: string) => {
+    if (import.meta.env.DEV && why) { const w = window as unknown as { __bookWhy?: Record<string, number> }; const t = (w.__bookWhy ??= {}); t[`${k}:${why}`] = (t[`${k}:${why}`] ?? 0) + amount }
+    setLedger((l) => ({ ...l, [k]: l[k] + amount }))
+  }
   /** packs of tissue boxes bought in (the stock's supplies), paid as purchasing */
   const buyTissues = (packs: number) => {
     const o = tissueOrder(packs)
@@ -2996,7 +3002,7 @@ export default function App() {
     } catch {
       // storage blocked
     }
-    saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, tillIn: 0, utility: 0, overtime: 0, night: 0, rent: 0, platform: 0, cardFee: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
+    saveRef.current = { ledger: { revenue: 0, food: 0, fuel: 0, wage: 0, bought: 0, offering: 0, promo: 0, till: 0, tillIn: 0, utility: 0, overtime: 0, night: 0, rent: 0, platform: 0, cardFee: 0, tossed: 0, refunds: 0 }, stock: startingSupplies(), hired: {}, notes: {}, owner: null, opened: {} }
     window.location.replace(window.location.pathname + '?v=' + Date.now())
   }
   const say = (text: string) => {
@@ -3043,8 +3049,8 @@ export default function App() {
     // (only paying customers bring money in; tasting with the shop closed only costs the ingredients)
     const sell = (n: number) => {
       if (!priced || !n) return
-      if (ai) book('revenue', priced.price * n)
-      book('food', costOf(priced) * n)
+      if (ai) book('revenue', priced.price * n, 'item')
+      book('food', costOf(priced) * n, ai ? 'item' : 'tasting')
     }
     // what it uses up from stock: a set takes its parts, anything else one portion of itself
     const uses = (x: string): [string, number][] => {
@@ -3108,7 +3114,7 @@ export default function App() {
   }
 
   /** a customer walked out: take back the price of what they didn't eat */
-  const refund = (ids: string[], d: DishInfo, guest?: number) => {
+  const refund = (ids: string[], d: DishInfo, guest?: number, why?: string) => {
     // (what they paid for the menu's dishes, in proportion to what of it they didn't get)
     // (a side at its own price, the rest their share of what the dishes came to (item 203))
     const bill = guest !== undefined ? bills.current[d.id]?.[guest] : undefined
@@ -3117,7 +3123,7 @@ export default function App() {
       : ids.reduce((n, id) => n + ((ALL_ITEMS.get(id) ?? d.bases.find((b) => b.id === id))?.price ?? 0), 0)
     // (and off what they pay at the till: it rang up the whole bill all the same, into the drawer (item 195))
     if (bill && back) Object.assign(bill, back.tab)
-    if (total) book('revenue', -total)
+    if (total) { book('revenue', -total, `refund-${why ?? 'other'}`); book('refunds', total) }
   }
   /**
    * A customer orders a dish off the menu: its parts come out of stock, it's paid at the menu's price, its cost is
@@ -3141,8 +3147,8 @@ export default function App() {
       for (const [k, q] of Object.entries(need)) next[k] = (next[k] ?? 0) - q
       return next
     })
-    book('revenue', e.price)
-    book('food', entryCost(e, warm))
+    book('revenue', e.price, 'dish')
+    book('food', entryCost(e, warm), 'dish')
     // (a delivery's order, placed through the platform its rider rides for: what it keeps of it (game/costs, item 210))
     if (!atTill && RIDERS.has(guest)) book('platform', platformCut(e.price))
     setOrdersBy((b) => {
@@ -3168,8 +3174,8 @@ export default function App() {
   const sellDrink = (guest: number, id: DrinkId) => {
     const d = DRINKS.find((x) => x.id === id)
     if (!d) return
-    book('revenue', d.price)
-    book('food', unitCost(id))
+    book('revenue', d.price, 'drink')
+    book('food', unitCost(id), 'drink')
     // (dev: how many drinks have been sold, for tests/e2e)
     if (import.meta.env.DEV) { const w = window as unknown as { __drinksSold?: number }; w.__drinksSold = (w.__drinksSold ?? 0) + 1 }
     // (and on their bill, paid with their dishes at the till)
@@ -3187,8 +3193,8 @@ export default function App() {
   const sellSide = (id: string, guest: number) => {
     if (id !== RICE_SIDE.id || !ai || (stockRef.current[RICE_SIDE.stock] ?? 0) < 1) return false
     shiftStock({ [RICE_SIDE.stock]: -1 })
-    book('revenue', RICE_SIDE.price)
-    book('food', costOf(ALL_ITEMS.get(RICE_SIDE.stock) ?? { price: 0 }))
+    book('revenue', RICE_SIDE.price, 'rice')
+    book('food', costOf(ALL_ITEMS.get(RICE_SIDE.stock) ?? { price: 0 }), 'rice')
     const tabs = (bills.current[dish.id] ??= {})
     let t = tabs[guest]
     if (!t) { t = tabs[guest] = { paid: 0, parts: 0, atTill: true }; owing.current.add(t) }

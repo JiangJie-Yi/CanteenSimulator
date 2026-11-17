@@ -6,11 +6,14 @@ import { useEffect, useRef, useState } from 'react'
 import { CLOSE_AT, OPEN_AT, lateBy, minutesOf } from '@/game/hours'
 import { createPortal } from 'react-dom'
 import { tl, type Lang } from '@/data/i18n'
-import type { DaySummary as Summary } from '@/game/daySummary'
-import { Stars } from './GameIcons'
+import { adviceOf, type DaySummary as Summary } from '@/game/daySummary'
+import { Glyph, Stars } from './GameIcons'
+import { FitLine } from './FitLine'
 
-/** how long (s, of real time: the game's clock stands still meanwhile) it stays up by itself */
+/** how long (s, of real time: the game's clock stands still meanwhile) it stays up by itself; a few more with things to point out, to
+ * read them (item 329) */
 export const AUTO_S = 10
+const AUTO_TIPS_S = 16
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString('en-US')}`
 
 export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summary; day: number; hours?: [string, string]; lang: Lang; nameOf: (key: string) => string; onClose: () => void }) {
@@ -26,26 +29,33 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
       : (lang === 'en' ? ` (${hm} early)` : lang === 'ja' ? `（${hm}早い）` : `（提早 ${hm}）`)}</small>
   }
   const t = (zh: string, ja: string, en: string) => tl(lang, zh, ja, en)
-  const [left, setLeft] = useState(AUTO_S)
+  // (what could be done better, past where a shop's usually run (game/daySummary's adviceOf, item 329))
+  const tips = adviceOf(s)
+  const auto = tips.length ? AUTO_TIPS_S : AUTO_S
+  const [left, setLeft] = useState(auto)
   // (counted from when it came up, once: the page above redraws every second or so (the staff resting), each time with a new onClose)
   const close = useRef(onClose)
   close.current = onClose
   useEffect(() => {
     const t0 = performance.now()
     const tick = window.setInterval(() => {
-      const l = Math.max(0, Math.ceil(AUTO_S - (performance.now() - t0) / 1000))
+      const l = Math.max(0, Math.ceil(auto - (performance.now() - t0) / 1000))
       setLeft(l)
       if (l <= 0) { window.clearInterval(tick); close.current() }
     }, 250)
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close.current() } }
     window.addEventListener('keydown', key, true)
     return () => { window.clearInterval(tick); window.removeEventListener('keydown', key, true) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // (each line: its label, the sum, whether it came in; `sub`, a part of the line above it, already in it (the wages' premiums))
   type Row = [string, number, boolean, boolean?]
   const rows: Row[] = [
     [t('營業額', '売上', 'Takings'), s.revenue, true],
+    // (given back to those who left before it all came, out of the takings already (item 329))
+    ...(s.refunds > 0.5 ? [[t('已扣退款（沒吃完就走）', 'うち返金（食べきれず退店）', 'less refunds (left before it came)'), -s.refunds, false, true] as Row] : []),
     [t('食材', '食材', 'Food'), -s.food, false],
+    ...(s.tossed > 0.5 ? [[t('其中丟掉的食材', 'うち廃棄した食材', 'of which thrown away'), -s.tossed, false, true] as Row] : []),
     [t('燃料（備長炭）', '燃料（備長炭）', 'Charcoal'), -s.fuel, false],
     [t('人事', '人件費', 'Wages'), -s.wage, false],
     // (of the wages, what was paid over the hour's pay, as Japan's labour law has it (game/hours, item 210): past eight hours, and the night's)
@@ -72,9 +82,12 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
           {/* (and how late either was, past 16:30 and 04:30 (the owner's, 2026-11-10); early, how early) */}
           {hours && (
             <p className="day-sum-hours">
-              {t(`${hours[0]} 開店`, `${hours[0]} 開店`, `Opened ${hours[0]}`)}{offBy(OPEN_AT, hours[0])}
-              {t('・', '・', ' · ')}
-              {t(`${hours[1]} 結束營業`, `${hours[1]} 閉店`, `closed ${hours[1]}`)}{offBy(CLOSE_AT, hours[1])}
+              {/* (on one line, smaller where it's long: both late by hours) */}
+              <FitLine min={9}>
+                {t(`${hours[0]} 開店`, `${hours[0]} 開店`, `Opened ${hours[0]}`)}{offBy(OPEN_AT, hours[0])}
+                {t('・', '・', ' · ')}
+                {t(`${hours[1]} 結束營業`, `${hours[1]} 閉店`, `closed ${hours[1]}`)}{offBy(CLOSE_AT, hours[1])}
+              </FitLine>
             </p>
           )}
           <p className={`day-sum-profit${s.profit < 0 ? ' is-loss' : ''}`}>
@@ -92,12 +105,31 @@ export function DaySummary({ s, day, hours, lang, nameOf, onClose }: { s: Summar
           <dl className="day-sum-guests">
             <div><dt>{t('來客', '来客', 'Customers')}</dt><dd>{t(`${s.guests} 位`, `${s.guests} 名`, `${s.guests}`)}{s.walkedOut > 0 && <small>{t(`（${s.walkedOut} 位沒吃就走）`, `（${s.walkedOut} 名が食べずに帰った）`, ` (${s.walkedOut} left without eating)`)}</small>}</dd></div>
             <div><dt>{t('平均評價', '平均評価', 'Rating')}</dt><dd>{stars === null ? '—' : <><span className="day-sum-stars"><Stars value={stars} /></span> {stars.toFixed(1)}</>}</dd></div>
-            <div><dt>{t('最暢銷', '一番人気', 'Best seller')}</dt><dd>{s.best ? `${nameOf(s.best.key)} ×${s.best.n}` : '—'}</dd></div>
+            <div><dt>{t('最暢銷', '一番人気', 'Best seller')}</dt><dd className="day-sum-best"><FitLine>{s.best ? `${nameOf(s.best.key)} ×${s.best.n}` : '—'}</FitLine></dd></div>
           </dl>
+          {/* (what could be done better: past where a shop's usually run, what it came to and what to try (item 329)) */}
+          {tips.length > 0 && (
+            <ul className="day-sum-tips" aria-label={t('可以改進的地方', '改善できるところ', 'What could be better')}>
+              {tips.map((a) => {
+                const pct = Math.round(a.share * 100)
+                const [head, hint] = a.kind === 'labour'
+                  ? [t(`人事費率 ${pct}%，一般店約三成`, `人件費率 ${pct}%（普通は3割ほど）`, `Wages ${pct}% of takings (a shop runs on ~30%)`),
+                    t(`今天 ${s.guests} 位客人，排班可以少一兩位`, `本日の来客 ${s.guests} 名、シフトを1、2人減らせる`, `${s.guests} customers: one or two fewer on the rota`)]
+                  : a.kind === 'tossed'
+                    ? [t(`丟掉的食材 ${nt(a.amount)}（食材的 ${pct}%）`, `廃棄した食材 ${nt(a.amount)}（食材の${pct}%）`, `Food thrown away ${nt(a.amount)} (${pct}%)`),
+                      t('叫貨少一點，先賣快壞的', '仕入れを減らし、傷みかけから売る', "Order less, sell what's going off first")]
+                    : [t(`退款 ${nt(a.amount)}（菜沒上完就走）`, `返金 ${nt(a.amount)}（食べきれず退店）`, `Refunds ${nt(a.amount)} (left before it came)`),
+                      t('出菜太慢：多一位廚手，或少放烤很久的魚', '料理が遅い：調理を一人増やすか、焼きの長い魚を減らす', 'Too slow: another cook, or fewer slow fish')]
+                return (
+                  <li key={a.kind}><Glyph id="bolt" size="13px" /><span><b><FitLine>{head}</FitLine></b><small><FitLine>{hint}</FitLine></small></span></li>
+                )
+              })}
+            </ul>
+          )}
           <button type="button" className="day-sum-ok" onClick={onClose}>{t('收工', 'お疲れさま', 'Done for the day')}</button>
           <small className="day-sum-auto">{t(`${left} 秒後自動關閉`, `${left} 秒後に閉じます`, `Closing in ${left}s`)}</small>
         </div>
-        <i className="day-sum-timer" style={{ animationDuration: `${AUTO_S}s` }} aria-hidden="true" />
+        <i className="day-sum-timer" style={{ animationDuration: `${auto}s` }} aria-hidden="true" />
       </section>
     </div>,
     document.body,

@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { lastCall, seatsOpen } from '@/game/hours'
 import { canRide, kindOf, RIDER_KINDS } from '@/data/guests'
-import { LAST_CALL_GAP, TAKEOUT_GAP, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
+import { fitsBeforeClose, LAST_CALL_GAP, PACK_MIN, TAKEOUT_GAP, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
 
 const at = (h: number, m = 0) => h * 60 + m
 
@@ -30,5 +30,19 @@ feature('外帶與外送', () => {
       for (let id = 1; id < 400; id++) if (['yukataLady', 'kid', 'grandma'].includes(kindOf(id).kind)) expect(canRide(id)).toBe(false)
     })
     and('往後找總找得到一位', () => { for (const from of [1, 50, 300]) { let i = from; while (!canRide(i) && i < from + 400) i++; expect(canRide(i)).toBe(true) } })
+  })
+})
+
+// (item 329: takeaways taken in the last half hour were grilled past closing, the shop kept open an hour longer for them)
+feature('最後半小時的外帶只接打烊前做得完的（第 329 項）', () => {
+  scenario('04:10 離打烊 20 分鐘', ({ given, then, but }) => {
+    given('離打烊 20 分鐘', (w) => { w.left = 20 })
+    then('烤 10 分鐘的獅子唐辛子接得下', (w) => { expect(fitsBeforeClose([10], w.left)).toBe(true) })
+    but('烤 29 分鐘的魚接不下', (w) => { expect(fitsBeforeClose([29], w.left)).toBe(false) })
+    but('一份裡只要有一道來不及就不接', (w) => { expect(fitsBeforeClose([10, 29], w.left)).toBe(false) })
+  })
+  scenario('最後幾分鐘什麼都不接', ({ given, then }) => {
+    given('離打烊不到包裝與交給客人的時間', (w) => { w.left = PACK_MIN - 1 })
+    then('連味噌湯（不用烤）都不接', (w) => { expect(fitsBeforeClose([0], w.left)).toBe(false) })
   })
 })

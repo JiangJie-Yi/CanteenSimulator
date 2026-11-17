@@ -56,7 +56,8 @@ import { biteSound, chewSound } from './chewSound'
 import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
 import { getLights } from '@/scene/lightsStore'
 import { canRide, comesLate, isMinor, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
-import { RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
+import { fitsBeforeClose, RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
+import { CLOSE_AT } from '@/game/hours'
 import type { Look, Role } from '@/data/staff'
 import { ROAST_STAGES, type Roast, type Seasoning } from '@/data/menu'
 import { partName, type Entry, type Seasoning as Dab } from '@/data/recipes'
@@ -4350,7 +4351,9 @@ type RoastingProps = {
   lang?: Lang
   names?: Record<string, string>
   /** a customer walked out: what they'd ordered and not eaten (to be refunded) */
-  onWalkOut?: (ids: string[], guest: number) => void
+  /** (`why`: what sent them off, for the books' notes in development (item 329): the first dish too long in coming, the next, the shop
+   * shutting, their time sat out, a takeaway not come) */
+  onWalkOut?: (ids: string[], guest: number, why?: 'first' | 'next' | 'hurry' | 'stay' | 'takeout') => void
   /** a customer's visit, scored as they go (game/reputation): App keeps them for the shop's rating */
   onVisit?: (v: Visit) => void
   /** (shop open) what's on the menu, each dish's parts (a food and what goes on it); customers order from this */
@@ -6051,6 +6054,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         // a dish (or a set) off the menu, made the way it's listed
         // (the miso soup too, ladled from the pot (the owner's, 2026-11-11): it was left off, not grilled, and every set with it never ordered)
         if (!e.parts.every((pt) => pt.id in roast.times || pt.id === 'MisoSoup')) return false
+        // (a takeaway in the last half hour: only what can be grilled, packed and handed over by closing (game/takeout's fitsBeforeClose,
+        // item 329), each part's time on the fire as it burns now; the soup's ladled)
+        if (!seated && LAST_CALL.on) {
+          const rate = roastRate(heatOf()), left = (CLOSE_AT - getClock().minute + 1440) % 1440
+          if (!fitsBeforeClose(e.parts.map((pt) => (pt.id === 'MisoSoup' ? 0 : (roast.times[pt.id] ?? 0) / rate)), left)) return false
+        }
         if (Math.random() > takesAt(e.price, fairPrice(e))) { dear++; return false }
         wants.current.push(...e.parts)
         // (its parts: one kept warm in the bowl, where there is; else made from portions already used and cleared, where there are any)
@@ -6268,7 +6277,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (mood === 'dark') gripe(g.id, 'dark')
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
-        onWalkOut?.(owed, g.id)
+        onWalkOut?.(owed, g.id, 'first')
         onSay?.('guest', mood === 'dark' ? L().darkGone(g.id) : L().angry(g.id), g.id)
         report()
       }
@@ -6282,7 +6291,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       g.state = 'angry'
       g.cleared = true
       if (o) o.gone = true
-      onWalkOut?.([...g.orders], g.id)
+      onWalkOut?.([...g.orders], g.id, 'takeout')
       onSay?.('guest', L().angry(g.id), g.id)
       onVisit?.({ id: g.id, taste: null, waited: now - g.since, walkedOut: true, gripes: ['wait'] })
       report()
@@ -6361,9 +6370,10 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         || (g.ate.length > 0 && !FED.has(g.id) && overstayed(g.since, now))) {
         const owed = [...g.orders]
         for (const a of g.ate) owed.splice(owed.indexOf(a), 1)
+        const why = SHOP.hurry && !FED.has(g.id) ? 'hurry' : g.state === 'eating' && now - (g.lastAte ?? now) > NEXT_DISH_WAIT + GUEST_EAT_SECONDS ? 'next' : 'stay'
         g.state = 'done'
         if (!SHOP.hurry || g.ate.length === 0) gripe(g.id, 'wait')
-        onWalkOut?.(owed, g.id)
+        onWalkOut?.(owed, g.id, why)
         report()
         continue
       }

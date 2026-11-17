@@ -15,6 +15,15 @@ export const RIDER_SHARE = 0.5
 export const LAST_CALL_GAP = 0.25
 /** the gap before the next one: a quarter in the last half hour */
 export const takeoutGap = (lastCall: boolean, crowd = 1) => TAKEOUT_GAP * crowd * (lastCall ? LAST_CALL_GAP : 1)
+/** the game's minutes a takeaway takes once its last piece is off the fire: packed into its box, carried out to the till, handed over */
+export const PACK_MIN = 6
+/**
+ * Whether a takeaway can be done and handed over by closing, `left` minutes off, each of its dishes `cookMin` of the game's minutes on the
+ * fire as it burns now (item 329: those taken in the last half hour (fish of half an hour on the fire at 04:25) were grilled past closing,
+ * the shop kept open for them till its last minute, an hour on, everyone paid overtime and the night's rate): in that half hour only what's
+ * quick is taken, and in its last minutes nothing
+ */
+export const fitsBeforeClose = (cookMin: readonly number[], left: number) => cookMin.every((m) => m + PACK_MIN <= left)
 /** how many dishes an order's for: a takeaway one or two, a delivery up to three */
 export const takeoutSize = (rider: boolean, r: number) => 1 + Math.floor(r * (rider ? 3 : 2))
 /** one order: who for (their number), a rider or not, how many dishes, how many packed so far; then taken out of the kitchen by a server,

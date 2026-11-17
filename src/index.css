@@ -6569,11 +6569,14 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
 }
 .day-sum-body {
   display: grid;
+  /* (its one column the sheet's width, never wider: a long line in it (a day opened ten hours late, a dish's long name) widened the
+     column past the sheet and every sum on the right was cut off (item 329); such a line shrinks to fit instead (FitLine)) */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   padding: 16px 18px 18px;
 }
 /* (the hours it was open, small over the profit) */
-.day-sum-late { font-size: 11px; color: #9a8a78; }
+.day-sum-late { font-size: 0.92em; color: #9a8a78; }
 .day-sum-late.is-late { color: #b0452c; }
 .day-sum-hours {
   margin: 0 0 6px;
@@ -6637,7 +6640,24 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
 .day-sum-books > div.is-sub dt,
 .day-sum-books > div.is-sub dd { font-size: 12px; font-weight: 500; }
 .day-sum-guests { padding-top: 12px; border-top: 1px solid var(--ds-rule); }
+/* (what could be done better (item 329): a line each, its figure bold, what to try under it, smaller; on a warm paper band) */
+.day-sum-tips {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: rgb(232 160 60 / 0.14);
+  list-style: none;
+}
+.day-sum-tips li { display: flex; align-items: flex-start; gap: 7px; color: #9a4a12; }
+.day-sum-tips li > svg { flex: none; margin-top: 2px; }
+.day-sum-tips span { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.day-sum-tips b { color: var(--ds-ink); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.day-sum-tips small { color: var(--ds-soft); font-size: 12px; white-space: nowrap; }
 .day-sum-guests small { margin-left: 4px; color: var(--ds-soft); font-size: 12px; font-weight: 500; }
+/* (the best seller's name: as long as dishes' names run, smaller where it's long, never past the sheet's edge (item 329)) */
+.day-sum-best { min-width: 0; text-align: right; }
 .day-sum-stars { color: #e0a72e; letter-spacing: 1px; }
 .day-sum-ok {
   justify-self: center;
