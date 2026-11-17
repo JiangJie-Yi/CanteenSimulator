@@ -327,6 +327,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-32', ['shoecab']],
   // (the way-in switches where the owner moved them on, made their defaults (item 298))
   ['jgs-edit-relaid-33', ['lightswitch-room', 'lightswitch-door']],
+  // (the tissues and cleaning things where the owner moved them on, made their default (item 299))
+  ['jgs-edit-relaid-34', ['supplies']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -462,7 +464,10 @@ export const BASES: Record<string, V3> = {
   // X would take it 37 cm into the drinks fridge beside it, as the shop's laid out to begin with, and the Z back against the wall, where
   // the door's panel slides along behind it, out on its track 8-11 cm off the wall: it stands in the gap between the fridge and the
   // door, 1 cm off the fridge, as far back as clears the panel's track by 1.5 cm)
-  supplies: [0.015, 0, -0.012],
+  // (and X -0.19 in the panel (the owner's, 2026-11-17, item 299: 「衛生紙與清潔用品 X: -0.19，然後 Reset」): 19 cm along the wall away from the
+  // fridge, toward the door (the panel's X along the wall, away from the door, as above; read the other way (its parent's -z), it went 19 cm
+  // into the fridge's shelves, 1 cm off them as it stood: clips.mjs))
+  supplies: [0.015, 0, 0.178],
   chochin: [0, 0.25, 0],
   chochin2: [0, 0.25, 0],
   // (then X -0.2, Z 0.16 as the owner set it in the panel's object axes (2026-11-15), taken into the parent's (turned 20.25°))
