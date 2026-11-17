@@ -3774,6 +3774,23 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   color: #8a7462;
   cursor: default;
 }
+/* (a hand's feeling for the owner, and the word of praise (item 323): a little heart, a bar, its number, the button) */
+.ofc-person .ofc-bond { display: inline-flex; align-items: center; gap: 5px; color: #c0503a; font-size: 12px; white-space: nowrap; }
+.ofc-person .ofc-bond i { display: block; width: 56px; height: 5px; border-radius: 3px; background: rgb(59 42 32 / 0.12); overflow: hidden; }
+.ofc-person .ofc-bond i b { display: block; height: 100%; background: #e07a5f; }
+.ofc-person .ofc-bond em { min-width: 18px; color: #7a6656; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ofc-person .ofc-praise {
+  padding: 3px 8px;
+  border: 1px solid rgb(224 122 95 / 0.5);
+  border-radius: 6px;
+  background: rgb(224 122 95 / 0.1);
+  color: #c0503a;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ofc-person .ofc-praise:disabled { opacity: 0.5; cursor: default; }
+.ofc-person .ofc-praise:not(:disabled):hover { background: rgb(224 122 95 / 0.2); }
 .ofc-person .ofc-fire {
   padding: 4px 10px;
   border: 1px solid rgb(224 82 82 / 0.4);
@@ -5800,6 +5817,43 @@ html[lang='en'] .menu-title-en { display: none; }
 .ofc-hireall:hover:not(:disabled) { background: #a8352a; }
 .ofc-hireall:disabled { opacity: 0.4; cursor: default; }
 /* (the dice: the applicants drawn again, two a day (the owner's); dark wood, the count left after it) */
+/* (the staff meal and the shop's air, a row of their own under the day's note (item 323)) */
+.ofc-care { display: flex; align-items: center; gap: 10px; margin: 2px 14px 2px; }
+.ofc-meal {
+  flex: none;
+  padding: 4px 10px;
+  border: 1.5px solid #b8862f;
+  border-radius: 8px;
+  background: #d9a441;
+  color: #3b2a20;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ofc-meal:disabled { opacity: 0.5; cursor: default; }
+.ofc-mood { flex: none; color: #7a6656; font-size: 12px; font-weight: 700; white-space: nowrap; }
+/* (the relations chart's tab (item 323)): the atmosphere's bar over the chart, the owner in its middle, the staff round them, the key under it */
+.ofc-bonds { padding: 10px 14px 14px; overflow: auto; }
+.rel { display: grid; justify-items: center; gap: 10px; }
+.rel-mood { display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap; }
+.rel-mood b { color: #3b2a20; font-size: 13px; }
+.rel-mood i { flex: 1; height: 7px; border-radius: 4px; background: rgb(59 42 32 / 0.12); overflow: hidden; }
+.rel-mood i span { display: block; height: 100%; border-radius: 4px; }
+.rel-mood em { color: #7a6656; font-size: 12px; font-style: normal; font-weight: 700; }
+.rel-chart { position: relative; flex: none; }
+.rel-chart svg { position: absolute; inset: 0; }
+.rel-dorm path, .rel-dorm rect { fill: #d9a441; stroke: #6b4a30; stroke-width: 1; }
+.rel-dorm-key path { fill: #d9a441; stroke: #6b4a30; stroke-width: 1; }
+.rel-face { position: absolute; display: grid; justify-items: center; }
+.rel-face.is-off { opacity: 0.45; }
+.rel-face small { margin-top: -6px; padding: 0 4px; border-radius: 6px; background: rgb(255 255 255 / 0.9); font-size: 11px; font-weight: 800; }
+.rel-face.is-owner { filter: drop-shadow(0 0 4px rgb(217 164 65 / 0.8)); }
+.rel-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin: 0; color: #7a6656; font-size: 11px; }
+.rel-key span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.rel-key i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.rel-none { color: #7a6656; font-size: 13px; }
 .ofc-roll {
   flex: none;
   display: inline-flex;

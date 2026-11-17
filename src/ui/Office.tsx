@@ -14,9 +14,11 @@ import { setTip } from '@/scene/hoverTip'
 import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts'
 import { dayPay } from '@/game/hours'
 import { Avatar } from './Avatar'
+import { Relations } from './Relations'
+import { bondOf, moodWord } from '@/game/affinity'
 
-/** the office's tabs: the kitchen's notebook, the staff, the books */
-export type OfficeTab = 'book' | 'staff' | 'ledger'
+/** the office's tabs: the kitchen's notebook, the staff, the books; the staff's relations chart (item 323) */
+export type OfficeTab = 'book' | 'staff' | 'ledger' | 'bonds'
 
 type Props = {
   dish: Dish
@@ -33,6 +35,14 @@ type Props = {
   onFire: (w: Worker) => void
   /** the shop's open: no one can be let go until it's shut */
   shopOpen?: boolean
+  /** (item 323) each pair of the staff's feeling for each other, the shop's atmosphere (0..100), whether today's staff meal's been had and
+   * what it'd cost; a word of praise for one of them, the meal for those on today */
+  pairs: Record<string, number>
+  atmos: number
+  mealDone: boolean
+  mealCost: number
+  onPraise: (w: Worker) => void
+  onMeal: () => void
   onClose: () => void
   /** which tab is showing, and the research notebook and the books to show in their own */
   tab: OfficeTab
@@ -59,7 +69,8 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * two cooks, someone on the floor and at the till — each filled with a face, or open, with the people who could
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
-export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll, today, onShift }: Props) {
+export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll, today, onShift,
+  pairs, atmos, mealDone, mealCost, onPraise, onMeal }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -103,13 +114,16 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
       <header {...drag.handle}>
         <div className="ofc-tabs" role="tablist">
           {/* (the books first: the cash button top right opens them; the cash itself shows there, not again here) */}
-          <button type="button" role="tab" aria-selected={tab === 'ledger'} onClick={() => onTab('ledger')}>{t('帳簿', '帳簿')}</button>
-          <button type="button" role="tab" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
-          <button type="button" role="tab" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('廚房', '厨房')}</button>
+          <button type="button" role="tab" data-tab="ledger" aria-selected={tab === 'ledger'} onClick={() => onTab('ledger')}>{t('帳簿', '帳簿')}</button>
+          <button type="button" role="tab" data-tab="staff" aria-selected={tab === 'staff'} onClick={() => onTab('staff')}>{t('人事', '人事')}</button>
+          {/* (beside 人事, the staff's relations (item 323)) */}
+          <button type="button" role="tab" data-tab="bonds" aria-selected={tab === 'bonds'} onClick={() => onTab('bonds')}>{t3('關係', '関係', 'Relations')}</button>
+          <button type="button" role="tab" data-tab="book" aria-selected={tab === 'book'} onClick={() => onTab('book')}>{t('廚房', '厨房')}</button>
         </div>
         <button type="button" className="panel-x" onClick={onClose} aria-label={t('關閉', '閉じる')}>×</button>
       </header>
-      {tab === 'book' ? book : tab === 'ledger' ? <div className="ofc-ledger ledger">{ledger}</div> : (
+      {tab === 'book' ? book : tab === 'ledger' ? <div className="ofc-ledger ledger">{ledger}</div>
+        : tab === 'bonds' ? <div className="ofc-bonds"><Relations people={people} hired={hired} pairs={pairs} atmos={atmos} today={today} lang={lang} /></div> : (
         <div className="ofc-staff" onScroll={(e) => { e.currentTarget.querySelector('.ofc-roster-bar')?.classList.toggle('is-scrolled', e.currentTarget.scrollTop > 2) }}>
           {/* the team as it stands, a strip of seats by job (the owner's: the big cards took over half the panel): the owner, then each job's
               places, a small round face with its shift on it, or a dashed ring where one's open; a face takes you down to that person's card,
@@ -191,6 +205,16 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
           })()}
           </div>
           <p className="ofc-today">{t3(`第 ${today} 營業日上班：${shiftLabel(crewOf(today))}（與全勤的人）`, `${today} 日目の出勤：${shiftLabel(crewOf(today))}（通しの人も）`, `Day ${today} on duty: ${shiftLabel(crewOf(today))} (and those on both)`)}</p>
+          {/* (the staff meal (まかない) for those on today, once a day, paid from the cash; and the shop's air as it is (item 323)): a row of
+              their own under the day's note (in the wages' row they ran over its words) */}
+          <div className="ofc-care">
+            <button type="button" className="ofc-meal" disabled={mealDone || mealCost <= 0} onClick={onMeal}
+              title={mealDone ? t3('今天已經吃過員工餐了', '今日のまかないは済み', 'Already had today') : t3(`請今天上班的人吃員工餐（${money(mealCost)}），好感度 +4`,
+                `今日のスタッフにまかない（${money(mealCost)}）、好感度 +4`, `A staff meal for today's crew (${money(mealCost)}): bond +4`)}>{t3('員工餐', 'まかない', 'Staff meal')}</button>
+            <span className="ofc-mood" title={t3('工作氣氛：大家對老闆與彼此的好感度，影響做事的速度', '職場の空気：店主と互いへの好感度。作業の速さに影響',
+              'The atmosphere: how they all feel for you and each other; it speeds or slows the work')}>
+              {t3('氣氛', '空気', 'Mood')} {[t3('冷淡', 'ぎすぎす', 'cold'), t3('生硬', 'ぎこちない', 'stiff'), t3('普通', 'ふつう', 'usual'), t3('融洽', 'なごやか', 'good'), t3('熱絡', 'にぎやか', 'warm')][moodWord(atmos)]}</span>
+          </div>
           <div className="ofc-wages">
             {/* (and what a whole day of it comes to, the night's and the overtime's premiums in (game/hours' dayPay, item 210)) */}
             {/* (two lines of their own, neither broken: the hour's, and the day's under it) */}
@@ -225,6 +249,14 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
                       <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}{isTired(hired[w.id].fatigue) && <em className="ofc-tired" title={t('能力減半・動作變慢', '能力半減・動きが遅い')}>{t('疲勞', '疲労')}</em>}{dot}{money(w.wage)}/h</small>
+                      {/* (their feeling for the owner, and a word of praise, once a day (item 323)) */}
+                      <span className="ofc-bond" title={t3(`好感度 ${Math.round(bondOf(hired[w.id].bond))}：稱讚、員工餐、讓人休息會升，超過十小時、累壞、店裡沒錢會降`,
+                        `好感度 ${Math.round(bondOf(hired[w.id].bond))}：褒める、まかない、休ませると上がり、10 時間超え、疲労、資金不足で下がる`,
+                        `Bond ${Math.round(bondOf(hired[w.id].bond))}: up with praise, a staff meal, rest; down with days past ten hours, wearing out, an empty till`)}>
+                        <Glyph id="heart" size={11} /><i><b style={{ width: `${bondOf(hired[w.id].bond)}%` }} /></i><em>{Math.round(bondOf(hired[w.id].bond))}</em>
+                        <button type="button" className="ofc-praise" disabled={hired[w.id].praised === today} onClick={() => onPraise(w)}>
+                          {hired[w.id].praised === today ? t3('已稱讚', '褒めた', 'Praised') : t3('稱讚', '褒める', 'Praise')}</button>
+                      </span>
                     </div>
                     {/* (their shift: A, B, or both (the owner's); not while the shop's open: they'd vanish from their place) */}
                     <span className="ofc-shift" role="group" aria-label={t('班別', '班')}>

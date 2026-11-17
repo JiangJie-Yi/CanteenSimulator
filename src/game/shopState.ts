@@ -40,8 +40,12 @@ export const LATE = keep(import.meta.hot, 'LATE', { on: false })
 export const LAST_CALL = keep(import.meta.hot, 'LAST_CALL', { on: false })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffState: { STAFF_SKILLS, STAFF_TIRED, LATE } })
 /** how fast this one of the staff gets about and gets things done: half, worn out, and as their skills make it now (data/staff's paceOf) */
+/** each of the staff's pace for how they feel for the owner (game/affinity's bondPace), and the shop's atmosphere's on them all (moodPace):
+ * App keeps both (item 323) */
+export const STAFF_BOND = keep(import.meta.hot, 'STAFF_BOND', new Map<string, number>())
+export const ATMOS = keep(import.meta.hot, 'ATMOS', { value: 50, pace: 1 })
 export const paceOfStaff = (id: string | null | undefined) =>
-  !id ? 1 : paceOf(STAFF_TIRED.has(id) ? TIRED_AT : 0, paceBoost({ skills: STAFF_SKILLS.get(id) }, LATE.on))
+  !id ? 1 : paceOf(STAFF_TIRED.has(id) ? TIRED_AT : 0, paceBoost({ skills: STAFF_SKILLS.get(id) }, LATE.on)) * (STAFF_BOND.get(id) ?? 1) * ATMOS.pace
 
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }

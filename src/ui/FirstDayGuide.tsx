@@ -28,8 +28,8 @@ type Props = {
 /** what glows for each step: the way to it, from the outside in; the deepest one on the screen glows */
 const WAY: Partial<Record<GuideStep, string[]>> = {
   stock: ['.fridge-toggle', '.tally-restock.is-full'],
-  hire: ['.money-chip', '.ofc-tabs button:nth-child(2)', '.ofc-hireall'],
-  menu: ['.money-chip', '.ofc-tabs button:nth-child(3)', '.nb-views button:nth-child(3)', '.nb-chef-acts button:first-child'],
+  hire: ['.money-chip', '.ofc-tabs [data-tab=staff]', '.ofc-hireall'],
+  menu: ['.money-chip', '.ofc-tabs [data-tab=book]', '.nb-views button:nth-child(3)', '.nb-chef-acts button:first-child'],
   open: ['.ai-toggle'],
 }
 

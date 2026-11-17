@@ -15,7 +15,9 @@ export const recoverShare = (streak: number) => RECOVER[Math.min(Math.max(0, str
 
 /** one of the staff's place in the rota: their shift, how many days running they've worked (to `last`, the business day), and the tiredness
  * a night's rest can't take below (`floor`) */
-export type Rota = { fatigue: number; shift?: Shift; streak?: number; last?: number; floor?: number }
+/** (`bond`: their feeling for the owner, `low` how many days running it's been low, `praised` the business day they were last praised
+ * (game/affinity, item 323)) */
+export type Rota = { fatigue: number; shift?: Shift; streak?: number; last?: number; floor?: number; bond?: number; low?: number; praised?: number }
 
 /** at opening on business day `day`: those working it count it to their run (a day missed, a run of one again), those off rest it all */
 export function openDay(r: Rota, day: number): Rota {

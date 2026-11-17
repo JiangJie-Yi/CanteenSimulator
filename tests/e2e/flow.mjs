@@ -68,11 +68,11 @@ for (const [i, shop] of SHOPS.entries()) {
     // hire the second chef, and have him try dishes out until there are enough for the menu
     await page.locator('.money-chip').click()
     await page.waitForTimeout(200)
-    await page.locator('.ofc-tabs button').nth(1).click()
+    await page.locator('.ofc-tabs [data-tab=staff]').click()
     await page.waitForTimeout(200)
     const hire = page.locator('.ofc-role').nth(0).locator('.ofc-person:not(.is-hired) button').first()
     if (await hire.count()) await hire.click()
-    await page.locator('.ofc-tabs button').nth(2).click()
+    await page.locator('.ofc-tabs [data-tab=book]').click()
     await page.waitForTimeout(200)
     // (廚房 shows one view at a time: 料理研製 to talk to the chef, then 試菜 to put the dishes on the menu)
     await page.locator('.nb-views button').nth(2).click()

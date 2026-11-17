@@ -48,7 +48,7 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { dutyDay, idleTick, LAST_CALL, LATE, ON_DUTY, RATING_FLOW, SHOP, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { ATMOS, dutyDay, idleTick, LAST_CALL, LATE, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -90,6 +90,7 @@ import { GUIDE_KEY } from '@/game/firstDay'
 import { FirstDayGuide } from '@/ui/FirstDayGuide'
 import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
+import { atmosphere, bondAfter, bondOf, bondPace, dayBond, dayPairs, givesNotice, LOW_BOND, MEAL_COST, moodPace, pairKey, QUIT_AFTER, WORN_AT } from '@/game/affinity'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
 import { Welcome } from '@/ui/Welcome'
@@ -121,7 +122,7 @@ const PREP_AT = 16 * 60
 const gameMinutes = () => getClock().day * 1440 + getClock().minute
 import { tl } from '@/data/i18n'
 import { hhmm, skyAt, themeOf, type Clock, type Sky } from '@/game/clock'
-import { advanceClock, getClock, setClock, useClock } from '@/ui/clockStore'
+import { advanceClock, getClock, minutesNow, setClock, useClock } from '@/ui/clockStore'
 import { startAdminLink, type AdminSnap } from '@/ui/admin/link'
 import { GameClock, NextDayButton } from '@/ui/GameClock'
 import { ageFresh } from '@/game/freshness'
@@ -141,6 +142,8 @@ type Saved = { v: number; ledger: { revenue: number; food: number; fuel: number;
     overtime?: number; night?: number; rent?: number; platform?: number; cardFee?: number; tossed?: number; refunds?: number }
   /** the last of the game's days the rent's been paid for (game/costs' rentDue) */
   rentPaid?: number
+  /** each pair of the staff's feeling for each other (game/affinity's pairKey); the business day the staff last had their meal (item 323) */
+  pairs?: Record<string, number>; mealDay?: number
   stock: Record<string, number>; hired: Record<string, Record<string, Rota>>; notes: Notes; owner: string | null; opened: Record<string, boolean>
   fresh?: Record<string, number>
   /** each food's lots, as bought (game/lots) */
@@ -1522,6 +1525,31 @@ export default function App() {
   const [hired, setHired] = useState<Record<string, Record<string, Rota>>>(() => SAVED?.hired ?? {})
   const hiredNow = useRef(hired)
   hiredNow.current = hired
+  // (the staff's feeling for each other, pair by pair, and the business day they last had their meal (game/affinity, item 323))
+  const [pairs, setPairs] = useState<Record<string, number>>(() => SAVED?.pairs ?? {})
+  const [mealDay, setMealDay] = useState(() => SAVED?.mealDay ?? -1)
+  // (in development, `__pairs()`: the staff's feeling for each other as it stands)
+  const pairsNow = useRef(pairs)
+  pairsNow.current = pairs
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __pairs: () => pairsNow.current })
+  // (each one's pace for how they feel, and the shop's air from those on today (game/affinity, item 323): for the 3D's pace
+  // (shopState's STAFF_BOND, ATMOS) and the office's meter)
+  const atmosNow = useMemo(() => {
+    const on: number[] = [], ids: string[] = []
+    for (const [shop, ws] of Object.entries(hired)) for (const [id, r] of Object.entries(ws)) {
+      if (!onShift(r.shift, dutyDay(ai)) || !CANDIDATES[shop]?.some((x) => x.id === id)) continue
+      on.push(bondOf(r.bond)); ids.push(id)
+    }
+    const pairBonds: number[] = []
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) pairBonds.push(pairs[pairKey(ids[i], ids[j])] ?? 50)
+    return atmosphere(on, pairBonds)
+  }, [hired, pairs, ai])
+  useEffect(() => {
+    STAFF_BOND.clear()
+    for (const ws of Object.values(hired)) for (const [id, r] of Object.entries(ws)) STAFF_BOND.set(id, bondPace(r.bond))
+    ATMOS.value = atmosNow
+    ATMOS.pace = moodPace(atmosNow)
+  }, [hired, atmosNow])
   // (in development, `__rota()`: each one hired's fatigue, shift, run of days and the floor a night's rest won't go below)
   if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __rota: () => hiredNow.current })
   // the applicants: a new lot each day (the game's clock turning a day: game/hiring's refreshApplicants, those taken on staying), and the
@@ -1548,6 +1576,31 @@ export default function App() {
   // (only the shift on duty (game/shifts, the owner's): the business day open, or the one coming while it's shut)
   const staffOf = (dishId: string, role?: Role) =>
     (CANDIDATES[dishId] ?? []).filter((w) => hired[dishId]?.[w.id] && onShift(hired[dishId][w.id].shift, dutyDay(ai)) && (!role || w.role === role))
+  /**
+   * A word of praise for one of the staff (game/affinity, item 323): once a business day each, their bond up; their thanks in the log. And
+   * the staff's meal (まかない) for everyone on today, once a day, paid from the cash: their bonds up
+   */
+  const praise = (dishId: string, w: Hand) => {
+    const today = dutyDay(ai), r = hired[dishId]?.[w.id]
+    if (!r || r.praised === today) return
+    setHired((h) => ({ ...h, [dishId]: { ...h[dishId], [w.id]: { ...h[dishId][w.id], bond: bondAfter(h[dishId][w.id].bond, 'praise'), praised: today } } }))
+    const pool = lang === 'ja' ? ['ありがとうございます！頑張ります。', '恐縮です、えへへ。', '店長にそう言ってもらえると嬉しいです。']
+      : lang === 'en' ? ['Thanks, boss! I will keep at it.', 'Oh, you flatter me.', 'That makes my day, boss.']
+        : ['謝謝老闆！我會繼續加油的。', '老闆過獎了，嘿嘿。', '被老闆這樣說，今天值得了。']
+    talk('staff', `${personName(w, lang)}${lang === 'en' ? ': ' : '：'}「${pool[Math.floor(Math.random() * pool.length)]}」`)
+  }
+  const giveMeal = (dishId: string) => {
+    const today = dutyDay(ai)
+    const on = staffOf(dishId)
+    const cost = MEAL_COST * on.length
+    if (mealDay === today || !on.length || cash < cost) return
+    book('food', cost, 'meal')
+    setMealDay(today)
+    setHired((h) => ({ ...h, [dishId]: Object.fromEntries(Object.entries(h[dishId] ?? {}).map(([id, r]) => [id, on.some((w) => w.id === id) ? { ...r, bond: bondAfter(r.bond, 'meal') } : r])) }))
+    talk('owner', tl(lang, `今天的員工餐：白飯、味噌湯、烤魚一片，大家先吃一點再忙（${on.length} 人，NT$${cost.toLocaleString('en-US')}）`,
+      `今日のまかない：ご飯、味噌汁、焼き魚。みんな食べてから頑張ろう（${on.length}人、NT$${cost.toLocaleString('en-US')}）`,
+      `Today's staff meal: rice, miso soup and a piece of fish for everyone (${on.length}, NT$${cost.toLocaleString('en-US')})`))
+  }
   /** a new hand's shift: the one of the two short of this job (A first) */
   const shiftFor = (dishId: string, role: Role, h: typeof hired): Shift => {
     const of = (CANDIDATES[dishId] ?? []).filter((x) => x.role === role && h[dishId]?.[x.id])
@@ -1565,7 +1618,9 @@ export default function App() {
     const all = [...staffOf(dishId, 'chef'), ...staffOf(dishId, 'sous')]
     const cooks = staffOf(dishId, 'chef').length ? staffOf(dishId, 'chef') : staffOf(dishId, 'sous')
     if (!cooks.length) return { ...CHEFS[1], id: 'owner', skill: 0.7, cooks: 1, wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0) }
-    const best = cooks.map((w) => ({ w, e: effective(w, hired[dishId][w.id].fatigue, LATE.on) })).sort((a, b) => b.e - a.e)[0]
+    // (how able each is today: their fatigue, the deep night, and how they feel for the owner and the shop's air (game/affinity, item 323))
+    const best = cooks.map((w) => ({ w, e: effective(w, hired[dishId][w.id].fatigue, LATE.on) * bondPace(hired[dishId][w.id].bond) * ATMOS.pace }))
+      .sort((a, b) => b.e - a.e)[0]
     const sp = best.w.speed / 100
     return { id: best.w.id, zh: best.w.zh, ja: best.w.ja, pace: Math.max(0.35, 1.7 - best.e * 0.7 - sp * 0.6),
       pullAt: 1.25 - best.e * 0.25, seasonChance: Math.min(1, 0.25 + best.e * 0.8),
@@ -1728,7 +1783,7 @@ export default function App() {
   const [spotOn, setSpotOn] = useState(false)
   // the business is saved as it goes (every few seconds and when the page is left), and picked up next time
   const saveRef = useRef<Omit<Saved, 'v'>>({ ledger, stock, hired, notes, owner, opened, fresh, lots })
-  saveRef.current = { ledger, stock, hired, notes, owner, opened, fresh, lots, rentPaid: rentPaid.current }
+  saveRef.current = { ledger, stock, hired, notes, owner, opened, fresh, lots, rentPaid: rentPaid.current, pairs, mealDay }
   useEffect(() => {
     const write = () => {
       try {
@@ -2882,8 +2937,36 @@ export default function App() {
         setLeaving(false)
         // (the night's done: the fire put out (item 270))
         dousing.current = true
-        // (the night's rest won't take all of a run of days' tiredness away (game/shifts))
-        setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws).map(([id, r]) => [id, shutDay(r, SHOP.day)]))])))
+        // (the night's rest won't take all of a run of days' tiredness away (game/shifts)); and the day's feelings (game/affinity, item 323):
+        // each who worked it by their hours, how worn they went home, whether the shop paid its way; the pairs by who worked it together;
+        // one unhappy too long gives notice (a day before, they look it)
+        {
+          const day = SHOP.day, nowM = minutesNow(), unpaid = cashNow.current < 0
+          const res = new Map<string, { bond: number; low: number }>()
+          const crew: { id: string; dorm: boolean; worn: boolean }[] = []
+          const quits: { shop: string; w: Hand }[] = [], warns: Hand[] = []
+          for (const [shop, ws] of Object.entries(hiredNow.current)) for (const [id, r] of Object.entries(ws)) {
+            if (r.last !== day) continue
+            const since = ON_DUTY.in.get(id)
+            const out = dayBond(r.bond, { hours: since === undefined ? 0 : (nowM - since) / 60, fatigue: r.fatigue, unpaid }, r.low)
+            res.set(id, out)
+            const w = CANDIDATES[shop]?.find((x) => x.id === id)
+            if (!w) continue
+            crew.push({ id, dorm: commuteOf(w.role) === 'dorm', worn: r.fatigue >= WORN_AT })
+            if (givesNotice(out.low)) quits.push({ shop, w })
+            else if (out.low === QUIT_AFTER - 1) warns.push(w)
+          }
+          setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws)
+            .filter(([id]) => !quits.some((q) => q.shop === shop && q.w.id === id))
+            .map(([id, r]) => [id, { ...shutDay(r, day), ...(res.get(id) ?? {}) }]))])))
+          setPairs((p) => dayPairs(p, crew))
+          for (const { w } of quits) talk('staff', tl(lang, `${personName(w, lang)}遞了辭呈：「老闆，我做到今天就好……」（好感度連續 ${QUIT_AFTER} 天低於 ${LOW_BOND}）`,
+            `${personName(w, lang)}が辞表を出した：「店長、今日で辞めさせてください……」（好感度が${QUIT_AFTER}日続けて${LOW_BOND}未満）`,
+            `${personName(w, lang)} handed in their notice: "Boss, today's my last day..." (their bond under ${LOW_BOND} ${QUIT_AFTER} days running)`))
+          for (const w of warns) talk('staff', tl(lang, `${personName(w, lang)}看起來很不開心，再這樣下去可能會辭職（稱讚、員工餐、讓人休息會好一點）`,
+            `${personName(w, lang)}はかなり不満そうだ。このままだと辞めるかも（褒める、まかない、休ませる）`,
+            `${personName(w, lang)} looks very unhappy and may quit (praise, a staff meal or rest would help)`))
+        }
         // (a bill still not paid with the last customer gone (their figure gone some way without getting to the till): paid on their way out
         // as anyone's is (item 210: counted as paid, its money in hand with no card's fee and never in the drawer), a card's or cash into the
         // drawer, then nothing owed)
@@ -3427,6 +3510,8 @@ export default function App() {
             today={dutyDay(ai)}
             onShift={(w, k) => setHired((h) => ({ ...h, [dish.id]: { ...(h[dish.id] ?? {}), [w.id]: { ...h[dish.id][w.id], shift: k } } }))}
             shopOpen={ai}
+            pairs={pairs} atmos={atmosNow} mealDone={mealDay === dutyDay(ai)} mealCost={MEAL_COST * staffOf(dish.id).length}
+            onPraise={(w) => praise(dish.id, w)} onMeal={() => giveMeal(dish.id)}
             onFire={(w) => setHired((h) => {
               const mine = { ...(h[dish.id] ?? {}) }
               delete mine[w.id]
