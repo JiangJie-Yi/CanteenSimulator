@@ -365,13 +365,8 @@ def stores(inn, yf, ys, zb, zs):
     put(lathe("potknob", px, yf + ph + 0.04, pz, [(0.022, 0.0), (0.026, 0.022)], "s_black", segs=8))
     for sd in (-1, 1):
         put(box(f"pothandle{sd}", px + sd * (pr + 0.004), px + sd * (pr + 0.05), yf + ph - 0.09, yf + ph - 0.06, pz - 0.035, pz + 0.035, "well"))
-    # (a tub of miso, its lid)
-    tx, tz, tr, th = l + 0.75, zc + 0.08, 0.15, 0.24
-    put(lathe("misotub", tx, yf, tz, [(tr * 0.93, 0.0), (tr, th)], "s_cream", segs=16, top=False))
-    put(lathe("misolid", tx, yf + th, tz, [(tr + 0.01, 0.0), (tr + 0.01, 0.03), (tr * 0.9, 0.034)], "s_orange", segs=16))
-    # (a second tub behind it, its lid the same)
-    put(lathe("misotub2", tx + 0.36, yf, tz - 0.12, [(tr * 0.93, 0.0), (tr, th)], "s_cream", segs=16, top=False))
-    put(lathe("misolid2", tx + 0.36, yf + th, tz - 0.12, [(tr + 0.01, 0.0), (tr + 0.01, 0.03), (tr * 0.9, 0.034)], "s_orange", segs=16))
+    # (the two tubs of miso that stood by it are gone (item 275: miso's kept cold, in the cook's table's fridge, as many as its stock); the
+    # peanut powder's pouches stand there now, as many as its stock (blender/pantry.py))
     # (on its shelf, the soup bowls in stacks (汁椀, red lacquer), and their lids in one)
     for n_, bx in enumerate((l + 0.14, l + 0.36, l + 0.58)):
         # (the stack's outline, a rim's step halfway up: 12 round, 70 faces)
@@ -381,17 +376,10 @@ def stores(inn, yf, ys, zb, zs):
     # (and the small dishes, a stack of white)
     put(lathe("dishes", l + 1.08, ys, zc - 0.02, [(0.07, 0.0), (0.1, 0.012), (0.1, 0.09), (0.095, 0.095)], "s_white", segs=16))
 
-    # (the middle cupboard: the rice, lying on its floor; on its shelf the trays, the nori and the salt)
+    # (the middle cupboard: on its shelf the trays; the rice, the salt, the shichimi and the nori that were here in plain colours, no stock
+    # behind them, are blender/pantry.py's now, each as many as its stock (items 274, 275))
     l, r = inn[1]
-    cx = (l + r) / 2
-    put(box("ricebag", cx - 0.36, cx + 0.2, yf, yf + 0.17, zc - 0.22, zc + 0.2, "s_kraft", bev=0.03))
-    put(box("riceband", cx - 0.36 + 0.06, cx - 0.36 + 0.2, yf + 0.17 + 0.002, yf + 0.174, zc - 0.21, zc + 0.19, "s_red"))
-    put(box("ricebag2", cx + 0.26, cx + 0.58, yf, yf + 0.3, zc - 0.16, zc + 0.08, "s_kraft", bev=0.03))
     put(box("trays", l + 0.04, l + 0.56, ys, ys + 0.16, zc - 0.2, zc + 0.17, "s_black", bev=0.008))
-    put(box("noribox", l + 0.66, l + 1.0, ys, ys + 0.12, zc - 0.17, zc + 0.12, "s_nori", bev=0.004))
-    put(box("norilabel", l + 0.7, l + 0.96, ys + 0.03, ys + 0.09, zc + 0.12 + 0.002, zc + 0.124, "s_white"))
-    put(lathe("salt", l + 1.17, ys, zc + 0.02, [(0.075, 0.0), (0.075, 0.16)], "s_white", segs=12, top=False))
-    put(lathe("saltcap", l + 1.17, ys + 0.16, zc + 0.02, [(0.078, 0.0), (0.078, 0.03), (0.07, 0.034)], "s_blue", segs=12))
 
     # (the rice-ball side's cupboard: food boxes in two stacks and the cloths on its floor; the bamboo trays and the takeaway boxes above)
     l, r = inn[2]

@@ -8,7 +8,9 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type React
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { homeCopy, plainColours, StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
+import { countedBatch, homeCopy, plainColours, StaticBatch, mergeByMaterial } from '@/scene/StaticBatch'
+import { DRY_STORE, parOf, unitsShown } from '@/game/pantry'
+import { NORI, supplyName } from '@/game/supplies'
 import { QUALITY } from '@/scene/quality'
 import { Steam } from '@/scene/Steam'
 import { glowLeave, glowOnly } from '@/scene/hoverGlow'
@@ -1168,9 +1170,102 @@ useGLTF.preload(WARMER_URL)
 // lip 0.06 proud of it at the counter's height; the owner's, 2026-11-11: 貼合))
 const WARMER_AT = { along: 4.3, lay: -0.5 - 0.937 }
 const WARMER_D = 1.0
+/**
+ * The dry goods in the counter's two other cupboards (items 274, 275, the owner's: 「調料有缺 跟庫存的對不上(比方說鹽巴、味精...)，這些可以
+ * 放到料理台下的系統櫃門」「這個遊戲是模擬真實世界，不是亂塞些模型的」): blender/pantry.py's packages, where warmer.py's plain-coloured salt
+ * tub, nori box, miso tubs and rice bags stood with no stock behind them: in the middle cupboard two bags of rice and three of salt on its
+ * floor, three tins of shichimi and three packs of nori on its shelf; three pouches of the peanut powder on the first's floor by the stock
+ * pot. As many of each shown as there's stock of it (game/pantry's unitsShown: all at the usual stock, none at none, the last one while
+ * there's any). Their print one picture painted here, a sixth each, in the stock panel's own names for them (game/supplies' supplyName, the
+ * rice's data/storage's; the Japanese in English, as the shop's packaging would be). Drawn only while a door of its cupboard's open.
+ */
+const PANTRY_URL = import.meta.env.BASE_URL + 'models/pantry.glb'
+useGLTF.preload(PANTRY_URL)
+/** which package is which sixth of the picture (blender/pantry.py's: three across, two down), and its cupboard (the first or the middle) */
+const PANTRY_KINDS: { id: string; prefix: string; cell: [number, number]; cup: 0 | 1 }[] = [
+  { id: 'Onigiri', prefix: 'PantryRice', cell: [2, 1], cup: 1 },
+  { id: 'season:salt', prefix: 'PantrySalt', cell: [0, 1], cup: 1 },
+  { id: 'season:shichimi', prefix: 'PantryShichimi', cell: [1, 1], cup: 1 },
+  { id: NORI, prefix: 'PantryNori', cell: [1, 0], cup: 1 },
+  { id: 'season:peanut', prefix: 'PantryPeanut', cell: [0, 0], cup: 0 },
+]
+/** the packages' print: each sixth its label (its left 72%: a bag's front, a pack's top, a tin's round), its side's colour and its top's */
+function paintPantry(g: CanvasRenderingContext2D, lang: string) {
+  const S = 256, ja = lang === 'ja' || lang === 'en', L = (ja ? 'ja' : 'zh') as 'ja' | 'zh'
+  const font = (px: number, w = 900) => `${w} ${px}px "Noto Sans TC", "Noto Sans JP", "Microsoft JhengHei", "Yu Gothic", sans-serif`
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.clearRect(0, 0, S * 3, S * 2)
+  for (const k of PANTRY_KINDS) {
+    const x0 = k.cell[0] * S, y0 = (1 - k.cell[1]) * S, LW = Math.round(S * 0.72)
+    const name = k.id === 'Onigiri' ? (ja ? 'コシヒカリ' : '越光米') : supplyName(k.id, L) ?? ''
+    const fill = (c: string, x: number, y: number, w: number, h: number) => { g.fillStyle = c; g.fillRect(x0 + x, y0 + y, w, h) }
+    const say = (t: string, x: number, y: number, px: number, c: string, w = 900) => {
+      g.font = font(px, w); g.fillStyle = c; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, x0 + x, y0 + y)
+    }
+    const down = (t: string, x: number, y: number, px: number, c: string) => [...t].forEach((ch, i) => say(ch, x, y + i * px * 1.02, px, c))
+    if (k.id === 'season:salt') {
+      // (a white bag, a blue band across its top, the salt's name big in blue, its weight under it, a red seal)
+      fill('#f4f3ee', 0, 0, S, S)
+      fill('#2a4f9a', 0, 34, LW, 22)
+      fill('#c9d6ee', 0, 56, LW, 6)
+      say(name, LW / 2, 140, name.length > 1 ? 64 : 104, '#1f3f86')
+      say('500g', LW / 2, 214, 26, '#2a2a2a', 700)
+      g.fillStyle = '#c0281d'; g.beginPath(); g.arc(x0 + LW - 26, y0 + 92, 14, 0, Math.PI * 2); g.fill()
+      fill('#e6e5df', LW + 10, 133, S - LW - 10, S - 133)
+      fill('#dcdad2', LW + 10, 0, S - LW - 10, 123)
+    } else if (k.id === 'season:shichimi') {
+      // (a tin: red-orange, a gold band at each end, the name down its front in black on a cream panel, the lid brass)
+      fill('#c8371f', 0, 0, S, S)
+      fill('#d9b25a', 0, 14, LW, 12)
+      fill('#d9b25a', 0, S - 26, LW, 12)
+      const n = [...name].length, px = Math.min(52, Math.floor(170 / Math.max(1, n)))
+      fill('#f3e7cc', LW / 2 - px * 0.7, 40, px * 1.4, S - 80)
+      down(name, LW / 2, 128 - ((n - 1) * px * 1.02) / 2, px, '#1c120c')
+      fill('#b8913f', LW + 10, 133, S - LW - 10, S - 133)
+      fill('#c9a24f', LW + 10, 0, S - LW - 10, 123)
+    } else if (k.id === 'Onigiri') {
+      // (a kraft rice bag, its top read from the doors: a red band, the rice's name, where it's from, 5 kg; its edges kraft, a red stripe)
+      fill('#c9a46e', 0, 0, S, S)
+      for (let y = 0; y < S; y += 3) fill(`rgba(110,80,40,${0.05 + 0.04 * ((y / 3) % 2)})`, 0, y, LW, 1)
+      fill('#b3261e', 0, 30, LW, 26)
+      say(name, LW / 2, 118, [...name].length > 3 ? 34 : 46, '#2a1a0c')
+      say(ja ? '新潟県産' : '日本新潟產', LW / 2, 166, 20, '#5a3a18', 700)
+      say('5kg', LW / 2, 206, 28, '#b3261e', 900)
+      fill('#b8925c', LW + 10, 133, S - LW - 10, S - 133)
+      fill('#b3261e', LW + 10, 180, S - LW - 10, 14)
+      fill('#a8844f', LW + 10, 0, S - LW - 10, 123)
+    } else if (k.id === 'season:peanut') {
+      // (a kraft pouch, a cream window with the name in brown, its weight)
+      fill('#b98e5a', 0, 0, S, S)
+      for (let y = 0; y < S; y += 4) fill(`rgba(90,60,30,${0.05 + 0.05 * ((y / 4) % 3)})`, 0, y, LW, 2)
+      fill('#f2e4c6', 18, 82, LW - 36, 110)
+      say(name, LW / 2, 128, [...name].length > 2 ? 44 : 56, '#5a3618')
+      say('300g', LW / 2, 172, 22, '#7a4a20', 700)
+      fill('#a87d4b', LW + 10, 133, S - LW - 10, S - 133)
+      fill('#9a7042', LW + 10, 0, S - LW - 10, 123)
+    } else {
+      // (nori: a black pack, a gold band, the name in gold, a red seal, how many sheets)
+      fill('#121812', 0, 0, S, S)
+      fill('#c6a24c', 0, 60, LW, 10)
+      say(name, LW / 2, 132, [...name].length > 2 ? 46 : 64, '#d9b860')
+      say(ja ? '全形10枚' : '10片裝', LW / 2, 200, 22, '#e7d6a6', 700)
+      g.fillStyle = '#b8261c'; g.fillRect(x0 + LW - 46, y0 + 20, 26, 26)
+      fill('#1a201a', LW + 10, 133, S - LW - 10, S - 133)
+      fill('#202820', LW + 10, 0, S - LW - 10, 123)
+    }
+  }
+}
+let PANTRY_LANG = ''
+const PANTRY_TEX = signTexture(768, 512, (g) => paintPantry(g, PANTRY_LANG))
+// (laid on as the model's own pictures are: a glTF's v runs down from the picture's top)
+if (PANTRY_TEX) PANTRY_TEX.flipY = false
+/** the picture's own canvas (the texture's may be a smaller copy of it: scene/textureCap) */
+const PANTRY_CANVAS = PANTRY_TEX?.image as HTMLCanvasElement | undefined
+const PANTRY_LABEL = new THREE.MeshToonMaterial({ color: '#ffffff', map: PANTRY_TEX })
 function Warmer() {
   useStudio()
   const gltf = useGLTF(WARMER_URL) as unknown as { scene: THREE.Group }
+  const pantryGltf = useGLTF(PANTRY_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
     const r = (gltf.scene.getObjectByName('Warmer') ?? gltf.scene).clone(true)
     r.position.set(0, 0, 0)
@@ -1236,8 +1331,37 @@ function Warmer() {
       warmLater(strip)
       return { veil, veilMat, strip, stripMat, on: 0, since: -1 }
     })
-    return { root: r, doors, shut, cells, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
-  }, [gltf])
+    // (the dry goods (items 274, 275): each kind's packages, in its cupboard's group, one mesh and one ink line a kind cut to as many as
+    // there's stock for (countedBatch))
+    const pr = (pantryGltf.scene.getObjectByName('Pantry') ?? pantryGltf.scene).clone(true)
+    pr.position.set(0, 0, 0)
+    pr.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      m.material = PANTRY_LABEL
+      m.castShadow = false
+      m.receiveShadow = true
+      m.raycast = () => {}
+    })
+    inkModel(pr, () => false, { width: 0.0014, weld: true })
+    r.add(pr)
+    const cups = [0, 1].map((j) => {
+      const g = new THREE.Group()
+      g.name = `PantryCup${j}`
+      g.visible = false
+      pr.add(g)
+      return g
+    })
+    const stores = PANTRY_KINDS.map((k) => {
+      const pieces = [0, 1, 2].map((i) => pr.getObjectByName(`${k.prefix}${i}`) as THREE.Mesh | undefined).filter((x): x is THREE.Mesh => !!x)
+      for (const p of pieces) cups[k.cup].attach(p)
+      return { id: k.id, all: DRY_STORE.find((d) => d.id === k.id)?.all ?? pieces.length, b: countedBatch(cups[k.cup], pieces), shown: -1 }
+    })
+    // (its program made at load, as the veils' are: shown only once a door's opened)
+    warmLater(new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), PANTRY_LABEL))
+    const pantry = { cups, stores, at: -1, lang: '' }
+    return { root: r, doors, shut, cells, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp'), pantry }
+  }, [gltf, pantryGltf])
   /** each door: whether it's to be open, and how far it is (0 shut .. 1 open) */
   const open = useRef<boolean[]>([])
   const swing = useRef<number[]>([])
@@ -1277,6 +1401,26 @@ function Warmer() {
       c.veilMat.opacity = CAB_DARK + (CAB_LIT - CAB_DARK) * c.on
       c.stripMat.color.copy(CAB_STRIP_OFF).lerp(CAB_STRIP_ON, c.on)
     })
+    // (the dry goods: each cupboard's drawn only while a door of it's open; how many of each there are, as the stock has it, every half second;
+    // their print in the page's language)
+    const P = model.pantry
+    const openOf = (j: number) => Math.max(swing.current[2 * j] ?? 0, swing.current[2 * j + 1] ?? 0) > 0.001
+    const o0 = openOf(0), o1 = openOf(1)
+    P.cups[0].visible = o0
+    P.cups[1].visible = o1
+    if ((o0 || o1) && now - P.at > 500) {
+      P.at = now
+      for (const s of P.stores) {
+        const n = unitsShown(SUPPLIES.has(s.id), s.all, parOf(s.id))
+        if (n !== s.shown) { s.shown = n; s.b.show(n) }
+      }
+      const lang = document.documentElement.lang
+      if (lang !== P.lang && PANTRY_TEX && PANTRY_CANVAS) {
+        P.lang = PANTRY_LANG = lang
+        paintPantry(PANTRY_CANVAS.getContext('2d')!, lang)
+        PANTRY_TEX.needsUpdate = true
+      }
+    }
   })
   const doorOf = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) { const m = /^WarmerDoor(\d)$/.exec(q.name); if (m) return +m[1] } return -1 }
   const doorSays = (i: number) => (open.current[i] ? '點一下關上' : '點一下打開')

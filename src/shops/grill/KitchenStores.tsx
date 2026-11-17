@@ -1,16 +1,17 @@
 // The kitchen's stores: what's kept in the cook's table's two cupboards (blender/cubbystock.py: the soy sauce and mirin, the pickle jar, the
 // cloths and the salt box on the right; the binchotan, the skewers, the foil and the lemons on the left; no plates, those are all on the dish
 // racks) and the sacks of raw potatoes and sweet potatoes against the kitchen side of the bar (blender/produce.py).
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
-import { countedBatch, mergeByMaterial, plainColours } from '@/scene/StaticBatch'
+import { countedBatch, homeCopy, mergeByMaterial, plainColours } from '@/scene/StaticBatch'
+import { parOf, unitsShown } from '@/game/pantry'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { SACK_STICKS, SEASON_GOODS } from '@/game/supplies'
 import { PAR } from '@/game/economy'
-import { askPantry, SUPPLIES, anyInStock, tipOver } from './bar'
+import { askPantry, SUPPLIES, tipOver } from './bar'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
 import { getEdit } from './edit'
@@ -185,16 +186,97 @@ function partOf(scene: THREE.Group, node: string, width: number, keep?: (o: THRE
   return r
 }
 
+/**
+ * What each thing in the two fridges is in the stock (item 275, the owner's, 2026-11-17: 「這個遊戲是模擬真實世界，不是亂塞些模型的」; with 274's
+ * 「調料...跟庫存的對不上」): each shown by its own stock, where they all went at once by whether there was any of anything (items 182, 199). Its
+ * stock (or either of two: the box both mushrooms are in), and where there are several of one (bottles, tins, lemons, cobs, skewers, rice
+ * balls...) which of them it is, its name's number: as many shown as there's stock for (game/pantry's unitsShown), what holds them there
+ * while any of them is.
+ */
+const CUBBY_PARTS: { re: RegExp; ids: string[]; counted?: true }[] = [
+  { re: /^StockBottle(?:Label)?(\d)$/, ids: ['season:soy'], counted: true },
+  { re: /^StockPickle/, ids: ['season:soy'] },
+  { re: /^StockMiso/, ids: ['season:miso'] },
+  { re: /^StockMilkTin(\d)$/, ids: ['season:milk'], counted: true },
+  { re: /^StockWasabi/, ids: ['season:wasabi'] },
+  { re: /^StockYuzu/, ids: ['season:yuzu'] },
+  { re: /^StockLemon(\d)$/, ids: ['season:lemon'], counted: true },
+  { re: /^StockLemonDish$/, ids: ['season:lemon'] },
+  { re: /^StockCorn(?:Husk)?(\d)$/, ids: ['GrilledCorn'], counted: true },
+  { re: /^StockCornCrate$/, ids: ['GrilledCorn'] },
+  { re: /^StockShiitake(?:Stem)?(\d)$/, ids: ['GrilledShiitake'], counted: true },
+  { re: /^StockEringi(\d)$/, ids: ['KingOyster'], counted: true },
+  { re: /^StockMushroomBox$/, ids: ['GrilledShiitake', 'KingOyster'] },
+  { re: /^StockAsparagus(\d)$/, ids: ['Asparagus'], counted: true },
+  { re: /^StockAsparaTie$/, ids: ['Asparagus'] },
+  { re: /^StockShishito(\d)$/, ids: ['Shishito'], counted: true },
+  { re: /^StockShishitoBasket$/, ids: ['Shishito'] },
+  { re: /^StockLeek(\d)$/, ids: ['Negi'], counted: true },
+  { re: /^StockLeekTie$/, ids: ['Negi'] },
+  { re: /^StockDaikon/, ids: ['Daikon'] },
+  // (the skewer trays: each tray its own meat, each of its four skewers one of them (its name's second number))
+  { re: /^Stock(?:TraySkewer|Meat|Fat|Sausage)0(\d)/, ids: ['Yakitori'], counted: true },
+  { re: /^StockSkewerTray0$/, ids: ['Yakitori'] },
+  { re: /^Stock(?:TraySkewer|Meat|Fat|Sausage)1(\d)/, ids: ['PorkBelly'], counted: true },
+  { re: /^StockSkewerTray1$/, ids: ['PorkBelly'] },
+  { re: /^Stock(?:TraySkewer|Meat|Fat|Sausage)2(\d)/, ids: ['Sausage'], counted: true },
+  { re: /^StockSkewerTray2$/, ids: ['Sausage'] },
+  // (the rice balls made ready for the grill, from the rice, each in its sheet of nori)
+  { re: /^Stock(?:Onigiri|Nori)(\d)$/, ids: ['Onigiri'], counted: true },
+  { re: /^StockOnigiriPlate$/, ids: ['Onigiri'] },
+]
 /** what's in one of the cook's table's cupboards ('right' or 'left'), standing on its floor, x along the table, +z toward its doors */
 export function CubbyStock({ which }: { which: 'right' | 'left' }) {
   useStudio()
   const gltf = useGLTF(STOCK_URL) as unknown as { scene: THREE.Group }
-  const obj = useMemo(() => partOf(gltf.scene, which === 'right' ? 'StockRight' : 'StockLeft', 0.0025), [gltf, which])
-  // (empty with none of the chilled foods in stock (item 182: its shelves full under a panel saying 0)); the right-hand one, all sauces, by
-  // the sauces (item 199: it went by the foods, full with no sauce left and empty with every bottle in stock)
-  const ids = which === 'right' ? CHILLED_SAUCES : CHILLED_FOODS
-  useFrame(() => { const v = anyInStock(ids); if (obj.visible !== v) obj.visible = v })
-  return <primitive object={obj} />
+  const view = useMemo(() => {
+    // (nothing folded together at first: each part shown or hidden by its stock, then what's shown drawn as one copy by material (homeCopy),
+    // made again only when what's shown changes)
+    const r = partOf(gltf.scene, which === 'right' ? 'StockRight' : 'StockLeft', 0.0025, () => true)
+    // (anything the table doesn't name: by whether there's any of the cupboard's foods, as it all went before)
+    const rest = which === 'right' ? CHILLED_SAUCES : CHILLED_FOODS
+    const parts = [...r.children].map((top) => {
+      const at = CUBBY_PARTS.findIndex((e) => e.re.test(top.name))
+      const e = at >= 0 ? CUBBY_PARTS[at] : null
+      const m = e?.counted ? e.re.exec(top.name) : null
+      const meshes: THREE.Mesh[] = []
+      top.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh) })
+      return { top, meshes, ids: e?.ids ?? rest, entry: at, unit: m ? +m[1] : null }
+    })
+    // (how many of each counted one there are)
+    const all = new Map<number, number>()
+    for (const p of parts) if (p.unit !== null) all.set(p.entry, Math.max(all.get(p.entry) ?? 0, p.unit + 1))
+    return { r, parts, all, key: '', copy: null as THREE.Object3D | null, at: -1 }
+  }, [gltf, which])
+  useEffect(() => () => { view.copy?.traverse((o) => (o as THREE.Mesh).geometry?.dispose()) }, [view])
+  useFrame(() => {
+    const now = performance.now()
+    if (now - view.at < 500) return
+    view.at = now
+    const has = (id: string) => SUPPLIES.has(id)
+    const counts = new Map<number, number>()
+    const shows = view.parts.map((p) => {
+      if (p.unit === null) return p.ids.some((id) => has(id) !== 0)
+      let n = counts.get(p.entry)
+      if (n === undefined) { n = unitsShown(has(p.ids[0]), view.all.get(p.entry) ?? 1, parOf(p.ids[0])); counts.set(p.entry, n) }
+      return p.unit < n
+    })
+    const key = shows.map((s) => (s ? 1 : 0)).join('')
+    if (key === view.key) return
+    view.key = key
+    // (the copy as it was let go; each part's meshes shown or not; what's shown folded together by material again, the parts themselves
+    // hidden under it (still pointed at))
+    if (view.copy) {
+      view.copy.removeFromParent()
+      view.copy.traverse((o) => (o as THREE.Mesh).geometry?.dispose())
+      view.copy = null
+    }
+    view.parts.forEach((p, i) => { for (const m of p.meshes) m.visible = shows[i] })
+    const before = new Set(view.r.children)
+    homeCopy(view.r, view.parts.map((p) => p.top)).home(true)
+    view.copy = view.r.children.find((c) => !before.has(c)) ?? null
+  })
+  return <primitive object={view.r} />
 }
 /** the foods the cook table's cupboards hold (data/storage's chilled ones on the menu) */
 const CHILLED_FOODS = DISHES.flatMap((d) => d.items.map((x) => x.id)).filter((id) => storageOf(id) === 'chilled')

@@ -1,8 +1,8 @@
 """What's kept in the cook's table's two cupboards (cubbystock.glb), which are fridges (the owner's: under-counter fridges, a cold white
 lining inside, what's kept cold kept there): no plates or bowls (those are all on the dish racks), nor anything that keeps at room temperature.
 "StockRight" for the right-hand fridge (1.15 across now, as wide as the left-hand one, the owner's; a shelf over its outer, right-hand half,
-its other half by the cook's notch the whole height for the soy sauce and the seasonings): two big 1.8-litre bottles (一升瓶) of soy sauce and
-mirin, a tub of miso under its lid and two tins of condensed milk by the notch; under the shelf the glazed jar of tare for basting; on the
+its other half by the cook's notch the whole height for the soy sauce and the seasonings): two big 1.8-litre bottles (一升瓶) of soy sauce
+(the second was mirin: the shop has none in stock), a tub of miso under its lid and two tins of condensed milk by the notch; under the shelf the glazed jar of tare for basting; on the
 shelf a box of wasabi, a jar of yuzu kosho and three lemons in a dish. "StockLeft" for the left-hand one (1.15 across, a shelf the whole way): what's grilled that keeps
 cold: on its floor a crate of corn and a box of mushrooms (shiitake, king oyster), bundles of asparagus and a basket of shishito; on the shelf
 trays of skewers ready for the fire (negima, pork belly, sausages) and onigiri on a plate.
@@ -76,9 +76,7 @@ def kraft_tex(name, band=None, mark=None):
 
 M = {
     "soyGlass": pbr("StockSoyGlass", tuple(lin("#2a140a")), rough=0.15),
-    "mirinGlass": pbr("StockMirinGlass", tuple(lin("#8a5a18")), rough=0.15),
     "soyLabel": pbr("StockSoyLabel", (1, 1, 1), tex=label_tex("StockSoyLabelTex", "#f1e8d2", "#b8322a", "#1c1410"), rough=0.6),
-    "mirinLabel": pbr("StockMirinLabel", (1, 1, 1), tex=label_tex("StockMirinLabelTex", "#f6f0dc", "#2a4f8a", "#f6f0dc"), rough=0.6),
     "cap": pbr("StockCap", tuple(lin("#c9a64e")), rough=0.35, metal=0.6),
     "jar": pbr("StockPickleJar", tuple(lin("#7a4a2a")), rough=0.25),
     "jarLip": pbr("StockPickleJarLip", tuple(lin("#c9a476")), rough=0.5),
@@ -226,7 +224,8 @@ def rod(name, a, b, r, mat, sides=5):
 cur = "right"
 # (two 一升瓶: a long body, round shoulders, a short neck, a gilt cap; the label round its middle)
 BOTTLE = [(0.0, 0.0), (0.046, 0.0), (0.05, 0.006), (0.05, 0.26), (0.044, 0.3), (0.022, 0.34), (0.016, 0.36), (0.016, 0.39), (0.018, 0.395), (0.018, 0.42), (0.0, 0.42)]
-for i, (x, z, glass, lab) in enumerate(((-0.48, -0.31, "soyGlass", "soyLabel"), (-0.36, -0.37, "mirinGlass", "mirinLabel"))):
+# (both soy sauce (item 275: the second was mirin, which the shop doesn't stock: nothing in the stock was it); shown as many as its stock)
+for i, (x, z, glass, lab) in enumerate(((-0.48, -0.31, "soyGlass", "soyLabel"), (-0.36, -0.37, "soyGlass", "soyLabel"))):
     lathe(f"StockBottle{i}", BOTTLE, lambda b, g=glass: "cap" if b >= 7 else g, (x, 0.0, z), seg=16)
     lathe(f"StockBottleLabel{i}", [(0.0512, 0.11), (0.0512, 0.23)], lambda b, l=lab: l, (x, 0.0, z), seg=16)
 # (the miso: a squat cedar tub bound with two indigo hoops, its lid on)
