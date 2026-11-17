@@ -1852,7 +1852,10 @@ useGLTF.preload(SHOE_URL)
 const SHOE_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 let SHOE_WOOD_MAT: THREE.MeshToonMaterial | null = null
 // (pale: its picture is pale ash and washi now (blender/shoecab.py, item 264: 「鞋櫃木紋感太重，要日和風 有紙糊的那種感覺，不要通透」); walnut before)
-const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#f4e9d6'), ShoeTop: new THREE.Color('#d7c4a6'), ShoeSlat: new THREE.Color('#ffffff') }
+// (and its colours traded with the waiting bench's (item 291, the owner's, 2026-11-17: 「它的色系與等候矮凳做交換」): its body the bench's brown
+// seat was (#9c7552 over the picture's pale ash), its top and its slats the bench's darker legs (#79583d), framing the washi as a shoji's
+// do; the bench pale ash now (blender/bench.py))
+const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#a27f5f'), ShoeTop: new THREE.Color('#7e5f47'), ShoeSlat: new THREE.Color('#7e5f47') }
 /** one of a pair of shoes put away in a cubby */
 const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
 function ShoeCupboard() {

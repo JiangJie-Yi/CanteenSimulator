@@ -323,6 +323,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-30', ['kabuto']],
   // (every place's chopsticks and rest where the owner put one set, made their defaults (item 282))
   ['jgs-edit-relaid-31', Array.from({ length: 8 }, (_, n) => [`chopsticks${n}`, `chopstickpair${n}`]).flat()],
+  // (the shoe cupboard where the owner moved it on, made its default (item 291))
+  ['jgs-edit-relaid-32', ['shoecab']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -489,8 +491,9 @@ export const BASES: Record<string, V3> = {
   // (the free view's camera: moved X -0.45 along its own axes (object space), taken into its parent's (the world's) units; its turn of
   // Y 15° Z 5° is App's VIEWCAM_TURN)
   'viewcam-free': [0.0478, 0, 0.4475],
-  // (the shoe cupboard moved 0.5 along the wall toward the door (the owner's, 2026-11-11), taken into its parent's units)
-  shoecab: [0, 0, 0.25],
+  // (the shoe cupboard moved 0.5 along the wall toward the door (the owner's, 2026-11-11), taken into its parent's units; and X -0.1 in the
+  // panel (its own axes, and the room's, turned -90 from its parent's: -0.1 on its parent's z) (item 291, the owner's, 2026-11-17))
+  shoecab: [0, 0, 0.15],
 }
 export const isGroup = (id: string | null) => !!id && id in state.groups
 /** the group a piece (or a group) is in, if any: the one holding it directly (that one may be in a view's area in its turn) */

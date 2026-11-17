@@ -50,8 +50,10 @@ u = np.linspace(0, 1, W)[None, :]
 grain = 0.5 + 0.5 * np.sin((v * 22 + np.sin(u * 7 + v * 2) * 0.9) * math.pi * 2)
 wood = np.clip(0.8 + 0.16 * grain - 0.2 * rng.random((Hh, 1)) + rng.normal(0, 0.025, (Hh, W)), 0, 1)
 # (a brown wood (item 214): it was a pale hinoki that the room's warm light turned orange-red)
-seat_rgb = (wood[..., None] * np.array(lin("#9c7552"))[None, None, :] * 1.1).astype(np.float32)
-leg_rgb = (wood[..., None] * np.array(lin("#79583d"))[None, None, :] * 1.1).astype(np.float32)
+# (and the shoe cupboard's pale ash now, its colours traded with the cupboard's (item 291, the owner's, 2026-11-17: 「它的色系與等候矮凳做交換」):
+# the seat its body's ash (blender/shoecab.py's picture under the game's tint), the legs its top's, a shade darker)
+seat_rgb = (wood[..., None] * np.array(lin("#e9d6b8"))[None, None, :] * 1.1).astype(np.float32)
+leg_rgb = (wood[..., None] * np.array(lin("#ceb48f"))[None, None, :] * 1.1).astype(np.float32)
 M = {
     "seat": pbr("BenchSeat", (1, 1, 1), tex=image("bench_seat", seat_rgb), rough=0.6),
     "leg": pbr("BenchLeg", (1, 1, 1), tex=image("bench_leg", leg_rgb), rough=0.7),
