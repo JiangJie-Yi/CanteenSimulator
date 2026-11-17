@@ -2256,8 +2256,47 @@ function minus(al: [number, number], ly: [number, number], h: { along: [number, 
   return out
 }
 const RISER = '#3a2416'
-/** the base's whole thickness, one dark colour all the way down (its sides show as a single band) */
-const BASE_COLOR = '#3d2414'
+/**
+ * The genkan's footing in stone (item 287, the owner's, 2026-11-17: 「門口的厚度要改成石造」: seen from above, the edge of the genkan was a
+ * dark board): granite blocks laid in courses, each a little its own grey, a dark mortar joint round each, a fine speckle; one picture laid
+ * at one scale over every face (timberBox's: 0.6 along, 0.3 up a repeat, two courses), nothing stretched
+ */
+const STONE_MASONRY = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 128
+  const g = c.getContext('2d')!
+  g.fillStyle = '#3a3633'; g.fillRect(0, 0, 256, 128)
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const greys = ['#8d8a84', '#9a958d', '#7e7c78', '#a39f97', '#86827b', '#94918b']
+  for (let row = 0; row < 2; row++) {
+    const y = row * 64
+    // (stones of a few lengths along the course, each course's joints off the last's)
+    let x = row ? -24 : 0
+    while (x < 256) {
+      const w = 52 + Math.floor(rnd() * 46)
+      const col = greys[Math.floor(rnd() * greys.length)]
+      g.fillStyle = col
+      g.beginPath(); g.roundRect(x + 2, y + 2, Math.min(w, 256 - x + 40) - 4, 60, 5); g.fill()
+      // (its face a little lighter at its top, as worn stone catches the light, and a few darker flecks)
+      const gr = g.createLinearGradient(0, y + 2, 0, y + 62)
+      gr.addColorStop(0, 'rgba(255,255,255,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0.12)')
+      g.fillStyle = gr; g.fillRect(x + 2, y + 2, w - 4, 60)
+      x += w
+    }
+  }
+  for (let k = 0; k < 900; k++) {
+    g.fillStyle = rnd() < 0.5 ? 'rgba(30,28,26,0.35)' : 'rgba(235,230,220,0.3)'
+    g.fillRect(Math.floor(rnd() * 256), Math.floor(rnd() * 128), 1, 1)
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+})()
+const STONE_FOOT = new THREE.MeshToonMaterial({ color: '#ffffff', map: STONE_MASONRY })
+const STONE_TILE = { along: 0.6, across: 0.3 }
 /**
  * The shop's base: a thick plinth of wood under the whole room (the customers' floor on a solid fill, the kitchen's lower
  * floor in a well in it), a pale rim of boards round its top edge, a dark body, a toe board at its foot, standing
@@ -2279,15 +2318,14 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
     ))
   }
   const [gal, gly] = genkan
+  // (under the genkan's stone, solid up to it, and in stone: granite courses from its stones down to the base's foot (item 287), where the
+  // rest of the base is timber)
+  const gTop = -step - GENKAN_SUNK - 0.004, gFoot = top - 0.33
   return (
     <>
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
-      {/* (and under the genkan's stone, solid up to it) */}
-      {layers(gal, gly, 'g')}
-      <mesh position={[-(gly[0] + gly[1]) / 2, (top + 0.0 - step) / 2 - (GENKAN_SUNK + 0.004) / 2, (gal[0] + gal[1]) / 2]}>
-        <boxGeometry args={[gly[1] - gly[0], -step - top - GENKAN_SUNK - 0.004, gal[1] - gal[0]]} />
-        <meshToonMaterial color={BASE_COLOR} />
-      </mesh>
+      <mesh position={[-(gly[0] + gly[1]) / 2, (gTop + gFoot) / 2, (gal[0] + gal[1]) / 2]}
+        geometry={timberBox(gly[1] - gly[0], gTop - gFoot, gal[1] - gal[0], STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
     </>
   )
 }
@@ -2593,8 +2631,9 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
       )))}
       {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
       {/* (the wall's foot, and the room's open end, down to the genkan's pebble-wash (its stones, step and threshold: GenkanFloor, below)) */}
-      <mesh position={[-l0, -(D + GENKAN_SUNK) / 2, (g0 + a1) / 2]}><boxGeometry args={[0.02, D + GENKAN_SUNK, a1 - g0]} /><meshToonMaterial color="#2a1a10" /></mesh>
-      <mesh position={[-(l0 + gl) / 2, -(D + GENKAN_SUNK) / 2, a1]}><boxGeometry args={[gl - l0, D + GENKAN_SUNK, 0.012]} /><meshToonMaterial color="#2a1a10" /></mesh>
+      {/* (in the genkan's stone, as its footing is (item 287): they were dark boards, the doorway's edge read as wood from above) */}
+      <mesh position={[-l0, -(D + GENKAN_SUNK) / 2, (g0 + a1) / 2]} geometry={timberBox(0.02, D + GENKAN_SUNK, a1 - g0, STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
+      <mesh position={[-(l0 + gl) / 2, -(D + GENKAN_SUNK) / 2, a1]} geometry={timberBox(gl - l0, D + GENKAN_SUNK, 0.012, STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
       </StaticBatch>
       {/* the genkan: its stones laid crazy-paving in pebble-wash, the shoe-off stone at the step, the threshold, the polished keyaki step
           (item 185: one flat picture of stones and two thin boards before) */}
