@@ -29,6 +29,7 @@ import { coolerDoorSound, lightSwitchSound } from './restroomSound'
 import { getEdit } from './edit'
 import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
+import { warmLater } from '@/scene/Prewarm'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { bottleFrom, goOf, pour, poursLeft, SAKE_BOTTLE_ML } from '@/game/sakeStand'
 import { Tokkuri, TOKKURI_H } from './Tokkuri'
@@ -1209,7 +1210,33 @@ function Warmer() {
     // (all shut, the six drawn as one (item 135: two draws and a line each)); let go as one starts to swing
     const shut = homeCopy(r, doors)
     shut.home(true)
-    return { root: r, doors, shut, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
+    // (each cupboard (two doors to it) dark inside till its doors open, and then its lamp on (items 263 and 277, the owner's, 2026-11-17:
+    // 「料理台的櫃門裡面應該是黑漆漆的，打開會有燈，這系統跟灶台的一樣」): a dark veil across its opening just inside the face frame, and a lamp
+    // strip under its top; as its doors open the strip lights, flickering on as a tube does, and the veil thins away: its inside seen lit. No
+    // light of its own (a light more is every material's cost, and lights aren't added as the game runs): only drawn while a door of it's open)
+    r.updateMatrixWorld(true)
+    const toR = new THREE.Matrix4().copy(r.matrixWorld).invert()
+    const boxOf = (d: THREE.Object3D) => new THREE.Box3().setFromObject(d).applyMatrix4(toR)
+    const cells = [0, 1, 2].map((j) => {
+      const a = doors[2 * j], b = doors[2 * j + 1]
+      if (!a || !b) return null
+      const box = boxOf(a).union(boxOf(b))
+      const w = box.max.x - box.min.x, h = box.max.y - box.min.y
+      const veilMat = new THREE.MeshBasicMaterial({ color: '#0b0806', transparent: true, opacity: CAB_DARK, depthWrite: false })
+      const veil = new THREE.Mesh(new THREE.PlaneGeometry(w, h), veilMat)
+      // (just inside the face frame, behind the doors' backs: the frame 2 cm deep in front of the opening)
+      veil.position.set((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, box.min.z - 0.0035 - 0.024)
+      veil.name = `WarmerVeil${j}`
+      const stripMat = new THREE.MeshBasicMaterial({ color: CAB_STRIP_OFF.clone(), toneMapped: false })
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.05, w - 0.12), 0.012, 0.02), stripMat)
+      strip.position.set(veil.position.x, box.max.y + 0.11, veil.position.z - 0.05)
+      strip.name = `WarmerLampStrip${j}`
+      for (const m of [veil, strip]) { m.visible = false; m.raycast = () => {}; r.add(m) }
+      warmLater(veil)
+      warmLater(strip)
+      return { veil, veilMat, strip, stripMat, on: 0, since: -1 }
+    })
+    return { root: r, doors, shut, cells, glow: mats.find((m) => m.name === 'WarmerGlow'), lamp: mats.find((m) => m.name === 'WarmerLamp') }
   }, [gltf])
   /** each door: whether it's to be open, and how far it is (0 shut .. 1 open) */
   const open = useRef<boolean[]>([])
@@ -1233,6 +1260,23 @@ function Warmer() {
       d.rotation.y = (i % 2 === 0 ? -1 : 1) * DOOR_OPEN * k * k * (3 - 2 * k)
     })
     model.shut.home(still && hovered.current < 0)
+    // (each cupboard's lamp: on once a door of it's a little open, a tube's flicker as it comes on (a flash, dark, a dim flash, on); off at
+    // once as they shut; its veil thinning as it lights)
+    const now = performance.now()
+    model.cells.forEach((c, j) => {
+      if (!c) return
+      const e = Math.max(swing.current[2 * j] ?? 0, swing.current[2 * j + 1] ?? 0)
+      const shown = e > 0.001
+      c.veil.visible = shown
+      c.strip.visible = shown
+      if (!shown) { c.since = -1; c.on = 0; return }
+      if (e > CAB_LAMP_AT && c.since < 0) c.since = now
+      if (e < CAB_LAMP_AT * 0.6) c.since = -1
+      const t = c.since < 0 ? -1 : (now - c.since) / 1000
+      c.on = t < 0 ? 0 : t < 0.06 ? 0.8 : t < 0.13 ? 0.1 : t < 0.2 ? 0.55 : t < 0.26 ? 0.25 : 1
+      c.veilMat.opacity = CAB_DARK + (CAB_LIT - CAB_DARK) * c.on
+      c.stripMat.color.copy(CAB_STRIP_OFF).lerp(CAB_STRIP_ON, c.on)
+    })
   })
   const doorOf = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) { const m = /^WarmerDoor(\d)$/.exec(q.name); if (m) return +m[1] } return -1 }
   const doorSays = (i: number) => (open.current[i] ? '點一下關上' : '點一下打開')
@@ -1276,6 +1320,10 @@ function Warmer() {
 }
 /** how far the counter's cupboard doors swing open (rad) */
 const DOOR_OPEN = 1.45
+/** a cupboard's inside: how dark its veil is unlit, and lit (items 263, 277); how far open its doors are when its lamp comes on; its lamp
+ * strip off and on */
+const CAB_DARK = 0.9, CAB_LIT = 0.06, CAB_LAMP_AT = 0.18
+const CAB_STRIP_OFF = new THREE.Color('#2a2622'), CAB_STRIP_ON = new THREE.Color('#fff1d0')
 /** the warming well's glow and its pilot lamp at each heat (off, low, high) */
 const GLOW_AT = [new THREE.Color('#2e2a28'), new THREE.Color('#6a2814'), new THREE.Color('#b8461e')]
 const LAMP_AT = [new THREE.Color('#3a1a14'), new THREE.Color('#ff7a3a'), new THREE.Color('#ffb060')]

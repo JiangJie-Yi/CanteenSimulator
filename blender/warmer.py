@@ -248,8 +248,12 @@ def counter(L, pre, doors, cx=0.0):
             px = a + (dw - 0.1 if i % 2 == 0 else 0.1)
             o.append(box(f"pull{i}", px - 0.012, px + 0.012, H - TT - 0.42, H - TT - 0.26, front + 0.018, front + 0.032, k + "brass"))
             continue
-        # (each door and its pull its own node, its origin on its hinge: the edge away from its pull, at the door's back face)
-        door = box(f"door{i}", a + 0.02, a + dw - 0.02, KICK + 0.05, H - TT - 0.16, front + 0.0035, front + 0.0215, k + "sugi", bev=0.006)
+        # (each door and its pull its own node, its origin on its hinge: the edge away from its pull, at the door's back face; each pair's
+        # free edges meeting in the middle, a hair apart (item 277: no mullion between them now, and through the gap left for it the lit
+        # inside showed))
+        dx0 = 0.0015 if i % 2 == 1 else 0.02
+        dx1 = 0.0015 if i % 2 == 0 else 0.02
+        door = box(f"door{i}", a + dx0, a + dw - dx1, KICK + 0.05, H - TT - 0.16, front + 0.0035, front + 0.0215, k + "sugi", bev=0.006)
         px = a + (dw - 0.1 if i % 2 == 0 else 0.1)
         pull = box(f"pull{i}", px - 0.012, px + 0.012, H - TT - 0.42, H - TT - 0.26, front + 0.0215, front + 0.0355, k + "brass")
         hx = a + 0.02 if i % 2 == 0 else a + dw - 0.02
@@ -298,9 +302,9 @@ def cupboards(x0, x1, z0, front, dw, doors, k):
     for j in range(1, bays):
         o.append(box(f"part{j}", xs[j] - T / 2, xs[j] + T / 2, y_lo, y_hi, zi, zf, k + "inside"))
         o.append(box(f"stile{j}", xs[j] - 0.02, xs[j] + 0.02, KICK + 0.05, H - TT - 0.16, zf, front, k + "sugi"))
-    # (and a mullion where each pair of doors meet: the solid block's face showed in the gap between them, the cupboard would)
-    for j in range(bays):
-        o.append(box(f"mullion{j}", xs[j] + dw - 0.02, xs[j] + dw + 0.02, KICK + 0.05, H - TT - 0.16, zf, front, k + "sugi"))
+    # (no mullion where each pair of doors meet (item 277, the owner's, 2026-11-17: 「櫃門內裝不行，這一條也要拿掉」: it stood in the middle of
+    # each opened cupboard, a dark strip down it): the two doors close on each other; the gap between them dark, the cupboard's inside unlit
+    # while they're shut (Decor's Warmer: its lamp on as they open))
     # (each cupboard's inside, wall to wall, and its shelf across it, set back from the face; the shelf's top, the floor's top)
     inn = [((x0 + T + 0.004) if j == 0 else (xs[j] + T / 2), (x1 - T - 0.004) if j == bays - 1 else (xs[j + 1] - T / 2)) for j in range(bays)]
     ys = mid + 0.011
