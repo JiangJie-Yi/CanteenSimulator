@@ -242,7 +242,9 @@ export function ProduceSacks() {
     // (each open sack's own pieces (its cloth, the dark floor inside it, its twine) kept out of the shop's merging, to be gathered and slumped
     // as one when it's empty (item 222))
     const ownSack = (o: THREE.Object3D) => /^ProduceSack\d/.test(o.name)
-    const r = partOf(holder, 'ProduceSacks', 0.004, (o) => piled(o) || ownSack(o))
+    // (a finer ink line (item 314): at 4 mm every tuber in the heaps had a thick black ring round it, a cartoon's blobs, the sweet potatoes red
+    // leaves, as the basket's vegetables were before item 153)
+    const r = partOf(holder, 'ProduceSacks', 0.0022, (o) => piled(o) || ownSack(o))
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true })
     // (each sack's pieces one mesh and one ink line cut to as many as there's stock for, the topmost going first (countedBatch, as the
     // charcoal sack's sticks); the onions' roots taken off them and done the same, in the same order)

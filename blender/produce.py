@@ -754,52 +754,73 @@ def bake_heap(name, hi, low, ground=(0.2, 0.12, 0.07)):
     return col, nrm
 
 
-def heap_of(kind, tx, tz, h, top, A0):
-    """a sack's heap: a dome of 10 by 10 quads (a square opened out into the mouth's round: no fan to a middle point) across its mouth, a
-    little inside the cloth's edge and sunk below it there, `top` the mouth's radius at each of the sack's 24 angles (the first at A0);
-    what the tubers' heap looks like baked onto it"""
+def heap_of(kind, tx, tz, h, top, A0, cloth=None):
+    """a sack's heap under the loose ones on top: real tubers (onions), close-packed across its mouth a little sunk, each one of the baked
+    templates turned and sized its own way, lifted clear of the cloth; joined into one mesh for the game to hide with the rest when the sack's
+    empty (item 314, the owner's, 2026-11-18: 「貼圖有點怪」「原本地瓜、馬鈴薯、洋蔥的貼圖還比較好看些」: a heap of tubers baked onto a dome over the
+    mouth read as flat red shards and blotches, its colours off the tubers' own; a heap of potatoes is its potatoes' outlines, as e64b275e
+    found trying a painted heap and a baked shell)"""
     rnd = __import__("random").Random(len(parts) * 17 + 3)
     seg = len(top)
-
-    def rad_at(a):
-        u = ((a - A0) % (2 * math.pi)) / (2 * math.pi / seg)
-        j = int(u) % seg
-        f = u - int(u)
-        return top[j] * (1 - f) + top[(j + 1) % seg] * f
-    bm = bmesh.new()
-    uvl = bm.loops.layers.uv.new()
-    N = HEAP_N
-    grid = []
-    for gi in range(N + 1):
-        row = []
-        for gj in range(N + 1):
-            s, t = -1 + 2 * gi / N, -1 + 2 * gj / N
-            px, py = s * math.sqrt(1 - t * t / 2), t * math.sqrt(1 - s * s / 2)
-            r = math.hypot(px, py)
-            rr = rad_at(math.atan2(py, px)) * HEAP_REACH if r > 1e-6 else 0.0
-            y = h + HEAP_EDGE + (HEAP_TOP - HEAP_EDGE) * max(0.0, 1 - min(r, 1.0) ** 2.2) ** 0.8
-            v = bm.verts.new(P(tx + px * rr, y, max(WALL_Z, tz + py * rr)))
-            row.append((v, 0.5 + 0.49 * px, 0.5 + 0.49 * py))
-        grid.append(row)
-    for gi in range(N):
-        for gj in range(N):
-            c = [grid[gi][gj], grid[gi + 1][gj], grid[gi + 1][gj + 1], grid[gi][gj + 1]]
-            f = bm.faces.new([q[0] for q in c])
-            for loop, q in zip(f.loops, c):
-                loop[uvl].uv = (q[1], q[2])
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    if sum(f.normal.z for f in bm.faces) < 0:
-        bmesh.ops.reverse_faces(bm, faces=bm.faces)
-    low = mesh_object(HEAP_NAMES[kind], bm, "inside")
-    hi = heap_hi(kind, tx, tz, h, sum(top) / seg * 0.98, rnd)
-    col, nrm = bake_heap(HEAP_NAMES[kind], hi, low, {"potato": (0.5, 0.36, 0.2), "sweet": (0.33, 0.04, 0.07), "onion": (0.62, 0.34, 0.12)}[kind])
-    for o in hi:
-        drop(o)
-    mat = pbr(HEAP_NAMES[kind], (1, 1, 1), tex=image(HEAP_NAMES[kind], col), nrm=image(HEAP_NAMES[kind] + "N", nrm, data=True), rough=0.85)
-    low.data.materials.clear()
-    low.data.materials.append(mat)
-    print("HEAP", HEAP_NAMES[kind], "tubers baked from", len(hi), "quads", len(low.data.polygons))
-    return low
+    R = sum(top) / seg
+    step = {"potato": 0.064, "sweet": 0.08, "onion": 0.064}[kind]
+    keep = {"potato": 0.07, "sweet": 0.06, "onion": 0.055}[kind]
+    n = int(R / step) + 1
+    made = []
+    k = 0
+    for gi in range(-n, n + 1):
+        for gj in range(-n, n + 1):
+            dx = gi * step + (0.5 * step if gj % 2 else 0.0) + rnd.uniform(-0.01, 0.01)
+            dz = gj * step * 0.88 + rnd.uniform(-0.01, 0.01)
+            r = math.hypot(dx, dz)
+            if r > R - keep:
+                continue
+            y = h + 0.002 + 0.02 * max(0.0, 1 - (r / R) ** 2)
+            name = f"{HEAP_NAMES[kind]}Part{k}"
+            if kind == "potato":
+                o = tuber(name, tx + dx, y, max(WALL_Z + 0.04, tz + dz), 0.054 * rnd.uniform(0.9, 1.05), "potato",
+                          rot=(rnd.uniform(0, 6.3), rnd.uniform(0, 6.3), rnd.uniform(0, 6.3)))
+            elif kind == "sweet":
+                o = tuber(name, tx + dx, y, max(WALL_Z + 0.04, tz + dz), 0.047 * rnd.uniform(0.9, 1.05), "sweet",
+                          rot=(rnd.uniform(-0.2, 0.2), rnd.uniform(-0.3, 0.3), rnd.uniform(0, 6.3)))
+            else:
+                o = onion(name, tx + dx, y, max(WALL_Z + 0.04, tz + dz), 0.041 * rnd.uniform(0.9, 1.05),
+                          rot=(rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(0, 6.3)))
+            made.append(o)
+            k += 1
+    # (each its own copy (the templates' meshes are shared), lifted clear of the cloth as the loose ones are, the little roots of an onion with it)
+    for o in made:
+        if o.data.users > 1:
+            o.data = o.data.copy()
+        if cloth is not None:
+            settle(o, cloth)
+    every = []
+    for o in made:
+        every.append(o)
+        for c in list(o.children):
+            if c.type == "MESH":
+                if c.data.users > 1:
+                    c.data = c.data.copy()
+                every.append(c)
+    for o in every:
+        if o in parts:
+            parts.remove(o)
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in every:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = made[0]
+    for o in every:
+        if o.parent is not None:
+            mw = o.matrix_world.copy()
+            o.parent = None
+            o.matrix_world = mw
+    bpy.ops.object.join()
+    heap = bpy.context.view_layer.objects.active
+    heap.name = HEAP_NAMES[kind]
+    heap.data.name = HEAP_NAMES[kind]
+    parts.append(heap)
+    print("HEAP", HEAP_NAMES[kind], len(made), "tubers, tris", sum(len(f.vertices) - 2 for f in heap.data.polygons))
+    return heap
 
 
 # ---- the three sacks, standing close together, a little apart at their cuffs; the middle one a step back ----
@@ -865,7 +886,7 @@ for i, (x, z, h, r, mat, lean, kind) in enumerate(SACKS):
     lifts = {o.name: round(settle(o, cloth), 3) for o in heap}
     print("SETTLED", i, {k_: v for k_, v in lifts.items() if v})
     # (and what's under them: the heap filling the mouth, so there's no flat dark disc to look down onto)
-    heap_of(kind, tx, tz, h, top, (front + math.pi / 2) % (2 * math.pi / 24))
+    heap_of(kind, tx, tz, h, top, (front + math.pi / 2) % (2 * math.pi / 24), cloth)
 
 
 def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14, stand=False):
