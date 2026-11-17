@@ -1223,6 +1223,40 @@ function RoundWood() {
   return <primitive object={obj} />
 }
 useGLTF.preload(ROUND_URL)
+/**
+ * The round window's bamboo blind (簾, blender/sudare.py; item 301, the owner's, 2026-11-17: 「圓窗加上日式窗簾注意面數」): half rolled up, hung
+ * from a bamboo pole just over the frame, in front of it (by 1.6 cm: nothing touches it), its slats' gaps cut out of its picture so the window's
+ * view shows through them, the rest rolled up at its foot on two cords. About a hundred triangles; its weave and its cloth in its picture.
+ * Not pointed at: a click through it is the shoji's, as it was
+ */
+const SUDARE_URL = import.meta.env.BASE_URL + 'models/sudare.glb'
+function Sudare() {
+  const gltf = useGLTF(SUDARE_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        // (the slats: their picture's gaps cut out (tested, not blended), seen from either side, as the chair back's kumiko is)
+        t = /Slats/.test(src.name) ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, alphaTest: 0.5, side: THREE.DoubleSide })
+          : new THREE.MeshToonMaterial({ color: src.color.clone() })
+        t.name = src.name
+        made.set(src, t)
+      }
+      m.material = t
+      m.raycast = () => {}
+      m.castShadow = false
+    })
+    inkModel(r, (m) => !/SudarePole/.test(m.name), { width: 0.002, weld: true })
+    return r
+  }, [gltf])
+  return <primitive object={obj} />
+}
+useGLTF.preload(SUDARE_URL)
 /** the round window's frame's tint over its keyaki: a deep walnut */
 const ROUND_WOOD_TINT = new THREE.Color('#7a5136')
 /** the round window's radius (its paper's) */
@@ -1942,6 +1976,8 @@ function RoundWindow() {
       {/* (the paper is the shoji's: RoundShoji, outside the batch, as it slides open) */}
       {/* (the reveal, the frame and its bead) */}
       <Suspense fallback={null}><RoundWood /></Suspense>
+      {/* (its bamboo blind, half rolled up (item 301)) */}
+      <Suspense fallback={null}><Sudare /></Suspense>
     </group>
   )
 }
