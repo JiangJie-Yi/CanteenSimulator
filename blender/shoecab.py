@@ -1,10 +1,14 @@
 """The genkan's shoe cupboard (下駄箱), as a ryotei's or an izakaya's is (the owner's: low, broad and solid, not a tall narrow cupboard of
 paper panes with brass knobs): shoecab.glb.
 
-A low, long cabinet of walnut on a recessed plinth, its top board overhanging a little all round (a vase stands on it); inside, two
+A low, long cabinet of pale ash on a recessed plinth, its top board overhanging a little all round (a vase stands on it); inside, two
 rows of four empty cubbies (the owner's, 2026-11-09: lower and longer than the three by three it was, a third lower, one cubby to each of
-the eight places; the guests' own shoes go in them); each one's door a fine frame with a kumiko lattice (two uprights, two rails) over washi,
-a little bronze ring pull at the top of its free edge. Every piece a plain box (no subdivisions) but the rings, the faces against the
+the eight places; the guests' own shoes go in them); each one's door a slim frame with a fine kumiko lattice (two uprights, two rails) over washi,
+a little bronze ring pull at the top of its free edge. Calm and modern-Japanese (the owner's, 2026-11-17: "too much wood grain; 日和風,
+pasted with paper, not see-through"): the wood pale and its grain quiet, the doors' panes opaque washi with its fibres in the picture.
+One picture for all of it (an atlas: the wood's grain in its lower three quarters, the paper in a strip above), each face cropped
+into its part, so the game's one grained material draws wood and paper together; the colours come from the picture, so the game's tints
+for ShoeWood / ShoeTop / ShoeSlat are to be paled to match (see the report). Every piece a plain box (no subdivisions) but the rings, the faces against the
 floor, the wall and each other left off.
 
 Nodes the game finds: "ShoeCab" (the carcass and what's inside, still), "ShoeDoorL<k>" / "ShoeDoorR<k>" (each door, hinged on its left or
@@ -50,47 +54,75 @@ W, D, H = 0.9, 0.2, 0.56          # across, deep, tall (top board included): lon
 T = 0.022                          # the carcass's boards
 PLINTH = 0.06                     # the recessed plinth's height
 TOP = 0.035                        # the top board, overhanging
-def walnut(N=512):
-    """walnut's grain (the owner's, 2026-11-10: pressed into it, as the other furniture's is; it was flat colours): along v, the late wood's
-    lines a little wavering, the long runs lighter and darker, a pore or two in streaks; near white, to be tinted by each part's own colour"""
+# the atlas: wood in rows 0..WOOD_V (a metre across, its grain along u), washi from PAPER_V up (a strip)
+ATLAS_N, WOOD_V, PAPER_V = 1024, 0.72, 0.76
+WOOD_M = 1.0                       # how many metres the picture's width is on the wood (a face is cropped from it at that scale)
+PAPER_CROP = (0.25, 0.22)          # one pane's crop of the paper strip (u, v extent)
+
+
+def atlas(N=ATLAS_N):
+    """the one picture: pale ash with a quiet straight grain (long lines along u, low contrast, a few fine pores, cloudy runs a shade lighter
+    and darker) below, and washi above it (warm white, mottled, with fibres and a few tan flecks)"""
     seed(29)
     u, v = grid01(N)
-    wob = fbm(N, 3, 2, 4) - 0.5
-    ring = u * 7.0 + 0.12 * np.sin(2 * math.pi * v * 2) + wob * 0.35
-    late = smooth(0.5, 0.97, np.sin(2 * math.pi * ring * 2.0))
-    col = np.ones((N, N, 3), np.float32) * (1.0 - 0.32 * late)[..., None]
-    fine = np.sin(2 * math.pi * (u * 41 + wob * 3 + fbm(N, 6, 2, 3) * 1.2))
-    col *= (1.0 - 0.12 * smooth(0.7, 1.0, fine))[..., None]
-    pores = smooth(0.82, 0.95, vnoise(N, 110, 8)) * smooth(0.3, 0.8, vnoise(N, 24, 5))
-    col *= (1.0 - 0.3 * pores)[..., None]
-    col *= (0.9 + 0.2 * fbm(N, 8, 2, 3))[..., None]
-    return np.clip(col, 0, 1).astype(np.float32)
+    out = np.zeros((N, N, 3), np.float32)
+    wr, pr = int(WOOD_V * N) + 1, int(PAPER_V * N)
+    # (wood)
+    wob = fbm(N, 2, 12, 3) - 0.5
+    line = np.sin(2 * math.pi * (v * 38 + wob * 2.6)) * 0.5 + 0.5
+    late = smooth(0.55, 1.0, line)
+    fine = smooth(0.78, 0.97, vnoise(N, 6, 240)) * 0.8
+    wood = mix((0.915, 0.835, 0.690), (0.835, 0.730, 0.565), np.clip(late * 0.32 + fine * 0.22, 0, 1))
+    wood = wood * (0.965 + 0.07 * fbm(N, 3, 3, 3))[..., None]
+    out[:wr] = wood[:wr]
+    # (washi)
+    pn = N - pr
+    base = mix((0.972, 0.955, 0.905), (0.945, 0.915, 0.850), fbm(N, 10, 4, 4)[:pn])
+    fib = np.zeros((pn, N), np.float32)
+    drk = np.zeros((pn, N), np.float32)
+    for _ in range(1100):
+        x, y = rng.uniform(0, N), rng.uniform(0, pn)
+        a, ln = rng.uniform(0, math.pi), rng.uniform(14, 70)
+        curl = rng.uniform(-0.03, 0.03)
+        t = np.arange(0, ln, 0.7)
+        ang = a + curl * t
+        px = (x + np.cumsum(np.cos(ang)) * 0.7).astype(int) % N
+        py = (y + np.cumsum(np.sin(ang)) * 0.7).astype(int)
+        ok = (py >= 0) & (py < pn)
+        np.add.at(drk if rng.random() < 0.28 else fib, (py[ok], px[ok]), 1.0)
+    for arr in (fib, drk):
+        arr += 0.25 * (np.roll(arr, 1, 0) + np.roll(arr, -1, 0) + np.roll(arr, 1, 1) + np.roll(arr, -1, 1))
+    paper = base + np.clip(fib, 0, 1.2)[..., None] * 0.03 - np.clip(drk, 0, 1.2)[..., None] * np.array([0.05, 0.07, 0.10], np.float32)
+    out[pr:] = paper
+    return np.clip(out, 0, 1).astype(np.float32)
 
 
-GRAIN = image("shoe_walnut", walnut())
+GRAIN = image("shoe_ash_washi", atlas())
 M = {
-    # (a deep walnut, matt (the owner's: roughness 0.85), its grain pressed in; the lattice a shade lighter, the washi behind it pale)
-    "wood": pbr("ShoeWood", lin("#6a4429"), tex=GRAIN, rough=0.85),
-    "top": pbr("ShoeTop", lin("#553520"), tex=GRAIN, rough=0.85),
-    "slat": pbr("ShoeSlat", lin("#7a5232"), tex=GRAIN, rough=0.85),
+    # (pale ash, matt, its quiet grain in the picture (so white here: the game's tints are to be paled); the washi in the same picture)
+    "wood": pbr("ShoeWood", (1, 1, 1), tex=GRAIN, rough=0.9),
+    "top": pbr("ShoeTop", (1, 1, 1), tex=GRAIN, rough=0.9),
+    "slat": pbr("ShoeSlat", (1, 1, 1), tex=GRAIN, rough=0.9),
     "ring": pbr("ShoeRing", lin("#9a6a34"), rough=0.4),
-    "paper": pbr("ShoePaper", lin("#efe6d0"), rough=0.9),
+    "paper": pbr("ShoePaper", (1, 1, 1), tex=GRAIN, rough=0.95),
     "back": pbr("ShoeBack", lin("#1c120c"), rough=0.8),
     "inside": pbr("ShoeInside", lin("#2e2016"), rough=0.8),
     "pull": pbr("ShoePull", lin("#141010"), rough=0.4),
 }
 
 
-TILE = 0.45
+import random
+R = random.Random(7)
 
 
 def box(name, x0, x1, y0, y1, z0, z1, mat, drop=(), bevel=0.0):
     """a box from (x0, y0, z0) to (x1, y1, z1) in the game's frame; `drop`: which of its faces to leave off ('-y' its bottom, '+z' its front...);
-    its grain (uvs) along its longest side, a tile to TILE; `bevel`: its edges taken off that much"""
+    each face's uvs a crop of the atlas: wood at true scale, its grain along the face's longer side (a random place in the picture, so no two
+    boards are alike); paper one pane's crop; `bevel`: its edges taken off that much"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     size = {'x': x1 - x0, 'y': y1 - y0, 'z': z1 - z0}
-    long_ = max(size, key=size.get)
+    lo = {'x': x0, 'y': y0, 'z': z0}
     vs = {}
     for ix, x in enumerate((x0, x1)):
         for iy, y in enumerate((y0, y1)):
@@ -101,18 +133,23 @@ def box(name, x0, x1, y0, y1, z0, z1, mat, drop=(), bevel=0.0):
         '-y': [(0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)], '+y': [(0, 1, 0), (0, 1, 1), (1, 1, 1), (1, 1, 0)],
         '-z': [(0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)], '+z': [(0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)],
     }
-    seedu = (hash(name) % 97) / 97.0
+    pane = (R.uniform(0, 1 - PAPER_CROP[0]), PAPER_V + 0.004 + R.uniform(0, (1 - PAPER_V - 0.008) - PAPER_CROP[1]))
     for k, f in faces.items():
         if k not in drop:
             face = bm.faces.new([vs[c] for c in f])
-            # (in the face's plane: v along the board's length (its grain), u across; offset per board, so no two are alike)
-            ax = k[1]
-            plane = [a for a in 'xyz' if a != ax]
-            along_ = long_ if long_ in plane else plane[1]
-            across_ = plane[0] if along_ == plane[1] else plane[1]
+            pa, pb = [a for a in 'xyz' if a != k[1]]
+            if mat == "paper":
+                axes, ext, o = (pa, pb), PAPER_CROP, pane
+            else:
+                # (grain along the longer side: u along it, v across; a crop at true scale from a random place in the wood)
+                axes = (pa, pb) if size[pa] >= size[pb] else (pb, pa)
+                ext = (min(size[axes[0]] / WOOD_M, 1.0), min(size[axes[1]] / WOOD_M, WOOD_V - 0.02))
+                o = (R.uniform(0, 1 - ext[0]), 0.01 + R.uniform(0, WOOD_V - 0.02 - ext[1]))
             for lp, c in zip(face.loops, f):
                 co = {'x': (x0, x1)[c[0]], 'y': (y0, y1)[c[1]], 'z': (z0, z1)[c[2]]}
-                lp[uvl].uv = (co[across_] / TILE + seedu, co[along_] / TILE + seedu * 3)
+                fa = (co[axes[0]] - lo[axes[0]]) / (size[axes[0]] or 1)
+                fb = (co[axes[1]] - lo[axes[1]]) / (size[axes[1]] or 1)
+                lp[uvl].uv = (o[0] + fa * ext[0], o[1] + fb * ext[1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     if bevel:
         bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bevel, segments=1, affect='EDGES', profile=0.5)
@@ -165,14 +202,15 @@ for k, (col, row) in enumerate(CELLS):
     a0, a1, b0, b1 = cx0 + g, cx1 - g, cy0 + g, cy1 - g
     hinge_left = col < COLS - 1    # (the right column hinges on the right, the others on the left: none swings into the next one open)
     parts = []
-    S = 0.016                      # the frame's width
+    S = 0.013                      # the frame's width
     # (the washi, set in the frame; over it the kumiko: two uprights and three rails, proud of the paper (the owner's: the shoji face kept))
-    parts.append(box("Washi", a0 + S, a1 - S, b0 + S, b1 - S, ZD + 0.004, ZD + 0.006, "paper", drop=('-z', '-x', '+x', '-y', '+y')))
+    # (a closed slab, its edges run 2 mm under the frame: no open face to be culled and show the dark cubby through, nothing coplanar)
+    parts.append(box("Washi", a0 + S - 0.002, a1 - S + 0.002, b0 + S - 0.002, b1 - S + 0.002, ZD + 0.004, ZD + 0.006, "paper"))
     parts.append(box("StileL", a0, a0 + S, b0, b1, ZD, ZD + DT, "wood", drop=('-z',), bevel=0.002))
     parts.append(box("StileR", a1 - S, a1, b0, b1, ZD, ZD + DT, "wood", drop=('-z',), bevel=0.002))
     parts.append(box("RailB", a0 + S, a1 - S, b0, b0 + S, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
     parts.append(box("RailT", a0 + S, a1 - S, b1 - S, b1, ZD, ZD + DT, "wood", drop=('-z', '-x', '+x')))
-    K = 0.005                      # a kumiko bar's width
+    K = 0.0045                     # a kumiko bar's width
     # (two uprights and two rails: a fine three-by-three lattice; the rails broken at the uprights)
     xs_k = [a0 + S + (a1 - a0 - 2 * S) * i / 3 for i in (1, 2)]
     for xk in xs_k:

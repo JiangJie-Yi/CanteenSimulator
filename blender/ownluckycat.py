@@ -290,6 +290,18 @@ for _ in range(48):
     col_[grow_] = acc_[grow_] / cnt_[grow_][:, None]
     valid |= grow_
 px[..., :3] = col_
+# (a black-and-white cat, the owner's, 2026-11-17: 「這隻招財貓換黑白色」, item 267): the door cat's orange patches (its calico's third colour)
+# turned black, a little of their light and shade kept in them; the white fur, the black patches, the red collar, the green bib, the pink
+# of the ears and pads, the face's lines as they were
+mx_, mn_ = col_.max(axis=2), col_.min(axis=2)
+sat_ = np.where(mx_ > 1e-4, (mx_ - mn_) / np.maximum(mx_, 1e-4), 0)
+r_, g_, b_ = col_[..., 0], col_[..., 1], col_[..., 2]
+hue_ = np.degrees(np.arctan2(np.sqrt(3) * (g_ - b_), 2 * r_ - g_ - b_)) % 360
+orange_ = (hue_ > 15) & (hue_ < 48) & (sat_ > 0.3) & (mx_ > 0.25)
+shade_ = 0.05 + 0.09 * np.clip((mx_ - 0.25) / 0.75, 0, 1)
+for c_ in range(3):
+    px[..., c_] = np.where(orange_, shade_, px[..., c_])
+print("BLACK_PATCH", int(orange_.sum()), "texels")
 img.pixels.foreach_set(px.ravel())
 img.pack()
 # (the picture into the colour only once it's baked: wired in before, it was read while it was being written)

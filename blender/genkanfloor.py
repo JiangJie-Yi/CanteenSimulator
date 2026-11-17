@@ -2,12 +2,14 @@
 plain": one flat picture of stones on a plane, a regular grid of grey slabs in thick pale joints, and the step up a thin dark board).
 
 - node "GenkanStones": the floor, natural stones laid crazy-paving (乱張り): each its own outline (a Voronoi cell of the genkan's rect), its
-  own tint (in its points' colour: pale granite, warm grey, cool grey, a dark slate now and then), its top a hair off level, a small chamfer
-  round it that catches the light; laid in the joints' pebble-wash. One mesh.
+  own tint (in its points' colour: pale granite, warm grey, cool grey, a dark slate now and then), its top domed (the owner's, 2026-11-17:
+  "a little bulging out, more shape and style"): a few rings of points to each, the edge rounded off like a worn stone's, the top swelling
+  up to a centimetre toward its middle and a hair tilted, shaded smooth; laid in the joints' pebble-wash. One mesh.
 - node "GenkanMortar": the pebble-wash (洗い出し) between them: small black, grey and white pebbles packed in dark cement, seen in the joints.
-- node "GenkanKutsunugi": the shoe-off stone (沓脱石) at the step, where the way in from the door crosses it: a slab of granite half the
-  step's height, rounded at its corners, its top a little domed, chamfered. People stand on it as they take their shoes off (bar.ts's
-  KUTSUNUGI; its place there and here the same).
+- node "GenkanRug": ONE large rug (the owner's, 2026-11-17, in place of the little lettered doormat and the shoe-off stone, both gone):
+  a 0.70 x 0.72 slab 1.8 cm thick laid on the stones just inside, a way in from the door, clear of the shoe cupboard's doors: a woven
+  igusa (rush) field, its strands run the other way where a quiet 菱 (diamond) pattern is dyed into it, in a border of indigo cotton with two
+  cream pin-stripes and a row of stitches. Four rim quads and a top (26 triangles); everything else is in its picture and normal map.
 - node "GenkanSill": the door's threshold (敷居石): a long slab of dark granite across the doorway, a little proud of the floor.
 - node "GenkanKamachi": the step's edge (上框): a polished keyaki beam along both of the genkan's open sides, its top a hair proud of the
   room's boards, its front the step's face down to the stones, its top front edge rounded; mitred at the corner.
@@ -15,6 +17,7 @@ plain": one flat picture of stones on a plane, a regular grid of grey slabs in t
 The game's frame is RoomFloor's (GuestBar3D): x = minus the first counter's lay, z = its along from its middle, y up from the room's floor;
 in the bar's units. The genkan's rect there (measured in the game, item 185): x 0.42..1.6569, z 2.4..3.7155, its stone 0.1 down.
 The shoe cupboard stands against the wall side from x 1.297; the way in runs at x 1.16.
+(The shoe-off stone, GenkanKutsunugi, that stood at x 0.80..1.27, z 2.445..2.72 is gone: the owner crossed it out, 2026-11-17.)
 
 Run:
     blender -b --factory-startup --python blender/genkanfloor.py -- <project path> [preview.png]
@@ -46,8 +49,12 @@ CHAMFER = 0.0045           # each stone's top edge, its chamfer in and down
 # (the step's beam: its profile across the edge (u: from under the room's boards, + into the genkan), its top and how far down it goes)
 K_BACK, K_FRONT, K_TOP, K_ROUND = -0.035, 0.024, 0.006, 0.012
 K_FOOT = MORTAR_Y
-# (the shoe-off stone: clear of the shoe cupboard's doors (x 1.297) and the doormat (from z 2.75), on the way in (x 1.16))
-KU = {"x": (0.80, 1.27), "z": (Z0 + 0.045, Z0 + 0.32), "top": FLOOR + 0.05, "r": 0.05}
+# (each stone's top: its middle's height over the base (the dome), how far its edge is rounded off, and the rings of points it takes: how far
+# in from its outline each lies (the last one is where the flat-ish top starts, closed with a ladder on export))
+DOME, ROUND, RINGS = 0.006, 0.011, (0.0, 0.003, 0.006, 0.011, 0.035)
+# (the rug: clear of the shoe cupboard's doors (x 1.297) and the step's stones where shoes are put (z up to about 2.8), on the way in (x 1.16),
+# its far end 7 cm short of the threshold; its top a hair over the stones' crowns (the highest: FLOOR + 0.004 + 0.006 + a tilt's 1 mm))
+RUG = {"x": (0.55, 1.25), "z": (2.85, 3.57), "top": FLOOR + 0.014, "foot": FLOOR - 0.004, "rim": 0.0055, "round": 0.012}
 # (the threshold across the doorway, against the door's end)
 SILL = {"x": (X0 + K_FRONT + 0.004, X1), "z": (Z1 - 0.075, Z1), "top": FLOOR + 0.004}
 
@@ -114,7 +121,76 @@ wood = wood * (0.92 + 0.1 * fbm(M3, 4, 24, 3))[..., None]
 WOOD_TEX = image("genkan_keyaki", np.clip(wood, 0, 1).astype(np.float32))
 WOOD_NRM = image("genkan_keyaki_nrm", to_normal(grain * 0.6 + fbm(M3, 6, 30, 3) * 0.4, 1.2).astype(np.float32), data=True)
 
+# (the rug, 1024 square over 0.70 x 0.72 m, about 1,450 px a metre: a border of indigo cotton, 5 cm, with two cream pin-stripes and a row of
+# stitches; inside it an igusa field, its strands (2 mm) running up the rug, each its own shade, in lengths a shade lighter or darker, bound
+# by pale weft threads; a 菱 pattern dyed into it: a moss-green diamond band, a straw-coloured diamond inside it with a dyed middle, and a
+# quarter-diamond in each corner, the strands in those turned across)
+RN = 1024
+RW, RL = RUG["x"][1] - RUG["x"][0], RUG["z"][1] - RUG["z"][0]
+ru, rv = grid01(RN)
+RX, RY = ru * RW, rv * RL
+edge = np.minimum(np.minimum(RX, RW - RX), np.minimum(RY, RL - RY))
+B_W = 0.05
+col_i = (ru * RN / 3.0).astype(int)
+row_i = (rv * RN / 3.0).astype(int)
+rrng = np.random.default_rng(2117)      # (its own: the stones' layout, from the module's rng, stays as it was)
+g_col, g_row = rrng.random(RN // 3 + 2).astype(np.float32), rrng.random(RN // 3 + 2).astype(np.float32)
+seg_v, seg_h = vnoise(RN, 5, 30), vnoise(RN, 30, 5)
+tone_v = np.clip(0.35 + 0.55 * g_col[col_i] + 0.4 * (seg_v - 0.5), 0, 1)
+tone_h = np.clip(0.35 + 0.55 * g_row[row_i] + 0.4 * (seg_h - 0.5), 0, 1)
+prof_v = 0.5 + 0.5 * np.cos(2 * math.pi * ru * RN / 3.0)
+prof_h = 0.5 + 0.5 * np.cos(2 * math.pi * rv * RN / 3.0)
+cx0, cy0 = RW / 2, RL / 2
+
+
+def dia(cx, cy, a):
+    return np.abs(RX - cx) / a + np.abs(RY - cy) / a
+
+
+d_big = dia(cx0, cy0, 0.27)
+d_in = dia(cx0, cy0, 0.145)
+d_cor = np.minimum(np.minimum(dia(B_W, B_W, 0.10), dia(RW - B_W, B_W, 0.10)), np.minimum(dia(B_W, RL - B_W, 0.10), dia(RW - B_W, RL - B_W, 0.10)))
+band = smooth(0.0, 0.03, d_big - 0.88) * smooth(0.0, 0.03, 1.0 - d_big)             # the moss diamond band
+straw = smooth(0.0, 0.03, 1.0 - d_in) * (1 - smooth(0.0, 0.03, 0.30 - d_in))      # the straw diamond, its middle left out
+core = smooth(0.0, 0.03, 0.30 - d_in)                                              # ...which is dyed
+corner = smooth(0.0, 0.03, 1.0 - d_cor)
+dyed = np.clip(band + core + corner, 0, 1)
+pale = np.clip(straw, 0, 1) * (1 - dyed)
+turned = np.clip(dyed + pale, 0, 1)                                               # strands run across where the pattern is
+tone = tone_v * (1 - turned) + tone_h * turned
+prof = prof_v * (1 - turned) + prof_h * turned
+igusa = mix((0.44, 0.47, 0.27), (0.64, 0.64, 0.40), tone)
+igusa = mix(igusa, igusa * np.array([0.66, 0.72, 0.74], np.float32), dyed)
+igusa = mix(igusa, (0.78, 0.73, 0.54) * (0.92 + 0.12 * tone)[..., None], pale)
+igusa = igusa * (0.86 + 0.14 * prof)[..., None]
+# (the weft: pale cotton binding threads across the strands (along them in the turned parts), a thin line every 14 px, a shade lighter)
+fr_v = (rv * RN / 14.0) % 1.0
+fr_h = (ru * RN / 14.0) % 1.0
+weft = np.maximum(smooth(0.80, 1.0, fr_v) * (1 - turned), smooth(0.80, 1.0, fr_h) * turned)
+igusa = mix(igusa, (0.76, 0.72, 0.56), weft * 0.16)
+igusa = igusa * (0.93 + 0.12 * fbm(RN, 3, 3, 4))[..., None]
+# (the border: indigo cotton, a fine weave, two cream pin-stripes and a row of stitches, a thin dark seam where it meets the field)
+weave = np.cos(2 * math.pi * ru * RN / 3.0) * np.cos(2 * math.pi * rv * RN / 3.0)
+cloth = mix((0.085, 0.115, 0.225), (0.125, 0.165, 0.30), fbm(RN, 6, 6, 3)) * (0.94 + 0.06 * weave)[..., None]
+stripe = smooth(0.0, 0.0006, edge - 0.0105) * smooth(0.0, 0.0006, 0.0128 - edge) + smooth(0.0, 0.0006, edge - 0.0165) * smooth(0.0, 0.0006, 0.0182 - edge)
+cloth = mix(cloth, (0.80, 0.77, 0.66), stripe * 0.85)
+along = np.where(np.minimum(RX, RW - RX) < np.minimum(RY, RL - RY), RY, RX)
+stitch = smooth(0.0, 0.0005, edge - 0.0365) * smooth(0.0, 0.0005, 0.0385 - edge) * smooth(0.0, 0.0008, 0.0068 - ((along / 0.012) % 1.0) * 0.012)
+cloth = mix(cloth, (0.74, 0.72, 0.62), stitch * 0.8)
+in_border = smooth(0.0, 0.0012, B_W - edge)
+seam = smooth(0.0, 0.0008, edge - (B_W - 0.0025)) * smooth(0.0, 0.0008, B_W + 0.0005 - edge)
+rug_rgb = mix(igusa, cloth, in_border)
+rug_rgb = mix(rug_rgb, rug_rgb * 0.45, seam)
+rug_rgb = rug_rgb * (0.95 + 0.07 * fbm(RN, 8, 8, 3))[..., None]
+RUG_TEX = image("genkan_rug", np.clip(rug_rgb, 0, 1).astype(np.float32))
+# (its relief: strands as rounded ridges with the weft pressed across, the border a hair raised, finely woven)
+rh = 0.5 * prof + 0.18 * weft + 0.1 * g_col[col_i] * (1 - turned)
+rh = rh * (1 - in_border) + (0.62 + 0.18 * weave) * in_border
+rh = rh - 0.3 * stitch
+RUG_NRM = image("genkan_rug_nrm", to_normal(rh, 2.2).astype(np.float32), data=True)
+
 M = {
+    "rug": pbr("GenkanRug", (1, 1, 1), tex=RUG_TEX, nrm=RUG_NRM, nrm_strength=0.8, rough=0.95),
     "stone": pbr("GenkanStone", (1, 1, 1), tex=STONE_TEX, nrm=STONE_NRM, nrm_strength=0.6, rough=0.7),
     "pebble": pbr("GenkanPebble", (1, 1, 1), tex=PEB_TEX, nrm=PEB_NRM, nrm_strength=0.8, rough=0.85),
     "wood": pbr("GenkanKeyaki", (1, 1, 1), tex=WOOD_TEX, nrm=WOOD_NRM, nrm_strength=0.4, rough=0.3),
@@ -123,7 +199,7 @@ M = {
 parts = []
 
 
-def new_obj(name, bm, mat):
+def new_obj(name, bm, mat, smooth_shade=False):
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
@@ -131,7 +207,7 @@ def new_obj(name, bm, mat):
     bpy.context.collection.objects.link(o)
     o.data.materials.append(M[mat])
     for poly in o.data.polygons:
-        poly.use_smooth = False
+        poly.use_smooth = smooth_shade
     parts.append(o)
     return o
 
@@ -220,6 +296,67 @@ def slab(bm, outline, top, foot, chamfer, uvl, col, tile, uv_off, dome=0.0, tilt
     return faces
 
 
+def drop_at(e):
+    """how far down a stone's top lies at `e` in from its edge: a quarter circle of radius ROUND, steep at the edge, level from ROUND in"""
+    if e >= ROUND:
+        return 0.0
+    t = 1.0 - e / ROUND
+    return ROUND * (1.0 - math.sqrt(max(0.0, 1.0 - t * t)))
+
+
+def pillow(bm, outline, top, foot, uvl, col, tile, uv_off, dome, tilt):
+    """a stone worn round: its outline (convex, x, z) down to `foot` straight, then its top in a few rings in from the edge (RINGS), each
+    ring's points at the height of the stone's dome there less the edge's rounding (drop_at), the last ring closed flat (a ladder on export);
+    shaded smooth; its picture laid from above (`tile`, moved by `uv_off`), its tint `col`"""
+    outline = ccw(outline)
+    cx = sum(p[0] for p in outline) / len(outline)
+    cz = sum(p[1] for p in outline) / len(outline)
+    rad = max(math.hypot(p[0] - cx, p[1] - cz) for p in outline) or 1
+    n = len(outline)
+    rings = [outline]
+    for e in RINGS[1:]:
+        r = inset(outline, e)
+        # (a ring that has run past a short edge: no longer the same way round as the outline: leave it and the ones in from it)
+        ok = len(r) == n and all((r[(i + 1) % n][0] - r[i][0]) * (outline[(i + 1) % n][0] - outline[i][0])
+                                 + (r[(i + 1) % n][1] - r[i][1]) * (outline[(i + 1) % n][1] - outline[i][1]) > 1e-9 for i in range(n))
+        if not ok:
+            break
+        rings.append(r)
+    ring_v = []
+    for k, r in enumerate(rings):
+        e = RINGS[k]
+        ring_v.append([bm.verts.new(P(x, top + dome * (1 - (math.hypot(x - cx, z - cz) / rad) ** 2) + tilt[0] * (x - cx) + tilt[1] * (z - cz)
+                                      - drop_at(e), z)) for x, z in r])
+    foot_v = [bm.verts.new(P(x, foot, z)) for x, z in outline]
+    sides, tops = [], []
+    for i in range(n):
+        j = (i + 1) % n
+        sides.append(bm.faces.new((foot_v[i], foot_v[j], ring_v[0][j], ring_v[0][i])))
+        for k in range(len(rings) - 1):
+            tops.append(bm.faces.new((ring_v[k][i], ring_v[k][j], ring_v[k + 1][j], ring_v[k + 1][i])))
+    cap = bm.faces.new(ring_v[-1])
+    tops.append(cap)
+    cen = Vector(P(cx, 0, cz))
+    for f in sides + tops:
+        f.normal_update()
+        if f in sides:
+            c = f.calc_center_median() - cen
+            want = f.normal.x * c.x + f.normal.y * c.y > 0
+        else:
+            want = f.normal.z > 0
+        if not want:
+            f.normal_flip()
+        for loop in f.loops:
+            co = loop.vert.co
+            gx, gz, gy = co.x, -co.y, co.z
+            if f in tops:
+                loop[uvl["uv"]].uv = (gx / tile + uv_off[0], gz / tile + uv_off[1])
+            else:
+                loop[uvl["uv"]].uv = ((gx + gz) / tile + uv_off[0], gy / tile * 3 + uv_off[1])
+            loop[uvl["col"]] = (*col, 1.0)
+    return sides + tops
+
+
 def layers(bm):
     return {"uv": bm.loops.layers.uv.verify(), "col": bm.loops.layers.color.new("Col")}
 
@@ -269,10 +406,10 @@ for i, s in enumerate(seeds):
     if len(merged) < 3:
         continue
     tint = TINTS[int(rng.integers(0, len(TINTS) - 1))] if rng.random() > 0.2 else TINTS[-1]
-    slab(bm, merged, FLOOR + 0.002 + rng.uniform(-0.0012, 0.0012), MORTAR_Y, CHAMFER, L, tint, 0.65, (rng.random(), rng.random()),
-         dome=0.0015, tilt=(rng.uniform(-0.004, 0.004), rng.uniform(-0.004, 0.004)))
+    pillow(bm, merged, FLOOR + 0.004 + rng.uniform(-0.001, 0.001), MORTAR_Y, L, tint, 0.65, (rng.random(), rng.random()),
+           dome=DOME, tilt=(rng.uniform(-0.004, 0.004), rng.uniform(-0.004, 0.004)))
     n_st += 1
-stones = new_obj("GenkanStones", bm, "stone")
+stones = new_obj("GenkanStones", bm, "stone", smooth_shade=True)
 print("GENKAN_STONES", n_st)
 
 # ------------------------------------------------------------------------------------------------ the pebble-wash under them
@@ -289,21 +426,43 @@ for loop in f.loops:
 mortar = new_obj("GenkanMortar", bm, "pebble")
 
 # ------------------------------------------------------------------------------------------------ the shoe-off stone and the threshold
-def rounded_rect(x0, x1, z0, z1, r, seg=4, jitter=0.0):
-    pts = []
-    for (cx, cz, a0) in ((x1 - r, z0 + r, -math.pi / 2), (x1 - r, z1 - r, 0), (x0 + r, z1 - r, math.pi / 2), (x0 + r, z0 + r, math.pi)):
-        for k in range(seg + 1):
-            a = a0 + (math.pi / 2) * k / seg
-            jr = r + (rng.uniform(-jitter, jitter) if jitter else 0)
-            pts.append((cx + math.cos(a) * jr, cz + math.sin(a) * jr))
-    return pts
+def rug_slab(bm, rect, top, foot, rim, round_, uvl):
+    """the rug: a rectangle, its edge taken off in two steps (`rim` down at its edge, half of `round_` in, then the flat top), straight sides
+    down to `foot`; its picture laid across the whole top (edges clamped into it), white points"""
+    (x0, x1), (z0, z1) = rect
+    rings = [(0.0, top - rim), (round_ * 0.45, top - rim * 0.28), (round_, top)]
+    ring_v = [[bm.verts.new(P(x, h, z)) for x, z in ((x0 + e, z0 + e), (x1 - e, z0 + e), (x1 - e, z1 - e), (x0 + e, z1 - e))] for e, h in rings]
+    foot_v = [bm.verts.new(P(x, foot, z)) for x, z in ((x0, z0), (x1, z0), (x1, z1), (x0, z1))]
+    faces = []
+    for i in range(4):
+        j = (i + 1) % 4
+        faces.append(("side", bm.faces.new((foot_v[i], foot_v[j], ring_v[0][j], ring_v[0][i]))))
+        for k in range(len(rings) - 1):
+            faces.append(("top", bm.faces.new((ring_v[k][i], ring_v[k][j], ring_v[k + 1][j], ring_v[k + 1][i]))))
+    faces.append(("top", bm.faces.new(ring_v[-1])))
+    cen = Vector(P((x0 + x1) / 2, 0, (z0 + z1) / 2))
+    for kind, f in faces:
+        f.normal_update()
+        if kind == "side":
+            c = f.calc_center_median() - cen
+            want = f.normal.x * c.x + f.normal.y * c.y > 0
+        else:
+            want = f.normal.z > 0
+        if not want:
+            f.normal_flip()
+        for loop in f.loops:
+            co = loop.vert.co
+            gx, gz = co.x, -co.y
+            uu = min(max((gx - x0) / (x1 - x0), 0.003), 0.997)
+            vv = min(max(1.0 - (gz - z0) / (z1 - z0), 0.003), 0.997)
+            loop[uvl["uv"]].uv = (uu, vv)
+            loop[uvl["col"]] = (1.0, 1.0, 1.0, 1.0)
 
 
 bm = bmesh.new()
 L = layers(bm)
-slab(bm, rounded_rect(KU["x"][0], KU["x"][1], KU["z"][0], KU["z"][1], KU["r"], seg=4, jitter=0.003), KU["top"], FLOOR - 0.004, 0.009, L,
-     (0.78, 0.77, 0.76), 0.55, (0.31, 0.62), dome=0.005)
-kutsu = new_obj("GenkanKutsunugi", bm, "stone")
+rug_slab(bm, (RUG["x"], RUG["z"]), RUG["top"], RUG["foot"], RUG["rim"], RUG["round"], L)
+rug = new_obj("GenkanRug", bm, "rug", smooth_shade=False)
 bm = bmesh.new()
 L = layers(bm)
 slab(bm, [(SILL["x"][0], SILL["z"][0]), (SILL["x"][1], SILL["z"][0]), (SILL["x"][1], SILL["z"][1]), (SILL["x"][0], SILL["z"][1])], SILL["top"],

@@ -864,14 +864,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </group>
       {/* (the samurai helmet (兜) that sat on the lower tier between the two small cats is on its own little stand by the staff's door now
           (the owner's, 2026-11-12): DiningRoom's) */}
-      <Movable id="genkan" label="玄關地墊"><StaticBatch plain>
-      {/* just inside, the doormat set flush into its recess: a dark stone well, a frame round it, the coir mat in it */}
-      {/* the coir mat lying on the genkan's stone, just inside */}
-      <mesh position={[0, -GENKAN.depth + 0.009, -0.18]} rotation-x={-Math.PI / 2} scale={[-1, 1, 1]}>
-        <planeGeometry args={[0.34, 0.34]} />
-        <meshToonMaterial color="#ffffff" map={DOORMAT} />
-      </mesh>
-      </StaticBatch></Movable>
+      {/* (the coir doormat that lay on the genkan's stone is gone (the owner's, 2026-11-17: 「紅圈地毯移除要換成地毯，做成一片就好、大片一點、日式風格」,
+          item 264): one larger rush rug in its place, part of the floor's model (blender/genkanfloor.py's GenkanRug)) */}
       <Movable id="shoecab" label="鞋櫃">
       {/* the shoe cupboard (下駄箱) against the wall in the genkan (blender/shoecab.py; the owner's: low, broad, walnut, louvred doors that
           open, sunk pulls): its doors swing open at a click to its empty cubbies; a vase of a sprig on its top */}
@@ -879,15 +873,10 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
         <group rotation-y={-Math.PI / 2}><ShoeCupboard /></group>
         <StaticBatch plain>
         <mesh position={[0, SHOE_TOP + 0.06, 0]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
-        {[0, 1, 2].map((k) => (
-          <mesh key={k} position={[Math.cos(k * 2) * 0.02, SHOE_TOP + 0.17 + k * 0.02, 0 + Math.sin(k * 2) * 0.02]} rotation={[Math.sin(k * 2) * 0.4, 0, Math.cos(k * 2) * 0.4]}>
-            <cylinderGeometry args={[0.003, 0.004, 0.16, 4]} /><meshToonMaterial color="#5a3a1e" />
-          </mesh>
-        ))}
-        {[0, 1, 2, 3].map((k) => (
-          <mesh key={`b${k}`} position={[Math.cos(k * 1.7) * 0.05, SHOE_TOP + 0.23 + (k % 2) * 0.03, 0 + Math.sin(k * 1.7) * 0.05]}><icosahedronGeometry args={[0.014, 0]} /><meshToonMaterial color="#f2b0c0" /></mesh>
-        ))}
         </StaticBatch>
+        {/* (its sprig a picture on one card, the owner's, 2026-11-17: 「鞋櫃的花不OK，可以用一片+貼圖，好看又美觀」, item 257: three sticks and four
+            pink balls before): a branch of plum blossom standing up out of the vase, facing the room as the cupboard does */}
+        <mesh position={[0, SHOE_TOP + 0.245, 0]} rotation-y={-Math.PI / 2} material={UME_CARD_MAT}><planeGeometry args={[0.24, 0.3]} /></mesh>
       </group>
       </Movable>
       <group position-x={DX}>
@@ -972,28 +961,55 @@ function NorenModel({ tex, panels, pole = 'lacquer' }: { tex: THREE.Texture | nu
 const NOREN_REACH = 0.5
 const NOREN_PUSH = 1.0
 /** how much longer the way in's noren is drawn than it was made, and how much wider (kept to the doorway's width) */
+/**
+ * The plum sprig in the shoe cupboard's vase, painted on one card (item 257): a dark branch forking up out of the vase's mouth, white-pink
+ * five-petalled blossoms along it with their yellow stamens, a few buds still shut; the rest of the card clear (cut out by alphaTest)
+ */
+const UME_CARD = signTexture(256, 320, (g, w, h) => {
+  g.clearRect(0, 0, w, h)
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  // (the branch: from the vase's mouth at the foot of the card, forking twice, tapering, a little crooked as plum is)
+  const twig = (x: number, y: number, a: number, len: number, wd: number, depth: number, out: [number, number][]) => {
+    let px = x, py = y
+    const n = 5
+    for (let i = 1; i <= n; i++) {
+      const t = i / n, nx = px + Math.sin(a) * (len / n) + (rnd() - 0.5) * 6, ny = py - Math.cos(a) * (len / n)
+      g.strokeStyle = '#4a2c1a'; g.lineCap = 'round'; g.lineWidth = Math.max(1.4, wd * (1 - t * 0.6))
+      g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke()
+      px = nx; py = ny
+      out.push([px, py])
+      if (depth > 0 && i === 3) twig(px, py, a + (rnd() < 0.5 ? -0.6 : 0.6), len * 0.55, wd * 0.6, depth - 1, out)
+    }
+  }
+  const pts: [number, number][] = []
+  twig(w * 0.5, h, -0.12, h * 0.78, 9, 2, pts)
+  twig(w * 0.5, h, 0.32, h * 0.55, 7, 1, pts)
+  // (the blossoms: five round petals about a yellow heart, white flushed pink, here and there along the twigs; a few buds)
+  const bloom = (x: number, y: number, r: number) => {
+    const turn = rnd() * Math.PI
+    for (let k = 0; k < 5; k++) {
+      const a = turn + (k / 5) * Math.PI * 2
+      const grd = g.createRadialGradient(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, 0, x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.62)
+      grd.addColorStop(0, '#fff6f7'); grd.addColorStop(0.75, '#f9d3db'); grd.addColorStop(1, '#e79aab')
+      g.fillStyle = grd
+      g.beginPath(); g.arc(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.6, 0, Math.PI * 2); g.fill()
+    }
+    g.fillStyle = '#d8a13a'; g.beginPath(); g.arc(x, y, r * 0.28, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = '#b8782a'; g.lineWidth = 1
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); g.stroke() }
+  }
+  pts.forEach(([x, y], i) => {
+    if (y > h * 0.86) return
+    if (i % 2 === 0) bloom(x + (rnd() - 0.5) * 10, y + (rnd() - 0.5) * 8, 9 + rnd() * 5)
+    else { g.fillStyle = '#c4566e'; g.beginPath(); g.ellipse(x + (rnd() - 0.5) * 8, y, 3.2, 4.4, rnd(), 0, Math.PI * 2); g.fill() }
+  })
+})
+const UME_CARD_MAT = new THREE.MeshToonMaterial({ map: UME_CARD, alphaTest: 0.5, side: THREE.DoubleSide })
 const NOREN_BIG = 1.3
 const NOREN_WIDE = 1.0
 /** how long the noren's two cords are, from the beam down to its rod (the rod hung 0.18 higher than it was) */
 const NOREN_CORD = 0.18
-
-/** the coir doormat: tan bristle in ribs, a dark border, the shop's welcome (いらっしゃいませ) woven across it */
-const DOORMAT = (() => signTexture(512, 280, (g) => {
-  // (a coir mat: its bristles in tufts, a woven indigo border with a cream line, the welcome brushed in and a crest of waves at each end)
-  g.setTransform(2, 0, 0, 2, 0, 0)
-  g.fillStyle = '#1e2c4c'; g.fillRect(0, 0, 256, 140)
-  g.fillStyle = '#f2e6c8'; g.fillRect(8, 8, 240, 124)
-  g.fillStyle = '#a77d4c'; g.fillRect(11, 11, 234, 118)
-  let seed = 5
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  for (let k = 0; k < 3200; k++) {
-    const x = 11 + rnd() * 234, y = 11 + rnd() * 118
-    g.fillStyle = rnd() < 0.5 ? 'rgba(80,50,22,0.35)' : 'rgba(230,200,150,0.25)'
-    g.fillRect(x, y, 1.2, 2.6)
-  }
-  for (const cx of [36, 220]) for (let r = 4; r <= 16; r += 4) { g.strokeStyle = 'rgba(40,24,10,0.55)'; g.lineWidth = 1.4; g.beginPath(); g.arc(cx, 82, r, Math.PI, 0); g.stroke() }
-  brushText(g, 'いらっしゃいませ', 128, 66, 24, { fill: '#2e1c0e', shadow: 'rgba(255,230,180,0.35)', spacing: 2 })
-}))()
 
 /**
  * A long lantern's skin (長提灯), its picture once round it: the washi lit from inside, the bamboo ribs it's wound on painted in (each a fine
@@ -1834,7 +1850,8 @@ useGLTF.preload(SHOE_URL)
  * it was flat colour) under its boards' colours, made once with the model's picture */
 const SHOE_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 let SHOE_WOOD_MAT: THREE.MeshToonMaterial | null = null
-const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#6a4429'), ShoeTop: new THREE.Color('#553520'), ShoeSlat: new THREE.Color('#7a5232') }
+// (pale: its picture is pale ash and washi now (blender/shoecab.py, item 264: 「鞋櫃木紋感太重，要日和風 有紙糊的那種感覺，不要通透」); walnut before)
+const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#f4e9d6'), ShoeTop: new THREE.Color('#d7c4a6'), ShoeSlat: new THREE.Color('#ffffff') }
 /** one of a pair of shoes put away in a cubby */
 const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
 function ShoeCupboard() {
@@ -1908,20 +1925,20 @@ function ShoeCupboard() {
     const shut = homeCopy(root, doors.map((d) => d.o))
     return { root, doors, cells, shut }
   }, [gltf])
-  const st = useRef({ open: false, k: 0 })
+  /** the cubbies opened by a click, each on its own (item 256, the owner's: 「這櫃子我點一下就全開，能否一個一個開」) */
+  const st = useRef({ cells: new Set<number>() })
   const g = useRef<THREE.Group>(null)
   const pairs = useRef<(THREE.Group | null)[]>([])
   const mats = useMemo(() => model.cells.map(() => new THREE.MeshToonMaterial({ color: '#444444' })), [model])
   useEffect(() => () => { for (const m of mats) m.dispose() }, [mats])
   useFrame((_, dt) => {
     const s = st.current
-    s.k += Math.sign((s.open ? 1 : 0) - s.k) * Math.min(Math.abs((s.open ? 1 : 0) - s.k), Math.min(dt, 0.1) * 2.4)
     const now = performance.now()
-    // (all of them by a click; one at a time as a customer puts their shoes in or takes them out, open a moment)
+    // (each cubby's door by a click on it; and as a customer puts their shoes in or takes them out, open a moment)
     model.doors.forEach((d) => {
-      const want = now - (SHOE_CELLS.kick.get(d.cell) ?? -1e9) < 1400 ? 1 : 0
+      const want = s.cells.has(d.cell) || now - (SHOE_CELLS.kick.get(d.cell) ?? -1e9) < 1400 ? 1 : 0
       d.k += Math.sign(want - d.k) * Math.min(Math.abs(want - d.k), Math.min(dt, 0.1) * 3.2)
-      const k = Math.max(s.k, d.k), e = k * k * (3 - 2 * k)
+      const e = d.k * d.k * (3 - 2 * d.k)
       d.o.rotation.y = d.s * e * (75 * Math.PI / 180)
     })
     // (shut, the one drawing of them all; the doors themselves hidden (still pointed at: the pointer's rays don't mind))
@@ -1934,10 +1951,20 @@ function ShoeCupboard() {
     })
     if (g.current) { g.current.getWorldPosition(SHOE_CELLS.at); SHOE_CELLS.ready = true }
   })
-  const says = () => (st.current.open ? '點擊關閉' : '點擊開啟')
   return (
-    <group onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; st.current.open = !st.current.open; shrineDoor(st.current.open); setTip({ title: '【下駄箱】', hint: says() }) }}
-      {...tipOver('【下駄箱】', '點擊開啟 / 關閉')}>
+    <group onClick={(e) => {
+      e.stopPropagation()
+      if (getEdit().on) return
+      // (the cubby whose door was clicked opened or shut, that one alone; a click on the cupboard itself shuts any that are open)
+      let cell = -1
+      for (let o: THREE.Object3D | null = e.object; o && cell < 0; o = o.parent) { const m = /^ShoeDoor[LR](\d+)$/.exec(o.name); if (m) cell = +m[1] }
+      const cells = st.current.cells
+      if (cell >= 0) { if (cells.has(cell)) cells.delete(cell); else cells.add(cell) } else cells.clear()
+      const open = cell >= 0 && cells.has(cell)
+      shrineDoor(open)
+      setTip({ title: '【下駄箱】', hint: open ? '再點一下關上這一格' : '點一格的門，開那一格' })
+    }}
+      {...tipOver('【下駄箱】', '點一格的門，開那一格')}>
       <primitive object={model.root} />
       <group ref={g}>
         {/* (the shoes in each cubby: a pair, the customer's colour, toes out) */}
@@ -2402,8 +2429,9 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
 /**
  * The genkan's floor and step (blender/genkanfloor.py, item 185, the owner's, 2026-11-15: "the genkan's doorway, its stone step and floor,
  * too plain"; it was one flat picture of a grid of grey slabs in thick pale joints, and the step two thin dark boards): natural stones laid
- * crazy-paving, each its own outline, tint (its points' colour) and chamfer, in a pebble-wash (洗い出し) seen in the joints; the shoe-off stone
- * (沓脱石) at the step where the way in crosses it (people stand on it: bar.ts's KUTSUNUGI, genkanY); a dark granite threshold across the
+ * crazy-paving, each its own outline, tint (its points' colour) and chamfer, each a little domed (item 265), in a pebble-wash (洗い出し) seen in
+ * the joints; a rush rug lying on it (item 264: the doormat and the shoe-off stone that stood at the step are gone; people stand on the rug:
+ * bar.ts's GENKAN_RUG, genkanY); a dark granite threshold across the
  * doorway; and the step's edge (上框), a polished keyaki beam along both open sides, mitred at the corner. Modelled in RoomFloor's own frame,
  * the genkan as it is (x 0.42..1.6569, z 2.4..3.7155); fitted to it as it is now, if that's changed. Toon-shaded as the room is, its pictures'
  * relief in their normal maps; one draw for each of its three materials (stone, pebbles, wood)
