@@ -1161,7 +1161,8 @@ export const GENKAN = { depth: 0.1, along: [0.15, 1.45] as [number, number], lay
 /** the rush rug on the genkan's stone (blender/genkanfloor.py's GenkanRug, item 264): along (from the first counter's end) and lay as GENKAN's,
  * and how high its top stands over the genkan's stone (1.4 cm: who stands on it stands on it, not in it) */
 // (pushed up against the step's beam (item 294, the owner's 「貼緊」): along 0.6 to 1.32 before)
-export const GENKAN_RUG = { along: [0.175, 0.895] as [number, number], lay: [-1.25, -0.55] as [number, number], top: 0.014 }
+// (and filled out side to side (item 312): lay -1.25 to -0.55 before)
+export const GENKAN_RUG = { along: [0.175, 0.895] as [number, number], lay: [-1.38, -0.445] as [number, number], top: 0.014 }
 /** how high someone stands at a point (the bar's frame): the room's floor, down in the genkan, or up on its rug there */
 export function genkanY(cs: Counter[], p: THREE.Vector3) {
   if (!inGenkan(cs, p)) return 0

@@ -56,7 +56,9 @@ DOME, ROUND, RINGS = 0.006, 0.011, (0.0, 0.003, 0.006, 0.011, 0.035)
 # its far end 7 cm short of the threshold; its top a hair over the stones' crowns (the highest: FLOOR + 0.004 + 0.006 + a tilt's 1 mm))
 # (and pushed up against the step's beam (item 294, the owner's, 2026-11-17: 「貼緊」, an arrow from it to the step): its near end a millimetre
 # off the beam's face (Z0 + K_FRONT), as long as it was)
-RUG = {"x": (0.55, 1.25), "z": (Z0 + K_FRONT + 0.001, Z0 + K_FRONT + 0.001 + 0.72), "top": FLOOR + 0.014, "foot": FLOOR - 0.004, "rim": 0.0055, "round": 0.012}
+# (and filled out side to side (item 312, the owner's, 2026-11-18: 「玄關地毯可以左右補滿」): from the step's beam on the left (X0 + K_FRONT) to
+# 6 mm short of the shoe cupboard's front on the right (at x 1.3866 as it stands now, measured; its doors swing over it, clear of its 1.4 cm))
+RUG = {"x": (X0 + K_FRONT + 0.001, 1.38), "z": (Z0 + K_FRONT + 0.001, Z0 + K_FRONT + 0.001 + 0.72), "top": FLOOR + 0.014, "foot": FLOOR - 0.004, "rim": 0.0055, "round": 0.012}
 # (the threshold across the doorway, against the door's end)
 SILL = {"x": (X0 + K_FRONT + 0.004, X1), "z": (Z1 - 0.075, Z1), "top": FLOOR + 0.004}
 
