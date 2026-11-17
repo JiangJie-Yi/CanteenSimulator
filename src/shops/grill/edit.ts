@@ -950,6 +950,8 @@ export function frameSelected() {
   const target = leavesOf(state.groups, id).find((m) => registry.has(m)) ?? id
   registry.get(target)?.focus()
 }
+/** every piece the editor knows of, with its measures (the contact shades read where each stands: ContactShades, item 306) */
+export const registryEntries = () => registry.entries()
 export function registerMovable(id: string, label: string, focus: () => void, center?: () => V3 | null, parent?: string | null, foot?: () => V3 | null, corners?: () => V3[] | null,
   frame?: () => number[] | null) {
   registry.set(id, { label, focus, center, parent, foot, corners, frame })

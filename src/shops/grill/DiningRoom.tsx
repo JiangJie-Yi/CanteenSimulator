@@ -1817,7 +1817,7 @@ const ROUND_AT = -1.36
 /** the daylight that comes in through it (by day only, gone at night): a cool glow round it on the plaster, and a faint shaft of it slanting
  * down into the room, soft at its edges and fading as it goes */
 const DAYLIGHT = (() => {
-  if (typeof document === 'undefined') return { halo: null, beam: null }
+  if (typeof document === 'undefined') return { halo: null, beam: null, fall: null }
   const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
   const halo = document.createElement('canvas')
   halo.width = halo.height = 128
@@ -1838,7 +1838,19 @@ const DAYLIGHT = (() => {
     row.addColorStop(0, 'rgba(255,255,255,0)'); row.addColorStop(0.5, `rgba(255,255,255,${k})`); row.addColorStop(1, 'rgba(255,255,255,0)')
     b.fillStyle = row; b.fillRect(0, y, 64, 1)
   }
-  return { halo: tex(halo), beam: tex(beam) }
+  // (the sun's patch on the floor (item 306): the round window's shape, soft at its edge, its lattice's bars dark across it)
+  const fall = document.createElement('canvas')
+  fall.width = fall.height = 128
+  const f = fall.getContext('2d')!
+  f.filter = 'blur(5px)'
+  f.fillStyle = 'rgba(255,255,255,0.95)'
+  f.beginPath(); f.arc(64, 64, 52, 0, Math.PI * 2); f.fill()
+  f.filter = 'blur(2px)'
+  f.globalCompositeOperation = 'destination-out'
+  f.fillStyle = 'rgba(0,0,0,0.75)'
+  for (const x of [46, 82]) f.fillRect(x - 3, 0, 6, 128)
+  for (const y of [38, 64, 90]) f.fillRect(0, y - 2.5, 128, 5)
+  return { halo: tex(halo), beam: tex(beam), fall: tex(fall) }
 })()
 /** the light from outside about the round window, by the part of the day: its colour, and how strong (none by day, the sky's light all
  * over then) */
@@ -1853,10 +1865,14 @@ function skyGlow(m: THREE.MeshBasicMaterial, looks: Record<Sky, [string, number]
 if (typeof document !== 'undefined') onSky(() => { const s = skyNow(); for (const { m, looks } of SKY_GLOWS) { m.color.set(looks[s][0]); m.opacity = looks[s][1] } })
 // (by night the moon's faint blue glow round the window and its shaft slanting in, dust drifting in it (WindowDust); at dusk the evening
 // sun's, orange and stronger; at dawn only a faint rose glow round it (the morning sun's on the room's other side); by day none)
+// (and by day (item 306, the owner's: 「光照跟陰影感還不行，尤其是白天，不太真實」): the plaster round it a little lit, a faint warm shaft of the
+// sun slanting in, and its patch on the floor where it falls, the lattice's bars across it)
 const WINDOW_HALO = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.halo, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false }), { day: ['#8fc4ff', 0], dawn: ['#ffc6d4', 0.12], dusk: ['#ffc07c', 0.3], night: ['#8fc4ff', 0.22] })
+  toneMapped: false }), { day: ['#fff4dc', 0.14], dawn: ['#ffc6d4', 0.12], dusk: ['#ffc07c', 0.3], night: ['#8fc4ff', 0.22] })
 const SUNBEAM = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.beam, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  toneMapped: false, side: THREE.DoubleSide }), { day: ['#78b2ff', 0], dawn: ['#ffd6de', 0], dusk: ['#ffb872', 0.22], night: ['#78b2ff', 0.15] })
+  toneMapped: false, side: THREE.DoubleSide }), { day: ['#fff1d6', 0.1], dawn: ['#ffd6de', 0], dusk: ['#ffb872', 0.22], night: ['#78b2ff', 0.15] })
+const SUNFALL = skyGlow(new THREE.MeshBasicMaterial({ map: DAYLIGHT.fall, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  toneMapped: false }), { day: ['#ffeccc', 0.3], dawn: ['#ffd6c8', 0.1], dusk: ['#ffb46e', 0.34], night: ['#9cc0ff', 0.1] })
 /** the dust in the moon's shaft by night, in the evening sun's at dusk: specks drifting slowly down it and about, catching its light (in the
  * window's frame, as the shaft) */
 // (24 of them, the owner's: fewer specks; they were 46)
@@ -1921,6 +1937,8 @@ function RoundWindow() {
       {/* (by day: the sky's light glowing round it on the plaster, and slanting in) */}
       <mesh position-x={-0.075} rotation-y={-Math.PI / 2} material={WINDOW_HALO} renderOrder={2}><planeGeometry args={[R * 4.2, R * 4.2]} /></mesh>
       <mesh geometry={SUNBEAM_GEO} material={SUNBEAM} renderOrder={2} />
+      {/* (where the shaft meets the floor (1.4 under the window's middle), drawn long the way it slants in) */}
+      <mesh position={[-2.05, -1.4 + 0.006, 0]} rotation-x={-Math.PI / 2} material={SUNFALL} renderOrder={2}><planeGeometry args={[1.5, 0.86]} /></mesh>
       {/* (the paper is the shoji's: RoundShoji, outside the batch, as it slides open) */}
       {/* (the reveal, the frame and its bead) */}
       <Suspense fallback={null}><RoundWood /></Suspense>

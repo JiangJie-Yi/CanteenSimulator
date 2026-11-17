@@ -78,6 +78,7 @@ import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
 import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, reviewsOf, visitStars, writesReview, type Visit } from '@/game/reputation'
 import { ReviewPop } from '@/ui/ReviewPop'
+import { ContactShades } from '@/shops/grill/ContactShades'
 import { refillBoxes, TISSUE, tissueOrder } from '@/game/tissues'
 import { SOAP, SOAP_FULL, SOAP_REFILL_AT, topUp, TOWEL, TOWEL_FULL, TOWEL_REFILL_AT, washroomOrder } from '@/game/washroom'
 import { RECEIPT, receiptOrder } from '@/game/receipts'
@@ -266,7 +267,8 @@ const LIGHTING: Record<Sky, { sun: string; sunIntensity: number; sky: string; gr
   /** how much of the sky's light the room's environment gives (the soft fill from all round) */
   env: number }> = {
   // golden-hour sun and a cool sky fill
-  day: { sun: '#ffe7c2', sunIntensity: 1.8, sky: '#cfe0ff', ground: '#7a6450', hemi: 1.0, spot: 18, fire: 2,
+  // (the even fill from all round a little under the sun (item 306): at 1 it lit every side alike, nothing in shade by day)
+  day: { sun: '#ffe7c2', sunIntensity: 1.9, sky: '#cfe0ff', ground: '#7a6450', hemi: 0.88, spot: 18, fire: 2,
     shadow: '#000000', shadowOpacity: 0.28, env: 1 },
   // the early sun, rosy and not yet strong, low from the room's far side; the rest of the room still in the cool of the night going
   // (the owner's: dawn and dusk between day and night)
@@ -1091,6 +1093,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
       <ShadowPacer />
       {/* (the staff room upstairs, a scene of its own off to the side (item 325)) */}
       <DormRoom />
+      {/* (where things meet what they stand on, darker: their contact shades, one mesh (item 306)) */}
+      <ContactShades />
       <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />
       <IndoorHDRI night={theme === 'dark'} intensity={(theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5) * look.env * dim} />
       <spotLight

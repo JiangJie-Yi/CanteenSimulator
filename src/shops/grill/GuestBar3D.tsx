@@ -799,6 +799,51 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
 }
 
 /**
+ * What's seen out through the doorway (item 306, the owner's: 「光照跟陰影感還不行，尤其是白天，不太真實」: the open doorway showed the dark
+ * behind the shop, black under the noren at noon): the street's light out there, a card past the doorway facing in (from outside it isn't
+ * there), pale sky over it and the street's warm stone under; and the day spilling in on the genkan's stones, brightest at the sill. Both
+ * by the part of the day: bright by day, amber at dusk, rose at dawn, the night's dark blue (the street's own lanterns are the door's)
+ */
+const DOOR_LIGHT = (() => {
+  if (typeof document === 'undefined') return { out: null, spill: null }
+  const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
+  const o = document.createElement('canvas')
+  o.width = 32; o.height = 128
+  const g = o.getContext('2d')!
+  const gr = g.createLinearGradient(0, 0, 0, 128)
+  gr.addColorStop(0, '#dfe9f4'); gr.addColorStop(0.45, '#fbf4e6'); gr.addColorStop(0.7, '#efe2cc'); gr.addColorStop(1, '#bfb2a0')
+  g.fillStyle = gr; g.fillRect(0, 0, 32, 128)
+  const s = document.createElement('canvas')
+  s.width = 64; s.height = 128
+  const h = s.getContext('2d')!
+  // (brightest at the sill (the picture's foot: laid flat it's toward the doorway), fading in over the stones; soft at either side)
+  for (let y = 0; y < 128; y++) {
+    const k = Math.pow(y / 127, 1.6)
+    const row = h.createLinearGradient(0, 0, 64, 0)
+    row.addColorStop(0, 'rgba(255,255,255,0)'); row.addColorStop(0.18, `rgba(255,255,255,${k})`); row.addColorStop(0.82, `rgba(255,255,255,${k})`)
+    row.addColorStop(1, 'rgba(255,255,255,0)')
+    h.fillStyle = row; h.fillRect(0, y, 64, 1)
+  }
+  return { out: tex(o), spill: tex(s) }
+})()
+const DOOR_OUT = new THREE.MeshBasicMaterial({ map: DOOR_LIGHT.out, toneMapped: false })
+const DOOR_SPILL = new THREE.MeshBasicMaterial({ map: DOOR_LIGHT.spill, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
+/** the street's light and the spill on the stones, by the part of the day (the page's data-sky): colour, and the spill's strength */
+const DOOR_LOOKS: Record<string, [string, string, number]> = {
+  day: ['#ffffff', '#fff0d6', 0.34], dawn: ['#ffd9cc', '#ffd6c8', 0.16], dusk: ['#ffb98a', '#ffb46e', 0.3], night: ['#28314a', '#8fa6d8', 0.07],
+}
+let doorSky = ''
+function doorLight() {
+  const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
+  if (s === doorSky) return
+  doorSky = s
+  const [c, sc, so] = DOOR_LOOKS[s] ?? DOOR_LOOKS.day
+  DOOR_OUT.color.set(c)
+  DOOR_SPILL.color.set(sc)
+  DOOR_SPILL.opacity = so
+}
+
+/**
  * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
  */
 // (drawn again only if the door's place or the shop's mark changes: the bar above it redraws several times a second while the shop's open, and
@@ -823,6 +868,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   useFrame(({ clock }, dt0) => {
     const t = clock.elapsedTime
     const dt = Math.min(dt0, 0.1)
+    doorLight()
     panels.current.forEach((m, i) => {
       if (!m) return
       if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
@@ -896,6 +942,9 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </group>
       </Movable>
       <group position-x={DX}>
+      {/* (the street's light out through the doorway, facing in only; and the day spilling in on the genkan's stones (item 306)) */}
+      <mesh position={[0, H / 2 - 0.1, NZ + 0.2]} rotation-y={Math.PI} material={DOOR_OUT} renderOrder={-2} raycast={NO_RAY}><planeGeometry args={[W + 0.24, H + 0.3]} /></mesh>
+      <mesh position={[0, -GENKAN.depth + 0.012, NZ - 0.6]} rotation-x={-Math.PI / 2} material={DOOR_SPILL} renderOrder={2} raycast={NO_RAY}><planeGeometry args={[W * 0.95, 1.2]} /></mesh>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
       {/* (the lanterns at the door don't fade when they're in the way, as the room's hangings do: they're outside, and it left them a ghost
