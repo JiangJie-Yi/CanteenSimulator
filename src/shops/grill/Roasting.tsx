@@ -189,6 +189,13 @@ const TURN_Q = new THREE.Quaternion()
 const LOW_AT = new THREE.Vector3()
 /** the ray that finds a plate's face under a piece set down on it (item 258), straight down */
 const REST_RAY = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 1)
+/** how far either side of a piece's middle, across its plate, what holds it up is felt for (the scene's units: about half a fish's width) */
+const REST_SIDE = 0.018 * GRILL_SCALE
+/** (scratch) the way across the plate a piece rests on, its length's, and its roll over about it (item 271) */
+const REST_ACROSS = new THREE.Vector3()
+const REST_LONG = new THREE.Vector3()
+const REST_ROLL = new THREE.Quaternion()
+const REST_BOX = new THREE.Box3()
 /** whether something's drawn: it and everything it's in */
 const drawnUp = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true }
 /** where the n-th piece on a seat's plate lies once it's set down before its customer (item 228): the plate's middle, and across it as the
@@ -4133,10 +4140,11 @@ type Piece = {
   ringSlot?: number
   /** (on a plate) how far its lowest point is under its origin, in its parent's frame, for the way it was turned and sized when measured
    * (measured again only when it's turned or sized otherwise, item 258) */
-  restDrop?: { q: THREE.Quaternion; s: number; drop: number }
+  restDrop?: { q: THREE.Quaternion; s: number; drop: number; cx: number; cz: number }
   /** (on a plate) the face it rests on, in its parent's frame: the plate's own surface (or what it lies on, on the plate) under it, found
-   * where it is (`at`) by a ray, again each second (`t`); none found, null (item 258) */
-  restFace?: { at: string; t: number; face: number | null }
+   * where it is (`at`) by a ray, again each second (`t`); none found, null (item 258); and how far it's rolled over about its length, from
+   * what holds it up either side of it (item 271) */
+  restFace?: { at: string; t: number; face: number | null; roll: number }
   id: string
   copy: number
   loose: boolean
@@ -8112,35 +8120,57 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           // one height, and it was never measured again there: a thick fish sank into its plate and a slice of fillet hovered over it
           // (item 258, the owner's 「2倍速看，時常有這問題」))
           if (p.flight >= 1 && (p.container === 'bar' || p.container === 'takeout') && p.node.parent) {
-            const r = p.restDrop
-            if (!r || r.s !== p.node.scale.x || r.q.angleTo(p.node.quaternion) > 1e-3) {
-              p.node.updateWorldMatrix(true, true)
-              // (only what's drawn of it: the model's own bamboo stick is kept, hidden (the rod drawn is the game's), and a box round all of
-              // it put that hidden stick's foot on the plate, the fillet itself 4 cm over it)
-              let low = Infinity
-              p.node.traverseVisible((o) => {
-                const m = o as THREE.Mesh
-                const a = m.isMesh ? (m.geometry?.attributes?.position as THREE.BufferAttribute | undefined) : undefined
-                if (!a) return
-                for (let i = 0; i < a.count; i++) low = Math.min(low, LOW_AT.fromBufferAttribute(a, i).applyMatrix4(m.matrixWorld).y)
-              })
-              if (low === Infinity) low = new THREE.Box3().setFromObject(p.node).min.y
-              low = p.node.parent.worldToLocal(LOW_AT.set(0, low, 0)).y
-              p.restDrop = { q: p.node.quaternion.clone(), s: p.node.scale.x, drop: p.node.position.y - low }
-            }
             // (and the face it rests on: the plate's own surface under it (or what it lies on there), found by a ray straight down onto the
             // plates as they're drawn (bar.ts's PLATE_FACES) and the other pieces lying on them, where it is, and again each second (what
             // it lay on eaten from under it); none under it (a takeaway's box, the table's top): from its spot's height as before (item
             // 258: worked out from its spot's height for the plates before item 228's, it rested 3 cm over the new ones' faces)
             const at = `${p.container}|${p.local.x.toFixed(3)}|${p.local.z.toFixed(3)}`
             const nowMs = performance.now()
+            // (and with gravity (item 271, the owner's: 「我覺得你對食物要考究一下，應該會有重力」): what holds it up either side of it, across
+            // the plate (the way things lie side by side on it), measured too: one side on the plate and the other on the piece beside it, or
+            // against the rim, it rolls over about its length to lie on both, its lower side on what's under it; it hung level over
+            // whatever was highest under its middle)
+            const across = REST_ACROSS.copy(PLATING_FRAME.across)
+            if (p.readyAt === undefined && p.seat !== undefined && p.seat >= 0) across.applyAxisAngle(UP_AXIS, seatTurn(p.seat))
             if (p.container === 'bar' && (!p.restFace || p.restFace.at !== at || nowMs - p.restFace.t > 1000)) {
               const par = p.node.parent
-              REST_RAY.ray.origin.copy(par.localToWorld(LOW_AT.set(p.node.position.x, p.node.position.y + 0.25, p.node.position.z)))
               const under: THREE.Object3D[] = [...PLATE_FACES]
               for (const q of pieces.current) if (q !== p && q.container === p.container && (q.flight ?? 0) >= 1 && !q.eaten && q.node) under.push(q.node)
-              const hit = REST_RAY.intersectObjects(under, true).find((h) => drawnUp(h.object))
-              p.restFace = { at, t: nowMs, face: hit ? par.worldToLocal(LOW_AT.copy(hit.point)).y : null }
+              const faceAt = (side: number) => {
+                // (from over the middle of what's drawn of it, not its origin, which can be at a stick's end: from there the ray found the
+                // fish beside it, and it hung over the plate on that)
+                REST_RAY.ray.origin.copy(par.localToWorld(LOW_AT.set(p.node.position.x + (p.restDrop?.cx ?? 0), p.node.position.y + 0.25, p.node.position.z + (p.restDrop?.cz ?? 0)).addScaledVector(across, side * REST_SIDE)))
+                const hit = REST_RAY.intersectObjects(under, true).find((h) => drawnUp(h.object))
+                return hit ? par.worldToLocal(LOW_AT.copy(hit.point)).y : null
+              }
+              const mid = faceAt(0), l = faceAt(-1), r = faceAt(1)
+              const roll = l !== null && r !== null ? THREE.MathUtils.clamp(Math.atan2(r - l, 2 * REST_SIDE), -0.4, 0.4) : 0
+              // (rolled, it lies on its lower side's support: the lower of either side's, or its middle's if a side found nothing)
+              const low = Math.min(...[l, r, mid].filter((v): v is number => v !== null))
+              p.restFace = { at, t: nowMs, face: Number.isFinite(low) ? (roll ? low : mid ?? low) : null, roll }
+            }
+            const roll = p.container === 'bar' ? p.restFace?.roll ?? 0 : 0
+            if (roll) p.node.quaternion.premultiply(REST_ROLL.setFromAxisAngle(REST_LONG.crossVectors(across, UP_AXIS).normalize(), roll))
+            // (its lowest point for the way it lies now, rolled or not: measured again only when that changes)
+            const r = p.restDrop
+            if (!r || r.s !== p.node.scale.x || r.q.angleTo(p.node.quaternion) > 1e-3) {
+              p.node.updateWorldMatrix(true, true)
+              // (only what's drawn of it: the model's own bamboo stick is kept, hidden (the rod drawn is the game's), and a box round all of
+              // it put that hidden stick's foot on the plate, the fillet itself 4 cm over it)
+              let low = Infinity
+              REST_BOX.makeEmpty()
+              p.node.traverseVisible((o) => {
+                const m = o as THREE.Mesh
+                const a = m.isMesh ? (m.geometry?.attributes?.position as THREE.BufferAttribute | undefined) : undefined
+                if (!a) return
+                for (let i = 0; i < a.count; i++) { LOW_AT.fromBufferAttribute(a, i).applyMatrix4(m.matrixWorld); low = Math.min(low, LOW_AT.y); REST_BOX.expandByPoint(LOW_AT) }
+              })
+              if (low === Infinity) low = new THREE.Box3().setFromObject(p.node).min.y
+              // (and where the middle of what's drawn of it is, from its origin, for the rays above)
+              const mid = REST_BOX.isEmpty() ? null : p.node.parent.worldToLocal(REST_BOX.getCenter(LOW_AT))
+              const cx = mid ? mid.x - p.node.position.x : 0, cz = mid ? mid.z - p.node.position.z : 0
+              low = p.node.parent.worldToLocal(LOW_AT.set(0, low, 0)).y
+              p.restDrop = { q: p.node.quaternion.clone(), s: p.node.scale.x, drop: p.node.position.y - low, cx, cz }
             }
             const face = (p.container === 'bar' ? p.restFace?.face : null) ?? p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
             p.node.position.y = face + 0.003 + p.restDrop!.drop

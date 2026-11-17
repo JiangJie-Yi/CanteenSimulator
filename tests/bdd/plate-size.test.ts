@@ -16,6 +16,11 @@ feature('盤子照份量配（店主 2026-11-16：「盤子種類自己設計吧
     then('一片鮭魚、兩片鰤魚是丸皿', () => { expect(plateFor(['Salmon'])).toBe('round'); expect(plateFor(['Buri', 'Buri'])).toBe('round') })
     and('兩個年糕、年糕配飯糰是丸皿', () => { expect(plateFor(['NetMochi', 'NetMochi'])).toBe('round'); expect(plateFor(['NetMochi', 'Onigiri'])).toBe('round') })
   })
+  // (item 272: the round plate is a hand across now, room for two fillets and no more)
+  scenario('丸皿放不下的就用長角皿', ({ then, and }) => {
+    then('三片魚片、兩片魚片加一個年糕是長角皿', () => { expect(plateFor(['Salmon', 'Buri', 'Gindara'])).toBe('long'); expect(plateFor(['Salmon', 'Buri', 'NetMochi'])).toBe('long') })
+    and('一片魚片加兩個小件還是丸皿', () => { expect(plateFor(['Salmon', 'NetMochi', 'Onigiri'])).toBe('round') })
+  })
   scenario('單一小件放豆皿', ({ then, and }) => {
     then('一個年糕、一個飯糰、一顆馬鈴薯是豆皿', () => {
       for (const id of ['NetMochi', 'Onigiri', 'Potato']) expect(plateFor([id])).toBe('mame')
@@ -26,6 +31,9 @@ feature('盤子照份量配（店主 2026-11-16：「盤子種類自己設計吧
     then('長角皿放得下一條秋刀魚（0.27），兩端各留不到 2 公分', () => { expect(PLATE_DIMS.long.l).toBeGreaterThan(0.27); expect(PLATE_DIMS.long.l).toBeLessThan(0.32) })
     and('丸皿放得下三片魚片並排（各寬約 0.045）', () => { expect(2 * PLATE_SPREAD.round + 0.045).toBeLessThan(PLATE_DIMS.round.w) })
     and('豆皿比丸皿小、丸皿比長角皿短', () => { expect(PLATE_DIMS.mame.l).toBeLessThan(PLATE_DIMS.round.l); expect(PLATE_DIMS.round.l).toBeLessThan(PLATE_DIMS.long.l) })
+    and('丸皿不到一片魚片（約 0.08）的兩倍，豆皿不到一個年糕（約 0.04）的 2.2 倍（第 272 項：盤子比食物大太多）', () => {
+      expect(PLATE_DIMS.round.w).toBeLessThan(2 * 0.08); expect(PLATE_DIMS.mame.w).toBeLessThan(2.2 * 0.04)
+    })
   })
   scenario('盤上的東西並排：第一個在中間，接著兩邊，第四個疊上去', ({ then }) => {
     then('順序是中、左、右，第四個在第二層中間', () => {

@@ -5,8 +5,10 @@ round and a low foot. Made in the bar's own units (the size the game draws it at
 (z in the game, -y here), 0.016 high. Its picture is painted in the game (wareDesigns' longDesign, a 染付 line drawing on white, as the
 round plates' are), laid flat from above: u along it, v across it, the whole outline from 0 to 1.
 
-Low-poly (docs/MODELING.md): 16 round its outline (four to each corner), five bands from the well's floor over the lip to the foot, the
-floor and the underside each closed with a ladder of quads straight across (no fan into a point): 96 faces.
+Low-poly (docs/MODELING.md): 16 round its outline (four to each corner), six bands in its profile from the well's floor, up the well's
+wall, over a lip (a rounded shoulder, an outer face 6 mm deep: the plate's thickness), down and in along the outside to a foot ring (高台)
+with a shallow recess under it; the floor and the recess each closed with a ladder of quads straight across (no fan into a point): 112
+faces, 0.0255 high. Its UVs are the outline's own, flat from above, as before (the brown lip is the outer 6 mm).
 
   blender -b --factory-startup --python blender/longplate.py -- <project> [preview.png]
 """
@@ -31,7 +33,10 @@ for o in list(bpy.data.objects):
 # (half its length and its width, its corners' round)
 A, B, RC = 0.15, 0.0575, 0.026
 # (each ring in from the outline (d) at a height (h), from the well's floor out over the lip and down to the foot)
-PROFILE = [(0.022, 0.005), (0.007, 0.0135), (0.0, 0.016), (0.005, 0.0065), (0.013, 0.0), (0.02, 0.0)]
+# (the floor, the lip's top inside (the well's wall one slope up to it), its rounded shoulder, its outer face (a band 6 mm deep: the plate's
+# thickness), the belly drawn in under it, the foot ring's outer edge, the recess's edge under it; the picture's double line (0.0105 and
+# 0.0135 in) falls on the wall)
+PROFILE = [(0.0225, 0.008), (0.0055, 0.0255), (0.0, 0.0235), (0.0, 0.0175), (0.0055, 0.0105), (0.0185, 0.0), (0.0245, 0.0025)]
 PER_CORNER = 4
 
 

@@ -226,10 +226,11 @@ BON_BLACK = pbr("BonBlack", lin("#16100e"), rough=0.3, coat=0.5)
 BON_FLOOR = pbr("BonFloor", lin("#4a1a12"), rough=0.35, coat=0.5)
 
 # ---------------------------------------------------------------------------------------------------- the rice bowl and its rice
-# (its foot ring, the body swelling out, the rim rounded over and down inside to the well; 12 cm across, 6 high)
-# (six rings round, 96 faces: its foot a short slope in under it, not a ring of its own (docs/MODELING.md: a small thing 50-100))
-turn("ChawanBody", [(0.024, 0.0), (0.044, 0.03), (0.052, 0.056), (0.049, 0.058), (0.042, 0.032), (0.017, 0.012)],
-     [CHAWAN_GLAZE], [0, 0, 0, 0, 0], cap_lo=0, cap_hi=0)
+# (its foot, the body swelling out to the shoulder, the rim a flat band 6 mm across (the bowl's thickness, seen from above and from the side),
+# down inside to the well; 12 cm across, 6 high)
+# (five bands round, its underside left open (never seen: it stands on the tray or the counter): 174 triangles, 188 before)
+turn("ChawanBody", [(0.0265, 0.0), (0.0495, 0.034), (0.0525, 0.0565), (0.0465, 0.0585), (0.042, 0.032), (0.018, 0.013)],
+     [CHAWAN_GLAZE], [0, 0, 0, 0, 0], cap_hi=0)
 # (the rice, heaped a little over the rim when full: its base the bowl's inside at the rim's height; the game sets it down and scales it
 # as it's filled, scoop by scoop)
 turn("ChawanRice", [(0.047, 0.0), (0.043, 0.011), (0.031, 0.021), (0.013, 0.027)], [RICE], [0, 0, 0], cap_hi=0, uv_planar=0.05)
@@ -237,8 +238,9 @@ turn("ChawanRice", [(0.047, 0.0), (0.043, 0.011), (0.031, 0.021), (0.013, 0.027)
 turn("ShamojiRice", [(0.022, 0.0), (0.02, 0.007), (0.013, 0.013), (0.005, 0.016)], [RICE], [0, 0, 0], cap_hi=0, uv_planar=0.025)
 
 # ---------------------------------------------------------------------------------------------------- the soup bowl and its soup
-turn("WanBody", [(0.029, 0.0), (0.046, 0.03), (0.05, 0.05), (0.047, 0.052), (0.04, 0.03), (0.02, 0.012)],
-     [WAN_BLACK, WAN_RED], [0, 0, 0, 1, 1], cap_lo=0, cap_hi=1)
+# (as the rice bowl: black to the rim's band, red from its inside edge down)
+turn("WanBody", [(0.028, 0.0), (0.0485, 0.03), (0.0505, 0.0505), (0.0445, 0.0525), (0.0395, 0.03), (0.019, 0.012)],
+     [WAN_BLACK, WAN_RED], [0, 0, 0, 1, 1], cap_hi=1)
 # (the soup's face: a disc the inside's width at four fifths full (the game sets it at its height, a little narrower as it goes down))
 turn("WanSoup", [(0.043, 0.0)], [MISO], [], cap_hi=0, uv_planar=0.045)
 

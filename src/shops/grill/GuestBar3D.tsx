@@ -2861,10 +2861,33 @@ const PLATE_R = 0.13
 const PLATE_GEO = wareGeometry(([[0, 0], [0.32, 0], [0.4, 0.012], [0.47, 0.03], [0.5, 0.038], [0.49, 0.042], [0.44, 0.026],
   [0.3, 0.01], [0, 0.01]] as [number, number][]).map(([x, y]) => [x * PLATE_R * 2, y] as [number, number]), PLATE_R)
 const SMEAR_GEO = new THREE.CircleGeometry(0.058, 18)
-/** the long plate (長角皿, blender/longplate.py, item 228): made in the bar's units at the size it's drawn, its length along x */
+/** the long plate (長角皿, blender/longplate.py, item 228): made in the bar's units at the size it's drawn, its length along x; its lip a band
+ * of thickness, a foot ring under it (item 251, the owner's: 「盤子造型再精美些有點太簡陋，厚度感要出來」「但模型要簡易」) */
 const LONG_PLATE_URL = import.meta.env.BASE_URL + 'models/longplate.glb'
 useGLTF.preload(LONG_PLATE_URL)
 let LONG_GEO: THREE.BufferGeometry | null = null
+/** the round plate (blender/roundplate.py, item 251): the shop's round plate as PLATE_GEO was, 2 x PLATE_R across its rim, now with a lip of
+ * some thickness and a foot ring, 20 round (it was a lathe in code, 384 triangles); its picture's UVs straight down, as wareGeometry's */
+const ROUND_PLATE_URL = import.meta.env.BASE_URL + 'models/roundplate.glb'
+useGLTF.preload(ROUND_PLATE_URL)
+let ROUND_GEO: THREE.BufferGeometry | null = null
+/** the round plate's geometry as loaded, its picture's v the way wareGeometry has it (0.5 - z / 2R: through glTF it may come the other way) */
+const roundGeoOf = (scene: THREE.Object3D) => {
+  const g = (scene.getObjectByName('RoundPlate') as THREE.Mesh | undefined)?.geometry
+  if (!g) return null
+  const pos = g.attributes.position, uv = g.attributes.uv
+  if (uv) {
+    let i = 0
+    while (i < pos.count && Math.abs(pos.getZ(i)) < PLATE_R * 0.5) i++
+    if (i < pos.count && Math.sign(uv.getY(i) - 0.5) === Math.sign(pos.getZ(i))) {
+      for (let k = 0; k < uv.count; k++) uv.setY(k, 1 - uv.getY(k))
+      uv.needsUpdate = true
+    }
+  }
+  return g
+}
+/** how high a plate's floor is in its own units (where what's left on it lies): the long one's and the round one's (item 251's) */
+const FLOOR_LONG = 0.008, FLOOR_ROUND = 0.009
 /** each kind of plate's size against the shop's round plate as it's drawn (PLATE_GEO, 2 x PLATE_R across its rim): the long one's own */
 const KIND_SCALE: Record<PlateKind, number> = { round: PLATE_DIMS.round.w / (2 * PLATE_R), mame: PLATE_DIMS.mame.w / (2 * PLATE_R), long: 1 }
 /** the way the plates at the plating place lie (their length back across the cook table, as what's on them does), as a turn about up in
@@ -2948,34 +2971,38 @@ function PlateImpl({ kind = 'round', dirty = false, dirt = 1, design = 0, sticks
   /** the crumpled tissue left by it, from its middle (on the bar, or on the plate being cleared) */
   tissue?: readonly [number, number, number] }) {
   const gltf = useGLTF(LONG_PLATE_URL) as unknown as { scene: THREE.Group }
+  const roundGltf = useGLTF(ROUND_PLATE_URL) as unknown as { scene: THREE.Group }
   if (!LONG_GEO) LONG_GEO = (gltf.scene.getObjectByName('LongPlate') as THREE.Mesh | undefined)?.geometry ?? null
+  if (!ROUND_GEO) ROUND_GEO = roundGeoOf(roundGltf.scene)
   const long = kind === 'long' && !!LONG_GEO
-  const geo = long ? LONG_GEO! : PLATE_GEO
+  const geo = long ? LONG_GEO! : ROUND_GEO ?? PLATE_GEO
+  // (what's left on it lies on its floor, not over it: the smear, the sticks and the bones were set for the plates before item 251's)
+  const floor = long ? FLOOR_LONG : FLOOR_ROUND
   return (
     <group>
       <group scale={KIND_SCALE[long ? 'long' : kind === 'long' ? 'round' : kind]}>
       <mesh geometry={geo} castShadow receiveShadow>
         <meshToonMaterial color="#ffffff" map={long ? longDesign(design) : wareDesign(design)} />
       </mesh>
-      <mesh geometry={geo} scale={long ? [1.012, 1.1, 1.03] : [1.03, 1.08, 1.03]}>
+      <mesh geometry={geo} scale={long ? [1.012, 1.05, 1.03] : [1.03, 1.05, 1.03]}>
         <meshBasicMaterial color={INK} side={THREE.BackSide} />
       </mesh>
       {dirty && (
         <>
           {/* (its smear, as dirty as it was left (game/plates' plateDirt): the more eaten off it, the bigger and the darker; in the sink it
               fades as it soaks, GuestBar3D setting its opacity frame by frame; on the long plate drawn out along it) */}
-          <mesh name="plate-smear" geometry={SMEAR_GEO} position={long ? [0.02, 0.013, 0] : [0.03, 0.013, -0.02]} rotation-x={-Math.PI / 2}
+          <mesh name="plate-smear" geometry={SMEAR_GEO} position={long ? [0.02, floor + 0.0015, 0] : [0.03, floor + 0.0015, -0.02]} rotation-x={-Math.PI / 2}
             scale={long ? [1.9 * (0.7 + 0.4 * dirt), 0.65 * (0.7 + 0.4 * dirt), 1] : [1.2 * (0.7 + 0.4 * dirt), 0.8 * (0.7 + 0.4 * dirt), 1]} visible={dirt > CLEAN_AT}>
             <meshBasicMaterial color="#8a5a32" transparent opacity={smearOpacity(dirt)} depthWrite={false} />
           </mesh>
           {STICKS_ON.slice(0, Math.min(4, sticks)).map(([x, yaw], i) => (
-            <mesh key={i} geometry={USED_STICK_GEO} position={[x, 0.018 + i * 0.006, 0.03 - i * 0.012]} rotation={[0, yaw, Math.PI / 2]}>
+            <mesh key={i} geometry={USED_STICK_GEO} position={[x, floor + 0.0042 + i * 0.006, 0.03 - i * 0.012]} rotation={[0, yaw, Math.PI / 2]}>
               <meshToonMaterial color="#c9a46a" />
             </mesh>
           ))}
           {/* (the bones of each fish eaten off it, picked clean, the head browned) */}
           {(long ? BONES_ON_LONG : BONES_ON).slice(0, Math.min(2, bones)).map(([x, z, yaw], i) => (
-            <group key={`b${i}`} name="plate-bones" position={[x, 0.016 + i * 0.004, z]} rotation-y={yaw}>
+            <group key={`b${i}`} name="plate-bones" position={[x, floor + 0.006 + i * 0.004, z]} rotation-y={yaw}>
               <mesh geometry={BONES_GEO}><meshToonMaterial color="#efe6cf" /></mesh>
               <mesh geometry={HEAD_GEO}><meshToonMaterial color="#8a5a30" /></mesh>
             </group>

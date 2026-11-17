@@ -843,8 +843,10 @@ const sceneToBar = (along: number, lay: number, y = 0) => new THREE.Vector3().ad
  * a row down the table's end, the plates and what's on them clear of each other), their stack of clean plates behind them */
 export const READY_SLOTS = 3
 // (a plate's width and a little apart (the owner's, 2026-11-11: two plates stood in each other there, 0.32 apart and 0.46 across); the clean
-// stack beside the last of them, toward the chef (there's no room behind it for a fourth plate before the third cook's bay))
-export const readyAlong = (k: number) => -0.235 * k
+// stack beside the last of them, toward the chef (there's no room behind it for a fourth plate before the third cook's bay). A long plate
+// lies along the row, 0.255 of it on the table (0.3 at ON_TABLE's 0.85): 0.235 apart, two of them ran into each other end to end, "the
+// plates strung together" (item 250); 0.275, two centimetres between them)
+export const readyAlong = (k: number) => -0.275 * k
 export const PLATE_STACK_ALONG = readyAlong(READY_SLOTS - 1)
 export const PLATE_STACK_ACROSS = -0.24
 /**
