@@ -28,7 +28,7 @@ import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnSmooth, turnToward, type Trip } from './commuteWalk'
-import { rimmedTray } from '@/scene/trayGeometry'
+import { latheSolid, rimmedTray } from '@/scene/trayGeometry'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
@@ -872,12 +872,10 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (7 mm up: the genkan's stones are domed now (item 265), their tops 6 mm over their joints, and its foot sat into them) */}
       <group position={[SHOE_CAB_X, -GENKAN.depth + 0.007, SHOE_CAB_Z]}>
         <group rotation-y={-Math.PI / 2}><ShoeCupboard /></group>
-        <StaticBatch plain>
-        <mesh position={[0, SHOE_TOP + 0.06, 0]}><cylinderGeometry args={[0.03, 0.04, 0.12, 12]} /><meshToonMaterial color="#e8e2d2" /></mesh>
-        </StaticBatch>
-        {/* (its sprig a picture on one card, the owner's, 2026-11-17: 「鞋櫃的花不OK，可以用一片+貼圖，好看又美觀」, item 257: three sticks and four
-            pink balls before): a branch of plum blossom standing up out of the vase, facing the room as the cupboard does */}
-        <mesh position={[0, SHOE_TOP + 0.245, 0]} rotation-y={-Math.PI / 2} material={UME_CARD_MAT}><planeGeometry args={[0.24, 0.3]} /></mesh>
+        {/* (three vases on its top, as a genkan's flowers are set (item 297, the owner's, 2026-11-17: 「上面多幾個花瓶」): the tall cream one with
+            its plum a little off the middle, a squat celadon pot with a camellia toward the bench's end, a slim indigo bud vase with narcissus
+            toward the door's; each flower a picture on one card (item 257's way), facing the room as the cupboard does) */}
+        <ShoeVases />
       </group>
       </Movable>
       <group position-x={DX}>
@@ -1007,6 +1005,113 @@ const UME_CARD = signTexture(256, 320, (g, w, h) => {
   })
 })
 const UME_CARD_MAT = new THREE.MeshToonMaterial({ map: UME_CARD, alphaTest: 0.5, side: THREE.DoubleSide })
+/** a camellia (椿) for the squat celadon pot (item 297): a short dark stem, glossy dark-green leaves in pairs, one open red flower with its
+ * yellow boss and a bud; the rest of the card clear */
+const TSUBAKI_CARD = signTexture(256, 256, (g, w, h) => {
+  g.clearRect(0, 0, w, h)
+  g.strokeStyle = '#3a2416'; g.lineCap = 'round'; g.lineWidth = 7
+  g.beginPath(); g.moveTo(w * 0.5, h); g.quadraticCurveTo(w * 0.47, h * 0.7, w * 0.55, h * 0.42); g.stroke()
+  const leaf = (x: number, y: number, a: number, s: number) => {
+    g.save(); g.translate(x, y); g.rotate(a)
+    const grd = g.createLinearGradient(0, -s * 0.3, 0, s * 0.3)
+    grd.addColorStop(0, '#2f5a2c'); grd.addColorStop(1, '#173a1c')
+    g.fillStyle = grd
+    g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(s * 0.5, -s * 0.32, s, 0); g.quadraticCurveTo(s * 0.5, s * 0.32, 0, 0); g.fill()
+    g.strokeStyle = 'rgba(160, 200, 140, 0.55)'; g.lineWidth = 1.6
+    g.beginPath(); g.moveTo(s * 0.06, 0); g.lineTo(s * 0.9, 0); g.stroke()
+    g.restore()
+  }
+  leaf(w * 0.5, h * 0.74, -2.5, 70); leaf(w * 0.49, h * 0.7, -0.55, 74); leaf(w * 0.53, h * 0.52, -2.75, 60); leaf(w * 0.54, h * 0.5, -0.3, 64)
+  // (the flower: five broad overlapping petals, deep red, a little lighter at their edges; the yellow boss in its middle)
+  const fx = w * 0.56, fy = h * 0.36, R = 40
+  for (let k = 0; k < 5; k++) {
+    const a = -Math.PI / 2 + (k / 5) * Math.PI * 2 + 0.3
+    const px = fx + Math.cos(a) * R * 0.48, py = fy + Math.sin(a) * R * 0.48
+    const grd = g.createRadialGradient(fx, fy, R * 0.1, px, py, R * 0.62)
+    grd.addColorStop(0, '#8e1020'); grd.addColorStop(0.7, '#c4202e'); grd.addColorStop(1, '#de4a52')
+    g.fillStyle = grd
+    g.beginPath(); g.ellipse(px, py, R * 0.6, R * 0.5, a, 0, Math.PI * 2); g.fill()
+  }
+  g.fillStyle = '#f2d24a'; g.beginPath(); g.arc(fx, fy, R * 0.26, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = '#d8a828'; g.lineWidth = 1.4
+  for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2; g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx + Math.cos(a) * R * 0.3, fy + Math.sin(a) * R * 0.3); g.stroke() }
+  // (a bud, still shut, red showing at its tip through its green)
+  g.fillStyle = '#2c5a2a'; g.beginPath(); g.ellipse(w * 0.36, h * 0.48, 9, 13, -0.5, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#b81c2a'; g.beginPath(); g.ellipse(w * 0.345, h * 0.455, 5, 7, -0.5, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = '#3a2416'; g.lineWidth = 3; g.beginPath(); g.moveTo(w * 0.49, h * 0.62); g.lineTo(w * 0.37, h * 0.5); g.stroke()
+})
+/** narcissus (水仙) for the slim bud vase (item 297): long flat leaves standing up, a stem with a few small white six-petalled flowers, each
+ * with its little yellow cup, nodding a little */
+const SUISEN_CARD = signTexture(160, 320, (g, w, h) => {
+  g.clearRect(0, 0, w, h)
+  const blade = (x: number, top: number, lean: number, wd: number) => {
+    const grd = g.createLinearGradient(0, h, 0, top)
+    grd.addColorStop(0, '#4c7a46'); grd.addColorStop(1, '#7aa86a')
+    g.fillStyle = grd
+    g.beginPath(); g.moveTo(x - wd / 2, h); g.quadraticCurveTo(x + lean * 0.4, (h + top) / 2, x + lean, top)
+    g.quadraticCurveTo(x + lean * 0.4 + wd * 0.3, (h + top) / 2, x + wd / 2, h); g.fill()
+  }
+  blade(w * 0.42, h * 0.18, -16, 11); blade(w * 0.58, h * 0.26, 18, 10); blade(w * 0.5, h * 0.4, 6, 9)
+  // (the flower stem, a little above the leaves, its head bent over)
+  g.strokeStyle = '#5c8a50'; g.lineWidth = 4; g.lineCap = 'round'
+  g.beginPath(); g.moveTo(w * 0.5, h); g.quadraticCurveTo(w * 0.52, h * 0.3, w * 0.6, h * 0.12); g.stroke()
+  const flower = (x: number, y: number, r: number) => {
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + 0.2
+      const grd = g.createRadialGradient(x, y, 0, x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.55)
+      grd.addColorStop(0, '#fffdf4'); grd.addColorStop(1, '#efe8d4')
+      g.fillStyle = grd
+      g.beginPath(); g.ellipse(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.5, r * 0.3, a, 0, Math.PI * 2); g.fill()
+    }
+    g.fillStyle = '#f0b62a'; g.beginPath(); g.arc(x, y, r * 0.3, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#d88a1a'; g.beginPath(); g.arc(x, y, r * 0.14, 0, Math.PI * 2); g.fill()
+  }
+  flower(w * 0.62, h * 0.11, 22); flower(w * 0.38, h * 0.16, 19); flower(w * 0.7, h * 0.24, 17)
+})
+const TSUBAKI_MAT = new THREE.MeshToonMaterial({ map: TSUBAKI_CARD, alphaTest: 0.5, side: THREE.DoubleSide })
+const SUISEN_MAT = new THREE.MeshToonMaterial({ map: SUISEN_CARD, alphaTest: 0.5, side: THREE.DoubleSide })
+/** the shoe cupboard's three vases (item 297), turned (latheSolid: open mouths, their feet closed by rungs, round bodies smooth): where each
+ * stands along the cupboard's top (its length runs along z here, the room at -x), its outline across, its glaze; and its flower's card: how
+ * big, how high its foot stands over the vase's foot */
+// (the three set together as one arrangement in the top's middle (the owner's, 「花看起來都太平，幫我放一起」): the tall one in front, the squat pot
+// behind it to one side, the bud vase behind to the other, a centimetre or so between them)
+const SHOE_VASES: { x: number; z: number; prof: [number, number][]; color: string; card: THREE.Material; size: [number, number]; at: number }[] = [
+  // (the tall cream one, the plum's: a shouldered body narrowing to a short neck)
+  { x: -0.015, z: 0, color: '#ebe4d2', card: UME_CARD_MAT, size: [0.24, 0.3], at: 0.185,
+    prof: [[0.03, 0], [0.037, 0.008], [0.042, 0.045], [0.04, 0.078], [0.03, 0.1], [0.019, 0.112], [0.017, 0.122], [0.0195, 0.126], [0.0145, 0.126], [0.0125, 0.11]] },
+  // (a squat celadon pot, wide-mouthed, toward the bench's end: the camellia)
+  { x: 0.02, z: -0.1, color: '#a6c6b0', card: TSUBAKI_MAT, size: [0.17, 0.17], at: 0.115,
+    prof: [[0.036, 0], [0.046, 0.007], [0.054, 0.028], [0.053, 0.046], [0.046, 0.06], [0.041, 0.064], [0.043, 0.068], [0.037, 0.068], [0.035, 0.055]] },
+  // (a slim indigo bud vase toward the door's end: the narcissus)
+  { x: 0.025, z: 0.075, color: '#2f3b55', card: SUISEN_MAT, size: [0.12, 0.24], at: 0.23,
+    prof: [[0.021, 0], [0.026, 0.008], [0.026, 0.05], [0.021, 0.09], [0.012, 0.125], [0.0095, 0.15], [0.012, 0.158], [0.0075, 0.158], [0.006, 0.14]] },
+]
+const ShoeVases = memo(function ShoeVases() {
+  const vases = useMemo(() => {
+    const g = new THREE.Group()
+    for (const v of SHOE_VASES) {
+      const m = new THREE.Mesh(latheSolid(v.prof, 20, true), new THREE.MeshToonMaterial({ color: v.color }))
+      // (a millimetre over the cupboard's top: its foot's underside not in the top's own plane)
+      m.position.set(v.x, SHOE_TOP + 0.001, v.z)
+      m.castShadow = true
+      g.add(m)
+    }
+    inkModel(g, () => false, { width: 0.0012, weld: true })
+    return g
+  }, [])
+  return (
+    <group {...nameOver('花瓶', '玄關的插花：梅花、山茶、水仙')}>
+      <primitive object={vases} />
+      {/* (each flower three cards crossed, a third of a turn apart, every other one turned over: never a flat picture from the side (the owner's,
+          「花看起來都太平」), and not the same picture twice side by side) */}
+      {SHOE_VASES.flatMap((v, i) => [0, 1, 2].map((k) => (
+        <mesh key={`${i}-${k}`} position={[v.x, SHOE_TOP + v.at, v.z]} rotation-y={-Math.PI / 2 + (k * Math.PI) / 3} scale-x={k % 2 ? -1 : 1} material={v.card}>
+          <planeGeometry args={v.size} />
+        </mesh>
+      )))}
+    </group>
+  )
+})
 const NOREN_BIG = 1.3
 const NOREN_WIDE = 1.0
 /** how long the noren's two cords are, from the beam down to its rod (the rod hung 0.18 higher than it was) */
@@ -1852,10 +1957,9 @@ useGLTF.preload(SHOE_URL)
 const SHOE_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 let SHOE_WOOD_MAT: THREE.MeshToonMaterial | null = null
 // (pale: its picture is pale ash and washi now (blender/shoecab.py, item 264: 「鞋櫃木紋感太重，要日和風 有紙糊的那種感覺，不要通透」); walnut before)
-// (and its colours traded with the waiting bench's (item 291, the owner's, 2026-11-17: 「它的色系與等候矮凳做交換」): its body the bench's brown
-// seat was (#9c7552 over the picture's pale ash), its top and its slats the bench's darker legs (#79583d), framing the washi as a shoji's
-// do; the bench pale ash now (blender/bench.py))
-const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#a27f5f'), ShoeTop: new THREE.Color('#7e5f47'), ShoeSlat: new THREE.Color('#7e5f47') }
+// (its colours were traded with the waiting bench's a while (item 291), and put back (item 297, the owner's, 2026-11-17: 「鞋櫃幫我換回原本的顏色
+// 好了」): the bench kept its new pale ash)
+const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#f4e9d6'), ShoeTop: new THREE.Color('#d7c4a6'), ShoeSlat: new THREE.Color('#ffffff') }
 /** one of a pair of shoes put away in a cubby */
 const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
 function ShoeCupboard() {

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 /**
  * A round lacquered tray (丸盆) as a low-poly shape (item 248, the owner's, 2026-11-17: the owner out serving came back from sweeping up
@@ -9,7 +10,16 @@ import * as THREE from 'three'
  */
 export function rimmedTray(r: number, h: number, t: number, n = 16): THREE.BufferGeometry {
   // (the outline across it, from the foot's edge round over the rim and down inside it to the floor's top, as (radius, height))
-  const prof: [number, number][] = [[r * 0.93, 0], [r, t * 0.8], [r, h], [r - t, h], [r - t, t]]
+  return latheSolid([[r * 0.93, 0], [r, t * 0.8], [r, h], [r - t, h], [r - t, t]], n)
+}
+
+/**
+ * A turned solid from its outline across (item 297: the vases on the shoe cupboard; and cups, bowls and bottles to come): `prof` from the
+ * foot's outer edge up the outside, over the lip and down the inside to the inside's floor, as (radius, height), each turned `n` round; the
+ * underside and the inside's floor each closed with a ladder of quads straight across, never a fan into its middle (the low-poly rule).
+ * Flat-shaded unless `smooth` (a vase's round body, its normals shared round each ring).
+ */
+export function latheSolid(prof: [number, number][], n = 16, smooth = false): THREE.BufferGeometry {
   const ring = (rad: number, y: number) => Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2
     return new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad)
@@ -44,6 +54,11 @@ export function rimmedTray(r: number, h: number, t: number, n = 16): THREE.Buffe
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  if (smooth) {
+    const m = mergeVertices(g, 1e-6)
+    m.computeVertexNormals()
+    return m
+  }
   g.computeVertexNormals()
   return g
 }
