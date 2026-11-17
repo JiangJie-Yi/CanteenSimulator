@@ -542,7 +542,7 @@ M["onion_root"] = pbr("ProduceOnionRoot", tuple(lin("#b89a70")), rough=0.9)
 M["carrot"] = pbr("ProduceCarrot", (1, 1, 1), tex=skin_picture("produce_carrot", "#ec7f2c", "#c55a16", 10), rough=0.6)
 M["carrot_leaf"] = pbr("ProduceCarrotLeaf", tuple(lin("#4f8a34")), rough=0.7)
 M["gobo"] = pbr("ProduceGobo", (1, 1, 1), tex=skin_picture("produce_gobo", "#a98355", "#7d5c36", 18), rough=0.85)
-def crate_wood(n=512, tones=("#9a7448", "#c9a273"), salt=0):
+def crate_wood(n=512, tones=("#b98f5c", "#e2c595"), salt=0):
     """an old produce crate's pine (the owner's, 2026-11-11: a better crate): planed boards gone grey-brown with use, the grain running
     along u, a knot or two, darker toward the board's ends and edges where it's handled and wet, and a nail's head in near each end"""
     u, v = grid01(n)
@@ -1157,7 +1157,8 @@ M["daikon"] = pbr("VegDaikon", (1, 1, 1), tex=skin_picture("veg_daikon", "#f2f0e
 M["daikon_top"] = pbr("VegDaikonTop", tuple(lin("#a8c878")), rough=0.6)
 M["negi_white"] = pbr("VegNegiWhite", tuple(lin("#eef0dc")), rough=0.5)
 M["negi_green"] = pbr("VegNegiGreen", (1, 1, 1), tex=skin_picture("veg_negi", "#3f8a3a", "#2c6a2a", 9, 0.5), rough=0.55)
-M["crate2"] = pbr("ProduceCrateRoots", (1, 1, 1), tex=image("produce_crate2", crate_wood(512, ("#7d6446", "#b39674"), 5)), rough=0.8)
+# (the roots' crate a little older and greyer than the other, the same raw pine (item 315: both were a dark stained brown))
+M["crate2"] = pbr("ProduceCrateRoots", (1, 1, 1), tex=image("produce_crate2", crate_wood(512, ("#a8865c", "#d6bc92"), 5)), rough=0.8)
 
 
 def napa_picture(n=256):
@@ -1393,27 +1394,67 @@ def crate_frame(cont, root, W, D, mat, gap=0.012):
 CRATE_W, CRATE_D = 0.54, 0.36
 
 
+def pile(zone, shapes, rnd, cell=0.004, tries=36):
+    """where each of a kind's pieces comes to rest, one after another, the first at the bottom (item 315, the owner's, 2026-11-18: 「木箱跟菜籃
+    時再不自然」: they lay in rows and layers, as on a shop's shelf, every one turned the same way): each tried at a few places and turns in
+    `zone` (x0, x1, z0, z1, the floor's height), dropped there onto what's under it (the floor, or the pieces of its kind already in), and kept
+    where it came to rest lowest: a heap that fills from the floor up, each one lying on something (so as they're used, from the top, none's
+    left in the air). `shapes`: each piece's (radius, half its height, its length (0: round), its turn (a function of the random, or None: any
+    way)); returns each one's middle and turn, (x, y, z, yaw)"""
+    x0, x1, z0, z1, fy = zone
+    nx, nz = int((x1 - x0) / cell) + 1, int((z1 - z0) / cell) + 1
+    X, Z = np.meshgrid(x0 + np.arange(nx) * cell, z0 + np.arange(nz) * cell)
+    hf = np.full((nz, nx), fy, np.float64)
+    out = []
+    for r, half, length, turn in shapes:
+        best = None
+        for _ in range(tries):
+            yaw = turn(rnd) if turn else rnd.uniform(0, 2 * math.pi)
+            reach = max(0.0, length / 2 - r)
+            ex, ez = abs(math.cos(yaw)) * reach + r, abs(math.sin(yaw)) * reach + r
+            if x1 - x0 < 2 * ex or z1 - z0 < 2 * ez:
+                continue
+            cx, cz = rnd.uniform(x0 + ex, x1 - ex), rnd.uniform(z0 + ez, z1 - ez)
+            # (each cell's distance from the piece's spine: a point (round), or a segment along its turn)
+            ux, uz = math.cos(yaw), math.sin(yaw)
+            t = np.clip((X - cx) * ux + (Z - cz) * uz, -reach, reach)
+            d = np.hypot(X - cx - t * ux, Z - cz - t * uz)
+            m = d < r
+            if not m.any():
+                continue
+            # (its middle as high as it must be for its underside to clear every cell under it)
+            y = float((hf[m] + half * np.sqrt(np.clip(1 - (d[m] / r) ** 2, 0, 1))).max())
+            score = y + rnd.uniform(0, 0.003)
+            if best is None or score < best[0]:
+                best = (score, cx, y, cz, yaw, d)
+        _, cx, y, cz, yaw, d = best
+        m = d < r
+        hf = np.where(m, np.maximum(hf, y + half * np.sqrt(np.clip(1 - (d / r) ** 2, 0, 1))), hf)
+        out.append((cx, y, cz, yaw))
+    return out
+
+
 # ---- the crate of summer vegetables: tomatoes, sweet peppers, aubergines, green peppers (the stock's Tomato, Paprika, Eggplant, Piman) ----
 veg_from = len(parts)
 crate1_root = empty("VegCrate")
 CONT_ROOT["VegCrate"] = crate1_root
 F1, TOP1 = crate_frame("VegCrate", empty("VegCrate_Frame", crate1_root), CRATE_W, CRATE_D, "crate")
+import random as _random
+rnd1 = _random.Random(315)
+# (inside the crate: clear of its walls and its corner posts; each kind its own quarter, heaped from the floor (item 315))
+IX, IZ = CRATE_W / 2 - 0.05, CRATE_D / 2 - 0.035
 TR = 0.035
-for k, (x_, z_, l) in enumerate([(-0.186 + 0.07 * i, 0.04 + 0.07 * j, 0) for j in range(2) for i in range(3)] +
-                                 [(-0.151, 0.075, 1), (-0.081, 0.075, 1), (-0.116, 0.075, 2)]):
-    y_ = F1 + TR * 0.88 + (0.0, 0.046, 0.1)[l]
-    mk("VegCrate", "Tomato", tomato, f"VegCrateTomato{k}", x_, y_, z_, TR, rot=k * 0.8)
-for k, (x_, z_, l) in enumerate([(-0.185 + 0.075 * i, -0.125 + 0.075 * j, 0) for j in range(2) for i in range(3)] + [(-0.1475, -0.0875, 1), (-0.0725, -0.0875, 1)]):
+for k, (x_, y_, z_, yaw) in enumerate(pile((-IX, -0.02, 0.0, IZ, F1), [(TR, TR * 0.88, 0, None)] * 9, rnd1)):
+    mk("VegCrate", "Tomato", tomato, f"VegCrateTomato{k}", x_, y_, z_, TR, rot=yaw)
+for k, (x_, y_, z_, yaw) in enumerate(pile((-IX, -0.02, -IZ, 0.0, F1), [(0.036, 0.039, 0, None)] * 8, rnd1)):
     mat = ("paprika_r", "paprika_y", "paprika_o")[(k + k // 3) % 3]
-    mk("VegCrate", "Paprika", paprika, f"VegCratePaprika{k}", x_, F1 + 0.039 + (0.0, 0.052)[l], z_, 0.036, mat, rot=k * 0.9)
+    mk("VegCrate", "Paprika", paprika, f"VegCratePaprika{k}", x_, y_, z_, 0.036, mat, rot=yaw)
 EGG_R = 0.029
-for k, (z_, l) in enumerate([(0.04, 0), (0.1, 0), (0.07, 1), (0.13, 1)]):
-    mk("VegCrate", "Eggplant", eggplant, f"VegCrateEggplant{k}", 0.11, F1 + EGG_R + 0.0008 + (0.0, 0.052)[l], z_, 0.15, EGG_R, (1, 0, 0), roll=k)
-rnd1 = __import__("random").Random(31)
-for k, (x_, z_, l) in enumerate([(0.06 + 0.11 * i, -0.12 + 0.037 * j, 0) for j in range(4) for i in range(2)] +
-                                 [(0.07 + 0.11 * i, -0.102 + 0.074 * j, 1) for j in range(2) for i in range(2)]):
-    mk("VegCrate", "Piman", piman, f"VegCratePiman{k}", x_ + rnd1.uniform(-0.006, 0.006), F1 + 0.0168 + 0.033 * l, z_ + rnd1.uniform(-0.002, 0.002),
-       (1, 0, rnd1.uniform(-0.12, 0.12)), roll=rnd1.uniform(0, 6))
+# (the aubergines lying roughly along the crate, each its own way round; the peppers any way)
+for k, (x_, y_, z_, yaw) in enumerate(pile((0.01, IX, 0.0, IZ, F1), [(EGG_R, EGG_R, 0.15, lambda r: r.uniform(-0.45, 0.45) + r.choice((0.0, math.pi)))] * 4, rnd1)):
+    mk("VegCrate", "Eggplant", eggplant, f"VegCrateEggplant{k}", x_, y_ + 0.0008, z_, 0.15, EGG_R, (math.cos(yaw), 0, math.sin(yaw)), roll=k * 1.3)
+for k, (x_, y_, z_, yaw) in enumerate(pile((0.01, IX, -IZ, 0.0, F1), [(0.016, 0.0168, 0.1, None)] * 12, rnd1)):
+    mk("VegCrate", "Piman", piman, f"VegCratePiman{k}", x_, y_, z_, (math.cos(yaw), rnd1.uniform(-0.08, 0.08), math.sin(yaw)), roll=rnd1.uniform(0, 6))
 crate_parts = parts[veg_from:]
 
 # ---- the crate of roots: carrots, burdock, daikon, leeks laid across the top (the stock's Carrot, Gobo, Daikon, Negi) ----
@@ -1422,14 +1463,18 @@ crate2_root = empty("VegCrate2")
 CONT_ROOT["VegCrate2"] = crate2_root
 F2, TOP2 = crate_frame("VegCrate2", empty("VegCrate2_Frame", crate2_root), CRATE_W, CRATE_D, "crate2")
 CR = 0.0204
-for k, (x_, l) in enumerate([(-0.2 + 0.0412 * i, 0) for i in range(4)] + [(-0.179 + 0.0412 * i, 1) for i in range(3)] + [(-0.158 + 0.0412 * i, 2) for i in range(2)]):
-    mk("VegCrate2", "Carrot", carrot2, f"VegCrate2Carrot{k}", x_, F2 + CR + 0.0008 + 0.0357 * l, -0.02, 0.17, (0, 0, 1))
-for k, (x_, l) in enumerate([(-0.03 + 0.03 * i, 0) for i in range(3)] + [(-0.015 + 0.03 * i, 1) for i in range(2)]):
-    mk("VegCrate2", "Gobo", gobo, f"VegCrate2Gobo{k}", x_ + 0.012, F2 + 0.0138 + 0.0008 + 0.025 * l, 0.0, 0.3, (math.pi / 2, 0, 0))
-for k, (x_, l) in enumerate([(0.1, 0), (0.18, 0), (0.14, 1)]):
-    mk("VegCrate2", "Daikon", daikon, f"VegCrate2Daikon{k}", x_, F2 + 0.036 + 0.0008 + 0.06 * l, 0.0, 0.26, 0.036, (0, 0, 1))
+rnd2 = _random.Random(3152)
+# (each lying roughly front to back in its own strip, a little askew, heaped from the floor (item 315); the leeks across the walls' tops)
+along_z = lambda spread: (lambda r: math.pi / 2 + r.uniform(-spread, spread))
+for k, (x_, y_, z_, yaw) in enumerate(pile((-IX, -0.07, -IZ - 0.02, IZ + 0.02, F2), [(CR, CR, 0.17, along_z(0.35))] * 9, rnd2)):
+    mk("VegCrate2", "Carrot", carrot2, f"VegCrate2Carrot{k}", x_, y_ + 0.0008, z_, 0.17, (math.cos(yaw), 0, math.sin(yaw)))
+for k, (x_, y_, z_, yaw) in enumerate(pile((-0.06, 0.05, -0.163, 0.163, F2), [(0.0138, 0.0138, 0.3, along_z(0.05))] * 5, rnd2)):
+    mk("VegCrate2", "Gobo", gobo, f"VegCrate2Gobo{k}", x_, y_ + 0.0008, z_, 0.3, (math.pi / 2, 0, yaw - math.pi / 2))
+for k, (x_, y_, z_, yaw) in enumerate(pile((0.06, IX, -0.16, 0.16, F2), [(0.036, 0.036, 0.26, along_z(0.18))] * 3, rnd2)):
+    mk("VegCrate2", "Daikon", daikon, f"VegCrate2Daikon{k}", x_, y_ + 0.0008, z_, 0.26, 0.036, (math.cos(yaw), 0, math.sin(yaw)))
 for k in range(3):
-    mk("VegCrate2", "Negi", negi, f"VegCrate2Negi{k}", 0.0, TOP2 + 0.0122, -0.118 + 0.03 * k, 0.56, 0.0108, (1, 0, 0.03 * (k - 1)))
+    mk("VegCrate2", "Negi", negi, f"VegCrate2Negi{k}", rnd2.uniform(-0.012, 0.012), TOP2 + 0.0122, -0.118 + 0.03 * k + rnd2.uniform(-0.006, 0.006),
+       0.56, 0.0108, (1, 0, rnd2.uniform(-0.05, 0.05)))
 crate2_parts = parts[veg_from:]
 crate2_parts = [o for o in crate2_parts if o.parent is not None or True]
 
@@ -1518,9 +1563,11 @@ bx_, bz_ = pol(105, 0.068)
 mk("VegBasket", "Broccoli", broccoli, "VegBasketBroccoli0", bx_, B_ + 0.002, bz_, 1.2)
 for k, (x_, z_) in enumerate(((-0.005, 0.105), (0.03, 0.1), (0.012, 0.075))):
     mk("VegBasket", "Radish", radish, f"VegBasketRadish{k}", x_, B_ + 0.026, z_, 0.018, k * 1.3)
-for k, (ang, rho) in enumerate(((175, 0.02), (150, 0.09))):
-    mk("VegBasket", "Cucumber", lean_veg, f"VegBasketCucumber{k}", math.radians(ang), rho, B_ + 0.016, 0.2, 0.016, "cucumber")
-mk("VegBasket", "Zucchini", lean_veg, "VegBasketZucchini0", math.radians(55), 0.08, B_ + 0.022, 0.22, 0.022, "courgette", 8, 0.8)
+# (the long ones lying on the leaves and leaning out on the rim, low, each its own way (item 315: they stood up nearly straight from the
+# floor, side by side); the leaves under them always there while they are (the game shows the basket's other kinds with them))
+for k, (ang, rho, up) in enumerate(((200, 0.03, 0.055), (138, 0.05, 0.062))):
+    mk("VegBasket", "Cucumber", lean_veg, f"VegBasketCucumber{k}", math.radians(ang), rho, B_ + up, 0.2, 0.016, "cucumber")
+mk("VegBasket", "Zucchini", lean_veg, "VegBasketZucchini0", math.radians(62), 0.04, B_ + 0.05, 0.22, 0.022, "courgette", 8, 0.8)
 basket_parts = parts[basket_from:]
 roots3 = [crate1_root, crate2_root, basket_root]
 crate_parts = [o for o in crate_parts]
