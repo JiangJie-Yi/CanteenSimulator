@@ -40,6 +40,8 @@ export type AdminSnap = {
   staff: { id: string; role: string; name: string; on: boolean }[]
   /** the day's log, the latest last */
   log: { id: number; who: string; text: string }[]
+  /** (items 311 and 317) the servers' trays, in their hands and at the pass; the pieces on the square tray by the fire (none: put away) */
+  ware?: { hands: number; pass: number; kakubat: number | null }
 }
 /** what the back office can ask the game to do */
 export type AdminCmd = { kind: 'speed'; x: number } | { kind: 'clock'; day: number; minute: number }

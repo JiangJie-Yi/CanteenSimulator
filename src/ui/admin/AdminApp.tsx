@@ -85,6 +85,8 @@ export function AdminApp() {
           <Tile label={T.visits} value={s.visits} />
           <Tile label={T.inShop} value={inShop.length} sub={`${T.ordersTitle} ${s.orders.reduce((n, o) => n + o.n, 0)}`} />
           <Tile label={T.status} value={s.open ? T.open : T.closed} tone={s.open ? 'up' : undefined} />
+          {/* (the servers' trays and the square tray by the fire (items 311, 317)) */}
+          {s.ware && <Tile label={T.trays} value={`${s.ware.hands} / ${s.ware.hands + s.ware.pass}`} sub={T.traysSub(s.ware.pass, s.ware.kakubat)} />}
           <Tile label={T.time} value={hhmm(s.clock.minute)} sub={`${T.day(s.clock.day)} · ${T.speed} x${s.speed}`} />
         </div>
         <section className="ad-card">

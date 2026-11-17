@@ -4,7 +4,7 @@ import { ROLL, SOAP, SOAP_FULL, SOAP_REFILL_AT, TOWEL, TOWEL_FULL, TOWEL_REFILL_
 import { ROLL_LOW } from '@/game/stocker'
 import { RECEIPT, RECEIPT_PACK, ROLL_SLIPS } from '@/game/receipts'
 import { HOUSEHOLD, HOUSEHOLD_PACK, householdName, type Household } from '@/game/household'
-import { tablewareList } from '@/game/tableware'
+import { tablewareList, traysAt } from '@/game/tableware'
 import { LOADS, USES, POWER_BASE, POWER_TIERS, WATER_TIERS, BILL_DAYS, type Meter, type Use } from '@/game/utilities'
 import { YEN } from '@/data/osaka'
 import { createPortal } from 'react-dom'
@@ -22,7 +22,7 @@ import { Glyph } from '@/ui/GameIcons'
 import { FoodArt } from '@/ui/FoodArt'
 import type { Restock } from '@/ui/Menu'
 import { CRATE, FREEZER_TEMP } from './Decor'
-import { GRILL_SEATS, onPrinter, PLATE_COUNT, PRINTER, tissuesAt, TOILETS } from './bar'
+import { GRILL_SEATS, KAKUBAT, onPrinter, PLATE_COUNT, PRINTER, SERVICE, tissuesAt, TOILETS } from './bar'
 import { DrinkStockBody } from './DrinkStockPanel'
 import { frostSound, usePanelSound } from '@/ui/uiSound'
 
@@ -473,6 +473,7 @@ function Tableware({ lang }: { lang: Lang }) {
   useEffect(() => { const t = window.setInterval(() => tick((n) => n + 1), 500); return () => window.clearInterval(t) }, [])
   const L = lang === 'ja' ? 1 : lang === 'en' ? 2 : 0
   const c = PLATE_COUNT
+  const trays = traysAt(SERVICE.servers)
   const live: [string, number][] = [
     [tl(lang, '架上', '棚', 'Racks'), c.rack + c.low], [tl(lang, '水槽', 'シンク', 'Sink'), c.sink], [tl(lang, '烘碗機', '乾燥機', 'Washer'), c.washer],
     [tl(lang, '瀝水籃', '水切り', 'Basket'), c.basket], [tl(lang, '使用中', '使用中', 'Out'), c.out],
@@ -494,6 +495,10 @@ function Tableware({ lang }: { lang: Lang }) {
                 <FitLine className="drink-bin-sub" min={8}>{[live[0], live[4]].map(([k, n]) => `${k} ${n}`).join('・')}</FitLine>
                 <FitLine className="drink-bin-sub" min={8}>{live.slice(1, 4).map(([k, n]) => `${k} ${n}`).join('・')}</FitLine>
               </>}
+              {/* (the trays where they are now: in the servers' hands, the rest at the pass (item 311)) */}
+              {w.id === 'trays' && <FitLine className="drink-bin-sub" min={8}>{tl(lang, `外場手上 ${trays.hands}・出餐口 ${trays.pass}`, `手元 ${trays.hands}・出し口 ${trays.pass}`, `In hand ${trays.hands} · at the pass ${trays.pass}`)}</FitLine>}
+              {/* (the square tray: out by the owner while the shop's open, what's on it waiting for the servers' tongs (item 317)) */}
+              {w.id === 'kakubat' && <FitLine className="drink-bin-sub" min={8}>{KAKUBAT.out ? tl(lang, `鐵盤上 ${KAKUBAT.n} 件`, `バットに ${KAKUBAT.n} 品`, `${KAKUBAT.n} on it`) : tl(lang, '閉店：收在櫃裡', '閉店中：棚の中', 'Shut: put away')}</FitLine>}
             </div>
           ))}
         </div>
@@ -521,6 +526,11 @@ function WareIcon({ id }: { id: string }) {
       {id === 'skewers' && [8, 13, 18, 23].map((x) => <g key={x}><path d={`M${x} 28 L${x + 2} 7`} stroke="#8a8f96" strokeWidth="1.4" /><circle cx={x + 2.2} cy="5.5" r="1.6" fill="none" stroke="#8a8f96" strokeWidth="1" /></g>)}
       {id === 'tokkuri' && <path d="M13 4 h6 v3 q-1 2 1 5 q5 6 3 12 q-1 4 -7 4 q-6 0 -7 -4 q-2 -6 3 -12 q2 -3 1 -5 Z" {...s} />}
       {id === 'trays' && <><rect x="4" y="14" width="24" height="8" rx="2" fill="#5a2a1a" stroke="#2a120a" strokeWidth="1" /><rect x="6" y="15.5" width="20" height="4" rx="1" fill="#7a3a24" /></>}
+      {/* (the square iron tray, its rack's wires; the tongs, two arms from a ring (item 317)) */}
+      {id === 'kakubat' && <><rect x="3" y="9" width="26" height="15" rx="2.5" fill="#8a9198" stroke="#3b4a5c" strokeWidth="1" />
+        <path d="M6 13 H26 M6 16.5 H26 M6 20 H26 M10 11 V22 M16 11 V22 M22 11 V22" stroke="#eef1f4" strokeWidth="0.9" /></>}
+      {id === 'tongs' && <><path d="M5 23 Q14 17 27 13 M5 23 Q14 21 27 19" fill="none" stroke="#8a9198" strokeWidth="2.2" strokeLinecap="round" />
+        <circle cx="5" cy="23" r="2.4" fill="none" stroke="#5a6470" strokeWidth="1.4" /></>}
     </svg>
   )
 }

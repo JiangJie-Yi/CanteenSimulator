@@ -1,6 +1,7 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { PER_CABINET, TABLEWARE, enoughFor } from '@/game/tableware'
+import { PER_CABINET, TABLEWARE, TRAYS, enoughFor, tablewareList, traysAt } from '@/game/tableware'
+import { ROLES } from '@/data/staff'
 import { SOUP_BOWLS } from '@/game/soup'
 
 feature('碗盤櫃裡的碗、筷子、湯匙：數量成比例', () => {
@@ -18,6 +19,18 @@ feature('碗盤櫃裡的碗、筷子、湯匙：數量成比例', () => {
   scenario('兩個碗盤櫃各放一半', ({ then }) => {
     then('每櫃：飯碗 12、湯碗 12、湯匙 12、筷子 30 雙', () => {
       expect(PER_CABINET).toEqual({ riceBowls: 12, soupBowls: 12, spoons: 12, chopsticks: 30 })
+    })
+  })
+  scenario('外場用托盤端菜、收盤，托盤也算在餐具裡', ({ then, and }) => {
+    then(`店裡有 ${TRAYS} 個托盤`, () => { expect(TRAYS).toBe(4) })
+    and('兩位外場上班時各拿一個，出餐口剩兩個', () => { expect(traysAt(2)).toEqual({ hands: 2, pass: 2 }) })
+    and('沒人上班時都放在出餐口', () => { expect(traysAt(0)).toEqual({ hands: 0, pass: TRAYS }) })
+    and('外場最多兩位，托盤一定夠，沒有人要等托盤', () => {
+      const most = ROLES.grilledfish.find((r) => r.role === 'server')!.max
+      expect(traysAt(most).pass).toBeGreaterThan(0)
+    })
+    and('餐具清單裡有托盤、方形鐵盤與夾子', () => {
+      expect(tablewareList(8).map((w) => w.id)).toEqual(expect.arrayContaining(['trays', 'kakubat', 'tongs']))
     })
   })
 })

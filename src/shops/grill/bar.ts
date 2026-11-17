@@ -254,6 +254,9 @@ export const PATH_MAP: { v: number; blocks: { id: string; pts: THREE.Vector3[] }
   hot: string | null } =
   keep(import.meta.hot, 'PATH_MAP', { v: 0, blocks: [], routes: [], places: [], home: null, hot: null })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pathMap: PATH_MAP })
+/** (item 317) the open shop's square iron tray by the fire: whether it's out (the shop open), and how many pieces lie on it just now (waiting
+ * there for their plates, or kept warm); Roasting counts them each frame, the stock's tableware tab and the back office show them */
+export const KAKUBAT = keep(import.meta.hot, 'KAKUBAT', { out: false, n: 0 })
 export const SERVICE = keep(import.meta.hot, 'SERVICE', {
   /** how many servers there are to carry (GuestBar3D says): none, and the cook hands it over the bar himself */
   servers: 0,
@@ -876,7 +879,10 @@ export function platingOf() {
 }
 /** what's ready at the plating place just now: one of its slots, the seat it's for, whether a plate's laid there (the seat's plate isn't out
  * yet), and how many of its pieces are flying to it and are down on it (Roasting counts them every frame) */
-export type ReadyPlate = { seat: number; plate: boolean; flying: number; landed: number }
+export type ReadyPlate = { seat: number; plate: boolean; flying: number; landed: number
+  /** (item 317) how many of its pieces still lie on the tray by the fire, to be lifted onto it with the tongs; and whether its server's
+   * there at the plating place for it (Roasting's tongs lift them over one at a time; the plate goes only once they're all on it) */
+  onTray: number; tongs: boolean }
 /**
  * The plating place: the clean plates stacked there for plating on (the kitchen's plater brings them from the racks: `coming`, on their
  * way), and its slots, each a plate ready for a server (Roasting lays a plate in one for a seat whose first food is done and puts that

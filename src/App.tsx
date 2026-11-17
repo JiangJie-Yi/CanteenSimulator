@@ -72,7 +72,8 @@ import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
 import { GuestBar3D } from '@/shops/grill/GuestBar3D'
 import { SAY_EACH, sayChunks } from '@/game/say'
-import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, GUEST_BILLS, TISSUES_KEY, tissuesAt, TOILETS, UTILITY } from '@/shops/grill/bar'
+import { CUBBY_OPEN, FIRE_SHIFT, gripe, LATE_GRIPE, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, setTissues, SINK, SUPPLIES, GUEST_BILLS, TISSUES_KEY, tissuesAt, TOILETS, UTILITY, KAKUBAT, SERVICE } from '@/shops/grill/bar'
+import { traysAt } from '@/game/tableware'
 import { getBgmOff } from '@/ui/bgmStore'
 import { energyOver, freshMeter, meterAdd, nextDay, type Meter } from '@/game/utilities'
 import { boughtVisits, flowOf, keepVisits, rateShop, REVIEW_PACKS, reviewsOf, writesReview, type Visit } from '@/game/reputation'
@@ -2366,6 +2367,7 @@ export default function App() {
       }),
       staff: (CANDIDATES[dish.id] ?? []).filter((w) => hired[dish.id]?.[w.id]).map((w) => ({ id: w.id, role: w.role, name: personName(w, lang), on: working.has(w.id) })),
       log: chat.slice(-80),
+      ware: { ...traysAt(SERVICE.servers), kakubat: KAKUBAT.out ? KAKUBAT.n : null },
     }
   }
   useEffect(() => startAdminLink(() => adminSnap.current(), (cmd) => {

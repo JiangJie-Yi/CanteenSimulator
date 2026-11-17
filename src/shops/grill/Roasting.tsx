@@ -2,6 +2,8 @@ import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, 
 import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
+import { TONG_S, TONG_TAKE_S, TRAY_PLACES, trayPlace } from '@/game/tray'
+import { KAKUBAT } from './bar'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -290,9 +292,10 @@ const PLATE_STEP = 1.2
 const DISH_TOP: [number, number, number] = [1.8, 0, -0.26]
 const BASKET_TOP: [number, number, number] = [2.0, 0, 0.4]
 /** what a container on the table is called, and what can be done with it (by its key: plate-0, box, bin, tray...) */
-const CONTAINER_TIP = (key: string) => {
+const CONTAINER_TIP = (key: string, open = false) => {
   const kind = key.split('-')[0]
-  const name = ({ plate: '餐盤', dish: '小碟', basket: '竹籃', box: '調味盒', bin: '水桶', tray: '大砧板', trash: '廚餘桶', rawdish: '生食碟', lantern: '行燈', bowl: '試吃碗' } as Record<string, string>)[kind] ?? '擺設'
+  // (with the shop open the bowl's put away and the square iron tray's in its place (item 317))
+  const name = ({ plate: '餐盤', dish: '小碟', basket: '竹籃', box: '調味盒', bin: '水桶', tray: '大砧板', trash: '廚餘桶', rawdish: '生食碟', lantern: '行燈', bowl: open ? '方形鐵盤' : '試吃碗' } as Record<string, string>)[kind] ?? '擺設'
   return { title: name, hint: kind === 'trash' ? '專放烤焦的食物｜拖曳移動' : '拖曳移動' }
 }
 /** where the tasting bowl stands on the table (a spot clear of the fire, the tray and the plates), and how big: clear of the notch the chef
@@ -300,6 +303,27 @@ const CONTAINER_TIP = (key: string) => {
  * and out past the edge); in the room's frame along 1.72, back from the front 0.43, the fire's frame here */
 const BOWL_TOP: [number, number, number] = [1.85, 0, 0.72]
 const BOWL_R = 0.4
+/**
+ * The open shop's square iron tray (角バット, item 317, the owner's) in the bowl's place (blender/kakubat.py): its long side along the table
+ * (STACK_DIR), what's laid on it lying back across it as on a plate, in the bowl's one row; how high it rests there (on its rack 3 cm over
+ * its foot, and the 2.3 cm the landing takes back off a spot's height). Its tongs (the floor's server's): 41 cm from hinge to grip, lying
+ * beside its end toward the plating place, their hinge toward the server's side; how long they take to reach a piece and lift it onto its
+ * plate (game/tray's TONG_TAKE_S for the first, TONG_S each after) and to go back down (s)
+ */
+const TRAY_REST = 0.03 + 0.023
+const TRAY_YAW = Math.atan2(0.59, 0.81)
+/** which way along the table the plating place is from the bowl (+1 or -1 along STACK_DIR); the tray stands 10 cm that way from the bowl's
+ * middle (longer than the bowl's round, it ran over the little dish beyond its other end), its tongs beyond its end there */
+const TRAY_SIDE = Math.sign(readyFoodAt(0, 0, true, 'round').sub(new THREE.Vector3(...BOWL_TOP)).dot(STACK_DIR)) || 1
+const TRAY_OFF = STACK_DIR.clone().multiplyScalar(TRAY_SIDE * 0.1)
+const TONG_LEN = 0.41, TONG_REST_OUT = 0.53
+/** how high their hinge lies over the table, on their side (their lower arm's widest, and its thickness) */
+const TONG_LIE = 0.028
+const TONG_LIFT_S = 0.32, TONG_BACK_S = 0.3
+type TongPhase = 'rest' | 'reach' | 'lift' | 'back'
+/** (scratch) the tongs' pose */
+const TONG_X = new THREE.Vector3(), TONG_Y = new THREE.Vector3(), TONG_Z = new THREE.Vector3(), TONG_M = new THREE.Matrix4()
+const TONG_QR = new THREE.Quaternion(), TONG_QU = new THREE.Quaternion(), TONG_AT = new THREE.Vector3(), TONG_REST_TIP = new THREE.Vector3()
 /** a fish's bones (fishBones, drawn at the customers' size) at the size the fire's fish are drawn, and what pointing at them says */
 const BONE_SCALE = 3
 const BONES_TIP = tipOver('魚骨', '吃剩的魚骨｜點一下丟進廚餘桶')
@@ -3639,20 +3663,96 @@ function OneBox({ tier }: { tier: number }) {
   )
 }
 const TasteBowl = memo(TasteBowlImpl, sameProps)
-function TasteBowlImpl({ position, container }: { position: [number, number, number]; container: string }) {
+/** (item 317) how long the bowl and the tray take to change places as the shop opens or shuts (s); and how far through that it is (0 the
+ * bowl, 1 the tray) and how big the tray's drawn now (the tongs at rest go with it; the pointer's tag names which is there) */
+const TRAY_SWAP_S = 0.7
+const TRAY_SWAP = { k: 0, tray: 0 }
+/** one coming in as the other goes: nothing till half way, then up with a little overshoot, set down (going, the same backwards: a little
+ * lift, then away) */
+const popIn = (x: number) => {
+  if (x <= 0.55) return 0
+  const t = (x - 0.55) / 0.45, c = 1.70158
+  return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2
+}
+const KAKU_URL = import.meta.env.BASE_URL + 'models/kakubat.glb'
+const TRAY_OFF_AT = TRAY_OFF.toArray() as [number, number, number]
+/** the tray and the tongs (blender/kakubat.py), made once: the steel the kitchen's (the studio in it), the rack's wires their picture with
+ * the gaps cut out (seen from either side), an ink line round the tray; the tongs' two arms, each turned about its hinge to close them */
+const KAKU: { made: { tray: THREE.Object3D; tongs: THREE.Object3D; arms: THREE.Object3D[] } | null } = { made: null }
+function kakuParts(scene: THREE.Group) {
+  if (KAKU.made) return KAKU.made
+  const root = scene.clone(true)
+  // (a working tray's dull, brushed stainless: grey, its rack's bright wires plain over its floor)
+  const steel = new THREE.MeshStandardMaterial({ color: '#737a82', metalness: 0.5, roughness: 0.55, envMapIntensity: 0.4 })
+  reflectStudio(steel)
+  let rack: THREE.Material | null = null
+  root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!m.isMesh) return
+    const src = m.material as THREE.MeshStandardMaterial
+    if (/Rack/.test(m.name)) {
+      rack ??= new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map, alphaTest: 0.5, side: THREE.DoubleSide })
+      m.material = rack
+      m.castShadow = false
+    } else {
+      m.material = steel
+      m.castShadow = true
+    }
+    m.receiveShadow = true
+  })
+  const tray = root.getObjectByName('KakubatTray')!, tongs = root.getObjectByName('KakubatTongs')!
+  tray.removeFromParent()
+  tongs.removeFromParent()
+  tray.position.set(0, 0, 0)
+  tongs.position.set(0, 0, 0)
+  inkModel(tray, (m) => /Rack/.test(m.name), { width: 0.0016, weld: true })
+  // (its programs made with the page's: it's first drawn as the shop opens)
+  warmLater(tray)
+  warmLater(tongs)
+  KAKU.made = { tray, tongs, arms: [tongs.getObjectByName('KakubatTong0')!, tongs.getObjectByName('KakubatTong1')!] }
+  return KAKU.made
+}
+useGLTF.preload(KAKU_URL)
+/** the floor's server's tongs by the open shop's tray (item 317): drawn here, posed each frame by Roasting's tongStep */
+function ServeTongs() {
+  const gltf = useGLTF(KAKU_URL) as unknown as { scene: THREE.Group }
+  const k = useMemo(() => kakuParts(gltf.scene), [gltf])
+  return <primitive object={k.tongs} />
+}
+/**
+ * The tasting bowl, or with the shop open the square iron tray in its place (item 317, the owner's: 「開店的時候老闆的碗會收起來換成方形鐵
+ * 盤」): the one put away as the other's set down (a little lift and away, a little overshoot set down), back again as it shuts.
+ */
+function TasteBowlImpl({ position, container, open = false }: { position: [number, number, number]; container: string; open?: boolean }) {
   const geometry = wareOnce('bowl', () => {
     const R = BOWL_R
     return wareGeometry([[0, 0], [R * 0.4, 0], [R * 0.46, 0.012], [R * 0.7, 0.04], [R * 0.92, 0.1], [R, 0.15], [R * 0.98, 0.158],
       [R * 0.9, 0.11], [R * 0.66, 0.05], [R * 0.4, 0.024], [0, 0.024]], R)
   })
+  const gltf = useGLTF(KAKU_URL) as unknown as { scene: THREE.Group }
+  const kaku = useMemo(() => kakuParts(gltf.scene), [gltf])
+  const bowl = useRef<THREE.Group>(null), tray = useRef<THREE.Group>(null)
+  const swap = useRef(open ? 1 : 0)
+  useFrame((_, dt) => {
+    const want = open ? 1 : 0, step = Math.min(dt, 0.1) / TRAY_SWAP_S
+    if (swap.current !== want) swap.current = want > swap.current ? Math.min(1, swap.current + step) : Math.max(0, swap.current - step)
+    const s = swap.current, bs = popIn(1 - s), ts = popIn(s)
+    TRAY_SWAP.k = s
+    TRAY_SWAP.tray = ts
+    if (bowl.current) { bowl.current.scale.setScalar(Math.max(1e-4, bs)); bowl.current.visible = bs > 0.002 }
+    if (tray.current) { tray.current.scale.setScalar(Math.max(1e-4, ts)); tray.current.visible = ts > 0.002 }
+  })
   return (
     <group position={position} userData={{ container }}>
-      <mesh geometry={geometry} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={PLUM_WARE} />
-      </mesh>
-      <mesh geometry={geometry} scale={[1.03, 1.06, 1.03]}>
-        <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
-      </mesh>
+      <group ref={bowl} visible={!open}>
+        <mesh geometry={geometry} castShadow receiveShadow>
+          <meshToonMaterial color="#ffffff" map={PLUM_WARE} />
+        </mesh>
+        <mesh geometry={geometry} scale={[1.03, 1.06, 1.03]}>
+          <meshBasicMaterial color="#3b2a20" side={THREE.BackSide} />
+        </mesh>
+      </group>
+      <group ref={tray} position={TRAY_OFF_AT} rotation-y={TRAY_YAW} visible={open}><primitive object={kaku.tray} /></group>
     </group>
   )
 }
@@ -4168,6 +4268,11 @@ type Piece = {
    * the one and after the other (the raw food from the fridge has none: the owner's) */
   skewerAt?: number
   pullAt?: number
+  /** (item 317) its place on the open shop's tray by the fire while it waits there for its plate (its skewer drawn out there); lifted onto
+   * its plate by the server's tongs (`tonged`: from then on it's that plate's, never back to the tray), in the tongs just now (`tong`) */
+  trayAt?: number
+  tonged?: boolean
+  tong?: boolean
   /** where its rod's middle is (its own frame): laid on the board centred on it */
   stickMid?: THREE.Vector3
   /** its place round the fire (game/fireSlots' RING_AZ), while it stands there or is on its way to it; given up as it leaves */
@@ -5194,22 +5299,173 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const plateOfSeat = (seat: number): PlateKind => plateFor(guests.current.find((g) => g.seat === seat && (g.state === 'waiting' || g.state === 'eating'))?.orders ?? [])
   const plateReady = (p: Piece) => {
     let k = PLATING.slots.findIndex((sl) => sl?.seat === p.seat)
+    const plated = PLATES_OUT.has(p.seat)
+    const free = k < 0 ? PLATING.slots.findIndex((sl) => sl === null) : -1
+    if (k < 0 && (free < 0 || (!plated && PLATING.stock <= 0))) return false
+    // (item 317, the owner's: onto the tray by the fire first, where its skewer's drawn out, and the floor's server lifts it onto its plate
+    // with the tongs when they come for it; a place free there, or it waits by the fire (the tray full of what waits for its plates, the
+    // oldest kept warm eaten by the staff to make room for it). Once it's been lifted onto its plate it's that plate's, as it was)
+    const viaTray = !p.tonged
+    let place = -1
+    let eat: Piece | undefined
+    if (viaTray) {
+      if (p.trayAt !== undefined) place = p.trayAt
+      else {
+        const warm = pieces.current.filter((q) => q !== p && q.keepWarm && q.collected && !q.eaten && q.slot !== null && q.container?.startsWith('bowl'))
+          .sort((a, b) => (a.bowlAt ?? 0) - (b.bowlAt ?? 0))
+        const r = trayPlace(trayTaken(p), warm[0]?.slot ?? null)
+        if (r.place < 0) return false
+        place = r.place
+        if (r.eat !== null) eat = warm[0]
+      }
+    }
     if (k < 0) {
-      const plated = PLATES_OUT.has(p.seat)
-      const free = PLATING.slots.findIndex((sl) => sl === null)
-      if (free < 0 || (!plated && PLATING.stock <= 0)) return false
       k = free
-      PLATING.slots[k] = { seat: p.seat, plate: !plated, flying: 1, landed: 0 }
+      PLATING.slots[k] = { seat: p.seat, plate: !plated, flying: 1, landed: 0, onTray: 0, tongs: false }
       if (!plated) PLATING.stock -= 1
     }
+    if (eat) { eat.eaten = true; eat.keepWarm = false; eat.slot = null }
     const row = pieces.current.filter((q) => q !== p && q.via === 'plated' && q.readyAt === k && !q.eaten && q.trash < 0 &&
       !SERVICE.claimed.has(q.key) && !SERVICE.carried.has(q.key)).length
     p.readyAt = k
+    if (viaTray) {
+      // (where it lies on the tray; kept where it was if it's on it already (its customer gone and another's ordered it): no hop in place)
+      const keep = p.trayAt === place
+      p.trayAt = place
+      trayFoodAt(place, p.toP)
+      if (keep && Math.hypot(p.node.position.x - p.toP.x, p.node.position.z - p.toP.z) < 0.02) p.flight = 1
+    }
     // (a plate under it always: the seat's own, or for a later dish (the seat's plate gone out) a carrier dish (GuestBar3D's), never the bare
     // table (the owner saw a skewer lying on the wood))
-    p.toP.copy(readyFoodAt(k, row, true, plateOfSeat(p.seat)))
+    else p.toP.copy(readyFoodAt(k, row, true, plateOfSeat(p.seat)))
     p.local.copy(p.toP).sub(containerAt('bar'))
     return true
+  }
+  /** (item 317) where a piece lies on the open shop's tray: its place in the bowl's one row (game/plates' bowlPlace), on the rack */
+  const trayFoodAt = (place: number, out = new THREE.Vector3()) => {
+    const b = bowlAt()
+    return out.copy(b).add(TRAY_OFF).addScaledVector(STACK_DIR, bowlPlace(place).across).setY(b.y + TRAY_REST)
+  }
+  /** (item 317) the tray's places in use (but `but`'s own): what waits there for its plate, and (in the same row) what's kept warm on it */
+  const trayTaken = (but?: Piece) => {
+    const out: number[] = []
+    for (const q of pieces.current) {
+      if (q === but || q.eaten || q.trash >= 0) continue
+      if (q.trayAt !== undefined) out.push(q.trayAt)
+      else if (q.keepWarm && q.collected && q.slot !== null && q.container?.startsWith('bowl')) out.push(q.slot)
+    }
+    return out
+  }
+  /**
+   * The tongs by the tray (item 317), each frame: lying beside it, or in the floor's server's hand while they're at the plating place for a
+   * plate: to a piece of that plate's on the tray (its skewer out of it), closed on it and lifting it in a low arc onto the plate, and on to
+   * the next, or back down beside the tray (ServeTongs draws them; they're posed here, in the fire's frame)
+   */
+  const tongRef = useRef({ key: null as string | null, slot: -1, phase: 'rest' as TongPhase, t: 0, tip: new THREE.Vector3(), from: new THREE.Vector3(),
+    first: true, open: 0, use: 0 })
+  const tongStep = (dt: number) => {
+    const T = tongRef.current
+    const now = performance.now()
+    T.t += dt
+    // (where they lie: on the table beside the tray's end toward the plating place, along the way the food lies, their hinge on the server's
+    // side (+LAY) and their grip toward the table's back)
+    const b = bowlAt()
+    const restTip = TONG_REST_TIP.copy(b).add(TRAY_OFF).addScaledVector(STACK_DIR, TRAY_SIDE * TONG_REST_OUT).addScaledVector(LAY_DIR, -TONG_LEN / 2)
+    // (lying on their side, one arm on the table and the other over it)
+    restTip.y = b.y + TONG_LIE
+    // (the next piece to lift: one on the tray for a plate whose server's there, down on it, its skewer drawn out of it)
+    const next = () => {
+      if (space !== 'open') return null
+      for (let k = 0; k < READY_SLOTS; k++) {
+        const sl = PLATING.slots[k]
+        if (!sl?.tongs || !sl.onTray) continue
+        const q = pieces.current.find((x) => x.readyAt === k && x.trayAt !== undefined && x.flight >= 1 && !x.eaten && x.trash < 0 &&
+          !(x.skewerAt !== undefined && (x.pullAt === undefined || now - x.pullAt < PULL_MS)))
+        if (q) return { q, k }
+      }
+      return null
+    }
+    if (T.phase === 'rest' || T.phase === 'back') {
+      const n = next()
+      if (n) { T.key = n.q.key; T.slot = n.k; T.from.copy(T.tip); T.first = T.phase === 'rest' || T.t < TONG_BACK_S * 0.3; T.phase = 'reach'; T.t = 0 }
+    }
+    const p = T.key ? pieces.current.find((q) => q.key === T.key) : undefined
+    // (its piece gone meanwhile (eaten, binned, its plate's customer gone): let go, back down)
+    if ((T.phase === 'reach' || T.phase === 'lift') && (!p || p.eaten || p.trash >= 0 || (T.phase === 'reach' && p.trayAt === undefined))) {
+      if (p) p.tong = false
+      T.key = null; T.from.copy(T.tip); T.phase = 'back'; T.t = 0
+    }
+    if (T.phase === 'reach' && p) {
+      // (from beside the tray, or from the plate it last set something on, to over the piece, opening as they come)
+      const dur = T.first ? TONG_TAKE_S : TONG_S - TONG_LIFT_S
+      const k = Math.min(1, T.t / dur), e = k * k * (3 - 2 * k)
+      TONG_AT.copy(p.node.position).setY(p.node.position.y + 0.04)
+      T.tip.lerpVectors(T.from, TONG_AT, e)
+      T.tip.y += Math.sin(k * Math.PI) * 0.06
+      T.open = THREE.MathUtils.lerp(T.open, 0.14, Math.min(1, dt * 14))
+      T.use = T.first ? e : 1
+      if (k >= 1) {
+        // (closed on it: off the tray, onto its plate beside what's on it already)
+        const row = pieces.current.filter((q) => q !== p && q.readyAt === T.slot && q.tonged && !q.eaten && q.trash < 0 &&
+          !SERVICE.claimed.has(q.key) && !SERVICE.carried.has(q.key)).length
+        p.fromP.copy(p.node.position)
+        p.fromQ.copy(p.node.quaternion)
+        p.toP.copy(readyFoodAt(T.slot, row, true, plateOfSeat(p.seat)))
+        p.local.copy(p.toP).sub(containerAt('bar'))
+        p.trayAt = undefined
+        p.tonged = true
+        p.tong = true
+        p.flight = 0
+        T.phase = 'lift'; T.t = 0
+      }
+    } else if (T.phase === 'lift' && p) {
+      // (holding it by its top as it goes over)
+      T.tip.copy(p.node.position).setY(p.node.position.y + 0.035)
+      T.open = THREE.MathUtils.lerp(T.open, -0.02, Math.min(1, dt * 20))
+      T.use = 1
+      if (p.flight >= 1) {
+        p.tong = false
+        T.key = null
+        // (straight on to the next of this plate's, or another's whose server's there; none, back down beside the tray)
+        const n = next()
+        T.from.copy(T.tip)
+        if (n) { T.key = n.q.key; T.slot = n.k; T.first = false; T.phase = 'reach' } else T.phase = 'back'
+        T.t = 0
+      }
+    } else if (T.phase === 'back') {
+      const k = Math.min(1, T.t / TONG_BACK_S), e = k * k * (3 - 2 * k)
+      T.tip.lerpVectors(T.from, restTip, e)
+      T.tip.y += Math.sin(k * Math.PI) * 0.05
+      T.open = THREE.MathUtils.lerp(T.open, 0, Math.min(1, dt * 10))
+      T.use = 1 - e
+      if (k >= 1) { T.phase = 'rest'; T.t = 0 }
+    } else {
+      T.tip.copy(restTip)
+      T.open = 0
+      T.use = 0
+    }
+    // (their pose: lying on their side beside the tray, their grip toward the table's back (their arms one over the other: the way they
+    // spread, up); in use tipped down to their grip from the server's hand, over it and toward them, their arms either side of what they hold)
+    const K = KAKU.made
+    if (!K) return
+    TONG_X.copy(LAY_DIR).negate()
+    TONG_Z.set(0, 1, 0)
+    TONG_Y.crossVectors(TONG_Z, TONG_X).normalize()
+    TONG_QR.setFromRotationMatrix(TONG_M.makeBasis(TONG_X, TONG_Y, TONG_Z))
+    TONG_X.copy(LAY_DIR).multiplyScalar(-0.18).add(TONG_Y.set(0, -0.34, 0)).normalize()
+    TONG_Z.crossVectors(TONG_X, TONG_Y.set(0, 1, 0)).normalize()
+    TONG_Y.crossVectors(TONG_Z, TONG_X).normalize()
+    TONG_QU.setFromRotationMatrix(TONG_M.makeBasis(TONG_X, TONG_Y, TONG_Z))
+    const g = K.tongs
+    g.quaternion.slerpQuaternions(TONG_QR, TONG_QU, THREE.MathUtils.clamp(T.use, 0, 1))
+    // (the hinge from the grip back along them)
+    g.position.copy(T.tip).addScaledVector(TONG_X.set(1, 0, 0).applyQuaternion(g.quaternion), -TONG_LEN)
+    K.arms[0].rotation.y = -T.open
+    K.arms[1].rotation.y = T.open
+    // (with the tray: put away with it, shut)
+    const s = T.phase === 'rest' ? TRAY_SWAP.tray : 1
+    g.scale.setScalar(Math.max(1e-4, s))
+    g.visible = s > 0.002
   }
   /**
    * The open shop: a cooked piece goes to the customer who's owed one of these, onto their plate at the bar (pieces already on it push the
@@ -5279,14 +5535,19 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (bowl) {
       const inIt = pieces.current.filter((q) => q !== p && q.collected && !q.eaten && q.slot !== null && q.container?.startsWith('bowl'))
         .sort((a, b) => (a.bowlAt ?? 0) - (b.bowlAt ?? 0))
-      for (const q of inIt.slice(0, warmToEat(inIt.length + 1, space === 'open' ? BOWL_WARM_MAX : BOWL_HAND_MAX))) { q.eaten = true; q.keepWarm = false; q.slot = null }
+      // (open, the bowl's the tray (item 317), its row shared with what waits on it for its plate: kept to its places with those counted)
+      const onTray = space === 'open' ? pieces.current.filter((q) => q !== p && q.trayAt !== undefined && !q.eaten && q.trash < 0).length : 0
+      for (const q of inIt.slice(0, warmToEat(inIt.length + onTray + 1, space === 'open' ? BOWL_WARM_MAX : BOWL_HAND_MAX))) { q.eaten = true; q.keepWarm = false; q.slot = null }
       p.bowlAt = performance.now()
     }
     // take the first free spot where it's going (basket, dishes or plates); eaten food frees its spot
     const taken = new Set(pieces.current.filter((q) => q.slot !== null && !q.eaten && present(q) &&
       destination(q) === destination(p)).map((q) => q.slot))
+    if (bowl && space === 'open') for (const t of trayTaken(p)) taken.add(t)
     let slot = 0
     while (taken.has(slot)) slot++
+    // (the tray's every place taken by what waits there for its plate: nowhere to keep it warm; the staff have it)
+    if (bowl && space === 'open' && slot >= TRAY_PLACES) { p.eaten = true; p.keepWarm = false; p.slot = null; return }
     // (food comes off the fire onto a plate only if that plate is on the cook's table: a plate carried off it, or fallen to the floor, takes nothing)
     if (bowl) {
       if (outsideTable(bowlAt(), BOWL_R)) { onNotice?.('offTable'); return }
@@ -5313,7 +5574,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // laid side by side across the bowl, the skewers' sticks resting across its rim: one row, kept to it (game/plates' bowlPlace)
       const { across, layer } = bowlPlace(slot)
       p.toP.copy(bowlAt()).addScaledVector(STACK_DIR, across)
-      p.toP.y += (p.loose ? 0.07 : BOWL_RIM + 0.02) + layer * LAYER_HEIGHT
+      if (space === 'open') p.toP.add(TRAY_OFF)
+      // (open, on the tray's rack (item 317), as what waits there for its plate lies)
+      p.toP.y += space === 'open' ? TRAY_REST : (p.loose ? 0.07 : BOWL_RIM + 0.02) + layer * LAYER_HEIGHT
       p.container = 'bowl-0'
     } else if (basket) {
       // tossed in from just above the basket; from there the physics drops it in and lets it settle
@@ -5508,7 +5771,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   // (its skewer too (skewerAt, pullAt): put away without them, what was on the fire came back off its skewer, standing in the air over the
   // coals (the owner's, 2026-11-10), and what had been skewered by hand on the board had to be skewered again)
   const SCALARS = ['progress', 'collected', 'flight', 'stickOnly', 'netSpot', 'container', 'staged', 'stagedAt', 'wasPresent',
-    'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten', 'guest', 'seat', 'skewerAt', 'pullAt'] as const
+    'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten', 'guest', 'seat', 'skewerAt', 'pullAt', 'trayAt', 'tonged',
+    'tong'] as const
   const VECS = ['fromP', 'fromQ', 'toP', 'toQ', 'local', 'trashFrom'] as const
   const save = (): Snap => {
     const out = new Map<string, Record<string, unknown>>()
@@ -5536,6 +5800,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   const fresh = (p: Piece) => {
     p.skewerAt = undefined
     p.pullAt = undefined
+    p.trayAt = undefined
+    p.tonged = false
+    p.tong = false
     p.wasPresent = false
     p.staged = false
     p.homeFlight = 1
@@ -5884,6 +6151,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         stray.guest = -1
         const owner = ownerOf(stray)
         if (owner) {
+          // (kept warm on the open shop's tray (item 317): it keeps its place there for its new customer's plate)
+          if (space === 'open' && stray.trayAt === undefined && stray.container?.startsWith('bowl') && stray.slot !== null) stray.trayAt = stray.slot
           SERVICE.waiting.delete(stray.key)
           stray.via = undefined
           stray.readyAt = undefined
@@ -5904,6 +6173,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           stray.readyAt = undefined
           stray.keepWarm = false
           stray.slot = null
+          stray.trayAt = undefined
           stray.eaten = true
           say(L().orphanMeal(nameOfP(stray)))
           return
@@ -5915,6 +6185,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           stray.readyAt = undefined
           stray.collected = false
           stray.slot = null
+          stray.trayAt = undefined
           stray.keepWarm = true
           collect(stray)
           say(L().orphanAway)
@@ -6860,7 +7131,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (lit || ownGlow) { glowOnly(lit); ownGlow = !!lit }
       // (what's under the pointer, named by a tag, for what isn't food or a tool (those have their own): a dish or the table's boxes, dragged about)
       // (only its own tag is cleared here: the scene's other things set theirs through the pointer events)
-      if (!tool && !p && !soup && !dec && cont) { setTip(CONTAINER_TIP(cont)); ownTip = true } else if (ownTip) { setTip(null); ownTip = false }
+      if (!tool && !p && !soup && !dec && cont) { setTip(CONTAINER_TIP(cont, TRAY_SWAP.k > 0.5)); ownTip = true } else if (ownTip) { setTip(null); ownTip = false }
       el.style.cursor = tool || dec ? 'grab' : p || soup ? 'pointer' : pickContainer() ? 'grab' : POINTER_HINT.hand ? 'pointer' : ''
     }
     const onDown = (e: PointerEvent) => {
@@ -7997,6 +8268,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         p.landed = -1
         p.via = undefined
         p.small = false
+        p.trayAt = undefined
+        p.tonged = false
+        p.tong = false
         p.collected = false
         p.flight = 0
         p.slot = null
@@ -8163,17 +8437,20 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             plateReady(p)
           } else if (p.flight >= 1) {
             p.small = true
-            if (!SERVICE.waiting.has(p.key) && !SERVICE.claimed.has(p.key)) SERVICE.waiting.set(p.key, p.seat)
+            // (on the tray by the fire it isn't on its plate yet (item 317): the server claims it once the tongs have put it there)
+            if (p.trayAt === undefined && !p.tong && !SERVICE.waiting.has(p.key) && !SERVICE.claimed.has(p.key)) SERVICE.waiting.set(p.key, p.seat)
           }
         }
         const held = p.via === 'plated' && p.readyAt === undefined
-        if (!plateless && !held) p.flight = Math.min(1, p.flight + dt / FLIGHT_SECONDS)
+        if (!plateless && !held) p.flight = Math.min(1, p.flight + dt / (p.tong ? TONG_LIFT_S : FLIGHT_SECONDS))
         if (!p.body?.live) {
           const e = p.flight < 0.5 ? 2 * p.flight * p.flight : 1 - (-2 * p.flight + 2) ** 2 / 2
-          // (its spot follows the plate or dish if that's been dragged somewhere)
-          if (p.container) p.toP.copy(containerAt(p.container)).add(p.local)
+          // (its spot follows the plate or dish if that's been dragged somewhere; on the tray, the tray (item 317))
+          if (p.trayAt !== undefined) trayFoodAt(p.trayAt, p.toP)
+          else if (p.container) p.toP.copy(containerAt(p.container)).add(p.local)
           p.node.position.lerpVectors(p.fromP, p.toP, e)
-          p.node.position.y += Math.sin(p.flight * Math.PI) * 0.45   // a little arc through the air
+          // (a little arc through the air; lifted in the tongs, a low one)
+          p.node.position.y += Math.sin(p.flight * Math.PI) * (p.tong ? 0.12 : 0.45)
           p.node.quaternion.slerpQuaternions(p.fromQ, p.toQ, e)
           // (landed on a plate (or in a takeaway's box): its own underside put on the plate's face, so a thick fish doesn't sink through it
           // and a thin slice doesn't hover over it (they were all set at one height: the owner saw both). Every frame, from how far its lowest
@@ -8181,7 +8458,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           // where it was and put into its spot, the correction was lost at the plating place, whose spots are given afresh each frame at
           // one height, and it was never measured again there: a thick fish sank into its plate and a slice of fillet hovered over it
           // (item 258, the owner's 「2倍速看，時常有這問題」))
-          if (p.flight >= 1 && (p.container === 'bar' || p.container === 'takeout') && p.node.parent) {
+          // (and on the open shop's tray, on its rack (item 317): what waits there for its plate, and what's kept warm on it)
+          const onTray = p.trayAt !== undefined || (space === 'open' && !!p.container?.startsWith('bowl'))
+          if (p.flight >= 1 && (p.container === 'bar' || p.container === 'takeout' || onTray) && p.node.parent) {
             // (and the face it rests on: the plate's own surface under it (or what it lies on there), found by a ray straight down onto the
             // plates as they're drawn (bar.ts's PLATE_FACES) and the other pieces lying on them, where it is, and again each second (what
             // it lay on eaten from under it); none under it (a takeaway's box, the table's top): from its spot's height as before (item
@@ -8194,7 +8473,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
             // whatever was highest under its middle)
             const across = REST_ACROSS.copy(PLATING_FRAME.across)
             if (p.readyAt === undefined && p.seat !== undefined && p.seat >= 0) across.applyAxisAngle(UP_AXIS, seatTurn(p.seat))
-            if (p.container === 'bar' && (!p.restFace || p.restFace.at !== at || nowMs - p.restFace.t > 1000)) {
+            if (p.container === 'bar' && !onTray && (!p.restFace || p.restFace.at !== at || nowMs - p.restFace.t > 1000)) {
               const par = p.node.parent
               const under: THREE.Object3D[] = [...PLATE_FACES]
               for (const q of pieces.current) if (q !== p && q.container === p.container && (q.flight ?? 0) >= 1 && !q.eaten && q.node) under.push(q.node)
@@ -8211,7 +8490,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
               const low = Math.min(...[l, r, mid].filter((v): v is number => v !== null))
               p.restFace = { at, t: nowMs, face: Number.isFinite(low) ? (roll ? low : mid ?? low) : null, roll }
             }
-            const roll = p.container === 'bar' ? p.restFace?.roll ?? 0 : 0
+            const roll = p.container === 'bar' && !onTray ? p.restFace?.roll ?? 0 : 0
             if (roll) p.node.quaternion.premultiply(REST_ROLL.setFromAxisAngle(REST_LONG.crossVectors(across, UP_AXIS).normalize(), roll))
             // (its lowest point for the way it lies now, rolled or not: measured again only when that changes)
             const r = p.restDrop
@@ -8234,7 +8513,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
               low = p.node.parent.worldToLocal(LOW_AT.set(0, low, 0)).y
               p.restDrop = { q: p.node.quaternion.clone(), s: p.node.scale.x, drop: p.node.position.y - low, cx, cz }
             }
-            const face = (p.container === 'bar' ? p.restFace?.face : null) ?? p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
+            const face = (p.container === 'bar' && !onTray ? p.restFace?.face : null) ?? p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
             p.node.position.y = face + 0.003 + p.restDrop!.drop
           }
           if (p.flight >= 1 && inBasket(p)) {
@@ -8359,7 +8638,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // served at the bar it comes down to the size of the customers and their plates (the fire is drawn big, to
       // cook on; the bar is in the people's own scale), shrinking as it's carried over
       // (in a takeaway's box a little under a plate's size: a whole saury lies in its main cell's length (item 331))
-      if ((p.container === 'bar' || p.container === 'takeout') && p.collected) shrink *= (p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1)))
+      // (and on the open shop's tray, kept warm there (item 317), as what waits there for its plate)
+      if ((p.container === 'bar' || p.container === 'takeout' || (space === 'open' && p.container?.startsWith('bowl'))) && p.collected) shrink *= (p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1)))
         * (p.container === 'takeout' ? TAKEOUT_FOOD : 1)
       if (p.eaten || waiting(p) || inFridge.has(p)) shrink = 0.0001
       const bounce = bounces.current.get(p)
@@ -8383,18 +8663,31 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     if (space === 'open') for (let k = 0; k < READY_SLOTS; k++) {
       const sl = PLATING.slots[k]
       if (!sl) continue
-      let flying = 0, landed = 0
+      let flying = 0, landed = 0, onTray = 0
       for (const q of pieces.current) {
         if (q.via !== 'plated' || q.readyAt !== k || q.eaten || q.trash >= 0 || SERVICE.claimed.has(q.key) || SERVICE.carried.has(q.key)) continue
-        if (q.flight >= 1) landed++
+        // (one just set down by the tongs is still theirs this frame (item 317): it's waiting for its server from the next, and the plate
+        // taken up in between went without it)
+        if (q.flight >= 1 && !q.tong) landed++
         else flying++
+        if (q.trayAt !== undefined) onTray++
       }
       sl.flying = flying
       sl.landed = landed
+      sl.onTray = onTray
       if (!flying && !landed) {
         if (sl.plate) PLATING.stock += 1
         PLATING.slots[k] = null
       }
+    }
+
+    // (the server's tongs by the tray, lifting what's on it onto its plate (item 317)); and how much is on it, for the stock's tableware tab
+    tongStep(dt)
+    KAKUBAT.out = space === 'open'
+    {
+      let n = 0
+      if (space === 'open') for (const q of pieces.current) if (!q.eaten && q.trash < 0 && (q.trayAt !== undefined || (q.keepWarm && q.collected && q.container?.startsWith('bowl')))) n++
+      KAKUBAT.n = n
     }
 
     // (what the chef's carrying: where it is through each step, and where he stands; it holds still in its own flight meanwhile)
@@ -8591,7 +8884,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {roast.dish && Array.from({ length: dishCount }, (_, n) => (
         <WhenHeld key={n} holds={() => holds(`dish-${n}`)}><SideDish container={`dish-${n}`} position={dishAt(n).toArray() as [number, number, number]} /></WhenHeld>
       ))}
-      <TasteBowl container="bowl-0" position={bowlAt().toArray() as [number, number, number]} />
+      <TasteBowl container="bowl-0" position={bowlAt().toArray() as [number, number, number]} open={space === 'open'} />
+      <ServeTongs />
       {/* (a whole fish's bones in the bowl, once eaten: clicked, into the bin with the rest) */}
       {bones.map((b) => (
         <group key={b.key} position={b.at} rotation-y={b.yaw} scale={BONE_SCALE} {...BONES_TIP}

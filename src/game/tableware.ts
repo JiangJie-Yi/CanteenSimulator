@@ -9,6 +9,17 @@ import { SKEWER_POOL } from './skewers'
 import { PLATES_ALL } from './plates'
 
 export const TABLEWARE = { riceBowls: 24, soupBowls: 24, spoons: 24, chopsticks: 60 }
+/**
+ * The servers' trays (お盆, item 311, the owner's: 「有個餐盤概念會比較好，服務員可以用餐盤承食物，它也算在餐具內」): four, lacquered. Each server
+ * on shift carries one (the food and the bowls out on it, the dirty plates back), the rest stand at the pass; two servers at the most
+ * (data/staff), so there's always one spare and none's ever waited for.
+ */
+export const TRAYS = 4
+/** where the trays are with `holding` servers on shift: in their hands (never more than there are), the rest at the pass */
+export const traysAt = (holding: number) => {
+  const hands = Math.min(TRAYS, Math.max(0, Math.floor(holding)))
+  return { hands, pass: TRAYS - hands }
+}
 /** each cabinet's half: what's behind its doors and in its drawers */
 export const PER_CABINET = { riceBowls: TABLEWARE.riceBowls / 2, soupBowls: TABLEWARE.soupBowls / 2, spoons: TABLEWARE.spoons / 2, chopsticks: TABLEWARE.chopsticks / 2 }
 /** settings for this many seats: bowls and spoons three times over, enough for two pots of soup, chopsticks two and a half times the bowls */
@@ -33,5 +44,9 @@ export const tablewareList = (seats: number): Ware[] => [
   { id: 'teacups', zh: '茶杯', ja: '湯呑み', en: 'Teacups', n: seats * 2, unit: ['個', '個', ''], where: ['吧台下的櫃子', 'カウンター下の棚', 'Under the bar'] },
   { id: 'sakeCups', zh: '酒杯', ja: 'ぐい呑み', en: 'Sake cups', n: seats, unit: ['個', '個', ''], where: ['吧台下的櫃子', 'カウンター下の棚', 'Under the bar'] },
   { id: 'tokkuri', zh: '德利（酒壺）', ja: '徳利', en: 'Tokkuri', n: Math.ceil(seats / 2), unit: ['個', '本', ''], where: ['吧台下的櫃子', 'カウンター下の棚', 'Under the bar'] },
-  { id: 'trays', zh: '托盤', ja: 'お盆', en: 'Trays', n: 4, unit: ['個', '枚', ''], where: ['出餐口', '出し口', 'The pass'] },
+  { id: 'trays', zh: '托盤', ja: 'お盆', en: 'Trays', n: TRAYS, unit: ['個', '枚', ''], where: ['外場手上與出餐口', 'ホールの手と出し口', 'In hand and at the pass'] },
+  // (the open shop's square iron tray by the fire and its tongs (item 317): the owner lays what's grilled on it, the servers lift it onto
+  // the plates with the tongs; shut, they're put away and the tasting bowl's out)
+  { id: 'kakubat', zh: '方形鐵盤', ja: '角バット', en: 'Square tray', n: 1, unit: ['個', '枚', ''], where: ['營業時在老闆旁', '営業中は親方の横', 'By the owner, open'] },
+  { id: 'tongs', zh: '夾子', ja: 'トング', en: 'Tongs', n: 1, unit: ['支', '本', ''], where: ['方形鐵盤旁', '角バットの横', 'By the square tray'] },
 ]
