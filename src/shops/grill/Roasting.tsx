@@ -156,6 +156,8 @@ const BAR_TOP_SCENE = BAR_TOP * GRILL_SCALE + GRILL_OFFSET.y
 /** how big food is on a plate, next to the fire's: a whole fish no longer than the plate is wide (the owner's: at the fire's size, laid
  * across the plating place, a fish's tail hung off the table's edge, three mushrooms ran off the plate onto the wood) */
 const BAR_FOOD_SCALE = 0.3 * GRILL_SCALE
+/** how much smaller what's grilled lies in a takeaway's box than on a plate (item 331: a whole saury fits its main cell's length) */
+const TAKEOUT_FOOD = 0.8
 /** the chef's plating place (bar.ts's platingOf), on the cook table right beside him: what's grilled is plated there, ready (ORDER_READY), and
  * a server comes into the kitchen to him for it (the owner's: no pass on the bar between them any more); the table's top in the scene, and
  * the way across the table */
@@ -205,10 +207,7 @@ const drawnUp = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent)
 const seatFoodAt = (seat: number, row: number, kind: PlateKind, out: THREE.Vector3) => out.copy(barSeat(seat))
   .addScaledVector(PLATING_FRAME.across.clone().applyAxisAngle(UP_AXIS, seatTurn(seat)), plateSide(row).across * PLATE_SPREAD[kind] * GRILL_SCALE)
   .add(new THREE.Vector3(0, BAR_TOP_SCENE + 0.04 + plateSide(row).layer * 0.06, 0))
-/** where the n-th piece put on a plate lies across it: the first in the middle, the next to one side of it, the third to the other (the owner
- * saw a dish alone on its plate lying by the rim: they were laid left, middle, right) */
-const sideOf = (row: number) => [0, -1, 1][row % 3]
-const barSeat = (n: number) => toGrillScene(GRILL_SEATS[n].plate).sub(FIRE_SHIFT).setY(0)
+const barSeat =(n: number) => toGrillScene(GRILL_SEATS[n].plate).sub(FIRE_SHIFT).setY(0)
 const HOVER_GLOW = new THREE.Color('#ffb347').multiplyScalar(0.35)
 /**
  * A stick of charcoal dropped on the heap: a dull, dry clatter, not a ring. A woody knock (noise through a mid band, gone in a few hundredths of
@@ -3419,11 +3418,14 @@ const CORD_RED = new THREE.Color('#c0262a'), SLEEVE_WHITE = new THREE.Color('#f4
 const BENTO_IN = new THREE.Color('#2e2b29')
 /** the bento's sides' colours (item 78, 122): the leaf, broccoli and its stalk, carrot, the salad's shredded cabbage and purple cabbage,
  * lemon, sesame; the miso soup's cup, the soup, its wakame and tofu */
-const BENTO_LEAF = new THREE.Color('#8cc152'), BENTO_LEAF_DEEP = new THREE.Color('#5f9a3a')
+const BENTO_LEAF = new THREE.Color('#8cc152')
 const BENTO_GREEN = new THREE.Color('#3f7d2c'), BENTO_STALK = new THREE.Color('#9cc46a'), BENTO_CARROT = new THREE.Color('#e8762a')
-const BENTO_CABBAGE = new THREE.Color('#d8e8a8'), BENTO_PURPLE = new THREE.Color('#7a2f6e'), BENTO_LEMON = new THREE.Color('#f5e15a')
+const BENTO_LEMON = new THREE.Color('#f5e15a')
 const BENTO_SESAME = new THREE.Color('#1a1714'), BENTO_CUP = new THREE.Color('#a3231b'), BENTO_MISO = new THREE.Color('#b98a45')
 const BENTO_WAKAME = new THREE.Color('#2f4a22'), BENTO_TOFU = new THREE.Color('#f4f0e2')
+/** (item 331) the pickled plum, the takuan and the shibazuke, the rolled omelette and its browned top */
+const BENTO_PLUM = new THREE.Color('#b8232e'), BENTO_TAKUAN = new THREE.Color('#f2d23a'), BENTO_SHIBA = new THREE.Color('#b0477a')
+const BENTO_EGG = new THREE.Color('#f6d35c'), BENTO_EGG_TOP = new THREE.Color('#e3a93a')
 /** the box and its lid's black, red and white, coloured on their points: one material for both */
 const BENTO_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 /** a flat round face, up, filled in rows across it (a zigzag from one side to the other: no fan of triangles to its middle point) */
@@ -3446,99 +3448,114 @@ function ladderDisc(r: number, n: number, x: number, y: number, z: number, c: TH
   return g
 }
 let bentoGeo: THREE.BufferGeometry | null = null
-/** the open box, made once (item 122, after the owner's picture): black outside and charcoal within, a low wall before the rice's end and
- * one across it, the rice heaped white with black sesame on it in its cell, a red cup of miso soup in the cell beside it (its wakame and
- * tofu floating); the ordered food laid on lettuce over the middle, broccoli and carrot at one end, a shredded salad and a lemon at the
- * other behind a low wall. The walls' ends fitted between the long sides and each lining a hair in from its wall: no two faces on one plane */
+/**
+ * The bento's cells, in its own frame (x its long side, z across it from the back): as a grilled-fish bento's are laid out (item 331, the
+ * owner's, 2026-11-18: 「便當有點亂塞」: the rice squeezed in a strip at the back, three great flat leaves over the middle, the broccoli and
+ * carrot and a heap of shredded salad at its ends just where a fish's head and tail came, a fourth piece laid on the third): along the back
+ * the rice (white, black sesame, a pickled plum in its middle), the pickles, the miso soup's cup; at the front the main cell, where what was
+ * grilled lies along the box's length on a leaf, side by side, never on another; and beside it a column of two: broccoli and carrot, and
+ * rolled omelette. Each cell's walls low and black; all of it inside the box
+ */
+const BENTO = {
+  back: [-0.222, -0.07] as const, front: [-0.07, 0.122] as const,
+  rice: [-0.282, 0.04] as const, pickles: [0.04, 0.13] as const, soup: [0.13, 0.282] as const,
+  main: [-0.282, 0.168] as const, side: [0.168, 0.282] as const, sideSplit: 0.026,
+}
+/** the open box, made once: black outside, charcoal within, its cells and what's in each but the grilled food (laid in as it's served) */
 function bentoBox() {
   if (bentoGeo) return bentoGeo
-  const T = 0.008, D = BOX_Z1 - BOX_Z0, zc = (BOX_Z0 + BOX_Z1) / 2, L = 0.002, gap = 0.0005
-  const riceZ = (BOX_Z0 + T - BOX_D / 2) / 2, riceD = -BOX_D / 2 - (BOX_Z0 + T) - 0.006
-  const inW = BOX_W - 2 * T - 2 * gap - 2 * L
-  // (the rice end split across: the rice's cell, the miso's beyond a low wall at CUP_X)
-  const CUP_X = 0.12, inX0 = -inW / 2 + 0.003, inX1 = inW / 2 - 0.003
+  const T = 0.008, D = BOX_Z1 - BOX_Z0, zc = (BOX_Z0 + BOX_Z1) / 2, L = 0.002, gap = 0.0005, F = 0.0075
+  const B = BENTO
+  const wallH = BOX_H * 0.78, wall = (w: number, d: number, x: number, z: number) => bentoBlock(w, wallH, d, x, F + wallH / 2, z, BENTO_IN)
   const parts = [
     bentoBlock(BOX_W, 0.005, D, 0, 0.0025, zc, BENTO_BLACK),
     bentoBlock(BOX_W - 2 * T - 2 * gap, L, D - 2 * T - 2 * gap, 0, 0.005 + gap + L / 2, zc, BENTO_IN),
     ...[BOX_Z0, BOX_Z1].flatMap((z, i) => {
-      const s = i === 0 ? 1 : -1
+      const s2 = i === 0 ? 1 : -1
       return [
-        bentoBlock(BOX_W, BOX_H, T, 0, BOX_H / 2, z + s * T / 2, BENTO_BLACK),
-        bentoBlock(BOX_W - 2 * T - 2 * gap, BOX_H - 0.012, L, 0, BOX_H / 2, z + s * (T + gap + L / 2), BENTO_IN),
+        bentoBlock(BOX_W, BOX_H, T, 0, BOX_H / 2, z + s2 * T / 2, BENTO_BLACK),
+        bentoBlock(BOX_W - 2 * T - 2 * gap, BOX_H - 0.012, L, 0, BOX_H / 2, z + s2 * (T + gap + L / 2), BENTO_IN),
       ]
     }),
     ...[-1, 1].flatMap((sx) => [
       bentoBlock(T, BOX_H, D - 2 * T, sx * (BOX_W / 2 - T / 2), BOX_H / 2, zc, BENTO_BLACK),
       bentoBlock(L, BOX_H - 0.012, D - 2 * T - 2 * gap - 2 * L, sx * (BOX_W / 2 - T - gap - L / 2), BOX_H / 2, zc, BENTO_IN),
     ]),
-    // (the walls inside: before the rice's end, and across it between the rice and the soup)
-    bentoBlock(inW - 0.002, BOX_H * 0.8, 0.006, 0, 0.0075 + BOX_H * 0.4, -BOX_D / 2, BENTO_IN),
-    bentoBlock(0.005, BOX_H * 0.7, riceD + 0.004, CUP_X, 0.0075 + BOX_H * 0.35, riceZ, BENTO_IN),
-    // (the rice, heaped: its bed and a rounded top a little in from it)
-    bentoBlock(CUP_X - 0.006 - inX0, 0.036, riceD, (inX0 + CUP_X - 0.006) / 2, 0.0075 + 0.018, riceZ, BENTO_RICE),
-    bentoBlock(CUP_X - 0.03 - inX0, 0.012, riceD - 0.024, (inX0 + CUP_X - 0.006) / 2, 0.0075 + 0.042, riceZ, BENTO_RICE),
+    // (the cells' walls: between the back row and the front; across the back row; the side column's, and across it)
+    wall(0.556, 0.005, 0, B.back[1]),
+    ...[B.pickles[0], B.soup[0]].map((x) => wall(0.005, B.back[1] - B.back[0] - 0.006, x, (B.back[0] + B.back[1]) / 2)),
+    wall(0.005, B.front[1] - B.front[0] - 0.006, B.side[0], (B.front[0] + B.front[1]) / 2),
+    wall(B.side[1] - B.side[0] - 0.006, 0.005, (B.side[0] + B.side[1]) / 2, B.sideSplit),
   ]
-  const riceTop = 0.0075 + 0.048, riceX = (inX0 + CUP_X - 0.006) / 2
-  // (the rice's top not a flat slab: little clumps of grains over it, two whites, at heights a little their own)
+  // (the rice: its bed and a rounded top in its cell, clumps of grains over it, black sesame, a pickled plum in its middle)
+  const riceX = (B.rice[0] + B.rice[1]) / 2, riceZ = (B.back[0] + B.back[1]) / 2
+  const riceW = B.rice[1] - B.rice[0] - 0.012, riceD = B.back[1] - B.back[0] - 0.012
+  parts.push(bentoBlock(riceW, 0.034, riceD, riceX, F + 0.017, riceZ, BENTO_RICE))
+  parts.push(bentoBlock(riceW - 0.03, 0.01, riceD - 0.026, riceX, F + 0.039, riceZ, BENTO_RICE))
+  const riceTop = F + 0.044
   const RICE_SHADE = new THREE.Color('#e6e0d0')
-  const grains = Array.from({ length: 36 }, (_, k) => {
-    const gx = riceX + ((k % 9) / 8 - 0.5) * (CUP_X - inX0 - 0.03) + Math.sin(k * 3.1) * 0.004
-    const gz = riceZ + ((Math.floor(k / 9)) / 3 - 0.5) * (riceD - 0.012) + Math.cos(k * 2.3) * 0.004
-    return bentoTurned(0.016, 0.008, 0.011, gx, riceTop - 0.004 + (k % 3) * 0.0015, gz, k % 4 === 0 ? RICE_SHADE : BENTO_RICE, 0.3 * Math.sin(k), k * 1.3)
+  const grains = Array.from({ length: 40 }, (_, k) => {
+    const gx = riceX + ((k % 10) / 9 - 0.5) * (riceW - 0.03) + Math.sin(k * 3.1) * 0.004
+    const gz = riceZ + ((Math.floor(k / 10)) / 3 - 0.5) * (riceD - 0.03) + Math.cos(k * 2.3) * 0.004
+    return bentoTurned(0.016, 0.008, 0.011, gx, riceTop - 0.003 + (k % 3) * 0.0015, gz, k % 4 === 0 ? RICE_SHADE : BENTO_RICE, 0.3 * Math.sin(k), k * 1.3)
   })
-  // (black sesame scattered over the rice's middle)
-  const sesame = Array.from({ length: 14 }, (_, k) => bentoTurned(0.006, 0.002, 0.0035, riceX + Math.sin(k * 2.7) * 0.05, riceTop + 0.0012, riceZ + Math.cos(k * 1.9) * 0.022,
-    BENTO_SESAME, 0, k * 0.9)).map((g) => g.translate(0, 0.0045, 0))
-  // (the miso soup: a red cup in its cell, turned (its wall only: it stands on the box's floor), the soup a little under its rim, wakame
-  // and two cubes of tofu in it)
-  const cupX = (CUP_X + inX1) / 2, cupR = Math.min(0.042, (inX1 - CUP_X) / 2 - 0.006), cupH = 0.048
+  const sesame = Array.from({ length: 16 }, (_, k) => bentoTurned(0.006, 0.002, 0.0035, riceX + Math.sin(k * 2.7) * 0.11, riceTop + 0.004, riceZ + Math.cos(k * 1.9) * 0.05,
+    BENTO_SESAME, 0, k * 0.9))
+  const plum = new THREE.IcosahedronGeometry(0.016, 1).scale(1, 0.8, 1).translate(riceX, riceTop + 0.008, riceZ)
+  colourVertices(plum, BENTO_PLUM)
+  // (the pickles: three slices of yellow takuan leaning on each other, a little heap of pink shibazuke)
+  const pkX = (B.pickles[0] + B.pickles[1]) / 2
+  const pickles = [
+    ...[0, 1, 2].map((k) => bentoTurned(0.034, 0.006, 0.03, pkX - 0.012 + k * 0.012, F + 0.016, riceZ - 0.03, BENTO_TAKUAN, 0.9, 0.2 * k)),
+    ...Array.from({ length: 7 }, (_, k) => bentoTurned(0.016, 0.006, 0.008, pkX + Math.sin(k * 2.2) * 0.022, F + 0.006 + (k % 3) * 0.004, riceZ + 0.03 + Math.cos(k * 1.7) * 0.014, BENTO_SHIBA, 0.3 * Math.sin(k), k * 1.1)),
+  ]
+  // (the miso soup: a red cup in its cell, the soup a little under its rim, wakame and two cubes of tofu in it)
+  const cupX = (B.soup[0] + B.soup[1]) / 2, cupR = 0.042, cupH = 0.048
   const cup = new THREE.LatheGeometry([new THREE.Vector2(cupR * 0.72, 0), new THREE.Vector2(cupR * 0.82, 0.003), new THREE.Vector2(cupR, cupH * 0.55),
-    new THREE.Vector2(cupR, cupH), new THREE.Vector2(cupR - 0.003, cupH), new THREE.Vector2(cupR - 0.003, cupH - 0.008)], 16).translate(cupX, 0.0075, riceZ)
+    new THREE.Vector2(cupR, cupH), new THREE.Vector2(cupR - 0.003, cupH), new THREE.Vector2(cupR - 0.003, cupH - 0.008)], 16).translate(cupX, F, riceZ)
   colourVertices(cup, BENTO_CUP)
-  const soupY = 0.0075 + cupH - 0.008
+  const soupY = F + cupH - 0.008
   const soup = ladderDisc(cupR - 0.003, 16, cupX, soupY, riceZ, BENTO_MISO)
   const inSoup = [
     ...[[-0.012, -0.008, 0.4], [0.01, 0.012, 1.9], [0.014, -0.014, 3.0]].map(([dx, dz, a]) => bentoTurned(0.016, 0.002, 0.009, cupX + dx, soupY + 0.001, riceZ + dz, BENTO_WAKAME, 0, a)),
     ...[[-0.004, 0.014], [0.002, -0.016]].map(([dx, dz], k) => bentoTurned(0.008, 0.005, 0.008, cupX + dx, soupY + 0.0015, riceZ + dz, BENTO_TOFU, 0, k * 0.6)),
   ]
-  // (the dishes laid on a bed of green leaf over the box's middle, as before (item 78): three lettuce leaves overlapping, their edges ragged
-  // and ruffled up and down, two greens)
-  const F = 0.0075
-  const leaves = ([[-0.08, -0.035, 0.1, 0.4, BENTO_LEAF], [0.075, 0.03, 0.095, 2.1, BENTO_LEAF_DEEP], [0.0, 0.0, 0.085, 4.0, BENTO_LEAF]] as const)
-    .map(([x, z, r, turn, c], k) => {
-      const g = new THREE.CircleGeometry(r, 12, turn).rotateX(-Math.PI / 2)
-      const lp = g.attributes.position
-      for (let i = 0; i < lp.count; i++) {
-        const lx = lp.getX(i), lz = lp.getZ(i), d = Math.hypot(lx, lz) / r, a = Math.atan2(lz, lx)
-        const ragged = 1 - 0.18 * Math.abs(Math.sin(a * 3 + k))
-        lp.setX(i, lx * ragged * 1.25)
-        lp.setZ(i, lz * ragged * 0.95)
-        lp.setY(i, 0.004 + k * 0.002 + d * d * (0.006 + 0.005 * Math.sin(a * 7 + k * 2)))
-      }
-      g.translate(x, F, z)
-      colourVertices(g, c)
-      return g
-    })
-  // (one end: two florets of broccoli on their stalks and three chunks of carrot, cut on the slant)
-  const greens = [[-0.238, -0.075], [-0.228, -0.025]].flatMap(([x, z], k) => {
-    const floret = new THREE.IcosahedronGeometry(0.024 - k * 0.002, 0).scale(1, 0.75, 1).rotateY(k * 0.8).translate(x, F + 0.032, z)
+  // (the main cell's leaf, under what's laid in: one lettuce leaf the cell's size, its edge ruffled a little, lying low)
+  const mX = (B.main[0] + B.main[1]) / 2, mZ = (B.front[0] + B.front[1]) / 2
+  const mW = B.main[1] - B.main[0] - 0.016, mD = B.front[1] - B.front[0] - 0.016
+  const leaf = new THREE.PlaneGeometry(mW, mD, 8, 4).rotateX(-Math.PI / 2)
+  {
+    const lp = leaf.attributes.position
+    for (let i = 0; i < lp.count; i++) {
+      const lx = lp.getX(i), lz = lp.getZ(i), e = Math.max(Math.abs(lx) / (mW / 2), Math.abs(lz) / (mD / 2))
+      lp.setY(i, 0.002 + e * e * (0.004 + 0.003 * Math.sin(lx * 90 + lz * 40)))
+    }
+    leaf.translate(mX, F, mZ)
+    colourVertices(leaf, BENTO_LEAF)
+  }
+  // (the side column: two florets of broccoli and two slices of carrot; and two pieces of rolled omelette, their layers showing)
+  const sX = (B.side[0] + B.side[1]) / 2
+  const greens = [[sX - 0.022, B.front[0] + 0.03], [sX + 0.02, B.front[0] + 0.036]].flatMap(([x, z], k) => {
+    const floret = new THREE.IcosahedronGeometry(0.02 - k * 0.002, 0).scale(1, 0.75, 1).rotateY(k * 0.8).translate(x, F + 0.028, z)
     colourVertices(floret, BENTO_GREEN)
-    return [floret, bentoBlock(0.011, 0.018, 0.011, x, F + 0.01, z, BENTO_STALK)]
+    return [floret, bentoBlock(0.01, 0.016, 0.01, x, F + 0.009, z, BENTO_STALK)]
   })
-  const carrots = [[-0.24, 0.03, 0.3], [-0.222, 0.06, 1.4], [-0.245, 0.088, 2.3]].map(([x, z, a]) => bentoTurned(0.026, 0.018, 0.02, x, F + 0.01, z, BENTO_CARROT, 0.35, a))
-  // (the other end, behind a low black wall: shredded cabbage with carrot and purple cabbage through it, heaped, and a wedge of lemon)
-  const shreds = Array.from({ length: 34 }, (_, k) => {
-    const c = k % 6 === 0 ? BENTO_CARROT : k % 5 === 0 ? BENTO_PURPLE : BENTO_CABBAGE
-    return bentoTurned(0.042, 0.003, 0.005, 0.24 + Math.sin(k * 1.7) * 0.026, F + 0.004 + (k % 5) * 0.004, -0.035 + Math.cos(k * 2.3) * 0.06, c, 0.2 * Math.sin(k), k * 0.83)
+  const carrots = [[sX - 0.018, B.sideSplit - 0.022, 0.4], [sX + 0.022, B.sideSplit - 0.02, 1.6]].map(([x, z, a]) => bentoTurned(0.024, 0.012, 0.018, x, F + 0.007, z, BENTO_CARROT, 0.25, a))
+  const omelette = [-1, 1].flatMap((k) => {
+    const x = sX + k * 0.024, z = (B.sideSplit + B.front[1]) / 2
+    return [bentoBlock(0.038, 0.026, 0.05, x, F + 0.013, z, BENTO_EGG), bentoBlock(0.039, 0.003, 0.051, x, F + 0.0275, z, BENTO_EGG_TOP)]
   })
-  const sides = [
-    ...leaves, ...greens, ...carrots,
-    bentoBlock(0.003, 0.03, 0.2, 0.2, F + 0.015, 0.0, BENTO_IN),
-    ...shreds,
-    bentoBlock(0.04, 0.018, 0.016, 0.24, F + 0.009, 0.075, BENTO_LEMON),
-  ]
-  bentoGeo = mergeGeometries([...parts, ...grains, ...sesame, cup, soup, ...inSoup, ...sides].map((g) => (g.index ? g.toNonIndexed() : g)))!
+  // (a wedge of lemon in the main cell's far corner, for the fish)
+  const lemon = bentoTurned(0.034, 0.016, 0.014, B.main[1] - 0.03, F + 0.012, B.front[1] - 0.02, BENTO_LEMON, 0, 0.5)
+  bentoGeo = mergeGeometries([...parts, ...grains, ...sesame, plum, ...pickles, cup, soup, ...inSoup, leaf, ...greens, ...carrots, ...omelette, lemon]
+    .map((g) => (g.index ? g.toNonIndexed() : g)))!
   return bentoGeo
+}
+/** where the `row`-th of `n` pieces of an order lies in its box (its own frame: x along the box, z across it): in the main cell, side by side
+ * across it, each along the box's length, never one on another (item 331) */
+function bentoSpot(row: number, n: number) {
+  const B = BENTO, k = Math.max(3, Math.min(5, n)), d = (B.front[1] - B.front[0] - 0.02) / k
+  return { x: (B.main[0] + B.main[1]) / 2, z: B.front[0] + 0.01 + d * (Math.min(row, k - 1) + 0.5) }
 }
 let lidGeo: THREE.BufferGeometry | null = null
 /** the lid, made once: black, over the box's rim; a red cord round it across the table (down both its long sides), the chopsticks in their
@@ -5210,8 +5227,11 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       p.body = null
       // (lying the box's long way, across the table, side by side along it; at the plate's size (BAR_FOOD_SCALE): at the fire's, a fish
       // lay out over the box's sides and the tasting bowl beside it)
-      p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, sideOf(row) * 0.075)
-        .add(new THREE.Vector3(0, 0.05 + Math.floor(row / 3) * 0.035 + tierOf(owner.id) * BOX_TIER, 0))
+      // (in the box's main cell, side by side across it (bentoSpot, item 331): they were laid three across and the fourth on the third)
+      const all = (TAKEOUT.orders.find((o) => o.id === owner.id)?.items ?? 3)
+      const spot = bentoSpot(row, all)
+      p.toP.copy(containerAt('takeout')).addScaledVector(ALONG, spot.z).addScaledVector(LAY, -spot.x)
+        .add(new THREE.Vector3(0, 0.05 + tierOf(owner.id) * BOX_TIER, 0))
       // (its box set out now, for it to land in)
       const order = TAKEOUT.orders.find((o) => o.id === owner.id)
       if (order) order.opened = true
@@ -8338,7 +8358,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       // served at the bar it comes down to the size of the customers and their plates (the fire is drawn big, to
       // cook on; the bar is in the people's own scale), shrinking as it's carried over
-      if ((p.container === 'bar' || p.container === 'takeout') && p.collected) shrink *= p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1))
+      // (in a takeaway's box a little under a plate's size: a whole saury lies in its main cell's length (item 331))
+      if ((p.container === 'bar' || p.container === 'takeout') && p.collected) shrink *= (p.small ? BAR_FOOD_SCALE : THREE.MathUtils.lerp(1, BAR_FOOD_SCALE, THREE.MathUtils.smoothstep(p.flight, 0, 1)))
+        * (p.container === 'takeout' ? TAKEOUT_FOOD : 1)
       if (p.eaten || waiting(p) || inFridge.has(p)) shrink = 0.0001
       const bounce = bounces.current.get(p)
       if (bounce !== undefined) shrink *= 1 + BOUNCE * Math.sin(Math.PI * bounce)
