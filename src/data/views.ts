@@ -3,7 +3,7 @@
 // the whole shop's have their own framing).
 import type { Lang } from './i18n'
 
-export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back' | 'window' | 'boss' | 'top'
+export type ViewId = 'free' | 'grill' | 'till' | 'genkan' | 'altar' | 'drinks' | 'toilet' | 'back' | 'window' | 'boss' | 'top' | 'upstairs'
 export type ViewSpot = {
   id: ViewId
   zh: string
@@ -53,8 +53,13 @@ export const VIEW_SPOTS: ViewSpot[] = [
   // length across the screen; a long lens, so the walls and what stands up lean out as little as can be)
   { id: 'top', zh: '俯視', ja: '真上', en: 'Top-down', fov: 32,
     about: { zh: '從正上方往下看整間店（90 度）', ja: '真上から店全体を見下ろす（90 度）', en: 'The whole shop from straight above (90°)' } },
+  // (the staff room upstairs (item 325, the owner's, 2026-11-18: 「捏個2F小房間，會切換場景，可以上樓去」): up the stair behind the staff
+  // door, a scene of its own (shops/grill/DormRoom), seen from its open front as a doll's house is)
+  { id: 'upstairs', zh: '二樓', ja: '二階', en: 'Upstairs', anchor: 'look-dorm', back: 11, up: 6.2, faceOn: true, fov: 40,
+    about: { zh: '二樓員工休息室兼宿舍：老闆與二廚住這裡，員工休息時上來喝茶', ja: '二階の休憩室兼寮：店主と二番手が住み、スタッフが休憩に上がる',
+      en: 'The staff room upstairs: the owner and the sous chef live here; the crew come up for a break' } },
 ]
 /** the key that brings each view up (its place in the list): 1 to 9, 0 the tenth (the owner's eyes), and ` the top-down one */
-export const viewKey = (i: number) => (VIEW_SPOTS[i]?.id === 'top' ? '`' : i === 9 ? '0' : String(i + 1))
+export const viewKey = (i: number) => (VIEW_SPOTS[i]?.id === 'top' ? '`' : VIEW_SPOTS[i]?.id === 'upstairs' ? '2F' : i === 9 ? '0' : String(i + 1))
 
 export const viewName = (v: ViewSpot, lang: Lang) => (lang === 'ja' ? v.ja : lang === 'en' ? v.en : v.zh)

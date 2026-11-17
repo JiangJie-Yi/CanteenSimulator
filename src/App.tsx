@@ -111,6 +111,7 @@ import { Prewarm } from '@/scene/Prewarm'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewKey, viewName, type ViewId } from '@/data/views'
+import { DormRoom } from '@/shops/grill/DormRoom'
 import { ViewToast } from '@/ui/ViewToast'
 
 /** closing up, by the game's minutes past closing time: those still in hurried out (half an hour), the shop shut whoever's left (an hour) */
@@ -1086,6 +1087,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
         shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04} shadow-radius={shadowSoft(theme === 'dark')}
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
+      {/* (the staff room upstairs, a scene of its own off to the side (item 325)) */}
+      <DormRoom />
       <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />
       <IndoorHDRI night={theme === 'dark'} intensity={(theme === 'dark' ? 0.3 + look.hemi * 0.4 : 0.5 + look.hemi * 0.5) * look.env * dim} />
       <spotLight
@@ -2331,6 +2334,16 @@ export default function App() {
   }, [editOn])
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
+  // (a view asked for from the room itself: the stair up behind the staff door, the stair down upstairs (item 325))
+  useEffect(() => {
+    const ask = (e: Event) => {
+      const id = (e as CustomEvent<ViewId>).detail
+      if (!VIEW_SPOTS.some((v) => v.id === id)) return
+      setView(id); setResetView((n) => n + 1); setViewMenu(false)
+    }
+    window.addEventListener('jgs-view', ask)
+    return () => window.removeEventListener('jgs-view', ask)
+  }, [])
   // the browser dropped the WebGL context (a phone out of GPU memory)
   const [glLost, setGlLost] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
@@ -3670,6 +3683,12 @@ export default function App() {
       </button>
       {/* (the game's day and time, under the round buttons (the owner's): day and night come round with it) */}
       <GameClock lang={lang} />
+      {/* (upstairs: the way down to the shop (item 325)) */}
+      {view === 'upstairs' && !editOn && (
+        <button type="button" className="dorm-down" onClick={() => { setView('back'); setResetView((n) => n + 1) }}>
+          <Glyph id="arrowU" size="14px" className="dorm-down-arrow" />{tl(lang, '下樓回店裡', '店に下りる', 'Back down to the shop')}
+        </button>
+      )}
       {/* (the shop shut and its day done: on to the next business day, under the clock (item 327)) */}
       <NextDayButton lang={lang} shown={!ai && !closing && !leaving && !daySum && !editOn && !guide && !bust} prepAt={PREP_AT} openAt={OPEN_AT}
         onGo={onNextDay} />

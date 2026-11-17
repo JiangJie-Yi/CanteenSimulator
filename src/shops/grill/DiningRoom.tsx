@@ -29,6 +29,7 @@ import { cartonMaterials } from './drinkCartons'
 import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, type Counter, type DrinkId } from './bar'
 import { EditBlock, Movable } from './Movable'
 import { getEdit } from './edit'
+import { askView } from './DormRoom'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
@@ -3658,7 +3659,8 @@ function StaffDoor() {
       </mesh>
       <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS}
         onPointerOver={(ev) => { ev.stopPropagation(); if (getEdit().on) return; stairsHot.current = true; document.body.style.cursor = 'not-allowed'; setTip({ title: '2F 員工休息室／倉庫', hint: '閒人勿進・禁止進入', warn: true }) }}
-        onPointerOut={() => { stairsHot.current = false; document.body.style.cursor = ''; setTip(null) }} onClick={(ev) => ev.stopPropagation()}>
+        onPointerOut={() => { stairsHot.current = false; document.body.style.cursor = ''; setTip(null) }}
+        onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; setTip(null); askView('upstairs') }}>
         <planeGeometry args={[STAFF_W + 0.06, WC_H + 0.03]} />
       </mesh>
       <group ref={g} onClick={(ev) => {

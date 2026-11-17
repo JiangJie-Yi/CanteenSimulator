@@ -778,6 +778,30 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: none; }
 }
+/* (upstairs: the way down (item 325), at the foot of the screen over the carousel's row, the clock's smoked glass) */
+.dorm-down {
+  position: fixed;
+  z-index: 10;
+  left: 50%;
+  bottom: 92px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgb(255 214 150 / 0.55);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgb(70 52 34 / 0.72), rgb(34 26 18 / 0.62));
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  color: #f6ecda;
+  font: 700 15px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+.dorm-down:hover { border-color: #ffd696; }
+.dorm-down .dorm-down-arrow { transform: rotate(180deg); }
 /* (out of the way of a panel docked at the right: its title runs down where the clock is) */
 .app.is-docked .game-clock,
 .app.is-docked .game-clock-next {
