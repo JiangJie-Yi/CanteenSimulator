@@ -3093,10 +3093,20 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   cursor: pointer;
 }
 
+/* (the take-off-the-menu button (item 330): its icon and its word, a press that gives, armed red for a second press) */
 .nb-publish button.nb-off {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: #fff;
   color: #c4442f;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease, transform 90ms ease, box-shadow 120ms ease;
 }
+.nb-publish button.nb-off:hover { background: #fdecea; }
+.nb-publish button.nb-off:active { transform: scale(0.95); }
+.nb-publish button.nb-off.is-armed { background: #c4442f; color: #fff; box-shadow: 0 0 0 3px rgb(196 68 47 / 0.22); animation: nb-off-arm 0.6s ease-in-out infinite alternate; }
+@keyframes nb-off-arm { from { box-shadow: 0 0 0 2px rgb(196 68 47 / 0.18); } to { box-shadow: 0 0 0 5px rgb(196 68 47 / 0.32); } }
 
 .nb-publish button:disabled {
   opacity: 0.4;

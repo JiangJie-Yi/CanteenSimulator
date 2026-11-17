@@ -5,7 +5,8 @@ import type { Dish } from '@/data/menu'
 import { findItem, MENU_MAX, MENU_MIN, partName, recipeKey, SEASON_NAME, signature, suggestPrice,
   type Entry, type Part, type Seasoning } from '@/data/recipes'
 import { starsOf } from '@/game/taste'
-import { Stars } from './GameIcons'
+import { Glyph, Stars } from './GameIcons'
+import { panelSound } from './uiSound'
 import { idealSteps, recipeSteps, timingTips } from '@/game/research'
 import { menuPrice } from '@/game/economy'
 import type { Notes, Talk, Try } from '@/game/types'
@@ -202,7 +203,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                           <label>NT$<input type="number" min={1} inputMode="numeric" value={e.price}
                             onChange={(ev) => { const v = Math.round(Number(ev.target.value)); if (v > 0) onReprice(e.key, v) }} /></label>
                           <small>{t(lang, '成本', '原価', 'Cost')} {cost}・{t(lang, '毛利', '粗利', 'Margin')} {Math.round((1 - cost / e.price) * 100)}%</small>
-                          <button type="button" className="nb-off" onClick={() => onUnpublish(e.key)}>{t(lang, '下架', '外す', 'Unlist')}</button>
+                          <UnlistButton lang={lang} onConfirm={() => onUnpublish(e.key)} />
                         </div>
                       </li>
                     )
@@ -273,5 +274,32 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
             </div>
           )}
     </div>
+  )
+}
+
+/**
+ * Taking a dish off the menu (item 330, the owner's, 2026-11-18: 「下架的Button要改」): asked twice, so a slip doesn't take it off: the first
+ * press arms it (its own icon, 「確定下架？」, filled red, a soft sound), a second within three seconds takes it off; left, it goes back as
+ * it was. Its words on one line in each language
+ */
+function UnlistButton({ lang, onConfirm }: { lang: Lang; onConfirm: () => void }) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const k = window.setTimeout(() => setArmed(false), 3000)
+    return () => window.clearTimeout(k)
+  }, [armed])
+  return (
+    <button type="button" className={`nb-off${armed ? ' is-armed' : ''}`} aria-pressed={armed}
+      title={armed ? t(lang, '再按一次就從菜單拿掉', 'もう一度押すとメニューから外す', 'Press again to take it off the menu') : undefined}
+      onClick={() => {
+        if (!armed) { setArmed(true); panelSound(true); return }
+        setArmed(false)
+        panelSound(false)
+        onConfirm()
+      }}>
+      <Glyph id={armed ? 'check' : 'minus'} size="12px" />
+      {armed ? t(lang, '確定下架？', '外しますか？', 'Unlist it?') : t(lang, '下架', '外す', 'Unlist')}
+    </button>
   )
 }
