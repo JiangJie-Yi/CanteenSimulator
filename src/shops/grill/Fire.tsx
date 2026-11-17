@@ -2,6 +2,7 @@ import { useMemo, useRef, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import { snoise } from '@/scene/shaders/noise'
+import { FIRE_FLARE } from './bar'
 
 const flameVertex = /* glsl */ `
 uniform float uTime;
@@ -23,6 +24,7 @@ const flameFragment = /* glsl */ `
 uniform float uTime;
 uniform float uSeed;
 uniform float uIntensity;
+uniform float uAlpha;
 varying vec2 vUv;
 ${snoise}
 void main() {
@@ -44,7 +46,8 @@ void main() {
   float inner = smoothstep(0.72, 0.75, flame);
   vec3 col = mix(vec3(0.93, 0.27, 0.12), vec3(1.0, 0.6, 0.18), mid);
   col = mix(col, vec3(1.0, 0.9, 0.5), inner);
-  gl_FragColor = vec4(col * uIntensity, outer);
+  // (see-through as binchotan's flames are, a thin flicker over the glowing bed; near solid as a flare stands up)
+  gl_FragColor = vec4(col * uIntensity, outer * uAlpha);
 }
 `
 
@@ -102,7 +105,7 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, base
           new THREE.ShaderMaterial({
             vertexShader: flameVertex,
             fragmentShader: flameFragment,
-            uniforms: { uTime: { value: 0 }, uSeed: { value: i * 4.17 }, uIntensity: { value: 1.0 } },
+            uniforms: { uTime: { value: 0 }, uSeed: { value: i * 4.17 }, uIntensity: { value: 1.0 }, uAlpha: { value: 0.6 } },
             transparent: true,
             depthWrite: false,
             side: THREE.DoubleSide,
@@ -160,24 +163,34 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, base
     const lv = level ? level.current : 1
     // once the charcoal is spent the flames die right down and go out
     const alive = THREE.MathUtils.smoothstep(lv, 0, 0.1)
+    // (item 276: binchotan's flames low and thin over its red bed, however hot it is (a campfire's stood a metre high); up a moment as fat
+    // drips on it, and for a few seconds as fresh charcoal catches)
+    const F = FIRE_FLARE
+    F.fat *= Math.exp(-dt / 0.33)
+    F.catch *= Math.exp(-dt / 2)
+    const flare = Math.min(1.2, F.fat + F.catch)
     if (flames.current) {
       flames.current.visible = alive > 0.01
-      flames.current.scale.set((0.6 + 0.6 * lv) * alive, (0.25 + 1.5 * lv) * alive, (0.6 + 0.6 * lv) * alive)
+      const w = (0.55 + 0.35 * lv) * (1 + 0.25 * flare) * alive
+      flames.current.scale.set(w, (0.1 + 0.26 * lv) * (1 + 2.6 * F.fat + 3.6 * F.catch) * alive, w)
     }
+    for (const m of flameMaterials) m.uniforms.uAlpha.value = 0.55 + 0.4 * Math.min(1, flare)
     emberMaterial.uniforms.uLevel.value = alive
 
     // flicker: a few incommensurate sines read as random
     if (light.current) {
       // no fire, no firelight
+      // (the bed's glow steady, as coals' is, only a little breathing; a flare's flash on top)
       light.current.intensity = baseIntensity * 1.45 * lv * alive *
-        (1 + Math.sin(t * 11) * 0.13 + Math.sin(t * 17.3) * 0.1 + Math.sin(t * 5.1) * 0.16)
+        (1 + Math.sin(t * 11) * 0.05 + Math.sin(t * 17.3) * 0.04 + Math.sin(t * 5.1) * 0.08 + 0.35 * flare)
     }
 
     // sparks follow the fire: a fierce fire throws lots of them, fast and high, in bursts as it crackles;
     // dying embers let off only the odd lazy one
     const { pos, vel, life, maxLife, size, baseSize, geometry } = emberState
     const crackle = 0.6 + 0.4 * Math.max(0, Math.sin(t * 2.3) * Math.sin(t * 5.7 + 1.3))
-    const spawn = alive * (0.15 + 0.85 * lv) * crackle
+    // (binchotan throws few sparks burning steady; a flare's fat and fresh charcoal catching throw them up)
+    const spawn = alive * (0.08 + 0.42 * lv) * crackle * (1 + 2.5 * flare)
     for (let i = 0; i < life.length; i++) {
       if (life[i] > 0) life[i] -= dt / maxLife[i]
       if (life[i] <= 0) {

@@ -254,6 +254,13 @@ export const PATH_MAP: { v: number; blocks: { id: string; pts: THREE.Vector3[] }
   hot: string | null } =
   keep(import.meta.hot, 'PATH_MAP', { v: 0, blocks: [], routes: [], places: [], home: null, hot: null })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pathMap: PATH_MAP })
+/**
+ * The fire's flare-ups (item 276, the owner's: 「這火也太旺? 真實世界是怎麼樣?」): binchotan burnt through hardly flames at all, its bed red
+ * through under a skin of white ash, its heat given off as it glows; the flames stand up only a moment as fat drips onto it from what's
+ * grilling (`fat`, Roasting sets it as it drips; gone in a third of a second), and for a few seconds as charcoal put on catches (`catch`,
+ * App sets it; gone in two). Fire draws its flames low and see-through, and taller and bright as these are up.
+ */
+export const FIRE_FLARE = keep(import.meta.hot, 'FIRE_FLARE', { fat: 0, catch: 0 })
 /** (item 317) the open shop's square iron tray by the fire: whether it's out (the shop open), and how many pieces lie on it just now (waiting
  * there for their plates, or kept warm); Roasting counts them each frame, the stock's tableware tab and the back office show them */
 export const KAKUBAT = keep(import.meta.hot, 'KAKUBAT', { out: false, n: 0 })

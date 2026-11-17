@@ -3,7 +3,7 @@ import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 import { TONG_S, TONG_TAKE_S, TRAY_PLACES, trayPlace } from '@/game/tray'
-import { KAKUBAT } from './bar'
+import { FIRE_FLARE, KAKUBAT } from './bar'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -310,6 +310,8 @@ const BOWL_R = 0.4
  * beside its end toward the plating place, their hinge toward the server's side; how long they take to reach a piece and lift it onto its
  * plate (game/tray's TONG_TAKE_S for the first, TONG_S each after) and to go back down (s)
  */
+/** (item 276) what drips fat onto the coals as it grills: the oily fish and the meats */
+const FATTY = /^(Saury|saury|Mackerel|mackerel|Salmon|Buri|Gindara|Hokke|Nodoguro|Iwashi|Aji|ayu|Shishamo|ExtraFish|PorkBelly|Sausage|Yakitori)$/
 const TRAY_REST = 0.03 + 0.023
 const TRAY_YAW = Math.atan2(0.59, 0.81)
 /** which way along the table the plating place is from the bowl (+1 or -1 along STACK_DIR); the tray stands 10 cm that way from the bowl's
@@ -8354,7 +8356,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         }
         if (p.fresh) { p.node.position.copy(at); p.fresh = false } else p.node.position.lerp(at, Math.min(1, dt * 10))
       } else if (!p.collected) {
-        if (active && !waiting(p) && !p.carried && p.homeFlight >= 1) p.progress += dt * roastRate(heatOf())
+        if (active && !waiting(p) && !p.carried && p.homeFlight >= 1) {
+          p.progress += dt * roastRate(heatOf())
+          // (fat dripping onto the coals as it cooks (item 276): a fatty fish or meat, from a third done on, now and then, a flare of flame
+          // under it a moment and the hiss of it; nothing over a bed too low to flame)
+          const r = p.progress / (roast.times[p.id] ?? 1)
+          if (FATTY.test(p.id) && r > 0.33 && r < 1.1 && heatOf() > 0.15 && Math.random() < dt * 0.14) {
+            FIRE_FLARE.fat = Math.max(FIRE_FLARE.fat, 0.55 + 0.45 * Math.random())
+            sizzleBurst(p.node.getWorldPosition(SIZZLE_AT), 0.8)
+          }
+        }
         p.node.quaternion.copy(p.homeQ)
         p.node.position.x = p.homeP.x
         p.node.position.z = p.homeP.z
