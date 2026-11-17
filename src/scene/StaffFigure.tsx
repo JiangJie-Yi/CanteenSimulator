@@ -2,6 +2,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { rimmedTray } from './trayGeometry'
 import { footDust, newSteps } from './DustPuffs'
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { atlasModel } from './atlasMerge'
@@ -286,8 +287,10 @@ function heldPieces(): { geo: THREE.BufferGeometry; part: Part }[] {
   const at = new THREE.Matrix4().makeTranslation(TRAY_AT[0], TRAY_AT[1], TRAY_AT[2])
   const clip = new THREE.Matrix4().makeTranslation(TRAY_AT[0], TRAY_AT[1] + 0.04, TRAY_AT[2] - 0.02).multiply(new THREE.Matrix4().makeRotationX(-0.6))
   return [
-    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.1, 0.095, 0.014, 12), '#3a1a14', at) },
-    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.024, 0.02, 0.05, 8), '#e8dcc0', at.clone().multiply(new THREE.Matrix4().makeTranslation(0.03, 0.03, 0))) },
+    // (a tray with a rim standing round it (scene/trayGeometry, item 248): a flat disc it was, read as a plate; its underside where the
+    // disc's was, the cup on its floor)
+    { part: 'tray', geo: piece(rimmedTray(0.1, 0.02, 0.006), '#3a1a14', at.clone().multiply(new THREE.Matrix4().makeTranslation(0, -0.007, 0))) },
+    { part: 'tray', geo: piece(new THREE.CylinderGeometry(0.024, 0.02, 0.05, 8), '#e8dcc0', at.clone().multiply(new THREE.Matrix4().makeTranslation(0.03, 0.024, 0))) },
     { part: 'clip', geo: piece(new THREE.BoxGeometry(0.12, 0.008, 0.16), '#c9a66b', clip) },
     { part: 'clip', geo: piece(new THREE.PlaneGeometry(0.1, 0.12), '#f7f3ea', clip.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.005, 0.01)).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2))) },
     // (its steel clip across the top, holding the list's top edge; the list's lines, written in pencil)
@@ -488,7 +491,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       /** wiping the floor (item 164): how long at it, and where the cloth is in their own upright frame */
       floorWipe?: number; wipeAt?: [number, number, number]
       /** both hands where a job wants them, in the world (item 177: on the open sake bottle as it's poured, a tokkuri, a cup) */
-      handsAt?: { left: THREE.Vector3; right: THREE.Vector3 } } | undefined
+      handsAt?: { left: THREE.Vector3; right: THREE.Vector3 }
+      /** (a server on an errand: their tray put down, item 249) */
+      trayDown?: boolean } | undefined
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -679,7 +684,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     if (pan.visible) { pan.position.copy(ownerSweepPose(job!.sweep!).pan); pan.rotation.set(-OWNER_BEND, 0, 0) }
     // (nor while they're down wiping the floor)
     // (nor while both hands are at a job (pouring the sake, item 177))
-    fig.tray?.scale.setScalar(role === 'server' && !job?.broom && job?.floorWipe === undefined && reachK.current < 0.5 ? 1 : 0)
+    // (nor while they're on an errand (GuestBar3D's trayDown: the till, the skewers, the sink, sweeping up): the tray's put down for it, picked
+    // up again at their place, item 249)
+    fig.tray?.scale.setScalar(role === 'server' && !job?.broom && job?.floorWipe === undefined && !job?.trayDown && reachK.current < 0.5 ? 1 : 0)
   })
   return (
     <group ref={outer} userData={{ staffRole: role }}>

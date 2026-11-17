@@ -15,8 +15,10 @@ export const isSeasonId = (id: string) => id.startsWith('season:')
 export const seasonOf = (id: string) => (isSeasonId(id) ? (id.slice(7) as Seasoning) : null)
 /** the binchotan in the sack (counted in sticks) */
 export const CHARCOAL = 'charcoal'
-/** what isn't food: kept out of what goes stale */
-export const isSupply = (id: string) => isSeasonId(id) || id === CHARCOAL
+/** what isn't food: kept out of what goes stale (and the shop's supplies, the tissues, the till's paper, the washroom's towels, roll and
+ * soap, the washing-up liquid, the toilet cleaner: none of them goes off (item 268: the stock keeper threw them out as gone off, ten tissues,
+ * twelve rolls... and called them by their codes, supply:tissue)) */
+export const isSupply = (id: string) => isSeasonId(id) || id === CHARCOAL || id.startsWith('supply:')
 
 /** the usual stock of each seasoning (補滿 tops it up to this), and what a new shop has of each */
 export const SEASON_PAR = 30

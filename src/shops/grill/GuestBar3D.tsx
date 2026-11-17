@@ -28,6 +28,7 @@ import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
 import { makeTrip, through, tripStep, turnSmooth, turnToward, type Trip } from './commuteWalk'
+import { rimmedTray } from '@/scene/trayGeometry'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
 import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
@@ -95,7 +96,7 @@ import { crowdAmbience } from './fireAmbience'
 import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
-import { DRAIN_KINDS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
+import { DRAIN_KINDS, EAT_PHASE, PLATE_FACES, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -226,7 +227,9 @@ const TRAY_SETS = 2
 const SAKE_TRAY = new THREE.Vector3()
 const SAKE_TRAY_YAW = { v: 0 }
 const OWNER_BONE = new THREE.Vector3()
-/** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a black-lacquered tray held in front */
+/** the owner's tray: a server's rimmed lacquered one (scene/trayGeometry, item 249: a flat black disc, it read as "a black plate") */
+const OWNER_TRAY_GEO = rimmedTray(0.15, 0.024, 0.008)
+/** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a lacquered tray held in front */
 function OwnerWalker({ moving }: { moving: boolean }) {
   const g = useRef<THREE.Group>(null)
   const tray = useRef<THREE.Mesh>(null)
@@ -240,8 +243,11 @@ function OwnerWalker({ moving }: { moving: boolean }) {
     o.position.y = moving ? Math.abs(Math.sin(t * 9)) * 0.014 : 0
     // (sweeping up broken glass, or the broom carried: the tray put by)
     // (nor while he's down sweeping or wiping the floor (item 116: the tray showed in his hands as he wiped, a black disc on the floor))
+    // (nor on an errand, the till, the skewers, the sink or sweeping up, there and back (trayDown, item 249: back from sweeping up broken glass
+    // he had it in his hands again, an empty black disc, "a black plate"))
     if (tray.current) tray.current.visible = !o.parent?.userData.broom && o.parent?.userData.scrub === undefined && o.parent?.userData.sweep === undefined
       && o.parent?.userData.floorWipe === undefined && o.parent?.userData.washHands === undefined && o.parent?.userData.handsAt === undefined
+      && !o.parent?.userData.trayDown
     // (sweeping: both his hands on the broom's handle, going with it from side to side, as a server's are (the owner's, 2026-11-11: his hands
     // stood still at his sides while the broom swept); back where they rest after)
     if (!hands.current) {
@@ -296,9 +302,8 @@ function OwnerWalker({ moving }: { moving: boolean }) {
       <group scale={OWNER_IN_STAFF}><BossModel /></group>
       {/* (the broom, when he sweeps up broken glass in a server's stead) */}
       <SweepBroom owner />
-      <mesh ref={tray} position={[HELD_AT[0], HELD_AT[1] + 0.005, HELD_AT[2]]}>
-        <cylinderGeometry args={[0.15, 0.14, 0.016, 28]} />
-        <meshToonMaterial color="#1c1412" />
+      <mesh ref={tray} position={[HELD_AT[0], HELD_AT[1] - 0.003, HELD_AT[2]]} geometry={OWNER_TRAY_GEO}>
+        <meshToonMaterial color="#3a1a14" />
       </mesh>
     </group>
   )
@@ -2556,6 +2561,13 @@ function billFor(x: { id: number; items?: number; drink?: DrinkId }) {
   const parts = drink ? [...each, ...sides, drink] : [...each, ...sides]
   return { parts, items: each.length, bill: parts.reduce((a, b) => a + b, 0) }
 }
+/** a server's errands, for which their tray's put down (item 249): sweeping up and wiping the floor, the till, the takeaway's bag, the skewers,
+ * washing up and their hands at the sink. The rest (fetching what's plated, carrying it, setting it down, clearing, the dried plates, the sake)
+ * is carried on it, and at their place they hold it */
+const TRAY_ERRANDS = new Set(['washGo', 'wash', 'handGo', 'handwash', 'toBox', 'boxTake', 'toTill', 'hand', 'toStand', 'standPut', 'skTrayGo', 'skTake',
+  'skSinkGo', 'skWash', 'skHolderGo', 'skPut', 'tillGo', 'tillAt', 'sweepGo', 'sweep', 'wipeFloor'])
+/** figures placed where they are at least once since they were put in the scene (till then hidden, item 242) */
+const placedOnce = new WeakSet<THREE.Object3D>()
 /** a walk that stops a while at a point along it: how far along, at a time when it would have been `d` */
 const withPause = (d: number, at: number, hold: number) => (d < at ? d : d < at + hold ? at : d - hold)
 /**
@@ -3309,6 +3321,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     box?: number
     /** (glass broken on the floor, bar.ts's SPILLS) the one they've gone to sweep up; and the broom in their hand, there and back */
     spill?: number; broom?: boolean
+    /** their tray put down for an errand (TRAY_ERRANDS), till they're back at their place (item 249) */
+    trayDown?: boolean
     path: THREE.Vector3[]; len: number; pos: THREE.Vector3; yaw: number
     /** their walk home once the shop's shut, and in as it opens (commuteWalk); whether they're in yet */
     out?: Trip; in?: Trip; arrived?: boolean }[]>([])
@@ -3369,7 +3383,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** at the soup's pot to make it (the pot empty), not just to stir it */
     making?: boolean
     /** where the plating place's plates are taken from this time: the low rack by the table, or the dish racks (game/plates' plateSource) */
-    src?: 'low' | 'rack' }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
+    src?: 'low' | 'rack'
+    /** the way they're to face; `yaw` (the way they face, and what's in their hands with them) turned to it a frame at a time (item 242) */
+    yawTo?: number }>({ phase: 'idle', t: 0, path: [], len: 0, pos: new THREE.Vector3(), yaw: 0, n: 0 })
   /**
    * A customer's tokkuri of sake (item 177, the owner's, 2026-11-15: "that sake stand: the way it goes looks odd, and not professional"): taken
    * off SAKE.want by the plater (the third cook; with no plater, a server), poured by hand at the sake station on the serving counter
@@ -3774,6 +3790,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // (kept in a map of its own, not on the figure's userData: React hands a waiter's group a new userData each time the bar redraws, and the
   // second day's audit still saw seven of them go 0.32 up in a frame)
   const stoolLifts = useRef(new WeakMap<THREE.Object3D, number>())
+  /** each customer's facing as shown and the one it's turning to (item 242: on their userData, lost each time the bar redrew) */
+  const facings = useRef(new WeakMap<THREE.Object3D, { shown: number; want: number }>())
   const stoolLift = (o: THREE.Object3D, p: THREE.Vector3, dt: number) => {
     const want = stoolY(p)
     const was = stoolLifts.current.get(o)
@@ -5143,9 +5161,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (turned toward the way they're to face a frame at a time: each step above sets it outright (along their way, to their seat, to the
       // till), and they spun round at every corner, up to 180° in a frame. A facing set this frame is the one to turn to; one left alone,
       // the last such is still)
+      // (kept by the figure, not on its userData: React puts a new userData on it each time the bar redraws, and with it gone the facing
+      // was taken afresh from the one set this frame, up to 2.5 rad in a frame (item 242; the step stool's lift had the same, item 220))
       if (g) {
-        const u = g.userData as { shown?: number; want?: number }
-        if (u.shown === undefined || u.want === undefined) u.shown = u.want = g.rotation.y
+        const u = facings.current.get(g)
+        if (!u) facings.current.set(g, { shown: g.rotation.y, want: g.rotation.y })
         else {
           if (g.rotation.y !== u.shown) u.want = g.rotation.y
           u.shown = turnToward(u.shown, u.want, dt)
@@ -5513,12 +5533,12 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const { p, dir } = alongPath(pl.path, d)
         pl.pos.copy(p)
         // (turned to the way quickly but not at once: setting off from their place, they snapped round from how they stood there)
-        if (dir.x || dir.z) { const want = Math.atan2(dir.x, dir.z); pl.yaw += Math.atan2(Math.sin(want - pl.yaw), Math.cos(want - pl.yaw)) * Math.min(1, step * 12) }
+        if (dir.x || dir.z) pl.yawTo = Math.atan2(dir.x, dir.z)
         if (d >= pl.len) { pl.t = 0; then() }
       }
       // (going: stood in for from just how the one at their place stands)
       const away = (on: boolean) => {
-        if (on) { const y = yawOfCrew(); if (y !== null) pl.yaw = y }
+        if (on) { const y = yawOfCrew(); if (y !== null) pl.yaw = pl.yawTo = y }
         if (plater) PLATER_OUT.id = on ? plater.id : null; else ownerAway('plate', on)
       }
       // (worn out, at half pace (the owner's))
@@ -5555,7 +5575,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
        * the nearest spot on the floor clear of the table (right under one, they stood half in the table's face) */
       const skTraySpot = () => skewerSpot('skewer-tray', home())
       const skHolderSpot = () => skewerSpot('skewer-holder', home())
-      const faceTo = (v: THREE.Vector3) => { pl.yaw = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
+      const faceTo = (v: THREE.Vector3) => { pl.yawTo = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z) }
       /** where they stand on the kitchen's floor to reach something on (or by) the cook table: the nearest spot clear of it that a way reaches
        * from where they are (game/kitchenPath's reachSpot; the nearest side alone (standClear) could be one no way reaches: the sake stand,
        * moved along the table's back by the owner, was reached from the gap between the table and the bar, the way there none, and the
@@ -5607,9 +5627,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       /** turned to face something where they stand, quickly but not at once, for `dur` seconds; then on */
       const turnTo = (v: THREE.Vector3, dur: number, then: () => void) => {
-        const want = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z)
-        pl.yaw += Math.atan2(Math.sin(want - pl.yaw), Math.cos(want - pl.yaw)) * Math.min(1, step * 12)
-        if (pl.t > dur) { pl.yaw = want; pl.t = 0; then() }
+        pl.yawTo = Math.atan2(v.x - pl.pos.x, v.z - pl.pos.z)
+        if (pl.t > dur) { pl.t = 0; then() }
       }
       const setOff = (to: THREE.Vector3, phase: typeof pl.phase) => {
         pl.path = kitchenRoute(pl.pos, to)
@@ -5764,7 +5783,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       else if (pl.phase === 'liftSack' && pl.t > 0.9) setOff(home(), 'toFill')
       else if (pl.phase === 'toFill') walk(() => { pl.phase = 'fillCrate' })
       else if (pl.phase === 'fillCrate') {
-        if (pl.t < 0.3) { const want = Math.atan2(crateAt().x - pl.pos.x, crateAt().z - pl.pos.z); pl.yaw += Math.atan2(Math.sin(want - pl.yaw), Math.cos(want - pl.yaw)) * Math.min(1, step * 12) }
+        if (pl.t < 0.3) pl.yawTo = Math.atan2(crateAt().x - pl.pos.x, crateAt().z - pl.pos.z)
         else if (pl.t > 0.9) {
           CRATE.left += SUPPLIES.refillCrate(Math.max(0, CRATE_FULL - CRATE.left))
           pl.phase = 'takeCoal'
@@ -5790,7 +5809,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.path = []; pl.len = 0
         pl.phase = 'settle'
         pl.t = 0
-      } else if (pl.phase === 'toSake') walk(() => { pl.phase = 'pourSake'; pl.yaw = stationYaw() })
+      } else if (pl.phase === 'toSake') walk(() => { pl.phase = 'pourSake'; pl.yawTo = stationYaw() })
       // (at the station, square on to it: a tokkuri set out, the bottle taken up in both hands, poured, set back, a cup put by it (the
       // beats, game/sakePour; the bottle and the hands posed from them below); poured, left there for a server, and home)
       else if (pl.phase === 'pourSake') {
@@ -5800,7 +5819,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       }
       // (a customer's bowls: at the cooker, square on to it, the rice scooped beat by beat; at the pot the soup ladled; to the counter with
       // them, set down there for a server; they gone meanwhile, the bowls put by, and home)
-      else if (pl.phase === 'toRiceBowl') walk(() => { const j = bowlJob.current; if (j) { j.W = riceFillAt(); j.t = 0; pl.yaw = Math.atan2(j.W.face.x, j.W.face.z) } pl.phase = 'riceBowl' })
+      else if (pl.phase === 'toRiceBowl') walk(() => { const j = bowlJob.current; if (j) { j.W = riceFillAt(); j.t = 0; pl.yawTo = Math.atan2(j.W.face.x, j.W.face.z) } pl.phase = 'riceBowl' })
       else if (pl.phase === 'riceBowl') {
         const j = bowlJob.current
         if (!j) setOff(home(), 'home')
@@ -5815,7 +5834,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
         }
       }
-      else if (pl.phase === 'toSoupBowl') walk(() => { const j = bowlJob.current; if (j) { j.W = soupFillAt(); j.t = 0; pl.yaw = Math.atan2(j.W.face.x, j.W.face.z) } pl.phase = 'soupBowl' })
+      else if (pl.phase === 'toSoupBowl') walk(() => { const j = bowlJob.current; if (j) { j.W = soupFillAt(); j.t = 0; pl.yawTo = Math.atan2(j.W.face.x, j.W.face.z) } pl.phase = 'soupBowl' })
       else if (pl.phase === 'soupBowl') {
         const j = bowlJob.current
         if (!j) setOff(home(), 'home')
@@ -5830,7 +5849,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
         }
       }
-      else if (pl.phase === 'toBowlPass') walk(() => { pl.phase = 'bowlPut'; pl.yaw = stationYaw() })
+      else if (pl.phase === 'toBowlPass') walk(() => { pl.phase = 'bowlPut'; pl.yawTo = stationYaw() })
       else if (pl.phase === 'bowlPut' && pl.t > BOWL_PUT_S) {
         // (left at the counter in their row for a server, and the plater free for the next customer's (item 207); they gone meanwhile,
         // put by)
@@ -5850,7 +5869,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       else if (pl.phase === 'toRack') walk(() => {
         pl.phase = 'take'
         const at = pl.src === 'low' ? lowTop() : rackTop(rackNow())
-        pl.yaw = Math.atan2(at.x - pl.pos.x, at.z - pl.pos.z)
+        pl.yawTo = Math.atan2(at.x - pl.pos.x, at.z - pl.pos.z)
       })
       else if (pl.phase === 'take' && pl.t > 0.5) {
         // (off the racks into their hands, as many as the plating place's stack wants)
@@ -5863,7 +5882,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         pl.t = 0
       } else if (pl.phase === 'toPass') walk(() => {
         pl.phase = 'put'
-        pl.yaw = Math.atan2(plating.at.x - pl.pos.x, plating.at.z - pl.pos.z)
+        pl.yawTo = Math.atan2(plating.at.x - pl.pos.x, plating.at.z - pl.pos.z)
       })
       else if (pl.phase === 'put' && pl.t > 0.5) {
         // (all of them set down, even with a plate or two put back on the stack meanwhile: none is ever lost)
@@ -5893,9 +5912,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         // (turned to face as they do at their place, then they're themselves again there: turned at once, they snapped round)
         const want = yawOfCrew()
         const turn = want === null ? 0 : Math.atan2(Math.sin(want - pl.yaw), Math.cos(want - pl.yaw))
-        if (want !== null) pl.yaw += turn * Math.min(1, step * 10)
-        if (Math.abs(turn) < 0.03 || pl.t > 0.5) {
-          if (want !== null) pl.yaw = want
+        if (want !== null) pl.yawTo = want
+        if (Math.abs(turn) < 0.03 || pl.t > 0.6) {
+          if (want !== null) pl.yaw = pl.yawTo = want
           pl.phase = 'idle'
           away(false)
         }
@@ -5964,6 +5983,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         || pl.phase === 'toCrate' || pl.phase === 'toBucket' || pl.phase === 'toHearth' || pl.phase === 'toSoup' || pl.phase === 'toCoalSack' || pl.phase === 'toFill'
         || pl.phase === 'toShape'
       if (mv !== platerMoving) setPlaterMoving(mv)
+      // (the way they face turned to the way they're to face, by time (commuteWalk's turnEase): set at once, they snapped round, over a
+      // hundred times a minute at double speed (item 242))
+      if (pl.yawTo !== undefined) pl.yaw = pl.phase === 'idle' ? pl.yawTo : turnToward(pl.yaw, pl.yawTo, step)
       const o = platerObj.current
       if (o) {
         o.visible = pl.phase !== 'idle'
@@ -6366,6 +6388,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         if (g) {
           g.position.copy(v.pos)
           g.position.y = genkanY(counters, v.pos)
+          // (shown once they're where they are: put in the scene between this and the frame's drawing, they were drawn a frame at the
+          // bar's middle first, a flash there as each came (item 242))
+          if (!placedOnce.has(g)) { placedOnce.add(g); g.visible = true; g.rotation.y = v.yaw }
           // (and those on the bench as they sit down, get up and go)
           g.rotation.y = turnToward(g.rotation.y, v.yaw, step * 1.5)
           // (a little bow at the step, down to their shoes)
@@ -7133,6 +7158,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       // (wiping the floor its own: stooped as for the sweep, but the broom and the dustpan put by and the cloth in hand (item 164: the three
       // were out together, the sweep's flag kept on for the stoop))
       if (o) { o.userData.sweep = w.phase === 'sweep' ? w.t : undefined; o.userData.floorWipe = w.phase === 'wipeFloor' ? w.t : undefined; o.userData.broom = !!w.broom }
+      // (their tray down for an errand, and on the way back from one; up again for what's carried on it and at their place)
+      if (TRAY_ERRANDS.has(w.phase)) w.trayDown = true
+      else if (w.phase !== 'back') w.trayDown = false
+      if (o) o.userData.trayDown = !!w.trayDown
       // (washing up at the sink, by hand or into the washer: the scrubbing motion (StaffFigure's scrub))
       if (o) o.userData.scrub = w.phase === 'wash' || w.phase === 'handwash' ? w.t : undefined
       // (pouring a customer's sake themself (no plater): both hands where the pour has them (item 177)); and the tray it's carried out on
@@ -7938,8 +7967,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       ))}
       {runs.current.map((r) => (
         <group key={r.key} name={`plate-run-${r.key}`} ref={(o) => {
-          if (!o) return void runObjs.current.delete(r.key)
+          if (!o) { const was = runObjs.current.get(r.key); if (was) PLATE_FACES.delete(was); return void runObjs.current.delete(r.key) }
           runObjs.current.set(r.key, o)
+          // (a plate a piece can be rested on, its face found by a ray (Roasting, item 258))
+          PLATE_FACES.add(o)
           if (!o.userData.placed) {
             o.userData.placed = true
             o.position.copy(r.from)
@@ -8056,7 +8087,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (gone from the bench's list, faded out: drawn so until React takes them away, never back at full (it was ?? 1: a blink of them whole in the
           doorway as they went, the last frame)) */}
       {people && sitterList.map((v) => (
-        <group key={`bench${v.id}`} name={`bench-sitter-${v.id}`} ref={(o) => { if (o) { sitterObjs.current.set(v.id, o); FIGURES.set(o, 'other') } else sitterObjs.current.delete(v.id) }}>
+        <group key={`bench${v.id}`} name={`bench-sitter-${v.id}`} ref={(o) => { if (o) { if (!placedOnce.has(o)) o.visible = false; sitterObjs.current.set(v.id, o); FIGURES.set(o, 'other') } else sitterObjs.current.delete(v.id) }}>
           <BlobShadow r={0.17 * PEOPLE_SCALE} />
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
@@ -8521,7 +8552,7 @@ function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s
   return <Suspense fallback={null}><FolkFigure id={s.id} eating={eating} walking={s.phase !== 'sit' && !s.wcSit} still={() => !!s.still} clock={clock} talk={talk} mood={mood}
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : s.phase === 'sit' && s.wipeAt ? 'Wipe' : undefined} fit={FOLK_FIT}
     held={inHand} heldShown={() => s.phase === 'wcBack' || (s.phase === 'wcGo' && s.wc?.who === 'drink') || (sipK() >= 0.2 && sipK() < 0.86)} cup={cup}
-    sip={() => (s.phase === 'sit' && s.drink ? sipK() : -1)} drinkAt={() => (s.drink ? drinkOf(s.seat, cup) : null)}
+    sip={() => (s.phase === 'sit' && s.drink ? sipK() : -1)} drinkAt={() => (s.drink ? drinkOf(s.seat, cup) : null)} bite={() => EAT_PHASE.get(s.id)}
     plate={() => (s.phase === 'sit' ? plateOf(s.seat) : null)} /></Suspense>
 }
 

@@ -47,6 +47,9 @@ feature('調味料與木炭（耗材）', () => {
     and('調味料與木炭不是食材，不會放到壞', () => {
       expect(isSupply(seasonId('soy'))).toBe(true)
       expect(isSupply(CHARCOAL)).toBe(true)
+      // (the shop's own supplies don't go off either: item 268, they were thrown out as gone off)
+      expect(isSupply('supply:tissue')).toBe(true)
+      expect(isSupply('supply:toiletcleaner')).toBe(true)
       expect(isSupply('Saury')).toBe(false)
     })
   })

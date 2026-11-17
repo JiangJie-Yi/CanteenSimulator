@@ -131,10 +131,23 @@ const SIP_MOUTH = new THREE.Vector3(-0.03, 0.74, 0.36)
 const SIP_MOUTH_CUP = new THREE.Vector3(-0.02, 0.68, 0.33)
 const REACH_U = new THREE.Vector3()
 const CHOP_MOUTH = new THREE.Vector3(0, 0.7, 0.26)
+/** a bite's places for the hand with the chopsticks, in the body's frame (item 242): at the food (found each frame, BITE_FOOD; with no plate
+ * known, out in front), up by the mouth (out in front of it: right at it the sticks went into the head), and resting between bites, a little
+ * up and back from the food toward the mouth, the tips over the plate */
+const BITE_FOOD = new THREE.Vector3()
+const BITE_FRONT = new THREE.Vector3(-0.07, 0.38, 0.5)
+const BITE_MOUTH = new THREE.Vector3(-0.15, 0.64, 0.36)
+const BITE_REST = new THREE.Vector3()
+const BITE_UP = new THREE.Vector3(0, 0.05, 0)
+/** how a hand, the lean and the head follow where they're to be: so much of the way a second, the same whatever the frame rate (item 242: a
+ * share of it each frame, dt x 10, which at double speed or on a slow frame was all of it at once) */
+const follow = (dt: number, rate: number) => 1 - Math.exp(-dt * rate)
 const UP = new THREE.Vector3(0, 1, 0)
 const X_AXIS = new THREE.Vector3(1, 0, 0)
 /** where they sit on the stool, in the customers' frame (blender/stools.py: its oak seat's top, 0.29, and on the cushion, pressed down) */
 export const SEAT = 0.31
+/** how long getting up onto a stool's seat or down off it takes (s) (item 242) */
+const SIT_T = 0.32
 /** how tall the figure stands, to the top of its head (blender/folk.py: the head's top), in its own frame */
 export const FOLK_HEIGHT = 1.07
 /** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers; the
@@ -370,7 +383,7 @@ export function FolkWarm() {
  * passing the time (looking about, at their phone, chin in hand), their mood on their face, a hop of delight when their food comes,
  * fading as they go; `fit`: their size in the frame they're drawn in (the boss's height there).
  */
-export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false }: {
+export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false, bite }: {
   id: number; eating: boolean; walking: boolean; still?: () => boolean; clock?: { current: number }; talk?: number; mood?: Mood | null
   fade?: () => number; slippers?: () => boolean; pose?: string; held?: ReactNode; fit?: number
   /** (sat eating) where their food is, in the world: their plate's middle, for the chopsticks to come down on */
@@ -383,6 +396,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   heldShown?: () => boolean
   /** (what's sipped is a sake cup: held nearer the mouth and tipped less) */
   cup?: boolean
+  /** (eating) how far into their dish they are, in bites, a bite taken out of it as each passes x.65 (none known: their own pace) */
+  bite?: () => number | undefined
   /** stood on the floor, not sat on a stool's seat, when not walking (the character viewer's turntable: there's no stool there, and sat
    * at the seat's height over it they floated, the briefcase set down by them on the floor) */
   ground?: boolean }) {
@@ -464,6 +479,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const outer = useRef<THREE.Group>(null)
   /** how far up they're lifted, eased to the seat's height as they sit (null till first drawn) */
   const lifted = useRef<number | null>(null)
+  /** up onto the stool or down off it under way: from what height to what, how far through (0..1) (item 242) */
+  const sitMove = useRef<{ from: number; to: number; t: number } | null>(null)
   const exprNow = useRef<Expr | null>('neutral')
   const v3 = useMemo(() => new THREE.Vector3(), [])
   const chopDir = useMemo(() => new THREE.Vector3(), [])
@@ -500,12 +517,27 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     applyFade(fade?.() ?? 1)
     const o = outer.current
     if (!o) return
-    // (up onto the stool's seat as they sit, down off it as they stand, over a quarter of a second: it was put there at once, a hop of 0.8 in a
-    // frame (tests/e2e/_popguest.mjs found it); the first time, where they are already)
+    // (up onto the stool's seat as they sit, down off it as they stand, over SIT_T: it was put there at once, a hop of 0.8 in a frame
+    // (tests/e2e/_popguest.mjs found it); then a share of what was left each frame, which at double speed did seven tenths of it in the first
+    // frame (item 242): now eased in and out over its time, whatever the frames, with a bob of the body (below) as they hop up or step down;
+    // the first time, where they are already)
+    let sitBob = 0
     {
       const want = walking || ground ? 0 : SEAT
-      lifted.current = lifted.current === null ? want : lifted.current + (want - lifted.current) * Math.min(1, dt * 7)
-      if (Math.abs(want - lifted.current) < 1e-4) lifted.current = want
+      if (lifted.current === null) lifted.current = want
+      if ((sitMove.current ? sitMove.current.to : lifted.current) !== want) sitMove.current = { from: lifted.current, to: want, t: 0 }
+      const m = sitMove.current
+      if (m) {
+        m.t = Math.min(1, m.t + dt / SIT_T)
+        const k = m.t
+        lifted.current = m.from + (m.to - m.from) * k * k * (3 - 2 * k)
+        // (hopping up: down a little into the knees first, stretched as they rise, squashed a touch as they land on the seat; stepping
+        // down: stretched off the seat, squashed as their feet meet the floor)
+        sitBob = m.to > m.from
+          ? (k < 0.2 ? -0.06 * Math.sin((k / 0.2) * Math.PI) : k < 0.75 ? 0.05 * Math.sin(((k - 0.2) / 0.55) * Math.PI) : -0.04 * Math.sin(((k - 0.75) / 0.25) * Math.PI))
+          : (k < 0.6 ? 0.03 * Math.sin((k / 0.6) * Math.PI) : -0.04 * Math.sin(((k - 0.6) / 0.4) * Math.PI))
+        if (m.t >= 1) { lifted.current = m.to; sitMove.current = null }
+      }
       o.position.y = lifted.current
     }
     // (walking: how fast they're going, from how far they've come since the last frame; stood still on the way, they stand)
@@ -513,7 +545,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const moved = lastPos.current ? Math.hypot(v3.x - lastPos.current.x, v3.z - lastPos.current.z) / Math.max(dt, 1e-3) : 0
     lastPos.current = (lastPos.current ?? new THREE.Vector3()).copy(v3)
     const going = walking && !still?.()
-    pace.current += ((going ? Math.min(1, Math.max(0.6, moved / 0.5)) : 0) - pace.current) * Math.min(1, dt * 8)
+    pace.current += ((going ? Math.min(1, Math.max(0.6, moved / 0.5)) : 0) - pace.current) * follow(dt, 8)
     const walk = pace.current
     if (!tall.current) { const bx = new THREE.Box3().setFromObject(fig.root); if (!bx.isEmpty()) tall.current = bx.max.y - bx.min.y }
     // (not on the character viewer's turntable (`ground`): its own little canvas, the puffs are the room's)
@@ -523,7 +555,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const since = t - served.current.at
     const yay = since >= 0 && since < 0.55 ? since / 0.55 : -1
     const lift = yay >= 0 ? Math.max(0, Math.sin(yay * Math.PI)) * 0.08 : 0
-    const squash = yay >= 0 ? (yay < 0.15 ? -0.08 * Math.sin((yay / 0.15) * Math.PI) : yay < 0.8 ? 0.07 * Math.sin(((yay - 0.15) / 0.65) * Math.PI) : -0.05 * Math.sin(((yay - 0.8) / 0.2) * Math.PI)) : 0
+    const squash = sitBob + (yay >= 0 ? (yay < 0.15 ? -0.08 * Math.sin((yay / 0.15) * Math.PI) : yay < 0.8 ? 0.07 * Math.sin(((yay - 0.15) / 0.65) * Math.PI) : -0.05 * Math.sin(((yay - 0.8) / 0.2) * Math.PI)) : 0)
     const hop = mood === 'joy' && !walking ? Math.max(0, Math.sin(t * 9 + id)) * 0.02 * Math.max(0, Math.sin(t * 0.7 + id * 2)) : 0
     // (a sip under way: the chopsticks put down meanwhile, the head tipped back a little as it's drunk)
     const sipK = !walking && sip ? sip() : -1
@@ -534,13 +566,29 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     b.position.y = walk * Math.abs(Math.sin(ph)) * 0.035 + lift + hop
     b.rotation.z = walk * Math.sin(ph) * 0.07
     // (leaning in to reach their plate, if it's further than the arm goes (below))
-    eatLean.current += ((eating && !walking ? leanWant.current : 0) - eatLean.current) * Math.min(1, dt * 3)
+    eatLean.current += ((eating && !walking ? leanWant.current : 0) - eatLean.current) * follow(dt, 4)
     b.rotation.x = walk * 0.08 + eatLean.current
     // (talking to the one they came with: turned toward them)
     const turn = !walking && talk && !eating ? talk * 0.35 : 0
-    b.rotation.y += (turn - b.rotation.y) * Math.min(1, dt * 4)
+    b.rotation.y += (turn - b.rotation.y) * follow(dt, 4)
     b.scale.y = 1 + (walking ? 0 : Math.sin(t * 1.7 + id) * 0.008) + squash
     b.scale.x = b.scale.z = 1 - squash * 0.5
+    // (a bite's beats (item 242): the hand out from where it rests to the food, the tips down into it and up with a bite, up to the mouth (the
+    // head coming up to meet it), the bite, back down to rest over the plate, and chewing there a while; each their own pace, 2.6 to 4 s a
+    // bite, and every third or fourth one a longer chew. It was the hand put at the plate or at the mouth by turns, 1.4 s round, all evening:
+    // pecking, the chewing face only while the hand was up)
+    // (with the dish's own bites known, in step with them: the tips down in the food (0.27 of a beat) as a bite goes from it (x.65); before
+    // the first, the hand resting over the plate; with none known, their own pace, 2 to 2.8 s a bite, every third or fourth a longer chew)
+    const dish = eating && !sipping ? bite?.() : undefined
+    const biteS = 2 + 0.8 * hash(id, 21)
+    const biteN = Math.floor((t + id * 1.7) / biteS)
+    const biteK = ((t + id * 1.7) / biteS) % 1
+    const bq = !eating || sipping ? 0
+      : dish !== undefined ? (dish < 0.38 ? 0.72 + (dish / 0.38) * 0.28 : (dish + 0.62) % 1)
+      : hash(id * 5 + biteN, 9) > 0.72 ? Math.min(1, biteK / 0.6) : biteK
+    const chewing = eating && !sipping && bq >= 0.52 && !(dish !== undefined && dish < 0.38)
+    // (the jaw going while they chew: the chewing face by turns)
+    const chew = chewing && ((t * 5.5 + id) % 1) < 0.5
     // (the head: looking about by beats while they sit, down at the phone or the plate, nodding as they talk)
     if (fig.head) {
       let yaw = 0, pitch = 0
@@ -550,6 +598,11 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         yaw = (hash(id * 7 + n, 1) - 0.5) * 0.9
         pitch = (hash(id * 7 + n, 2) - 0.6) * 0.3
         if (showPhone || eating) { pitch = -0.28 + (eating && hash(id * 7 + n, 3) > 0.7 ? 0.3 : 0); yaw *= 0.3 }
+        // (eating: down at the food as they pick it up, up a little to meet it as it comes, level while they chew, a look about now and then)
+        if (eating && !sipping) {
+          pitch = bq < 0.3 ? -0.3 : bq < 0.6 ? -0.16 : -0.08 + (hash(id * 7 + n, 3) > 0.7 ? 0.2 : 0)
+          if (chewing) pitch += Math.sin(t * 11 + id) * 0.012
+        }
         if (idle === 'chin' && !eating && !talk) { yaw *= 0.4; pitch = 0.06 }
         if (talk && !eating) { yaw = talk * 0.25; pitch = 0.05 + Math.sin(t * 7 + id) * 0.05 * (Math.sin(t * 1.3 + id) > 0 ? 1 : 0) }
         if (sipping && sipK > 0.36 && sipK < 0.72) { yaw *= 0.2; pitch = sipCup ? 0.12 : 0.28 }
@@ -562,32 +615,42 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     // (the hands: swinging as they walk; at the table, the left on the bar and the chopsticks from the plate to the mouth in the right; the phone
     // up in the left; the chin on the left hand; reaching into the fridge; a drink held in the right)
     const L = fig.handL, Rh = fig.handR
-    const chew = eating && ((t * 0.7 + id * 0.3) % 1) > 0.55
     // (their food, in the body's frame)
     const where = eating && !walking && !sipping ? plate?.() : null
     if (import.meta.env?.DEV) fig.root.userData.reach = where ? where.clone() : null
     const reach = where ? fig.body.worldToLocal(REACH.copy(where)) : null
+    let tipsUp = false
     if (L && Rh) {
       const swing = walk * Math.sin(ph) * 0.08
       const lp = REST.L.clone(), rp = REST.R.clone()
       let lr = 0, rr = 0
       if (walking) { lp.z += swing; rp.z -= swing }
       if (eating && !sipping) {
-        // (the right hand, the chopsticks in it, out over their plate on the bar, then up beside the face with a bite (out in front of it:
-        // right at it the sticks went into the head); the left resting on the bar's edge (it held up a bowl, which nobody could make out))
-        const k = chew ? 1 : 0
-        lp.set(-0.07 - 0.08 * k, 0.38 + 0.26 * k, 0.5 - 0.14 * k)
-        // (at the plate: put out from the shoulder toward their own food, so the tips come down in it, as far as the arm goes; past that they
-        // lean in)
+        // (the right hand, the chopsticks in it, through a bite's beats (above): the food on their plate, by the mouth, resting between; the
+        // left resting on the bar's edge (it held up a bowl, which nobody could make out))
+        // (at the food: put out from the shoulder toward it, so the tips come down in it, as far as the arm goes; past that they lean in,
+        // while the hand's out there)
+        BITE_FOOD.copy(BITE_FRONT)
         leanWant.current = 0
-        if (!chew && reach) {
+        if (reach) {
           REACH_U.copy(SHOULDER_R).sub(reach).normalize()
-          lp.copy(reach).addScaledVector(REACH_U, TIP_IN)
-          const d = lp.distanceTo(SHOULDER_R)
-          leanWant.current = Math.min(LEAN_MAX, Math.max(0, (d - ARM) * 1.2))
-          if (d > ARM_MOST) lp.sub(SHOULDER_R).setLength(ARM_MOST).add(SHOULDER_R)
+          BITE_FOOD.copy(reach).addScaledVector(REACH_U, TIP_IN)
+          const d = BITE_FOOD.distanceTo(SHOULDER_R)
+          if (bq < 0.34) leanWant.current = Math.min(LEAN_MAX, Math.max(0, (d - ARM) * 1.2))
+          if (d > ARM_MOST) BITE_FOOD.sub(SHOULDER_R).setLength(ARM_MOST).add(SHOULDER_R)
         }
-        lr = -0.7 - 0.6 * k
+        BITE_REST.copy(BITE_FOOD).lerp(BITE_MOUTH, 0.3).add(BITE_UP)
+        const ss = THREE.MathUtils.smoothstep
+        // (how far up toward the mouth the tips point, 0 down at the plate to 1 up at the mouth)
+        let up = 0
+        if (bq < 0.18) lp.copy(BITE_REST).lerp(BITE_FOOD, ss(bq, 0, 0.18))
+        else if (bq < 0.3) { lp.copy(BITE_FOOD); lp.y -= 0.025 * Math.sin(((bq - 0.18) / 0.12) * Math.PI) }
+        else if (bq < 0.48) { up = ss(bq, 0.3, 0.48); lp.copy(BITE_FOOD).lerp(BITE_MOUTH, up) }
+        else if (bq < 0.56) { up = 1; lp.copy(BITE_MOUTH) }
+        else if (bq < 0.72) { up = 1 - ss(bq, 0.56, 0.72); lp.copy(BITE_MOUTH).lerp(BITE_REST, 1 - up) }
+        else { lp.copy(BITE_REST); lp.y += Math.sin(t * 11 + id) * 0.003 }
+        tipsUp = up > 0.5
+        lr = -0.7 - 0.6 * up
         rp.set(0.17, 0.31, 0.36)
         rr = -0.3
       } else if (showPhone) {
@@ -625,23 +688,26 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       }
       if (held && !eating && !sipping) { lp.set(-0.22, 0.34, 0.2); lr = -0.3 }
       if (heldRef.current) heldRef.current.visible = !!held && (heldShown ? heldShown() : true)
-      L.position.lerp(lp, Math.min(1, dt * (sipping ? 14 : 10)))
-      Rh.position.lerp(rp, Math.min(1, dt * 10))
-      L.rotation.x += (lr - L.rotation.x) * Math.min(1, dt * 10)
-      Rh.rotation.x += (rr - Rh.rotation.x) * Math.min(1, dt * 10)
+      // (closely, through a bite's or a sip's beats, which are eased themselves; more loosely from one thing to the next)
+      const kL = follow(dt, eating || sipping ? 24 : 10)
+      L.position.lerp(lp, kL)
+      Rh.position.lerp(rp, follow(dt, 10))
+      L.rotation.x += (lr - L.rotation.x) * kL
+      Rh.rotation.x += (rr - Rh.rotation.x) * follow(dt, 10)
     }
     // (what's in their hands, shown by its part of the one mesh being its size, hidden by its being nothing)
     if (fig.chop) {
       fig.chop.scale.setScalar(eating && !sipping ? 1 : 0)
       // (the tips at the plate, or at the mouth: their way from the hand in the figure's frame, taken into the hand's (turned about x))
       if (eating && L && !sipping) {
-        const to = chew ? CHOP_MOUTH : reach ?? CHOP_PLATE
+        const to = tipsUp ? CHOP_MOUTH : reach ?? CHOP_PLATE
         chopDir.copy(to).sub(L.position).normalize().applyAxisAngle(X_AXIS, -L.rotation.x)
         chopQ.setFromUnitVectors(UP, chopDir)
-        fig.chop.quaternion.slerp(chopQ, Math.min(1, dt * 12))
+        fig.chop.quaternion.slerp(chopQ, follow(dt, 14))
       }
       // (a bite in the tips from the plate till they're at the mouth)
-      if (eating && !!L && L.position.y < 0.55) fig.bite?.scale.set(1, 0.7, 0.8)
+      // (a bite in the tips from when they've picked it up till it's eaten at the mouth)
+      if (eating && !sipping && bq > 0.24 && bq < 0.52) fig.bite?.scale.set(1, 0.7, 0.8)
       else fig.bite?.scale.setScalar(0)
     }
     fig.phone?.scale.setScalar(showPhone ? 1 : 0)

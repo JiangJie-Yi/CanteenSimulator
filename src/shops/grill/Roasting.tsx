@@ -85,7 +85,7 @@ import { PLATE_SPREAD, plateFor, plateSide, type PlateKind } from '@/game/plateS
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
 import { SHOP, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
-import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
+import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, EAT_PHASE, PLATE_FACES, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 
@@ -185,6 +185,12 @@ const readyFoodAt = (slot: number, row: number, plate: boolean, kind: PlateKind)
   .setY(PLATING_TOP + 0.04 + (plate ? 0.01 * GRILL_SCALE : 0) + plateSide(row).layer * 0.06)
 /** a turn about up (scratch, for what's on a plate turned with it) */
 const TURN_Q = new THREE.Quaternion()
+/** (scratch) a point of a piece being sat down on its plate (item 258) */
+const LOW_AT = new THREE.Vector3()
+/** the ray that finds a plate's face under a piece set down on it (item 258), straight down */
+const REST_RAY = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 1)
+/** whether something's drawn: it and everything it's in */
+const drawnUp = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true }
 /** where the n-th piece on a seat's plate lies once it's set down before its customer (item 228): the plate's middle, and across it as the
  * plate's turned to lie along their counter (seatTurn), as far apart as its kind has them */
 const seatFoodAt = (seat: number, row: number, kind: PlateKind, out: THREE.Vector3) => out.copy(barSeat(seat))
@@ -4125,8 +4131,12 @@ type Piece = {
   stickMid?: THREE.Vector3
   /** its place round the fire (game/fireSlots' RING_AZ), while it stands there or is on its way to it; given up as it leaves */
   ringSlot?: number
-  /** (on a plate) where it was last sat down on its face (its container and place there): measured again only when it's moved */
-  sitAt?: string
+  /** (on a plate) how far its lowest point is under its origin, in its parent's frame, for the way it was turned and sized when measured
+   * (measured again only when it's turned or sized otherwise, item 258) */
+  restDrop?: { q: THREE.Quaternion; s: number; drop: number }
+  /** (on a plate) the face it rests on, in its parent's frame: the plate's own surface (or what it lies on, on the plate) under it, found
+   * where it is (`at`) by a ray, again each second (`t`); none found, null (item 258) */
+  restFace?: { at: string; t: number; face: number | null }
   id: string
   copy: number
   loose: boolean
@@ -7842,6 +7852,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const lost = SKEWER_POOL - skewerTotal(SKEWERS.s, inUse)
       if (lost !== 0) SKEWERS.s = { ...SKEWERS.s, clean: Math.max(0, SKEWERS.s.clean + lost) }
     }
+    // (how far into their dish each customer is, kept afresh each frame below (bar.ts's EAT_PHASE))
+    EAT_PHASE.clear()
     pieces.current.forEach((p, n) => {
       bindMaterials(p)
       // (its one ink line shown while its food is)
@@ -8093,19 +8105,45 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
           p.node.position.lerpVectors(p.fromP, p.toP, e)
           p.node.position.y += Math.sin(p.flight * Math.PI) * 0.45   // a little arc through the air
           p.node.quaternion.slerpQuaternions(p.fromQ, p.toQ, e)
-          // (landed on a plate (or in a takeaway's box): its own underside put on the plate's face, measured once there, so a thick fish
-          // doesn't sink through it and a thin slice doesn't hover over it (they were all set at one height: the owner saw both))
+          // (landed on a plate (or in a takeaway's box): its own underside put on the plate's face, so a thick fish doesn't sink through it
+          // and a thin slice doesn't hover over it (they were all set at one height: the owner saw both). Every frame, from how far its lowest
+          // point is under its origin for the way it's turned (measured again only when it's turned or sized otherwise): measured once for
+          // where it was and put into its spot, the correction was lost at the plating place, whose spots are given afresh each frame at
+          // one height, and it was never measured again there: a thick fish sank into its plate and a slice of fillet hovered over it
+          // (item 258, the owner's 「2倍速看，時常有這問題」))
           if (p.flight >= 1 && (p.container === 'bar' || p.container === 'takeout') && p.node.parent) {
-            const at = `${p.container}|${p.local.x.toFixed(3)}|${p.local.z.toFixed(3)}`
-            if (p.sitAt !== at) {
+            const r = p.restDrop
+            if (!r || r.s !== p.node.scale.x || r.q.angleTo(p.node.quaternion) > 1e-3) {
               p.node.updateWorldMatrix(true, true)
-              const low = p.node.parent.worldToLocal(new THREE.Box3().setFromObject(p.node).min).y
-              const face = p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
-              p.local.y += face + 0.003 - low
-              p.toP.copy(containerAt(p.container)).add(p.local)
-              p.node.position.copy(p.toP)
-              p.sitAt = `${p.container}|${p.local.x.toFixed(3)}|${p.local.z.toFixed(3)}`
+              // (only what's drawn of it: the model's own bamboo stick is kept, hidden (the rod drawn is the game's), and a box round all of
+              // it put that hidden stick's foot on the plate, the fillet itself 4 cm over it)
+              let low = Infinity
+              p.node.traverseVisible((o) => {
+                const m = o as THREE.Mesh
+                const a = m.isMesh ? (m.geometry?.attributes?.position as THREE.BufferAttribute | undefined) : undefined
+                if (!a) return
+                for (let i = 0; i < a.count; i++) low = Math.min(low, LOW_AT.fromBufferAttribute(a, i).applyMatrix4(m.matrixWorld).y)
+              })
+              if (low === Infinity) low = new THREE.Box3().setFromObject(p.node).min.y
+              low = p.node.parent.worldToLocal(LOW_AT.set(0, low, 0)).y
+              p.restDrop = { q: p.node.quaternion.clone(), s: p.node.scale.x, drop: p.node.position.y - low }
             }
+            // (and the face it rests on: the plate's own surface under it (or what it lies on there), found by a ray straight down onto the
+            // plates as they're drawn (bar.ts's PLATE_FACES) and the other pieces lying on them, where it is, and again each second (what
+            // it lay on eaten from under it); none under it (a takeaway's box, the table's top): from its spot's height as before (item
+            // 258: worked out from its spot's height for the plates before item 228's, it rested 3 cm over the new ones' faces)
+            const at = `${p.container}|${p.local.x.toFixed(3)}|${p.local.z.toFixed(3)}`
+            const nowMs = performance.now()
+            if (p.container === 'bar' && (!p.restFace || p.restFace.at !== at || nowMs - p.restFace.t > 1000)) {
+              const par = p.node.parent
+              REST_RAY.ray.origin.copy(par.localToWorld(LOW_AT.set(p.node.position.x, p.node.position.y + 0.25, p.node.position.z)))
+              const under: THREE.Object3D[] = [...PLATE_FACES]
+              for (const q of pieces.current) if (q !== p && q.container === p.container && (q.flight ?? 0) >= 1 && !q.eaten && q.node) under.push(q.node)
+              const hit = REST_RAY.intersectObjects(under, true).find((h) => drawnUp(h.object))
+              p.restFace = { at, t: nowMs, face: hit ? par.worldToLocal(LOW_AT.copy(hit.point)).y : null }
+            }
+            const face = (p.container === 'bar' ? p.restFace?.face : null) ?? p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
+            p.node.position.y = face + 0.003 + p.restDrop!.drop
           }
           if (p.flight >= 1 && inBasket(p)) {
             // let go above the basket: size the ball from the potato's two shorter axes
@@ -8178,6 +8216,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (p.eat > 0 && !p.eaten && !p.stickOnly) {
         p.eat = Math.min(1, p.eat + dt / (p.container === 'bar' && !p.byBoss ? GUEST_EAT_SECONDS / (SHOP.hurry ? 4 : 1) : EAT_SECONDS))
         const phase = p.eat * BITES_PER_PIECE
+        if (p.container === 'bar' && p.guest >= 0 && !p.byBoss) EAT_PHASE.set(p.guest, Math.max(EAT_PHASE.get(p.guest) ?? 0, phase))
         const wanted = Math.min(BITES_PER_PIECE, Math.floor(phase + 0.35))
         while (p.bites.uBiteCount.value < wanted) {
           takeBite(p)

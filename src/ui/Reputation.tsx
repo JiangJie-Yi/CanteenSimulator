@@ -218,7 +218,7 @@ export const Reputation = memo(function Reputation({ open, lang, rating, visits,
                 <dt>GitHub</dt><dd><FitLine><a href={REPO_URL} target="_blank" rel="noopener noreferrer">{REPO_URL.replace(/^https:\/\/|\/$/g, '')}</a></FitLine></dd>
                 {/* (the site's: v and its number; run here, on the developer's own machine, not a version at all: the build and its commit) */}
                 <dt>{pick('版本', 'バージョン', 'Version')}</dt><dd>{versionText(VERSION, pick('開發版', '開発版', 'Dev build'))}</dd>
-                <dt>{pick('開發模型', '開発モデル', 'Model')}</dt><dd><FitLine>{DEV_MODEL}（Anthropic）</FitLine></dd>
+                <dt>{pick('開發模型', '開発モデル', 'Model')}</dt><dd><FitLine>{DEV_MODEL}</FitLine></dd>
                 {/* (what it's made with, as its development tools (the owner's: one line, where 製作 was; Claude Code's line taken off)) */}
                 <dt>{pick('開發工具', '開発ツール', 'Tools')}</dt><dd><FitLine>React・three.js・Vite・Blender</FitLine></dd>
               </dl>

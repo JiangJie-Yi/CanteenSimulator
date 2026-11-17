@@ -1017,10 +1017,11 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
     length = d.length + extra
     point_len = 0.06
     total = length + point_len
-    # (sixteen rings up the shaft (its drift is five spans), three more down the point, whose last is closed across in a ladder: forty, the
-    # last eight points all at its tip, a fan of degenerate triangles there)
-    zs = [length * i / 16 for i in range(17)] + [length + point_len * q for q in (0.4, 0.72, 0.92)]
-    rings, seg = len(zs) - 1, 8
+    # (item 259, the owner's, 2026-11-17: the fish and their sticks have too many faces: six sides round, a ring at each span of its
+    # thickness drift (five), one ring halfway down the point and a small last ring closed by a ladder, as the foot is; 316 triangles
+    # before, sixteen rings of eight up the shaft and a cap of an N-gon cut into a fan on export)
+    zs = [length * i / 5 for i in range(6)] + [length + point_len * q for q in (0.45, 0.95)]
+    rings, seg = len(zs) - 1, 6
     r0 = random.uniform(0.0065, 0.0085)
     bow = random.uniform(-0.008, 0.008)
     flat = random.uniform(0.8, 1.0)                      # split bamboo is never quite round
@@ -1043,7 +1044,7 @@ def skewer_stick(angle_deg, name, var=(0.0, 0.0, 0.0), extra=0.0):
             f = bm.faces.new((grid[i][j], grid[i][jn], grid[i + 1][jn], grid[i + 1][j]))
             for l, (uu, vv) in zip(f.loops, ((j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1))):
                 l[uvl].uv = (uu / seg, vv / rings)
-    bm.faces.new(grid[0][::-1])
+    ladder_fill(bm, grid[0][::-1])
     ladder_fill(bm, grid[-1])
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -1448,7 +1449,10 @@ def fillet(name, length, height, thick, flesh, skin, skin_w=0.012):
     # (low-poly, item 81 (the owner's, 2026-11-13: "blocky things like the square cod can be far simpler"): two cuts a side, enough for its
     # taper and its slight curve (six before), its corners eased in one step (three before); the flesh's flakes, its skin and its char are
     # in its picture)
-    bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=2, use_grid_fill=True)
+    # (item 259, the owner's, 2026-11-17: "the fish chunks have too many faces": one cut a side, a 2 by 2 grid a face, the taper, the
+    # bulge and the eased corners all kept (they sit on the middle row and the bevel); 188 triangles for the flesh before, the
+    # grid's quads running the length of the slab)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=1, use_grid_fill=True)
     for v in bm.verts:
         x, y, z = v.co
         zn = (z + 1) / 2                               # 0 belly .. 1 back

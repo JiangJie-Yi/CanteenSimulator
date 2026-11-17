@@ -2,8 +2,8 @@
 other with glutinous rice dumplings):
 
 - node "Sanbo": a 三方 of plain white hinoki: a square tray (折敷) with a low rim round it, its corners eased, on a square base (胴) a little
-  narrower, each of whose four sides has its opening (眼象, a rounded cusped window) painted dark on it (a picture, not cut through: the
-  low-poly rule), a thin dark line where the tray sits on the base.
+  narrower, each of whose four sides has its opening (眼象, a rounded cusped window) cut through the board for real (item 247; it was painted on the
+  picture, which read as a black sticker), the hollow inside dark wood, a thin dark line where the tray sits on the base.
 - node "Dango": five white glutinous rice dumplings heaped on a square of white kaishi paper laid corner-on, four below and one on top
   (stands on the tray's floor at its origin).
 
@@ -50,38 +50,13 @@ hin = mix((0.94, 0.86, 0.71), (0.86, 0.75, 0.58), smooth(0.55, 1.0, _g) * 0.45 +
 hin = hin * (0.96 + 0.06 * fbm(N, 6, 3, 3))[..., None]
 hin = hin * (0.985 + 0.015 * np.sin(v * 900 + u * 40))[..., None]
 hin_h = (smooth(0.55, 1.0, _g) * 0.15 + _late * 0.25).astype(np.float32)
-# (a base side: the hinoki, and its opening cut through it in its middle (眼象: a rounded window, its top cusped in three), drawn as a cut: the
-# board's thickness showing round its inside, its lower wall facing up and catching the light (pale end grain), its upper wall and sides in
-# shadow, the dark of the hollow behind, a hair of shadow on the face just under its top edge; its heights into a normal map, the cut's
-# edges standing in the light. It was a flat dark patch, which read as a sticker)
-x, y = (u - 0.5) * 2, (v - 0.42) * 2
-cusp = 0.62 + 0.1 * np.cos(np.clip(x / 0.62, -1, 1) * math.pi * 1.5)
-
-
-def window(grow):
-    return (np.abs(x) < 0.62 + grow) & (y > -0.45 - grow) & (y < cusp + grow) & ((x / (0.62 + grow)) ** 2 + ((y + 0.45) / (1.0 + grow)) ** 2 < 1.6)
-
-
-hole = window(-0.07)                     # (the dark of the hollow, seen through)
-cut = window(0.0) & ~hole               # (the board's thickness round it: its cut walls)
-side = hin.copy()
-low = cut & (y < -0.2)                  # (the lower wall, facing up)
-side[cut] = (hin * 0.62)[cut]
-side[low] = (mix(hin, (0.98, 0.9, 0.74), np.full(x.shape, 0.5)) * 1.0)[low]
-side[low] = side[low] * (0.92 + 0.08 * np.sin(x * 140))[low][:, None]     # (end grain's rings)
-dark = mix(np.zeros_like(hin) + np.array((0.05, 0.035, 0.025)), np.zeros_like(hin) + np.array((0.17, 0.12, 0.08)), smooth(0.6, -0.4, y))
-side[hole] = dark[hole]
-under = window(0.035) & ~window(0.0) & (y > 0.0)
-side[under] = side[under] * 0.82
-side_h = hin_h.copy()
-side_h[cut] = 0.55
-side_h[hole] = 0.0
-side_h[window(0.012) & ~window(0.0)] = 1.0
+# (item 247, the owner's, 2026-11-17: "the red circles look unreal": the openings were painted on the base's picture, a black sticker with no depth;
+# now they are cut through the board for real (see `base_shell`), so the picture is the plain hinoki and the dark of the hollow is a material)
 M = {
     "hinoki": pbr("SanboHinoki", (1, 1, 1), tex=image("sanbo_hinoki", np.clip(hin, 0, 1).astype(np.float32)),
                   nrm=image("sanbo_hinoki_n", to_normal(hin_h, 1.5).astype(np.float32), data=True), nrm_strength=1.0, rough=0.6),
-    "side": pbr("SanboSide", (1, 1, 1), tex=image("sanbo_side", np.clip(side, 0, 1).astype(np.float32)),
-                nrm=image("sanbo_side_n", to_normal(side_h.astype(np.float32), 4.0).astype(np.float32), data=True), nrm_strength=1.0, rough=0.6),
+    # (the hollow inside the base: dark wood, not black, so what is seen through an opening reads as a space)
+    "inner": pbr("SanboInner", (0.14, 0.10, 0.065), rough=0.85),
     "line": pbr("SanboLine", lin("#5a4632") if False else (0.09, 0.06, 0.04), rough=0.6),
     "mochi": pbr("SanboMochi", (0.93, 0.92, 0.88), rough=0.75),
     "paper": pbr("SanboPaper", (0.95, 0.94, 0.9), rough=0.9),
@@ -123,10 +98,100 @@ def lin(h):
     return tuple(x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c)
 
 
+# (an opening 眼象, in a wall's own frame: x along the wall, z up from the foot; round at the bottom, straight sides, its top rising in two
+# curves to a cusp in the middle; 17 points, counter-clockwise from the bottom-right corner's start)
+def window_outline():
+    a, zb, r, zs = 0.0215, 0.0098, 0.009, 0.0262
+    right = [(a - r + r * math.sin(math.radians(d)), zb + r - r * math.cos(math.radians(d))) for d in (0, 30, 60, 90)]
+    right += [(a, zs), (0.0188, 0.0307), (0.0135, 0.0340), (0.0075, 0.0358), (0.0035, 0.0366)]
+    return right + [(0.0, 0.0390)] + [(-x, z) for x, z in reversed(right)]
+
+
+def base_shell():
+    """The base (胴) as four boards, each a real wall of thickness BOARD with its opening cut through: outer face, inner face (the hollow's
+    wall, dark), and the opening's cut edge between them (the board's thickness, lit hinoki). Rings of quads from the opening out to the
+    wall's edge (a wall's corner takes one extra triangle), no fan; the hollow's floor is one quad."""
+    hole = window_outline()
+    cx, cz = 0.0, 0.024
+    K = len(hole)
+    ang = [math.atan2(z - cz, x - cx) for x, z in hole]
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.verify()
+    T = BOARD
+
+    def poly(pts, mat, uvf):
+        f = bm.faces.new([bm.verts.new(p) for p in pts])
+        f.material_index = mat
+        for lp in f.loops:
+            lp[uvl].uv = uvf(lp.vert.co)
+        return f
+
+    for w, (wide, rot) in enumerate(((BASE_W, 0), (BASE_W - 2 * T, 90), (BASE_W, 180), (BASE_W - 2 * T, 270))):
+        hw = wide / 2
+        y0, y1 = -b2, -b2 + T
+        c, sn = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+
+        def place(x, y, z):
+            return (x * c - y * sn, x * sn + y * c, z)
+
+        def uv_face(co):
+            return (co.x / 0.1 + 0.5 + w * 0.13, co.z / 0.1 + 0.5)
+
+        def uv_cut(co):
+            return (co.x / 0.1 + 0.5 + w * 0.13, co.y / 0.1 + 0.5)
+
+        def edge_pt(k):
+            # (where the ray from the opening's middle through point k meets the wall's rectangle)
+            dx, dz = hole[k][0] - cx, hole[k][1] - cz
+            s = min((hw - cx) / dx if dx > 0 else (-hw - cx) / dx if dx < 0 else 1e9, (BASE_H - cz) / dz if dz > 0 else (0 - cz) / dz if dz < 0 else 1e9)
+            return (cx + dx * s, cz + dz * s)
+
+        corners = [(hw, 0.0), (hw, BASE_H), (-hw, BASE_H), (-hw, 0.0)]      # (counter-clockwise from the bottom-right)
+        cang = [math.atan2(z - cz, x - cx) for x, z in corners]
+        for k in range(K):
+            k2 = (k + 1) % K
+            o1, o2, h1, h2 = edge_pt(k), edge_pt(k2), hole[k], hole[k2]
+            # (the corner between the two rays, if any: its angle after the first ray's, before the second's)
+            span = (ang[k2] - ang[k]) % (2 * math.pi)
+            between = [corners[i] for i in range(4) if 0 < (cang[i] - ang[k]) % (2 * math.pi) < span]
+            for face_y, mat, flip in ((y0, 0, False), (y1, 1, True)):
+                def ring(pts):
+                    return [place(x, face_y, z) for x, z in (pts[::-1] if flip else pts)]
+                if between:
+                    poly(ring([o1, between[0], o2]), mat, uv_face)
+                poly(ring([o1, o2, h2, h1]), mat, uv_face)
+            # (the cut edge of the board: its face looks into the opening)
+            poly([place(h1[0], y0, h1[1]), place(h2[0], y0, h2[1]), place(h2[0], y1, h2[1]), place(h1[0], y1, h1[1])], 0, uv_cut)
+        if rot in (0, 180):
+            # (the end of the board, seen from the side where it meets the next wall)
+            poly([place(hw, y0, 0), place(hw, y1, 0), place(hw, y1, BASE_H), place(hw, y0, BASE_H)], 0, uv_cut)
+            poly([place(-hw, y0, 0), place(-hw, y0, BASE_H), place(-hw, y1, BASE_H), place(-hw, y1, 0)], 0, uv_cut)
+    # (a dark post in the middle of the hollow, so that looking in through an opening one sees a dim shape and not the room through the opposite
+    # opening; its sides face out, in the dark wood)
+    q = 0.017
+    for pts in (((-q, -q), (q, -q)), ((q, -q), (q, q)), ((q, q), (-q, q)), ((-q, q), (-q, -q))):
+        (x0, y0_), (x1, y1_) = pts
+        poly([(x0, y0_, 0.002), (x1, y1_, 0.002), (x1, y1_, BASE_H - 0.002), (x0, y0_, BASE_H - 0.002)], 1, lambda co: (0, 0))
+    i = b2 - T
+    poly([(-i, -i, 0.002), (i, -i, 0.002), (i, i, 0.002), (-i, i, 0.002)], 1, lambda co: (0, 0))
+    me = bpy.data.meshes.new("base")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("base", me)
+    bpy.context.collection.objects.link(o)
+    me.materials.append(M["hinoki"])
+    me.materials.append(M["inner"])
+    for p in me.polygons:
+        p.use_smooth = False
+    bpy.context.view_layer.objects.active = o
+    parts.append(o)
+    return o
+
+
 # ---- the stand
 s = []
 b2, t2 = BASE_W / 2, TRAY_W / 2
-s.append(box("base", -b2, b2, 0.0, BASE_H, -b2, b2, "side", bev=0.0015, uv_side=True))
+s.append(base_shell())
 s.append(box("seat", -b2 - 0.002, b2 + 0.002, BASE_H - 0.002, BASE_H, -b2 - 0.002, b2 + 0.002, "line"))
 s.append(box("floor", -t2, t2, BASE_H, BASE_H + BOARD, -t2, t2, "hinoki", bev=0.0012))
 for k, (a0, a1, c0, c1) in enumerate(((-t2, t2, -t2, -t2 + BOARD), (-t2, t2, t2 - BOARD, t2), (-t2, -t2 + BOARD, -t2 + BOARD, t2 - BOARD),

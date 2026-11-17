@@ -201,7 +201,11 @@ def box_uv(o, tile=0.5):
 
 
 def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0, seg=2, tile=0.5):
-    """a box from its extents (the game's frame), its picture laid at its true size; bevelled along its edges if bev"""
+    """a box from its extents (the game's frame), its picture laid at its true size; bevelled along its edges if bev (a bevel of 3 mm or
+    less isn't kept: it reads as nothing at the game's distance and cost 96 triangles a box; wider ones in at most two steps)"""
+    if bev <= 0.003:
+        bev = 0.0
+    seg = min(seg, 2)
     bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
     o = active()
     o.scale = (x1 - x0, z1 - z0, y1 - y0)
@@ -472,7 +476,7 @@ box("SinkRailFoot", -W / 2 + 0.01, W / 2 - 0.01, 0.08, 0.12, FRONT - 0.012, FRON
 # a black band across the basin)
 box("SinkHollow", -W / 2 + 0.05, MID - 0.02, 0.12, H - TT - 0.045, BZ1 + 0.001, BZ1 + 0.004, "kick")
 rod_y = H - TT - 0.06
-tube("SinkNorenRod", [(-W / 2 + 0.03, rod_y, FRONT + 0.02), (MID + 0.0, rod_y, FRONT + 0.02)], 0.008, "rod", res=2, sides=8)
+tube("SinkNorenRod", [(-W / 2 + 0.03, rod_y, FRONT + 0.02), (MID + 0.0, rod_y, FRONT + 0.02)], 0.008, "rod", res=3, sides=8)
 for k, (a, b) in enumerate(((-W / 2 + 0.06, -0.39), (-0.375, MID - 0.03))):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
@@ -518,26 +522,55 @@ for p_ in o.data.polygons:
     p_.use_smooth = False
 parts.append(o)
 # (its basket, wire: a frame along its floor and one round its rim, uprights at its corners, two rows of tines the plates stand between; it
-# slides out as the door drops (its holder at its front foot). Each wire a thin six-sided rod)
+# slides out as the door drops (its holder at its front foot). Each wire a thin square-sectioned rod, a mesh for each kind)
 RX0, RX1, RZ0, RZ1 = cx0 + 0.015, cx1 - 0.015, cz0 + 0.03, cz1 - 0.03
 RY0, RY1 = cy0 + 0.012, cy0 + 0.1
-def wire(name, pts):
-    return tube(name, pts, 0.0028, "steel", res=1, sides=6)
-for k, y_ in enumerate((RY0, RY1)):
-    wire(f"SinkRackWireRing{k}", [(RX0, y_, RZ0), (RX1, y_, RZ0), (RX1, y_, RZ1), (RX0, y_, RZ1), (RX0, y_, RZ0)])
-for k, (xx, zz) in enumerate(((RX0, RZ0), (RX1, RZ0), (RX1, RZ1), (RX0, RZ1))):
-    wire(f"SinkRackWirePost{k}", [(xx, RY0, zz), (xx, RY1, zz)])
+WIRE_R = 0.0022
+
+
+def wire_set(name, runs, caps=False):
+    """thin square-section wires, each run a straight (a, b) in the game's frame, all of them one mesh: 4 long faces a run (8 triangles),
+    and a cap at the far end if asked (a tine's tip). 6-sided round rods before, one mesh each: the rack was 880 triangles"""
+    bm_ = bmesh.new()
+    for a_, b_ in runs:
+        a_, b_ = Vector(P(*a_)), Vector(P(*b_))
+        d = (b_ - a_).normalized()
+        u = d.cross(Vector((0, 0, 1)) if abs(d.z) < 0.9 else Vector((1, 0, 0))).normalized() * WIRE_R
+        v = d.cross(u).normalized() * WIRE_R
+        ring_a = [bm_.verts.new(a_ + c) for c in (u + v, -u + v, -u - v, u - v)]
+        ring_b = [bm_.verts.new(b_ + c) for c in (u + v, -u + v, -u - v, u - v)]
+        for i in range(4):
+            j = (i + 1) % 4
+            bm_.faces.new((ring_a[i], ring_a[j], ring_b[j], ring_b[i]))
+        if caps:
+            bm_.faces.new(ring_b)
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me = bpy.data.meshes.new(name)
+    bm_.to_mesh(me)
+    bm_.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(M["steel"])
+    for p_ in o.data.polygons:
+        p_.use_smooth = False
+    parts.append(o)
+    return o
+
+
+ring_runs = []
+for y_ in (RY0, RY1):
+    c_ = ((RX0, y_, RZ0), (RX1, y_, RZ0), (RX1, y_, RZ1), (RX0, y_, RZ1), (RX0, y_, RZ0))
+    ring_runs += list(zip(c_[:-1], c_[1:]))
+wire_set("SinkRackWireRings", ring_runs)
+wire_set("SinkRackWirePosts", [((xx, RY0, zz), (xx, RY1, zz)) for xx, zz in ((RX0, RZ0), (RX1, RZ0), (RX1, RZ1), (RX0, RZ1))])
 # (the floor's cross wires, and the tines: two rows along it, a plate standing between each pair)
-for k in range(6):
-    xx = RX0 + (RX1 - RX0) * (k + 0.5) / 6
-    wire(f"SinkRackWireCross{k}", [(xx, RY0, RZ0), (xx, RY0, RZ1)])
 TINE_ROWS = (ZF - 0.29, ZF - 0.13)
 NT = 13
-for r_, zz in enumerate(TINE_ROWS):
-    wire(f"SinkRackWireRow{r_}", [(RX0, RY0, zz), (RX1, RY0, zz)])
-    for k in range(NT):
-        xx = RX0 + 0.02 + (RX1 - RX0 - 0.04) * k / (NT - 1)
-        wire(f"SinkRackWireTine{r_}_{k}", [(xx, RY0, zz), (xx, RY0 + 0.075, zz)])
+floor_runs = [(((RX0 + (RX1 - RX0) * (k + 0.5) / 6), RY0, RZ0), ((RX0 + (RX1 - RX0) * (k + 0.5) / 6), RY0, RZ1)) for k in range(6)]
+floor_runs += [((RX0, RY0, zz), (RX1, RY0, zz)) for zz in TINE_ROWS]
+wire_set("SinkRackWireFloor", floor_runs)
+wire_set("SinkRackWireTines", [((RX0 + 0.02 + (RX1 - RX0 - 0.04) * k / (NT - 1), RY0, zz), (RX0 + 0.02 + (RX1 - RX0 - 0.04) * k / (NT - 1), RY0 + 0.075, zz))
+                               for zz in TINE_ROWS for k in range(NT)], caps=True)
 RACK_AT = ((cx0 + cx1) / 2, cy0, cz1)
 # (where the first and the last plate stand: in the basket, upright, in a row along it (they go with it as it slides))
 empty("SinkDryerRack0", cx0 + 0.09, cy0 + 0.035 + 0.16, ZF - 0.21)
@@ -576,7 +609,7 @@ for hx in (gx0 + 0.07, gx1 - 0.07):
 DOOR_HINGE = ((gx0 + gx1) / 2, GY0, ZF + 0.01)
 # (a wooden bar across the cabinet's other end, toward its back, a cloth hung over it (it hung across the right's doors, where the dryer is))
 TX = -W / 2 - 0.035
-tube("SinkTowelBar", [(TX, H - TT - 0.03, -0.36), (TX, H - TT - 0.03, -0.06)], 0.008, "rod", res=2, sides=8)
+tube("SinkTowelBar", [(TX, H - TT - 0.03, -0.36), (TX, H - TT - 0.03, -0.06)], 0.008, "rod", res=3, sides=8)
 for z_ in (-0.36, -0.06):
     box(f"SinkTowelPeg{z_:.2f}", -W / 2 - 0.035, -W / 2 + 0.002, H - TT - 0.04, H - TT - 0.02, z_ - 0.008, z_ + 0.008, "sugi")
 bm = bmesh.new()
@@ -616,7 +649,7 @@ cyl("SinkTapBody", tx, H + 0.012, H + 0.13, tz, 0.022, "faucet", seg=16)
 mz = (BASIN[2] + BASIN[3]) / 2 - 0.02
 spout = [(tx, H + 0.1, tz + 0.016), (tx, H + 0.3, tz + 0.02), (tx, H + 0.37, tz + (mz - tz) * 0.35), (tx, H + 0.33, tz + (mz - tz) * 0.8),
          (tx, H + 0.25, mz)]
-tube("SinkTapSpout", spout, 0.011, "faucet", res=4, sides=12)
+tube("SinkTapSpout", spout, 0.011, "faucet", res=3, sides=8)
 mouth = spout[-1]
 # (the aerator: a short wider cylinder at its mouth, its screen darker)
 cyl("SinkTapMouth", tx, mouth[1] - 0.026, mouth[1] + 0.004, mouth[2], 0.0135, "faucet", seg=12)
@@ -716,20 +749,23 @@ for zi, z_ in enumerate((LANE_Z - 0.082, LANE_Z + 0.082)):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
     top = []
-    tw = RACK_PITCH * 0.2                 # (a tooth's half width; its tip a half round over it)
+    tw = RACK_PITCH * 0.2                 # (a tooth's half width; its tip three points: a shoulder either side of a crown (a chamfered tip))
     for k in range(RACK_N + 1):
         xt = RACK_X0 - RACK_PITCH / 2 + k * RACK_PITCH
-        for a in (math.pi, math.pi * 0.75, math.pi * 0.5, math.pi * 0.25, 0.0):
-            top.append((xt + tw * math.cos(a), RAIL_HI - tw + tw * math.sin(a)))
+        top.append((xt - tw, RAIL_HI - tw * 0.7))
+        top.append((xt, RAIL_HI))
+        top.append((xt + tw, RAIL_HI - tw * 0.7))
         if k < RACK_N:
+            # (the notch: its floor two points, flat between them, its walls a slant down from the teeth either side)
             xn = RACK_X0 + k * RACK_PITCH
-            nw = (RACK_PITCH - 2 * tw) / 2
-            for a in (math.pi * 0.85, math.pi * 1.5, math.pi * 2.15):
-                top.append((xn + nw * math.cos(a), NOTCH + nw + nw * math.sin(a) * 0.9))
+            nw = (RACK_PITCH - 2 * tw) / 2 * 0.62
+            top.append((xn - nw, NOTCH))
+            top.append((xn + nw, NOTCH))
     xa, xb = top[0][0], top[-1][0]
     uv_ = lambda x_, y_: ((x_ - xa) / (xb - xa), (y_ - RAIL_LO) / (RAIL_HI - RAIL_LO))
     # (filled as a ladder: a strip from each point along the top straight down to the foot, every face a quad (one many-sided face, the
-    # notches came out filled in by its triangulation: a plain board))
+    # notches came out filled in by its triangulation: a plain board). 5 points a pitch, no foot (it lies on the basket's floor, out of
+    # sight): 1,956 triangles a comb before, 8 points a pitch and a foot)
     cols = []
     for x_, y_ in top:
         cols.append([(bm.verts.new(P(x_, yy, z_ + sd * 0.0035)), (x_, yy)) for sd in (-1, 1) for yy in (RAIL_LO, y_)])
@@ -743,7 +779,6 @@ for zi, z_ in enumerate((LANE_Z - 0.082, LANE_Z + 0.082)):
         quad(af, bf, bt, at_)          # (front)
         quad(bb, ab, abt, bbt)         # (back)
         quad(at_, bt, bbt, abt)        # (top)
-        quad(bf, af, ab, bb)           # (foot)
     for c_, fl in ((cols[0], True), (cols[-1], False)):
         f_, t_, b_, bt_ = c_
         quad(*((f_, b_, bt_, t_) if fl else (b_, f_, t_, bt_)))

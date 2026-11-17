@@ -61,12 +61,23 @@ export type TripPose = {
   /** how far into their nod (0..1..0); stretching while they finish up */
   nod: number; stretch: boolean; walking: boolean
 }
+/** how fast anyone in the shop turns round at most (rad/s): right round in about half a second, as a person turns (item 242) */
+export const TURN_RATE = 6
+/** a facing turned toward the way it's to face, the short way round, over `dt` seconds: `rate` of what's left each second, eased (frame by
+ * frame the same whatever the frame rate), and never faster than TURN_RATE, so a turn right round takes half a second and its last part
+ * slows into place (item 242: a share of what was left each frame, dt x 10, turned them right round in one frame on a slow frame or at
+ * double speed: the cooks snapped round 180° over a hundred times a minute; a cap of so much a frame (item 183) still turned them faster
+ * the faster the frames came) */
+export const turnEase = (cur: number, want: number, dt: number, rate = 10) => {
+  const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur))
+  const most = TURN_RATE * dt
+  return cur + Math.max(-most, Math.min(most, d * (1 - Math.exp(-dt * rate))))
+}
 /** a facing turned toward the way they're to face, quickly but not at once (setting off from where they'd stood, they snapped round to the
- * way in a frame, as much as 90°) */
-export const turnToward = (cur: number, want: number, dt: number) => cur + Math.atan2(Math.sin(want - cur), Math.cos(want - cur)) * Math.min(1, dt * 10)
-/** a turn as it's shown (item 183, the owner's: "the staff are far too stiff"): eased as turnToward is, but never more than about a quarter of
- * a right angle in one frame: a slow frame, or the game at double speed, snapped them round half a turn at once */
-export const turnSmooth = (cur: number, want: number, dt: number) => cur + Math.max(-0.45, Math.min(0.45, Math.atan2(Math.sin(want - cur), Math.cos(want - cur)) * Math.min(1, dt * 10)))
+ * way in a frame, as much as 90°): turnEase */
+export const turnToward = (cur: number, want: number, dt: number) => turnEase(cur, want, dt)
+/** a turn as it's shown (item 183, the owner's: "the staff are far too stiff"): the same as turnToward now (turnEase) */
+export const turnSmooth = turnToward
 
 /**
  * A step along a trip: `dt` seconds, `speed` everyone's walking pace in the walker's frame, `world` the walker's frame to the world (for

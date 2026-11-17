@@ -26,6 +26,7 @@ const skinOf = (r: THREE.Object3D) => {
 /** his name tag's words: his role, and his name when he's been given one */
 const bossName = () => SPEAKERS.get('owner') ?? '老闆'
 import { crewFaceSheet, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
+import { turnEase } from './commuteWalk'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -464,11 +465,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         const stepL = Math.min(d, speed * dt)
         if (d > 1e-6) { s.x += (dx / d) * stepL; s.z += (dz / d) * stepL }
         s.stride += stepL
-        turnTo(s, Math.atan2(dx, dz), dt * 9)
+        turnTo(s, Math.atan2(dx, dz), dt, 9)
         if (drinking) BOSS_DRINK.arrived = false
         else BOSS_TASTE.arrived = false
       } else if (drinking) {
-        turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt * 7)
+        turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt, 7)
         if (!BOSS_DRINK.arrived) {
           // (he picks it up off the table: it's in his hand now)
           BOSS_DRINK.arrived = true; BOSS_DRINK.since = T
@@ -480,7 +481,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         if (T - BOSS_DRINK.since > 4.2) { BOSS_DRINK.at = null; BOSS_DRINK.id = null; BOSS_DRINK.item = null; BOSS_DRINK.arrived = false; setDrinkId(null) }
         act = 'drink'
       } else {
-        turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt * 7)
+        turnTo(s, Math.atan2(ask.x - s.x, ask.z - s.z), dt, 7)
         if (!BOSS_TASTE.arrived) { BOSS_TASTE.arrived = true; BOSS_TASTE.since = T; BOSS_TASTE.chewing = false; setSay({ text: tasteLineText(Math.random(), lang), key: Date.now() }) }
         // (once he bites in, what he says turns to munching)
         if (BOSS_TASTE.chewing && !chewSaid.current) { chewSaid.current = true; setSay({ text: munchLineText(Math.random(), lang), key: Date.now() }) }
@@ -500,20 +501,20 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       const dx = at.x - s.x, dz = at.z - s.z, d = Math.hypot(dx, dz)
       if (d > 1e-4) { const go = Math.min(d, d * Math.min(1, dt * 8), dt * 1.4); s.x += (dx / d) * go; s.z += (dz / d) * go }
       const f = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.face))
-      turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt * 10)
+      turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt, 10)
       act = 'hold'
     } else if (!edit && !OWNER_OUT.on && performance.now() < OWNER_GRILL.pierceUntil && m.parent) {
       // (the player skewering something on the board by hand (item 105): he stops where he is, turns to it and pushes the rod through with them)
       const f = m.parent.worldToLocal(HAND_AT.copy(OWNER_GRILL.pierceAt))
-      turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt * 10)
+      turnTo(s, Math.atan2(f.x - s.x, f.z - s.z), dt, 10)
       act = 'pierce'
     } else if (grill && performance.now() < OWNER_GRILL.dabUntil) {
       // (seasoning something on the fire: turned to it, a hand out over it)
-      turnTo(s, 0, dt * 6)
+      turnTo(s, 0, dt, 6)
       act = 'dab'
     } else if (grill && performance.now() < OWNER_GRILL.fanUntil) {
       // (the coals fanned a moment, half way through something salted)
-      turnTo(s, 0, dt * 5)
+      turnTo(s, 0, dt, 5)
       act = 'fan'
     } else if (act === 'walk' || act === 'run') {
       // (out along the aisle and back home, by way of the notch's mouth)
@@ -530,11 +531,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         const step = Math.min(d, speed * dt)
         if (d > 1e-6) { s.x += (dx / d) * step; s.z += (dz / d) * step }
         s.stride += step
-        turnTo(s, Math.atan2(dx, dz), dt * 9)
+        turnTo(s, Math.atan2(dx, dz), dt, 9)
       }
     } else {
       // (at a stop he turns back to face the fire)
-      turnTo(s, 0, dt * 5)
+      turnTo(s, 0, dt, 5)
       if (s.t > ph.len) { s.phase = (s.phase + 1) % ROUNDS.length; s.t = 0 }
     }
     if (edit) act = 'idle'
@@ -828,10 +829,9 @@ function solidStuff(o: THREE.Mesh) {
   }
   return true
 }
-/** turn toward a heading, the short way round, at most `k` of the way this frame */
-function turnTo(s: { yaw: number }, to: number, k: number) {
-  let d = to - s.yaw
-  d = Math.atan2(Math.sin(d), Math.cos(d))
-  s.yaw += d * Math.min(1, k)
+/** turn toward a heading, the short way round, `rate` of what's left each second and no faster than anyone turns (commuteWalk's turnEase,
+ * item 242: a share of it each frame, he turned a quarter round in one slow frame) */
+function turnTo(s: { yaw: number }, to: number, dt: number, rate: number) {
+  s.yaw = turnEase(s.yaw, to, dt, rate)
 }
 useGLTF.preload(URL)

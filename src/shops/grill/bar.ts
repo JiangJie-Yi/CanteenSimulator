@@ -97,6 +97,14 @@ export const CHOPS_UP = new Set<number>()
 /** the customers with food before them just now, on their own plate at the bar (Roasting keeps it): only they're drawn eating, chopsticks in
  * hand (the owner's: waiting for the next dish, they went on picking at an empty plate) */
 export const FED = new Set<number>()
+/** how far into the dish they're eating each customer is, in bites (0 to Roasting's BITES_PER_PIECE; a bite's taken out of the food as it
+ * passes x.65): kept by Roasting each frame, so their hand's beats go with it, the chopsticks in the food as the bite goes from the plate
+ * (item 242) */
+export const EAT_PHASE = new Map<number, number>()
+/** the plates as GuestBar3D draws them (at the plating place, on the tray, before the customers, in the sink): what a piece set down on a plate
+ * is rested on, its own surface found by a ray straight down (item 258: the pieces were put at a height worked out for the plates before
+ * item 228's, 3 cm over the new ones' faces, a skewer hanging over its plate) */
+export const PLATE_FACES = new Set<THREE.Object3D>()
 /** what a customer says they're having, said once they're on their stool (item 203: called out from the doorway as they came in, before
  * they were even welcomed; the kitchen has the order from the door, as ever): their line kept by Roasting, said by GuestBar3D as they sit,
  * through Roasting's own way of saying it */
