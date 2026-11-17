@@ -19,16 +19,18 @@ import { SAKE } from './bar'
  * SERVE_TOP. In the bar's units.
  */
 export const SERVE_TOP = 0.496
+// (each 0.04 further right since the counter's an old bamboo table 0.1 longer (items 254, 286): as far from its right-hand end as they were,
+// all on its woven top inside the split culms round its edge)
 export const STATION = {
   /** the open bottle's foot, at the back of the counter's right-hand end */
-  bottle: new THREE.Vector3(0.36, SERVE_TOP, -0.075),
+  bottle: new THREE.Vector3(0.4, SERVE_TOP, -0.075),
   /** where a customer's tokkuri is set out to be poured into, and waits for its server; its cup set down in front of it */
-  jug: new THREE.Vector3(0.15, SERVE_TOP, -0.105),
-  cup: new THREE.Vector3(0.235, SERVE_TOP, -0.055),
+  jug: new THREE.Vector3(0.19, SERVE_TOP, -0.105),
+  cup: new THREE.Vector3(0.275, SERVE_TOP, -0.055),
   /** the clean cups, nested three high, at the front corner */
-  cups: new THREE.Vector3(0.395, SERVE_TOP, 0.105),
+  cups: new THREE.Vector3(0.435, SERVE_TOP, 0.105),
   /** where the one pouring stands, before it, facing in (-z) */
-  front: new THREE.Vector3(0.3, 0, 0.47),
+  front: new THREE.Vector3(0.34, 0, 0.47),
 }
 /** the way the bottle's tipped to pour (from its foot toward its mouth, level): back and to the left across the counter, toward the tokkuri,
  * so it's held across the one pouring, its foot by their right hand */

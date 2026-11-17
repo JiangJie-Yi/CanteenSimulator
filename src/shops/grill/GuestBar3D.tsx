@@ -211,7 +211,8 @@ const BOWL_HANDS = { left: new THREE.Vector3(), right: new THREE.Vector3() }
 const BOWL_HANDS_ON = { v: false }
 /** a customer's bowls left at the serving counter for a server (the counter's own frame: its left end, clear of the takeaways in its middle
  * and the sake at its right), and where the one setting them down or taking them up stands */
-const BOWL_PASS = { rice: new THREE.Vector3(-0.35, SERVE_TOP, -0.035), soup: new THREE.Vector3(-0.22, SERVE_TOP, -0.035), front: new THREE.Vector3(-0.28, 0, 0.47) }
+// (0.04 further left since the counter's 0.1 longer (items 254, 286))
+const BOWL_PASS = { rice: new THREE.Vector3(-0.39, SERVE_TOP, -0.035), soup: new THREE.Vector3(-0.26, SERVE_TOP, -0.035), front: new THREE.Vector3(-0.32, 0, 0.47) }
 const RICE_LEN = beatsLength(RICE_BEATS), SOUP_LEN = beatsLength(SOUP_BEATS)
 /** seconds: the bowls set down at the counter; taken up onto a tray; set down at a place */
 const BOWL_PUT_S = 0.5, BOWL_UP_S = 0.45, BOWL_SET_S = 0.6

@@ -71,6 +71,41 @@ grain = np.sin((u * 34 + (fbm(N, 2, 5, 4) - 0.5) * 0.9 + (fbm(N, 6, 2, 3) - 0.5)
 sugi = mix((0.04, 0.034, 0.03), (0.016, 0.014, 0.013), smooth(0.6, 1.0, grain) * 0.7)
 sugi = sugi * (0.94 + 0.08 * fbm(N, 3, 12, 4))[..., None]
 hin = mix((0.86, 0.74, 0.55), (0.76, 0.62, 0.42), smooth(0.6, 1.0, np.sin((u * 40 + fbm(N, 2, 4, 3)) * 2 * math.pi) * 0.5 + 0.5) * 0.6)
+
+
+def bamboo_slats(n=256, slats=50):
+    """the rice-ball tray's bamboo (item 254): slats along u, `slats` of them across v, each its own tone, dark seams between them, a node's
+    mark on each somewhere, fibres along them"""
+    uu, vv = grid01(n)
+    k = vv * slats
+    idx = np.floor(k).astype(int)
+    f = k - idx
+    rr = np.random.default_rng(54)
+    tone = 0.86 + 0.16 * rr.random(slats + 1)[idx]
+    fib = 0.95 + 0.05 * np.sin((uu * 90 + vnoise(n, 32, 4) * 3) * 2 * math.pi)
+    seam = smooth(0.0, 0.14, f) * smooth(0.0, 0.14, 1 - f)
+    col = np.array((0.82, 0.66, 0.4), np.float32)[None, None, :] * (tone * fib * (0.5 + 0.5 * seam))[..., None]
+    node_u = rr.random(slats + 1)[idx]
+    node = np.exp(-((uu - node_u) / 0.008) ** 2) * (seam > 0.3)
+    return mix(col, (0.45, 0.33, 0.18), node * 0.7)
+
+
+def sasa_leaf(n=128):
+    """a bamboo leaf's face (item 254): its length along u, across v: deep green darker to its edges, a pale midrib, fine veins along it"""
+    uu, vv = grid01(n)
+    a = np.abs(vv - 0.5) * 2
+    col = mix((0.27, 0.5, 0.2), (0.16, 0.34, 0.12), smooth(0.2, 1.0, a))
+    col = mix(col, (0.62, 0.74, 0.42), np.exp(-((vv - 0.5) / 0.018) ** 2) * 0.8)
+    veins = (np.sin(vv * 2 * math.pi * 11) * 0.5 + 0.5) ** 6
+    col = mix(col, (0.36, 0.6, 0.28), veins * 0.35 * (1 - a))
+    return col * (0.92 + 0.12 * fbm(n, 4, 2, 3))[..., None]
+
+
+def nori_sheet(n=128):
+    """dried nori (item 254): a dark green-black, its pressed fibres showing, a few greener flecks"""
+    col = np.array((0.1, 0.15, 0.1), np.float32)[None, None, :] * (0.75 + 0.5 * fbm(n, 24, 24, 3))[..., None]
+    fleck = smooth(0.82, 0.9, vnoise(n, 60, 60))
+    return mix(col, (0.2, 0.3, 0.16), fleck * 0.6)
 # (plywood for the cupboards' insides: a paler, plainer grain than the hinoki, a little shade of age)
 ply = mix((0.62, 0.5, 0.36), (0.55, 0.43, 0.3), smooth(0.55, 1.0, np.sin((u * 22 + fbm(N, 2, 3, 3) * 1.4) * 2 * math.pi) * 0.5 + 0.5) * 0.7)
 ply = ply * (0.9 + 0.12 * fbm(N, 5, 5, 3))[..., None]
@@ -114,7 +149,7 @@ M.update({
     "lamp": pbr("WarmerLamp", lin("#ff6a2a"), emit=lin("#ff6a2a"), emit_strength=2.0),
     "hinoki": pbr("PrepHinoki", (1, 1, 1), tex=image("prep_hinoki", np.clip(hin, 0, 1).astype(np.float32)), rough=0.55),
     "rice": pbr("PrepRice", lin("#f6f3ea"), rough=0.8),
-    "nori": pbr("PrepNori", lin("#1d2a1e"), rough=0.6),
+    "nori": pbr("PrepNori", (1, 1, 1), tex=image("prep_nori", np.clip(nori_sheet(), 0, 1).astype(np.float32)), rough=0.6),
     "lacquer": pbr("PrepLacquer", lin("#7a1a14"), rough=0.25),
     "lacquerin": pbr("PrepLacquerIn", lin("#1a1210"), rough=0.2),
     "water": pbr("PrepWater", lin("#8fb2b8"), rough=0.1),
@@ -513,7 +548,9 @@ M.update({
     "sesame": pbr("PrepSesame", lin("#3a3128"), rough=0.5),
     "towel": pbr("PrepTowel", lin("#eef0ea"), rough=0.9),
     "towelband": pbr("PrepTowelBand", lin("#3a5f8f"), rough=0.9),
-    "bamboo": pbr("PrepBamboo", lin("#cfae70"), rough=0.55),
+    # (the bamboo: slats a centimetre wide side by side, each its own tone, dark seams, a node's mark here and there, its fibres along it
+    # (item 254, the owner's, 2026-11-17: 「這風格明顯不符」: the rice-ball set was plain colour, no picture, no line))
+    "bamboo": pbr("PrepBamboo", (1, 1, 1), tex=image("prep_bamboo", np.clip(bamboo_slats(), 0, 1).astype(np.float32)), rough=0.55),
     "card": pbr("PrepCard", lin("#c9a26c"), rough=0.8),
     "label": pbr("PrepLabel", lin("#f4f0e4"), rough=0.7),
 })
@@ -557,16 +594,20 @@ set_.append(box("traywallf", TX0, TX1, H, H + 0.05, TZ1 - 0.012, TZ1, "bamboo"))
 set_.append(box("traywalll", TX0, TX0 + 0.012, H, H + 0.05, TZ0, TZ1, "bamboo"))
 set_.append(box("traywallr", TX1 - 0.012, TX1, H, H + 0.05, TZ0, TZ1, "bamboo"))
 # (bamboo leaves laid under them, as rice balls are set out (item 129): long pointed blades, a little apart, a hair over the tray's floor)
-M["sasa"] = pbr("PrepSasa", lin("#3f7a32"), rough=0.5)
+M["sasa"] = pbr("PrepSasa", (1, 1, 1), tex=image("prep_sasa", np.clip(sasa_leaf(), 0, 1).astype(np.float32)), rough=0.5)
 for k in range(3):
     bm_ = bmesh.new()
     lx, lz, L_, W_ = TX0 + 0.075 + k * 0.14, (TZ0 + TZ1) / 2 - 0.02, 0.24, 0.07
     pts = [(-L_ / 2, 0), (-L_ / 4, -W_ / 2), (L_ / 4, -W_ / 2 * 0.9), (L_ / 2, 0), (L_ / 4, W_ / 2 * 0.9), (-L_ / 4, W_ / 2)]
     ang = math.pi / 2 + (k - 1) * 0.18
     vs_ = [bm_.verts.new(P(lx + px * math.cos(ang) - pz * math.sin(ang), H + 0.0095 + 0.0004 * k, lz + px * math.sin(ang) + pz * math.cos(ang))) for px, pz in pts]
-    bm_.faces.new((vs_[0], vs_[1], vs_[5]))
-    bm_.faces.new((vs_[1], vs_[2], vs_[4], vs_[5]))
-    bm_.faces.new((vs_[2], vs_[3], vs_[4]))
+    fs_ = [bm_.faces.new((vs_[0], vs_[1], vs_[5])), bm_.faces.new((vs_[1], vs_[2], vs_[4], vs_[5])), bm_.faces.new((vs_[2], vs_[3], vs_[4]))]
+    # (its picture laid along it: its length u, across it v (item 254))
+    uv_ = bm_.loops.layers.uv.new("UVMap")
+    for f_ in fs_:
+        for lp in f_.loops:
+            px, pz = pts[vs_.index(lp.vert)]
+            lp[uv_].uv = (px / L_ + 0.5, pz / W_ + 0.5)
     bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
     me_ = bpy.data.meshes.new(f"sasa{k}")
     bm_.to_mesh(me_)
