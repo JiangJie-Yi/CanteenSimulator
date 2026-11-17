@@ -1,4 +1,5 @@
 import { paceBoost, paceOf, SLACK_AFTER, TIRED_AT, type SkillId } from '@/data/staff'
+import { keep } from './hotKeep'
 
 /**
  * Where the shop is in closing (App writes it, the scenes read it): `closing` once the owner has shut up for the day, so no
@@ -13,7 +14,7 @@ import { paceBoost, paceOf, SLACK_AFTER, TIRED_AT, type SkillId } from '@/data/s
  * (dutyDay) */
 /** (`hurry`: half an hour past closing time and customers still in (App's closing deadlines): those with nothing before them pay for what
  * they've had and go, those eating eat up quickly) */
-export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, walking: new Set<string>(), inRoom: 0, counted: false, hurry: false }
+export const SHOP = keep(import.meta.hot, 'SHOP', { closing: false, leaving: false, openedAt: -1e9, day: 0, walking: new Set<string>(), inRoom: 0, counted: false, hurry: false })
 /** the business day whose shift is on (game/shifts): the one open (once counted), or the one coming; the same number either side of the
  * opening, so nobody's swapped for a frame as the shop opens */
 export const dutyDay = (open: boolean) => (open && SHOP.counted ? SHOP.day : SHOP.day + 1)
@@ -24,19 +25,19 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * they're out of the door or up the stair at its shutting (`out`). App pays each by it (game/hours' crewPay) and begins it afresh as the
  * shop opens
  */
-export const ON_DUTY = { in: new Map<string, number>(), out: new Set<string>() }
+export const ON_DUTY = keep(import.meta.hot, 'ON_DUTY', { in: new Map<string, number>(), out: new Set<string>() })
 /** in at their place (the first time since the opening counts) */
 export const clockIn = (id: string, at: number) => { if (!ON_DUTY.in.has(id)) ON_DUTY.in.set(id, at) }
 /** gone home */
 export const clockOut = (id: string) => { ON_DUTY.out.add(id) }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __onDuty: ON_DUTY })
 /** the staff worn out just now (data/staff's isTired, App keeps it): at half pace in the 3D, a badge beside them */
-export const STAFF_TIRED = new Set<string>()
+export const STAFF_TIRED = keep(import.meta.hot, 'STAFF_TIRED', new Set<string>())
 /** each of the staff's special skills (data/staff's SKILLS), and whether it's the deep night (game/hours' isLate): App keeps both */
-export const STAFF_SKILLS = new Map<string, SkillId[]>()
-export const LATE = { on: false }
+export const STAFF_SKILLS = keep(import.meta.hot, 'STAFF_SKILLS', new Map<string, SkillId[]>())
+export const LATE = keep(import.meta.hot, 'LATE', { on: false })
 /** the last half hour before closing (game/hours' lastCall): no one more sat down, takeaways only (App keeps it) */
-export const LAST_CALL = { on: false }
+export const LAST_CALL = keep(import.meta.hot, 'LAST_CALL', { on: false })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffState: { STAFF_SKILLS, STAFF_TIRED, LATE } })
 /** how fast this one of the staff gets about and gets things done: half, worn out, and as their skills make it now (data/staff's paceOf) */
 export const paceOfStaff = (id: string | null | undefined) =>
@@ -44,25 +45,25 @@ export const paceOfStaff = (id: string | null | undefined) =>
 
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }
-export const STAFF_TALK: StaffWord[] = []
+export const STAFF_TALK: StaffWord[] = keep(import.meta.hot, 'STAFF_TALK', [])
 /** a word from one of the staff or the owner from inside the scene, over their head and in the day's log (App sets it to its own sayStaff) */
 export const STAFF_SAY: { say: (id: string, pool: { zh: readonly string[]; ja: readonly string[]; en: readonly string[] }) => void } = { say: () => {} }
 /** the room's light switch by the way in (DiningRoom's, the world's: where it is and the way its face looks out into the room), and who's
  * gone to switch the lights on (one coming in at the opening, the room dark: commuteWalk), since when */
-export const SWITCH_SPOT = { at: null as { x: number; y: number; z: number } | null, front: { x: 0, y: 0, z: 1 }, by: '', since: 0 }
+export const SWITCH_SPOT = keep(import.meta.hot, 'SWITCH_SPOT', { at: null as { x: number; y: number; z: number } | null, front: { x: 0, y: 0, z: 1 }, by: '', since: 0 })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __switchSpot: SWITCH_SPOT })
 /** each speaker's tag over their words (the owner's: every bubble says who): a staff member's id, 'owner', 'role:cashier' (whoever's at the
  * till) to their role and name (老闆 江老闆, 外場 小美…); App keeps it up to date with who's hired and the owner's name */
-export const SPEAKERS = new Map<string, string>()
+export const SPEAKERS = keep(import.meta.hot, 'SPEAKERS', new Map<string, string>())
 /** when a customer last complained of the wait (performance.now(), shops/grill/bar's gripe): the owner and the staff look alarmed a moment
  * (the owner's: Overcooked's panic as the orders pile up) */
-export const RUSH = { at: -1e9 }
+export const RUSH = keep(import.meta.hot, 'RUSH', { at: -1e9 })
 /** what the shop's name brings in today (game/reputation's flowOf, taken as the day's business opens: App): how many more customers come
  * (the gap between them divided by it), how patient they are */
-export const RATING_FLOW = { more: 1, patience: 1 }
+export const RATING_FLOW = keep(import.meta.hot, 'RATING_FLOW', { more: 1, patience: 1 })
 /** how long (the game's seconds) each of the staff has had nothing to do just now (none: at something), kept by whoever draws them at work
  * (GuestBar3D's servers, stock keeper and plater; Roasting's second cook; App's cashier): App tires them by it (data/staff's activityOf) */
-export const STAFF_IDLE = new Map<string, number>()
+export const STAFF_IDLE = keep(import.meta.hot, 'STAFF_IDLE', new Map<string, number>())
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __staffIdle: STAFF_IDLE })
 // (only the stock keeper slacks, his game out (the owner's, 2026-11-10): the rest, with nothing to do, only ever stand by, their idle time
 // held short of SLACK_AFTER)

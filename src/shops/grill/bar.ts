@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import type { TakeoutOrder } from '@/game/takeout'
 import { startSkewers, type Skewers } from '@/game/skewers'
 import { RUSH } from '@/game/shopState'
+import { keep } from '@/game/hotKeep'
 import { emptyKama, type Kama } from '@/game/rice'
 import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
 import { fullStand } from '@/game/sakeStand'
@@ -87,57 +88,57 @@ export const aisleOf = (c: Counter) => c.aisle ?? AISLE
  * The seats with a customer's plate set down at them just now (GuestBar3D keeps it, every frame): what's grilled for
  * someone is only carried over once their plate's there, so it never lands on the bare bar before it.
  */
-export const PLATES_SET = new Set<number>()
+export const PLATES_SET = keep(import.meta.hot, 'PLATES_SET', new Set<number>())
 /**
  * The stools someone's at in the 3D room just now (GuestBar3D): sat there, on their way to it, away at the toilet, or
  * still getting up and going. Nobody new is given one of these, though the shop's done with whoever had it.
  */
-export const SEATS_TAKEN = new Set<number>()
+export const SEATS_TAKEN = keep(import.meta.hot, 'SEATS_TAKEN', new Set<number>())
 /** the stools someone's sitting on just now (GuestBar3D): their drawer's theirs, not to be pulled out under them; one taken by someone away at
  * the toilet or the fridge, or on their way in or out, isn't (item 269, the owner's: 「可是沒人啊，不能開」) */
-export const SEATS_SAT = new Set<number>()
+export const SEATS_SAT = keep(import.meta.hot, 'SEATS_SAT', new Set<number>())
 /** a customer gone to their drawer for a tissue (item 269: 「我都沒看到有客人打開抽屜用衛生紙」): the seat, and when (performance.now()); the
  * drawer slides out, a tissue's drawn up out of the box, and it's pushed back */
-export const DRAWER_KICK = new Map<number, number>()
+export const DRAWER_KICK = keep(import.meta.hot, 'DRAWER_KICK', new Map<number, number>())
 /** how long a customer's reach to their drawer for a tissue takes (ms), before they wipe their mouth with it */
 export const TISSUE_REACH_MS = 800
 /** the places whose chopsticks are up: their customer's eating (GuestBar3D fills it each frame; Roasting's BarChopsticks takes those pairs
  * off their rests, FolkFigure has them in the hand) */
-export const CHOPS_UP = new Set<number>()
+export const CHOPS_UP = keep(import.meta.hot, 'CHOPS_UP', new Set<number>())
 /** the customers with food before them just now, on their own plate at the bar (Roasting keeps it): only they're drawn eating, chopsticks in
  * hand (the owner's: waiting for the next dish, they went on picking at an empty plate) */
-export const FED = new Set<number>()
+export const FED = keep(import.meta.hot, 'FED', new Set<number>())
 /** how far into the dish they're eating each customer is, in bites (0 to Roasting's BITES_PER_PIECE; a bite's taken out of the food as it
  * passes x.65): kept by Roasting each frame, so their hand's beats go with it, the chopsticks in the food as the bite goes from the plate
  * (item 242) */
-export const EAT_PHASE = new Map<number, number>()
+export const EAT_PHASE = keep(import.meta.hot, 'EAT_PHASE', new Map<number, number>())
 /** the plates as GuestBar3D draws them (at the plating place, on the tray, before the customers, in the sink): what a piece set down on a plate
  * is rested on, its own surface found by a ray straight down (item 258: the pieces were put at a height worked out for the plates before
  * item 228's, 3 cm over the new ones' faces, a skewer hanging over its plate) */
-export const PLATE_FACES = new Set<THREE.Object3D>()
+export const PLATE_FACES = keep(import.meta.hot, 'PLATE_FACES', new Set<THREE.Object3D>())
 /** what a customer says they're having, said once they're on their stool (item 203: called out from the doorway as they came in, before
  * they were even welcomed; the kitchen has the order from the door, as ever): their line kept by Roasting, said by GuestBar3D as they sit,
  * through Roasting's own way of saying it */
 export const SAY_SEATED: { lines: Map<number, string>; say: (id: number, text: string) => void } = { lines: new Map(), say: () => {} }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __fed: FED })
 /** the customers whose stomachs something spoiled has upset (game/freshness sickChance): off to the toilet as soon as they can be */
-export const SICK = new Set<number>()
+export const SICK = keep(import.meta.hot, 'SICK', new Set<number>())
 /**
  * The people about the kitchen (the owner, the cooks, the servers), each figure put in by its own while it's drawn and taken out when it
  * goes: the cook's table's cupboard doors don't swing into anyone stood or passing in front of them (read from their world matrices).
  */
-export const KITCHEN_FOLK = new Set<THREE.Object3D>()
+export const KITCHEN_FOLK = keep(import.meta.hot, 'KITCHEN_FOLK', new Set<THREE.Object3D>())
 /**
  * Everyone drawn (the owner, the cooks, the servers, the cashier, the stock keeper, the customers, those waiting or come for a takeaway),
  * each figure's own group (the one its way moves), put in by its own as it's drawn, and who they are to the cook table (game/hearthGuard):
  * the owner may stand in his notch, the third cook in his bay, no one else on the table, no one at all in the hearth (Roasting's
  * HearthGuard puts them out of it the last thing before each frame's drawn, after all that moves them). One no longer in the scene is let go.
  */
-export const FIGURES = new Map<THREE.Object3D, HearthRole>()
+export const FIGURES = keep(import.meta.hot, 'FIGURES', new Map<THREE.Object3D, HearthRole>())
 /** what each of the kitchen's people has in hand this frame (GuestBar3D lists it as it lays it out): the hearth's guard moves it as far as it
  * moves them, so nothing carried is left in the air where they were put out of the cook table from (the owner, 2026-11-15: plates stood over
  * the fire bed and by the lantern) */
-export const CARRIED = new Map<THREE.Object3D, THREE.Object3D[]>()
+export const CARRIED = keep(import.meta.hot, 'CARRIED', new Map<THREE.Object3D, THREE.Object3D[]>())
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __figures: FIGURES, __carried: CARRIED })
 
 /**
@@ -147,19 +148,19 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * each other, by the food's key.
  */
 /** how fresh each food in the pantry is just now (0..100, game/freshness), kept by the App, read when a dish is tasted */
-export const PANTRY = { fresh: {} as Record<string, number>,
+export const PANTRY = keep(import.meta.hot, 'PANTRY', { fresh: {} as Record<string, number>,
   /** how fresh the portions last used of each food were (game/lots: the stalest lot first): what a dish made of it tastes of */
-  used: {} as Record<string, number> }
+  used: {} as Record<string, number> })
 /** water (and the power heating it) used about the shop since App last metered it (game/utilities' uses: a plate washed, a flush, the
  * washlet, hands washed, the dipper...): App drains it every second into the month's meter */
-export const UTILITY: { uses: Partial<Record<Use, number>> } = { uses: {} }
+export const UTILITY: { uses: Partial<Record<Use, number>> } = keep(import.meta.hot, 'UTILITY', { uses: {} })
 export const meterWater = (u: Use, n = 1) => { UTILITY.uses[u] = (UTILITY.uses[u] ?? 0) + n }
 /** the cook table's fridges' doors open (for what they draw open) */
-export const CUBBY_OPEN = { left: false, right: false }
+export const CUBBY_OPEN = keep(import.meta.hot, 'CUBBY_OPEN', { left: false, right: false })
 /** when the chef last reached into each fridge under the cook table (performance.now()): its doors open part way for him a moment */
-export const CUBBY_KICK = { left: -1e9, right: -1e9 }
+export const CUBBY_KICK = keep(import.meta.hot, 'CUBBY_KICK', { left: -1e9, right: -1e9 })
 /** the staff door held open till then (performance.now()): one of the staff going up or coming down the stair behind it */
-export const STAFF_DOOR_HOLD = { until: -1e9 }
+export const STAFF_DOOR_HOLD = keep(import.meta.hot, 'STAFF_DOOR_HOLD', { until: -1e9 })
 /**
  * The shoe cupboard's cubbies (the owner's: a customer's shoes go into one as they come in and out of it as they go): the colour of the
  * shoes in each (by cell, 0..8), when each one's door was last opened for them (performance.now(): open a moment), and where the cupboard
@@ -167,20 +168,20 @@ export const STAFF_DOOR_HOLD = { until: -1e9 }
  */
 /** each place's stool pulled out from the bar this far (the bar's frame, back toward the aisle; GuestBar3D: a customer pulls it out, sits,
  * slides in with it; gets up with it pushed back, and it's pushed home behind them) */
-export const SEAT_PULL = new Map<number, number>()
+export const SEAT_PULL = keep(import.meta.hot, 'SEAT_PULL', new Map<number, number>())
 /** how far in under the counter's top a stool's pushed while its place is empty (the owner's, 2026-11-11: put away under the table), from
  * where it stands sat at: none in SEAT_PULL is put away; its seat clear under the drawer case, its far edge clear of the counter's base */
 export const STOOL_TUCK = 0.3
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __seatPull?: unknown }).__seatPull = SEAT_PULL
-export const SHOE_CELLS = { shoes: new Map<number, string>(), kick: new Map<number, number>(), at: new THREE.Vector3(), ready: false }
+export const SHOE_CELLS = keep(import.meta.hot, 'SHOE_CELLS', { shoes: new Map<number, string>(), kick: new Map<number, number>(), at: new THREE.Vector3(), ready: false })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shoes?: typeof SHOE_CELLS }).__shoes = SHOE_CELLS
 export const TISSUES_KEY = 'jgs-tissues-1'
 /** each place's box of tissues (sheets left; game/tissues): a customer takes a few as they finish, the owner one at a time from the
  * drawer; swapped for a full box from the spares before each opening (App); kept in the browser */
-export const TISSUES: { boxes: number[] } = { boxes: (() => {
+export const TISSUES: { boxes: number[] } = keep(import.meta.hot, 'TISSUES', { boxes: (() => {
   try { const v = JSON.parse(localStorage.getItem(TISSUES_KEY) ?? 'null'); if (Array.isArray(v) && v.every((n) => typeof n === 'number')) return v as number[] } catch { /* (none kept) */ }
   return []
-})() }
+})() })
 /** a place's box (full, for a place never seen before) */
 export const tissuesAt = (seat: number) => TISSUES.boxes[seat] ?? BOX_SHEETS
 export function setTissues(seat: number, sheets: number) {
@@ -189,7 +190,7 @@ export function setTissues(seat: number, sheets: number) {
   try { localStorage.setItem(TISSUES_KEY, JSON.stringify(TISSUES.boxes)) } catch { /* (not kept) */ }
 }
 /** what's put each customer out while they're here (game/reputation's gripes), for their visit's score as they go (Roasting) */
-export const GRIPES = new Map<number, Set<Gripe>>()
+export const GRIPES = keep(import.meta.hot, 'GRIPES', new Map<number, Set<Gripe>>())
 export const gripe = (id: number, g: Gripe) => {
   const s = GRIPES.get(id) ?? new Set<Gripe>(); s.add(g); GRIPES.set(id, s)
   if (g === 'wait') RUSH.at = performance.now()
@@ -198,7 +199,7 @@ export const gripe = (id: number, g: Gripe) => {
 export const LATE_GRIPE: { add: (id: number, g: Gripe) => void } = { add: gripe }
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __lateGripe?: typeof LATE_GRIPE }).__lateGripe = LATE_GRIPE
 /** the receipt printer's roll (game/receipts): slips left on it; `ver` counts its changes, for the stock's panel to follow */
-export const PRINTER = { slips: ROLL_SLIPS, ver: 0 }
+export const PRINTER = keep(import.meta.hot, 'PRINTER', { slips: ROLL_SLIPS, ver: 0 })
 const printerSubs = new Set<() => void>()
 export const onPrinter = (f: () => void) => { printerSubs.add(f); return () => { printerSubs.delete(f) } }
 export function setPrinter(slips: number) { if (PRINTER.slips === slips) return; PRINTER.slips = slips; PRINTER.ver++; printerSubs.forEach((f) => f()) }
@@ -208,13 +209,13 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * answers (`answer`): yes only while they're sat waiting with nothing cooked theirs yet (a dish is tied to a stool once it's off the fire)
  * and the stool's free; then both move them, Roasting's guest and GuestBar3D's figure.
  */
-export const SEAT_MOVE: { ask: { guest: number; from: number; to: number } | null; answer: { guest: number; to: number; ok: boolean } | null } = { ask: null, answer: null }
+export const SEAT_MOVE: { ask: { guest: number; from: number; to: number } | null; answer: { guest: number; to: number; ok: boolean } | null } = keep(import.meta.hot, 'SEAT_MOVE', { ask: null, answer: null })
 /** the shop's fifty iron skewers (game/skewers): clean in the holder, dirty in the used tray, carried to the sink; `inUse`, those on food now
  * (Roasting counts them each frame) */
-export const SKEWERS: { s: Skewers; inUse: number } = { s: startSkewers(), inUse: 0 }
+export const SKEWERS: { s: Skewers; inUse: number } = keep(import.meta.hot, 'SKEWERS', { s: startSkewers(), inUse: 0 })
 /** the skewers just pulled out of the food as it's plated (the owner's, 2026-11-11: the chef pulls them and drops them in the used bucket):
  * where each was (the world) and when (performance.now()); SkewerStore flies each into the used bucket and lets it go */
-export const PULLED: { from: THREE.Vector3; at: number }[] = []
+export const PULLED: { from: THREE.Vector3; at: number }[] = keep(import.meta.hot, 'PULLED', [])
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __skewers?: typeof SKEWERS }).__skewers = SKEWERS
 /** what takes the owner off his place at the fire: out on the floor serving (no server hired: he carries the plates, clears them and takes
  * the washed ones back himself, the owner's: nothing flies), washing up at the sink, the third cook's rounds with none hired */
@@ -226,7 +227,7 @@ export type OwnerJob = 'serve' | 'wash' | 'plate'
  * washing up handed to him, one owner washed at the sink while another stood by the pass). Only that job's figure of him is drawn, and no
  * other's started till he's back from it.
  */
-export const OWNER_OUT: { on: boolean; by: OwnerJob | null } = { on: false, by: null }
+export const OWNER_OUT: { on: boolean; by: OwnerJob | null } = keep(import.meta.hot, 'OWNER_OUT', { on: false, by: null })
 /** the owner off on a job, or back from it (only that job's own coming back frees him) */
 export function ownerAway(by: OwnerJob, on: boolean) {
   if (on) { OWNER_OUT.by = by; OWNER_OUT.on = true } else if (OWNER_OUT.by === by) { OWNER_OUT.by = null; OWNER_OUT.on = false }
@@ -251,9 +252,9 @@ export const PATH_MAP: { v: number; blocks: { id: string; pts: THREE.Vector3[] }
   home: THREE.Vector3 | null
   /** the person or the way the map's list is pointing at (a `who`, or a way's key): drawn bright, the rest faint */
   hot: string | null } =
-  { v: 0, blocks: [], routes: [], places: [], home: null, hot: null }
+  keep(import.meta.hot, 'PATH_MAP', { v: 0, blocks: [], routes: [], places: [], home: null, hot: null })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pathMap: PATH_MAP })
-export const SERVICE = {
+export const SERVICE = keep(import.meta.hot, 'SERVICE', {
   /** how many servers there are to carry (GuestBar3D says): none, and the cook hands it over the bar himself */
   servers: 0,
   /** what's out at the pass waiting to go, and for which seat (Roasting) */
@@ -269,7 +270,7 @@ export const SERVICE = {
   /** how far the plate under each piece being carried has been turned from the way it stood at the plating place (radians about up), as the
    * server sets it down before its customer (item 228: seatTurn); what's on it turns with it (Roasting) */
   turn: new Map<string, number>(),
-}
+})
 // (in development, to be watched from the console)
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __service?: typeof SERVICE }).__service = SERVICE
 /**
@@ -292,7 +293,7 @@ export const gateCut = (g: { w: number; shift?: number }) => g.w - (g.shift ?? 0
  */
 export const BAR_BASE_Z = [0.02, 0.28] as const
 /** where each place's soy dish stands (the world's; Roasting's BarTableware, as it may be moved in edit mode): the soy's poured there */
-export const SOY_DISH_AT = new Map<number, THREE.Vector3>()
+export const SOY_DISH_AT = keep(import.meta.hot, 'SOY_DISH_AT', new Map<number, THREE.Vector3>())
 export function gateOf(c: Counter, g: Gate) {
   const hinge = g.end * ((c.length + 0.2) / 2 - gateCut(g))
   return { hinge, mid: c.at.clone().addScaledVector(c.along, hinge + g.end * g.leaf / 2).addScaledVector(c.lay, (BAR_BASE_Z[0] + BAR_BASE_Z[1]) / 2) }
@@ -306,7 +307,7 @@ export function sauceSide(c: Counter, gate: { end: 1 | -1; w: number; shift?: nu
   return x + PLACE.sauce[0] + 0.06 > topX1 ? -PLACE.sauce[0] : PLACE.sauce[0]
 }
 /** things in the room that can be clicked (the toilets' doors, the shrine's omiki): how many are under the pointer */
-export const POINTER_HINT = { hand: 0 }
+export const POINTER_HINT = keep(import.meta.hot, 'POINTER_HINT', { hand: 0 })
 /** handlers for one of those: a hand over it */
 export const handOver = {
   onPointerOver: (e: { stopPropagation: () => void; nativeEvent: Event; eventObject?: THREE.Object3D; camera?: THREE.Camera }) => {
@@ -484,15 +485,15 @@ export const DRINKS_KEY = 'jgs-drinks-1'
 const DRINK_HOMES = FRIDGE_UNITS.map((u) => u.shelves.map((sh) => [...sh.ids] as string[]))
 const keptDrinks = (() => { try { return readDrinks(localStorage.getItem(DRINKS_KEY), DRINK_HOMES) } catch { return null } })()
 /** the drinks kept in the back (the crates and cartons by the fridges, game/drinkStock): what's carried out to the fridges, bought by the case */
-export const DRINK_BACK: { back: Back; ver: number } = { back: keptDrinks?.back ?? startBack(), ver: 0 }
+export const DRINK_BACK: { back: Back; ver: number } = keep(import.meta.hot, 'DRINK_BACK', { back: keptDrinks?.back ?? startBack(), ver: 0 })
 /** the cases ordered from the liquor shop on their way (game/drinkStock's Delivery, item 243): the stocker's orders and the fridge panel's;
  * brought in, paid for and put in the back as each comes (GuestBar3D) */
-export const DRINK_COMING: { list: Delivery[] } = { list: [] }
+export const DRINK_COMING: { list: Delivery[] } = keep(import.meta.hot, 'DRINK_COMING', { list: [] })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __drinkBack?: typeof DRINK_BACK }).__drinkBack = DRINK_BACK
 /** the shop's cash, for buying from the room itself (App fills it in): how much there is, and paying out (a purchase in the ledger) */
-export const SHOP_PURSE = { cash: () => Infinity as number, spend: (n: number) => { void n } }
+export const SHOP_PURSE = keep(import.meta.hot, 'SHOP_PURSE', { cash: () => Infinity as number, spend: (n: number) => { void n } })
 const NEW_FRIDGES = FRIDGE_UNITS.map((u) => emptyFridge<DrinkId>(u.shelves.map((sh) => sh.ids)))
-export const FRIDGE_STOCK = {
+export const FRIDGE_STOCK = keep(import.meta.hot, 'FRIDGE_STOCK', {
   units: (keptDrinks?.units as (DrinkId | null)[][][] | undefined) ?? NEW_FRIDGES.map((f) => f.rows),
   /** how many stand in each place, one behind another (0 where there's nothing) */
   counts: keptDrinks?.counts ?? NEW_FRIDGES.map((f) => f.counts),
@@ -503,7 +504,7 @@ export const FRIDGE_STOCK = {
   out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number]; fy?: number; vy?: number; fell?: number; tip?: number; roll?: number; tipped?: boolean; lift?: number; hit?: boolean
     base?: number }[],
   ver: 0,
-}
+})
 /** a fridge's places as game/drinkStock takes them (its own rows and counts, changed in place) */
 export const placesOf = (unit: number): Places<DrinkId> => ({ rows: FRIDGE_STOCK.units[unit], counts: FRIDGE_STOCK.counts[unit] })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __stock: FRIDGE_STOCK, __fridgeUnits: FRIDGE_UNITS })
@@ -529,10 +530,10 @@ if (typeof window !== 'undefined') {
 export type Spill = { key: number; at: [number, number, number]; unit: number; drink: string; clear: number; glass: string; seed: number; t0: number; by: number | null; left: number
   /** the drink still on the floor, 1 to 0 as it's wiped up after the glass is swept (item 116) */
   wet: number }
-export const SPILLS: { list: Spill[]; next: number } = { list: [], next: 1 }
+export const SPILLS: { list: Spill[]; next: number } = keep(import.meta.hot, 'SPILLS', { list: [], next: 1 })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __spills?: typeof SPILLS }).__spills = SPILLS
 /** the drinks' stock panel (shops/grill/DrinkStockPanel), opened from the back stock by the fridges: open or not, and who's watching */
-export const DRINK_PANEL = { open: false }
+export const DRINK_PANEL = keep(import.meta.hot, 'DRINK_PANEL', { open: false })
 const drinkPanelSubs = new Set<() => void>()
 export function setDrinkPanel(open: boolean) { if (DRINK_PANEL.open === open) return; DRINK_PANEL.open = open; drinkPanelSubs.forEach((f) => f()) }
 export const onDrinkPanel = (f: () => void) => { drinkPanelSubs.add(f); return () => { drinkPanelSubs.delete(f) } }
@@ -662,9 +663,9 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
 // sheet was last pulled, the pump last pressed, by a guest or a click)
 const wcOf = () => ({ passing: 0, inside: 0, open: false, room: freshRoom(), tap: false, basin: emptyBasin(), flushAt: -1e9, scrubAt: -1e9, otoAt: -1e9,
   knockAt: -1e9, rollAt: -1e9, washAt: -1e9, handAt: -1e9, dryAt: -1e9, towels: TOWEL_FULL, soap: SOAP_FULL, towelAt: -1e9, pumpAt: -1e9 })
-export const TOILETS = { m: wcOf(), f: wcOf() }
+export const TOILETS = keep(import.meta.hot, 'TOILETS', { m: wcOf(), f: wcOf() })
 /** points off the taste of what each guest eats, for what they found in the toilet (Roasting reads it) */
-export const WC_GRUMBLE = new Map<number, number>()
+export const WC_GRUMBLE = keep(import.meta.hot, 'WC_GRUMBLE', new Map<number, number>())
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __toilets?: typeof TOILETS }).__toilets = TOILETS
 
 /**
@@ -708,7 +709,7 @@ export const TILL = { along: 0.75, W: 1.2, D: 0.82, rise: 0.22,
   lay: 0.3 }
 
 /** the till's live state: what its displays read and how far its drawer is out (0 shut, 1 open), set by the customer paying there */
-export const TILL_STATE = { text: '0', drawer: 0,
+export const TILL_STATE = keep(import.meta.hot, 'TILL_STATE', { text: '0', drawer: 0,
   /** how far on the customer's payment has got (0..1; -1 when no one's paying), the note they hand over and the change they're due */
   k: -1, tender: 0, change: 0,
   /** what's rung up for the customer paying: each dish, then the drink if any; and how many of those are dishes */
@@ -720,7 +721,7 @@ export const TILL_STATE = { text: '0', drawer: 0,
   /** what the one paying owes, and their number */
   bill: 0, payer: 0,
   /** this payment's receipt printed (cashRegister: none with the printer out of paper and no spare roll) */
-  slip: true }
+  slip: true })
 /** what a customer's bill comes to: the dishes they ordered and the drink from the fridge, if they took one */
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __till?: typeof TILL_STATE }).__till = TILL_STATE
 /**
@@ -730,7 +731,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  */
 export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null
   onPaid: ((guest: number, amount: number, card: boolean) => void) | null; paid: Set<number> } =
-  { drawer: openingFloat(), onTake: null, onPaid: null, paid: new Set() }
+  keep(import.meta.hot, 'TILL_CASH', { drawer: openingFloat(), onTake: null, onPaid: null, paid: new Set() })
 /** a customer's bill paid at the till, once: cash into the drawer, and the shop's books told (GuestBar3D: as the cash key's pressed, or
  * as they're by the till if a frame went past that moment; item 195: the register put it in the drawer only on the frame the key went
  * down) */
@@ -743,25 +744,25 @@ export function payIn(guest: number, amount: number, card: boolean, tender = amo
   TILL_CASH.onPaid?.(guest, amount, card)
 }
 /** the dish racks' plates (game/plates): how many are on them (all the shop's but those out at the seats, in the sink, or being carried) */
-export const PLATE_RACK = { n: RACK_FULL }
+export const PLATE_RACK = keep(import.meta.hot, 'PLATE_RACK', { n: RACK_FULL })
 /** the low rack by the cook table (game/plates' LOW_FULL; the owner's, 2026-11-11): how many clean plates are on it, and how many are on their
  * way to it from the dish racks */
-export const LOW_RACK = { n: LOW_FULL, coming: 0 }
+export const LOW_RACK = keep(import.meta.hot, 'LOW_RACK', { n: LOW_FULL, coming: 0 })
 /** the sink (Sink.tsx): its plates being washed (the tap runs); and its tap turned on by hand (the owner's: its handle's to be turned) */
 /** the sink: someone's washing at it, its tap's on, how many dirty plates are in it (GuestBar3D keeps them; told here for the washer's
  * label) */
 /** the sink: being washed at, its tap turned on by hand, its dirty plates; its plug in, and the water in its basin (game/sinkWater's level) */
 /** (`dirt`: each dirty plate in the sink, how dirty (game/plates), the bottom one first: GuestBar3D keeps it, soaking them; Sink reads the
  * top one's for how long a scrub by hand takes) */
-export const SINK = { washing: false, tap: false, dirty: 0, plug: false, water: 0, dirt: [] as number[],
+export const SINK = keep(import.meta.hot, 'SINK', { washing: false, tap: false, dirty: 0, plug: false, water: 0, dirt: [] as number[],
   /** each of the sink's plates' kind (game/plateSize, item 228), as `dirt` has how dirty: a long plate cleared into the sink is a long plate
    * there, in hand and in the basket */
   kinds: [] as PlateKind[],
   /** washing by hand (game/handWash, item 103): the plates' worth of washing-up liquid in the water, and the sponge taken up */
-  soap: 0, sponge: false }
+  soap: 0, sponge: false })
 /** the stack of dirty plates on the sink's counter as the shop's taken over (game/sinkPile, item 103): how many are left of it (a new game
  * starts with it; it isn't put back each day), and the last day the owner spoke of it */
-export const PILE = { n: PILE_START, saidDay: -1 }
+export const PILE = keep(import.meta.hot, 'PILE', { n: PILE_START, saidDay: -1 })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __plates: PLATE_RACK, __lowRack: LOW_RACK, __sink: SINK })
 /** the grill's own way to put charcoal on from outside the scene (App's fire bar): `place` throws a portion on and says how many went on
  * (none when the bed is full); the scene sets it while it's showing */
@@ -772,19 +773,19 @@ export const COAL_BRIDGE: { place: (() => number) | null } = { place: null }
  * them; until it does, there's no end to any of it.
  */
 export const SUPPLIES: { coal: () => number; refillCrate: (cap: number) => number; dab: (k: string) => boolean; has: (id: string) => number
-  take: (id: string, n: number) => boolean } = {
+  take: (id: string, n: number) => boolean } = keep(import.meta.hot, 'SUPPLIES', {
   coal: () => Infinity, refillCrate: (cap) => cap, dab: () => true,
   // (how many of a food there are in stock, for what's said of it in the room; -1, not known: no shop's running)
   has: () => -1,
   // (n of something taken out of stock, if there are as many: a spare box of tissues, the stock keeper's)
   take: () => true,
-}
+})
 /**
  * The cleaning things' bottles in use (game/household; item 203: stocked and bought, and nothing ever used them): the dish soap by the sink,
  * so many squeezes left in it, and how many plates the staff's last squeeze has still to wash; the toilet cleaner, so many scrubs left. A
  * new one's opened from the spares in stock as each runs out (each a full one as the page loads).
  */
-export const IN_USE = { soap: DISH_SOAP_SQUEEZES, plates: 0, cleaner: CLEANER_SCRUBS }
+export const IN_USE = keep(import.meta.hot, 'IN_USE', { soap: DISH_SOAP_SQUEEZES, plates: 0, cleaner: CLEANER_SCRUBS })
 /** a squeeze of the dish soap into the sink: false with the bottle empty and none in stock */
 export const squeezeSoap = () => {
   const r = takeDose(IN_USE.soap, DISH_SOAP_SQUEEZES, () => SUPPLIES.take(DISH_SOAP, 1))
@@ -818,9 +819,9 @@ export const batchOf = (id: string, full: number) => { const n = SUPPLIES.has(id
 export const GUEST_BILLS: { of: (guest: number) => Tab | null } = { of: () => null }
 /** the stock keeper at a toilet just now, to change its roll: which, whether near enough its door to have it open, whether in (the guests
  * leave that toilet till he's done; the door opens and shuts for him as for them) */
-export const STOCKER_WC: { who: 'm' | 'f' | null; near: boolean; inside: boolean } = { who: null, near: false, inside: false }
+export const STOCKER_WC: { who: 'm' | 'f' | null; near: boolean; inside: boolean } = keep(import.meta.hot, 'STOCKER_WC', { who: null, near: false, inside: false })
 /** the places whose drawer the stock keeper has out just now, changing the box of tissues in it */
-export const DRAWER_HELD = new Set<number>()
+export const DRAWER_HELD = keep(import.meta.hot, 'DRAWER_HELD', new Set<number>())
 export const billOf = (items: number, drink?: DrinkId) => Math.max(1, items) * 380 + (drink ? 320 : 0)
 /** the figures on the register's displays: a number with its thousands comma */
 export const yen = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
@@ -881,7 +882,7 @@ export type ReadyPlate = { seat: number; plate: boolean; flying: number; landed:
  * way), and its slots, each a plate ready for a server (Roasting lays a plate in one for a seat whose first food is done and puts that
  * seat's food on it; GuestBar3D draws the plate and has a server come for it, the slot freed as it's taken up)
  */
-export const PLATING = { stock: 0, coming: 0, slots: Array.from({ length: READY_SLOTS }, () => null as ReadyPlate | null) }
+export const PLATING = keep(import.meta.hot, 'PLATING', { stock: 0, coming: 0, slots: Array.from({ length: READY_SLOTS }, () => null as ReadyPlate | null) })
 /** which end of a plated piece its head is at (Roasting's flatQ lays its stick's top end toward the way it's laid, 1, or its foot, -1) */
 const HEAD_END = 1
 /**
@@ -900,17 +901,17 @@ export const seatTurn = (seat: number) => {
  * (TAKEOUT_SPOT: the plating place's second slot, toward the chef, free) and marks it ready; GuestBar3D walks the one waiting to the till, has
  * a server carry the box out to them (`taken`, `handed`) and walks them out (`gone`, then Roasting lets it go)
  */
-export const TAKEOUT = { orders: [] as TakeoutOrder[] }
+export const TAKEOUT = keep(import.meta.hot, 'TAKEOUT', { orders: [] as TakeoutOrder[] })
 /** the numbers of the delivery riders' orders still about (item 210): their food's ordered through the platform they ride for, which keeps its
  * cut of it (App's orderEntry, game/costs' platformCut); put in as the order's placed, let go as it's gone */
-export const RIDERS = new Set<number>()
+export const RIDERS = keep(import.meta.hot, 'RIDERS', new Set<number>())
 /**
  * The takeaway stand behind the cashier's chair (the owner's, 2026-11-11): with a cashier at the till, a server sets the bagged takeaway down on
  * it (`bags`, the orders' ids), and the cashier turns round in their chair, takes it up and hands it over the till to its customer (`handing`:
  * whose, how far on in seconds; `turn`, how far they're turned round to it, 0..1; `carry`, their hands out holding it); with no one at the till
  * the server takes it out to the customer as before. `cashierAt`: the moment the cashier was last seen sat at the till (Roasting).
  */
-export const TAKEOUT_STAND = { bags: [] as number[], handing: null as { id: number; t: number } | null, turn: 0, carry: false, cashierAt: -1e9 }
+export const TAKEOUT_STAND = keep(import.meta.hot, 'TAKEOUT_STAND', { bags: [] as number[], handing: null as { id: number; t: number } | null, turn: 0, carry: false, cashierAt: -1e9 })
 export const cashierIn = () => performance.now() - TAKEOUT_STAND.cashierAt < 800
 /** where the stand is, in the bar's frame: right behind the cashier's chair, its front to it */
 export const STAND_AT = { x: 1.72, z: -2.14, yaw: Math.atan2(-0.59, -0.81) }
@@ -936,7 +937,7 @@ export const BENCH_PLACE = { x: -1.2697, z: -3.9993, y: 0, yaw: 0.6297, pitch: 0
  * the first, toward the stand, by this much (its middle half way between them: 0.55 m of floor to either, in the world), the same way round */
 export const BENCH2_ALONG = -1.332
 export const BENCH_WAIT = 90
-export const BENCH = { ids: [] as number[], since: new Map<number, number>(), up: new Set<number>(), gone: new Set<number>() }
+export const BENCH = keep(import.meta.hot, 'BENCH', { ids: [] as number[], since: new Map<number, number>(), up: new Set<number>(), gone: new Set<number>() })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bench: BENCH, __seatsTaken: SEATS_TAKEN })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __takeout: TAKEOUT, __takeoutStand: TAKEOUT_STAND })
 /** the takeaway box's place on the table, in the scene's frame (ALONG, LAY) */
@@ -948,7 +949,7 @@ export const TAKEOUT_SPOT = { along: PLATING_SPOT.along - 0.46, lay: PLATING_SPO
  * plating place, where the box stood in its second slot's plate. GuestBar3D says where it is, in the bar's frame: its top's middle (`at`) and
  * where one stands before it to take from it (`out`); null till it's found
  */
-export const SERVE_COUNTER: { at: THREE.Vector3 | null; out: THREE.Vector3 | null } = { at: null, out: null }
+export const SERVE_COUNTER: { at: THREE.Vector3 | null; out: THREE.Vector3 | null } = keep(import.meta.hot, 'SERVE_COUNTER', { at: null, out: null })
 /** the same, in the bar's frame (for the server who comes for it): where it stands and where they stand to take it (on the serving counter
  * once it's there; else at the cook table, by the plating place) */
 export const takeoutOf = () => {
@@ -959,20 +960,20 @@ export const takeoutOf = () => {
 /** a place in the bar's frame into the scene's (Roasting's, the fire's own: FIRE_SHIFT back), as sceneToBar undoes */
 export const barToFire = (v: THREE.Vector3) => v.clone().multiplyScalar(GRILL_SCALE).add(GRILL_OFFSET).sub(FIRE_SHIFT)
 /** the seats whose plate is out (set down at them, or on its way there): their later food is set out at the plating place loose, for adding to it */
-export const PLATES_OUT = new Set<number>()
+export const PLATES_OUT = keep(import.meta.hot, 'PLATES_OUT', new Set<number>())
 /** the kitchen's plater (the third cook, or the second) off their place, fetching plates for the plating place: GuestBar3D walks a figure of them,
  * Roasting's at their place is hidden meanwhile (the owner, plating with no cook to, is OWNER_OUT) */
-export const PLATER_OUT: { id: string | null } = { id: null }
+export const PLATER_OUT: { id: string | null } = keep(import.meta.hot, 'PLATER_OUT', { id: null })
 /** the dish dryer in the sink's cabinet (game/plates' Dryer: what's in it, its time left); `open`, its door down (0..1) to load or unload it
  * (Sink.tsx draws it, GuestBar3D runs it) */
 /** the washer under the sink (game/plates): its plates and time left; `open`: a server's at it, its door down; `manual`: the player's let its
  * door down (Sink); `ask`: the player's asked for the sink's dirty plates to be put in it (GuestBar3D, which keeps the sink's, does it) */
-export const DRYER: Dryer & { open: number; manual: boolean; ask: number } = { n: 0, left: null, open: 0, manual: false, ask: 0 }
+export const DRYER: Dryer & { open: number; manual: boolean; ask: number } = keep(import.meta.hot, 'DRYER', { n: 0, left: null, open: 0, manual: false, ask: 0 })
 /** the draining basket on the sink's counter (game/plates' Drain: the plates washed by hand while the washer's busy, and how long till
  * they're dry); GuestBar3D runs it, draws its plates */
-export const DRAIN: Drain = { n: 0, left: null }
+export const DRAIN: Drain = keep(import.meta.hot, 'DRAIN', { n: 0, left: null })
 /** the kind of plate standing in each of the draining basket's slots (item 228), as it was washed */
-export const DRAIN_KINDS: PlateKind[] = []
+export const DRAIN_KINDS: PlateKind[] = keep(import.meta.hot, 'DRAIN_KINDS', [])
 /** the player's own washing up, asked of the sink (Sink) and done where the sink's plates are counted (GuestBar3D): one plate washed by hand into
  * the basket, or the basket's dry plates taken back to the racks; `until`: not again before the last one's washed */
 export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number; boss: boolean
@@ -983,10 +984,10 @@ export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number; boss: bool
    * coming on) */
   held: boolean
   /** a press on the sink's basin starts the washing as a press on the dirty stack does (item 234; GuestBar3D sets it): whether it started */
-  take: ((x: number, y: number) => boolean) | null } = { ask: null, until: 0, boss: false, spongeHeld: false, stream: null, held: false, take: null }
+  take: ((x: number, y: number) => boolean) | null } = keep(import.meta.hot, 'HAND_WASH', { ask: null, until: 0, boss: false, spongeHeld: false, stream: null, held: false, take: null })
 /** where the shop's plates are just now, told over for the racks' and the basket's labels (the owner's: every plate counted): on the racks, in
  * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
-export const PLATE_COUNT = { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 }
+export const PLATE_COUNT = keep(import.meta.hot, 'PLATE_COUNT', { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __drain: DRAIN, __plateCount: PLATE_COUNT, __handWash: HAND_WASH, __ownerOut: OWNER_OUT })
 /** the bins by the sink (item 208, game/bins): how many used sticks are in the rubbish one (cleared off the customers' plates with them;
  * the owner's: thrown away there), how full each is and the bottles and cans in the recycling one; each lid asked open (a click) or
@@ -994,17 +995,17 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * keeper: none in it till he's back with a new one) */
 export const SINK_BIN: { sticks: number; b: Bins; lids: Record<BinKind, { open: boolean; until: number }>; out: BinKind | null
   /** the full bags tied up and stowed under the sink while customers are about, to be put out after closing (item 318) */
-  stowed: Record<BinKind, number> } = {
-  sticks: 0, b: emptyBins(), lids: { rubbish: { open: false, until: 0 }, recycle: { open: false, until: 0 } }, out: null, stowed: { rubbish: 0, recycle: 0 } }
+  stowed: Record<BinKind, number> } = keep(import.meta.hot, 'SINK_BIN', {
+  sticks: 0, b: emptyBins(), lids: { rubbish: { open: false, until: 0 }, recycle: { open: false, until: 0 } }, out: null, stowed: { rubbish: 0, recycle: 0 } })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __sinkBin: SINK_BIN, __staffDoorHold: STAFF_DOOR_HOLD })
 /** how many raw pieces wait on the cook table's board now (Roasting writes it every frame; App won't let more be taken out of the freezer
  * past its BOARD_SLOTS while researching: item 115) */
-export const BOARD = { n: 0 }
+export const BOARD = keep(import.meta.hot, 'BOARD', { n: 0 })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pile: PILE })
 /** the sticks each seat's plate has on it, of what's been eaten off it (Roasting counts what's set down; GuestBar3D clears them with the plate) */
-export const SEAT_STICKS = new Map<number, number>()
+export const SEAT_STICKS = keep(import.meta.hot, 'SEAT_STICKS', new Map<number, number>())
 /** the whole fish each seat's eaten (their bones left on the plate, the owner's), and which of the foods are a whole fish to leave them */
-export const SEAT_BONES = new Map<number, number>()
+export const SEAT_BONES = keep(import.meta.hot, 'SEAT_BONES', new Map<number, number>())
 /**
  * The kitchen's rice (game/rice): how many rice balls' rice the tub holds now, the iron pot on its stove (cooking, cooked, empty), and
  * whether someone's washing the next pot's rice at the sink just now (GuestBar3D's plater does it all; Decor draws the pot; Roasting
@@ -1014,7 +1015,7 @@ export const SEAT_BONES = new Map<number, number>()
 /** (`batch`: how many portions the pot on the stove was set on with, what it's full of once cooked (item 199)) */
 export const RICE: { rice: number; kama: Kama; washing: boolean; batch: number
   /** how far its lid's lifted off by the one scooping a bowl of rice from it (0..1, item 206: GuestBar3D's scoop; Decor draws it) */
-  lid: number } = { rice: 0, kama: emptyKama(), washing: false, batch: 20, lid: 0 }
+  lid: number } = keep(import.meta.hot, 'RICE', { rice: 0, kama: emptyKama(), washing: false, batch: 20, lid: 0 })
 /**
  * The rice and the miso soup had with the dishes (items 205, 206, the owner's, 2026-11-16: 「我看客人都沒叫白飯跟味噌湯」「打飯的動畫？我
  * 要看到好的動畫品質」): Roasting asks for a customer's bowls once they've ordered them (`want`); the third cook (with none, a server)
@@ -1023,25 +1024,25 @@ export const RICE: { rice: number; kama: Kama; washing: boolean; batch: number
  * each place's was set down (`rice:<seat>`, `soup:<seat>`: how much is left of it as they eat, GuestBar3D draws it); `ver` counts each
  * change, for the drawing to see.
  */
-export const BOWLS = { want: [] as { guest: number; rice: boolean; soup: boolean }[], asked: new Set<number>(), got: new Set<string>(),
-  setAt: new Map<string, number>(), ver: 0 }
+export const BOWLS = keep(import.meta.hot, 'BOWLS', { want: [] as { guest: number; rice: boolean; soup: boolean }[], asked: new Set<number>(), got: new Set<string>(),
+  setAt: new Map<string, number>(), ver: 0 })
 /** the places with a bowl of rice set at them (as SOUP_SEATS has the soup's) */
-export const RICE_SEATS = new Set<number>()
+export const RICE_SEATS = keep(import.meta.hot, 'RICE_SEATS', new Set<number>())
 /** a bowl of rice sold to a customer as they order (App's: its price on their bill, a portion of rice off the stock); false: none to be had */
 export const SIDE_SALE: { sell: (id: string, guest: number) => boolean } = { sell: () => false }
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bowls: BOWLS, __riceSeats: RICE_SEATS })
 /** the finished rice balls on the bamboo tray at the rice-ball counter's end (game/rice, item 129): the third cook shapes them ahead
  * (GuestBar3D's plater), the head chef's fetcher takes an order's off it first (Roasting; with none on it, he shapes them); Decor shows as
  * many. Empty as the shop's first set out (item 229: three stood on it with no rice in stock or cooked; they're shaped from the cooker's) */
-export const ONIGIRI_TRAY = { n: 0 }
+export const ONIGIRI_TRAY = keep(import.meta.hot, 'ONIGIRI_TRAY', { n: 0 })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __onigiri?: typeof ONIGIRI_TRAY }).__onigiri = ONIGIRI_TRAY
 /** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
  * plater; Decor draws it) */
 /** (`batch`: how many bowls the pot was made with (item 199): the pot holds that many once hot, and its surface stands as high as they do) */
-export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat; batch: number } = { pot: emptyPot(), left: 0, served: 0, heat: 'auto', batch: 12 }
+export const SOUP: { pot: SoupPot; left: number; served: number; heat: Heat; batch: number } = keep(import.meta.hot, 'SOUP', { pot: emptyPot(), left: 0, served: 0, heat: 'auto', batch: 12 })
 /** the seats with a bowl of miso soup set at them (Roasting ladles it out to those who ordered it; GuestBar3D draws it; `SOUP.served` counts
  * each change, for the drawing to see) */
-export const SOUP_SEATS = new Set<number>()
+export const SOUP_SEATS = keep(import.meta.hot, 'SOUP_SEATS', new Set<number>())
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __soup: SOUP })
 /**
  * The sake stand's bottles (game/sakeStand, item 89): how full each is; a bottle dragged by the player over the stand's tokkuri or a glass pours
@@ -1054,13 +1055,13 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * `unpoured`: who's been sold a tokkuri that's still to be poured (its sake, taken from the stock as it was ordered, still in the bottle)
  */
 export const SAKE: { levels: number[]; served: number; want: number[]; ready: Set<number>; open: number; station: boolean; unpoured: Set<number> } =
-  { levels: fullStand(), served: 0, want: [], ready: new Set(), open: 1, station: false, unpoured: new Set() }
+  keep(import.meta.hot, 'SAKE', { levels: fullStand(), served: 0, want: [], ready: new Set(), open: 1, station: false, unpoured: new Set() })
 /** the shop's sake not yet poured, in tokkuri (item 199): what's in stock, and what's been sold and is still to be poured; Infinity with no
  * shop running */
 export const sakeLeft = () => { const have = SUPPLIES.has('Sake'); return have < 0 ? Infinity : have + SAKE.unpoured.size }
 /** the seats with a tokkuri of sake and its cup set at them (Roasting pours it for those who ordered it; GuestBar3D draws it; `SAKE.served`
  * counts each change, for the drawing to see) */
-export const SAKE_SEATS = new Set<number>()
+export const SAKE_SEATS = keep(import.meta.hot, 'SAKE_SEATS', new Set<number>())
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __sake: SAKE, __sakeSeats: SAKE_SEATS })
 /**
  * The fire kept by the third cook (三廚, the plater: the owner's, a robata's kitchen split three ways): the grill (Roasting) asks for charcoal
@@ -1075,7 +1076,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * the world) and when he was last there to do it (`seenAt`: away tasting or drinking, the food goes across by itself as it did); and when he's
  * seasoning something on the fire (`dabUntil`), how: a pinch of salt rubbed over it, a glaze brushed on, a powder tapped off a spoon (`dab`).
  */
-export const OWNER_GRILL = { on: false, stand: new THREE.Vector3(), face: new THREE.Vector3(), lean: 0, hold: false, hand: new THREE.Vector3(), seenAt: -1e9, fanUntil: 0,
+export const OWNER_GRILL = keep(import.meta.hot, 'OWNER_GRILL', { on: false, stand: new THREE.Vector3(), face: new THREE.Vector3(), lean: 0, hold: false, hand: new THREE.Vector3(), seenAt: -1e9, fanUntil: 0,
   /** his own uchiwa in his hand just now (Boss): the one in the holder on the table taken up for it, not drawn there meanwhile (item 203: two
    * fans, his out of nothing and the table's still in its holder) */
   fanning: false,
@@ -1086,12 +1087,12 @@ export const OWNER_GRILL = { on: false, stand: new THREE.Vector3(), face: new TH
   /** the player's just pushed a skewer through something on the board by hand (Roasting, item 105, the owner's, 2026-11-14: "he should
    * move as I skewer"): he does it with them, turned to it, the left hand holding it down and the right pushing the rod in, till then
    * (performance.now()); `pierceAt`, where it is (the world) */
-  pierceUntil: 0, pierceAt: new THREE.Vector3() }
+  pierceUntil: 0, pierceAt: new THREE.Vector3() })
 /** the second cook (二廚), fetching the orders out of the stores and skewering them at the board (Roasting's CrewWalk): who he is, and
  * whether he's on a round now (with no third cook he plates and keeps the fire too: GuestBar3D sends him only between rounds) */
-export const FETCHER: { id: string | null; busy: boolean } = { id: null, busy: false }
+export const FETCHER: { id: string | null; busy: boolean } = keep(import.meta.hot, 'FETCHER', { id: null, busy: false })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __ownerGrill: OWNER_GRILL, __fetcher: FETCHER })
-export const FIRE_TEND: { want: null | 'coal' | 'water' | 'tidy'; done: null | 'coal' | 'water' | 'tidy'; tender: boolean } = { want: null, done: null, tender: false }
+export const FIRE_TEND: { want: null | 'coal' | 'water' | 'tidy'; done: null | 'coal' | 'water' | 'tidy'; tender: boolean } = keep(import.meta.hot, 'FIRE_TEND', { want: null, done: null, tender: false })
 /** the fire irons by the third cook's bay (item 108, the owner's, 2026-11-15: "something a hand can set off; the third cook tidies with them
  * too"): taken up and worked over the fire till `until` (performance.now(); Roasting draws it); `ask`, the player's click: the fire tidied once
  * it's done (the third cook's is FIRE_TEND's 'tidy') */
@@ -1278,7 +1279,7 @@ export function staffWayOut(cs: Counter[]): THREE.Vector3[] {
  * GuestBar3D's kitchen route (game/kitchenPath), for the crew too (Roasting: the cooks' way home); null till the bar's drawn */
 export const KITCHEN_ROUTE: { route: ((from: THREE.Vector3, to: THREE.Vector3) => THREE.Vector3[]) | null
   /** the nearest place to stand to one (the first counter's frame) clear of all that stands on the kitchen's floor (game/kitchenPath's standClear) */
-  clear?: ((at: THREE.Vector3) => THREE.Vector3) | null } = { route: null, clear: null }
+  clear?: ((at: THREE.Vector3) => THREE.Vector3) | null } = keep(import.meta.hot, 'KITCHEN_ROUTE', { route: null, clear: null })
 /** whether a place (the first counter's frame) is over the kitchen's raised floor */
 export function inKitchen(cs: Counter[], p: THREE.Vector3) {
   const k = kitchenOf(cs), d = p.clone().sub(cs[0].at), a = d.dot(cs[0].along), l = d.dot(cs[0].lay)
