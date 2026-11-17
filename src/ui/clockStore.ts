@@ -13,6 +13,8 @@ export function setClock(c: Clock) {
   clock = c
   subs.forEach((f) => f())
 }
+/** the game's minutes from day 0 just now (the staff's clocking in, item 336) */
+export const minutesNow = () => clock.day * 1440 + clock.minute
 /** on by so many real seconds (already sped up by the game's speed) */
 export const advanceClock = (seconds: number) => setClock(tick(clock, seconds))
 /** one thing about the clock, redrawing only when that changes (a number, a string: compared as they are) */

@@ -18,6 +18,18 @@ export const SHOP = { closing: false, leaving: false, openedAt: -1e9, day: 0, wa
  * opening, so nobody's swapped for a frame as the shop opens */
 export const dutyDay = (open: boolean) => (open && SHOP.counted ? SHOP.day : SHOP.day + 1)
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shop?: typeof SHOP }).__shop = SHOP
+/**
+ * Who of the staff is clocked in (item 336): each one from when they're in at their place as the shop opens (the game's minutes from day 0;
+ * their walk in done, commuteWalk, or there at once when there's no walk: Roasting's crew, GuestBar3D's servers and stock keeper), till
+ * they're out of the door or up the stair at its shutting (`out`). App pays each by it (game/hours' crewPay) and begins it afresh as the
+ * shop opens
+ */
+export const ON_DUTY = { in: new Map<string, number>(), out: new Set<string>() }
+/** in at their place (the first time since the opening counts) */
+export const clockIn = (id: string, at: number) => { if (!ON_DUTY.in.has(id)) ON_DUTY.in.set(id, at) }
+/** gone home */
+export const clockOut = (id: string) => { ON_DUTY.out.add(id) }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __onDuty: ON_DUTY })
 /** the staff worn out just now (data/staff's isTired, App keeps it): at half pace in the 3D, a badge beside them */
 export const STAFF_TIRED = new Set<string>()
 /** each of the staff's special skills (data/staff's SKILLS), and whether it's the deep night (game/hours' isLate): App keeps both */

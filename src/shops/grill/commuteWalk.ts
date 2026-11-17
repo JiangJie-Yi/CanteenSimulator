@@ -4,7 +4,8 @@
 // GuestBar3D's servers and stock keeper) steps its own along in its own frame; where they all are in the world is kept here, to keep apart.
 import * as THREE from 'three'
 import { FADE_S, NOD_S, yieldTo } from '@/game/commute'
-import { STAFF_TALK, SWITCH_SPOT } from '@/game/shopState'
+import { clockIn, clockOut, STAFF_TALK, SWITCH_SPOT } from '@/game/shopState'
+import { minutesNow } from '@/ui/clockStore'
 import { getLights, pressLightSwitch } from '@/scene/lightsStore'
 import { LIGHTS_ON } from '@/data/commuteLines'
 import type { Lang } from '@/data/i18n'
@@ -139,6 +140,9 @@ export function tripStep(tr: Trip, dt: number, speed: number, world: (v: THREE.V
   if ((tr.d >= tr.len && (tr.dir !== 'out' || vis <= 0)) || (tr.dir === 'out' && atDoor && (tr.door ?? 0) >= FADE_S && vis <= 0.02)) {
     tr.done = true
     COMMUTERS.delete(tr.id)
+    // (in at their place: clocked in; out of the door or up the stair: clocked out (item 336: paid from then till then, not from the opening))
+    if (tr.dir === 'in') clockIn(tr.id, minutesNow())
+    else clockOut(tr.id)
   }
   return { p, yaw: dir.x || dir.z ? Math.atan2(dir.x, dir.z) : null, vis: tr.done ? (tr.dir === 'out' ? 0 : 1) : vis, shown: !(tr.done && tr.dir === 'out'), nod: 0, stretch: false, walking: true }
 }

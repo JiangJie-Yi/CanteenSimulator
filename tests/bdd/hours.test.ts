@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { CLOSE_AT, OPEN_AT, PAY, dayPay, hoursBegin, hoursEnd, hoursText, inHours, isLate, isNightWork, lateBy, minutesOf, payFor, payRate } from '@/game/hours'
+import { CLOSE_AT, OPEN_AT, PAY, crewPay, dayPay, hoursBegin, hoursEnd, hoursText, inHours, isLate, isNightWork, lateBy, minutesOf, payFor, payRate } from '@/game/hours'
 
 const at = (h: number, m = 0) => h * 60 + m
 
@@ -60,5 +60,37 @@ feature('員工的薪水照日本的勞動基準法（店在大阪，店主 2026
   })
   scenario('一整天（16:30 到 04:30）的工資：12 小時，加給算進去約 14.6 小時', ({ then }) => {
     then('時薪 NT$1,000 一天付 NT$14,625', () => { expect(dayPay(1000)).toBeCloseTo(14625, 3) })
+  })
+})
+
+// (item 336, the owner's, 2026-11-18: 「員工扣薪水是算時薪嗎?沒來上班也扣?」)
+feature('薪水從每個人真正到店算起、離開就停（第 336 項）', () => {
+  const day = (h: number, m = 0) => 1440 + at(h, m)
+  scenario('還沒到店的人不算薪水', ({ given, when, then }) => {
+    given('兩個人都排了今天的班，時薪 200，一個 16:30 到店，一個還在路上', (w) => {
+      w.crew = [{ wage: 200, since: day(16, 30) }, { wage: 200 }]
+    })
+    when('17:30 算這一分鐘', (w) => { w.p = crewPay(w.crew, 1, day(17, 30)) })
+    then('只付到店那個人的一分鐘', (w) => { expect(w.p.pay).toBeCloseTo(200 / 60, 6) })
+  })
+  scenario('到店那一刻才開始算', ({ given, when, then }) => {
+    given('時薪 240 的人 16:40 到店', (w) => { w.crew = [{ wage: 240, since: day(16, 40) }] })
+    when('算 16:39 到 16:41 這兩分鐘', (w) => { w.p = crewPay(w.crew, 2, day(16, 41)) })
+    then('只付到店後的一分鐘', (w) => { expect(w.p.pay).toBeCloseTo(240 / 60, 6) })
+  })
+  scenario('下班離開就停', ({ given, when, then }) => {
+    given('時薪 200 的人已經走出店門', (w) => { w.crew = [{ wage: 200, since: day(16, 30), gone: true }] })
+    when('收店時再算一分鐘', (w) => { w.p = crewPay(w.crew, 1, day(28, 50)) })
+    then('不再付錢', (w) => { expect(w.p.pay).toBe(0) })
+  })
+  scenario('加班從自己到店起滿 8 小時才算', ({ given, when, then, and }) => {
+    given('一個 16:30 到店，一個 17:30 到店，時薪都 200', (w) => {
+      w.crew = [{ wage: 200, since: day(16, 30) }, { wage: 200, since: day(17, 30) }]
+    })
+    when('00:45 算一分鐘（深夜加給兩人都有）', (w) => { w.p = crewPay(w.crew, 1, day(24, 45)) })
+    then('16:30 到的已過 8 小時，有加班費', (w) => { expect(w.p.over).toBeCloseTo((200 / 60) * PAY.over, 6) })
+    and('17:30 到的還沒滿 8 小時，沒有', (w) => {
+      expect(w.p.pay).toBeCloseTo((200 / 60) * (1 + PAY.over + PAY.night) + (200 / 60) * (1 + PAY.night), 6)
+    })
   })
 })

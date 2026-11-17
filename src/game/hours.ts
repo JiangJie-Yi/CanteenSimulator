@@ -72,6 +72,23 @@ export function payFor(perHour: number, minutes: number, minute: number, worked:
   const over = worked > PAY.day ? base * PAY.over : 0, night = isNightWork(minute) ? base * PAY.night : 0
   return { pay: base + over + night, over, night }
 }
+/**
+ * What the staff on duty are paid for the `minutes` of the shop's clock up to `now` (the game's minutes from day 0), each by their own
+ * clocking in (item 336, the owner's, 2026-11-18: 「員工扣薪水是算時薪嗎?沒來上班也扣?」: everyone on the day's shift was paid from the moment
+ * the shop opened, those who live out and came in at the door a while later as well): `since` when they came in to their place (none: not
+ * in yet, nothing), `gone` once they've gone home; their own eight hours counted from their own coming in; one in part way through the
+ * minutes paid only for the part since
+ */
+export function crewPay(crew: readonly { wage: number; since?: number; gone?: boolean }[], minutes: number, now: number) {
+  const minute = ((now % 1440) + 1440) % 1440
+  let pay = 0, over = 0, night = 0
+  for (const w of crew) {
+    if (w.since === undefined || w.gone || w.since >= now) continue
+    const p = payFor(w.wage, Math.min(minutes, now - w.since), minute, now - w.since)
+    pay += p.pay; over += p.over; night += p.night
+  }
+  return { pay, over, night }
+}
 /** a whole day's pay at the hours (16:30 to 04:30) for wages of `perHour` together, the premiums in: what a shift costs */
 export function dayPay(perHour: number) {
   let pay = 0

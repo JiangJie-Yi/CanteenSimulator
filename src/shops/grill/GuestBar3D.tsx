@@ -2,7 +2,7 @@ import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes, washUrgent } from '@/game/skewers'
 import { rattleSound } from './skewerSound'
 import { useSaid } from '@/ui/speechStore'
-import { getClock } from '@/ui/clockStore'
+import { getClock, minutesNow } from '@/ui/clockStore'
 import { NO_RAY } from '@/scene/pickable'
 import { nextClean, sweeps, SWEEP_S, WIPE_S as FLOOR_WIPE_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
@@ -89,7 +89,7 @@ import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soup
 import { RICE_BEATS, SOUP_BEATS, beatsLength } from '@/game/sides'
 import { SeatBowls, fillRice, fillSoup, ladleRest, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
 import { bottleClink, lightSwitchSound, plateClink, scrubSound, stoolSound, tapTurnSound, washSplash } from './restroomSound'
-import { LAST_CALL, SHOP } from '@/game/shopState'
+import { LAST_CALL, SHOP, clockIn } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
@@ -504,7 +504,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       if (!c.arrived) {
         if (!c.trip) {
           if (performance.now() - SHOP.openedAt < 4000) c.trip = makeTrip(who.id, 'in', wayFrom(home).reverse(), delayOf(who.id, SHOP.day + 0.5) * 0.8 + 1.2, paceOf(who.id))
-          else c.arrived = true
+          else { c.arrived = true; clockIn(who.id, minutesNow()) }
         }
         if (c.trip) {
           apply(c.trip)
@@ -6629,7 +6629,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             const way = [home.at.clone(), ...home.way.slice(1).map((v) => v.clone()), ...(home.counter ? [aisleCorner(counters[home.counter])] : []), doorOf(counters)]
             way.push(through(way[way.length - 2], way[way.length - 1], 0.5))
             w.in = makeTrip(id, 'in', way.reverse(), delayOf(id, SHOP.day + 0.5) * 0.8 + 0.8, paceOf(id))
-          } else w.arrived = true
+          } else { w.arrived = true; clockIn(id, minutesNow()) }
         }
         if (w.in && o) {
           walkCommute(o, w.in, w)

@@ -48,7 +48,7 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { dutyDay, idleTick, LAST_CALL, LATE, RATING_FLOW, SHOP, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { dutyDay, idleTick, LAST_CALL, LATE, ON_DUTY, RATING_FLOW, SHOP, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -84,7 +84,7 @@ import { LINES, tallyNames } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { guestLabel } from '@/data/guests'
 import { activityOf, effective, isTired, restPerHour, ROLES, tireNow, workFatigue, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
-import { CLOSE_AT, OPEN_AT, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy, payFor } from '@/game/hours'
+import { CLOSE_AT, OPEN_AT, crewPay, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy } from '@/game/hours'
 import { cardFee, platformCut, rentDue } from '@/game/costs'
 import { GUIDE_KEY } from '@/game/firstDay'
 import { FirstDayGuide } from '@/ui/FirstDayGuide'
@@ -1423,8 +1423,6 @@ export default function App() {
   lastCallSay.current = () => talk('chef', LINES[lang].lastCall)
   /** a new day by the game's clock: the applicants' new lot, the dice back */
   const newDay = useRef<(day: number) => void>(() => {})
-  /** the game's clock as the shop opened (the staff's hours counted from it) */
-  const openClock = useRef(getClock())
   /** the last of the game's days the rent's been paid for (0: none yet) */
   const rentPaid = useRef(SAVED?.rentPaid ?? 0)
   /** the hours over: shut up as by hand (the button's way: no auto-run reopening it till they come round again) */
@@ -1456,8 +1454,9 @@ export default function App() {
   useEffect(() => {
     if (!ai) return
     SHOP.openedAt = performance.now()
-    // (when on the game's clock: the hours the staff have worked are counted from it (game/hours' payFor: past eight, a quarter more))
-    openClock.current = { ...getClock() }
+    // (nobody clocked in yet: each from when they're in at their place (game/shopState's ON_DUTY, item 336), their eight hours from then)
+    ON_DUTY.in.clear()
+    ON_DUTY.out.clear()
     // (the rent, a day at a time, for every day since it was last paid, this one's too (game/costs, item 210): a day shut is paid for as well)
     {
       const due = rentDue(rentPaid.current, getClock().day)
@@ -1572,7 +1571,6 @@ export default function App() {
       pullAt: 1.25 - best.e * 0.25, seasonChance: Math.min(1, 0.25 + best.e * 0.8),
       wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0), skill: best.e, cooks: all.length + 1 }
   }
-  const chef = chefOf(DISHES[active].id)
   const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
   const guestsRef = useRef(guestsBy)
   guestsRef.current = guestsBy
@@ -2498,8 +2496,10 @@ export default function App() {
   }, [])
 
   // running costs: the chef's wages while the AI chef is working
-  const aiRef = useRef({ ai, wage: chef.wagePerHour, shop: DISHES[active].id })
-  aiRef.current = { ai, wage: chef.wagePerHour, shop: DISHES[active].id }
+  // (the day's shift, each one's hourly wage: paid as they're clocked in (item 336))
+  const shiftNow = staffOf(DISHES[active].id).map((w) => ({ id: w.id, wage: w.wage }))
+  const aiRef = useRef({ ai, crew: shiftNow, shop: DISHES[active].id })
+  aiRef.current = { ai, crew: shiftNow, shop: DISHES[active].id }
   const stockRef = useRef(stock)
   stockRef.current = stock
   /** a change to the stock, at once (stockRef, for what reads it before the next draw) and in state */
@@ -2657,11 +2657,14 @@ export default function App() {
       if (aiRef.current.ai && hoursEnd(was, getClock().minute)) hoursOver.current()
       // (and the staff's wages while the shop's open, by the game's clock: each tick is GAME_SPEED of its minutes, and an hour of it is an
       // hour's pay (item 210: a minute was paid as a second, a sixtieth of the wage); in the same tick, so the two are one redraw of the page)
-      // (as Japan's labour law has it (game/hours' payFor, the owner's, 2026-11-16: the shop's in Osaka): the hours past eight since the shop
-      // opened and the night's (22:00 to 05:00) a quarter more each, the two extras kept apart too, as the books' notes of them)
+      // (as Japan's labour law has it (game/hours' payFor, the owner's, 2026-11-16: the shop's in Osaka): the hours past eight and the night's
+      // (22:00 to 05:00) a quarter more each, the two extras kept apart too, as the books' notes of them)
+      // (each of them from when they're in at their place till they've gone home (game/hours' crewPay, item 336, the owner's: 「沒來上班也
+      // 扣?」): not the whole shift from the moment the shop opened, those still on their way in as well; their eight hours their own)
       if (aiRef.current.ai) {
-        const now = getClock(), o = openClock.current
-        const p = payFor(aiRef.current.wage, GAME_SPEED.value, now.minute, (now.day - o.day) * 1440 + now.minute - o.minute)
+        const now = getClock()
+        const p = crewPay(aiRef.current.crew.map((w) => ({ wage: w.wage, since: ON_DUTY.in.get(w.id), gone: ON_DUTY.out.has(w.id) })), GAME_SPEED.value,
+          now.day * 1440 + now.minute)
         st5.wage += p.pay
         st5.overtime += p.over
         st5.night += p.night
