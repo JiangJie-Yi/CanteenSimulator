@@ -444,15 +444,19 @@ const TRASH_LABEL = signTexture(96, 180, (g) => {
  * ごみ, a third the size, a crumpled napkin or two in it; its shapes and looks shared by them all (the bar's batch draws them all at once)
  */
 const BASKET_K = 0.34
+/** how much of its height it keeps (item 283, the owner's, 2026-11-17: 「稍微短一節」): a band of its weave lower, its weave cut short with it
+ * (the same cells, not squashed) */
+const BASKET_SHORT = 0.78
 const BASKET_GEO = (() => {
-  const R = TRASH_R * BASKET_K, H = TRASH_H * BASKET_K
-  const body = new THREE.CylinderGeometry(R * 1.04, R * 0.86, H, 16, 1, true).translate(0, H / 2, 0)
-  const inner = new THREE.CylinderGeometry(R * 0.99, R * 0.82, H - 0.006, 16, 1, true).translate(0, H / 2 + 0.003, 0)
+  const R = TRASH_R * BASKET_K, H = TRASH_H * BASKET_K * BASKET_SHORT
+  const cut = (g: THREE.BufferGeometry) => { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * BASKET_SHORT); return g }
+  const body = cut(new THREE.CylinderGeometry(R * 1.04, R * 0.86, H, 16, 1, true).translate(0, H / 2, 0))
+  const inner = cut(new THREE.CylinderGeometry(R * 0.99, R * 0.82, H - 0.006, 16, 1, true).translate(0, H / 2 + 0.003, 0))
   const floor = new THREE.CircleGeometry(R * 0.84, 16).rotateX(-Math.PI / 2).translate(0, 0.006, 0)
   const rim = new THREE.TorusGeometry(R * 1.04, 0.006, 5, 16).rotateX(Math.PI / 2).translate(0, H, 0)
   const foot = new THREE.TorusGeometry(R * 0.87, 0.005, 5, 16).rotateX(Math.PI / 2).translate(0, 0.005, 0)
   // (its strip of washi on the front, toward the customers (-z))
-  const label = new THREE.PlaneGeometry(0.03, 0.057).rotateY(Math.PI).translate(0, H * 0.48, -(R * 1.04 * 0.95 + 0.002))
+  const label = new THREE.PlaneGeometry(0.03 * BASKET_SHORT, 0.057 * BASKET_SHORT).rotateY(Math.PI).translate(0, H * 0.48, -(R * 1.04 * 0.95 + 0.002))
   const paper = new THREE.IcosahedronGeometry(0.016, 0).translate(0.006, H * 0.62, 0.004)
   return { body, inner, floor, rim, foot, label, paper, ink: body }
 })()
