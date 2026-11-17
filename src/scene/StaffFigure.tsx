@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { rimmedTray } from './trayGeometry'
+import { featuresOf, variantOf, type CrewVariant } from '@/data/crewLook'
 import { footDust, newSteps } from './DustPuffs'
 import type { Look as StaffLook, Role } from '@/data/staff'
 import { atlasModel } from './atlasMerge'
@@ -30,11 +31,11 @@ import { FigureHit } from './FigureHit'
  * round its inked pieces, bending with it. Built once per variant, then copied. The skin and the hair, each person's own, are colours in
  * their vertices too: each figure has its own colours over the variant's shared shape (its positions, normals and UVs shared, its colours its own).
  */
-type Variant = 'chef' | 'chefF' | 'server' | 'serverF' | 'stock'
+// (which model a job and a sex is dressed as, and each person's own skin, hair and glasses: data/crewLook, the list their picture in the
+// office draws from too (item 321))
+type Variant = CrewVariant
 const url = (v: Variant) => import.meta.env.BASE_URL + `models/crew_${v}.glb`
 const VARIANTS: Variant[] = ['chef', 'chefF', 'server', 'serverF', 'stock']
-const variantOf = (role: Role, female: boolean): Variant =>
-  role === 'chef' || role === 'sous' ? (female ? 'chefF' : 'chef') : role === 'stock' ? 'stock' : female ? 'serverF' : 'server'
 
 /** the small parts: no ink line round them */
 /** the head and what's on it, which take no shadow (as the customers' don't): the face's and the glasses' patches are see-through
@@ -241,9 +242,6 @@ const HANDHELD_GEO = (() => {
 })()
 const HANDHELD_MAT = new THREE.MeshToonMaterial({ vertexColors: true })
 
-const AV_SKIN = ['#f3d2b0', '#eac39c', '#e2b48a', '#f6dcc0', '#d9a77e']
-const AV_HAIR = ['#2b1d14', '#3a2a20', '#1c1c22', '#5a3a2a', '#4a3020', '#6b4a32']
-const avHash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
 
 type Built = { root: THREE.Group }
 /** the parts that move (the figure's bones), in the order the mesh's vertices name them */
@@ -387,7 +385,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   face?: CrewFace
   /** sat (the cashier on the till's chair): leaning in a little, the hands up on the counter in front, now and then tapping at the keys */
   seated?: boolean }) {
-  const h = avHash(id)
+  const own = featuresOf(id, who)
+  const h = own.h
   const seed = h % 997
   const cook = role === 'chef' || role === 'sous'
   const v = variantOf(role, who.female)
@@ -397,15 +396,14 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const base = made.get(v)!
     // (a copy whose one mesh is bound to the copy's own parts)
     const root = cloneFigure(base.root) as THREE.Group
-    const old = who.age === 'old'
-    const glasses = (h >> 7) % 5 === 0 || (old && (h >> 7) % 2 === 0)
+    const glasses = own.glasses
     const get = (n: string) => root.getObjectByName(n) ?? null
     // (what they don't have scaled to nothing: their part of the one mesh drawn as nothing)
     get('glasses')?.scale.setScalar(glasses ? 1 : 0)
     get('tray')?.scale.setScalar(role === 'server' ? 1 : 0)
     get('clip')?.scale.setScalar(0)
     return { root, body: root, handL: get('handL'), handR: get('handR'), fan: get('fan'), eyes: get('eyes'), clip: get('clip'), tray: get('tray') }
-  }, [gltf, v, h, who.age, role])
+  }, [gltf, v, own.glasses, role])
   // (their skeleton's picture let go as they go)
   useEffect(() => () => releaseFigure(fig.root), [fig])
   // (their own skin and hair: colours over the variant's shape, in a colour attribute of their own, the shape's other attributes shared.
@@ -413,11 +411,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   // with the figure and let go in an effect, and the effect's let-go ran once before they were ever drawn (React's strict checks unmount
   // and mount again): it took the shared shape off the meshes still drawn, and they drew nothing but their ink, black (the owner saw it))
   useLayoutEffect(() => {
-    const old = who.age === 'old'
-    // (a hash past 2^31 makes `h >> 3` negative and its pick nothing: their hair then stays the model's own, as it always has)
-    const pickHair = old ? ((h >> 4) & 1 ? '#d6d1c8' : '#a9a49c') : AV_HAIR[(h >> 3) % AV_HAIR.length]
-    const skin = new THREE.Color(AV_SKIN[h % AV_SKIN.length])
-    const hair = pickHair ? new THREE.Color(pickHair) : null
+    // (their own, as their picture has them: data/crewLook (a hash past 2^31 once picked no hair colour, the model's own brown kept))
+    const skin = new THREE.Color(own.skin)
+    const hair = new THREE.Color(own.hair)
     // (the nose their skin, a little rosy)
     const nose = skin.clone().multiply(new THREE.Color('#ffd2c4'))
     // (their face their own too: its UVs, slid from one expression to the next (scene/faceSheet))
@@ -430,7 +426,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       }
       return true
     })
-  }, [fig, h, who.age])
+  }, [fig, own.skin, own.hair])
   // (their name tag's words (App keeps who's who); their role alone before it's known)
   const nameTag = useMemo(() => () => SPEAKERS.get(id) ?? ROLE_TAG[role], [id, role])
   // (their face (setExpression): what they're doing says it; a squash and stretch as it changes, or as they start to say something)

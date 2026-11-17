@@ -572,13 +572,19 @@ if not CAPPED:
 # (its rolled front edge: a soft roll round where it ends; a hachimaki is that roll alone, a twisted white band round the brow, lower behind)
 HB = math.asin(0.105 / R)
 roll = []
-for i in range(10):
-    a = 2 * math.pi * i / 10
+# (the band round the head: 16 points (item 321): at 8 its straight runs between them cut into the hair over the crown, the band showing in
+# pieces from the side)
+NROLL = 16 if WEAR == "band" else 10
+for i in range(NROLL):
+    a = 2 * math.pi * i / NROLL
     zc = math.cos(a)
     e = math.asin(max(-0.9, ((R + 0.02) * math.sin(BE) - 0.07 * max(0.0, -zc)) / (R + 0.02))) if CAPPED else HB - 0.12 * max(0.0, -zc)
-    roll.append(head_at(a, e, 0.022 if CAPPED else 0.023))
+    # (a hachimaki over the crown's hair (item 321, the owner's: the floor's and the stock keeper's pictures wear it round the brow): at
+    # 2.3 cm off the head it lay inside the hair over the crown (1.56 cm thick, BossHairTop), and from the front only the hair showed, the
+    # band and its knot seen from behind alone; 3.2 cm, it rides on the hair all round)
+    roll.append(head_at(a, e, 0.022 if CAPPED else 0.032))
 if WEAR != "bun":
-    tube("BossTenuguiRoll", roll, 0.013 if CAPPED else 0.017, M["tenugui"], cyclic=True, most=8)
+    tube("BossTenuguiRoll", roll, 0.013 if CAPPED else 0.017, M["tenugui"], cyclic=True, most=16 if WEAR == "band" else 8)
 # (the knot at the back, and its two corners: flat flaps of the cloth, hanging and flaring out)
 kp = head_at(math.pi, 0.14 if CAPPED else HB - 0.12, 0.035 if CAPPED else 0.05)
 ring_ball(radius=0.034, segs=5, rings=3, location=P(*kp))
@@ -838,8 +844,10 @@ props.append(fan)
 
 # ==================================================================== the clean figure (the owner's, 2026-11-06: no patches over the face, no
 # boxes stuck on the chest, nothing left inside the head): what's painted is painted on the shape it's on
-_drop = ("BossObiCord", "BossFace", "BossGlass", "BossSideburn", "BossPencil", "BossPin", "BossCollar", "BossHem", "BossCord", "BossApron", "BossTenuguiRoll",
-         "BossPants", "BossBody", "BossTowel1", "BossTowel2")
+# (a hachimaki's band kept, round the head over its hair (item 321): dropped with the cap's rolled edge, the floor's and the stock keeper's
+# figures had only its knot at the back, nothing round the brow)
+_drop = ("BossObiCord", "BossFace", "BossGlass", "BossSideburn", "BossPencil", "BossPin", "BossCollar", "BossHem", "BossCord", "BossApron",
+         *(() if WEAR == "band" else ("BossTenuguiRoll",)), "BossPants", "BossBody", "BossTowel1", "BossTowel2")
 for o in [x for x in parts if (x.name.startswith(_drop) or x.name == "BossObi") and not x.name.startswith("BossGlassArm")]:
     parts.remove(o)
     bpy.data.objects.remove(o)
