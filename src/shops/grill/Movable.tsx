@@ -999,7 +999,8 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     const now = turnAndSize()
     if (!m || m.empty || !now) return
     const pv = pivotOf(id)
-    const want: V3 = [m.c[0] - mid[0], m.c[1] - mid[1], m.c[2] - mid[2]]
+    // (back at its foot's middle (its handles' own place, where it began: a pivot kept from before put right, item 307), or a box's middle)
+    const want: V3 = kind === 'foot' ? [0, 0, 0] : [m.c[0] - mid[0], m.c[1] - mid[1], m.c[2] - mid[2]]
     const d = new THREE.Vector3(want[0] - pv[0], want[1] - pv[1], want[2] - pv[2])
     const shift = d.clone().applyMatrix4(now).sub(d)
     setPivot(id, want, [shift.x, shift.y, shift.z])

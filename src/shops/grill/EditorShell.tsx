@@ -10,7 +10,7 @@ import { panelSound } from '@/ui/uiSound'
 import { PathLegend } from './PathLegend'
 import { ADMIN_URL } from '@/scene/toolPage'
 import { discardEdit, dissolveGroup, frameSelected, freezeSelected, getCharHidden, hideSelected, isDirty, makeGroup, playGame, redo, resetAll, saveEdit,
-  select, selectedName, setCharHidden, setPaths, setShade, SHADES, showHidden, subscribeEdit, undo, useEditSel } from './edit'
+  resetAllPivots, resetPivot, select, selectedName, setCharHidden, setPaths, setShade, SHADES, showHidden, subscribeEdit, undo, useEditSel } from './edit'
 
 /**
  * The shop's editor (editor.html, item 178, the owner's, 2026-11-15: "the developer's way of working: more professional, as the mainstream
@@ -78,6 +78,8 @@ export const EditorShell = memo(function EditorShell({ lang }: { lang: Lang }) {
       { label: T.hideSel, keys: 'H', run: hideSelected, off: !st.selected }, { label: T.showAll, keys: 'Alt+H', run: showHidden },
       'gap',
       { label: T.group, run: makeGroup }, { label: T.ungroup, run: () => dissolveGroup() }, { label: T.freeze, run: () => freezeSelected(), off: !st.selected },
+      // (the pivots back at their pieces' feet: the chosen one's, or every one's (item 307))
+      { label: T.pivotHome, run: () => resetPivot('foot'), off: !st.selected }, { label: T.pivotHomeAll, run: () => { if (window.confirm(T.pivotHomeAllAsk)) resetAllPivots() } },
     ] },
     { name: T.menuView, items: [
       { label: T.frameSel, keys: 'F', run: frameSelected, off: !st.selected },

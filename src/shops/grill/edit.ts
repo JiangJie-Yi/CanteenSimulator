@@ -329,6 +329,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-33', ['lightswitch-room', 'lightswitch-door']],
   // (the tissues and cleaning things where the owner moved them on, made their default (item 299))
   ['jgs-edit-relaid-34', ['supplies']],
+  // (the till's two stools where the owner moved them, made their defaults (item 309))
+  ['jgs-edit-relaid-35', ['till-stool-hi', 'till-stool-lo']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -498,6 +500,11 @@ export const BASES: Record<string, V3> = {
   // (the free view's camera: moved X -0.45 along its own axes (object space), taken into its parent's (the world's) units; its turn of
   // Y 15° Z 5° is App's VIEWCAM_TURN)
   'viewcam-free': [0.0478, 0, 0.4475],
+  // (the till's two stools moved X 0.25 together (item 309, the owner's, 2026-11-18: 「收銀機前的兩個凳子都幫我調整位置 X:0.25 然後 Reset」): the
+  // high one's panel axes (its own, turned 36.1 from its parent's, as the room's are), into their parent's units; the same for both, as they
+  // go when picked together)
+  'till-stool-hi': [0.202, 0, -0.147],
+  'till-stool-lo': [0.202, 0, -0.147],
   // (the shoe cupboard moved 0.5 along the wall toward the door (the owner's, 2026-11-11), taken into its parent's units; and X -0.1 in the
   // panel (its own axes, and the room's, turned -90 from its parent's: -0.1 on its parent's z) (item 291, the owner's, 2026-11-17))
   shoecab: [0, 0, 0.15],
@@ -635,14 +642,20 @@ export function setPivot(id: string, v: V3, shift: V3 = [0, 0, 0]) {
  * squared to the shop (AABB) or along the piece's own way (OBB), at its middle in height too; the piece not moved. A piece does it itself
  * (Movable registers how: its own frame, its own turn and size); a group here, over all its pieces' boxes
  */
-const pivotResets = new Map<string, (kind: 'aabb' | 'obb') => void>()
-export const registerPivotReset = (id: string, f: (kind: 'aabb' | 'obb') => void) => { pivotResets.set(id, f); return () => { pivotResets.delete(id) } }
-export function resetPivot(kind: 'aabb' | 'obb') {
+/** (and 'foot': back where it began, its foot's middle (a hung one's, its middle): the pivot a browser kept from before put right (item 307)) */
+export type PivotKind = 'aabb' | 'obb' | 'foot'
+const pivotResets = new Map<string, (kind: PivotKind) => void>()
+export const registerPivotReset = (id: string, f: (kind: PivotKind) => void) => { pivotResets.set(id, f); return () => { pivotResets.delete(id) } }
+export function resetPivot(kind: PivotKind) {
   const id = state.selected
   if (!id) { toast(T().pivotNone); return }
   beginChange()
   const g = state.groups[id]
-  if (g) {
+  if (g && kind === 'foot') {
+    // (a group's: at its pieces' feet's middle again, as every group's is when it's made (settleGroupFeet), its move made up for)
+    groupFootDone.delete(id)
+    settleGroupFeet()
+  } else if (g) {
     const boxes = leavesOf(state.groups, id).map((m) => registry.get(m)?.corners?.() ?? null).filter((v): v is V3[] => !!v && v.length > 0)
     if (!boxes.length) return
     const world = boxes.flat()
@@ -667,7 +680,20 @@ export function resetPivot(kind: 'aabb' | 'obb') {
     keepFeet()
   } else pivotResets.get(id)?.(kind)
   save(); emit()
-  toast(T().pivotReset(kind === 'obb' ? 'OBB' : 'AABB'), 'edit')
+  toast(kind === 'foot' ? T().pivotHomed(1) : T().pivotReset(kind === 'obb' ? 'OBB' : 'AABB'), 'edit')
+}
+/** every piece's and group's pivot back at its foot's middle at once, none of them moved (item 307, the owner's, 2026-11-17: 「還是有很多物件
+ * 中心點沒歸位，中心點歸位這個功能幫我加入到編輯器內」: a browser kept pivots from before, moved by hand or left over from a piece made over,
+ * its handles off to one side of it) */
+export function resetAllPivots() {
+  beginChange()
+  const ids = Object.keys(state.pivots).filter((id) => !state.groups[id] && state.pivots[id].some((v) => Math.abs(v) > 1e-9) && pivotResets.has(id))
+  for (const id of ids) pivotResets.get(id)!('foot')
+  const groups = Object.keys(state.groups)
+  for (const gid of groups) groupFootDone.delete(gid)
+  settleGroupFeet()
+  save(); emit()
+  toast(T().pivotHomed(ids.length + groups.length), 'edit')
 }
 /** D: the arrows move the pivot instead of the piece (as Maya's D), again to move the piece */
 export function togglePivotMode() { state.pivotMode = !state.pivotMode; emit() }
@@ -1976,6 +2002,7 @@ function panel() {
     }
     foot.append(
       mk(T().freeze, T().freezeTip, () => freezeSelected()),
+      mk(T().pivotHome, T().pivotHomeTip, () => resetPivot('foot')),
       mk(T().group, T().groupTip, makeGroup),
       mk(T().ungroup, T().ungroupTip, () => dissolveGroup()),
       mk(T().rename, T().renameTip, () => { const g = state.selected ? state.groups[state.selected] : null; if (g) { const n = window.prompt(T().renamePrompt, g.name); if (n) renameGroup(state.selected!, n) } }),
@@ -2109,5 +2136,5 @@ if (typeof window !== 'undefined') {
   // (a hot update swaps this module for a new copy: the old one's key let go of (or G was heard by every copy left behind, each with its own
   // developer mode, one more with every edit), its panel and notice taken away)
   replaces(import.meta.hot, () => { window.removeEventListener('keydown', onKey); offRenderPrefs(); el?.remove(); toastEl?.remove() })
-  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, select, toggle: toggleEdit, resetAll, areaCheck, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
+  if (import.meta.env?.DEV) (window as unknown as { __edit?: unknown }).__edit = { groupFrame, framesOf: (id: string) => [frames.get(id), framesObj.get(id)], get: getEdit, moveTo, turnTo, setPivot, resetPivot, resetAllPivots, select, toggle: toggleEdit, resetAll, areaCheck, confirm: confirmEdit, cancel: cancelEdit, setLocked, undo, redo, setTool, frame: (id: string) => frames.get(id), cams: () => viewCams?.() }
 }
