@@ -61,19 +61,31 @@ PAPER_CROP = (0.25, 0.22)          # one pane's crop of the paper strip (u, v ex
 
 
 def atlas(N=ATLAS_N):
-    """the one picture: pale ash with a quiet straight grain (long lines along u, low contrast, a few fine pores, cloudy runs a shade lighter
-    and darker) below, and washi above it (warm white, mottled, with fibres and a few tan flecks)"""
+    """the one picture: a medium brown wood with its grain as it grows (item 305: rings along u rising into arches, fine pores, each board's
+    crop its own shade) below, and washi above it (warm white, mottled, with fibres and a few tan flecks)"""
     seed(29)
     u, v = grid01(N)
     out = np.zeros((N, N, 3), np.float32)
     wr, pr = int(WOOD_V * N) + 1, int(PAPER_V * N)
-    # (wood)
-    wob = fbm(N, 2, 12, 3) - 0.5
-    line = np.sin(2 * math.pi * (v * 38 + wob * 2.6)) * 0.5 + 0.5
-    late = smooth(0.55, 1.0, line)
-    fine = smooth(0.78, 0.97, vnoise(N, 6, 240)) * 0.8
-    wood = mix((0.915, 0.835, 0.690), (0.835, 0.730, 0.565), np.clip(late * 0.32 + fine * 0.22, 0, 1))
-    wood = wood * (0.965 + 0.07 * fbm(N, 3, 3, 3))[..., None]
+    # (wood: a medium brown, natural (item 305, the owner's, 2026-11-17: 「鞋櫃改回剛剛的深色，但別太深，記得木紋要自然」: the pale ash dyed
+    # dark all over in the game read as plastic, its grain faint): flat-sawn, the growth rings running along u and rising into arches
+    # (cathedrals) every so often, the late wood darker, wandering a little; long fine pores along the grain; each band of it (a board's crop)
+    # its own shade, a little lighter or darker, warmer or cooler; the colour in the picture, the game's tint near white)
+    wob = fbm(N, 2, 10, 3) - 0.5
+    arch = (np.abs(((u * 2.4 + wob * 0.5) % 1.0) - 0.5) * 2.0) ** 1.7
+    # (rings about 7 mm apart on the picture's metre, the arches some dozen rings high)
+    phase = v * 140 + arch * 14 + wob * 7
+    ring = np.sin(2 * math.pi * phase) * 0.5 + 0.5
+    late = smooth(0.7, 0.98, ring)
+    pores = smooth(0.78, 0.96, vnoise(N, 7, 300)) * smooth(0.3, 0.7, ring)
+    early_c, late_c = np.array((0.63, 0.46, 0.3), np.float32), np.array((0.5, 0.35, 0.22), np.float32)
+    wood = mix(early_c, late_c, np.clip(late * 0.55 + pores * 0.3, 0, 1))
+    # (board to board: bands across v, each its own shade and warmth)
+    band = np.floor(v * 9).astype(int)
+    rr = np.random.default_rng(305)
+    shade, warm = (0.9 + 0.18 * rr.random(10))[band], (rr.random(10) - 0.5)[band] * 0.06
+    wood = wood * shade[..., None] + np.stack([warm, warm * 0.4, -warm], -1)
+    wood = wood * (0.95 + 0.08 * fbm(N, 3, 3, 3))[..., None]
     out[:wr] = wood[:wr]
     # (washi)
     pn = N - pr

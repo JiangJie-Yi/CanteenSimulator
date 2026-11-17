@@ -1974,7 +1974,9 @@ let SHOE_WOOD_MAT: THREE.MeshToonMaterial | null = null
 // (pale: its picture is pale ash and washi now (blender/shoecab.py, item 264: 「鞋櫃木紋感太重，要日和風 有紙糊的那種感覺，不要通透」); walnut before)
 // (its colours were traded with the waiting bench's a while (item 291), and put back (item 297, the owner's, 2026-11-17: 「鞋櫃幫我換回原本的顏色
 // 好了」): the bench kept its new pale ash)
-const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#f4e9d6'), ShoeTop: new THREE.Color('#d7c4a6'), ShoeSlat: new THREE.Color('#ffffff') }
+// (a medium brown with a natural grain since item 305 (the owner's, 2026-11-17: 「鞋櫃改回剛剛的深色，但別太深，記得木紋要自然」): the colour in
+// its picture (blender/shoecab.py), the tints near white, the top a shade deeper)
+const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#fbf6ef'), ShoeTop: new THREE.Color('#ece0d0'), ShoeSlat: new THREE.Color('#ffffff') }
 /** one of a pair of shoes put away in a cubby */
 const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
 function ShoeCupboard() {
