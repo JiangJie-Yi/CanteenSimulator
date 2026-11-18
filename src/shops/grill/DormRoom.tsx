@@ -14,6 +14,7 @@ import { StaffFigure } from '@/scene/StaffFigure'
 import { getClock } from '@/ui/clockStore'
 import { DORM_LIFE } from './bar'
 import { getEdit } from './edit'
+import { drawStreetView, type Sky } from '@/scene/streetView'
 
 /**
  * The staff room upstairs (二樓員工休息室兼宿舍, blender/dorm.py; item 325, the owner's, 2026-11-18: 「然後捏個2F小房間，會切換場景，可以上樓
@@ -25,6 +26,28 @@ import { getEdit } from './edit'
  * stair step by step, across to their place; asleep under their quilt from four in the morning till eleven (the table folded away, the
  * futons laid), else sat on their cushion at the table; as the shop opens, up off it, over to the stair and down it (game/dormLife).
  */
+/** what's out of the window (found by the owner's eye at 10 in the morning: the model's one painted night, its roofs' windows lit, all day
+ * long): the street's far side as the shop's doorway shows it (scene/streetView), its upper half, from up here; by the part of the day,
+ * painted again as it turns */
+const DORM_VIEW = (() => {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 512; c.height = 1024
+  drawStreetView(c.getContext('2d')!, 512, 1024, 'day')
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+let dormSky = 'day'
+/** the window's picture to the part of the day (the page's data-sky), once each turn */
+function dormViewTo() {
+  const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
+  if (s === dormSky || !DORM_VIEW) return
+  dormSky = s
+  const c = DORM_VIEW.image as HTMLCanvasElement
+  drawStreetView(c.getContext('2d')!, c.width, c.height, (['dawn', 'day', 'dusk', 'night'].includes(s) ? s : 'day') as Sky)
+  DORM_VIEW.needsUpdate = true
+}
 const DORM_URL = import.meta.env.BASE_URL + 'models/dorm.glb'
 useGLTF.preload(DORM_URL)
 /** where it stands in the world: off to the side of the shop, on its floor's level (the dining room's floor, the staff door's foot) */
@@ -211,7 +234,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
         // (the lamp's shade a warm glow of its own, the night through the window as it's painted (both unlit); the rest the room's toon, a
         // little of the lamp's warmth on it (it's off the shop's lamps and its shadows: by night it went near black))
         t = src.name === 'DormLampShade' ? new THREE.MeshBasicMaterial({ color: '#ffe6b8' })
-          : src.name === 'DormNightView' ? new THREE.MeshBasicMaterial({ map: src.map ?? null })
+          : src.name === 'DormNightView' ? new THREE.MeshBasicMaterial({ map: DORM_VIEW ?? src.map ?? null })
             : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, emissive: new THREE.Color('#2a1f14'), emissiveIntensity: 1 })
         t.name = src.name
         made.set(src, t)
@@ -222,6 +245,20 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     })
     // (the room's line, in its own metres: the dining room's 0.0016 a metre; none round the glow, the night, the screen)
     inkModel(r, (m) => /DormLampShade|DormNightView|DormScreen/.test((m.material as THREE.Material).name), { width: 0.0016, weld: true })
+    // (the window's picture laid on its pane: the street's upper half (its sky and the houses' upper floors) across the pane's own UVs)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || (m.material as THREE.Material).name !== 'DormNightView' || !DORM_VIEW) return
+      const uv = m.geometry.attributes.uv
+      if (!uv) return
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity
+      for (let i = 0; i < uv.count; i++) { u0 = Math.min(u0, uv.getX(i)); u1 = Math.max(u1, uv.getX(i)); v0 = Math.min(v0, uv.getY(i)); v1 = Math.max(v1, uv.getY(i)) }
+      const g = m.geometry.clone()
+      const a = g.attributes.uv
+      for (let i = 0; i < a.count; i++) a.setXY(i, (a.getX(i) - u0) / (u1 - u0 || 1), 0.48 + 0.5 * ((a.getY(i) - v0) / (v1 - v0 || 1)))
+      a.needsUpdate = true
+      m.geometry = g
+    })
     mergeByMaterial(r, (o) => PIECES.test(o.name))
     const at = (n: string, d: THREE.Vector3) => r.getObjectByName(n)?.position.clone() ?? d
     const mk: Marks = {
@@ -255,6 +292,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
   }, [open, living])
   // (asleep: the table folded away, each sleeper's futon laid; else the table out, the futons in the closet)
   useFrame(() => {
+    dormViewTo()
     const asleep = dormDoing(getClock().minute) === 'sleep'
     let anyone = false
     living.forEach((m, k) => {
