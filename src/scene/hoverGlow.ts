@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { replaces } from './hot'
+import { lift } from './worldMerge'
 import { tapSound } from './tapSound'
 
 /**
@@ -36,12 +37,17 @@ function brighten(m: THREE.Material): THREE.Material {
 /** while edit mode is on, nothing in the room lights up under the pointer (edit.ts sets it) */
 export const HOVER = { paused: false }
 
+/** anything lit by the pointer just now (the room's merge (scene/WorldBatch) isn't made while it is: it would take in a glowing copy) */
+export const anyLit = () => LIT.size > 0
+
 export function glowOn(root: THREE.Object3D | null | undefined) {
   if (!root || LIT.has(root) || HOVER.paused) return
   LIT.add(root)
   root.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh || !m.material || WAS.has(m)) return
+    // (drawn as part of the room's merge (item 367): taken out of it while it's lit, drawn by itself in its glowing copy)
+    if (m.userData.worldHidden) lift(m, true)
     // (the ink outlines, drawn inside out, stay as they were)
     const mats = ([] as THREE.Material[]).concat(m.material)
     if (mats.every((x) => x.side === THREE.BackSide)) return
@@ -61,6 +67,8 @@ export function glowOff(root: THREE.Object3D | null | undefined) {
     for (const x of now) x.dispose()
     m.material = was
     WAS.delete(m)
+    // (back into the room's merge, if it was taken out of it to be lit)
+    if (m.userData.worldHidden) lift(m, false)
   })
 }
 

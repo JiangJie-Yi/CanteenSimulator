@@ -68,6 +68,7 @@ import { HoverTip } from '@/ui/HoverTip'
 import { DustPuffs } from '@/scene/DustPuffs'
 import { RegisterManual } from '@/ui/RegisterManual'
 import { TillPanel, type TillDay } from '@/ui/TillPanel'
+import { WorldBatch } from '@/scene/WorldBatch'
 import { StaffPop, type StaffPopAt } from '@/ui/StaffPop'
 import { CALM } from '@/game/calm'
 import { URGE_BOND, urgeOk, urgeWait } from '@/game/urge'
@@ -3741,6 +3742,8 @@ export default function App() {
           <DrawnProbe />
           <SfxEar />
           <Prewarm />
+          {/* (the room's batches merged across it: a mesh a material for the whole room (item 367)) */}
+          <WorldBatch />
           <DustPuffs />
           {/* (glass broken on the floor, its drink spilt round it, till it's swept up: in the scene's own frame) */}
           {!NO_SCENE && <Spills />}
