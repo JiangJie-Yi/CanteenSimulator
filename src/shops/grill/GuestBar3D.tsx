@@ -2550,6 +2550,8 @@ const STONE_MASONRY = (() => {
 })()
 const STONE_FOOT = new THREE.MeshToonMaterial({ color: '#ffffff', map: STONE_MASONRY })
 const STONE_TILE = { along: 0.6, across: 0.3 }
+/** how far out each of the doorway's stone steps reaches (the bar's units: a tread a third of a metre deep, the dining room's metres) */
+const STEP_GO = 0.17
 /**
  * The shop's base: a thick plinth of wood under the whole room (the customers' floor on a solid fill, the kitchen's lower
  * floor in a well in it), a pale rim of boards round its top edge, a dark body, a toe board at its foot, standing
@@ -2574,11 +2576,19 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   // (under the genkan's stone, solid up to it, and in stone: granite courses from its stones down to the base's foot (item 287), where the
   // rest of the base is timber)
   const gTop = -step - GENKAN_SUNK - 0.004, gFoot = top - 0.33
+  // (its street side in steps (item 342, the owner's: 「這邊做成石階」: it stood a sheer wall of three courses at the door): two treads of the
+  // same granite down from the genkan's stone toward the street, each a third of the way down and STEP_GO further out, the doorway's width)
+  const rise = (gTop - gFoot) / 3
   return (
     <>
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
       <mesh position={[-(gly[0] + gly[1]) / 2, (gTop + gFoot) / 2, (gal[0] + gal[1]) / 2]}
         geometry={timberBox(gly[1] - gly[0], gTop - gFoot, gal[1] - gal[0], STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
+      {[1, 2].map((k) => {
+        const yTop = gTop - rise * k, z0 = gal[1] + STEP_GO * (k - 1) + 0.002, z1 = gal[1] + STEP_GO * k
+        return <mesh key={`step${k}`} position={[-(gly[0] + gly[1]) / 2, (yTop + gFoot) / 2, (z0 + z1) / 2]}
+          geometry={timberBox(gly[1] - gly[0] - 0.004 * k, yTop - gFoot, z1 - z0, STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
+      })}
     </>
   )
 }
