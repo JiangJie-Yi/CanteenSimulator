@@ -6,11 +6,14 @@
 import * as THREE from 'three'
 import { isMac } from '@/game/navInput'
 import { lowPower } from './power'
+import { QUALITY } from './quality'
 
 const asked = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('tex')) : 0
 const onMac = typeof navigator !== 'undefined' && isMac(navigator.platform, navigator.userAgent)
-/** the largest side a picture's held at */
-export const texCap = () => asked > 0 ? asked : (onMac || lowPower()) ? 512 : 1024
+/** the largest side a picture's held at: 512 too on a level stepped down (item 252: after the browser took the 3D view away, the next start
+ * was a level lower, its canvas and shadows smaller, but the pictures, the most of the GPU's memory, as large as before (some 760 MB of
+ * them at 1024); at 512 they're about a third of that) */
+export const texCap = () => asked > 0 ? asked : (onMac || lowPower() || QUALITY.tier !== 'high') ? 512 : 1024
 
 type Picture = HTMLCanvasElement | OffscreenCanvas | ImageBitmap | HTMLImageElement
 const isPicture = (x: unknown): x is Picture => (typeof HTMLCanvasElement !== 'undefined' && x instanceof HTMLCanvasElement)
