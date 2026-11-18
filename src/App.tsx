@@ -438,6 +438,10 @@ const OMIKI_MS = 180000
 /** what offering the sake costs (NT$) */
 const OFFERING_COST = 1000
 type SceneProps = {
+  /** the room upstairs in the scene (item 350, the owner's 「2F 可以跑進度條讀取，你這樣的方法不好」: it stood in the scene all the time, off in
+   * the sky beside the shop, seen from the overview): only while going up, there, and coming down; and its word once it's in and drawn */
+  dorm?: boolean
+  onDormDrawn?: () => void
   /** a customer took a drink from the grill's fridge */
   onDrink?: (guest: number, drink: DrinkId) => void
   /** the omiki (御神酒) at the shrine by the door: when it was offered (performance.now), and offering it again */
@@ -642,8 +646,42 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
  * the GPU process died); never drawn finer than the screen either */
 const DPR_MAX = 1.25
 const HOLD_POSE = { next: false }
+/** says so once what's beside it in its Suspense is in and has been drawn twice (its pictures up, its programs made): the room upstairs
+ * (item 350) */
+function Drawn({ onDrawn }: { onDrawn?: () => void }) {
+  const said = useRef(false)
+  const frames = useRef(0)
+  useFrame(() => {
+    if (said.current || ++frames.current < 3) return
+    said.current = true
+    onDrawn?.()
+  })
+  return null
+}
+/** the cover over the move between the shop and the room upstairs (item 350): a dark veil, where they're going, a bar filling (to half as
+ * the room's made, to the end as the camera gets there), gone once it's done */
+function FloorCover({ go, lang }: { go: { dir: 'up' | 'down'; stage: number } | null; lang: Lang }) {
+  const [shown, setShown] = useState(go)
+  useEffect(() => {
+    if (go) { setShown(go); return }
+    const t = window.setTimeout(() => setShown(null), 380)
+    return () => window.clearTimeout(t)
+  }, [go])
+  // (shown from the first render it's asked for: the effect's copy only keeps it a moment as it fades)
+  const on = go ?? shown
+  if (!on) return null
+  const up = on.dir === 'up'
+  return (
+    <div className={`floor-cover${go ? '' : ' is-done'}`} role="status" aria-live="polite">
+      <div className="floor-cover-card">
+        <span className="floor-cover-word">{up ? tl(lang, '上二樓', '二階へ', 'Going upstairs') : tl(lang, '下樓回店裡', '店に下りる', 'Back down to the shop')}</span>
+        <span className="floor-cover-bar"><i style={{ width: `${go ? [12, 55, 100][go.stage] : 100}%` }} /></span>
+      </div>
+    </div>
+  )
+}
 function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, livingOf, guestsBy, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
-  onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
+  onOrder, onAddCharcoal, onSay, blessed = false, onDrink, dorm = false, onDormDrawn }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
   // (in development, the view can be set from the console: __ctl.target, __cam.position)
@@ -1096,8 +1134,13 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
       {/* (the staff room upstairs, a scene of its own off to the side (item 325)); those living in it up there while the shop's shut (item 339) */}
-      <DormRoom crew={(livingOf ?? crewOf)(DISHES[active]?.id ?? DISHES[0].id)} open={ai} fallback={HOUSE_CHEF}
-        working={crewOf(DISHES[active]?.id ?? DISHES[0].id).map((m) => m.id)} />
+      {dorm && (
+        <Suspense fallback={null}>
+          <DormRoom crew={(livingOf ?? crewOf)(DISHES[active]?.id ?? DISHES[0].id)} open={ai} fallback={HOUSE_CHEF}
+            working={crewOf(DISHES[active]?.id ?? DISHES[0].id).map((m) => m.id)} />
+          <Drawn onDrawn={onDormDrawn} />
+        </Suspense>
+      )}
       {/* (where things meet what they stand on, darker: their contact shades, one mesh (item 306)) */}
       <ContactShades />
       <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />
@@ -1919,7 +1962,7 @@ export default function App() {
       const v = top ? VIEW_SPOTS.find((x) => x.id === 'top') : VIEW_SPOTS[e.key === '0' ? 9 : +e.key - 1]
       if (!v) return
       e.preventDefault()
-      setView(v.id); setResetView((n) => n + 1); setViewMenu(false)
+      goView(v.id)
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
@@ -2420,12 +2463,50 @@ export default function App() {
   }, [editOn])
   // bumped to send the camera back to its home view
   const [resetView, setResetView] = useState(0)
+  // (the room upstairs (item 350): in the scene only while going up, there, and coming down; the view before it was gone up to, to come back
+  // down to (item 362, the owner's 「下樓回到這?」: down the stair went to the sink's view, every time); the cover over the move and how far it's
+  // got (0: started, 1: the room in and drawn, 2: the camera on its way))
+  const [dorm, setDorm] = useState(false)
+  const [floorGo, setFloorGo] = useState<{ dir: 'up' | 'down'; stage: number } | null>(null)
+  const beforeUp = useRef<ViewId>('free')
+  const viewNow = useRef(view)
+  viewNow.current = view
+  const goView = useCallback((id: ViewId | 'down') => {
+    setViewMenu(false)
+    const cur = viewNow.current
+    if (id === 'upstairs' && cur !== 'upstairs') {
+      beforeUp.current = cur
+      setFloorGo({ dir: 'up', stage: 0 })
+      // (the cover up first, the room put in under it a frame or two after: its making a moment's stall, not to be seen at the view left)
+      window.setTimeout(() => setDorm(true), 70)
+      return
+    }
+    if (cur === 'upstairs' && id !== 'upstairs') {
+      const to = id === 'down' ? beforeUp.current : id
+      setFloorGo({ dir: 'down', stage: 1 })
+      // (the camera sent back behind the cover; the room let go once it's there)
+      window.setTimeout(() => { setView(to); setResetView((n) => n + 1); setFloorGo({ dir: 'down', stage: 2 }) }, 260)
+      window.setTimeout(() => { setDorm(false); setFloorGo(null) }, 260 + FLY_S * 1000 + 120)
+      return
+    }
+    if (id === 'down') return
+    // (the room upstairs let go if it was still in from the developer's mode, the view not up there)
+    if (id !== 'upstairs') setDorm(false)
+    setView(id); setResetView((n) => n + 1)
+  }, [])
+  // (the room upstairs in and drawn: the camera up to it behind the cover, the cover off once it's there)
+  const onDormDrawn = useCallback(() => {
+    if (viewNow.current === 'upstairs') return
+    setFloorGo({ dir: 'up', stage: 1 })
+    window.setTimeout(() => { setView('upstairs'); setResetView((n) => n + 1); setFloorGo({ dir: 'up', stage: 2 }) }, 120)
+    window.setTimeout(() => setFloorGo(null), 120 + FLY_S * 1000 + 120)
+  }, [])
   // (a view asked for from the room itself: the stair up behind the staff door, the stair down upstairs (item 325))
   useEffect(() => {
     const ask = (e: Event) => {
-      const id = (e as CustomEvent<ViewId>).detail
-      if (!VIEW_SPOTS.some((v) => v.id === id)) return
-      setView(id); setResetView((n) => n + 1); setViewMenu(false)
+      const id = (e as CustomEvent<ViewId | 'down'>).detail
+      if (id !== 'down' && !VIEW_SPOTS.some((v) => v.id === id)) return
+      goView(id)
     }
     window.addEventListener('jgs-view', ask)
     return () => window.removeEventListener('jgs-view', ask)
@@ -3507,7 +3588,7 @@ export default function App() {
           {!NO_SCENE && <Scene active={active} orders={orders} theme={theme} sky={sky} reducedMotion={reducedMotion}
             fire={fire} heat={heat} frame={frame} onOffFire={sceneOffFire}
             onEat={onEat} onNotice={sceneNotice}
-            resetView={resetView} pins={viewMenu} view={view} onView={(v) => { setView(v); setResetView((n) => n + 1); setViewMenu(false) }} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
+            resetView={resetView} pins={viewMenu} view={view} onView={(v) => goView(v)} dorm={dorm} onDormDrawn={onDormDrawn} ai={ai} research={research} onOrder={sceneOrder} onAddCharcoal={addCharcoal} onSay={talk}
             lang={lang} notes={notes} spotOn={spotOn && !opened[dish.id]} chefOf={chefOf} crowdOf={(id) => (staffOf(id, 'cashier').length ? 1 : 1.8) * (blessed ? 0.65 : 1)} blessed={blessed}
             omiki={omikiProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy}
@@ -3707,7 +3788,7 @@ export default function App() {
             {VIEW_SPOTS.map((v, i) => (
               <li key={v.id}>
                 <button type="button" role="menuitemradio" aria-checked={view === v.id} className={view === v.id ? 'is-on' : ''}
-                  onClick={() => { setView(v.id); setResetView((n) => n + 1); setViewMenu(false) }} title={v.about[lang]}>
+                  onClick={() => goView(v.id)} title={v.about[lang]}>
                   <i>{viewKey(i)}</i>{viewName(v, lang)}
                 </button>
               </li>
@@ -3827,11 +3908,13 @@ export default function App() {
       <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel} title={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>
+      {/* (the cover over the move up to the room upstairs and back down (item 350)) */}
+      <FloorCover go={floorGo} lang={lang} />
       {/* (the game's day and time, under the round buttons (the owner's): day and night come round with it) */}
       <GameClock lang={lang} />
       {/* (upstairs: the way down to the shop (item 325)) */}
       {view === 'upstairs' && !editOn && (
-        <button type="button" className="dorm-down" onClick={() => { setView('back'); setResetView((n) => n + 1) }}>
+        <button type="button" className="dorm-down" onClick={() => goView('down')}>
           <Glyph id="arrowU" size="14px" className="dorm-down-arrow" />{tl(lang, '下樓回店裡', '店に下りる', 'Back down to the shop')}
         </button>
       )}

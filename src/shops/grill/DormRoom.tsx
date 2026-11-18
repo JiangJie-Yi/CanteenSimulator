@@ -275,7 +275,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       <group name="look-dorm" position={look} />
       {/* (the stair's well: pointed at, it says where it goes; clicked, down to the shop) */}
       <mesh position={[STAIR.x, 0.08, STAIR.z]} visible={false}
-        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip(null); askView('back') }}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip(null); askView('down') }}
         onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; setTip({ title: '樓梯', hint: '點一下下樓，回到店裡' }) }}
         onPointerOut={() => { document.body.style.cursor = ''; setTip(null) }}>
         <boxGeometry args={[STAIR.w, 0.16, STAIR.d]} />

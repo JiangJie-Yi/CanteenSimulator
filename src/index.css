@@ -779,6 +779,50 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   to { opacity: 1; transform: none; }
 }
 /* (upstairs: the way down (item 325), at the foot of the screen over the carousel's row, the clock's smoked glass) */
+/* (the cover over the move up to the room upstairs and back down (item 350): a dark veil, where they're going, a bar filling) */
+.floor-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 11, 8, 0.86);
+  opacity: 1;
+  transition: opacity 0.36s ease;
+  pointer-events: auto;
+}
+.floor-cover.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+.floor-cover-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.floor-cover-word {
+  white-space: nowrap;
+  color: #f3e6cf;
+  font-size: 18px;
+  letter-spacing: 0.18em;
+}
+.floor-cover-bar {
+  display: block;
+  width: 240px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.floor-cover-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: #e2b770;
+  transition: width 0.55s ease-out;
+}
 .dorm-down {
   position: fixed;
   z-index: 10;
