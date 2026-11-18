@@ -102,11 +102,18 @@ function Fish({ c, f }: { c: Ctx; f: FishLook }) {
  */
 type FinAt = { at: number; w: number; h: number; spiny?: boolean }
 type Fish2 = { back: string; belly: string; fin: string; len: number; deep: number; nose: number; hump: number; fork: number; tailW: number
-  dorsal: FinAt[]; anal?: FinAt; adipose?: number; finlets?: number; spot?: string; flank?: string; beak?: string; sheen?: string; worms?: string; sharp?: boolean }
+  dorsal: FinAt[]; anal?: FinAt; adipose?: number; finlets?: number; spot?: string; flank?: string; beak?: string; sheen?: string; worms?: string; sharp?: boolean
+  /** (item 354) a golden middle between back and belly; fine scales over the back; the lateral line; the dorsal's dark leading edge and the
+   * tail's dark trailing edge; the little mouth at the snout */
+  mid?: string; scales?: string; lateral?: string; edge?: string; mouth?: boolean }
 const FISH2: Record<string, Fish2> = {
   // (ayu: slender, olive over cream, its tall dorsal and the little adipose fin, the yellow spot behind the gill, yellowed fins)
-  ExtraFish: { back: '#6b9165', belly: '#f6f1d9', fin: '#e8c870', len: 1, deep: 0.8, nose: 0.3, hump: 0.4, fork: 0.5, tailW: 0.95,
-    dorsal: [{ at: 0.4, w: 0.22, h: 0.8 }], anal: { at: 0.72, w: 0.14, h: 0.42 }, adipose: 0.82, spot: '#f2c34a', flank: '#ecd27e' },
+  // (drawn again (item 354, the owner's 「在畫過，可以更好看」): longer and slimmer, its snout finer; olive down through a golden middle to the
+  // cream belly; fine scales over its back and its lateral line; the yellow spot glowing; its tall dorsal dark along its front, its tail's
+  // fork edged dark, its fins a warmer yellow; the little mouth)
+  ExtraFish: { back: '#5c8758', mid: '#b9b66a', belly: '#f8f3de', fin: '#ebc766', len: 1.06, deep: 0.7, nose: 0.5, hump: 0.38, fork: 0.58, tailW: 0.98,
+    dorsal: [{ at: 0.4, w: 0.25, h: 0.98 }], anal: { at: 0.72, w: 0.14, h: 0.44 }, adipose: 0.83, spot: '#f9c62f', flank: '#efd27a',
+    scales: '#47704a', lateral: '#8ea46c', edge: '#6a5528', mouth: true },
   // (saury: long and thin as a blade, its snout pointed and its lower jaw out yellow, blue over silver cut sharp, a silver line along it,
   // its little fins far back, finlets above and below before its small deep-forked tail)
   Saury: { back: '#2b5d9e', belly: '#eef3fa', fin: '#9fb6d4', len: 1.05, deep: 0.5, nose: 0.9, hump: 0.5, fork: 0.85, tailW: 1.5,
@@ -159,15 +166,23 @@ function Fish2Art({ c, f }: { c: Ctx; f: Fish2 }) {
     <g>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          {f.sharp
+          {f.mid
+            ? <><stop offset="0" stopColor={tone(f.back, 0.1)} /><stop offset="0.36" stopColor={f.back} /><stop offset="0.54" stopColor={f.mid} /><stop offset="0.7" stopColor={tone(f.belly, -0.04)} /><stop offset="1" stopColor={f.belly} /></>
+            : f.sharp
             ? <><stop offset="0" stopColor={tone(f.back, 0.14)} /><stop offset="0.44" stopColor={f.back} /><stop offset="0.5" stopColor={tone(f.belly, -0.08)} /><stop offset="1" stopColor={f.belly} /></>
             : <><stop offset="0" stopColor={tone(f.back, 0.12)} /><stop offset="0.42" stopColor={f.back} /><stop offset="0.6" stopColor={tone(f.belly, -0.05)} /><stop offset="1" stopColor={f.belly} /></>}
         </linearGradient>
+        {f.scales && <clipPath id={`${id}c`}><path d={body} /></clipPath>}
+        {f.spot && f.mid && <radialGradient id={`${id}s`}><stop offset="0" stopColor="#fff6c0" /><stop offset="0.45" stopColor={f.spot} /><stop offset="1" stopColor={f.spot} stopOpacity="0" /></radialGradient>}
       </defs>
       {/* (behind the body: the tail and its rays, the fins on the back and under it, the adipose fin, the finlets) */}
       <Blob c={c} k={f.fin} d={tail} at={[20, 30]} />
       {[-0.55, 0, 0.55].map((k) => line(`M${tx + 2} ${cy + k * D * 0.25} L${tx + T * 0.82} ${cy + k * W * 0.95}`, finDark, 1.1, `t${k}`))}
-      {f.dorsal.map((g, i) => <g key={`d${i}`}><Blob c={c} k={f.fin} d={finD(g, true)} sw={2.4} />{!g.spiny && rays(g, true)}</g>)}
+      {f.edge && <path d={`M${tx + T} ${cy - W} C${tx + T * 0.92} ${cy - W * 0.45} ${notch + 2} ${cy - 2} ${notch} ${cy} C${notch + 2} ${cy + 2} ${tx + T * 0.92} ${cy + W * 0.45} ${tx + T} ${cy + W}`}
+        fill="none" stroke={f.edge} strokeWidth="2.2" strokeOpacity="0.75" strokeLinecap="round" />}
+      {f.dorsal.map((g, i) => <g key={`d${i}`}><Blob c={c} k={f.fin} d={finD(g, true)} sw={2.4} />{!g.spiny && rays(g, true)}
+        {f.edge && (() => { const x0 = along(g.at - g.w / 2), w = along(g.at + g.w / 2) - x0, top = cy - (D + g.h * D * 0.75)
+          return <path d={`M${x0 + 1.5} ${cy - D * 0.62} Q${x0 + w * 0.08} ${top + 1} ${x0 + w * 0.42} ${top + 1.2}`} fill="none" stroke={f.edge} strokeWidth="2" strokeOpacity="0.8" strokeLinecap="round" /> })()}</g>)}
       {f.anal && <g><Blob c={c} k={f.fin} d={finD(f.anal, false)} sw={2.4} />{rays(f.anal, false)}</g>}
       {f.adipose !== undefined && <Blob c={c} k={f.fin} d={`M${along(f.adipose) - 4} ${cy - D * 0.4} Q${along(f.adipose)} ${cy - D * 0.4 - 9} ${along(f.adipose) + 5} ${cy - D * 0.4} Z`} sw={2} />}
       {f.finlets && [-1, 1].map((s) => Array.from({ length: f.finlets! }, (_, k) => {
@@ -181,16 +196,27 @@ function Fish2Art({ c, f }: { c: Ctx; f: Fish2 }) {
         const x = cx - L * 0.38 + k * L * 0.17
         return line(`M${x} ${cy - D * 0.9} q3.2 ${D * 0.14} 0 ${D * 0.28} t0 ${D * 0.28} t0 ${D * 0.2}`, f.worms, 2.1, `w${k}`)
       })}
-      {f.flank && line(`M${cx - L * 0.5} ${cy + D * 0.45} Q${cx} ${cy + D * 0.52} ${tx - 4} ${cy + D * 0.14}`, f.flank, 3, 'fl')}
+      {f.flank && <g opacity={f.mid ? 0.55 : 1}>{line(`M${cx - L * 0.5} ${cy + D * 0.45} Q${cx} ${cy + D * 0.52} ${tx - 4} ${cy + D * 0.14}`, f.flank, f.mid ? 1.8 : 3, 'fl')}</g>}
       {f.sheen && line(`M${cx - L * 0.52} ${cy + D * 0.02} Q${cx} ${cy - D * 0.04} ${tx - 2} ${cy}`, f.sheen, 1.8, 'sh')}
-      {f.spot && <><ellipse cx={cx - L * 0.46} cy={cy - D * 0.16} rx={9} ry={6} fill={f.spot} opacity={0.35} /><ellipse cx={cx - L * 0.46} cy={cy - D * 0.16} rx={5.2} ry={3.6} fill={f.spot} /></>}
+      {/* (the fine scales over the back, and the lateral line (item 354)) */}
+      {f.scales && <g clipPath={`url(#${id}c)`} opacity="0.55">
+        {Array.from({ length: 4 }, (_, r) => Array.from({ length: 13 }, (_, k) => {
+          const x = cx - L * 0.36 + k * L * 0.1 + (r % 2) * L * 0.05, y = cy - D * (0.82 - r * 0.2)
+          return <path key={`s${r}${k}`} d={`M${x} ${y} q${L * 0.05} ${D * 0.14} ${L * 0.1} 0`} fill="none" stroke={f.scales} strokeWidth="0.9" />
+        }))}
+      </g>}
+      {f.lateral && line(`M${cx - L * 0.46} ${cy - D * 0.06} Q${cx} ${cy - D * 0.16} ${tx - 3} ${cy - D * 0.02}`, f.lateral, 1.2, 'lat')}
+      {f.spot && (f.mid
+        ? <><ellipse cx={cx - L * 0.44} cy={cy - D * 0.14} rx={11} ry={7.5} fill={`url(#${id}s)`} /><ellipse cx={cx - L * 0.44} cy={cy - D * 0.14} rx={4.6} ry={3.1} fill={f.spot} /><ellipse cx={cx - L * 0.455} cy={cy - D * 0.2} rx={1.8} ry={1.1} fill="#fffbe0" /></>
+        : <><ellipse cx={cx - L * 0.46} cy={cy - D * 0.16} rx={9} ry={6} fill={f.spot} opacity={0.35} /><ellipse cx={cx - L * 0.46} cy={cy - D * 0.16} rx={5.2} ry={3.6} fill={f.spot} /></>)}
+      {f.mouth && line(`M${sx + 1.2} ${sy + 1.4} q${L * 0.05} ${D * 0.1} ${L * 0.12} ${D * 0.02}`, tone(f.back, -0.45), 1.4, 'mo')}
       {f.beak && <path d={`M${sx + 4} ${sy - 0.4} L${sx - beak} ${sy + 2.4} L${sx + 5} ${sy + 4.8} Z`} fill={f.beak} stroke={INK} strokeWidth="1.6" strokeLinejoin="round" />}
       {/* (the gill cover's curve, and the pectoral fin behind it, a little lighter, its ray) */}
       {line(`M${cx - L * 0.62} ${cy - D * 0.66} Q${cx - L * 0.48} ${cy} ${cx - L * 0.62} ${cy + D * 0.66}`, tone(f.back, -0.35), 2)}
       <path d={`M${cx - L * 0.55} ${cy + D * 0.12} Q${cx - L * 0.38} ${cy + D * 0.05} ${cx - L * 0.3} ${cy + D * 0.42} Q${cx - L * 0.44} ${cy + D * 0.46} ${cx - L * 0.55} ${cy + D * 0.12} Z`}
         fill={tone(f.fin, 0.2)} stroke={INK} strokeWidth="1.6" strokeLinejoin="round" />
       {line(`M${cx - L * 0.52} ${cy + D * 0.17} L${cx - L * 0.36} ${cy + D * 0.36}`, finDark, 1, 'pr')}
-      <Gleam x={cx - L * 0.12} y={cy - D * 0.62} rx={L * 0.26} ry={2.6} rot={-4} o={0.7} />
+      <Gleam x={cx - L * 0.12} y={cy - D * 0.62} rx={L * (f.mid ? 0.18 : 0.26)} ry={f.mid ? 1.8 : 2.6} rot={-4} o={f.mid ? 0.4 : 0.7} />
     </g>
   )
 }
