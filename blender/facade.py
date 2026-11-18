@@ -15,8 +15,15 @@ x 0.43..0.71, its top at y 2.30, z up to 0.44.
 - "FacadeLattice": the wooden lattice (木格子): a strip of it along the wall between the beam and the eave, and the band's middle bay (over the
   big lantern): squares, the slats in their picture, the gaps cut out.
 - "FacadeRafters": the rafters (垂木), out from the wall, down to the eave's edge.
-- "FacadeRoof": the eave's boards and its tiles (いぶし瓦) on them: one slab, sloping down to the street, the tiles in its picture.
-- "FacadeEaveTiles": the row of eave-end tiles (軒瓦) along its edge, their round ends in its picture.
+- "FacadeRoof": the eave's boards (野地板), sloping down to the street (item 341: the tiles were painted on this one slab, and the owner:
+  「屋頂不像阿」).
+- "FacadeTileRoof": the tiles (いぶし瓦), in their own shapes: pan tiles side by side across it, a trough and a roll each, in six courses down
+  the slope, each course's lower edge lapped up over the next (the lap a step in the shape, not a line in a picture); over the big lantern
+  the eave swept up in a bell (軒唐破風), the tiles and the boards and the rafters with it.
+- "FacadeEaveTiles", "FacadeRoundEnds": along the edge, the flat end tiles (軒平瓦) in a band with their scroll, and a round end tile (軒丸瓦)
+  at every roll.
+- "FacadeGable", "FacadeGableTrim", "FacadeGegyo": the swept-up eave's front: its curved bargeboard (唐破風板) with a pale trim along its top, a
+  little ridge plate (鬼板) on its crown and the hanging ornament (懸魚) under it. "FacadeVerge": the eave's two ends, a board down each.
 - "FacadeFrame": the band of the menu boards on the wall over the eave: its foot rail over the roof's back (雨押さえ), the stiles between the
   boards' bays, its top rail and the coping (笠木) on it.
 - "FacadeBar": the bar the red and the grill's lanterns hang from (提灯掛け), on two short arms out from the beam.
@@ -77,6 +84,27 @@ EAVE_Z = (0.237, 1.06)
 def under(z):
     """the eave's boards' underside at z: 2.56 at the wall, down 0.16 by z 1.0 (the lanterns' tops, 2.31, well under it)"""
     return 2.56 - 0.16 * (z - 0.20) / 0.80
+
+
+# (the eave swept up over the big lantern (軒唐破風, item 341): its middle and half width along the front, how high its crown rises at the
+# edge; the lift dies away up the slope from KARA_FROM)
+KARA_X, KARA_HW, KARA_H = -0.12, 0.42, 0.16
+KARA_FROM = 0.5
+
+
+def bell(x):
+    """the swept-up edge's height over the straight eave at x: a bell, its crown a little peaked, curving out into the straight both sides"""
+    s_ = abs(x - KARA_X) / KARA_HW
+    if s_ >= 1:
+        return 0.0
+    return KARA_H * ((1 + math.cos(math.pi * s_)) / 2) ** 0.85
+
+
+def lift(x, z):
+    """how far the roof at (x, z) is lifted by the swept-up eave: the bell at the edge, dying away up the slope"""
+    if z <= KARA_FROM:
+        return 0.0
+    return bell(x) * ((z - KARA_FROM) / (EAVE_Z[1] - KARA_FROM)) ** 1.6
 
 
 RAFTER_W, RAFTER_H = 0.035, 0.045
@@ -189,6 +217,20 @@ def tile_picture(N=256):
     return np.clip(base[None, None, :] * k[..., None] * 1.3, 0, 1).astype(np.float32)
 
 
+def tile_tone_picture(N=128, ROWS=6, ROLLS=8):
+    """the tiles' faces now they've their own shapes (item 341): dull silver-grey, each tile its own shade, a fine fired mottle, a little
+    lighter toward each one's lower edge where the weather's worn it"""
+    rng_ = np.random.default_rng(341)
+    u = np.linspace(0, 1, N, endpoint=False)
+    U, V = np.meshgrid(u, u)
+    tone = 0.9 + 0.16 * rng_.random((ROWS, ROLLS))
+    k = tone[(V * ROWS).astype(int) % ROWS, (U * ROLLS).astype(int) % ROLLS]
+    k = k * (0.95 + 0.08 * rng_.random((N, N)))
+    k = k * (1 + 0.06 * ((V * ROWS) % 1.0))
+    base = np.array([0.36, 0.37, 0.39], np.float32)
+    return np.clip(base[None, None, :] * k[..., None], 0, 1).astype(np.float32)
+
+
 def eave_tile_picture(W=512, H=64):
     """the eave tiles' ends along the edge (u along it, v up it): round ends (軒丸瓦) every 1/8, each a boss ringed and studded, and under
     them the flat ends (軒平瓦) with a scroll along them"""
@@ -243,6 +285,10 @@ M = {
     "soffit": pbr("FacadeSoffit", (1, 1, 1), tex=image("facadesoffit", wood_picture(base=(0.42, 0.29, 0.18), seed=8)), rough=0.8),
     "tiles": pbr("FacadeTiles", (1, 1, 1), tex=image("facadetiles", tile_picture()), rough=0.55),
     "eavetiles": pbr("FacadeEaveTiles", (1, 1, 1), tex=image("facadeeavetiles", eave_tile_picture()), rough=0.55),
+    "tileshape": pbr("FacadeTileFaces", (1, 1, 1), tex=image("facadetilefaces", tile_tone_picture()), rough=0.5),
+    "roundend": pbr("FacadeRoundEnds", (0.36, 0.37, 0.4), rough=0.45),
+    "trim": pbr("FacadeTrim", (0.86, 0.8, 0.66), rough=0.6),
+    "gold": pbr("FacadeGegyo", (0.62, 0.48, 0.22), rough=0.4, metal=0.5),
     "back": pbr("FacadeBack", (0.11, 0.075, 0.05), rough=0.9),
 }
 lat_rgb, lat_a = lattice_picture()
@@ -295,51 +341,187 @@ n_r = 10
 for k in range(n_r):
     x = EAVE_X[0] + 0.05 + k * (EAVE_X[1] - EAVE_X[0] - 0.1) / (n_r - 1)
     za, zb = BACK_Z[1] + 0.01, EAVE_Z[1] - 0.03
-    ya, yb = under(za), under(zb)
+    ya, yb = under(za), under(zb) + lift(x, zb)
     corners = [(xx, yy, zz) for zz, ytop in ((za, ya), (zb, yb)) for yy in (ytop - RAFTER_H, ytop - 0.001) for xx in (x - RAFTER_W / 2, x + RAFTER_W / 2)]
     rafters.append({"corners": corners, "grain": "z"})
 keep(box_obj("FacadeRafters", rafters, "z"), M["rafter"])
 
-# the roof: its boards' underside (the soffit, seen between the rafters) and its tiles on top, one sloping slab; its tiles' picture along
-# the slope
+# the roof (item 341): its boards (the soffit seen between the rafters, their ends at the edge), lifted where the eave sweeps up; on them the
+# tiles in their own shapes, six courses of pan tiles down the slope; along the edge the end tiles; over the big lantern the swept-up eave's
+# front; a board down each end
 z0, z1 = EAVE_Z
-roof = [(x, under(z) + dy, z) for z in (z0, z1) for dy in (0, ROOF_T) for x in EAVE_X]
+TW = (EAVE_X[1] - EAVE_X[0]) / 20                   # twenty tiles across
+NC = 6                                              # six courses down the slope
+PROF_U = [0.0, 0.34, 0.68, 0.84]                    # across a tile: its trough's two sides and its hollow, the roll's crest
+PROF_H = [0.024, 0.010, 0.024, 0.042]               # how high each stands over the boards
+LAP = 0.012                                         # each course's lower edge lapped up over the next
+xs = [EAVE_X[0] + (i + PROF_U[j]) * TW for i in range(20) for j in range(4)] + [EAVE_X[1]]
+hs = [PROF_H[j] for i in range(20) for j in range(4)] + [PROF_H[0]]
+zs = [z0 + (z1 - z0) * c / NC for c in range(NC + 1)]
+
+
+def board_top(x, z):
+    return under(z) + ROOF_T + lift(x, z)
+
+
+# (the boards: a grid along the tiles' columns and the courses' edges, its top and underside lifted alike; its front, back and ends closed)
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
-v = [bm.verts.new(P(*c)) for c in roof]
-# (corners: 0 x0 under z0, 1 x1 under z0, 2 x0 top z0, 3 x1 top z0, 4..7 the same at z1)
-quads = {"top": (2, 6, 7, 3), "under": (0, 1, 5, 4), "front": (4, 5, 7, 6), "back": (0, 2, 3, 1), "l": (0, 4, 6, 2), "r": (1, 3, 7, 5)}
-slope = math.hypot(z1 - z0, under(z0) - under(z1))
-for nm, q in quads.items():
-    face = bm.faces.new([v[i] for i in q])
-    for lp, i in zip(face.loops, q):
-        x, y, z = roof[i]
-        if nm == "top":
-            lp[uvl].uv = ((x - EAVE_X[0]) / 1.2, (z - z0) / (z1 - z0) * slope / 0.84)
-        elif nm == "under":
-            lp[uvl].uv = ((z - z0) / TILE, x / TILE)
-        else:
-            lp[uvl].uv = (x / TILE if nm in ("front", "back") else z / TILE, (y - 2.6) / TILE)
-    face.material_index = 0 if nm == "top" else 1
+cols = [EAVE_X[0] + k * TW for k in range(21)]
+top = [[bm.verts.new(P(x, board_top(x, z), z)) for x in cols] for z in zs]
+bot = [[bm.verts.new(P(x, board_top(x, z) - ROOF_T, z)) for x in cols] for z in zs]
+for r in range(NC):
+    for k in range(20):
+        f = bm.faces.new((top[r][k], top[r + 1][k], top[r + 1][k + 1], top[r][k + 1]))
+        f.material_index = 1
+        f = bm.faces.new((bot[r][k], bot[r][k + 1], bot[r + 1][k + 1], bot[r + 1][k]))
+        f.material_index = 1
+        for lp in f.loops:
+            co = lp.vert.co
+            lp[uvl].uv = (-co.y / TILE, co.x / TILE)
+for k in range(20):
+    for row in (NC, 0):
+        f = bm.faces.new((bot[row][k], bot[row][k + 1], top[row][k + 1], top[row][k]))
+        f.material_index = 1
+for r in range(NC):
+    for k in (0, 20):
+        f = bm.faces.new((bot[r][k], bot[r + 1][k], top[r + 1][k], top[r][k]))
+        f.material_index = 1
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 roof_o = keep(mesh_obj("FacadeRoof", bm), M["tiles"])
 roof_o.data.materials.append(M["soffit"])
 
-# the eave tiles' ends along its edge, standing a little proud of the slab's front and over it
-et_z = (EAVE_Z[1] - 0.004, EAVE_Z[1] + 0.05)
-et_y = (under(EAVE_Z[1]) - 0.018, under(EAVE_Z[1]) + ROOF_T + 0.035)
+# (the tiles: each course a strip across the front in the tiles' profile, rising LAP to its lower edge, and the step down from that edge to
+# the next course's top: the lap, a shadowed edge as tiles have)
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
-fs = add_box(bm, uvl, (EAVE_X[0] - 0.01, et_y[0], et_z[0]), (EAVE_X[1] + 0.01, et_y[1], et_z[1]), "x")
+
+
+def tile_y(i, z, raised):
+    return board_top(xs[i], z) + hs[i] + (LAP if raised else 0.0)
+
+
+for c in range(NC):
+    za, zb = zs[c], zs[c + 1]
+    ra = [bm.verts.new(P(xs[i], tile_y(i, za, False), za)) for i in range(len(xs))]
+    rb = [bm.verts.new(P(xs[i], tile_y(i, zb, True), zb)) for i in range(len(xs))]
+    for i in range(len(xs) - 1):
+        f = bm.faces.new((ra[i], rb[i], rb[i + 1], ra[i + 1]))
+        for lp, (xx, zz) in zip(f.loops, ((xs[i], za), (xs[i], zb), (xs[i + 1], zb), (xs[i + 1], za))):
+            lp[uvl].uv = ((xx - EAVE_X[0]) / (TW * 8), 1 - (zz - z0) / (z1 - z0))
+    if c < NC - 1:
+        # (the lap's face: down from this course's lifted edge to the next one's top, facing the street)
+        nb = [bm.verts.new(P(xs[i], tile_y(i, zb, False) + 0.0005, zb + 0.0005)) for i in range(len(xs))]
+        for i in range(len(xs) - 1):
+            f = bm.faces.new((rb[i], nb[i], nb[i + 1], rb[i + 1]))
+            for lp in f.loops:
+                lp[uvl].uv = ((lp.vert.co.x - EAVE_X[0]) / (TW * 8), 1 - (c + 0.98) / NC)
+# (all facing up and out toward the street: an open strip could come out either way)
+for f in bm.faces:
+    f.normal_update()
+    if f.normal.z < -0.05 or (abs(f.normal.z) <= 0.05 and f.normal.y > 0):
+        f.normal_flip()
+keep(mesh_obj("FacadeTileRoof", bm), M["tileshape"])
+
+# (the end tiles along the edge: the flat ends' band under the rolls, following the sweep; a round end at every roll, facing the street)
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+ex = [EAVE_X[0] + k * TW / 2 for k in range(41)]
+zf0, zf1 = z1 - 0.004, z1 + 0.022
+band = []
+for x in ex:
+    yb_ = board_top(x, z1) - 0.012
+    yt_ = board_top(x, z1) + 0.03
+    band.append([bm.verts.new(P(x, yb_, zf1)), bm.verts.new(P(x, yt_, zf1)), bm.verts.new(P(x, yt_, zf0)), bm.verts.new(P(x, yb_, zf0))])
+for k in range(40):
+    a, b_ = band[k], band[k + 1]
+    for j in range(4):
+        f = bm.faces.new((a[j], b_[j], b_[(j + 1) % 4], a[(j + 1) % 4]))
+        if j == 0:   # (its front: the flat ends' scroll, the lower band of the eave tiles' picture)
+            for lp, (uu, vv) in zip(f.loops, ((ex[k], 0.0), (ex[k + 1], 0.0), (ex[k + 1], 0.36), (ex[k], 0.36))):
+                lp[uvl].uv = ((uu - EAVE_X[0]) / 0.82, vv)
+bm.faces.new(tuple(reversed(band[0])))
+bm.faces.new(tuple(band[-1]))
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-# (its front: the ends' picture once along every 0.82, its pixels square: eight ends of 10 cm)
-for face in bm.faces:
-    n = face.normal
-    if n.y < -0.9:     # Blender -y is the game's +z: the street side
-        for lp in face.loops:
-            co = lp.vert.co
-            lp[uvl].uv = ((co.x - EAVE_X[0]) / 0.82, (co.z - et_y[0]) / (et_y[1] - et_y[0]))
 keep(mesh_obj("FacadeEaveTiles", bm), M["eavetiles"])
+bm = bmesh.new()
+RR, SEG = 0.024, 10
+for i in range(20):
+    x = EAVE_X[0] + (i + 0.84) * TW
+    cy = board_top(x, z1) + 0.026
+    rings = [[bm.verts.new(P(x + RR * math.cos(2 * math.pi * k / SEG), cy + RR * math.sin(2 * math.pi * k / SEG), zz)) for k in range(SEG)]
+             for zz in (z1 - 0.05, z1 + 0.03)]
+    for k in range(SEG):
+        k2 = (k + 1) % SEG
+        bm.faces.new((rings[0][k], rings[0][k2], rings[1][k2], rings[1][k]))
+    bm.faces.new(rings[1])
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+keep(mesh_obj("FacadeRoundEnds", bm), M["roundend"])
+
+# (the swept-up eave's front: its curved bargeboard standing just proud of the end tiles, from where the sweep begins to where it ends, a
+# pale trim along its top; a little ridge plate on its crown; the ornament hung under it)
+gx = [KARA_X - KARA_HW - 0.06 + k * (2 * KARA_HW + 0.12) / 36 for k in range(37)]
+gz0, gz1 = z1 + 0.024, z1 + 0.046
+
+
+def gable_edge(x):
+    return board_top(x, z1) + 0.034
+
+
+def swept_band(name, y_lo, y_hi, za_, zb_, mat):
+    bm_ = bmesh.new()
+    uvl_ = bm_.loops.layers.uv.new()
+    ring = []
+    for x in gx:
+        yt_ = gable_edge(x)
+        ring.append([bm_.verts.new(P(x, yt_ + y_lo, zb_)), bm_.verts.new(P(x, yt_ + y_hi, zb_)), bm_.verts.new(P(x, yt_ + y_hi, za_)),
+                     bm_.verts.new(P(x, yt_ + y_lo, za_))])
+    for k in range(len(gx) - 1):
+        a, b_ = ring[k], ring[k + 1]
+        for j in range(4):
+            f = bm_.faces.new((a[j], b_[j], b_[(j + 1) % 4], a[(j + 1) % 4]))
+            for lp in f.loops:
+                co = lp.vert.co
+                lp[uvl_].uv = (co.x / TILE, co.z / TILE)
+    bm_.faces.new(tuple(reversed(ring[0])))
+    bm_.faces.new(tuple(ring[-1]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    return keep(mesh_obj(name, bm_), M[mat])
+
+
+swept_band("FacadeGable", -0.075, 0.0, gz0, gz1, "rafter")
+swept_band("FacadeGableTrim", -0.002, 0.012, gz0 - 0.002, gz1 + 0.004, "trim")
+crown = gable_edge(KARA_X)
+# (the ridge plate on the crown: tile-grey, as the end tiles are)
+bm = bmesh.new()
+uvl = bm.loops.layers.uv.new()
+add_box(bm, uvl, (KARA_X - 0.04, crown + 0.012, gz0 - 0.03), (KARA_X + 0.04, crown + 0.07, gz1 + 0.006), "x")
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+keep(mesh_obj("FacadeOnita", bm), M["roundend"])
+bm = bmesh.new()
+# (the ornament under the crown: a six-sided board, wider than tall, its point down)
+hx = [(-0.06, 0.0), (-0.04, 0.035), (0.04, 0.035), (0.06, 0.0), (0.03, -0.055), (-0.03, -0.055)]
+gy = crown - 0.075 - 0.04
+front = [bm.verts.new(P(KARA_X + a, gy + b, gz1 + 0.012)) for a, b in hx]
+back_ = [bm.verts.new(P(KARA_X + a, gy + b, gz1 - 0.002)) for a, b in hx]
+bm.faces.new(front)
+bm.faces.new(tuple(reversed(back_)))
+for k in range(6):
+    k2 = (k + 1) % 6
+    bm.faces.new((back_[k], back_[k2], front[k2], front[k]))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+keep(mesh_obj("FacadeGegyo", bm), M["gold"])
+# (the eave's two ends: a board down each (けらば), so it's seen to have a thickness from the side)
+ends = []
+for x0_, x1_ in ((EAVE_X[0] - 0.014, EAVE_X[0] + 0.004), (EAVE_X[1] - 0.004, EAVE_X[1] + 0.014)):
+    corners = []
+    for zz in (z0, z1 + 0.024):
+        for lohi in ("lo", "hi"):
+            for xx in (x0_, x1_):
+                yy = (board_top(xx, min(zz, z1)) - ROOF_T - 0.02) if lohi == "lo" else (board_top(xx, min(zz, z1)) + 0.05)
+                corners.append((xx, yy, zz))
+    ends.append({"corners": corners, "grain": "z"})
+keep(box_obj("FacadeVerge", ends, "z"), M["rafter"])
 
 # the lanterns' bar, on two short arms out from the beam
 bx, by, bz = BAR["x"], BAR["y"], BAR["z"]
