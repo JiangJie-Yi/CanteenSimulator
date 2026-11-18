@@ -3,9 +3,10 @@
 // customer's order; a bottle that can't fill another is finished, and a new one opened in its place. Pure rules; Roasting takes the orders,
 // Decor draws the stand and pours.
 
-/** what each bottle holds (ml), in the stand's order (blender/sakestand.py: the three tall at the back, the two at the front) */
-// (eight bottles: the stand's 1.8 l at the back and 720 ml at the front, three more makes added (item 132): 瑠璃灘, 雲雀谷, 楓霞)
-export const SAKE_BOTTLE_ML = [1800, 1800, 1800, 720, 720, 1800, 720, 720] as const
+/** what each bottle holds (ml), by its number in blender/sakestand.py (where each stands is that script's) */
+// (eight bottles, three more makes added (item 132): 瑠璃灘, 雲雀谷, 楓霞; twelve (item 285, the owner's: 「數量也不夠」): 稲穂川 and 澄藍 in
+// 1.8 l, 玄雪 (the black stoneware one) and 雪見舟 (the cloudy one) in 720 ml; six of each)
+export const SAKE_BOTTLE_ML = [1800, 1800, 1800, 720, 720, 1800, 720, 720, 1800, 1800, 720, 720] as const
 /** a tokkuri's worth: one gō */
 export const TOKKURI_ML = 180
 /** how many of those ordering add a tokkuri of sake alongside (sat at the bar, not a takeaway); and how long after their order it's poured

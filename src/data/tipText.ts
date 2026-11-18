@@ -91,6 +91,7 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   拿起來從後場拿一瓶新的: ['持ち上げると裏から新しい一本を出す', 'Take it up to bring a new one from the back'],
   // (item 235: the stand's glasses are the owner's, for tasting)
   '自己試喝用，客人的酒杯在出餐口': ['自分の試飲用・お客さんの杯は出し口に', 'For your own tasting: the customers’ cups are at the pass'],
+  '店裡賣的清酒，擺給客人看（客人點的從酒櫃拿）': ['店で出す日本酒をお客さんに見せる棚（注文の酒は冷蔵ケースから）', 'The sake the shop sells, out for the customers to see (what they order comes from the fridge)'],
   '老闆自己試倒試喝用：按住一支酒拖到德利或燒酒杯上方倒酒': ['自分の試し注ぎ用：瓶を押したまま徳利かグラスの上へ', 'For your own tasting: hold a bottle and drag it over the tokkuri or a glass'],
   '客人的清酒在出餐口倒、用那裡的酒杯端出去': ['お客さんの日本酒は出し口で注ぎ、そこの杯で運ぶ', 'The customers’ sake is poured at the pass and carried out in its cups'],
   溫控旋鈕: ['温度調節つまみ', 'Thermostat knob'],

@@ -3,9 +3,20 @@ import { feature, scenario } from './bdd'
 import { SAKE_BOTTLE_ML, STATION_GO, TOKKURI_ML, bottleFrom, fullStand, goOf, pour, pourFrom, poursLeft, stationGo } from '@/game/sakeStand'
 
 feature('酒台倒酒（店主要的，第 89 項）', () => {
+  scenario('酒台上有十二支酒：一升瓶六支、四合瓶六支（第 285 項：數量不夠）', ({ given, then, and }) => {
+    given('酒台上的酒', () => { expect(SAKE_BOTTLE_ML.length).toBeGreaterThan(0) })
+    then('一共十二支', () => { expect(SAKE_BOTTLE_ML.length).toBe(12) })
+    and('一升瓶（1.8 公升）六支，四合瓶（720 ml）六支', () => {
+      expect(SAKE_BOTTLE_ML.filter((ml) => ml === 1800).length).toBe(6)
+      expect(SAKE_BOTTLE_ML.filter((ml) => ml === 720).length).toBe(6)
+    })
+    and('一支一升瓶倒十壺、一支四合瓶倒四壺', () => {
+      SAKE_BOTTLE_ML.forEach((ml, k) => expect(goOf(k)).toBe(ml === 1800 ? 10 : 4))
+    })
+  })
   scenario('一壺德利是一合，從開著的那支倒，倒完才開下一支', ({ given, when, then, and }) => {
     let levels = fullStand()
-    given('每一支都是滿的（八支，第 132 項）', () => { expect(levels).toEqual(SAKE_BOTTLE_ML.map(() => 1)) })
+    given('每一支都是滿的（十二支，第 285 項）', () => { expect(levels).toEqual(SAKE_BOTTLE_ML.map(() => 1)) })
     when('倒一壺', () => { levels = pour(levels, pourFrom(levels)).levels })
     then('第一支少了一合（1.8 公升的十分之一）', () => {
       expect(levels[0]).toBeCloseTo(1 - TOKKURI_ML / SAKE_BOTTLE_ML[0])

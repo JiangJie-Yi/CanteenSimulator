@@ -1580,6 +1580,11 @@ export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Mat
           depthWrite: false, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.5, emissive: green ? '#1f5a34' : '#6a8088' })
         reflectStudio(g)
         t = g
+      } else if (/Nigori/.test(src.name)) {
+        // (the cloudy sake (雪見舟, item 285): milk-white, little seen through)
+        const g = new THREE.MeshStandardMaterial({ color: '#f1eee6', transparent: true, opacity: 0.86, depthWrite: false, roughness: 0.3 })
+        reflectStudio(g)
+        t = g
       } else if (/SakeLiquid|ShochuLiquid/.test(src.name)) {
         // (the drink: near clear, sake a pale straw gold, shochu clearer still; its top catching the light)
         const g = new THREE.MeshStandardMaterial({ color: /Shochu/.test(src.name) ? '#e6efe4' : '#b89a52', transparent: true,
@@ -1601,7 +1606,7 @@ export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Mat
     m.receiveShadow = !see
   })
   // (no ink round the drink inside: its outline would show through the glass)
-  inkModel(r, (m) => /Liquid/.test((m.material as THREE.Material).name) || /Liquid/.test(m.name), { width: 0.0012, weld: true })
+  inkModel(r, (m) => /Liquid/.test((m.material as THREE.Material).name) || /Liquid|Cord/.test(m.name), { width: 0.0012, weld: true })
 }
 const SAKESTAND_URL = import.meta.env.BASE_URL + 'models/sakestand.glb'
 useGLTF.preload(SAKESTAND_URL)
@@ -1615,10 +1620,12 @@ const SAKESTAND_SCALE = 2.0
 const SHOCHU_URL = import.meta.env.BASE_URL + 'models/shochu.glb'
 useGLTF.preload(SHOCHU_URL)
 /** the shochu's tray beside the stand, in the stand's frame: right of it, between it and the lantern (item 107, measured clear of both) */
-const SHOCHU_AT = new THREE.Vector3(0.45, 0, 0)
+// (the stand 0.92 long now (item 285): its end board and brass to 0.483, the tray's middle 0.11 past them and a little)
+const SHOCHU_AT = new THREE.Vector3(0.623, 0, 0)
 /** the tokkuri, set on the stand's front step at its right-hand end, at the bottles' own size (item 107: it stood at half their size down
  * on the table under where a tipped bottle's mouth came, the stream long and the jug tiny) */
-const JUG_AT = new THREE.Vector3(0.25, 0.045, 0.07)
+// (item 285: the front step's last place, between the two bottles behind it, as the front's bottles are)
+const JUG_AT = new THREE.Vector3(2.5 * 0.131, 0.045, 0.07)
 /** how long a pour into a cup or the tokkuri takes, held over it (s); how high a bottle's carried, its foot over the table (the stand's
  * frame); how far it's tipped to pour; a cup's pours out of a bottle of shochu */
 const POUR_S = 1.2
@@ -1661,7 +1668,7 @@ function SakeStand() {
     r.position.set(0, 0, 0)
     dressSake(r, new Map())
     // (the stand merged; each bottle kept its own, to be lifted and poured (item 89))
-    mergeByMaterial(r, (o) => /^SakeBottle\d$/.test(o.name))
+    mergeByMaterial(r, (o) => /^SakeBottle\d+$/.test(o.name))
     return r
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gltf])
@@ -1674,7 +1681,7 @@ function SakeStand() {
     return r
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sho])
-  // (every bottle, the five sake and the shochu: where it stands and how it's turned in its own parent, that parent's place in the stand,
+  // (every bottle, the twelve sake and the shochu: where it stands and how it's turned in its own parent, that parent's place in the stand,
   // how tall, the drink inside)
   const bottles = useMemo(() => {
     const one = (node: THREE.Object3D, liquid: THREE.Object3D | null, off: THREE.Vector3, shochu_: boolean) => {
@@ -1726,7 +1733,7 @@ function SakeStand() {
     s.position.copy(mouth)
     s.scale.set(1, Math.max(0.0001, mouth.y - to.y), 1)
   }
-  // (the eight sake bottles drawn as one while none of them is moving (item 135: the stand was 73 draws, each bottle its glass, its sake,
+  // (the twelve sake bottles drawn as one while none of them is moving (item 135: the stand was 73 draws, each bottle its glass, its sake,
   // its label and its line): a copy of them made as they come to rest, with their levels as they are then; let go as one's taken up)
   const homeAt = useRef<ReturnType<typeof homeCopy> | null>(null)
   const sakeNodes = useMemo(() => bottles.filter((b) => !b.shochu).map((b) => b.node), [bottles])
@@ -1803,7 +1810,7 @@ function SakeStand() {
   /** which bottle a pointer's on (its node up the tree), or -1 */
   const bottleOf = (o: THREE.Object3D | null) => {
     for (let q = o; q; q = q.parent) {
-      const m = /^SakeBottle(\d)$/.exec(q.name)
+      const m = /^SakeBottle(\d+)$/.exec(q.name)
       if (m) return +m[1]
       if (q.name === 'ShochuBottle') return SAKE_BOTTLE_ML.length
     }
@@ -1909,7 +1916,7 @@ function SakeStand() {
     setTip({ title: '燒酒杯', hint: `${full.current[i] ? '倒滿了｜點一下喝掉' : '空的｜拖一支酒到上方倒酒'}｜自己試喝用，客人的酒杯在出餐口` })
   }
   return (
-    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '老闆自己試倒試喝用：按住一支酒拖到德利或燒酒杯上方倒酒｜客人的清酒在出餐口倒、用那裡的酒杯端出去｜雪嶺錦、朝霞川、鶴汀、瑠璃灘、月汀桜、雲雀谷、楓霞、燒酒')}>
+    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '店裡賣的清酒，擺給客人看（客人點的從酒櫃拿）｜老闆自己試倒試喝用：按住一支酒拖到德利或燒酒杯上方倒酒｜客人的清酒在出餐口倒、用那裡的酒杯端出去｜稲穂川、朝霞川、雪嶺錦、玄雪、澄藍、鶴汀、瑠璃灘、月汀桜、雲雀谷、楓霞、雪見舟、燒酒')}>
       <primitive object={obj} onPointerDown={onDown} onPointerOver={onOver} onPointerOut={onOut} />
       <primitive object={shochu} onPointerDown={onDown} onPointerOver={(e: { stopPropagation: () => void; object: THREE.Object3D }) => { onOver(e); onCupOver(e) }}
         onPointerOut={onOut} onClick={onCupClick} />

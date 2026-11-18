@@ -1075,6 +1075,8 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  */
 export const SAKE: { levels: number[]; served: number; want: number[]; ready: Set<number>; open: number; station: boolean; unpoured: Set<number> } =
   keep(import.meta.hot, 'SAKE', { levels: fullStand(), served: 0, want: [], ready: new Set(), open: 1, station: false, unpoured: new Set() })
+// (kept over a hot update from when the stand had fewer bottles (item 285: eight to twelve): the ones it didn't have, full)
+if (SAKE.levels.length !== fullStand().length) SAKE.levels = fullStand().map((l, k) => SAKE.levels[k] ?? l)
 /** the shop's sake not yet poured, in tokkuri (item 199): what's in stock, and what's been sold and is still to be poured; Infinity with no
  * shop running */
 export const sakeLeft = () => { const have = SUPPLIES.has('Sake'); return have < 0 ? Infinity : have + SAKE.unpoured.size }

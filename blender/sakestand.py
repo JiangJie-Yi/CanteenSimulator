@@ -30,20 +30,35 @@ PREVIEW = argv[1] if len(argv) > 1 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 rng = np.random.default_rng(7)
 
-NA = 16
+NA = 20
 # (the two bottles' outlines, (radius, height) up from the foot: the foot's chamfer, the body, the shoulder, the neck, the paper cap's skirt
-# and its top)
-ISSHO = ((0.048, 0.0), (0.052, 0.008), (0.052, 0.235), (0.036, 0.29), (0.0165, 0.33), (0.0165, 0.362), (0.0185, 0.366), (0.0185, 0.395))
-YONGO = ((0.037, 0.0), (0.04, 0.006), (0.04, 0.18), (0.028, 0.222), (0.0135, 0.25), (0.0135, 0.272), (0.0155, 0.276), (0.0155, 0.298))
-CAP_FROM = 5          # (from this point up, the paper cap)
+# and its top. The shoulder in five steps, eased in off the body and into the neck (item 285, the owner's: 「模型要精緻」: it was one
+# bend, a cone, the bottles read as cut from card), as a real 一升瓶's rounds over)
+def _shoulder(r0, z0, r1, z1, n=4):
+    return tuple((round(r1 + (r0 - r1) * (0.5 + 0.5 * math.cos(math.pi * i / (n + 1))), 5), round(z0 + (z1 - z0) * i / (n + 1), 5)) for i in range(1, n + 1))
+
+
+ISSHO = ((0.047, 0.0), (0.052, 0.007), (0.052, 0.232)) + _shoulder(0.052, 0.232, 0.0165, 0.33) + ((0.0165, 0.33), (0.0165, 0.362), (0.0185, 0.366), (0.0185, 0.395))
+YONGO = ((0.037, 0.0), (0.04, 0.006), (0.04, 0.178)) + _shoulder(0.04, 0.178, 0.0135, 0.25) + ((0.0135, 0.25), (0.0135, 0.272), (0.0155, 0.276), (0.0155, 0.298))
+CAP_FROM = 8          # (from this point up, the paper cap)
+NECK_FOOT = 7         # (where the shoulder meets the neck)
 
 # =====================================================================
 # The bottles' picture: one column each (u round the bottle once, its front (-y) at the column's middle), v up it (the foot at 0, the
 # cap's top at 1)
 # =====================================================================
-NB = 9                # (eight bottles and the hang tag's picture)
-# (448 wide a column (512 before): nine of them are 4032 across, within the 4096 every GPU takes)
+NB = 13               # (twelve bottles and the hang tag's picture)
+# (448 wide a column, 1024 high: thirteen in a row would be 5,824 across, past the 4,096 every GPU takes; so two rows of seven (item 285),
+# 3,136 by 2,048, the last cell empty)
+NCOL, NROW = 7, 2
 CWID, CH = 448, 1024
+TAG = 12              # (the hang tag's picture: the cell after the twelve bottles')
+NIGORI = {11}         # (the cloudy one: its sake white)
+# (the stoneware one's washi cap draped down its neck, tied with a gold cord, two tassels over its shoulder (item 285, the owner's picture):
+# the drape's top ring just outside the cap's skirt, its middle ring, its hem (every other point hanging lower); the cord's height; each
+# tassel's cord from round the cord (its angle from the front) down to where its tassel hangs from)
+DRAPE = {10: dict(top=(0.0158, 0.2765), mid=(0.0163, 0.257), hem=(0.0228, 0.228, 0.2385), cord=0.257,
+                  ends=((-math.pi / 2 - 0.38, 0.206), (-math.pi / 2 + 0.22, 0.197)))}
 SS = 2
 FONTS = ("C:/Windows/Fonts/YuMinB.ttf", "C:/Windows/Fonts/msmincho.ttc", "C:/Windows/Fonts/YuGothB.ttc")
 # (the big names brushed: Yuji Boku, an open font (SIL OFL, blender/fonts/OFL-YujiBoku.txt), the owner's: "the labels' big characters
@@ -435,6 +450,120 @@ cap(c, H4, YONGO[CAP_FROM][1] - 0.003, (0.95, 0.9, 0.78), (0.55, 0.08, 0.05))
 OPAQUE[7] = [(Y0, Y1), (YONGO[CAP_FROM][1] - 0.003, H4)]
 cols.append(c)
 
+# ---- four more (item 285, the owner's, 2026-11-17: 「酒台不夠精美，數量也不夠…模型要精緻」, and two bottles to go by: a black stoneware
+# one, its washi cap tied with a gold cord and tassels, a cream label brushed big; a smoky clear one, a white label brushed big in blue, a
+# strip of paper down its front), made up as the others are, each looked for and none found to be a real one
+# 8: 稲穂川 (1.8 l), 本醸造, the house's everyday sake: amber glass; a kraft paper label all round, the name brushed big in black, an ear of
+# rice in gold arching up its side, 本醸造 in red, a red seal; a kraft paper cap tied with red
+c = Col(2 * math.pi * 0.052, H, (0.3, 0.15, 0.04))
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.048, 0.205
+lab = c.rect(X0, X1, Y0, Y1)
+washi(c, lab, (0.76, 0.63, 0.43), fibre=0.08)
+border(c, X0, X1, Y0 + 0.002, Y1 - 0.002, 0.0011, (0.35, 0.22, 0.1))
+# (the ear of rice up the label's left: its stem rising and bowing over at the top under the grains' weight, the grains along its upper
+# part in gold, long and pointed, each leaning out from the stem, alternate sides, smaller toward the tip)
+def ear_pt(t):
+    return -0.034 + 0.011 * t - 0.009 * t ** 3, 0.066 + 0.112 * t - 0.03 * t ** 3
+for i in range(40):
+    sx_, sy_ = ear_pt(i / 39)
+    disc(c, sx_, sy_, 0.0007, (0.45, 0.32, 0.12))
+for i in range(12):
+    t = 0.42 + 0.56 * i / 11
+    (x0_, y0_), (x1_, y1_) = ear_pt(t - 0.01), ear_pt(t + 0.01)
+    ang_ = math.atan2(y1_ - y0_, x1_ - x0_) + (0.6 if i % 2 else -0.6)
+    a_, b_ = 0.0042 * (1.1 - 0.4 * i / 11), 0.0017 * (1.1 - 0.3 * i / 11)
+    gx, gy = ear_pt(t)
+    gx, gy = gx + math.cos(ang_) * a_ * 0.9, gy + math.sin(ang_) * a_ * 0.9
+    dx, dy = c.x - gx, c.y - gy
+    u_, v_ = (dx * math.cos(ang_) + dy * math.sin(ang_)) / a_, (-dx * math.sin(ang_) + dy * math.cos(ang_)) / b_
+    grain = u_ ** 2 + v_ ** 2 * (1.0 + 0.6 * np.clip(u_, 0, 1)) < 1.0
+    c.paint(grain, GOLD, 0.4)
+    c.paint(grain & (u_ ** 2 + v_ ** 2 > 0.62), (0.55, 0.38, 0.12), 0.5)
+c.text("稲穂川", 0.004, 0.185, 0.04, INK, brush=True, gap=0.98)
+c.text("本醸造", 0.032, 0.192, 0.0105, RED, brush=True, gap=1.05)
+c.paint(c.rect(0.026, 0.038, 0.062, 0.074), RED, 0.7)
+c.text("稲", 0.032, 0.068, 0.0085, (0.95, 0.9, 0.78))
+c.text("INAHOGAWA", 0.0, Y0 + 0.008, 0.0042, INK, vertical=False, gap=0.62, x_centre=True)
+back_label(c, Y1, "稲穂川", "一八〇〇ml", INK)
+worn(c, lab)
+cap(c, H, ISSHO[CAP_FROM][1] - 0.004, (0.78, 0.66, 0.46), RED)
+OPAQUE[8] = [(Y0, Y1), (ISSHO[CAP_FROM][1] - 0.004, H)]
+cols.append(c)
+
+# 9: 澄藍 (1.8 l), 純米吟醸 無濾過生原酒: smoky clear glass, grey; a white label low on it, the name brushed big in indigo, one character over
+# the other, the grade down its side, the brewer's red seal; a strip of white paper down its front over it, 無濾過生原酒 in black and a small
+# red seal (on the body, not the shoulder: the picture's round is the body's, so up the shoulder its words would be squeezed); a black
+# screw cap
+c = Col(2 * math.pi * 0.052, H, (0.5, 0.53, 0.55))
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.04, 0.158
+lab = c.rect(X0, X1, Y0, Y1)
+washi(c, lab, (0.97, 0.97, 0.96), fibre=0.025)
+INDIGO = (0.1, 0.2, 0.52)
+c.text("澄", 0.0, 0.128, 0.05, INDIGO, brush=True)
+c.text("藍", 0.0, 0.08, 0.038, INDIGO, brush=True)
+c.text("純米吟醸", 0.03, 0.146, 0.0085, INK, brush=True, gap=1.05)
+disc(c, -0.03, 0.06, 0.0075, RED, ring=0.0012)
+c.text("澄", -0.03, 0.06, 0.0075, RED, brush=True)
+c.text("CHORAN", 0.0, Y0 + 0.006, 0.0046, INDIGO, vertical=False, gap=0.62, x_centre=True)
+fine_print(c, -0.024, 0.15, ["清酒", "精米歩合五五％", "原酒　生"], 0.0042, INK)
+back_label(c, Y1, "澄藍", "一八〇〇ml", INK)
+strip = c.rect(-0.0065, 0.0065, 0.168, 0.229)
+washi(c, strip, (0.97, 0.97, 0.95), fibre=0.02)
+c.text("無濾過生原酒", 0.0, 0.222, 0.0072, INK, gap=1.04)
+c.paint(c.rect(-0.003, 0.003, 0.171, 0.177), RED, 0.7)
+screw_cap(c, H, ISSHO[CAP_FROM][1] - 0.006, (0.1, 0.1, 0.11))
+OPAQUE[9] = [(Y0, Y1), (ISSHO[CAP_FROM][1] - 0.006, H)]
+cols.append(c)
+
+# 10: 玄雪 (720 ml), 純米大吟醸: black stoneware, matte, flecked; a cream label on its front only (the pot's own black round the rest), the
+# name brushed big, the grade and 清酒 small, a red seal; its washi cap draped down the neck in points and tied with a gold cord, two
+# tassels hanging over the shoulder (the drape and the cord are shapes: drape())
+c = Col(2 * math.pi * 0.04, H4, (0.06, 0.055, 0.05))
+nz = fbm(CH // 2, 40, 80, 3)[:CH // 2, :CWID].repeat(2, 0)[:CH]
+c.col[:] = np.asarray((0.07, 0.065, 0.06), np.float32) * (0.75 + 0.5 * nz)[..., None]
+r_ = np.random.default_rng(10)
+for _ in range(900):
+    yy_, xx_ = r_.integers(0, CH), r_.integers(0, CWID)
+    c.col[yy_, xx_] = (0.32, 0.29, 0.25) if r_.random() < 0.6 else (0.5, 0.42, 0.3)
+X0, X1, Y0, Y1 = -0.031, 0.031, 0.03, 0.152
+lab = c.rect(X0, X1, Y0, Y1)
+washi(c, lab, (0.93, 0.88, 0.74), fibre=0.07)
+border(c, X0, X1, Y0, Y1, 0.0012, (0.72, 0.62, 0.42))
+c.text("玄雪", 0.002, 0.128, 0.034, INK, brush=True, gap=0.96)
+c.text("純米大吟醸", 0.024, 0.146, 0.0064, INK, brush=True, gap=1.04)
+c.text("清酒", -0.023, 0.146, 0.0058, INK)
+c.paint(c.rect(-0.026, -0.016, 0.04, 0.05), RED, 0.7)
+c.text("玄", -0.021, 0.045, 0.0075, (0.95, 0.9, 0.78), brush=True)
+c.text("GENSETSU", 0.004, Y0 + 0.006, 0.0036, INK, vertical=False, gap=0.6, x_centre=True)
+cap(c, H4, YONGO[CAP_FROM][1] - 0.003, (0.95, 0.94, 0.9), GOLD)
+OPAQUE[10] = [(0.0, H4)]
+cols.append(c)
+
+# 11: 雪見舟 (720 ml), 活性にごり: clear glass, the sake in it white (its own material); a white label, a little boat under falling snow in
+# pale blue and the name brushed big in deep rose, にごり酒 brushed beside it; a white screw cap, pink on top
+c = Col(2 * math.pi * 0.04, H4, (0.8, 0.85, 0.86))
+X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.036, 0.152
+lab = c.rect(X0, X1, Y0, Y1)
+washi(c, lab, (0.98, 0.97, 0.96), fibre=0.03)
+ROSE = (0.62, 0.12, 0.24)
+SNOW = (0.55, 0.7, 0.85)
+r_ = np.random.default_rng(11)
+for _ in range(26):
+    disc(c, r_.uniform(-0.045, 0.045), r_.uniform(0.06, 0.15), r_.uniform(0.0008, 0.0016), SNOW)
+# (the boat: a low hull, its pole leaning)
+c.paint(lab & (c.y > 0.048) & (c.y < 0.048 + 0.006 * (1 - ((c.x + 0.012) / 0.016) ** 2)) & (np.abs(c.x + 0.012) < 0.016), SNOW, 0.6)
+c.paint(lab & (np.abs(c.x + 0.004 - (c.y - 0.05) * 0.25) < 0.0006) & (c.y > 0.05) & (c.y < 0.07), SNOW, 0.6)
+c.text("雪見舟", 0.008, 0.136, 0.026, ROSE, brush=True, gap=0.98)
+c.text("にごり酒", -0.016, 0.142, 0.0085, INK, brush=True, gap=1.05)
+c.text("活性", 0.03, 0.142, 0.0065, RED, gap=1.05)
+c.text("YUKIMIBUNE", 0.0, Y0 + 0.006, 0.0036, ROSE, vertical=False, gap=0.6, x_centre=True)
+back_label(c, Y1, "雪見舟", "七二〇ml", INK)
+screw_cap(c, H4, YONGO[CAP_FROM][1] - 0.006, (0.95, 0.95, 0.95))
+c.paint(c.y > H4 - 0.006, (0.92, 0.55, 0.65), 0.4)
+OPAQUE[11] = [(Y0, Y1), (YONGO[CAP_FROM][1] - 0.006, H4)]
+cols.append(c)
+
+assert len(cols) == TAG
 # ---- the hang tag's picture (its own column): yellow card, a black-edged red title, 最高金賞 brushed big, a gold medal
 tag = Col(0.035 * 2, 0.07 * 2, (0.95, 0.82, 0.12))
 tag.col[:] = (0.97, 0.84, 0.14)
@@ -447,8 +576,8 @@ disc(tag, 0.022, 0.02, 0.009, GOLD, rough=0.3)
 disc(tag, 0.0, 0.124, 0.003, (0.3, 0.3, 0.3))
 cols.append(tag)
 
-atlas = np.concatenate([np.clip(k.col, 0, 1) for k in cols], 1).astype(np.float32)
-rough = np.concatenate([k.rough for k in cols], 1)
+cells = [np.clip(k.col, 0, 1) for k in cols] + [np.full((CH, CWID, 3), 0.5, np.float32)] * (NCOL * NROW - len(cols))
+atlas = np.concatenate([np.concatenate(cells[r * NCOL:(r + 1) * NCOL], 1) for r in range(NROW)], 0).astype(np.float32)
 # (the roughness in the picture's alpha is no use to the game's toon; the shine kept in a second small picture would be one more texture:
 # instead the label's matte and the glass's gloss come from the material's own roughness, the label's own look painted)
 
@@ -472,6 +601,10 @@ M = {
     # (the same picture: the game draws this one see-through, the light through it (item 88))
     "clear": pbr("SakeGlass", (1, 1, 1), tex=bpy.data.images["sake_bottles"], rough=0.08),
     "liquid": pbr("SakeLiquid", (0.96, 0.92, 0.74), rough=0.05),
+    # (the cloudy sake (にごり, item 285): white, near opaque, the game its own see-through for it)
+    "nigori": pbr("SakeLiquidNigori", (0.95, 0.94, 0.9), rough=0.25),
+    # (the stand's brass corner fittings)
+    "brass": pbr("SakeStandBrass", (0.78, 0.6, 0.28), rough=0.3, metal=0.8),
     "wood": pbr("SakeStandWood", (1, 1, 1), tex=image("sake_stand_wood", stand_col), rough=0.6),
     "lacquer": pbr("SakeStandLacquer", (0.04, 0.03, 0.03), rough=0.3),
     # (the end boards' wood: the stand's own grain stained a deep chestnut (item 131))
@@ -492,9 +625,96 @@ def mesh_obj(name, bm, mat, smooth_=True, join=True):
     return o
 
 
+def prof_r(prof, z):
+    """the bottle's radius at height z, by its outline"""
+    for (r0, z0), (r1, z1) in zip(prof, prof[1:]):
+        if z0 <= z <= z1 and z1 > z0:
+            return r0 + (r1 - r0) * (z - z0) / (z1 - z0)
+    return prof[-1][0] if z > prof[-1][1] else prof[0][0]
+
+
+def tube(bm, uvl, pts, rad, sides, uv, out=None):
+    """a cord along `pts` (Vectors), `sides` round, its rings square to its way (`out`, a way it never runs along, to set them by)"""
+    rings_ = []
+    for i, p in enumerate(pts):
+        t = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+        o = (out or Vector((p.x, p.y, 0))).normalized()
+        b = t.cross(o).normalized()
+        n = b.cross(t).normalized()
+        rings_.append([bm.verts.new(p + rad * (math.cos(2 * math.pi * (j + 0.5) / sides) * n + math.sin(2 * math.pi * (j + 0.5) / sides) * b)) for j in range(sides)])
+    for a, b in zip(rings_, rings_[1:]):
+        for j in range(sides):
+            f = bm.faces.new((a[j], a[(j + 1) % sides], b[(j + 1) % sides], b[j]))
+            for l in f.loops:
+                l[uvl].uv = uv
+    return rings_
+
+
+def drape(bm, uvl, k, prof, u0, uw, vrow):
+    """the washi draped down the neck from under the cap, its hem cut in points (into the bottle's own mesh); and a gold cord round it, two
+    cords from that down over the shoulder and a tassel on each (a mesh of their own: too fine to outline). All in the bottle's own picture:
+    the washi from its cap's paper (above the cord's band), the gold from its cap's cord"""
+    d = DRAPE[k]
+    cap0, capH = prof[CAP_FROM][1] - 0.003, prof[-1][1]
+    gold = (u0 + uw * 0.5, vrow(cap0 + (capH - cap0) * 0.3))
+    paper = lambda t: vrow(cap0 + (capH - cap0) * (0.42 + 0.5 * t))
+    (rt, zt), (rm, zm), (rh, zlo, zhi) = d["top"], d["mid"], d["hem"]
+    ang = lambda i: -math.pi / 2 + 2 * math.pi * (i / NA - 0.5)
+    rs = [[bm.verts.new((rt * math.cos(ang(i)), rt * math.sin(ang(i)), zt)) for i in range(NA)],
+          [bm.verts.new((rm * math.cos(ang(i)), rm * math.sin(ang(i)), zm)) for i in range(NA)],
+          [bm.verts.new((rh * math.cos(ang(i)), rh * math.sin(ang(i)), zlo if i % 2 == 0 else zhi)) for i in range(NA)]]
+    for a, b, (va, vb) in ((rs[0], rs[1], (1.0, 0.6)), (rs[1], rs[2], (0.6, 0.0))):
+        for i in range(NA):
+            i2 = (i + 1) % NA
+            f = bm.faces.new((b[i], b[i2], a[i2], a[i]))
+            f.material_index = 0
+            for l, uvq in zip(f.loops, ((u0 + uw * i / NA, paper(vb)), (u0 + uw * (i + 1) / NA, paper(vb)), (u0 + uw * (i + 1) / NA, paper(va)), (u0 + uw * i / NA, paper(va)))):
+                l[uvl].uv = uvq
+    # (the cords: one round the drape at its middle ring, and from it down the shoulder, a little off whatever's under them)
+    cb = bmesh.new()
+    cuv = cb.loops.layers.uv.new()
+    zc = d["cord"]
+    R_ = rm + 0.0017
+    ring_pts = [Vector((R_ * math.cos(2 * math.pi * j / 12), R_ * math.sin(2 * math.pi * j / 12), zc)) for j in range(13)]
+    tube(cb, cuv, ring_pts, 0.0015, 4, gold, out=Vector((0, 0, 1)))
+    shell_r = lambda z: (rm + (rh - rm) * (zm - z) / (zm - zlo)) if zlo <= z <= zm else 0.0
+    for a0, z_end in d["ends"]:
+        zs = [zc - (zc - z_end) * s / 6 for s in range(7)]
+        pts = []
+        for z in zs:
+            r = max(shell_r(z), prof_r(prof, z)) + 0.0028
+            if z == zc:
+                r = R_
+            pts.append(Vector((r * math.cos(a0), r * math.sin(a0), z)))
+        tube(cb, cuv, pts, 0.0012, 4, gold)
+        # (its tassel: a knot, then a bunch of threads widening down the shoulder, along its slope and a little off it)
+        zb = z_end - 0.022
+        A = Vector(((prof_r(prof, z_end) + 0.0042) * math.cos(a0), (prof_r(prof, z_end) + 0.0042) * math.sin(a0), z_end))
+        B = Vector(((prof_r(prof, zb) + 0.0068) * math.cos(a0), (prof_r(prof, zb) + 0.0068) * math.sin(a0), zb))
+        ax = (B - A).normalized()
+        o = Vector((math.cos(a0), math.sin(a0), 0))
+        bn = ax.cross(o).normalized()
+        nn = bn.cross(ax).normalized()
+        rings_ = []
+        for t, rr in ((0.0, 0.0026), (0.16, 0.0029), (0.24, 0.0031), (1.0, 0.0055)):
+            c_ = A + (B - A) * t
+            rings_.append([cb.verts.new(c_ + rr * (math.cos(2 * math.pi * j / 6) * nn + math.sin(2 * math.pi * j / 6) * bn)) for j in range(6)])
+        for a, b in zip(rings_, rings_[1:]):
+            for j in range(6):
+                f = cb.faces.new((a[j], a[(j + 1) % 6], b[(j + 1) % 6], b[j]))
+                for l in f.loops:
+                    l[cuv].uv = gold
+        for ring_ in (rings_[0][::-1], rings_[-1]):
+            for f in ladder_fill(cb, ring_):
+                for l in f.loops:
+                    l[cuv].uv = gold
+    bmesh.ops.recalc_face_normals(cb, faces=cb.faces)
+    return cb
+
+
 bottles = []
 # (how full each is: up into its shoulder, a little lower in the open ones)
-FILL = {0: 0.262, 1: 0.248, 2: 0.255, 3: 0.196, 4: 0.19, 5: 0.25, 6: 0.2, 7: 0.192}
+FILL = {0: 0.262, 1: 0.248, 2: 0.255, 3: 0.196, 4: 0.19, 5: 0.25, 6: 0.2, 7: 0.192, 8: 0.252, 9: 0.258, 10: 0.19, 11: 0.198}
 
 
 def bottle(k, prof, at, turn):
@@ -514,42 +734,50 @@ def bottle(k, prof, at, turn):
     rings = [[bm.verts.new((r * math.cos(-math.pi / 2 + 2 * math.pi * (i / NA - 0.5)), r * math.sin(-math.pi / 2 + 2 * math.pi * (i / NA - 0.5)), z))
               for i in range(NA)] for r, z in prof]
     # (each bottle's column kept a little in from its edges: its back, where the column's edges meet, picked up the next bottle's colour as
-    # the picture was drawn smaller (item 197: a line of another bottle's colour down each one's back, the kitchen's side))
-    u0, uw = k / NB + 0.006 / NB, (1 - 0.012) / NB
+    # the picture was drawn smaller (item 197: a line of another bottle's colour down each one's back, the kitchen's side); in two rows
+    # now (item 285), its foot and its cap's top kept in from the row above and below the same way)
+    u0, uw = (k % NCOL) / NCOL + 0.006 / NCOL, (1 - 0.012) / NCOL
+    vrow = lambda z: ((k // NCOL) + 0.004 + 0.992 * z / H_) / NROW
     for j in range(len(prof) - 1):
         for i in range(NA):
             i2 = (i + 1) % NA
             f = bm.faces.new((rings[j][i], rings[j][i2], rings[j + 1][i2], rings[j + 1][i]))
             f.material_index = 0 if opaque((prof[j][1] + prof[j + 1][1]) / 2) else 1
             ua, ub = u0 + uw * i / NA, u0 + uw * (i + 1) / NA
-            va, vb = prof[j][1] / H_, prof[j + 1][1] / H_
+            va, vb = vrow(prof[j][1]), vrow(prof[j + 1][1])
             for l, uvq in zip(f.loops, ((ua, va), (ub, va), (ub, vb), (ua, vb))):
                 l[uvl].uv = uvq
     for f in ladder_fill(bm, rings[0][::-1]):
-        f.material_index = 1
+        f.material_index = 0 if opaque(0.0) else 1
         for l in f.loops:
-            l[uvl].uv = (u0 + uw * 0.5, 0.002)
+            l[uvl].uv = (u0 + uw * 0.5, vrow(0.002))
     for f in ladder_fill(bm, rings[-1]):
         for l in f.loops:
-            l[uvl].uv = (u0 + uw * 0.5, 0.998)
+            l[uvl].uv = (u0 + uw * 0.5, vrow(H_ - 0.002))
+    cord = drape(bm, uvl, k, prof0, u0, uw, vrow) if k in DRAPE else None
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     if k == 3:
         # (the hang tag (by the outline as given: the bands' cuts put into `prof` move its points' numbers): a card on a cord round the neck, hanging down the bottle's shoulder, a little turned out; its picture the last column)
         # (hung from the neck's foot, flat down over the shoulder, its foot clear of the body (the shoulder's radius there and a little))
-        z0, w_, h_ = prof0[4][1] - 0.004, 0.035, 0.07
-        y0 = -prof0[4][0] - 0.003
+        z0, w_, h_ = prof0[NECK_FOOT][1] - 0.004, 0.035, 0.07
+        y0 = -prof0[NECK_FOOT][0] - 0.003
         y1 = -prof0[2][0] - 0.007
         q = [Vector((-w_ / 2 + 0.006, y1, z0 - h_)), Vector((w_ / 2 + 0.006, y1, z0 - h_)), Vector((w_ / 2, y0, z0)), Vector((-w_ / 2, y0, z0))]
         sw = Matrix.Rotation(-0.55, 4, "Z")
         q = [sw @ p_ for p_ in q]
         f = bm.faces.new([bm.verts.new(p_) for p_ in q])
-        tu0 = 8 / NB
-        for l, uvq in zip(f.loops, ((tu0, 0.0), (tu0 + 1 / NB, 0.0), (tu0 + 1 / NB, 1.0), (tu0, 1.0))):
+        tu0, tv0 = (TAG % NCOL) / NCOL, (TAG // NCOL) / NROW
+        for l, uvq in zip(f.loops, ((tu0, tv0), (tu0 + 1 / NCOL, tv0), (tu0 + 1 / NCOL, tv0 + 1 / NROW), (tu0, tv0 + 1 / NROW))):
             l[uvl].uv = uvq
     bmesh.ops.transform(bm, matrix=Matrix.Rotation(turn, 4, "Z"), verts=bm.verts)
     o = mesh_obj(f"SakeBottle{k}", bm, [M["glass"], M["clear"]], join=False)
     o.location = at
     bottles.append(o)
+    if cord is not None:
+        bmesh.ops.transform(cord, matrix=Matrix.Rotation(turn, 4, "Z"), verts=cord.verts)
+        co = mesh_obj(f"SakeCord{k}", cord, M["glass"], join=False)
+        co.parent = o
+        bottles.append(co)
     # (the sake in it: its glass's inside (9/10 of it, a little in from the wall) from just over its foot up to how full it is, 12 round,
     # laddered top and bottom; its own object under the bottle, so it can go down as it's poured)
     fill = FILL[k]
@@ -570,13 +798,13 @@ def bottle(k, prof, at, turn):
     ladder_fill(bl, lr[0][::-1])
     ladder_fill(bl, lr[-1])
     bmesh.ops.recalc_face_normals(bl, faces=bl.faces)
-    lo = mesh_obj(f"SakeLiquid{k}", bl, M["liquid"], join=False)
+    lo = mesh_obj(f"SakeLiquid{k}", bl, M["nigori"] if k in NIGORI else M["liquid"], join=False)
     lo.parent = o
     bottles.append(lo)
 
 
 # ---- the stand: two steps, hinoki, a black-lacquered band round each step's front edge, on two low feet
-L, D = 0.62, 0.25
+L, D = 0.92, 0.25
 FRONT_D, FRONT_H, BACK_H = 0.11, 0.045, 0.105
 STEP = ((-D / 2, 0.012), (-D / 2, FRONT_H), (-D / 2 + FRONT_D, FRONT_H), (-D / 2 + FRONT_D, BACK_H), (D / 2, BACK_H), (D / 2, 0.012))
 bm = bmesh.new()
@@ -650,21 +878,30 @@ end_board("SakeStandEndL", -L / 2 - 0.021, -L / 2 - 0.003)
 end_board("SakeStandEndR", L / 2 + 0.003, L / 2 + 0.021)
 # (the rail: a slim lacquered bar across the back on the boards' tops, its ends let into them)
 block("SakeStandRail", -L / 2 - 0.01, L / 2 + 0.01, D / 2 - 0.012, D / 2 - 0.002, BACK_H + 0.052, BACK_H + 0.064, M["lacquer"])
+# (brass caps over the end boards' top corners (item 285), a little proud of the board all round; the back ones behind the rail's ends)
+for sx in (-1, 1):
+    bx0, bx1 = sorted((sx * (L / 2 + 0.001), sx * (L / 2 + 0.023)))
+    block(f"SakeStandBrassF{sx}", bx0, bx1, -D / 2 - 0.006, -D / 2 + 0.008, FRONT_H + 0.02, FRONT_H + 0.032, M["brass"])
+    block(f"SakeStandBrassB{sx}", bx0, bx1, D / 2 - 0.001, D / 2 + 0.006, BACK_H + 0.058, BACK_H + 0.072, M["brass"])
 
 # ---- the bottles: three tall at the back, two short at the front, each turned a touch its own way, a hair over the step
 ys_back = -D / 2 + FRONT_D + (D - FRONT_D) / 2
 # (four up at the back and four at the front now (item 132), set closer: the front's right-hand end kept for the tokkuri)
 # (each row on one line, every label square to the front, as a shop sets out what it pours (item 197, the owner's: the stand no good at
 # all; each bottle was askew on its own and its label turned its own way))
-bottle(1, ISSHO, Vector((-0.24, ys_back, BACK_H + 0.0005)), 0.0)
-bottle(0, ISSHO, Vector((-0.08, ys_back, BACK_H + 0.0005)), 0.0)
-bottle(2, ISSHO, Vector((0.08, ys_back, BACK_H + 0.0005)), 0.0)
-bottle(5, ISSHO, Vector((0.24, ys_back, BACK_H + 0.0005)), 0.0)
+# (seven up the back and five along the front (item 285), each front one between two at the back so every label shows, the front's
+# right-hand end kept for the tokkuri: up the back amber, green, brown, the black pot in the middle on a little lacquered stand of its
+# own (the best of them, set apart, as a shop shows it), smoky grey, dark green, blue; along the front green, pale blue, amber, black, the
+# white cloudy one)
+SPAN = 0.131
+for k_, j_ in ((8, -3), (1, -2), (0, -1), (9, 1), (2, 2), (5, 3)):
+    bottle(k_, ISSHO, Vector((j_ * SPAN, ys_back, BACK_H + 0.0005)), 0.0)
+DAI = 0.045
+block("SakeStandDai", -0.046, 0.046, ys_back - 0.046, ys_back + 0.046, BACK_H, BACK_H + DAI, M["lacquer"])
+bottle(10, YONGO, Vector((0.0, ys_back, BACK_H + DAI + 0.0005)), 0.0)
 ys_front = -D / 2 + FRONT_D / 2
-bottle(3, YONGO, Vector((-0.24, ys_front, FRONT_H + 0.0005)), 0.0)
-bottle(6, YONGO, Vector((-0.12, ys_front, FRONT_H + 0.0005)), 0.0)
-bottle(4, YONGO, Vector((0.0, ys_front, FRONT_H + 0.0005)), 0.0)
-bottle(7, YONGO, Vector((0.12, ys_front, FRONT_H + 0.0005)), 0.0)
+for k_, j_ in ((3, -2.5), (6, -1.5), (7, -0.5), (4, 0.5), (11, 1.5)):
+    bottle(k_, YONGO, Vector((j_ * SPAN, ys_front, FRONT_H + 0.0005)), 0.0)
 
 # (joined by material)
 by = {}
@@ -690,7 +927,7 @@ print("SAKESTAND_TRIS", sum(len(p.vertices) - 2 for o in joined + bottles for p 
 if PREVIEW:
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     bpy.context.collection.objects.link(cam)
-    cam.location = (0.25, -0.95, 0.42)
+    cam.location = (0.3, -1.3, 0.5)
     cam.rotation_mode = "QUATERNION"
     cam.rotation_quaternion = (Vector((0, 0, 0.17)) - cam.location).to_track_quat("-Z", "Y")
     cam.data.lens = 50
