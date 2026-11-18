@@ -8,7 +8,7 @@ import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer
 import { blindSound, bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
 import { landingOf } from '@/game/spills'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { SWITCH_SPOT } from '@/game/shopState'
 import * as THREE from 'three'
 import { NO_RAY } from '@/scene/pickable'
@@ -3760,7 +3760,10 @@ const STAFF_SPILL_MAT = new THREE.MeshBasicMaterial({ map: STAFF_SPILL ?? undefi
  * The little wooden stand just past the staff's door, the samurai helmet on it (the owner's, 2026-11-12: off the cats' stand, onto a small
  * wooden stand beside this door): blender/kabutostand.py, in the wall's own units, its foot's middle at its origin. It stands off the wall
  * (KSTAND_OFF, its middle) clear of the door's panel, which slides open along the wall behind it, and along from the door's middle past its
- * frame (KSTAND_ALONG); its top KSTAND_H up. Nothing else: the scroll beyond it hangs higher than the helmet's crest
+ * frame (KSTAND_ALONG); its top KSTAND_H up. Nothing else: the scroll beyond it hangs higher than the helmet's crest.
+ * A low cabinet now (item 292, the owner's, 2026-11-17: 「台座的模型太複雜了」「武士頭盔底下的台座有拉門」): clean boxes, its kumiko lattice
+ * and pulls in its picture; its two sliding doors each slid open by a click (the left in the back track to the right, the right in the
+ * front one to the left), the helmet's lacquered box and a shelf inside
  */
 const KSTAND_URL = import.meta.env.BASE_URL + 'models/kabutostand.glb'
 useGLTF.preload(KSTAND_URL)
@@ -3768,6 +3771,8 @@ useGLTF.preload(KSTAND_URL)
 // front was 0.42 out, and all who went along the wall into the side counter's aisle (the servers to their gate, the stock keeper, the staff
 // coming in) brushed it, their middles 2 cm off it (item 48, tests/e2e/_nearpiece.mjs))
 const KSTAND_H = 0.7, KSTAND_OFF = 0.215, KSTAND_ALONG = 0.68
+/** how far each sliding door goes to open (the inside's half, less where they overlap) */
+const KSTAND_SLIDE = 0.126
 function KabutoStandModel() {
   const gltf = useGLTF(KSTAND_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
@@ -3779,15 +3784,62 @@ function KabutoStandModel() {
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      if (!t) {
+        // (its lattice's and pulls' relief kept: the normal map its picture came with)
+        t = new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color.clone(), map: src.map ?? null, normalMap: src.normalMap ?? null,
+          normalScale: src.normalMap ? src.normalScale.clone() : undefined })
+        t.name = src.name
+        made.set(src, t)
+      }
       m.material = t
       m.castShadow = true
       m.receiveShadow = true
     })
     inkModel(r, () => false, { width: 0.0016, weld: true })
-    return mergeByMaterial(r)
+    // (the doors left as they are, to slide; the rest drawn by material)
+    const isDoor = (o: THREE.Object3D) => /^KabutoStandDoor[LR]$/.test(o.name)
+    mergeByMaterial(r, isDoor)
+    const doors = (['L', 'R'] as const).map((k) => r.getObjectByName(`KabutoStandDoor${k}`) ?? null)
+    return { r, doors, home: doors.map((d) => d?.position.x ?? 0) }
   }, [gltf])
-  return <primitive object={model} />
+  /** each door: whether it's to be open, and how far it is */
+  const st = useRef({ open: [false, false], k: [0, 0] })
+  useFrame((_, dt) => {
+    const s = st.current
+    model.doors.forEach((d, i) => {
+      if (!d) return
+      const want = s.open[i] ? 1 : 0
+      if (s.k[i] === want) return
+      s.k[i] += Math.sign(want - s.k[i]) * Math.min(Math.abs(want - s.k[i]), Math.min(dt, 0.1) * 3.2)
+      const e = s.k[i] * s.k[i] * (3 - 2 * s.k[i])
+      // (the left door along to the right, behind the right one; the right along to the left, in front of it)
+      d.position.x = model.home[i] + (i === 0 ? 1 : -1) * KSTAND_SLIDE * e
+    })
+  })
+  const which = (o: THREE.Object3D | null) => { for (let q = o; q; q = q.parent) { if (q === model.doors[0]) return 0; if (q === model.doors[1]) return 1 } return -1 }
+  const says = (i: number) => (st.current.open[i] ? '點一下關上' : '點一下拉開・裡面是頭盔的收納盒')
+  return (
+    <primitive object={model.r}
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        const i = which(e.object)
+        if (i < 0 || getEdit().on) return
+        e.stopPropagation()
+        st.current.open[i] = !st.current.open[i]
+        // (the two in their tracks only pass each other: one opened, the other's slid back shut, so its half's the one that's open)
+        if (st.current.open[i]) st.current.open[1 - i] = false
+        slideDoorSound(st.current.open[i], 0.35, 0.32)
+        setTip({ title: '頭盔木櫃的拉門', hint: says(i) })
+      }}
+      onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+        const i = which(e.object)
+        if (i < 0 || getEdit().on) return
+        e.stopPropagation()
+        document.body.style.cursor = 'pointer'
+        glowOnly(model.doors[i]!)
+        setTip({ title: '頭盔木櫃的拉門', hint: says(i) })
+      }}
+      onPointerOut={() => { for (const d of model.doors) if (d) glowLeave(d); document.body.style.cursor = ''; setTip(null) }} />
+  )
 }
 /**
  * Whether what the pointer's on is the first thing it meets (item 106, the owner's, 2026-11-14: the staff's door named itself over the grill:
@@ -4862,9 +4914,10 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
         {/* (just past its frame, the little wooden stand and the samurai helmet on it, facing into the room (the owner's, 2026-11-12)) */}
-        {staffDoor !== undefined && <Movable id="kabutostand" label="頭盔木台"><StaticBatch plain>
+        {/* (its doors slide (item 292): not in a batch, which would hold them still; it's drawn by material itself) */}
+        {staffDoor !== undefined && <Movable id="kabutostand" label="頭盔木台">
           <group position={[-KSTAND_OFF, 0, staffDoor + KSTAND_ALONG]} rotation-y={-Math.PI / 2}><KabutoStandModel /></group>
-        </StaticBatch></Movable>}
+        </Movable>}
         {/* (turned about to face into the room, its crest and visor toward the counter, and a quarter as big again (item 212, the owner's,
             2026-11-16: 「武士頭盔轉180度，放大1.25倍，Reset!」): its back was what the room saw) */}
         {/* (turned and grown about its own foot, so it stays sat on the stand: about the piece's middle it sank into the stand's top) */}
