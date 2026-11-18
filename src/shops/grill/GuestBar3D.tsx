@@ -91,7 +91,7 @@ import { RICE_FULL, SCOOP_S, SHAPE_EACH, TRAY_MAX, WASH_S, emptyKama, kamaTick, 
 import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
 import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes, soupReady, takeBowl, topUpGoes } from '@/game/soup'
 import { RICE_BEATS, SOUP_BEATS, beatsLength } from '@/game/sides'
-import { SeatBowls, fillRice, fillSoup, ladleRest, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
+import { SeatBowls, fillRice, fillSoup, ladleRest, leftOf, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
 import { bottleClink, lightSwitchSound, plateClink, plateDownSound, scrubSound, stoolSound, tapTurnSound, washSplash } from './restroomSound'
 import { LAST_CALL, SHOP, clockIn } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
@@ -3002,6 +3002,8 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   /** their drink, sipped now and then as they sit (the bar's clock): when this sip began (none under way: undefined), when the next is
    * due; how much of it's gone (0 to 1) */
   sipAt?: number; sipNext?: number; drunk?: number
+  /** (a mouthful of their miso soup under way since (the bar's clock), and when the next is due (item 345)) */
+  soupSipAt?: number; soupNext?: number
   /** how many drinks they've had from the fridge (item 210: another when one's drunk, up to DRINKS_MAX) */
   drinks?: number
   /** at their stool: seconds into pulling it out and stepping up onto it (coming in), into sliding in with it (sat) */
@@ -3424,6 +3426,8 @@ const TISSUE_ON: [number, number, number] = [-0.035, 0.006, 0.025]
 const WIPE_MOUTH_MS = 900 + TISSUE_REACH_MS
 /** a sip of their drink: how long (the bar's clock), about how long between sips, how many to a drink */
 const SIP_S = 2.4
+/** how long a mouthful of miso soup takes, the bowl taken up in both hands and put down again (item 345) */
+const SOUP_SIP_S = 3.2
 /** (item 210: a drink went down in about fifty minutes, so few had a second; an izakaya's customers have two or three in an evening) */
 const SIP_GAP = 6
 const SIPS = 4
@@ -4368,6 +4372,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     const f = frame.current
     return f && seats[seat] ? f.localToWorld(drinkWorldAt.current.fromArray(drinkSpot(seat, cup))) : null
   }, [seats, drinkSpot])
+  /** where a seat's bowl of miso soup stands, in the world (its foot), for their hands to go to (item 345) */
+  const soupWorldAt = useRef(new THREE.Vector3())
+  const soupSpot = useRef<(n: number) => THREE.Vector3>(() => new THREE.Vector3())
+  const soupWorld = useCallback((seat: number) => {
+    const f = frame.current
+    return f && seats[seat] ? f.localToWorld(soupWorldAt.current.copy(soupSpot.current(seat))) : null
+  }, [seats])
   const scene = useThree((st) => st.scene)
   const camera = useThree((st) => st.camera)
   const marks = useRef(new Map<string, THREE.Object3D | null>())
@@ -5545,6 +5556,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             redraw()
           } else if (s.sipAt === undefined && now >= s.sipNext) s.sipAt = now
         } else if (s.sipAt !== undefined && clock.current - s.sipAt >= SIP_S) s.sipAt = undefined
+        // (their miso soup, a mouthful now and then as they eat (item 345, the owner's: 「然後喝湯是怎喝?」): both hands to the bowl, up to the
+        // mouth, drunk, down (FolkFigure's soup); never while a sip of their drink's under way, nor once they're wiping their mouth to go)
+        const soupKey = `soup:${s.seat}`
+        if (SOUP_SEATS.has(s.seat) && BOWLS.setAt.has(soupKey) && !s.wipeAt && leftOf(soupKey) > 0.15) {
+          const now = clock.current
+          if (s.soupNext === undefined) s.soupNext = now + 3 + (s.id % 5)
+          if (s.soupSipAt !== undefined && now - s.soupSipAt >= SOUP_SIP_S) { s.soupSipAt = undefined; s.soupNext = now + 8 + ((s.id * 5 + Math.round(now)) % 7) }
+          else if (s.soupSipAt === undefined && s.sipAt === undefined && now >= s.soupNext) s.soupSipAt = now
+        } else if (s.soupSipAt !== undefined && clock.current - s.soupSipAt >= SOUP_SIP_S) s.soupSipAt = undefined
         // (now and then, while they wait, off to the toilet: their kind's own)
         const guest = guestsRef.current.find((x) => x.id === s.id)
         if (guest) s.items = guest.items
@@ -8390,7 +8410,9 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   useFrame(() => { if (SOUP.served !== soupVer) setSoupVer(SOUP.served) })
   /** where a place's bowl of soup is set (the plate's other side from its soy), and its rice: in front of the plate toward the soy's side,
    * on the customer's left of it or right as there's room, clear of the plate and of whatever stands on the bar (item 205) */
-  const soupSpotOf = (n: number) => {
+  // (kept for the customers' hands: soupWorld above)
+  soupSpot.current = (n: number) => soupSpotOf(n)
+  function soupSpotOf(n: number) {
     const st = seats[n], c = counters[st.counter]
     const x = st.mid.clone().sub(c.at).dot(c.along)
     return st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]).setY(top + 0.002)
@@ -8741,7 +8763,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>
               <PersonClock s={s} phase={s.wcSit ? 'wcSit' : s.phase === 'sit' && s.wipeAt ? 'wipe' : s.phase} drink={s.drink} eating={s.phase === 'sit' && FED.has(s.id)}
-                clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} plateOf={plateWorld} drinkOf={drinkWorld} drunk={s.drunk} />
+                clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} plateOf={plateWorld} drinkOf={drinkWorld} soupOf={soupWorld} drunk={s.drunk} />
               {/* (named as the pointer's over them; picked up and carried to another stool while they wait) */}
               <FigureHit title={() => guestLabel(s.id, lang)} hint={() => (canMove(s) ? (lang === 'ja' ? 'ドラッグして空席へ' : lang === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : '')}
                 onPointerDown={grab(s)} grabbable={() => !getEdit().on && canMove(s)} />
@@ -9241,8 +9263,9 @@ const SeatDrink = memo(function SeatDrink({ s, id, at, cupAt, clock, level }: { 
 // (drawn again only when what's shown of them changes (their phase, eating or not, the drink in hand, who they turn to, how they're
 // getting on), not each time the bar above them redraws, several times a second; `phase` and `drink` are passed only so it notices them)
 const PersonClock = memo(PersonClockImpl)
-function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
+function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf, soupOf }: { s: Shown; phase: string; drink?: string; eating: boolean; clock: { current: number }
   talk: number; mood: ReturnType<typeof moodOf>; plateOf: (seat: number) => THREE.Vector3 | null; drinkOf: (seat: number, cup: boolean) => THREE.Vector3 | null
+  soupOf?: (seat: number) => THREE.Vector3 | null
   drunk?: number }) {
   // (a drink in hand: carried back from the fridge, or up off the bar for a sip (a sake's cup for it, not its bottle); at the size it stands on
   // the bar (the hand's frame is the figure's, smaller), held round its middle)
@@ -9262,6 +9285,8 @@ function PersonClockImpl({ s, eating, clock, talk, mood, plateOf, drinkOf }: { s
     fade={() => s.fade ?? 1} slippers={() => s.slippers ?? true} pose={atFridge ? 'Fetch' : s.phase === 'wcWash' ? 'Wash' : s.phase === 'sit' && s.wipeAt ? 'Wipe' : undefined} fit={FOLK_FIT}
     held={inHand} heldShown={() => s.phase === 'wcBack' || (s.phase === 'wcGo' && s.wc?.who === 'drink') || (sipK() >= 0.2 && sipK() < 0.86)} cup={cup}
     sip={() => (s.phase === 'sit' && s.drink ? sipK() : -1)} drinkAt={() => (s.drink ? drinkOf(s.seat, cup) : null)} bite={() => EAT_PHASE.get(s.id)}
+    soup={() => (s.phase === 'sit' && s.soupSipAt !== undefined ? (clock.current - s.soupSipAt) / SOUP_SIP_S : -1)} soupAt={() => soupOf?.(s.seat) ?? null}
+    soupKey={s.phase === 'sit' ? `soup:${s.seat}` : undefined}
     plate={() => (s.phase === 'sit' ? plateOf(s.seat) : null)} /></Suspense>
 }
 

@@ -3,6 +3,7 @@ import { guestFaceStrip, type FaceKind } from './faceSheet'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { BOWL_LIFT } from './bowlLift'
 import { footDust, newSteps } from './DustPuffs'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
@@ -139,6 +140,16 @@ const BITE_FRONT = new THREE.Vector3(-0.07, 0.38, 0.5)
 const BITE_MOUTH = new THREE.Vector3(-0.15, 0.64, 0.36)
 const BITE_REST = new THREE.Vector3()
 const BITE_UP = new THREE.Vector3(0, 0.05, 0)
+/** a mouthful of miso soup (item 345), in the body's frame: the bowl's middle with nothing on the bar to go to, at the mouth (a little out in
+ * front of it and below, the rim at the lips), where the right hand and the left hold it from its middle; the bowl's foot is that far under
+ * its middle (its place on the bar is its foot) */
+const SOUP_REST = new THREE.Vector3(0.05, 0.36, 0.46)
+const SOUP_MOUTH = new THREE.Vector3(-0.01, 0.6, 0.3)
+const SOUP_GRIP_R = new THREE.Vector3(-0.075, 0.015, 0)
+const SOUP_GRIP_L = new THREE.Vector3(0.05, -0.035, 0.01)
+const SOUP_UP = new THREE.Vector3(0, 0.03, 0)
+const SOUP_AT = new THREE.Vector3(), BOWL_C = new THREE.Vector3(), BOWL_SIDE = new THREE.Vector3()
+const BOWL_DOWN = new THREE.Vector3(0, -0.035, 0), BOWL_TIP = new THREE.Quaternion()
 /** how a hand, the lean and the head follow where they're to be: so much of the way a second, the same whatever the frame rate (item 242: a
  * share of it each frame, dt x 10, which at double speed or on a slow frame was all of it at once) */
 const follow = (dt: number, rate: number) => 1 - Math.exp(-dt * rate)
@@ -385,7 +396,7 @@ export function FolkWarm() {
  * passing the time (looking about, at their phone, chin in hand), their mood on their face, a hop of delight when their food comes,
  * fading as they go; `fit`: their size in the frame they're drawn in (the boss's height there).
  */
-export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false, bite }: {
+export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false, bite, soup, soupAt, soupKey }: {
   id: number; eating: boolean; walking: boolean; still?: () => boolean; clock?: { current: number }; talk?: number; mood?: Mood | null
   fade?: () => number; slippers?: () => boolean; pose?: string; held?: ReactNode; fit?: number
   /** (sat eating) where their food is, in the world: their plate's middle, for the chopsticks to come down on */
@@ -398,6 +409,12 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   heldShown?: () => boolean
   /** (what's sipped is a sake cup: held nearer the mouth and tipped less) */
   cup?: boolean
+  /** (sat with a bowl of miso soup at their place, item 345) how far into a mouthful of it they are (0 to 1; below 0, not), where the bowl
+   * stands on the bar (the world's), and its key there: as the Japanese drink it, the chopsticks put down, both hands to the bowl (the left
+   * under it, the right at its side), up to the mouth, tipped and drunk, and down again; the bowl in their hands meanwhile (scene/bowlLift) */
+  soup?: () => number
+  soupAt?: () => THREE.Vector3 | null
+  soupKey?: string
   /** (eating) how far into their dish they are, in bites, a bite taken out of it as each passes x.65 (none known: their own pace) */
   bite?: () => number | undefined
   /** stood on the floor, not sat on a stool's seat, when not walking (the character viewer's turntable: there's no stool there, and sat
@@ -563,8 +580,11 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const hop = mood === 'joy' && !walking ? Math.max(0, Math.sin(t * 9 + id)) * 0.02 * Math.max(0, Math.sin(t * 0.7 + id * 2)) : 0
     // (a sip under way: the chopsticks put down meanwhile, the head tipped back a little as it's drunk)
     const sipK = !walking && sip ? sip() : -1
-    const sipping = sipK >= 0 && sipK < 1
-    const sipCup = sipping && cup
+    // (or a mouthful of soup: the chopsticks put down, as for a sip; `sipping` covers both, as all that waits on it waits on either)
+    const soupK = !walking && soup ? soup() : -1
+    const souping = soupK >= 0 && soupK < 1 && !(sipK >= 0 && sipK < 1)
+    const sipping = (sipK >= 0 && sipK < 1) || souping
+    const sipCup = sipping && cup && !souping
     const ph = t * 9 + id
     const b = fig.body
     b.position.y = walk * Math.abs(Math.sin(ph)) * 0.035 + lift + hop
@@ -610,6 +630,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         if (idle === 'chin' && !eating && !talk) { yaw *= 0.4; pitch = 0.06 }
         if (talk && !eating) { yaw = talk * 0.25; pitch = 0.05 + Math.sin(t * 7 + id) * 0.05 * (Math.sin(t * 1.3 + id) > 0 ? 1 : 0) }
         if (sipping && sipK > 0.36 && sipK < 0.72) { yaw *= 0.2; pitch = sipCup ? 0.12 : 0.28 }
+        if (souping && soupK > 0.36 && soupK < 0.7) { yaw *= 0.2; pitch = 0.16 }
         if (pose === 'Wipe' && wipeFrom.current !== null && performance.now() - wipeFrom.current < WIPE_REACH_MS) { yaw *= 0.2; pitch = -0.42 }
       }
       const ease = 1 - Math.exp(-dt * 3)
@@ -690,7 +711,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         lr = rr = -1.4
       }
       // (a sip: the right hand out to the drink on the bar, up to the mouth with it, tipped up and drunk, and down to the bar again)
-      if (sipping) {
+      if (sipping && !souping) {
         const k = sipK
         const at = drinkAt?.()
         const on = at ? fig.body.worldToLocal(SIP_AT.copy(at)).add(SIP_GRIP) : SIP_REST
@@ -701,14 +722,37 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         else if (k < 0.86) { lp.copy(mouth).lerp(on, THREE.MathUtils.smoothstep(k, 0.66, 0.86)); lr = -(1 - THREE.MathUtils.smoothstep(k, 0.66, 0.86)) * tip }
         else { lp.copy(on).lerp(REST.L, THREE.MathUtils.smoothstep(k, 0.86, 1)); lr = 0 }
       }
+      if (souping) {
+        // (a mouthful of miso soup: both hands out to the bowl, the right at its side, the left under it; up to the mouth with it, tipped
+        // toward them as it's drunk, and down to its place again; then the hands back)
+        const k = soupK, at = soupAt?.()
+        const on = at ? fig.body.worldToLocal(SOUP_AT.copy(at)).add(SOUP_UP) : SOUP_REST
+        const up = k < 0.2 ? 0 : k < 0.42 ? THREE.MathUtils.smoothstep(k, 0.2, 0.42) : k < 0.68 ? 1 : k < 0.86 ? 1 - THREE.MathUtils.smoothstep(k, 0.68, 0.86) : 0
+        const reach = k < 0.2 ? THREE.MathUtils.smoothstep(k, 0, 0.2) : k < 0.86 ? 1 : 1 - THREE.MathUtils.smoothstep(k, 0.86, 1)
+        const tip = k > 0.42 && k < 0.68 ? Math.sin(((k - 0.42) / 0.26) * Math.PI) * 0.5 : 0
+        BOWL_C.copy(on).lerp(SOUP_MOUTH, up)
+        lp.copy(REST.L).lerp(BOWL_SIDE.copy(BOWL_C).add(SOUP_GRIP_R), reach)
+        rp.copy(REST.R).lerp(BOWL_SIDE.copy(BOWL_C).add(SOUP_GRIP_L), reach)
+        lr = rr = -tip
+      }
       if (held && !eating && !sipping) { lp.set(-0.22, 0.34, 0.2); lr = -0.3 }
       if (heldRef.current) heldRef.current.visible = !!held && (heldShown ? heldShown() : true)
       // (closely, through a bite's or a sip's beats, which are eased themselves; more loosely from one thing to the next)
       const kL = follow(dt, eating || sipping ? 24 : 10)
       L.position.lerp(lp, kL)
-      Rh.position.lerp(rp, follow(dt, 10))
+      Rh.position.lerp(rp, follow(dt, souping ? 24 : 10))
       L.rotation.x += (lr - L.rotation.x) * kL
-      Rh.rotation.x += (rr - Rh.rotation.x) * follow(dt, 10)
+      Rh.rotation.x += (rr - Rh.rotation.x) * follow(dt, souping ? 24 : 10)
+      // (the bowl in their hands, from when they've hold of it till it's down again: midway between them, as they are, tipped with them)
+      if (soupKey) {
+        if (souping && soupK > 0.17 && soupK < 0.89) {
+          BOWL_C.copy(L.position).sub(SOUP_GRIP_R).add(BOWL_SIDE.copy(Rh.position).sub(SOUP_GRIP_L)).multiplyScalar(0.5)
+          const lifted = BOWL_LIFT.get(soupKey) ?? { p: new THREE.Vector3(), q: new THREE.Quaternion() }
+          L.parent!.localToWorld(lifted.p.copy(BOWL_C)).add(BOWL_DOWN)
+          b.getWorldQuaternion(lifted.q).multiply(BOWL_TIP.setFromAxisAngle(X_AXIS, L.rotation.x * 0.8))
+          BOWL_LIFT.set(soupKey, lifted)
+        } else BOWL_LIFT.delete(soupKey)
+      }
     }
     // (what's in their hands, shown by its part of the one mesh being its size, hidden by its being nothing)
     if (fig.chop) {

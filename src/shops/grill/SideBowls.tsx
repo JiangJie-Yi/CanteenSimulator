@@ -13,6 +13,7 @@ import { warmLater } from '@/scene/Prewarm'
 import { rimmedTray } from '@/scene/trayGeometry'
 import { GAME_SPEED } from '@/scene/speed'
 import { beatAt, fillAt, RICE_BEATS, SOUP_BEATS } from '@/game/sides'
+import { BOWL_LIFT } from '@/scene/bowlLift'
 import { BOWLS } from './bar'
 
 export const SIDEBOWLS_URL = import.meta.env.BASE_URL + 'models/sidebowls.glb'
@@ -454,7 +455,7 @@ export function SeatBowls({ rice, soup }: { rice: { key: string; at: THREE.Vecto
     return { rice: [...grab('ChawanBody', 'body'), ...grab('ChawanRice', 'rice')], soup: [...grab('WanBody', 'body'), ...grab('WanSoup', 'soup')] }
   }, [gltf])
   const meshes = useRef<Record<'rice' | 'soup', (THREE.InstancedMesh | null)[]>>({ rice: [], soup: [] })
-  const M = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), s: new THREE.Vector3(), p: new THREE.Vector3() }), [])
+  const M = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), s: new THREE.Vector3(), p: new THREE.Vector3(), lp: new THREE.Vector3(), lq: new THREE.Quaternion(), wq: new THREE.Quaternion() }), [])
   useLayoutEffect(() => { for (const k of ['rice', 'soup'] as const) for (const m of meshes.current[k]) if (m) warmLater(m) }, [])
   useFrame(() => {
     const now = performance.now()
@@ -466,6 +467,20 @@ export function SeatBowls({ rice, soup }: { rice: { key: string; at: THREE.Vecto
         const n = Math.min(SEAT_MAX, list.length)
         for (let j = 0; j < n; j++) {
           const b = list[j], left = leftOf(b.key, now)
+          // (a bowl up in someone's hands for a mouthful (item 345, scene/bowlLift): where they hold it, tipped as they hold it)
+          const lift = BOWL_LIFT.get(b.key)
+          if (lift) {
+            m.worldToLocal(M.lp.copy(lift.p))
+            M.lq.copy(m.getWorldQuaternion(M.wq).invert()).multiply(lift.q)
+            if (pt.kind === 'body') M.m.compose(M.lp, M.lq, M.s.set(1, 1, 1))
+            else {
+              const s = Math.max(0.02, left)
+              const up = pt.kind === 'rice' ? 0.014 + 0.036 * s : 0.014 + 0.028 * s
+              M.m.compose(M.p.set(0, up, 0).applyQuaternion(M.lq).add(M.lp), M.lq, pt.kind === 'rice' ? M.s.set(0.55 + 0.45 * s, s, 0.55 + 0.45 * s) : M.s.set(0.62 + 0.38 * s, 1, 0.62 + 0.38 * s))
+            }
+            m.setMatrixAt(j, M.m)
+            continue
+          }
           M.q.setFromAxisAngle(UP, b.yaw)
           if (pt.kind === 'body') M.m.compose(b.at, M.q, M.s.set(1, 1, 1))
           else if (pt.kind === 'rice') {
