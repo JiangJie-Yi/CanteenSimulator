@@ -22,7 +22,7 @@ import { warmLater } from './Prewarm'
 /*
  * A customer in the boss's style (blender/folk.py: public/models/folk.glb): an Overcooked cook's big round head on a short plump body, no
  * legs, floating mitten hands, the boss's height; low in faces and shaded smooth, the detail painted. What they wear is a picture round the
- * body (textures/folk/outfit_<kind>_<n>.png), their face a picture over the front of the head, one of eight expressions in a strip
+ * body (textures/folk/outfit_<kind>_<n>.jpg), their face a picture over the front of the head, one of eight expressions in a strip
  * (textures/folk/face_<type>.png: as they are, blinking, delighted, cross, sad, chewing, talking, surprised), slid along to the one they
  * show; their hair one of a dozen styles, and what some of them have about them (glasses, a hat, headphones, a randoseru...) shown as
  * their kind has it. Skin and hair in their own colours (lookOf, as the old figures had them).
@@ -234,7 +234,8 @@ export function folkSpec(id: number): FolkSpec {
 const KINDS: GuestKind[] = ['salaryman', 'officeLady', 'schoolgirl', 'schoolboy', 'grandma', 'grandpa', 'kid', 'uncle', 'collegeStudent', 'yukataLady',
   'delinquent', 'bosozoku', 'foreignTourist', 'civilServant', 'maidCoser', 'gyaru']
 const PICTURES = [...KINDS.flatMap((k) => [`outfit_${k}_0`, `outfit_${k}_1`]), 'face_male', 'face_female', 'face_elder', 'face_kid']
-const PICTURE_URLS = PICTURES.map((n) => TEX + n + '.png')
+// (the clothes JPEGs (item 347: at twice the pixels, PNGs were four times the bytes), the faces PNGs (their strip's painted afresh anyway))
+const PICTURE_URLS = PICTURES.map((n) => TEX + n + (n.startsWith('outfit') ? '.jpg' : '.png'))
 const prepared = new WeakSet<THREE.Texture>()
 function usePictures() {
   const list = useLoader(THREE.TextureLoader, PICTURE_URLS)

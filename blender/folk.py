@@ -1118,7 +1118,7 @@ def write_png(path, arr):
 
 
 # ---- the clothes, one picture for each kind (and its other colours): u round the body (the front at 0.5), v up it (the neck at 1)
-OW, OH = 256, 128
+OW, OH = 512, 256
 U = np.tile((np.arange(OW) + 0.5) / OW, (OH, 1))
 V = np.tile(((np.arange(OH) + 0.5) / OH)[:, None], (1, OW))
 DU = U - 0.5                       # (round from the front: 0 at its middle, ±0.5 at the back)
@@ -1141,8 +1141,10 @@ def soft(x, w=0.004):
 
 
 def weave(img, k=0.05):
+    # (its unevenness in little patches of four by four (at twice the pixels, the old grain's size), not a speck a pixel: a speck a pixel
+    # made each picture five times the bytes, the page slower to load (item 347))
     rng = np.random.default_rng(3)
-    n = rng.random((OH, OW)).astype(np.float32)
+    n = np.kron(rng.random((OH // 4, OW // 4)), np.ones((4, 4))).astype(np.float32)
     t = 1.0 + (np.sin(U * 2 * np.pi * 96) * np.sin(V * 2 * np.pi * 48)) * k * 0.5 + (n - 0.5) * k
     img *= t[..., None]
 
@@ -1192,6 +1194,74 @@ def lapels(img, col, depth=0.3):
     put(img, (V > tip) & (V < NECK) & (edge < 0.008), col)
 
 
+# ---- (item 347, the owner's 「模型服裝真的太簡單了」: the clothes were flat colour and a pattern: no seam, pocket, belt or stitch, no shade of a
+# collar or a fold. Painted in now, the low-poly way (the body's faces as they were): its light and shade, its seams and hem, and each kind's
+# own pockets, belts, collars, buttons that catch the light)
+def dim(img, mask, k):
+    """darker where `mask` is (a shadow, a seam), by `k`"""
+    img *= (1 - np.clip(mask.astype(np.float32), 0, 1) * k)[..., None]
+
+
+def lift(img, mask, k):
+    """lighter where `mask` is (a fold's top, a shine)"""
+    img[:] = img + (1 - img) * (np.clip(mask.astype(np.float32), 0, 1) * k)[..., None]
+
+
+def body_shade(img):
+    """the body's own light and shade, soft: darker toward its sides and back, under the collar, at the hem; a little light down the chest"""
+    side = np.clip((np.abs(DU) - 0.16) / 0.34, 0, 1)
+    dim(img, side ** 1.4, 0.16)
+    dim(img, np.clip((0.08 - V) / 0.08, 0, 1), 0.2)
+    dim(img, np.clip(1 - np.abs(V - (NECK - 0.03)) / 0.035, 0, 1) * (np.abs(DU) < 0.2), 0.12)
+    lift(img, np.clip(1 - np.abs(DU) / 0.12, 0, 1) * np.clip((V - 0.45) / 0.3, 0, 1) * (V < NECK - 0.06), 0.06)
+
+
+def seams(img):
+    """the side seams and the shoulders' (a darker line), the hem's stitching (a dashed line just over it)"""
+    dim(img, np.abs(np.abs(DU) - 0.25) < 0.0022, 0.28)
+    dim(img, np.abs(V - 0.935) < 0.0028, 0.22)
+    dim(img, (np.abs(V - 0.05) < 0.0022) & (((U / 0.01) % 1.0) < 0.55), 0.35)
+
+
+def pocket(img, x, v, w, h, col=None, flap=True):
+    """a pocket at (x across from the front, v up): its outline stitched, a flap's shadow under its top (or a welt's line)"""
+    inside = (np.abs(DU - x) < w / 2) & (np.abs(V - v) < h / 2)
+    if col:
+        put(img, inside, col)
+    edge = inside & ((np.abs(np.abs(DU - x) - w / 2) < 0.003) | (np.abs(V - v + h / 2) < 0.003))
+    dim(img, edge & (((U / 0.008 + V / 0.008) % 1.0) < 0.6), 0.3)
+    if flap:
+        dim(img, (np.abs(DU - x) < w / 2) & (V < v + h / 2) & (V > v + h / 2 - 0.012), 0.22)
+        dim(img, (np.abs(DU - x) < w / 2) & (np.abs(V - (v + h / 2)) < 0.002), 0.4)
+
+
+def shiny_buttons(img, col, at, x=0.0, r=0.009):
+    """buttons with a rim and a spot of light on them"""
+    for v in at:
+        d = np.hypot((DU - x) * 1.0, (V - v) * 0.42)
+        put(img, d < r, col)
+        dim(img, (d < r) & (d > r * 0.7), 0.3)
+        lift(img, np.hypot((DU - x + r * 0.3), (V - v - r * 0.9) * 0.42) < r * 0.32, 0.7)
+
+
+def belt(img, col, v=WAIST, h=0.03, buckle="#d8c070"):
+    """a belt round at `v`, its buckle at the front, a line of stitching along it"""
+    band = np.abs(V - v) < h / 2
+    put(img, band, col)
+    dim(img, band & (np.abs(np.abs(V - v) - h / 2 + 0.004) < 0.0018), 0.3)
+    bk = (np.abs(DU) < 0.03) & (np.abs(V - v) < h * 0.7)
+    put(img, bk, buckle)
+    put(img, (np.abs(DU) < 0.018) & (np.abs(V - v) < h * 0.35), col)
+    lift(img, bk & (DU < -0.018), 0.35)
+
+
+def pleats(img, below, every=0.04, k=0.12):
+    """a skirt's pleats under `below`: each a light fold and its shadow"""
+    ph = (U / every) % 1.0
+    lift(img, (V < below) & (ph < 0.2), k)
+    dim(img, (V < below) & (np.abs(ph - 0.55) < 0.06), k * 1.6)
+
+
 def outfit(kind, n):
     """what `kind` wears (its `n`th colours), as a picture round the body"""
     if kind == "salaryman":
@@ -1201,13 +1271,23 @@ def outfit(kind, n):
         put(img, vee(0.24, 0.075), "#f4f2ee")
         tie(img, ["#a8322a", "#2a4a8a"][n], "#e8c050")
         lapels(img, "#1a2030")
-        buttons(img, "#1a1e26", (0.5, 0.58), 0.0, 0.007)
+        shiny_buttons(img, "#1a1e26", (0.5, 0.58), 0.0, 0.008)
+        # (a breast pocket, its white square peeking out; the two pockets' flaps low at the sides)
+        pocket(img, 0.1, 0.7, 0.05, 0.012, flap=False)
+        put(img, (np.abs(DU - 0.1) < 0.02) & (V > 0.706) & (V < 0.706 + 0.018 * (1 - np.abs(DU - 0.1) / 0.02)), "#f4f2ee")
+        for x_ in (-0.12, 0.12):
+            pocket(img, x_, 0.34, 0.07, 0.03)
     elif kind == "officeLady":
         img = fill(["#6a6f78", "#7a5a5a"][n])
         put(img, V < WAIST, ["#4a4f58", "#5a3e3e"][n])
         put(img, vee(0.22, 0.07), "#f6f4f0")
         lapels(img, "#40444c")
-        buttons(img, "#d8c070", (0.55,), 0.0, 0.008)
+        shiny_buttons(img, "#d8c070", (0.55,), 0.0, 0.009)
+        # (a narrow belt at the waist, the skirt pleated under it, a pocket's flap either side)
+        belt(img, "#2a2420", WAIST + 0.015, 0.022)
+        pleats(img, WAIST, 0.05, 0.1)
+        for x_ in (-0.11, 0.11):
+            pocket(img, x_, 0.52, 0.06, 0.024)
     elif kind == "schoolgirl":
         img = fill("#f4f1ea")
         put(img, V < WAIST, "#23324a")
@@ -1216,31 +1296,57 @@ def outfit(kind, n):
         put(img, vee(0.2, 0.06) & (V > 0.66), "#f4f1ea")
         put(img, (np.abs(V - 0.79) < 0.008) & ~vee(0.2, 0.1), "#f4f1ea")
         put(img, (np.abs(DU) < 0.03 + (0.72 - V) * 0.25) & (V > 0.6) & (V < 0.72), ["#c8302a", "#2a4a9a"][n])
+        # (the collar's two white lines along its edge; the scarf's knot shaded; the skirt's pleats folded)
+        put(img, (np.abs(V - 0.772) < 0.004) & ~vee(0.2, 0.1), "#f4f1ea")
+        dim(img, (np.abs(DU) < 0.03) & (np.abs(V - 0.715) < 0.01), 0.25)
+        pleats(img, WAIST, 0.035, 0.12)
     elif kind == "schoolboy":
         img = fill(["#1c1e26", "#22263a"][n])
-        buttons(img, "#e0b040", (0.48, 0.58, 0.68, 0.78), 0.0, 0.011)
+        shiny_buttons(img, "#e0b040", (0.48, 0.58, 0.68, 0.78), 0.0, 0.012)
         put(img, V > 0.84, "#101218")
+        # (the stand collar's white liner showing at its top, a breast pocket, the front's seam down it)
+        put(img, V > 0.972, "#f2f0ea")
+        pocket(img, 0.11, 0.72, 0.05, 0.012, flap=False)
+        dim(img, (np.abs(DU) < 0.0025) & (V < 0.84), 0.35)
     elif kind == "grandma":
         img = fill(["#c9b48a", "#9a8ab0"][n])
         dots(img, "#f2e8d8", 0.06, 0.14, 0.011, petals=5)
         put(img, np.abs(DU) < 0.006, "#7a6a50")
-        buttons(img, "#f4f0e6", (0.5, 0.6, 0.7), 0.012, 0.008)
+        shiny_buttons(img, "#f4f0e6", (0.5, 0.6, 0.7), 0.012, 0.009)
         put(img, V < WAIST - 0.04, ["#5a4a3e", "#4a4a5a"][n])
+        # (a cardigan's ribbed band down its front and at its hem; two patch pockets)
+        dim(img, (np.abs(DU - 0.012) < 0.018) & (V > WAIST - 0.04) & (((V / 0.012) % 1.0) < 0.4), 0.12)
+        dim(img, (V > WAIST - 0.04) & (V < WAIST + 0.02) & (((U / 0.008) % 1.0) < 0.4), 0.15)
+        for x_ in (-0.1, 0.12):
+            pocket(img, x_, WAIST + 0.08, 0.06, 0.05, flap=False)
     elif kind == "grandpa":
         img = fill("#f0ece2")
         vest = ~vee(0.36, 0.11) & (V > WAIST - 0.02)
         put(img, vest, ["#7a5a3a", "#5a6a4a"][n])
         put(img, vest & ((np.abs(((U / 0.04) % 1.0) - 0.5) < 0.08) | (np.abs(((V / 0.05) % 1.0) - 0.5) < 0.1)), "#000000", 0.15)
         put(img, V < WAIST - 0.02, "#4a4038")
+        # (the vest's buttons, a watch chain looped from one to its pocket, the pocket's welt)
+        shiny_buttons(img, "#d8c070", (0.5, 0.58, 0.66), 0.0, 0.008)
+        pocket(img, -0.1, 0.56, 0.05, 0.01, flap=False)
+        chain = np.abs(V - (0.58 - 0.5 * (DU + 0.1) * (DU - 0.0) * 4)) < 0.003
+        put(img, chain & (DU > -0.1) & (DU < 0.0) & (((U / 0.006) % 1.0) < 0.6), "#e0c060")
     elif kind == "kid":
         img = fill(["#e85a4a", "#4a8ad8"][n])
         put(img, ((V / 0.07) % 1.0) < 0.45, "#f6f2ea")
         put(img, V < WAIST, "#2a4a7a")
+        # (a patch pocket with a star sewn on, the shorts' waistband)
+        pocket(img, 0.1, 0.62, 0.06, 0.05, "#f6d24a", flap=False)
+        a_ = np.arctan2((V - 0.62) * 0.42, DU - 0.1)
+        put(img, np.hypot(DU - 0.1, (V - 0.62) * 0.42) < 0.011 * (0.62 + 0.38 * np.cos(5 * a_)), "#e8503a")
+        belt(img, "#1e3a6a", WAIST - 0.01, 0.02, "#1e3a6a")
     elif kind == "uncle":
         img = fill(["#4a7a5a", "#a8432f"][n])
         dots(img, "#f2d0a0", 0.09, 0.2, 0.02, petals=5)
         dots(img, "#2a3a2a", 0.09, 0.2, 0.005)
-        buttons(img, "#f4f0e6", (0.5, 0.6, 0.7, 0.8), 0.0, 0.007)
+        shiny_buttons(img, "#f4f0e6", (0.5, 0.6, 0.7, 0.8), 0.0, 0.008)
+        # (the open camp collar's shadow either side of the neck, a breast pocket)
+        dim(img, vee(0.14, 0.11) & ~vee(0.14, 0.07), 0.25)
+        pocket(img, 0.11, 0.68, 0.06, 0.05, flap=False)
         put(img, V < WAIST - 0.03, "#c8b48a")
     elif kind == "collegeStudent":
         img = fill(["#6d7f8c", "#8a4a3a"][n])
@@ -1248,6 +1354,11 @@ def outfit(kind, n):
         put(img, vee(0.3, 0.09), "#f2f0ea")
         put(img, V < WAIST, "#3a4a6a")
         put(img, (V < WAIST) & (np.abs(((U / 0.25) % 1.0) - 0.5) < 0.004), "#c8a050")
+        # (the tee under the open shirt: a round print on it; the shirt's front edges shaded; the jeans' belt)
+        put(img, np.hypot(DU, (V - 0.66) * 0.42) < 0.03, ["#3a6a9a", "#c8402a"][n])
+        put(img, np.hypot(DU, (V - 0.66) * 0.42) < 0.018, "#f2f0ea")
+        dim(img, np.abs(np.abs(DU) - 0.09 * np.clip((V - (NECK - 0.3)) / 0.3, 0, 1)) < 0.005, 0.3)
+        belt(img, "#4a3020", WAIST, 0.024)
     elif kind == "yukataLady":
         base = ["#3a5a8c", "#a84a6a"][n]
         img = fill(base)
@@ -1257,12 +1368,22 @@ def outfit(kind, n):
         put(img, cross, "#f4efe6")
         put(img, (V > 0.42) & (V < 0.58), ["#e8b84a", "#e8d8a8"][n])
         put(img, np.abs(V - 0.5) < 0.008, "#c8302a")
+        # (the obi woven (a diagonal), its edges shaded; the obijime's tassel at the front; the white under-collar along the crossing)
+        dim(img, (V > 0.42) & (V < 0.58) & ((((U * 3 + V) / 0.02) % 1.0) < 0.3), 0.1)
+        dim(img, (V > 0.42) & (V < 0.58) & ((np.abs(V - 0.425) < 0.006) | (np.abs(V - 0.575) < 0.006)), 0.25)
+        put(img, (np.abs(DU - 0.04) < 0.006) & (V > 0.44) & (V < 0.5), "#c8302a")
+        put(img, (np.abs(DU - (V - 0.6) * 0.32 - 0.026) < 0.006) & (V > 0.6), "#ffffff")
     elif kind == "delinquent":
         img = fill("#15161c")
         put(img, np.abs(DU) < 0.05 + 0.02 * (V > 0.6), "#a8242a")
         put(img, (np.abs(np.abs(DU) - 0.05) < 0.006), "#e0b040")
-        buttons(img, "#e0b040", (0.3, 0.42, 0.54), -0.065, 0.009)
+        shiny_buttons(img, "#e0b040", (0.3, 0.42, 0.54), -0.065, 0.01)
         put(img, V > 0.86, "#0c0d12")
+        # (a swirl embroidered in gold across his back)
+        bu = np.where(DU > 0, DU - 0.5, DU + 0.5)
+        r_ = np.hypot(bu, (V - 0.6) * 0.42)
+        a_ = np.arctan2((V - 0.6) * 0.42, bu)
+        put(img, (r_ < 0.11) & (np.abs(((r_ * 60 + a_ / np.pi) % 1.0) - 0.5) < 0.12), "#d8a830")
     elif kind == "bosozoku":
         coat = ["#f2efe8", "#4a2a5e"][n]
         img = fill(coat)
@@ -1272,6 +1393,10 @@ def outfit(kind, n):
             put(img, (np.abs(DU - 0.14) < 0.006) & (np.abs(V - (0.76 - k * 0.07)) < 0.03), ink)
         put(img, (np.abs(DU) < 0.004), "#000000", 0.3)
         put(img, V > 0.84, coat)
+        # (a sash across from the shoulder to the hip, its edges dark)
+        sash = np.abs(V - (0.86 - (DU + 0.2) * 1.4)) < 0.035
+        put(img, sash & (np.abs(DU) < 0.25), ["#c8302a", "#f2efe8"][n])
+        dim(img, (np.abs(np.abs(V - (0.86 - (DU + 0.2) * 1.4)) - 0.035) < 0.003) & (np.abs(DU) < 0.25), 0.4)
     elif kind == "foreignTourist":
         img = fill(["#e8d24a", "#4aa8d8"][n])
         if n == 1:
@@ -1280,6 +1405,11 @@ def outfit(kind, n):
             put(img, np.hypot(DU * 1.0, (V - 0.66) * 0.42) < 0.05, "#e85a4a")
             put(img, np.hypot(DU * 1.0, (V - 0.66) * 0.42) < 0.03, "#f6f2ea")
         put(img, V < WAIST, "#a8946a")
+        # (a camera's strap across him, the shorts' belt)
+        strap = np.abs(V - (0.9 - (DU + 0.22) * 1.2)) < 0.012
+        put(img, strap & (np.abs(DU) < 0.3), "#2a2a2e")
+        dim(img, strap & (((U / 0.01) % 1.0) < 0.3) & (np.abs(DU) < 0.3), 0.3)
+        belt(img, "#5a4028", WAIST, 0.022)
     elif kind == "civilServant":
         img = fill(["#4a4e56", "#3a4250"][n])
         put(img, vee(0.24, 0.07), "#f4f2ee")
@@ -1287,6 +1417,11 @@ def outfit(kind, n):
         lapels(img, "#30343a")
         put(img, (np.abs(DU + 0.12) < 0.025) & (np.abs(V - 0.7) < 0.03), "#f6f4ee")
         put(img, (np.abs(DU + 0.12) < 0.02) & (np.abs(V - 0.715) < 0.006), "#3a5a9a")
+        # (two pens clipped in his breast pocket, the pocket's welt; his buttons)
+        pocket(img, 0.11, 0.68, 0.05, 0.01, flap=False)
+        put(img, (np.abs(DU - 0.1) < 0.003) & (V > 0.685) & (V < 0.72), "#1a1a1a")
+        put(img, (np.abs(DU - 0.115) < 0.003) & (V > 0.685) & (V < 0.715), "#c8302a")
+        shiny_buttons(img, "#1a1c22", (0.5, 0.58), 0.0, 0.008)
     elif kind == "maidCoser":
         img = fill("#1c1c24")
         apron = ((np.abs(DU) < 0.16) & (V < WAIST + 0.02)) | ((np.abs(DU) < 0.075) & (V >= WAIST) & (V < 0.72))
@@ -1295,23 +1430,45 @@ def outfit(kind, n):
         put(img, (np.abs(np.abs(DU) - 0.06) < 0.01) & (V > 0.72) & (V < NECK), "#f8f6f2")
         put(img, (V > 0.8) & (np.abs(DU) < 0.12), "#f8f6f2")
         put(img, (np.abs(DU) < 0.02) & (np.abs(V - 0.79) < 0.02), "#c8302a")
+        # (the apron's frilled edge, scalloped, and its strings to the back; the dress's pleats under it)
+        edge_u = np.abs(np.abs(DU) - 0.16) < 0.012
+        put(img, edge_u & (V < WAIST + 0.02) & (np.abs(((V / 0.03) % 1.0) - 0.5) < 0.4), "#f8f6f2")
+        put(img, (V < 0.03) & (np.abs(DU) < 0.17) & (np.abs(((U / 0.015) % 1.0) - 0.5) < 0.38), "#f8f6f2")
+        put(img, (np.abs(V - (WAIST + 0.01)) < 0.008) & (np.abs(DU) > 0.16), "#f8f6f2")
+        pleats(img.reshape(img.shape), WAIST, 0.045, 0.08)
     elif kind == "gyaru":
         img = fill(["#f06aa0", "#f2f0ea"][n])
         put(img, (V > 0.44) & (V < 0.52), "#d8a07a")
         put(img, V < 0.46, ["#3a5a8a", "#1c1c22"][n])
         put(img, (V > 0.44) & (V < 0.465), "#e8c050")
         put(img, vee(0.16, 0.06), "#d8a07a")
+        # (studs along her belt, a heart on her top)
+        put(img, (np.abs(V - 0.452) < 0.006) & (np.abs(((U / 0.02) % 1.0) - 0.5) < 0.12), "#f4f0e6")
+        hx, hy = (DU - 0.08) / 0.03, (V - 0.64) * 0.42 / 0.03
+        put(img, (hx * hx + (hy - np.sqrt(np.abs(hx)) * 0.7) ** 2) < 0.9, ["#f2f0ea", "#e8407a"][n])
     else:
         img = fill("#888888")
+    body_shade(img)
+    seams(img)
     weave(img)
     return img
 
 
 KINDS = ["salaryman", "officeLady", "schoolgirl", "schoolboy", "grandma", "grandpa", "kid", "uncle", "collegeStudent", "yukataLady", "delinquent",
          "bosozoku", "foreignTourist", "civilServant", "maidCoser", "gyaru"]
+# (written as a PNG, then made a JPEG at 88 (item 347): at twice the pixels each way the weave's grain made the PNGs four times the bytes; a
+# JPEG holds the clothes as well at less than the old PNGs. The PNG let go)
+_jpg = bpy.context.scene.render.image_settings
+_jpg.file_format = "JPEG"
+_jpg.quality = 88
 for kind in KINDS:
     for n in (0, 1):
-        write_png(os.path.join(TEX_DIR, f"outfit_{kind}_{n}.png"), outfit(kind, n))
+        _png = os.path.join(TEX_DIR, f"outfit_{kind}_{n}.png")
+        write_png(_png, outfit(kind, n))
+        _im = bpy.data.images.load(_png)
+        _im.save_render(os.path.join(TEX_DIR, f"outfit_{kind}_{n}.jpg"), scene=bpy.context.scene)
+        bpy.data.images.remove(_im)
+        os.remove(_png)
 
 # ---- faces: eight expressions side by side, each a cell 256 across, painted in degrees round the head (so a circle is a circle)
 FC = 256
