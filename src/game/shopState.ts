@@ -66,6 +66,10 @@ export const SPEAKERS = keep(import.meta.hot, 'SPEAKERS', new Map<string, string
 /** each of the staff's job, by id (the shop's own server 'house-server' a server): who calls the welcome, who answers an order, who asks the
  * kitchen (shops/grill/crewTalk, item 372). App keeps it with SPEAKERS */
 export const CREW_ROLES = keep(import.meta.hot, 'CREW_ROLES', new Map<string, Role>())
+/** a face one of the staff makes for a while (item 368): shy at a word of praise, glad of a raise or the staff meal, cross at a cut or a
+ * curt word with a colleague (App, crewTalk set it; StaffFigure shows it over what their work says, till `until`, performance.now()) */
+export const CREW_MOOD = keep(import.meta.hot, 'CREW_MOOD', new Map<string, { face: 'shy' | 'happy' | 'mad' | 'proud' | 'surprised'; until: number }>())
+export const moodFor = (id: string, face: 'shy' | 'happy' | 'mad' | 'proud' | 'surprised', ms = 3000) => { CREW_MOOD.set(id, { face, until: performance.now() + ms }) }
 /** when a customer last complained of the wait (performance.now(), shops/grill/bar's gripe): the owner and the staff look alarmed a moment
  * (the owner's: Overcooked's panic as the orders pile up) */
 export const RUSH = keep(import.meta.hot, 'RUSH', { at: -1e9 })

@@ -300,7 +300,10 @@ export function CharacterViewer({ lang }: { lang: Lang }) {
   const moods: [Mood | null, string][] = [[null, tl(lang, '平常', 'ふつう', 'Calm')], ['joy', tl(lang, '開心', 'うれしい', 'Happy')], ['mad', tl(lang, '生氣', '怒り', 'Cross')], ['sad', tl(lang, '難過', 'かなしい', 'Sad')]]
   const faces: [CrewFace, string][] = [['idle', tl(lang, '表情：平常', '表情：ふつう', 'Face: calm')], ['happy', tl(lang, '開心', 'うれしい', 'Happy')],
     ['focused', tl(lang, '認真', '真剣', 'Focused')], ['panic', tl(lang, '慌張', 'あわてる', 'Panic')], ['proud', tl(lang, '得意', '得意げ', 'Proud')],
-    ['drink', tl(lang, '暢飲', 'ごくごく', 'Gulp')], ['talk', tl(lang, '說話', '話す', 'Talk')]]
+    ['drink', tl(lang, '暢飲', 'ごくごく', 'Gulp')], ['talk', tl(lang, '說話', '話す', 'Talk')],
+    // (item 368's moods, and a glance and a wide-open word to check their frames by)
+    ['tired', tl(lang, '疲累', 'ぐったり', 'Tired')], ['shy', tl(lang, '害羞', '照れる', 'Shy')], ['mad', tl(lang, '生氣', '怒る', 'Cross')],
+    ['surprised', tl(lang, '驚訝', 'びっくり', 'Surprised')], ['lookR', tl(lang, '看旁邊', 'よそ見', 'Glance')], ['talkWide', tl(lang, '張大嘴', '大口', 'Wide open')]]
   const minLabel = tl(lang, '縮到左下角', '左下にしまう', 'Minimise to the bottom left')
   const closeLabel = tl(lang, '關閉（離開開發者模式）', '閉じる（開発者モード終了）', 'Close (leave developer mode)')
   return createPortal(

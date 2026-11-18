@@ -48,7 +48,7 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { ATMOS, CREW_ROLES, dutyDay, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { ATMOS, CREW_ROLES, dutyDay, moodFor, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -1658,6 +1658,8 @@ export default function App() {
       : lang === 'en' ? ['Thanks, boss! I will keep at it.', 'Oh, you flatter me.', 'That makes my day, boss.']
         : ['謝謝老闆！我會繼續加油的。', '老闆過獎了，嘿嘿。', '被老闆這樣說，今天值得了。']
     talk('staff', `${personName(w, lang)}${lang === 'en' ? ': ' : '：'}「${pool[Math.floor(Math.random() * pool.length)]}」`)
+    // (and on their face in the room a while: shy at it (item 368))
+    moodFor(w.id, 'shy', 3600)
   }
   /** (item 370) what they're paid an hour: what they were hired at, and their raise (or cut) */
   const payOf = (dishId: string, w: { id: string; wage: number }) => w.wage + (hired[dishId]?.[w.id]?.raise ?? 0)
@@ -1670,6 +1672,8 @@ export default function App() {
     if (now === was) return
     const bond = Math.max(0, Math.min(100, bondOf(r.bond) + (dir > 0 ? raiseBond(Math.max(0, was)) : CUT_BOND)))
     setHired((h) => ({ ...h, [dishId]: { ...h[dishId], [w.id]: { ...h[dishId][w.id], raise: now, bond } } }))
+    // (glad of a raise, cross at a cut, on their face in the room (item 368))
+    moodFor(w.id, dir > 0 ? 'happy' : 'mad', 3600)
     const name = personName(w, lang), pay = 'NT$' + (w.wage + now).toLocaleString('en-US')
     talk('staff', dir > 0
       ? tl(lang, `幫${name}加薪到 ${pay}/時。${name}：「真的嗎？謝謝老闆，我會更努力！」`, `${name}の時給を${pay}に上げた。${name}「本当ですか？ありがとうございます、頑張ります！」`,
@@ -1690,10 +1694,12 @@ export default function App() {
     if ((act === 'yes' || act === 'offer') && !hasRoom(lodgerCount(dishId))) return
     if (act === 'yes') {
       set({ lives: true, lodgeAsk: undefined })
+      moodFor(w.id, 'happy', 3600)
       talk('staff', tl(lang, `讓${name}住進二樓。${name}：「太好了，謝謝老闆！」`, `${name}を二階に住ませた。${name}「助かります、ありがとうございます！」`,
         `Let ${name} move in upstairs. ${name}: "That's a weight off, thank you!"`))
     } else if (act === 'no') {
       set({ lodgeAsk: undefined, lodgeNo: today, bond: Math.max(0, bondOf(r.bond) + NO_BOND) })
+      moodFor(w.id, 'mad', 3000)
       talk('staff', tl(lang, `沒答應${name}住宿的事。${name}：「……我知道了。」（一星期內不會再提）`, `${name}の住み込みを断った。${name}「……わかりました。」（1週間は言わない）`,
         `Turned down ${name}'s asking to live in. ${name}: "...I see." (Won't ask again for a week)`))
     } else if (act === 'offer') {
@@ -1770,6 +1776,7 @@ export default function App() {
     book('food', cost, 'meal')
     setMealDay(today)
     setHired((h) => ({ ...h, [dishId]: Object.fromEntries(Object.entries(h[dishId] ?? {}).map(([id, r]) => [id, on.some((w) => w.id === id) ? { ...r, bond: bondAfter(r.bond, 'meal') } : r])) }))
+    for (const w of on) moodFor(w.id, 'happy', 4000)
     talk('owner', tl(lang, `今天的員工餐：白飯、味噌湯、烤魚一片，大家先吃一點再忙（${on.length} 人，NT$${cost.toLocaleString('en-US')}）`,
       `今日のまかない：ご飯、味噌汁、焼き魚。みんな食べてから頑張ろう（${on.length}人、NT$${cost.toLocaleString('en-US')}）`,
       `Today's staff meal: rice, miso soup and a piece of fish for everyone (${on.length}, NT$${cost.toLocaleString('en-US')})`))

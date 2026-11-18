@@ -15,7 +15,7 @@ import { CREW_ANSWER, CREW_BUSY, CREW_CHAT, CREW_COAL, CREW_ECHO, CREW_PLATES, C
 import type { Lang } from '@/data/i18n'
 import type { Role } from '@/data/staff'
 import { pairKey } from '@/game/affinity'
-import { ATMOS, CREW_ROLES, ON_DUTY, STAFF_TALK } from '@/game/shopState'
+import { ATMOS, CREW_ROLES, moodFor, ON_DUTY, STAFF_TALK } from '@/game/shopState'
 import { talkPart } from '@/game/talkTime'
 import { replaces } from '@/scene/hot'
 
@@ -148,4 +148,6 @@ export function crewChatTick(lang: Lang, dt: number, busy: boolean, pairs: Recor
   const [said, answer] = pick(`chat-${tone}`, CREW_CHAT[tone][lang])
   sayOver(a, said, 0, 2800)
   sayOver(b, answer, 1700, 2800)
+  // (and their faces as they say it (item 368): glad between two who get on, cross between two who don't)
+  if (tone !== 'usual') { moodFor(a, tone === 'warm' ? 'happy' : 'mad', 4600); moodFor(b, tone === 'warm' ? 'happy' : 'mad', 4600) }
 }

@@ -12,8 +12,9 @@ import { cloneFigure, paintable, releaseFigure, rigidFigure, thinWithFade, type 
 import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
-import { crewFaceSheet, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
-import { RUSH, SPEAKERS, STAFF_IDLE, STAFF_TALK } from '@/game/shopState'
+import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
+import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
+import { CREW_MOOD, RUSH, SPEAKERS, STAFF_IDLE, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { activityOf } from '@/data/staff'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { FigureHit } from './FigureHit'
@@ -461,6 +462,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   const bend = useRef(0)
   /** how far their hands are at a job's places (handsAt: eased there and back), and those places in their own frame, each to the hand on its side */
   const reachK = useRef(0)
+  /** their face's life (game/faceLife, item 368), and which way they faced last frame (for the eyes to go first where they're turning) */
+  const life = useRef<FaceLife | null>(null)
+  const yawWas = useRef(0)
   const reachAt = useRef({ L: new THREE.Vector3(), R: new THREE.Vector3() })
   const broom = useMemo(() => makeHandBroom(), [])
   const pan = useMemo(() => makeDustpan(), [])
@@ -538,10 +542,21 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const tapping = seated && (t + seed) % 7 < 2.2
     let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined || job?.sweep !== undefined || job?.floorWipe !== undefined || slack ? 'focused'
       : job?.carry || job?.stretch || (job?.nod ?? 0) > 0.2 ? 'happy' : 'idle')
-    if (!faceAsked && word && Math.sin(t * 17) + Math.sin(t * 7.3) * 0.6 > 0.2) face = 'talk'
-    if ((t + seed * 0.9) % 3.4 < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
+    // (item 368: the shop's mood on them a while (praise, a raise, a cut, a word with a colleague: CREW_MOOD) over their idle or their work's
+    // face but a fright; worn out, a tired face for their idle one)
+    const mood = CREW_MOOD.get(id)
+    if (!faceAsked && mood && mood.until > now && face !== 'panic') face = mood.face
+    else if (!faceAsked && face === 'idle' && STAFF_TIRED.has(id)) face = 'tired'
+    // (and the face's life over it (game/faceLife): a blink at no fixed beat that closes and opens, a new face through a blink, the mouth in
+    // syllables while a word's up, a glance aside now and then while they're free, the eyes first where the head's turning)
+    const fl = (life.current ??= newFaceLife(seed * 7.31 + 1, face, t))
+    const yawNow = Math.atan2(fig.root.matrixWorld.elements[8], fig.root.matrixWorld.elements[10])
+    const turn = dt > 0 ? Math.atan2(Math.sin(yawNow - yawWas.current), Math.cos(yawNow - yawWas.current)) / dt : 0
+    yawWas.current = yawNow
+    const lifeNow = faceNow(fl, t, face, { free: !faceAsked && walk < 0.2 && !slack && face === 'idle', turn, talk: !faceAsked && !!word })
+    face = crewFrame(lifeNow.face as CrewFace, lifeNow)
     const fw = faceWas.current
-    const settled = (f: CrewFace) => (f === 'blink' || f === 'talk' ? 'idle' : f)
+    const settled = (f: CrewFace) => (f === 'blink' || f === 'half' || f === 'talk' || f === 'talkWide' || f === 'lookL' || f === 'lookR' ? 'idle' : f)
     // (not as they set to wiping the bar down or leave off it: the squash took their head a fifth of a metre down, and the bar's top is
     // at their shoulders, their face went under it (the owner saw a server's face in the bar))
     const wiping = job?.wipe !== undefined

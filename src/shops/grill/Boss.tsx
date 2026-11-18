@@ -27,7 +27,8 @@ const skinOf = (r: THREE.Object3D) => {
 }
 /** his name tag's words: his role, and his name when he's been given one */
 const bossName = () => SPEAKERS.get('owner') ?? '老闆'
-import { crewFaceSheet, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
+import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
+import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { turnEase } from './commuteWalk'
 
 /**
@@ -308,6 +309,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   const tache = useMemo(() => parts.moustache?.position.clone() ?? new THREE.Vector3(), [parts])
   /** the face he made last frame (a change sets off a squash and stretch) */
   const faceWas = useRef<CrewFace>('idle')
+  /** his face's life (game/faceLife, item 368) */
+  const bossLife = useRef<FaceLife | null>(null)
   /** the last line he started to say */
   const saidKey = useRef(0)
   /** where his right hand is really drawn, in the hand bone's own frame (worked out once): the bone's origin isn't at the hand (he's one
@@ -750,15 +753,15 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       : act === 'drink' ? ((T - BOSS_DRINK.since) % 1.4 < 1 ? 'drink' : 'talk') : now - RUSH.at < 2500 ? 'panic' : now - BOSS_FX.joyAt < 2000 ? 'proud'
       : act === 'wave' ? 'happy' : 'idle'
     if (BOSS_FACE.face && now < BOSS_FACE.until) face = BOSS_FACE.face
-    if (gape && (face === 'idle' || face === 'happy' || face === 'focused')) face = 'talk'
-    const since = T - s.blinkAt
-    if (since >= 0.15) {
-      s.blinkAt = T + (s.blinks % 4 === 3 ? 0.12 : 2.5 + Math.random() * 1.5)
-      s.blinks++
-    }
-    if (since > 0 && since < 0.15 && (face === 'idle' || face === 'focused' || face === 'talk')) face = 'blink'
+    // (the face's life over it (item 368, game/faceLife): a blink at no fixed beat that closes and opens, now and then twice; a new face
+    // through a blink; the mouth in syllables while a line of his is up (his muttering or a word to the shop); a glance aside, idle)
+    const word = talking || STAFF_TALK.some((w) => w.id === 'owner' && w.until > now)
+    const fl = (bossLife.current ??= newFaceLife(4.2, face, T))
+    const lifeNow = faceNow(fl, T, face, { free: face === 'idle' && act === 'idle', talk: word })
+    face = crewFrame(lifeNow.face as CrewFace, lifeNow)
+    void gape
     // (a new face (not a blink, not the flap of a word) sets off a squash and stretch; so does starting to talk)
-    const settled = (f: CrewFace) => (f === 'blink' || f === 'talk' ? 'idle' : f)
+    const settled = (f: CrewFace) => (f === 'blink' || f === 'half' || f === 'talk' || f === 'talkWide' || f === 'lookL' || f === 'lookR' ? 'idle' : f)
     if (settled(face) !== settled(faceWas.current)) BOSS_FACE.at = now
     if (sayRef.current && sayRef.current.key !== saidKey.current) { saidKey.current = sayRef.current.key; BOSS_FACE.at = now }
     faceWas.current = face

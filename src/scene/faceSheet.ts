@@ -8,12 +8,16 @@ import * as THREE from 'three'
  * middle) so one painter draws them all: the owner's and the staff's face patch (blender/boss.py: a sheet of four by two, the patch's UVs
  * slid from one frame to the next) and the customers' strips of eight (blender/folk.py's order, slid by their material).
  */
-export const FACES = ['idle', 'blink', 'happy', 'focused', 'panic', 'proud', 'drink', 'talk'] as const
+// (item 368, the owner's 「人物表情實在很僵硬」: eight more, the in-betweens and the moods: eyes half shut (a blink's way down and up, so it
+// closes and opens rather than jumping), the mouth open wide (a word's syllables between it, the small O and shut), the eyes to one side and
+// the other (a glance, looking where the head's about to turn), tired, shy, cross, surprised; the customers' chewing's other half, a laugh)
+export const FACES = ['idle', 'blink', 'happy', 'focused', 'panic', 'proud', 'drink', 'talk', 'half', 'talkWide', 'lookL', 'lookR', 'tired', 'shy', 'mad', 'surprised'] as const
 /** a face the owner and the staff make (setExpression's states) */
 export type CrewFace = (typeof FACES)[number]
-/** the customers' strip, in its order (blender/folk.py's EXPR) */
-const GUEST_FACES = ['idle', 'blink', 'happy', 'mad', 'sad', 'chew', 'talk', 'surprised'] as const
-type Face = CrewFace | (typeof GUEST_FACES)[number]
+/** the customers' strip, in its order (blender/folk.py's EXPR, the first eight; the second row item 368's) */
+export const GUEST_FACES = ['idle', 'blink', 'happy', 'mad', 'sad', 'chew', 'talk', 'surprised', 'half', 'talkWide', 'lookL', 'lookR', 'tired', 'shy', 'chew2', 'laugh'] as const
+export type GuestFace = (typeof GUEST_FACES)[number]
+type Face = CrewFace | GuestFace
 export type FaceKind = 'boss' | 'male' | 'female' | 'elder' | 'kid'
 
 const INK = '#1c1410'
@@ -52,7 +56,15 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
   }
   // (faint, a soft apricot: solid all the same, the figures being hashed on their alpha (a see-through blush came out a scatter of dots), so
   // a pale tint near the skin's own rather than a see-through one)
-  blush(face === 'proud' || face === 'happy' ? '#f4ae9a' : '#f6c3b2', kind === 'boss' || kind === 'male' ? 4.6 : 5.4)
+  const bw = kind === 'boss' || kind === 'male' ? 4.6 : 5.4
+  if (face === 'shy') {
+    blush('#ef9584', bw * 1.3)
+    // (and its hatching: three short strokes over each cheek)
+    for (const sd of [-1, 1]) at(sd * 30, -12, () => {
+      g.strokeStyle = '#d0614e'; g.lineWidth = 0.9
+      for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(i * 2.4 - 1, 1.4); g.lineTo(i * 2.4 + 1, -1.4); g.stroke() }
+    })
+  } else blush(face === 'proud' || face === 'happy' || face === 'laugh' ? '#f4ae9a' : '#f6c3b2', bw)
   for (const sd of [-1, 1]) {
     const cx = sd * EYE_AZ
     // ---- the eyes
@@ -61,9 +73,31 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
       const dot = (k = 1) => { g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0.3 * rx * sd, -0.4 * ry, 0.26 * rx * k, 0, Math.PI * 2); g.fill() }
       const bean = (sx = 1, sy = 1) => { g.fillStyle = INK; g.beginPath(); g.ellipse(0, 0, rx * sx, ry * sy, 0, 0, Math.PI * 2); g.fill() }
       const stroke = (w: number, path: () => void, colour = INK) => { g.strokeStyle = colour; g.lineWidth = w; g.beginPath(); path(); g.stroke() }
+      // (a lid come down to `lid` (in the bean's heights from its middle, down positive): the bean above it cut off, its edge drawn)
+      const lidded = (lid: number, sx = 1, sy = 1, dx = 0, dy = 0) => {
+        g.save(); g.translate(dx * rx, dy * ry)
+        g.save(); g.beginPath(); g.rect(-2 * rx, lid * ry, 4 * rx, 2 * ry); g.clip(); bean(sx, sy); dot(0.85); g.restore()
+        const half = Math.sqrt(Math.max(0, 1 - lid * lid / (sy * sy))) * rx * sx
+        stroke(1.8, () => { g.moveTo(-half - 0.15 * rx, lid * ry); g.lineTo(half + 0.15 * rx, lid * ry) })
+        g.restore()
+      }
       if (face === 'blink') stroke(2.2, () => { g.moveTo(-rx * 1.1, 0.5); g.quadraticCurveTo(0, 0.35 * ry, rx * 1.1, 0.5) })
-      // (happy, proud, a mouthful that's good: closed into arcs, ^ ^)
-      else if (face === 'happy' || face === 'proud' || face === 'chew') stroke(2.6, () => { g.moveTo(-rx * 1.2, 0.35 * ry); g.quadraticCurveTo(0, -1.0 * ry, rx * 1.2, 0.35 * ry) })
+      // (on the way shut or open: the lid half down over the bean)
+      else if (face === 'half') lidded(0.15)
+      // (happy, proud, a mouthful that's good, a laugh: closed into arcs, ^ ^)
+      else if (face === 'happy' || face === 'proud' || face === 'chew' || face === 'chew2' || face === 'laugh')
+        stroke(face === 'laugh' ? 3 : 2.6, () => { g.moveTo(-rx * 1.2, 0.35 * ry); g.quadraticCurveTo(0, -1.0 * ry, rx * 1.2, 0.35 * ry) })
+      // (a glance: the bean and its dot to one side of where it sits, a little narrower as it turns)
+      else if (face === 'lookL' || face === 'lookR') {
+        g.save(); g.translate((face === 'lookL' ? -0.42 : 0.42) * rx, 0); bean(0.9, 1); dot(); g.restore()
+      }
+      // (tired: heavy lids most of the way down, a faint shadow under)
+      else if (face === 'tired') {
+        lidded(0.05, 0.95, 0.9)
+        stroke(0.9, () => { g.moveTo(-0.9 * rx, 1.25 * ry); g.quadraticCurveTo(0, 1.55 * ry, 0.9 * rx, 1.25 * ry) }, '#b07a6a')
+      }
+      // (shy: smaller, looking down and away)
+      else if (face === 'shy') { g.save(); g.translate(sd * -0.2 * rx, 0.3 * ry); bean(0.82, 0.8); dot(0.8); g.restore() }
       // (gulping it down: > <)
       else if (face === 'drink') stroke(2.4, () => { g.moveTo(sd * 1.1 * rx, -0.6 * ry); g.lineTo(-sd * 0.8 * rx, 0); g.lineTo(sd * 1.1 * rx, 0.6 * ry) })
       // (a fright: rounder and a touch bigger, the dot as ever)
@@ -79,8 +113,10 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
     })
     // ---- the brows: thick, tilted and lifted by the mood (inner end down when focused or cross, up when worried)
     // (the inner end down when at work or cross, up and the whole brow sagging when sad, lifted high in a fright)
-    const tilt = face === 'focused' || face === 'mad' || face === 'drink' ? 3.6 : face === 'sad' ? -4.2 : face === 'panic' ? -2.4 : 0
-    const lift = face === 'panic' || face === 'surprised' ? 6 : face === 'happy' || face === 'proud' ? 2 : face === 'mad' ? -1.5 : face === 'sad' ? -1 : 0
+    const tilt = face === 'focused' || face === 'mad' || face === 'drink' ? 3.6 : face === 'sad' ? -4.2 : face === 'panic' ? -2.4 : face === 'tired' ? -3.2
+      : face === 'shy' ? -2.2 : 0
+    const lift = face === 'panic' || face === 'surprised' ? 6 : face === 'happy' || face === 'proud' ? 2 : face === 'laugh' ? 3 : face === 'mad' ? -1.5 : face === 'sad' ? -1
+      : face === 'tired' ? -2 : face === 'shy' ? 1 : 0
     at(cx, BROW_EL - 3 + lift, () => {
       g.strokeStyle = browC; g.lineWidth = browW * 1.25
       g.beginPath()
@@ -93,10 +129,24 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
     const dark = '#5a1810', tongue = '#e8786a'
     const line = (w: number, path: () => void) => { g.strokeStyle = lip; g.lineWidth = w; g.beginPath(); path(); g.stroke() }
     // (a short gentle curve at rest)
-    if (face === 'idle' || face === 'blink') line(1.7, () => { g.moveTo(-3.4, -0.2); g.quadraticCurveTo(0, 2, 3.4, -0.2) })
-    else if (face === 'happy' || face === 'proud') {
-      // (a little open D: its top flat, a hint of tongue at the bottom)
-      const w = face === 'proud' ? 4.8 : 4.2
+    if (face === 'idle' || face === 'blink' || face === 'half' || face === 'lookL' || face === 'lookR') line(1.7, () => { g.moveTo(-3.4, -0.2); g.quadraticCurveTo(0, 2, 3.4, -0.2) })
+    // (a word's open syllable: a D taller than the happy one, the tongue low in it)
+    else if (face === 'talkWide') {
+      g.beginPath(); g.moveTo(-3.6, -1.4); g.lineTo(3.6, -1.4); g.ellipse(0, -1.4, 3.6, 4.6, 0, 0, Math.PI); g.closePath()
+      g.fillStyle = dark; g.fill()
+      g.save(); g.clip()
+      g.fillStyle = tongue; g.beginPath(); g.ellipse(0, 3.2, 2.4, 1.6, 0, 0, Math.PI * 2); g.fill()
+      g.restore()
+    }
+    // (tired: a short flat line, sagging at its ends)
+    else if (face === 'tired') line(1.5, () => { g.moveTo(-2.6, 0.9); g.quadraticCurveTo(0, 0.1, 2.6, 0.9) })
+    // (shy: a small wavering line)
+    else if (face === 'shy') line(1.4, () => { g.moveTo(-2.4, 0.4); g.bezierCurveTo(-1.4, -0.8, -0.6, 1.2, 0, 0.3); g.bezierCurveTo(0.6, -0.6, 1.4, 1.2, 2.4, 0.2) })
+    // (the other half of chewing: shut, the cheek puffed to one side)
+    else if (face === 'chew2') line(1.6, () => { g.moveTo(-3, 0.6); g.quadraticCurveTo(-0.4, 1.8, 1.4, 0.2); g.quadraticCurveTo(2.6, -0.6, 3.4, 0.4) })
+    else if (face === 'happy' || face === 'proud' || face === 'laugh') {
+      // (a little open D: its top flat, a hint of tongue at the bottom; a laugh's wide open)
+      const w = face === 'laugh' ? 5.6 : face === 'proud' ? 4.8 : 4.2
       g.beginPath(); g.moveTo(-w, -1); g.lineTo(w, -1); g.ellipse(0, -1, w, w * 0.95, 0, 0, Math.PI); g.closePath()
       g.fillStyle = dark; g.fill()
       g.save(); g.clip()
@@ -145,7 +195,11 @@ export type SeeThrough = HTMLCanvasElement & { seeThrough?: boolean }
 // ---- the owner's and the staff's: a sheet of four by two frames, each the front of the head itself (blender/boss.py: the head's faces within
 // 45 degrees of its middle are the face, their UVs by bearing and elevation, az -45..45 across a frame, el 45..-45 down it)
 const SPAN = 45
-const CELL = 243
+/** a frame's pixels (sixteen of them now, four by four (item 368): 243 for eight) */
+const CELL = 200
+/** the frames' rows on the sheet, and on the sheet the model's face patch was made for (blender/boss.py: four by two) */
+const ROWS = 4
+const MODEL_ROWS = 2
 const crewSheets = new Map<FaceKind, THREE.CanvasTexture>()
 /** the sheet of faces for the owner (`boss`) or the staff (`male`, `female`) */
 export function crewFaceSheet(kind: FaceKind) {
@@ -153,7 +207,7 @@ export function crewFaceSheet(kind: FaceKind) {
   if (t) return t
   const c = document.createElement('canvas') as SeeThrough
   c.width = CELL * 4
-  c.height = CELL * 2
+  c.height = CELL * ROWS
   c.seeThrough = true
   const g = c.getContext('2d')!
   const k = CELL / (2 * SPAN)
@@ -169,7 +223,8 @@ export function crewFaceSheet(kind: FaceKind) {
   return t
 }
 
-// ---- the customers': a strip of eight frames 256 square each, painted in degrees (az −62 to 62 across, el 42 down to −52; blender/folk.py)
+// ---- the customers': a strip of eight frames 256 square each, painted in degrees (az −62 to 62 across, el 42 down to −52; blender/folk.py);
+// two rows of them since item 368 (the face's UVs halved in height and slid down a row in FolkFigure's shader)
 const guestStrips = new Map<FaceKind, HTMLCanvasElement>()
 /** the customers' strip of faces for their face type, painted as the owner's are */
 export function guestFaceStrip(kind: FaceKind) {
@@ -177,11 +232,11 @@ export function guestFaceStrip(kind: FaceKind) {
   if (c) return c
   c = document.createElement('canvas')
   c.width = 2048
-  c.height = 256
+  c.height = 512
   const g = c.getContext('2d')!
   GUEST_FACES.forEach((face, i) => {
-    const ox = i * 256
-    paintFace(g, { place: (az, el) => [ox + ((az + 62) / 124) * 256, ((42 - el) / 94) * 256], sx: 256 / 124, sy: 256 / 94 }, kind, face)
+    const ox = (i % 8) * 256, oy = Math.floor(i / 8) * 256
+    paintFace(g, { place: (az, el) => [ox + ((az + 62) / 124) * 256, oy + ((42 - el) / 94) * 256], sx: 256 / 124, sy: 256 / 94 }, kind, face)
   })
   solidify(c)
   guestStrips.set(kind, c)
@@ -200,12 +255,17 @@ export function faceRange(pieces: { geo: THREE.BufferGeometry }[], index: number
   const base = new Float32Array(uv.array as ArrayLike<number>)
   let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity
   for (let i = 0; i < uv.count; i++) { u0 = Math.min(u0, uv.getX(i)); u1 = Math.max(u1, uv.getX(i)); v0 = Math.min(v0, uv.getY(i)); v1 = Math.max(v1, uv.getY(i)) }
-  return { start, count: uv.count, base, du: u1 - u0, dv: v1 - v0 }
+  // (the model's patch spans a frame of a sheet two rows high; the sheet's four now (item 368): squeezed to one of them, from its top)
+  const k = MODEL_ROWS / ROWS
+  for (let i = 1; i < base.length; i += 2) base[i] = v0 + (base[i] - v0) * k
+  return { start, count: uv.count, base, du: u1 - u0, dv: (v1 - v0) * k }
 }
 const RANGES = new WeakMap<THREE.BufferGeometry, FaceRange>()
 /** the figure template's mesh's face (kept by its shape: the copies share it) */
 export function markFace(mesh: THREE.Mesh, r: FaceRange | null) {
   if (!r) return
+  const uv = mesh.geometry.attributes.uv as THREE.BufferAttribute | undefined
+  if (uv) { for (let i = 0; i < r.count; i++) uv.setXY(r.start + i, r.base[i * 2], r.base[i * 2 + 1]); uv.needsUpdate = true }
   RANGES.set(mesh.geometry, r)
   // (and on the template itself, for a figure drawn as its template (the owner in the room): its face changed in place)
   mesh.geometry.userData.face = r
@@ -260,6 +320,32 @@ export function setFace(root: THREE.Object3D, face: CrewFace) {
     uv.addUpdateRange(r.start * 2, r.count * 2)
     uv.needsUpdate = true
   })
+}
+
+/** the faces whose eyes are shut already (a smile's arcs, a gulp's squeeze): no blink, no glance over them */
+const SHUT_EYES = new Set<string>(['blink', 'happy', 'proud', 'drink', 'chew', 'chew2', 'laugh'])
+/** the faces a word's syllables can be said over (the talking frames have their eyes and brows as these have them, near enough) */
+const SAID_OVER = new Set<string>(['idle', 'focused', 'tired', 'shy', 'surprised'])
+/** a moment of a face's life (game/faceLife's faceNow) */
+type Moment = { blink: 'open' | 'half' | 'shut'; look: -1 | 0 | 1; mouth: 0 | 1 | 2 }
+/**
+ * The frame for a moment of a face's life (item 368): its eyes half or all shut in a blink (a tired face's heavy lids straight to shut);
+ * a word's syllables over a face that can say them, shut, a little open, wide; a glance aside from a face at ease; else the face itself
+ */
+export function crewFrame(face: CrewFace, m: Moment): CrewFace {
+  if (!SHUT_EYES.has(face) && m.blink !== 'open') return m.blink === 'shut' || face === 'tired' ? 'blink' : 'half'
+  if (m.mouth && SAID_OVER.has(face)) return m.mouth === 2 ? 'talkWide' : 'talk'
+  if (m.look && face === 'idle') return m.look > 0 ? 'lookR' : 'lookL'
+  return face
+}
+/** the same for a customer's strip: chewing by turns (`jaw`), a laugh between a delighted face's words */
+export function guestFrame(face: GuestFace, m: Moment, jaw = false): GuestFace {
+  if (face === 'chew') return jaw ? 'chew' : 'chew2'
+  if (!SHUT_EYES.has(face) && m.blink !== 'open') return m.blink === 'shut' || face === 'tired' ? 'blink' : 'half'
+  if (m.mouth && face === 'happy') return m.mouth === 2 ? 'laugh' : 'happy'
+  if (m.mouth && (face === 'idle' || face === 'tired' || face === 'surprised')) return m.mouth === 2 ? 'talkWide' : 'talk'
+  if (m.look && face === 'idle') return m.look > 0 ? 'lookR' : 'lookL'
+  return face
 }
 
 /**

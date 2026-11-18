@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { guestFaceStrip, type FaceKind } from './faceSheet'
+import { GUEST_FACES, guestFaceStrip, guestFrame, type FaceKind, type GuestFace } from './faceSheet'
+import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
+import { LATE } from '@/game/shopState'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -34,8 +36,8 @@ import { warmLater } from './Prewarm'
 const URL = import.meta.env.BASE_URL + 'models/folk.glb'
 const TEX = import.meta.env.BASE_URL + 'textures/folk/'
 type FaceType = 'male' | 'female' | 'elder' | 'kid'
-const EXPR = { neutral: 0, blink: 1, joy: 2, mad: 3, sad: 4, chew: 5, talk: 6, surprised: 7 } as const
-type Expr = keyof typeof EXPR
+/** their faces (scene/faceSheet's strip, two rows of eight since item 368): the expression's place on it */
+type Expr = GuestFace
 
 /** how each kind wears its hair (one picked by id) and what it has about it */
 const HAIR: Record<GuestKind, string[]> = {
@@ -266,7 +268,7 @@ const templates = new Map<string, Template>()
  * so its soft edges stay soft), the knit's (tiled as it says). Made fresh for each, its uniforms its own.
  */
 function folkMaterial(outfit: THREE.Texture | null, face: THREE.Texture | null, knit: THREE.Texture | null) {
-  const u = { faceMap: { value: face }, faceOffset: { value: 0 }, knitMap: { value: knit }, knitRepeat: { value: knit?.repeat ?? new THREE.Vector2(1, 1) } }
+  const u = { faceMap: { value: face }, faceOffset: { value: new THREE.Vector2() }, knitMap: { value: knit }, knitRepeat: { value: knit?.repeat ?? new THREE.Vector2(1, 1) } }
   // (hashed from the start, so a fade (theirs as they come in and go) only moves its opacity: switched on and off for each, the last fade
   // over let the hashed program go and the next one linked it again, a hitch at every customer's coming and going; at full opacity nothing's
   // cut)
@@ -276,7 +278,7 @@ function folkMaterial(outfit: THREE.Texture | null, face: THREE.Texture | null, 
   m.onBeforeCompile = (sh, r) => {
     before.call(m, sh, r)
     Object.assign(sh.uniforms, u)
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D faceMap;\nuniform float faceOffset;\nuniform sampler2D knitMap;\nuniform vec2 knitRepeat;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D faceMap;\nuniform vec2 faceOffset;\nuniform sampler2D knitMap;\nuniform vec2 knitRepeat;')
       .replace('#include <map_fragment>', `#ifdef USE_MAP
   if (vPaint.z > 0.5 && vPaint.z < 1.5) diffuseColor *= texture2D(map, vMapUv);
   else if (vPaint.z > 2.5) diffuseColor *= texture2D(knitMap, vMapUv * knitRepeat);
@@ -284,7 +286,7 @@ function folkMaterial(outfit: THREE.Texture | null, face: THREE.Texture | null, 
       // (the face over the skin once the skin's colour and the airbrush are in (the face's own colours not shaded by them, as its own sheet
       // had them), its faintest edges cut as they were (that sheet's alpha test))
       .replace('#include <alphamap_fragment>', `#ifdef USE_MAP
-  if (vPaint.z > 1.5 && vPaint.z < 2.5) { vec4 fc = texture2D(faceMap, vMapUv + vec2(faceOffset, 0.0)); diffuseColor.rgb = mix(diffuseColor.rgb, fc.rgb, fc.a < 0.35 ? 0.0 : fc.a); }
+  if (vPaint.z > 1.5 && vPaint.z < 2.5) { vec4 fc = texture2D(faceMap, vec2(vMapUv.x + faceOffset.x, vMapUv.y * 0.5 + faceOffset.y)); diffuseColor.rgb = mix(diffuseColor.rgb, fc.rgb, fc.a < 0.35 ? 0.0 : fc.a); }
 #endif
 #include <alphamap_fragment>`)
   }
@@ -467,7 +469,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const get = (n: string) => root.getObjectByName(n) ?? null
     return { root, tints: t.tints, body: get('body')!, head: get('head'), handL: get('handL'), handR: get('handR'), chop: get('chop'), bite: get('bite'),
       phone: get('phone'), carried: get('carried'), parked: get('parked'), mesh: root.getObjectByName('FolkMesh') as THREE.SkinnedMesh,
-      face: null as { value: number } | null }
+      face: null as { value: THREE.Vector2 } | null }
   }, [gltf, spec])
   // (their skeleton's picture let go as they go)
   useEffect(() => () => releaseFigure(fig.root), [fig])
@@ -549,7 +551,7 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const wipeFrom = useRef<number | null>(null)
   /** up onto the stool or down off it under way: from what height to what, how far through (0..1) (item 242) */
   const sitMove = useRef<{ from: number; to: number; t: number } | null>(null)
-  const exprNow = useRef<Expr | null>('neutral')
+  const exprNow = useRef<Expr | null>('idle')
   const v3 = useMemo(() => new THREE.Vector3(), [])
   const chopDir = useMemo(() => new THREE.Vector3(), [])
   const chopQ = useMemo(() => new THREE.Quaternion(), [])
@@ -574,8 +576,13 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   const setExpr = (e: Expr) => {
     if (exprNow.current === e || !fig.face) return
     exprNow.current = e
-    fig.face.value = EXPR[e] / 8
+    // (its frame on the strip: eight across, two rows (the face's UVs halved in height in the shader))
+    const i = GUEST_FACES.indexOf(e)
+    fig.face.value.set((i % 8) / 8, Math.floor(i / 8) / 2)
   }
+  /** their face's life (game/faceLife, item 368), and their head's turn last frame (the eyes go first where it's turning) */
+  const life = useRef<FaceLife | null>(null)
+  const headYaw = useRef(0)
 
   useFrame(() => {
     const t = timeNow()
@@ -658,8 +665,8 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
       : dish !== undefined ? (dish < 0.38 ? 0.72 + (dish / 0.38) * 0.28 : (dish + 0.62) % 1)
       : hash(id * 5 + biteN, 9) > 0.72 ? Math.min(1, biteK / 0.6) : biteK
     const chewing = eating && !sipping && bq >= 0.52 && !(dish !== undefined && dish < 0.38)
-    // (the jaw going while they chew: the chewing face by turns)
-    const chew = chewing && ((t * 5.5 + id) % 1) < 0.5
+    // (the jaw going while they chew: the chewing face's two halves by turns (item 368: it was the chewing face and their idle one))
+    const jaw = ((t * 5.5 + id) % 1) < 0.5
     // (the head: looking about by beats while they sit, down at the phone or the plate, nodding as they talk)
     if (fig.head) {
       let yaw = 0, pitch = 0
@@ -831,8 +838,10 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     // (the face: their mood; blinking now and then; delighted when the food's just come; chewing; talking)
     const delighted = since >= 0 && since < 1.2
     const joy = mood === 'joy' || delighted
-    const blink = !joy && (t * 0.9 + id * 0.37) % 4 < 0.12
-    const talking = !!talk && !eating && Math.sin(t * 11 + id) > 0.1 && Math.sin(t * 1.3 + id) > -0.2
+    // (a word of theirs up: said in phrases, a breath between (the mouth's syllables are the face's life's))
+    const talking = !!talk && !eating && Math.sin(t * 1.3 + id) > -0.2
+    // (the deep night: some, sat with nothing to do, sleepy (item 368))
+    const sleepy = !walking && !eating && LATE.on && hash(id, 31) < 0.45
     // (getting cross, sat waiting: the mark by the head, the face, the steam (item 347); walked out angry, all of it)
     const f = Math.max(fume?.() ?? 0, mood === 'mad' ? 1 : 0)
     if (fig.head && fx.g.parent !== fig.head) fig.head.add(fx.g)
@@ -847,7 +856,16 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         p.scale.setScalar((0.05 + 0.11 * Math.sin(Math.PI * k)) * (0.7 + 0.6 * Math.min(1, (f - 0.8) / 0.2)))
       })
     }
-    setExpr(chew ? 'chew' : joy ? 'joy' : blink ? 'blink' : mood === 'mad' || (f >= 0.7 && !eating) ? 'mad' : mood === 'sad' ? 'sad' : talking ? 'talk' : 'neutral')
+    // (their mood's face (the food just come, cross, sad, sleepy, chewing), through the face's life (game/faceLife, item 368): a blink at no
+    // fixed beat that closes and opens, now and then twice; a new face through a blink; the mouth in syllables while a word's up, a laugh
+    // between a delighted one's words; a glance aside now and then while they sit at ease, the eyes first where the head's turning)
+    const want: Expr = chewing ? 'chew' : joy ? 'happy' : mood === 'mad' || (f >= 0.7 && !eating) ? 'mad' : mood === 'sad' ? 'sad' : sleepy ? 'tired' : 'idle'
+    const fl = (life.current ??= newFaceLife(id * 1.618 + 0.5, want, t))
+    const yawNow = look.current.yaw
+    const headTurn = dt > 0 ? (yawNow - headYaw.current) / dt : 0
+    headYaw.current = yawNow
+    const lifeNow = faceNow(fl, t, want, { free: !walking && !eating && !talking && want === 'idle', turn: headTurn, talk: talking })
+    setExpr(guestFrame(lifeNow.face as Expr, lifeNow, jaw))
   })
 
   const k = fit * spec.size
