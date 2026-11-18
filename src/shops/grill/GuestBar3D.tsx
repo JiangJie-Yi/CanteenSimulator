@@ -3233,6 +3233,12 @@ type PlateRun = { key: number; seat: number; guest: number; phase: 'ready' | 'se
   /** (done with) how dirty it's been left (game/plates' plateDirt: by how much was eaten off it) */
   dirt?: number }
 const STACK_GAP = 0.026
+/** the step between two round plates nested in a stack (item 358, the owner's 「漂浮?」: at STACK_GAP each stood a plate's whole depth and
+ * more over the one under it, a gap of air between every two, a stack of plates floating over one another): a real stack's, about a third
+ * of a plate's depth (the round one 0.0198 deep, its outline 0.0207: clear of the one under's outline and its smear) */
+const NEST_GAP = 0.0055
+/** (a ray down onto one surface, made once: the counter's top under the sink's stack) */
+const SURFACE_RAY = new THREE.Raycaster(), SURFACE_HITS: THREE.Intersection[] = [], TOP_FROM = new THREE.Vector3(), DOWN_Y = new THREE.Vector3(0, -1, 0)
 const UP_Y = new THREE.Vector3(0, 1, 0)
 /** what was left on cleared plates thrown into the bins by the sink (item 208, game/bins): the sticks, the fish's bones and the crumpled
  * tissues into the rubbish bin, the bottles and cans into the recycling bin; each bin's lid lifted a moment for what goes in it */
@@ -4490,7 +4496,15 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   const dirtyAt = (k: number) => {
     const c = onCounter.current
     if (k < c) return counterAt(k)
-    return inBar('SinkBasinFloor', endOf(1)).add(new THREE.Vector3(0, 0.004 + Math.min(k - c, SINK_SHOWN - 1) * STACK_GAP * IN_SINK, 0))
+    return inBar('SinkBasinFloor', endOf(1)).add(new THREE.Vector3(0, 0.004 + sinkStackUp(c, k), 0))
+  }
+  /** how far up the k-th of the sink's dirty plates stands over the first of its stack (`from`, the counter's 0, the basin's the first in
+   * it): a round one on a round one nested into it (NEST_GAP), a long one on or under any other on its rim (STACK_GAP) (item 358) */
+  const sinkStackUp = (from: number, k: number) => {
+    let y = 0
+    const K = SINK.kinds
+    for (let i = from + 1; i <= Math.min(k, from + SINK_SHOWN - 1); i++) y += K[i] === 'long' || K[i - 1] === 'long' ? STACK_GAP : NEST_GAP
+    return y * IN_SINK
   }
   /** the k-th plate up the stack waiting on the counter (item 82, the owner's circle): in front of the draining basket toward the counter's
    * front, a little toward its far end from the basin, on the counter's top (found from the sink's own marks, again now and then: it's moved
@@ -4502,7 +4516,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       if (!b || !fr || !top || !f) return inBar('SinkBasinFloor', endOf(1))
       const bw = b.getWorldPosition(new THREE.Vector3()), front = fr.getWorldPosition(new THREE.Vector3()).sub(bw).setY(0).normalize()
       const side = new THREE.Vector3(front.z, 0, -front.x)
-      const y = new THREE.Box3().setFromObject(top).max.y
+      let y = new THREE.Box3().setFromObject(top).max.y
       f.updateWorldMatrix(true, false)
       let at = bw.addScaledVector(front, 0.52).addScaledVector(side, 0.25).setY(y)
       // (worked out in the counter top's own frame (the owner's, 2026-11-15: the stack hung half off the counter's corner, over the palm
@@ -4526,10 +4540,16 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         const x = (bb.min.x + bb.max.x) / 2
         const l = new THREE.Vector3(THREE.MathUtils.clamp(x, tb.min.x + r, tb.max.x - r), 0, THREE.MathUtils.clamp(z, tb.min.z + r, tb.max.z - r))
         at = tm.localToWorld(l).setY(y)
+        // (on the counter's top where the stack stands, found by a ray down onto it alone (item 358, the owner's 「漂浮?」: its box's top
+        // was the splashback's along its back edge, the stack 10.5 cm over the counter, in the air))
+        SURFACE_RAY.set(TOP_FROM.set(at.x, y + 0.5, at.z), DOWN_Y)
+        const hit = SURFACE_RAY.intersectObject(tm, false, SURFACE_HITS)
+        if (hit.length) at.y = y = hit[0].point.y
+        SURFACE_HITS.length = 0
       }
       counterSpot.current = { at: f.worldToLocal(at), t: now }
     }
-    return counterSpot.current.at.clone().add(new THREE.Vector3(0, 0.002 + Math.min(k, SINK_SHOWN - 1) * STACK_GAP * IN_SINK, 0))
+    return counterSpot.current.at.clone().add(new THREE.Vector3(0, 0.002 + sinkStackUp(0, k), 0))
   }
   /** a place in the bar's frame as the first counter's (along it, across it): the kitchen's floor and all that stands on it lie square there */
   const flat = (v: THREE.Vector3): [number, number] => { const c0 = counters[0], d = v.clone().sub(c0.at); return [d.dot(c0.along), d.dot(c0.lay)] }
@@ -8577,7 +8597,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         <group ref={plateStack} name="plating-stack" position={platingPlace(PLATE_STACK_ALONG).addScaledVector(plating.across, PLATE_STACK_ACROSS)}
           {...shownOver('乾淨的盤子', '裝盤處的備用盤｜菜一烤好就拿一個來裝')}>
           {Array.from({ length: PASS_STACK_SHOWN }, (_, i) => (
-            <group key={i} position={[0, i * STACK_GAP * ON_TABLE, 0]} rotation-y={i * 1.1} scale={ON_TABLE} visible={false}><Plate design={i + 5} /></group>
+            <group key={i} position={[0, i * NEST_GAP * ON_TABLE, 0]} rotation-y={i * 1.1} scale={ON_TABLE} visible={false}><Plate design={i + 5} /></group>
           ))}
         </group>
       )}
@@ -8677,13 +8697,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       )}
       {given && (
         <group ref={platerStack} visible={false} {...shownOver('乾淨的盤子', '從碗盤櫃補到裝盤處')}>
-          {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * STACK_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK}><Plate design={i + 7} /></group>)}
+          {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * NEST_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK}><Plate design={i + 7} /></group>)}
         </group>
       )}
       {/* (a server's stack of dried plates, on their tray on the way from the dryer back to the racks) */}
       {waiters.current.map((_, wi) => (
         <group key={`stack${wi}`} ref={(o) => { stackObjs.current[wi] = o }} visible={false} {...shownOver('洗好的盤子', '外場搬回碗盤架')}>
-          {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * STACK_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK} name={`stack-plate-${i}`}><Plate design={i + 3} /></group>)}
+          {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * NEST_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK} name={`stack-plate-${i}`}><Plate design={i + 3} /></group>)}
         </group>
       ))}
       {/* (each server's cloth, out on the bar as they wipe it down) */}
