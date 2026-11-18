@@ -37,6 +37,10 @@ export function Relations({ people, hired, pairs, atmos, today, lang }: {
       <rect x="-1.6" y="2.5" width="3.2" height="4.5" />
     </g>
   )
+  // (the one the owner's seeing (game/romance, item 340): a heart on the line between them)
+  const heart = (x: number, y: number) => (
+    <g transform={`translate(${x} ${y})`} className="rel-heart"><path d="M0 4.5 C-7.5 -1 -4.5 -7.5 0 -3.6 C4.5 -7.5 7.5 -1 0 4.5 Z" /></g>
+  )
   return (
     <div className="rel">
       <div className="rel-mood">
@@ -59,6 +63,7 @@ export function Relations({ people, hired, pairs, atmos, today, lang }: {
             {/* (the owner lives upstairs, and the cooks: a little house by each) */}
             {house(MID + FACE * 0.62, MID - FACE * 0.62)}
             {spots.filter((s) => commuteOf(s.w.role) === 'dorm').map((s) => <g key={s.w.id}>{house(s.x + FACE * 0.62, s.y - FACE * 0.62)}</g>)}
+            {spots.filter((s) => hired[s.w.id].dating !== undefined).map((s) => <g key={`h${s.w.id}`}>{heart((s.x + MID) / 2, (s.y + MID) / 2)}</g>)}
           </svg>
           <span className="rel-face is-owner" style={{ left: MID - FACE / 2, top: MID - FACE / 2 }} title={tl(lang, '老闆（你）', '店主（あなた）', 'Owner (you)')}>
             <Avatar id="owner" look={{ female: false, age: 'middle' }} role="owner" size={FACE} />
@@ -77,6 +82,7 @@ export function Relations({ people, hired, pairs, atmos, today, lang }: {
         <span><i style={{ background: '#9a8f80' }} />{tl(lang, '普通', 'ふつう', 'As usual')}</span>
         <span><i style={{ background: '#c0503a' }} />{tl(lang, '差', '悪い', 'Cold')}</span>
         <span><svg width="14" height="14" viewBox="-8 -7 16 15" className="rel-dorm-key"><path d="M-7 1 L0 -6 L7 1 L5 1 L5 7 L-5 7 L-5 1 Z" /></svg>{tl(lang, '住宿', '住み込み', 'Lives in')}</span>
+        <span><svg width="14" height="14" viewBox="-8 -8 16 14" className="rel-heart-key"><path d="M0 4.5 C-7.5 -1 -4.5 -7.5 0 -3.6 C4.5 -7.5 7.5 -1 0 4.5 Z" /></svg>{tl(lang, '交往中', '交際中', 'Dating')}</span>
         <span>{tl(lang, '實線老闆、虛線同事', '実線は店主、点線は同僚', 'Solid: you · dashed: each other')}</span>
       </p>
     </div>

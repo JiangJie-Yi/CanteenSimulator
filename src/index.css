@@ -3824,6 +3824,8 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   cursor: pointer;
 }
 .ofc-person .ofc-praise:disabled { opacity: 0.5; cursor: default; }
+/* (seeing the owner (game/romance, item 340): a small rose tag by her feeling) */
+.ofc-person .ofc-dating { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; border-radius: 8px; background: #fbe3e6; color: #b23a54; font-size: 11px; font-style: normal; font-weight: 700; white-space: nowrap; }
 .ofc-person .ofc-praise:not(:disabled):hover { background: rgb(224 122 95 / 0.2); }
 .ofc-person .ofc-fire {
   padding: 4px 10px;
@@ -5880,6 +5882,8 @@ html[lang='en'] .menu-title-en { display: none; }
 .rel-chart svg { position: absolute; inset: 0; }
 .rel-dorm path, .rel-dorm rect { fill: #d9a441; stroke: #6b4a30; stroke-width: 1; }
 .rel-dorm-key path { fill: #d9a441; stroke: #6b4a30; stroke-width: 1; }
+/* (the one the owner's seeing (item 340): a rose heart on the line between them, and in the key) */
+.rel-heart path, .rel-heart-key path { fill: #d9506c; stroke: #fff4f0; stroke-width: 1.2; }
 .rel-face { position: absolute; display: grid; justify-items: center; }
 .rel-face.is-off { opacity: 0.45; }
 .rel-face small { margin-top: -6px; padding: 0 4px; border-radius: 6px; background: rgb(255 255 255 / 0.9); font-size: 11px; font-weight: 800; }

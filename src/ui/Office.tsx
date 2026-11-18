@@ -43,6 +43,12 @@ type Props = {
   mealCost: number
   onPraise: (w: Worker) => void
   onMeal: () => void
+  /** (game/romance, item 340) the one the owner's seeing; whether she can be asked out today, whether they can go out today; asking, going */
+  seeing?: string | null
+  canAsk?: (w: Worker) => boolean
+  canGoOut?: (w: Worker) => boolean
+  onAskOut?: (w: Worker) => void
+  onGoOut?: (w: Worker) => void
   onClose: () => void
   /** which tab is showing, and the research notebook and the books to show in their own */
   tab: OfficeTab
@@ -70,7 +76,7 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
 export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll, today, onShift,
-  pairs, atmos, mealDone, mealCost, onPraise, onMeal }: Props) {
+  pairs, atmos, mealDone, mealCost, onPraise, onMeal, seeing = null, canAsk, canGoOut, onAskOut, onGoOut }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -256,6 +262,18 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                         <Glyph id="heart" size={11} /><i><b style={{ width: `${bondOf(hired[w.id].bond)}%` }} /></i><em>{Math.round(bondOf(hired[w.id].bond))}</em>
                         <button type="button" className="ofc-praise" disabled={hired[w.id].praised === today} onClick={() => onPraise(w)}>
                           {hired[w.id].praised === today ? t3('已稱讚', '褒めた', 'Praised') : t3('稱讚', '褒める', 'Praise')}</button>
+                        {/* (seeing each other: so marked, and a date on a day the shop's shut; fond enough, a woman of age, him seeing no one: ask her out
+                            (game/romance, item 340)) */}
+                        {seeing === w.id ? (<>
+                          <em className="ofc-dating"><Glyph id="heart" size={10} />{t3('交往中', '交際中', 'Dating')}</em>
+                          <button type="button" className="ofc-praise" disabled={!canGoOut?.(w)} onClick={() => onGoOut?.(w)}
+                            title={shopOpen ? t3('營業中不能約會', '営業中はデートできません', 'Not while open') : t3('休店的日子約會一次，好感上升（NT$1,500）', '休みの日に一度デート、好感度アップ（NT$1,500）', 'A date on a day off: closer (NT$1,500)')}>
+                            {t3('約會', 'デート', 'Date')}</button>
+                        </>) : canAsk?.(w) ? (
+                          <button type="button" className="ofc-praise" onClick={() => onAskOut?.(w)}
+                            title={t3('好感度夠高了，鼓起勇氣約她（越喜歡越容易答應）', '好感度が十分。思い切って誘う（好きなほど OK しやすい）', 'Fond enough: ask her out (the fonder, the likelier a yes)')}>
+                            {t3('告白', '告白', 'Ask out')}</button>
+                        ) : null}
                       </span>
                     </div>
                     {/* (their shift: A, B, or both (the owner's); not while the shop's open: they'd vanish from their place) */}

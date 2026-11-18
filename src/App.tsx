@@ -95,6 +95,7 @@ import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
 import { crewChatTick } from '@/shops/grill/crewTalk'
 import { atmosphere, bondAfter, bondOf, bondPace, dayBond, dayPairs, givesNotice, LOW_BOND, MEAL_COST, moodPace, pairKey, QUIT_AFTER, WORN_AT } from '@/game/affinity'
+import { canConfess, canDate, confess, DATE_COST, dayRomance, goOnDate, ROMANCE_ATMOS } from '@/game/romance'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
 import { Welcome } from '@/ui/Welcome'
@@ -1546,17 +1547,24 @@ export default function App() {
   const pairsNow = useRef(pairs)
   pairsNow.current = pairs
   if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __pairs: () => pairsNow.current })
+  // (in development, each hand's feeling for the owner set by hand, to try what follows from it: __setBond(id, 90))
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, {
+    __setBond: (id: string, v: number) => setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, ws[id] ? { ...ws, [id]: { ...ws[id], bond: v } } : ws]))),
+  })
   // (each one's pace for how they feel, and the shop's air from those on today (game/affinity, item 323): for the 3D's pace
   // (shopState's STAFF_BOND, ATMOS) and the office's meter)
   const atmosNow = useMemo(() => {
     const on: number[] = [], ids: string[] = []
+    let sweet = false
     for (const [shop, ws] of Object.entries(hired)) for (const [id, r] of Object.entries(ws)) {
       if (!onShift(r.shift, dutyDay(ai)) || !CANDIDATES[shop]?.some((x) => x.id === id)) continue
       on.push(bondOf(r.bond)); ids.push(id)
+      if (r.dating !== undefined) sweet = true
     }
     const pairBonds: number[] = []
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) pairBonds.push(pairs[pairKey(ids[i], ids[j])] ?? 50)
-    return atmosphere(on, pairBonds)
+    // (a little lighter with the one the owner's seeing on today (game/romance, item 340))
+    return Math.min(100, atmosphere(on, pairBonds) + (sweet ? ROMANCE_ATMOS : 0))
   }, [hired, pairs, ai])
   useEffect(() => {
     STAFF_BOND.clear()
@@ -1602,6 +1610,36 @@ export default function App() {
       : lang === 'en' ? ['Thanks, boss! I will keep at it.', 'Oh, you flatter me.', 'That makes my day, boss.']
         : ['謝謝老闆！我會繼續加油的。', '老闆過獎了，嘿嘿。', '被老闆這樣說，今天值得了。']
     talk('staff', `${personName(w, lang)}${lang === 'en' ? ': ' : '：'}「${pool[Math.floor(Math.random() * pool.length)]}」`)
+  }
+  /** (item 340, game/romance) the one of the staff the owner's seeing, if any (one at a time) */
+  const seeing = (dishId: string) => Object.entries(hired[dishId] ?? {}).find(([, r]) => r.dating !== undefined)?.[0] ?? null
+  /** asking her out: yes or no by the dice, as fond as she is; said in the log */
+  const askOut = (dishId: string, w: Hand) => {
+    const today = dutyDay(ai), r = hired[dishId]?.[w.id]
+    if (!r || !canConfess(w, r, today, seeing(dishId) !== null)) return
+    const res = confess(r, today, Math.random())
+    setHired((h) => ({ ...h, [dishId]: { ...h[dishId], [w.id]: { ...h[dishId][w.id], ...res.r } } }))
+    const name = personName(w, lang)
+    talk('owner', res.yes
+      ? tl(lang, `鼓起勇氣約了${name}。${name}紅著臉點頭：「……嗯，我也一直在等老闆開口。」兩人開始交往了。`,
+        `勇気を出して${name}を誘った。${name}は頬を赤らめてうなずいた。「……はい、ずっと待ってました。」二人は付き合い始めた。`,
+        `plucked up the courage and asked ${name} out. She went pink and nodded: "...Yes. I was hoping you'd ask." They're seeing each other now.`)
+      : tl(lang, `約了${name}，${name}低下頭：「對不起，我現在還想專心在工作上……」場面有點尷尬。（一星期內先別再問）`,
+        `${name}を誘ったが、${name}はうつむいた。「ごめんなさい、今は仕事に集中したくて……」少し気まずい。（一週間は誘わないで）`,
+        `asked ${name} out. She looked down: "I'm sorry, I'd rather keep my mind on the work for now..." A little awkward. (Give it a week.)`))
+  }
+  /** a date, on a day the shop's shut (once a day; its cost from the cash): her feeling up; said in the log */
+  const goOut = (dishId: string, w: Hand) => {
+    const today = dutyDay(ai), r = hired[dishId]?.[w.id]
+    if (!r || !canDate(r, today, ai) || cash < DATE_COST) return
+    // (a treat for one of the staff: the staff's costs in the books)
+    book('wage', DATE_COST, 'date')
+    setHired((h) => ({ ...h, [dishId]: { ...h[dishId], [w.id]: goOnDate(h[dishId][w.id], today) } }))
+    const name = personName(w, lang)
+    const pool = lang === 'ja' ? [`${name}と川沿いを散歩して、屋台でたこ焼きを分けた。`, `${name}と映画を観て、喫茶店でパフェを食べた。`, `${name}と水族館へ。クラゲの前でずっと話していた。`]
+      : lang === 'en' ? [`A walk by the river with ${name}, takoyaki shared from a stall.`, `A film with ${name}, then a parfait at a coffee shop.`, `The aquarium with ${name}: they talked for ages by the jellyfish.`]
+        : [`和${name}沿著河邊散步，在攤子分著吃章魚燒。`, `和${name}看了一場電影，再去喫茶店吃聖代。`, `和${name}去水族館，在水母前聊了好久。`]
+    talk('owner', `${pool[Math.floor(Math.random() * pool.length)]}（NT$${DATE_COST.toLocaleString('en-US')}）`)
   }
   const giveMeal = (dishId: string) => {
     const today = dutyDay(ai)
@@ -3020,9 +3058,20 @@ export default function App() {
             if (givesNotice(out.low)) quits.push({ shop, w })
             else if (out.low === QUIT_AFTER - 1) warns.push(w)
           }
+          // (and seeing each other (game/romance, item 340): her feeling up a little each day; fallen too low, it's over)
+          const breakups: Hand[] = []
           setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws)
             .filter(([id]) => !quits.some((q) => q.shop === shop && q.w.id === id))
-            .map(([id, r]) => [id, { ...shutDay(r, day), ...(res.get(id) ?? {}) }]))])))
+            .map(([id, r]) => {
+              const rom = dayRomance({ ...shutDay(r, day), ...(res.get(id) ?? {}) })
+              if (rom.brokeUp) { const w = CANDIDATES[shop]?.find((x) => x.id === id); if (w && !breakups.includes(w)) breakups.push(w) }
+              return [id, rom.r]
+            }))])))
+          window.setTimeout(() => {
+            for (const w of breakups) talk('staff', tl(lang, `${personName(w, lang)}：「老闆，我們……就到這裡吧。最近真的太累了。」兩人分手了。`,
+              `${personName(w, lang)}「店長、私たち……ここまでにしましょう。最近、本当に疲れてしまって。」二人は別れた。`,
+              `${personName(w, lang)}: "Boss... let's leave it here. I've been so worn out lately." They've broken up.`))
+          }, 0)
           setPairs((p) => dayPairs(p, crew))
           for (const { w } of quits) talk('staff', tl(lang, `${personName(w, lang)}遞了辭呈：「老闆，我做到今天就好……」（好感度連續 ${QUIT_AFTER} 天低於 ${LOW_BOND}）`,
             `${personName(w, lang)}が辞表を出した：「店長、今日で辞めさせてください……」（好感度が${QUIT_AFTER}日続けて${LOW_BOND}未満）`,
@@ -3606,6 +3655,9 @@ export default function App() {
             shopOpen={ai}
             pairs={pairs} atmos={atmosNow} mealDone={mealDay === dutyDay(ai)} mealCost={MEAL_COST * staffOf(dish.id).length}
             onPraise={(w) => praise(dish.id, w)} onMeal={() => giveMeal(dish.id)}
+            seeing={seeing(dish.id)} canAsk={(w) => { const r = hired[dish.id]?.[w.id]; return !!r && canConfess(w, r, dutyDay(ai), seeing(dish.id) !== null) }}
+            canGoOut={(w) => { const r = hired[dish.id]?.[w.id]; return !!r && canDate(r, dutyDay(ai), ai) && cash >= DATE_COST }}
+            onAskOut={(w) => askOut(dish.id, w)} onGoOut={(w) => goOut(dish.id, w)}
             onFire={(w) => setHired((h) => {
               const mine = { ...(h[dish.id] ?? {}) }
               delete mine[w.id]
