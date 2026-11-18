@@ -2867,7 +2867,8 @@ const BarTableware = memo(function BarTableware() {
                   {/* (the chopstick rest: its own piece (the owner's, 2026-11-12: the chopsticks themselves a piece to be moved, said three times)) */}
                   <Movable id={`chopsticks${seat}`} label={`筷架（座位 ${no}）`}>
                     <group ref={keep(k++)} name={`chop-set-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷架', '靛藍釉的筷架，黑漆塗箸擱在上面')}>
-                      <StaticBatch plain><group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" flat /></group></StaticBatch>
+                      {/* (itself, 136 triangles, its glaze shining (item 281): as a flat sheet (item 144) it was a blue line along the bar) */}
+                      <StaticBatch plain><group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group></StaticBatch>
                     </group>
                   </Movable>
                   {/* (the pair of chopsticks: a piece of its own, moved apart from the rest; BarChopsticks, instanced, lays them where this stands, and
@@ -3111,8 +3112,8 @@ const CHOP_GONE = new THREE.Matrix4().makeScale(0, 0, 0)
  * the customers ate with the pair on the rest untouched). Out of the bar's batch, so a pair can go.
  */
 const BarChopsticks = memo(function BarChopsticks() {
+  useStudio()
   const gltf = useGLTF(SETTING_URL) as unknown as { scene: THREE.Group }
-  const gl = useThree((s) => s.gl)
   const made = useMemo(() => {
     const src = gltf.scene.getObjectByName('BarChopstick')
     let mesh: THREE.Mesh | null = null
@@ -3123,7 +3124,9 @@ const BarChopsticks = memo(function BarChopsticks() {
     src.updateMatrixWorld(true)
     const geo = m0.geometry.clone().applyMatrix4(new THREE.Matrix4().copy(src.matrixWorld).invert().multiply(m0.matrixWorld))
     const was = m0.material as THREE.MeshStandardMaterial
-    const mat = new THREE.MeshToonMaterial({ color: was.color.clone(), map: was.map })
+    // (black lacquer with the studio's gleam along it: a stick shows its round by its light (item 281))
+    const mat = new THREE.MeshStandardMaterial({ color: was.color.clone(), map: was.map, roughness: 0.28, metalness: 0, envMapIntensity: 0.9 })
+    reflectStudio(mat)
     const shape = new THREE.BufferGeometry()
     shape.setAttribute('position', geo.attributes.position)
     if (geo.index) shape.setIndex(geo.index)
@@ -3142,25 +3145,21 @@ const BarChopsticks = memo(function BarChopsticks() {
         places.push(onSet.map((s) => at.clone().multiply(s)))
       }
     }
-    // (each lying stick one flat strip with its picture from above, its ink line in it (the owner's, 2026-11-15: "one sheet, with a picture"));
-    // those in a customer's hand are theirs, drawn with them)
-    const lone = new THREE.Mesh(geo, mat)
-    inkModel(lone, () => false, { width: 0.0008, weld: true })
-    const f = flatOf(gl, 'BarChopstick', lone, 512)
-    const sticks = new THREE.InstancedMesh(f.geo, f.mat, places.length * 2)
+    // (each lying stick itself, 56 triangles, square at the top tapering to its rounded tip, its ink line round it, both instanced: two draws
+    // for every place's pair (item 281, the owner's, 2026-11-17: 「筷子跟筷架要有基本的立體感」: laid as one flat sheet with its picture from
+    // above (item 144) they were a hairline seen along the bar, and cast no shadow); those in a customer's hand are theirs, drawn with them)
+    const sticks = new THREE.InstancedMesh(geo, mat, places.length * 2)
     const ink = new THREE.InstancedMesh(hull, CHOP_INK, places.length * 2)
-    ink.visible = false
     ink.instanceMatrix = sticks.instanceMatrix
     sticks.receiveShadow = true
     sticks.frustumCulled = ink.frustumCulled = false
     return { sticks, ink, places, geo, hull, mat, onSet }
-  }, [gltf, gl])
+  }, [gltf])
   // (the sets' pieces as they stand: looked up once they're drawn; read again while editing, as they're moved)
   const sets = useRef<(THREE.Object3D | null)[]>([])
   const settled = useRef(0)
   const scene = useThree((s) => s.scene)
-  // (the flat strip's geometry and material are flatOf's, shared: kept)
-  useEffect(() => () => { if (made) { made.geo.dispose(); made.hull.dispose(); made.mat.dispose(); made.ink.dispose() } }, [made])
+  useEffect(() => () => { if (made) { made.geo.dispose(); made.hull.dispose(); made.mat.dispose(); made.ink.dispose(); made.sticks.dispose() } }, [made])
   // (which places' pairs are up, last laid out: laid out again only when that changes)
   const shown = useRef('-')
   useFrame(() => {
@@ -3241,7 +3240,10 @@ function BarPiece({ name, design, grain, fade, flat }: { name: string; design?: 
           : /RackWood/.test(was.name) ? TRAY_WOOD : was.map
         // (the walnut glowing a little with its own grain: under the bar's top it's in shadow, and it went a dark brown block there)
         const wood = /Walnut/.test(was.name)
-        m.material = /Brass/.test(was.name) ? barBrassOf()
+        // (the chopstick rest's indigo glaze glossy, the studio's light caught on its curves (item 281))
+        const glaze = /RestGlaze/.test(was.name) ? new THREE.MeshStandardMaterial({ color: was.color.clone(), map, roughness: 0.22, metalness: 0, envMapIntensity: 0.8 }) : null
+        if (glaze) reflectStudio(glaze)
+        m.material = /Brass/.test(was.name) ? barBrassOf() : glaze ? glaze
           : new THREE.MeshToonMaterial({ color: was.color.clone(), map,
             ...(wood ? { emissive: new THREE.Color('#ffffff'), emissiveMap: map, emissiveIntensity: 0.2 } : {}),
             side: /Paper/.test(was.name) ? THREE.DoubleSide : THREE.FrontSide })
