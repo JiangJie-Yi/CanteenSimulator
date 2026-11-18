@@ -3047,6 +3047,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leaving])
   const autoStep = useRef<() => void>(() => {})
+  /** which of its ways the manager says the next thing (item 268: never the same line twice running), and when it last said it bought in
+   * while open (once a minute at most: it tops up every few seconds) */
+  const autoSaid = useRef({ k: 0, bought: 0 })
+  const autoK = () => (autoSaid.current.k += 1 + Math.floor(Math.random() * 2))
   autoStep.current = () => {
     // (shut for the day by hand: it stays shut)
     if (closing || leaving) return
@@ -3061,6 +3065,10 @@ export default function App() {
         if (cost || fuel) {
           book('bought', cost)
           if (fuel) book('fuel', fuel)
+          if (auto && cost + fuel >= 300 && performance.now() - autoSaid.current.bought > 60000) {
+            autoSaid.current.bought = performance.now()
+            say(T.autoRestock(cost + fuel, autoK()))
+          }
           setStock((st) => {
             const next = { ...st }
             for (const [k, q] of Object.entries(buy)) next[k] = (next[k] ?? 0) + q
@@ -3074,7 +3082,7 @@ export default function App() {
     const hires = pickHires(CANDIDATES[d.id] ?? [], (ROLES[d.id] ?? []).map((r) => ({ ...r, max: r.max * 2 })), mine)
     if (hires.length) {
       hire(d.id, hires)
-      say(T.autoHired(hires.length))
+      say(T.autoHired(hires.length, autoK()))
       return
     }
     // (and the rota made out by itself (game/shifts' arrange): A, then B, the best on both where a shift's short of hands)
@@ -3083,12 +3091,14 @@ export default function App() {
       for (const r of ROLES[d.id] ?? []) Object.assign(want, arrange((CANDIDATES[d.id] ?? []).filter((w) => w.role === r.role && mine[w.id]).sort((a, b) => valueOf(b) - valueOf(a)), r.max))
       if (Object.entries(want).some(([id, k]) => (mine[id]?.shift ?? 'A') !== k)) {
         setHired((h) => ({ ...h, [d.id]: Object.fromEntries(Object.entries(h[d.id] ?? {}).map(([id, r]) => [id, want[id] ? { ...r, shift: want[id] } : r])) }))
+        say(T.autoRota(autoK()))
         return
       }
     }
     const order = topUpOrder(d, stock)
     if (order.cost && order.cost <= cash) {
       restock(d, 'full')
+      say(T.autoRestock(order.cost, autoK()))
       return
     }
     if (entriesOf(d.id).length < (MENU_MIN[d.id] ?? 1) && cooksNow(d).length) {
@@ -3099,7 +3109,7 @@ export default function App() {
     // (opened only in the shop's hours (16:30 to 04:30, the owner's): ready before, it waits for them)
     if (entriesOf(d.id).length >= (MENU_MIN[d.id] ?? 1) && sellable(d) && inHours(getClock().minute)) {
       setAi(true)
-      say(T.autoOpen)
+      say(T.autoOpen(autoK()))
     }
   }
   useEffect(() => {
