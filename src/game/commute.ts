@@ -2,10 +2,12 @@
 // and who goes home, each one's own moment to set off and pace, a pause at the door to nod back in, and a word or two on the way. Pure
 // rules; the walks themselves are the shop's (Roasting's crew, GuestBar3D's servers and stock keeper).
 
-/** where someone goes when the shop shuts, and comes from when it opens: upstairs by the staff door (the owner and the cooks who live in),
- * or out of the front door and home (the servers, the till, the stock keeper, the helpers) */
+import { LODGERS } from './shopState'
+
+/** where someone goes when the shop shuts, and comes from when it opens: upstairs by the staff door (the owner, and those of the staff who
+ * live in: each one's own matter since item 361, game/lodging, App keeping LODGERS), or out of the front door and home */
 export type CommuteType = 'dorm' | 'home'
-export const commuteOf = (role: string): CommuteType => (role === 'owner' || role === 'chef' ? 'dorm' : 'home')
+export const commuteOf = (role: string, id?: string): CommuteType => (role === 'owner' || (id !== undefined && LODGERS.has(id)) ? 'dorm' : 'home')
 
 /** a number 0..1 of its own for a name and a salt, the same every time */
 export function unit(id: string, salt = '') {

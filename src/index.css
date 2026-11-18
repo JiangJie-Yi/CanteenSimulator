@@ -3856,6 +3856,21 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .ofc-person .ofc-bond { display: inline-flex; align-items: center; gap: 5px; color: #c0503a; font-size: 12px; white-space: nowrap; }
 .ofc-person .ofc-bond i { display: block; width: 56px; height: 5px; border-radius: 3px; background: rgb(59 42 32 / 0.12); overflow: hidden; }
 .ofc-person .ofc-bond i b { display: block; height: 100%; background: #e07a5f; }
+/* (each band of the bond its own colour (item 359): cold grey-blue, so-so sand, friendly coral, close rose; its name after the number) */
+.ofc-person .ofc-bond.is-st0 i b { background: #8a9ab0; }
+.ofc-person .ofc-bond.is-st1 i b { background: #d8b070; }
+.ofc-person .ofc-bond.is-st3 i b { background: #d4506a; }
+.ofc-person .ofc-stage { padding: 0 5px; border-radius: 7px; background: rgb(59 42 32 / 0.07); color: #6a5040; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.ofc-person .ofc-bond.is-st0 .ofc-stage { background: #e4eaf2; color: #4a5a72; }
+.ofc-person .ofc-bond.is-st3 .ofc-stage { background: #fbe3e6; color: #b23a54; }
+.ofc-person .ofc-bond-acts, .ofc-person .ofc-pay-row { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ofc-person .ofc-pay { color: #6a5040; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofc-person .ofc-pay em { margin-left: 3px; font-style: normal; font-weight: 700; font-size: 11px; }
+.ofc-person .ofc-pay em.is-up { color: #2f8a4a; }
+.ofc-person .ofc-pay em.is-down { color: #b23a3a; }
+.ofc-person .ofc-lodge { padding: 0 6px; border-radius: 8px; font-size: 11px; font-style: normal; font-weight: 700; white-space: nowrap; }
+.ofc-person .ofc-lodge.is-in { background: #e6efe0; color: #3a6a3a; }
+.ofc-person .ofc-lodge.is-ask { background: #fff1d2; color: #946010; }
 .ofc-person .ofc-bond em { min-width: 18px; color: #7a6656; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ofc-person .ofc-praise {
   padding: 3px 8px;
@@ -5935,6 +5950,8 @@ html[lang='en'] .menu-title-en { display: none; }
 .rel-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin: 0; color: #7a6656; font-size: 11px; }
 .rel-key span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .rel-key i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.rel-bands { margin-top: 4px; }
+.rel-bands b { color: #6a5040; font-weight: 700; margin-right: 1px; }
 .rel-none { color: #7a6656; font-size: 13px; }
 .ofc-roll {
   flex: none;

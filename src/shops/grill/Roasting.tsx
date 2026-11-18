@@ -1253,7 +1253,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     const across = round && KITCHEN_ROUTE.route ? KITCHEN_ROUTE.route(toBar(from), out[0]) : null
     const toGate = across ? [from, ...across.slice(1).map(fromBar)] : null
     const floor = (v: THREE.Vector3) => v.setY(floorAt(v))
-    const sd = commuteOf(role) === 'dorm' && o.parent ? scene.getObjectByName('staff-door') : undefined
+    const sd = commuteOf(role, id) === 'dorm' && o.parent ? scene.getObjectByName('staff-door') : undefined
     if (sd && o.parent) {
       sd.updateWorldMatrix(true, false)
       const dW = sd.getWorldPosition(new THREE.Vector3()), room = sd.localToWorld(new THREE.Vector3(-1, 0, 0)).sub(dW).setY(0).normalize()
@@ -1284,7 +1284,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     o.userData.fade = pose.vis
     o.userData.nod = pose.nod
     o.userData.stretch = pose.stretch
-    if (commuteOf(role) === 'dorm' && tr.len - tr.d < 1.6 && tr.t > tr.wait) STAFF_DOOR_HOLD.until = performance.now() + 1500
+    if (commuteOf(role, id) === 'dorm' && tr.len - tr.d < 1.6 && tr.t > tr.wait) STAFF_DOOR_HOLD.until = performance.now() + 1500
     if (tr.done) { o.userData.fade = 1; o.userData.nod = 0; o.userData.stretch = false }
     return tr.done
   }
@@ -1304,7 +1304,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
           if (w && w.length > 2) commute.current = makeTrip(id, 'in', w.reverse(), delayOf(id, SHOP.day + 0.5) * 0.8, paceOf(id))
           else { arrived.current = true; clockIn(id, minutesNow()) }
           // (living upstairs: off down the stair up there as they set off (item 339))
-          if (commuteOf(role) === 'dorm') { DORM_LIFE.downAt.set(id, performance.now()); DORM_LIFE.upAt.delete(id) }
+          if (commuteOf(role, id) === 'dorm') { DORM_LIFE.downAt.set(id, performance.now()); DORM_LIFE.upAt.delete(id) }
         }
         if (!arrived.current) {
           if (!stepCommute(o, dt)) return
@@ -1364,7 +1364,7 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
     }
     if (stepCommute(o, dt)) {
       // (through the staff door, living upstairs: on the stair up there now (item 339))
-      if (SHOP.walking.has(id) && commuteOf(role) === 'dorm') { DORM_LIFE.upAt.set(id, performance.now()); DORM_LIFE.downAt.delete(id) }
+      if (SHOP.walking.has(id) && commuteOf(role, id) === 'dorm') { DORM_LIFE.upAt.set(id, performance.now()); DORM_LIFE.downAt.delete(id) }
       SHOP.walking.delete(id)
     }
   })

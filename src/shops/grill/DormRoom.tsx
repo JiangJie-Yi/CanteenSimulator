@@ -278,7 +278,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
   // (the same list while it's the same people: a new array each time the scene's drawn)
   const key = crew.map((m) => `${m.id}:${m.role}`).join(',')
   const living = useMemo(() => {
-    const r = crew.filter((m) => commuteOf(m.role) === 'dorm')
+    const r = crew.filter((m) => commuteOf(m.role, m.id) === 'dorm')
     return (r.length ? r : fallback ? [fallback] : []).slice(0, 2)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, fallback])

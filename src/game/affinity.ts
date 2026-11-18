@@ -81,3 +81,44 @@ export function atmosphere(ownerBonds: readonly number[], pairBonds: readonly nu
 export const moodPace = (a: number) => 0.95 + 0.1 * (clamp(a) / 100)
 /** how it's put in words (the office's meter): cold, stiff, as usual, good, warm */
 export const moodWord = (a: number) => (a < 25 ? 0 : a < 42 ? 1 : a < 58 ? 2 : a < 75 ? 3 : 4)
+
+/**
+ * What the bond means, in four bands (item 359, the owner's, 2026-11-19: 「關係系統有點看不懂」): each band's name and what it does, from the
+ * bottom; where someone is, and how far to the next band.
+ */
+export const BOND_STAGES = [
+  { at: 0, zh: '冷淡', ja: '冷えきり', en: 'Cold',
+    does: { zh: '做事慢一成；連續 3 天在這裡就會辭職', ja: '作業が1割遅い。3日続くと辞める', en: 'A tenth slower; three days here and they quit' } },
+  { at: LOW_BOND, zh: '普通', ja: 'ふつう', en: 'So-so',
+    does: { zh: '做事稍慢，氣氛平平', ja: '少し遅い。空気はふつう', en: 'A little slow; the mood so-so' } },
+  { at: 50, zh: '友好', ja: '良好', en: 'Friendly',
+    does: { zh: '做事快一點，店裡氣氛變好', ja: '少し速い。店の空気が良くなる', en: 'A little quicker; the shop warmer' } },
+  { at: 80, zh: '親密', ja: '親密', en: 'Close',
+    does: { zh: '做事最快；成年的女員工可以交往', ja: '一番速い。成人の女性スタッフと交際できる', en: 'Quickest; a woman of age on the staff can be asked out' } },
+] as const
+/** the band someone's in, the next one up, and how far to it */
+export function stageOf(b: number | undefined) {
+  const v = bondOf(b)
+  let k = 0
+  for (let i = 0; i < BOND_STAGES.length; i++) if (v >= BOND_STAGES[i].at) k = i
+  const next = BOND_STAGES[k + 1] ?? null
+  return { k, stage: BOND_STAGES[k], next, toNext: next ? Math.ceil(next.at - v) : 0 }
+}
+
+/**
+ * Their pay (item 370, the owner's, 2026-11-19: 「人物關係系統要精緻，比方說幫他加薪水 關係會變好。 稱讚也得要有滿足一定條件。」): a raise
+ * brings them closer, most the first time (5, then 4, 3, 2, and 1 after); a cut's a blow; and every day what they're paid against the going
+ * rate for their job and how good they are (game/hiring's wageOf): a tenth and more over it, a point closer; a tenth and more under it, a
+ * point cooler (a bargain hire is a bargain that wears thin).
+ */
+export const RAISE_STEP = 10
+/** the most a raise can add to what they were hired at (NT$ an hour), and the most a cut can take */
+export const RAISE_MAX = 60
+export const CUT_MAX = 30
+export const raiseBond = (raisedSoFar: number) => Math.max(1, 5 - Math.round(Math.max(0, raisedSoFar) / RAISE_STEP))
+export const CUT_BOND = -8
+export const PAY_FAIR = 0.1
+export const payBond = (pay: number, market: number) => (pay >= market * (1 + PAY_FAIR) ? 1 : pay < market * (1 - PAY_FAIR) ? -1 : 0)
+/** praise (item 370): only once they've put in PRAISE_AFTER_H hours on today, and once a day */
+export const PRAISE_AFTER_H = 4
+export const canPraise = (hoursToday: number, praisedToday: boolean) => !praisedToday && hoursToday >= PRAISE_AFTER_H

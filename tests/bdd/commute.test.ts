@@ -1,12 +1,18 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
+import { LODGERS } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, paceOf, talkersOf, yieldTo } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 
 feature('打烊與開店：員工上下班', () => {
-  scenario('老闆與廚師住樓上，其他人回家', ({ then, and }) => {
-    then('老闆、廚師走員工門上樓', () => { expect(commuteOf('owner')).toBe('dorm'); expect(commuteOf('chef')).toBe('dorm') })
-    and('外場、收銀、倉儲、三廚從大門回家', () => { for (const r of ['server', 'cashier', 'stock', 'sous']) expect(commuteOf(r)).toBe('home') })
+  // (item 361: who lives upstairs is each one's own matter (game/lodging), not their job's: the lodgers' list says)
+  scenario('老闆住樓上；員工住不住看各自（住宿名單），住的走員工門上樓，其他人回家', ({ then, and }) => {
+    then('老闆走員工門上樓', () => { expect(commuteOf('owner')).toBe('dorm') })
+    and('沒住宿的廚師、外場、收銀、倉儲、三廚：從大門回家', () => { for (const r of ['chef', 'server', 'cashier', 'stock', 'sous']) expect(commuteOf(r, 'nobody-lodging')).toBe('home') })
+    and('住宿名單上的人（不論職位）：走員工門上樓', () => {
+      LODGERS.add('lodger-1')
+      try { expect(commuteOf('server', 'lodger-1')).toBe('dorm'); expect(commuteOf('chef', 'lodger-1')).toBe('dorm') } finally { LODGERS.delete('lodger-1') }
+    })
   })
 
   scenario('不會同一秒一起走：每人收尾的時間與步速不同', ({ given, then, and }) => {

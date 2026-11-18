@@ -15,7 +15,8 @@ import { crewOf, onShift as worksOn, type Rota, type Shift } from '@/game/shifts
 import { dayPay } from '@/game/hours'
 import { Avatar } from './Avatar'
 import { Relations } from './Relations'
-import { bondOf, moodWord } from '@/game/affinity'
+import { bondOf, CUT_MAX, moodWord, PRAISE_AFTER_H, RAISE_MAX, RAISE_STEP, stageOf } from '@/game/affinity'
+import { DORM_CAP, lodgeWhy, wantsLodging } from '@/game/lodging'
 
 /** the office's tabs: the kitchen's notebook, the staff, the books; the staff's relations chart (item 323) */
 export type OfficeTab = 'book' | 'staff' | 'ledger' | 'bonds'
@@ -49,6 +50,16 @@ type Props = {
   canGoOut?: (w: Worker) => boolean
   onAskOut?: (w: Worker) => void
   onGoOut?: (w: Worker) => void
+  /** (item 370) whether a word of praise means anything now (game/affinity's canPraise), their hours on today; their pay an hour and the going
+   * rate for them; a raise or a cut */
+  praiseOk?: (w: Worker) => boolean
+  hoursOf?: (w: Worker) => number
+  payOf?: (w: Worker) => number
+  marketOf?: (w: Worker) => number
+  onPay?: (w: Worker, dir: 1 | -1) => void
+  /** (item 361, game/lodging) how many live upstairs; their asking answered, an offer, moving out */
+  lodgers?: number
+  onLodge?: (w: Worker, act: 'yes' | 'no' | 'offer' | 'out') => void
   onClose: () => void
   /** which tab is showing, and the research notebook and the books to show in their own */
   tab: OfficeTab
@@ -61,6 +72,12 @@ type Props = {
 }
 
 const money = (n: number) => `NT$${Math.round(n).toLocaleString()}`
+/** what moves the bond, in a line each way (items 359, 370, 361) */
+const BOND_HOW = {
+  zh: '↑ 稱讚（上班滿 4 小時，一天一次）+3｜員工餐 +4｜休息夠 +1｜加薪 +5 起｜薪水高於行情 每天 +1｜住二樓（想住的人）每天 +1　↓ 超過 10 小時 -2｜累壞 -3｜發不出薪水 -8｜減薪 -8｜薪水低於行情 每天 -1｜拒絕住宿 -4',
+  ja: '↑ 褒める（4時間以上、1日1回）+3｜まかない +4｜よく休む +1｜昇給 +5〜｜相場より高い 毎日 +1｜二階住み（希望者）毎日 +1　↓ 10時間超え -2｜疲労 -3｜給料未払い -8｜減給 -8｜相場より低い 毎日 -1｜住み込み拒否 -4',
+  en: 'Up: praise (after 4 h, once a day) +3 | staff meal +4 | rested +1 | a raise +5 and down | pay over the going rate +1 a day | living upstairs (if wanted) +1 a day   Down: past 10 h -2 | worn out -3 | unpaid -8 | a cut -8 | pay under the going rate -1 a day | lodging refused -4',
+}
 /** a 1..100 rating as a short bar, with its number */
 const Stat = ({ label, v }: { label: string; v: number }) => (
   <span className="ofc-stat" title={`${label} ${v}`}>
@@ -76,7 +93,8 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  * fill it. (Buying in is done on the 試做 board itself, tag by tag.)
  */
 export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll, today, onShift,
-  pairs, atmos, mealDone, mealCost, onPraise, onMeal, seeing = null, canAsk, canGoOut, onAskOut, onGoOut }: Props) {
+  pairs, atmos, mealDone, mealCost, onPraise, onMeal, seeing = null, canAsk, canGoOut, onAskOut, onGoOut, praiseOk, hoursOf, payOf, marketOf, onPay, lodgers = 0,
+  onLodge }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -100,7 +118,8 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
   // (two shifts' worth of every job (game/shifts, the owner's); the wages are the shift on duty's)
   const shiftRoles = roles.map((r) => ({ ...r, max: r.max * 2 }))
   const onToday = (w: Worker) => !!hired[w.id] && worksOn(hired[w.id].shift, today)
-  const wages = people.filter(onToday).reduce((s, w) => s + w.wage, 0)
+  // (what they're paid now, raises and cuts in (item 370))
+  const wages = people.filter(onToday).reduce((s, w) => s + (payOf ? payOf(w) : w.wage), 0)
   const shiftLabel = (k: Shift) => (k === 'both' ? t3('全勤', '通し', 'Both') : t3(`${k} 班`, `${k} 番`, `Shift ${k}`))
   // (taking someone on in a full job (替換): who they'd replace, chosen from those in it, the two compared side by side first (the owner's));
   // and a word as it's done
@@ -254,14 +273,30 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                       <span className="ofc-energy" title={t('精神', '元気')}>
                         <i style={{ width: `${100 - hired[w.id].fatigue}%` }} />
                       </span>
-                      <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}{isTired(hired[w.id].fatigue) && <em className="ofc-tired" title={t('能力減半・動作變慢', '能力半減・動きが遅い')}>{t('疲勞', '疲労')}</em>}{dot}{money(w.wage)}/h</small>
+                      <small>{t('精神', '元気')} {Math.round(100 - hired[w.id].fatigue)}{isTired(hired[w.id].fatigue) && <em className="ofc-tired" title={t('能力減半・動作變慢', '能力半減・動きが遅い')}>{t('疲勞', '疲労')}</em>}</small>
                       {/* (their feeling for the owner, and a word of praise, once a day (item 323)) */}
-                      <span className="ofc-bond" title={t3(`好感度 ${Math.round(bondOf(hired[w.id].bond))}：稱讚、員工餐、讓人休息會升，超過十小時、累壞、店裡沒錢會降`,
-                        `好感度 ${Math.round(bondOf(hired[w.id].bond))}：褒める、まかない、休ませると上がり、10 時間超え、疲労、資金不足で下がる`,
-                        `Bond ${Math.round(bondOf(hired[w.id].bond))}: up with praise, a staff meal, rest; down with days past ten hours, wearing out, an empty till`)}>
-                        <Glyph id="heart" size={11} /><i><b style={{ width: `${bondOf(hired[w.id].bond)}%` }} /></i><em>{Math.round(bondOf(hired[w.id].bond))}</em>
-                        <button type="button" className="ofc-praise" disabled={hired[w.id].praised === today} onClick={() => onPraise(w)}>
-                          {hired[w.id].praised === today ? t3('已稱讚', '褒めた', 'Praised') : t3('稱讚', '褒める', 'Praise')}</button>
+                      {(() => {
+                        // (its band, what it does, how far to the next, and what moves it (items 359, 370))
+                        const b = Math.round(bondOf(hired[w.id].bond)), st = stageOf(b), nm = (x: { zh: string; ja: string; en: string }) => t3(x.zh, x.ja, x.en)
+                        const next = st.next ? t3(`再 ${st.toNext} 到「${st.next.zh}」`, `あと ${st.toNext} で「${st.next.ja}」`, `${st.toNext} more to ${st.next.en}`) : t3('已經是最高', '最高の段階', 'At the top')
+                        return (
+                          <span className={`ofc-bond is-st${st.k}`} title={`${t3('好感度', '好感度', 'Bond')} ${b}（${nm(st.stage)}）：${nm(st.stage.does)}｜${next}\n${BOND_HOW[lang === 'ja' ? 'ja' : lang === 'en' ? 'en' : 'zh']}`}>
+                            <Glyph id="heart" size={11} /><i><b style={{ width: `${b}%` }} /></i><em>{b}</em><span className="ofc-stage">{nm(st.stage)}</span>
+                          </span>
+                        )
+                      })()}
+                      <span className="ofc-bond-acts">
+                        {(() => {
+                          const done = hired[w.id].praised === today, ok = praiseOk ? praiseOk(w) : !done
+                          const h = hoursOf?.(w) ?? 0
+                          return (
+                            <button type="button" className="ofc-praise" disabled={!ok} onClick={() => onPraise(w)}
+                              title={done ? t3('今天已經稱讚過了', '今日はもう褒めた', 'Already praised today')
+                                : ok ? t3(`今天上了 ${h.toFixed(1)} 小時的班，稱讚他（好感 +3，一天一次）`, `今日 ${h.toFixed(1)} 時間働いた。褒める（好感度 +3、1日1回）`, `On ${h.toFixed(1)} h today: praise them (bond +3, once a day)`)
+                                  : t3(`今天還沒有值得稱讚的表現（上班滿 ${PRAISE_AFTER_H} 小時後才能稱讚）`, `まだ褒めるほどの働きがない（${PRAISE_AFTER_H} 時間働いてから）`, `Nothing to praise yet (after ${PRAISE_AFTER_H} hours on today)`)}>
+                              {done ? t3('已稱讚', '褒めた', 'Praised') : t3('稱讚', '褒める', 'Praise')}</button>
+                          )
+                        })()}
                         {/* (seeing each other: so marked, and a date on a day the shop's shut; fond enough, a woman of age, him seeing no one: ask her out
                             (game/romance, item 340)) */}
                         {seeing === w.id ? (<>
@@ -274,6 +309,49 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
                             title={t3('好感度夠高了，鼓起勇氣約她（越喜歡越容易答應）', '好感度が十分。思い切って誘う（好きなほど OK しやすい）', 'Fond enough: ask her out (the fonder, the likelier a yes)')}>
                             {t3('告白', '告白', 'Ask out')}</button>
                         ) : null}
+                      </span>
+                      {/* (their pay, a raise or a cut (item 370); living upstairs, asked for, offered, moving out (item 361)) */}
+                      <span className="ofc-pay-row">
+                        {(() => {
+                          const pay = payOf ? payOf(w) : w.wage, mk = marketOf?.(w) ?? w.wage, raised = pay - w.wage
+                          const vs = pay >= mk * 1.1 ? t3('高於行情：每天好感 +1', '相場より高い：毎日好感度 +1', 'Over the going rate: bond +1 a day')
+                            : pay < mk * 0.9 ? t3('低於行情：每天好感 -1', '相場より低い：毎日好感度 -1', 'Under the going rate: bond -1 a day') : t3('跟行情差不多', '相場並み', 'About the going rate')
+                          return (<>
+                            <span className="ofc-pay" title={t3(`時薪 ${money(pay)}（行情 ${money(mk)}）｜${vs}`, `時給 ${money(pay)}（相場 ${money(mk)}）｜${vs}`, `${money(pay)}/h (going rate ${money(mk)}) | ${vs}`)}>
+                              {money(pay)}/h{raised !== 0 && <em className={raised > 0 ? 'is-up' : 'is-down'}>{raised > 0 ? `+${raised}` : raised}</em>}</span>
+                            <button type="button" className="ofc-praise" disabled={raised >= RAISE_MAX} onClick={() => onPay?.(w, 1)}
+                              title={t3(`加薪 NT$${RAISE_STEP}/時：好感上升（第一次 +5，之後遞減）`, `時給 NT$${RAISE_STEP} 上げる：好感度アップ（初回 +5、以後減る）`, `A raise of NT$${RAISE_STEP}/h: closer (+5 the first time, less after)`)}>
+                              {t3('加薪', '昇給', 'Raise')}</button>
+                            <button type="button" className="ofc-praise" disabled={raised <= -CUT_MAX} onClick={() => onPay?.(w, -1)}
+                              title={t3(`減薪 NT$${RAISE_STEP}/時：好感 -8`, `時給 NT$${RAISE_STEP} 下げる：好感度 -8`, `A cut of NT$${RAISE_STEP}/h: bond -8`)}>
+                              {t3('減薪', '減給', 'Cut')}</button>
+                          </>)
+                        })()}
+                        {(() => {
+                          const r = hired[w.id], full = lodgers >= DORM_CAP
+                          const why = lodgeWhy(w.id), wy = t3(why.zh, why.ja, why.en)
+                          if (r.lives) return (<>
+                            <em className="ofc-lodge is-in" title={t3('住在二樓：不用通勤；想住的人每天好感 +1', '二階に住む：通勤なし。住みたかった人は毎日好感度 +1', 'Lives upstairs: no commute; bond +1 a day if they wanted it')}>
+                              {t3('住二樓', '二階住み', 'Upstairs')}</em>
+                            <button type="button" className="ofc-praise" onClick={() => onLodge?.(w, 'out')}
+                              title={wantsLodging(w.id) ? t3('請他搬出（他想住，好感 -6）', '出てもらう（住みたいので好感度 -6）', 'Ask them to move out (they want to stay: bond -6)') : t3('請他搬出', '出てもらう', 'Ask them to move out')}>
+                              {t3('請搬出', '退去', 'Move out')}</button>
+                          </>)
+                          if (r.lodgeAsk !== undefined) return (<>
+                            <em className="ofc-lodge is-ask" title={wy}>{t3('想住二樓', '住み込み希望', 'Asks to live in')}</em>
+                            <button type="button" className="ofc-praise" disabled={full} onClick={() => onLodge?.(w, 'yes')}
+                              title={full ? t3(`二樓已住滿（${DORM_CAP} 人）`, `二階は満室（${DORM_CAP} 人）`, `Upstairs is full (${DORM_CAP})`) : t3(`答應：${wy}`, `許可：${wy}`, `Yes: ${wy}`)}>{t3('准', '許可', 'Yes')}</button>
+                            <button type="button" className="ofc-praise" onClick={() => onLodge?.(w, 'no')}
+                              title={t3('不准：好感 -4，一星期內不再提', '断る：好感度 -4、1週間は言わない', 'No: bond -4, won\'t ask for a week')}>{t3('不准', '断る', 'No')}</button>
+                          </>)
+                          return (
+                            <button type="button" className="ofc-praise" disabled={full} onClick={() => onLodge?.(w, 'offer')}
+                              title={full ? t3(`二樓已住滿（${lodgers}/${DORM_CAP}）`, `二階は満室（${lodgers}/${DORM_CAP}）`, `Upstairs is full (${lodgers}/${DORM_CAP})`)
+                                : t3(`邀他住二樓（${lodgers}/${DORM_CAP}）：想住的人一定答應，不想住的看好感`, `二階に誘う（${lodgers}/${DORM_CAP}）：住みたい人は必ず、そうでない人は好感度次第`,
+                                  `Offer the room upstairs (${lodgers}/${DORM_CAP}): yes if they want it, else as fond as they are`)}>
+                              {t3('邀住宿', '住み込み', 'Offer room')}</button>
+                          )
+                        })()}
                       </span>
                     </div>
                     {/* (their shift: A, B, or both (the owner's); not while the shop's open: they'd vanish from their place) */}

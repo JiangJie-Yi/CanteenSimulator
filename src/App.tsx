@@ -48,7 +48,7 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { ATMOS, dutyDay, idleTick, LAST_CALL, LATE, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { ATMOS, dutyDay, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -94,7 +94,10 @@ import { FirstDayGuide } from '@/ui/FirstDayGuide'
 import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from '@/game/hiring'
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
 import { crewChatTick } from '@/shops/grill/crewTalk'
-import { atmosphere, bondAfter, bondOf, bondPace, dayBond, dayPairs, givesNotice, LOW_BOND, MEAL_COST, moodPace, pairKey, QUIT_AFTER, WORN_AT } from '@/game/affinity'
+import { atmosphere, bondAfter, bondOf, bondPace, canPraise, CUT_BOND, CUT_MAX, dayBond, dayPairs, givesNotice, LOW_BOND, MEAL_COST, moodPace, pairKey, payBond, QUIT_AFTER,
+  RAISE_MAX, RAISE_STEP, raiseBond, WORN_AT } from '@/game/affinity'
+import { asksToday, DORM_CAP, hasRoom, lodgeDayBond, lodgeWhy, MOVE_OUT_BOND, movesOut, NO_BOND, takesOffer, wantsLodging } from '@/game/lodging'
+import { wageOf } from '@/game/hiring'
 import { canConfess, canDate, confess, DATE_COST, dayRomance, goOnDate, ROMANCE_ATMOS } from '@/game/romance'
 import { keptForResume, resumeFrom } from '@/game/resume'
 import { Office, type OfficeTab } from '@/ui/Office'
@@ -1497,7 +1500,7 @@ export default function App() {
    * cooks who live upstairs, and the shop's own server when none's hired */
   const commuters = () => {
     const d = DISHES[active].id
-    const crew = staffOf(d).filter((w) => commuteOf(w.role) === 'home')
+    const crew = staffOf(d).filter((w) => commuteOf(w.role, w.id) === 'home')
     return staffOf(d, 'server').length ? crew : [...crew, { id: 'house-server', zh: '', ja: '', role: 'server' as Role }]
   }
   /** a word from one of the staff (or the owner): over their head, and in the log with their name */
@@ -1647,13 +1650,86 @@ export default function App() {
    */
   const praise = (dishId: string, w: Hand) => {
     const today = dutyDay(ai), r = hired[dishId]?.[w.id]
-    if (!r || r.praised === today) return
+    if (!r || !canPraise(hoursToday(w.id), r.praised === today)) return
     setHired((h) => ({ ...h, [dishId]: { ...h[dishId], [w.id]: { ...h[dishId][w.id], bond: bondAfter(h[dishId][w.id].bond, 'praise'), praised: today } } }))
     const pool = lang === 'ja' ? ['ありがとうございます！頑張ります。', '恐縮です、えへへ。', '店長にそう言ってもらえると嬉しいです。']
       : lang === 'en' ? ['Thanks, boss! I will keep at it.', 'Oh, you flatter me.', 'That makes my day, boss.']
         : ['謝謝老闆！我會繼續加油的。', '老闆過獎了，嘿嘿。', '被老闆這樣說，今天值得了。']
     talk('staff', `${personName(w, lang)}${lang === 'en' ? ': ' : '：'}「${pool[Math.floor(Math.random() * pool.length)]}」`)
   }
+  /** (item 370) what they're paid an hour: what they were hired at, and their raise (or cut) */
+  const payOf = (dishId: string, w: { id: string; wage: number }) => w.wage + (hired[dishId]?.[w.id]?.raise ?? 0)
+  /** a raise (dir 1) or a cut (dir -1) of RAISE_STEP an hour (game/affinity): their bond up as the raise is their first or more, or down at
+   * a cut; said in the log */
+  const changePay = (dishId: string, w: Hand, dir: 1 | -1) => {
+    const r = hired[dishId]?.[w.id]
+    if (!r) return
+    const was = r.raise ?? 0, now = Math.max(-CUT_MAX, Math.min(RAISE_MAX, was + dir * RAISE_STEP))
+    if (now === was) return
+    const bond = Math.max(0, Math.min(100, bondOf(r.bond) + (dir > 0 ? raiseBond(Math.max(0, was)) : CUT_BOND)))
+    setHired((h) => ({ ...h, [dishId]: { ...h[dishId], [w.id]: { ...h[dishId][w.id], raise: now, bond } } }))
+    const name = personName(w, lang), pay = 'NT$' + (w.wage + now).toLocaleString('en-US')
+    talk('staff', dir > 0
+      ? tl(lang, `幫${name}加薪到 ${pay}/時。${name}：「真的嗎？謝謝老闆，我會更努力！」`, `${name}の時給を${pay}に上げた。${name}「本当ですか？ありがとうございます、頑張ります！」`,
+        `Gave ${name} a raise to ${pay}/h. ${name}: "Really? Thank you, boss, I will work even harder!"`)
+      : tl(lang, `把${name}的時薪降到 ${pay}。${name}低下頭，沒有說話。`, `${name}の時給を${pay}に下げた。${name}はうつむいて黙った。`,
+        `Cut ${name}'s pay to ${pay}/h. ${name} looked down and said nothing.`))
+  }
+  /** how many hours they've been on today (clocked in since the opening) */
+  const hoursToday = (id: string) => { const since = ON_DUTY.in.get(id); return since === undefined || !ai ? 0 : Math.max(0, (minutesNow() - since) / 60) }
+  /** how many of the staff live upstairs */
+  const lodgerCount = (dishId: string) => Object.values(hired[dishId] ?? {}).filter((r) => r.lives).length
+  /** living upstairs (game/lodging, item 361): their asking answered yes or no; an offer made; asked to move out. Said in the log */
+  const lodge = (dishId: string, w: Hand, act: 'yes' | 'no' | 'offer' | 'out') => {
+    const today = dutyDay(ai), r = hired[dishId]?.[w.id]
+    if (!r) return
+    const name = personName(w, lang), why = lodgeWhy(w.id)[lang === 'ja' ? 'ja' : lang === 'en' ? 'en' : 'zh']
+    const set = (patch: Partial<typeof r>) => setHired((h) => ({ ...h, [dishId]: { ...h[dishId], [w.id]: { ...h[dishId][w.id], ...patch } } }))
+    if ((act === 'yes' || act === 'offer') && !hasRoom(lodgerCount(dishId))) return
+    if (act === 'yes') {
+      set({ lives: true, lodgeAsk: undefined })
+      talk('staff', tl(lang, `讓${name}住進二樓。${name}：「太好了，謝謝老闆！」`, `${name}を二階に住ませた。${name}「助かります、ありがとうございます！」`,
+        `Let ${name} move in upstairs. ${name}: "That's a weight off, thank you!"`))
+    } else if (act === 'no') {
+      set({ lodgeAsk: undefined, lodgeNo: today, bond: Math.max(0, bondOf(r.bond) + NO_BOND) })
+      talk('staff', tl(lang, `沒答應${name}住宿的事。${name}：「……我知道了。」（一星期內不會再提）`, `${name}の住み込みを断った。${name}「……わかりました。」（1週間は言わない）`,
+        `Turned down ${name}'s asking to live in. ${name}: "...I see." (Won't ask again for a week)`))
+    } else if (act === 'offer') {
+      if (takesOffer(w.id, bondOf(r.bond), Math.random())) {
+        set({ lives: true, lodgeAsk: undefined })
+        talk('staff', tl(lang, `邀${name}住二樓。${name}：「可以嗎？那就麻煩老闆了！」`, `${name}に二階に住まないかと誘った。${name}「いいんですか？お世話になります！」`,
+          `Offered ${name} the room upstairs. ${name}: "Really? I'd love to!"`))
+      } else {
+        set({ lodgeNo: today })
+        talk('staff', tl(lang, `邀${name}住二樓。${name}：「謝謝老闆，不過我${why}……」婉拒了。`, `${name}に二階に住まないかと誘った。${name}「ありがたいんですが、${why}ので……」と断った。`,
+          `Offered ${name} the room upstairs. ${name}: "Thank you, but... ${why}." Declined.`))
+      }
+    } else {
+      set({ lives: false, bond: Math.max(0, bondOf(r.bond) + (wantsLodging(w.id) ? MOVE_OUT_BOND : 0)) })
+      talk('staff', tl(lang, `請${name}搬出二樓。`, `${name}に二階から出てもらった。`, `Asked ${name} to move out from upstairs.`))
+    }
+  }
+  // (who lives upstairs (item 361): the rotas' `lives`, kept for the walks, the room upstairs and the chart; a save from before it, its cooks
+  // who lived in as their job had them living in still, three at most)
+  useEffect(() => {
+    LODGERS.clear()
+    for (const ws of Object.values(hired)) for (const [id, r] of Object.entries(ws)) if (r.lives) LODGERS.add(id)
+  }, [hired])
+  const lodgingMoved = useRef(false)
+  useEffect(() => {
+    if (lodgingMoved.current) return
+    lodgingMoved.current = true
+    const isChef = (shop: string, id: string) => CANDIDATES[shop]?.find((w) => w.id === id)?.role === 'chef'
+    if (!Object.entries(hired).some(([shop, ws]) => Object.entries(ws).some(([id, r]) => r.lives === undefined && isChef(shop, id)))) return
+    setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => {
+      let n = Object.values(ws).filter((r) => r.lives).length
+      return [shop, Object.fromEntries(Object.entries(ws).map(([id, r]) => {
+        if (r.lives !== undefined || !isChef(shop, id) || n >= DORM_CAP) return [id, r]
+        n++
+        return [id, { ...r, lives: true }]
+      }))]
+    })))
+  }, [hired])
   /** (item 340, game/romance) the one of the staff the owner's seeing, if any (one at a time) */
   const seeing = (dishId: string) => Object.entries(hired[dishId] ?? {}).find(([, r]) => r.dating !== undefined)?.[0] ?? null
   /** asking her out: yes or no by the dice, as fond as she is; said in the log */
@@ -1712,14 +1788,14 @@ export default function App() {
   const chefOf = (dishId: string): Chef => {
     const all = [...staffOf(dishId, 'chef'), ...staffOf(dishId, 'sous')]
     const cooks = staffOf(dishId, 'chef').length ? staffOf(dishId, 'chef') : staffOf(dishId, 'sous')
-    if (!cooks.length) return { ...CHEFS[1], id: 'owner', skill: 0.7, cooks: 1, wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0) }
+    if (!cooks.length) return { ...CHEFS[1], id: 'owner', skill: 0.7, cooks: 1, wagePerHour: staffOf(dishId).reduce((n, w) => n + payOf(dishId, w), 0) }
     // (how able each is today: their fatigue, the deep night, and how they feel for the owner and the shop's air (game/affinity, item 323))
     const best = cooks.map((w) => ({ w, e: effective(w, hired[dishId][w.id].fatigue, LATE.on) * bondPace(hired[dishId][w.id].bond) * ATMOS.pace }))
       .sort((a, b) => b.e - a.e)[0]
     const sp = best.w.speed / 100
     return { id: best.w.id, zh: best.w.zh, ja: best.w.ja, pace: Math.max(0.35, 1.7 - best.e * 0.7 - sp * 0.6),
       pullAt: 1.25 - best.e * 0.25, seasonChance: Math.min(1, 0.25 + best.e * 0.8),
-      wagePerHour: staffOf(dishId).reduce((n, w) => n + w.wage, 0), skill: best.e, cooks: all.length + 1 }
+      wagePerHour: staffOf(dishId).reduce((n, w) => n + payOf(dishId, w), 0), skill: best.e, cooks: all.length + 1 }
   }
   const [guestsBy, setGuestsBy] = useState<Record<string, GuestView[]>>({})
   const guestsRef = useRef(guestsBy)
@@ -2742,7 +2818,7 @@ export default function App() {
 
   // running costs: the chef's wages while the AI chef is working
   // (the day's shift, each one's hourly wage: paid as they're clocked in (item 336))
-  const shiftNow = staffOf(DISHES[active].id).map((w) => ({ id: w.id, wage: w.wage }))
+  const shiftNow = staffOf(DISHES[active].id).map((w) => ({ id: w.id, wage: payOf(DISHES[active].id, w) }))
   const aiRef = useRef({ ai, crew: shiftNow, shop: DISHES[active].id })
   aiRef.current = { ai, crew: shiftNow, shop: DISHES[active].id }
   const stockRef = useRef(stock)
@@ -3145,22 +3221,40 @@ export default function App() {
             if (r.last !== day) continue
             const since = ON_DUTY.in.get(id)
             const out = dayBond(r.bond, { hours: since === undefined ? 0 : (nowM - since) / 60, fatigue: r.fatigue, unpaid }, r.low)
-            res.set(id, out)
             const w = CANDIDATES[shop]?.find((x) => x.id === id)
-            if (!w) continue
-            crew.push({ id, dorm: commuteOf(w.role) === 'dorm', worn: r.fatigue >= WORN_AT })
+            if (!w) { res.set(id, out); continue }
+            // (paid against the going rate, and living in as they wanted (items 370, 361))
+            out.bond = Math.max(0, Math.min(100, out.bond + payBond(w.wage + (r.raise ?? 0), wageOf(w.role, w)) + lodgeDayBond(id, r.lives)))
+            res.set(id, out)
+            crew.push({ id, dorm: !!r.lives, worn: r.fatigue >= WORN_AT })
             if (givesNotice(out.low)) quits.push({ shop, w })
             else if (out.low === QUIT_AFTER - 1) warns.push(w)
           }
           // (and seeing each other (game/romance, item 340): her feeling up a little each day; fallen too low, it's over)
           const breakups: Hand[] = []
+          // (and living upstairs (game/lodging, item 361): one who wants to and is fond enough asks; one fallen out with him moves out)
+          const asks: Hand[] = [], leaves: Hand[] = []
           setHired((h) => Object.fromEntries(Object.entries(h).map(([shop, ws]) => [shop, Object.fromEntries(Object.entries(ws)
             .filter(([id]) => !quits.some((q) => q.shop === shop && q.w.id === id))
             .map(([id, r]) => {
               const rom = dayRomance({ ...shutDay(r, day), ...(res.get(id) ?? {}) })
               if (rom.brokeUp) { const w = CANDIDATES[shop]?.find((x) => x.id === id); if (w && !breakups.includes(w)) breakups.push(w) }
-              return [id, rom.r]
+              let next = rom.r
+              const w = CANDIDATES[shop]?.find((x) => x.id === id)
+              if (w && movesOut(next)) { next = { ...next, lives: false }; if (!leaves.includes(w)) leaves.push(w) }
+              else if (w && asksToday(id, next, day + 1)) { next = { ...next, lodgeAsk: day + 1 }; if (!asks.includes(w)) asks.push(w) }
+              return [id, next]
             }))])))
+          window.setTimeout(() => {
+            for (const w of asks) {
+              const why = lodgeWhy(w.id)[lang === 'ja' ? 'ja' : lang === 'en' ? 'en' : 'zh']
+              talk('staff', tl(lang, `${personName(w, lang)}：「老闆，我可以住二樓嗎？${why}……」（到辦公室的員工卡片准或不准）`,
+                `${personName(w, lang)}「店長、二階に住ませてもらえませんか？${why}……」（事務所のスタッフカードで決める）`,
+                `${personName(w, lang)}: "Boss, could I live upstairs? ${why}..." (Yes or no on their card in the office)`))
+            }
+            for (const w of leaves) talk('staff', tl(lang, `${personName(w, lang)}搬出了二樓：「我還是自己住好了。」`, `${personName(w, lang)}が二階を出た。「やっぱり自分で部屋を借ります。」`,
+              `${personName(w, lang)} moved out from upstairs: "I'd rather find my own place."`))
+          }, 0)
           window.setTimeout(() => {
             for (const w of breakups) talk('staff', tl(lang, `${personName(w, lang)}：「老闆，我們……就到這裡吧。最近真的太累了。」兩人分手了。`,
               `${personName(w, lang)}「店長、私たち……ここまでにしましょう。最近、本当に疲れてしまって。」二人は別れた。`,
@@ -3593,7 +3687,7 @@ export default function App() {
             omiki={omikiProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests}
-            livingOf={(id) => (CANDIDATES[id] ?? []).filter((w) => hired[id]?.[w.id] && commuteOf(w.role) === 'dorm').map((w) => ({ id: w.id, role: w.role, look: w.look }))}
+            livingOf={(id) => (CANDIDATES[id] ?? []).filter((w) => hired[id]?.[w.id]?.lives).map((w) => ({ id: w.id, role: w.role, look: w.look }))}
             phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />}
         </Canvas>}
         </Crash>
@@ -3751,6 +3845,9 @@ export default function App() {
             shopOpen={ai}
             pairs={pairs} atmos={atmosNow} mealDone={mealDay === dutyDay(ai)} mealCost={MEAL_COST * staffOf(dish.id).length}
             onPraise={(w) => praise(dish.id, w)} onMeal={() => giveMeal(dish.id)}
+            praiseOk={(w) => canPraise(hoursToday(w.id), hired[dish.id]?.[w.id]?.praised === dutyDay(ai))} hoursOf={(w) => hoursToday(w.id)}
+            payOf={(w) => payOf(dish.id, w)} marketOf={(w) => wageOf(w.role, w)} onPay={(w, dir) => changePay(dish.id, w, dir)}
+            lodgers={lodgerCount(dish.id)} onLodge={(w, act) => lodge(dish.id, w, act)}
             seeing={seeing(dish.id)} canAsk={(w) => { const r = hired[dish.id]?.[w.id]; return !!r && canConfess(w, r, dutyDay(ai), seeing(dish.id) !== null) }}
             canGoOut={(w) => { const r = hired[dish.id]?.[w.id]; return !!r && canDate(r, dutyDay(ai), ai) && cash >= DATE_COST }}
             onAskOut={(w) => askOut(dish.id, w)} onGoOut={(w) => goOut(dish.id, w)}

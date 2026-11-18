@@ -2,7 +2,7 @@ import { personName } from '@/data/people'
 import type { Lang } from '@/data/i18n'
 import { tl } from '@/data/i18n'
 import type { Worker } from '@/data/staff'
-import { BOND_START, bondOf, moodWord, pairKey } from '@/game/affinity'
+import { BOND_STAGES, BOND_START, bondOf, moodWord, pairKey } from '@/game/affinity'
 import { commuteOf } from '@/game/commute'
 import type { Rota } from '@/game/shifts'
 import { onShift } from '@/game/shifts'
@@ -62,7 +62,7 @@ export function Relations({ people, hired, pairs, atmos, today, lang }: {
             {spots.map((s) => <line key={s.w.id} x1={MID} y1={MID} x2={s.x} y2={s.y} stroke={warmth(s.bond)} strokeWidth={width(s.bond)} opacity={s.on ? 0.95 : 0.35} />)}
             {/* (the owner lives upstairs, and the cooks: a little house by each) */}
             {house(MID + FACE * 0.62, MID - FACE * 0.62)}
-            {spots.filter((s) => commuteOf(s.w.role) === 'dorm').map((s) => <g key={s.w.id}>{house(s.x + FACE * 0.62, s.y - FACE * 0.62)}</g>)}
+            {spots.filter((s) => commuteOf(s.w.role, s.w.id) === 'dorm').map((s) => <g key={s.w.id}>{house(s.x + FACE * 0.62, s.y - FACE * 0.62)}</g>)}
             {spots.filter((s) => hired[s.w.id].dating !== undefined).map((s) => <g key={`h${s.w.id}`}>{heart((s.x + MID) / 2, (s.y + MID) / 2)}</g>)}
           </svg>
           <span className="rel-face is-owner" style={{ left: MID - FACE / 2, top: MID - FACE / 2 }} title={tl(lang, '老闆（你）', '店主（あなた）', 'Owner (you)')}>
@@ -84,6 +84,19 @@ export function Relations({ people, hired, pairs, atmos, today, lang }: {
         <span><svg width="14" height="14" viewBox="-8 -7 16 15" className="rel-dorm-key"><path d="M-7 1 L0 -6 L7 1 L5 1 L5 7 L-5 7 L-5 1 Z" /></svg>{tl(lang, '住宿', '住み込み', 'Lives in')}</span>
         <span><svg width="14" height="14" viewBox="-8 -8 16 14" className="rel-heart-key"><path d="M0 4.5 C-7.5 -1 -4.5 -7.5 0 -3.6 C4.5 -7.5 7.5 -1 0 4.5 Z" /></svg>{tl(lang, '交往中', '交際中', 'Dating')}</span>
         <span>{tl(lang, '實線老闆、虛線同事', '実線は店主、点線は同僚', 'Solid: you · dashed: each other')}</span>
+      </p>
+      {/* (what the numbers mean (item 359, the owner's 「關係系統有點看不懂」): the bond's four bands, and what the atmosphere is) */}
+      <p className="rel-key rel-bands">
+        {BOND_STAGES.map((st, k) => (
+          <span key={st.zh} title={tl(lang, st.does.zh, st.does.ja, st.does.en)}>
+            <b>{tl(lang, st.zh, st.ja, st.en)}</b>{st.at}{k < BOND_STAGES.length - 1 ? `–${BOND_STAGES[k + 1].at - 1}` : '–100'}
+          </span>
+        ))}
+        <span>{tl(lang, '頭像下的數字是對老闆的好感，線越粗越好', '顔の下の数字は店主への好感度、線が太いほど良い', 'The number under each face is their bond with you; the thicker the line, the better')}</span>
+      </p>
+      <p className="rel-key rel-bands">
+        <span>{tl(lang, '工作氣氛：今天上班的人對老闆和彼此的好感平均，越高做事越快', '職場の空気：今日の出勤者の店主と互いへの好感度の平均。高いほど作業が速い',
+          'Atmosphere: how today\'s crew feel for you and each other, together; the warmer, the quicker the work')}</span>
       </p>
     </div>
   )
