@@ -7,6 +7,7 @@ import { keep } from '@/game/hotKeep'
 import { emptyKama, type Kama } from '@/game/rice'
 import { emptyPot, type Heat, type SoupPot } from '@/game/soup'
 import { fullStand } from '@/game/sakeStand'
+import { readTasted, taste } from '@/game/sakeTasting'
 import type { Gripe } from '@/game/reputation'
 import { BOX_SHEETS } from '@/game/tissues'
 import type { Use } from '@/game/utilities'
@@ -1079,6 +1080,16 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * `station`: whether there's a station and someone to pour at it (none, Roasting sets it at their place itself after SAKE_WAIT_S);
  * `unpoured`: who's been sold a tokkuri that's still to be poured (its sake, taken from the stock as it was ordered, still in the bottle)
  */
+/** the stand's makes the owner's tasted (item 363, game/sakeTasting): kept in the browser (TASTED_KEY; cleared only by starting over), read
+ * by the orders (Roasting: more add a tokkuri) and the stand (Decor: their notes on the bottles) */
+export const TASTED_KEY = 'jgs-sake-tasted-1'
+export const SAKE_TASTED = keep(import.meta.hot, 'SAKE_TASTED', { list: (() => { try { return readTasted(localStorage.getItem(TASTED_KEY)) } catch { return [] as number[] } })() })
+/** bottle `k` drunk from at the stand: its first tasting kept (and said whether it was) */
+export const tasteSake = (k: number) => {
+  const r = taste(SAKE_TASTED.list, k)
+  if (r.first) { SAKE_TASTED.list = r.list; try { localStorage.setItem(TASTED_KEY, JSON.stringify(r.list)) } catch { /* storage blocked */ } }
+  return r.first
+}
 export const SAKE: { levels: number[]; served: number; want: number[]; ready: Set<number>; open: number; station: boolean; unpoured: Set<number> } =
   keep(import.meta.hot, 'SAKE', { levels: fullStand(), served: 0, want: [], ready: new Set(), open: 1, station: false, unpoured: new Set() })
 // (kept over a hot update from when the stand had fewer bottles (item 285: eight to twelve): the ones it didn't have, full)

@@ -54,6 +54,7 @@ import { RICE_SIDE, riceName } from '@/data/sides'
 import { SHAPE_S, fromTray, takeRice } from '@/game/rice'
 import { SOUP_SERVE_S, SOUP_SIDE, soupReady, takeBowl } from '@/game/soup'
 import { SAKE_SERVE_S, SAKE_SIDE, SAKE_WAIT_S } from '@/game/sakeStand'
+import { sideChance as sakeChance } from '@/game/sakeTasting'
 import { CubbyStock } from './KitchenStores'
 import { QUALITY } from '@/scene/quality'
 import { seasonSound, sprinkleTick } from './seasonSound'
@@ -71,7 +72,7 @@ import { bestStage, PAIRING, PAIRING_DEFAULT, stageOf as seasonStage, timingLoss
 import type { Step } from '@/game/types'
 import type { GuestView } from '@/game/types'
 import { CRATE, DECOR, Decor, FREEZER, FRIDGE_KICK, backToCrate, liftFromCrate, takeFromCrate, type Held } from './Decor'
-import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, RIDERS, TAKEOUT_SPOT, TAKEOUT_STAND, SERVE_COUNTER, barToFire, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
+import { BOARD, COAL_BRIDGE, DRAWER_HELD, IRONS, SAKE, SAKE_SEATS, SAKE_TASTED, SOUP, SOUP_SEATS, SHRINE_FLOWERS, WC_GRUMBLE, setTissues, tissuesAt, TAKEOUT, RIDERS, TAKEOUT_SPOT, TAKEOUT_STAND, SERVE_COUNTER, barToFire, BENCH, BENCH_SEATS, BENCH_WAIT, PULLED } from './bar'
 import { BOX_SHEETS } from '@/game/tissues'
 import { fireAmbience } from './fireAmbience'
 import { fireSound } from '@/game/fireSound'
@@ -6567,7 +6568,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       // (and some a tokkuri of sake, sat at the bar (item 89, the owner's: "it's on the menu, the customers order it"; they never did): charged
       // and taken from the stock as any order is, poured from the stand)
       // (never to one under age (item 203: a pupil was poured one like anyone))
-      if (seated && orders.length && !isMinor(id) && Math.random() < SAKE_SIDE && onOrder?.('Sake', id, false)) {
+      // (more of them for each make the owner's tasted at the stand: the floor staff speak for it (item 363, game/sakeTasting))
+      if (seated && orders.length && !isMinor(id) && Math.random() < sakeChance(SAKE_SIDE, SAKE_TASTED.list) && onOrder?.('Sake', id, false)) {
         orders.push('Sake')
         said.push(nameOf('Sake'))
         // (theirs till it's poured: out of the stock, still in the bottle (item 199))

@@ -17,7 +17,7 @@ import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
-import { ONIGIRI_TRAY, OWNER_GRILL, RICE, SOUP, SAKE, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf, DRINK_BACK } from './bar'
+import { ONIGIRI_TRAY, OWNER_GRILL, RICE, SOUP, SAKE, SAKE_TASTED, tasteSake, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf, DRINK_BACK } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
@@ -33,7 +33,9 @@ import { useBinchotan } from './binchotanModel'
 import { inkModel } from '@/scene/inkHull'
 import { warmLater } from '@/scene/Prewarm'
 import { reflectStudio, useStudio } from '@/scene/studio'
-import { bottleFrom, goOf, pour, poursLeft, SAKE_BOTTLE_ML } from '@/game/sakeStand'
+import { bottleFrom, goOf, pour, poursLeft, SAKE_BOTTLE_ML, SAKE_SIDE } from '@/game/sakeStand'
+import { canTaste, SAKE_NOTES, sideChance } from '@/game/sakeTasting'
+import { SHOP } from '@/game/shopState'
 import { Tokkuri, TOKKURI_H } from './Tokkuri'
 import { AnchoredLight } from '@/scene/AnchoredLight'
 
@@ -1740,6 +1742,22 @@ const dryTip = (shochu: boolean, fresh: boolean, done: boolean) => ({
   title: shochu ? '燒酒' : '清酒',
   hint: `${done ? '倒完了' : '空瓶'}｜${fresh ? (shochu ? '從後場拿了一瓶新的' : '從庫存開了一瓶新的') : shochu ? '後場沒有燒酒了，到飲料庫存訂貨' : '清酒沒有庫存了，到庫存訂貨'}`,
 })
+/** the stand's words in the page's language (item 363: each make's notes are its own, not in the tips' table) */
+const pick3 = (t: readonly [string, string, string]) => {
+  const l = typeof document === 'undefined' ? 'zh' : document.documentElement.lang
+  return l === 'ja' ? t[1] : l === 'en' ? t[2] : t[0]
+}
+/** what's said of bottle `k` pointed at (item 363): its make and grade; tasted, its notes and what it goes with; how to taste it, or, the
+ * shop open, that the customers' is poured at the pass */
+const bottleSays = (k: number) => {
+  const n = SAKE_NOTES[k], open = !canTaste(!!SHOP.open), shochu = k === SHOCHU_K
+  const known = SAKE_TASTED.list.includes(k)
+  const notes = known ? `${pick3(n.grade)}｜${pick3(n.taste)}｜${pick3(['配', '合う料理：', 'With '])}${pick3(n.with)}` : `${pick3(n.grade)}｜${pick3(['還沒試飲', 'まだ試飲していない', 'Not tasted yet'])}`
+  const how = open ? pick3(['營業中｜客人的清酒由三廚在出餐口倒', '営業中｜お客さんの酒は三番手が出し口で注ぐ', 'Open｜The customers’ sake is poured at the pass'])
+    : shochu ? pick3(['按住拖到燒酒杯上方倒一杯，再點杯子喝掉', 'グラスの上へドラッグして一杯注ぎ、グラスをクリックして飲む', 'Drag it over a glass to pour, then click the glass to drink'])
+      : pick3(['按住拖到德利或燒酒杯上方倒一杯，再點一下喝掉', '徳利か杯の上へドラッグして注ぎ、クリックして飲む', 'Drag it over the tokkuri or a glass to pour, then click to drink'])
+  return { title: pick3(n.name), hint: `${notes}｜${how}` }
+}
 function SakeStand() {
   useStudio()
   const gltf = useGLTF(SAKESTAND_URL) as unknown as { scene: THREE.Group }
@@ -1789,6 +1807,8 @@ function SakeStand() {
   }, [shochu])
   /** what's full of what's been poured: the tokkuri (till it's taken to a customer, or emptied), and each glass (till it's clicked empty) */
   const full = useRef<boolean[]>([false, false, false, false])
+  /** which bottle each of them was poured from (the tokkuri, the three glasses): drunk, that make's tasted (item 363) */
+  const pouredFrom = useRef<number[]>([-1, -1, -1, -1])
   const stream = useRef<THREE.Mesh>(null)
   const group = useRef<THREE.Group>(null)
   /**
@@ -1867,6 +1887,7 @@ function SakeStand() {
         if (b.liquid) b.liquid.scale.y = Math.max(0.02, (b.shochu ? SHOCHU_LEVEL.v : SAKE.levels[d.b]) - (d.t / POUR_S) * (b.shochu ? 1 / SHOCHU_CUPS : 0.1))
         if (d.t >= POUR_S) {
           full.current[over] = true
+          pouredFrom.current[over] = d.b
           // (poured empty: a new one in its place only from the stock (item 199: it stood full again, sake in stock or none), the sake's
           // as full as there's sake for, the shochu a bottle from the spares in the back; none, it's left standing empty)
           if (b.shochu) {
@@ -1922,6 +1943,8 @@ function SakeStand() {
     const k = bottleOf(e.object)
     if (k < 0 || !bottles[k]) return
     e.stopPropagation()
+    // (the shop open, it's only to look at: the customers' is poured at the pass, and the owner's at the fire (item 363))
+    if (!canTaste(!!SHOP.open)) { setTip(bottleSays(k)); return }
     const b = bottles[k]
     // (an empty one taken up: a new one in its place from the stock, if there's any now (item 199); none, it's carried empty, pouring nothing)
     if (dryAt(k)) {
@@ -1962,7 +1985,7 @@ function SakeStand() {
       // (an empty one: whether there's a new one to be had (item 199))
       const more = shochu_ ? (DRINK_BACK.back.shochu ?? 0) > 0 : SUPPLIES.has('Sake') !== 0
       setTip(dryAt(k) ? { title: shochu_ ? '燒酒' : '清酒', hint: more ? `空瓶｜${shochu_ ? '拿起來從後場拿一瓶新的' : '拿起來從庫存開一瓶新的'}` : dryTip(shochu_, false, false).hint }
-        : { title: shochu_ ? '燒酒' : '清酒', hint: shochu_ ? '按住拖到燒酒杯上方倒酒' : '按住拖到德利或燒酒杯上方倒酒' })
+        : bottleSays(k))
     }
   }
   const onOut = () => { if (!drag.current) { document.body.style.cursor = ''; setTip(null) } }
@@ -1976,7 +1999,22 @@ function SakeStand() {
     full.current[i] = false
     const l = targets[i].liquid
     if (l) l.scale.y = 0.001
-    setTip({ title: '燒酒杯', hint: '空的｜拖一支酒到上方倒酒｜自己試喝用，客人的酒杯在出餐口' })
+    drunk(i)
+  }
+  /** what was poured into target `i` drunk (item 363): the first of its make a tasting, its notes written down and said, the staff to speak
+   * for it; after, just drunk */
+  const drunk = (i: number) => {
+    const k = pouredFrom.current[i]
+    pouredFrom.current[i] = -1
+    if (k < 0 || !SAKE_NOTES[k]) return
+    const n = SAKE_NOTES[k], name = pick3(n.name)
+    if (tasteSake(k)) {
+      const pct = Math.round(sideChance(SAKE_SIDE, SAKE_TASTED.list) * 100)
+      setTip({ title: `${pick3(['試飲', '試飲', 'Tasted'])}：${name}`,
+        hint: `${pick3(n.grade)}｜${pick3(n.taste)}｜${pick3(['配', '合う料理：', 'With '])}${pick3(n.with)}${k === SHOCHU_K ? '' : `｜${pick3(['外場會推薦給客人：加點清酒的客人', 'ホールが勧める：お酒を頼む人', 'The floor will recommend it: customers adding sake'])} ${pct}%`}` })
+      window.dispatchEvent(new CustomEvent('jgs-owner-says', { detail: pick3([`試飲了${name}：${pick3(n.taste)}，配${pick3(n.with)}。`,
+        `${name}を試飲：${pick3(n.taste)}。${pick3(n.with)}に合う。`, `Tasted ${name}: ${pick3(n.taste)}. Good with ${pick3(n.with)}.`]) }))
+    } else setTip({ title: name, hint: `${pick3(['喝掉了', '飲み干した', 'Drunk'])}｜${pick3(n.taste)}` })
   }
   // (the tokkuri on the step: full after a pour, a click empties it; pointed at, what it holds and what to do)
   const onJugClick = (e: { stopPropagation: () => void }) => {
@@ -1984,22 +2022,22 @@ function SakeStand() {
     e.stopPropagation()
     if (!full.current[0]) return
     full.current[0] = false
-    setTip({ title: '德利', hint: '空的｜拖一支清酒到上方倒酒' })
+    drunk(0)
   }
   const onJugOver = (e: { stopPropagation: () => void }) => {
     if (getEdit().on || drag.current) return
     e.stopPropagation()
-    setTip({ title: '德利', hint: full.current[0] ? '倒滿了｜點一下清空' : '空的｜拖一支清酒到上方倒酒' })
+    setTip({ title: '德利', hint: full.current[0] ? '倒滿了｜點一下喝掉（試飲）' : '空的｜閉店時拖一支清酒到上方倒一杯' })
   }
   const onCupOver = (e: { stopPropagation: () => void; object: THREE.Object3D }) => {
     const c = cupOf(e.object)
     if (c < 0 || getEdit().on || drag.current) return
     const i = targets.findIndex((t) => t.cup === c)
     // (the owner's own glasses, for tasting (item 235, the owner's 「小酒杯放在那要怎到給客人?」): the customers' cups are at the sake station)
-    setTip({ title: '燒酒杯', hint: `${full.current[i] ? '倒滿了｜點一下喝掉' : '空的｜拖一支酒到上方倒酒'}｜自己試喝用，客人的酒杯在出餐口` })
+    setTip({ title: '燒酒杯', hint: `${full.current[i] ? '倒滿了｜點一下喝掉（試飲）' : '空的｜閉店時拖一支酒到上方倒一杯'}｜老闆試飲用，客人的酒杯在出餐口` })
   }
   return (
-    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '店裡賣的清酒，擺給客人看（客人點的從酒櫃拿）｜老闆自己試倒試喝用：按住一支酒拖到德利或燒酒杯上方倒酒｜客人的清酒在出餐口倒、用那裡的酒杯端出去｜稲穂川、朝霞川、雪嶺錦、玄雪、澄藍、鶴汀、瑠璃灘、月汀桜、雲雀谷、楓霞、雪見舟、燒酒')}>
+    <group ref={group} position={SAKESTAND_AT} rotation-y={SAKESTAND_TURN} scale={SAKESTAND_SCALE} {...nameOver('酒台', '店裡賣的清酒，擺給客人看｜閉店時老闆可以試飲：拖一支倒一杯、點一下喝掉，記下風味與適合的菜｜試飲過的酒外場會推薦，加點清酒的客人變多｜營業中客人的清酒由三廚在出餐口倒')}>
       <primitive object={obj} onPointerDown={onDown} onPointerOver={onOver} onPointerOut={onOut} />
       <primitive object={shochu} onPointerDown={onDown} onPointerOver={(e: { stopPropagation: () => void; object: THREE.Object3D }) => { onOver(e); onCupOver(e) }}
         onPointerOut={onOut} onClick={onCupClick} />

@@ -53,7 +53,7 @@ import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { BOARD_SLOTS } from '@/game/fireSlots'
-import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, payIn, RIDERS, setDrinkPanel, SHOP_PURSE, SIDE_SALE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
+import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, TASTED_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, payIn, RIDERS, setDrinkPanel, SHOP_PURSE, SIDE_SALE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { unitCost } from '@/game/drinkStock'
 import { RICE_SIDE, riceName } from '@/data/sides'
 import { deselectAll, getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
@@ -1428,7 +1428,7 @@ export default function App() {
   const closingAt = useRef(0)
   useEffect(() => { if (closing) closingAt.current = gameMinutes(); else SHOP.hurry = false }, [closing])
   const [leaving, setLeaving] = useState(false)
-  useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving }, [closing, leaving])
+  useEffect(() => { SHOP.closing = closing; SHOP.leaving = leaving; SHOP.open = ai }, [closing, leaving, ai])
   // (the door's lanterns lit as the shop opens and put out at its last order (the owner's: shut, or the room's lights off for the night,
   // they still shone on): their switch by the way in thrown by the shop itself; pressed by hand, it still puts them out or lights them between)
   useEffect(() => { setLightSwitch('door', lanternsLit(ai, closing)) }, [ai, closing])
@@ -2390,6 +2390,12 @@ export default function App() {
     window.addEventListener('jgs-menu', ask)
     return () => window.removeEventListener('jgs-menu', ask)
   }, [ai])
+  // (a line of the owner's from the room itself, into the log: his tasting at the sake stand (item 363))
+  useEffect(() => {
+    const said = (e: Event) => { const t = (e as CustomEvent<string>).detail; if (t) talk('owner', t) }
+    window.addEventListener('jgs-owner-says', said)
+    return () => window.removeEventListener('jgs-owner-says', said)
+  }, [talk])
   // (every panel heard as it opens and as it shuts (the owner's): the rating's drawer, the office, the stock, the drinks, the views' menu,
   // the menu folded away and back, the developer's panel)
   usePanelSound(showRating)
@@ -3210,6 +3216,8 @@ export default function App() {
       localStorage.removeItem(VISITS_KEY)
       localStorage.removeItem(DAYS_KEY)
       localStorage.removeItem(TISSUES_KEY)
+      // (and the sake the owner's tasted at the stand (item 363))
+      localStorage.removeItem(TASTED_KEY)
       // (and this tab's kept progress, from a lost 3D view: never brought back over the fresh start)
       sessionStorage.removeItem(RESUME_KEY)
     } catch {
