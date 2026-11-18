@@ -3708,12 +3708,12 @@ export default function App() {
       {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
       {ai && (
         <button type="button" className="menu-fold" onClick={() => setMenuFolded((f) => !f)} disabled={!!(owner !== null && !opened[dish.id])}
-          aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
+          aria-expanded={!menuFolded} aria-label={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu} title={menuFolded ? UI[lang].showMenu : UI[lang].hideMenu}>
           <span aria-hidden="true" />
         </button>
       )}
       <button type="button" className="tools-toggle" onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
-        aria-label={UI[lang].tools}><Glyph id={toolsOpen ? 'close' : 'menu'} size="1.1em" /></button>
+        aria-label={UI[lang].tools} title={UI[lang].tools}><Glyph id={toolsOpen ? 'close' : 'menu'} size="1.1em" /></button>
       <button type="button" className={`ai-toggle${ai ? ' is-on' : ''}`} onClick={() => {
         // (opening with nothing a customer could order would only shut again at once: say what's missing instead)
         if (!ai && entriesOf(dish.id).length < (MENU_MIN[dish.id] ?? 1)) {
@@ -3741,7 +3741,8 @@ export default function App() {
         aria-pressed={ai} title={UI[lang].aiLabel}>
         {ai ? (closing ? (tl(lang, '準備閉店', '閉店準備中', 'Closing up')) : UI[lang].shopOpen) : UI[lang].shopClosed}
       </button>
-      <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel}>
+      {/* (each round button says what it does as the pointer rests on it (item 273): these three only told a screen reader) */}
+      <button type="button" className="lang-toggle" onClick={toggleLang} aria-label={UI[lang].langLabel} title={UI[lang].langLabel}>
         {UI[lang].lang}
       </button>
       {/* (the game's day and time, under the round buttons (the owner's): day and night come round with it) */}
