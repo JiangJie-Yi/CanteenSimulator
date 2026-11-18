@@ -15,6 +15,7 @@ import type { HearthRole } from '@/game/hearthGuard'
 import { glowLeave, glowOnly, HOVER } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { openingFloat, payCash, type DrawerCash, type Tab } from '@/game/till'
+import type { CalmKind } from '@/game/calm'
 import { LOW_FULL, RACK_FULL, type Dryer, type Drain } from '@/game/plates'
 import { PILE_START } from '@/game/sinkPile'
 import type { Flower } from '@/game/shrineFlowers'
@@ -759,6 +760,11 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 export const TILL_CASH: { drawer: DrawerCash; onTake: ((amount: number) => void) | null
   onPaid: ((guest: number, amount: number, card: boolean) => void) | null; paid: Set<number> } =
   keep(import.meta.hot, 'TILL_CASH', { drawer: openingFloat(), onTake: null, onPaid: null, paid: new Set() })
+/** the owner seeing to customers kept waiting (item 348, game/calm): asked from their label (GuestBar3D's CalmButton), done on the kitchen's
+ * next beat (Roasting: their wait's start moved on, the owner's word and theirs); what each's been given; `onDone` (App's) books a dish's
+ * cost */
+export const CALM_ASK = keep(import.meta.hot, 'CALM_ASK', { q: [] as { id: number; kind: CalmKind }[], used: new Map<number, CalmKind[]>(),
+  onDone: null as ((id: number, kind: CalmKind) => void) | null })
 /** a customer's bill paid at the till, once: cash into the drawer, and the shop's books told (GuestBar3D: as the cash key's pressed, or
  * as they're by the till if a frame went past that moment; item 195: the register put it in the drawer only on the frame the key went
  * down) */

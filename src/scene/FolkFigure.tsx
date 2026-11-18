@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { GUEST_FACES, guestFaceStrip, guestFrame, type FaceKind, type GuestFace } from './faceSheet'
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
-import { LATE } from '@/game/shopState'
+import { GAZE, LATE } from '@/game/shopState'
+/** (where one's looking at a thing in the room, worked out) */
+const GZ_P = new THREE.Vector3()
 import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -686,6 +688,15 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
         if (sipping && sipK > 0.36 && sipK < 0.72) { yaw *= 0.2; pitch = sipCup ? 0.12 : 0.28 }
         if (souping && soupK > 0.36 && soupK < 0.7) { yaw *= 0.2; pitch = 0.16 }
         if (pose === 'Wipe' && wipeFrom.current !== null && performance.now() - wipeFrom.current < WIPE_REACH_MS) { yaw *= 0.2; pitch = -0.42 }
+        // (looking at a thing in the room as they speak of it (item 348, GAZE): their head turned to it as far as a neck goes, a little up)
+        const gz = GAZE.get(id)
+        if (gz && gz.until > performance.now() && !eating) {
+          fig.body.getWorldPosition(GZ_P)
+          const e = fig.body.matrixWorld.elements
+          const by = Math.atan2(e[8], e[10]), ty = Math.atan2(gz.x - GZ_P.x, gz.z - GZ_P.z)
+          yaw = Math.max(-0.9, Math.min(0.9, Math.atan2(Math.sin(ty - by), Math.cos(ty - by))))
+          pitch = 0.08
+        }
       }
       const ease = 1 - Math.exp(-dt * 3)
       look.current.yaw += (yaw - look.current.yaw) * ease

@@ -7,6 +7,7 @@ import { crewCall, crewThanks, crewWelcome } from './crewTalk'
 import { NO_RAY } from '@/scene/pickable'
 import { nextClean, sweeps, SWEEP_S, WIPE_S as FLOOR_WIPE_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
+import { CALM, calmLeft, canCalm, type CalmKind } from '@/game/calm'
 import { glowOff } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, ROLL_LOW, stockerChore, type StockChore } from '@/game/stocker'
@@ -24,7 +25,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { GuestView } from '@/game/types'
 import { MoodFace } from '@/ui/MoodFace'
 import { Glyph, StarIcon } from '@/ui/GameIcons'
-import { joySound } from '@/ui/uiSound'
+import { joySound, usePanelSound } from '@/ui/uiSound'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
@@ -102,7 +103,7 @@ import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
 import { plateGoes } from '@/game/tray'
-import { FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
+import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -8664,7 +8665,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             {/* (their label just over their head, sat up on the seat or standing) */}
             <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.08}
               dots={!!g && !walking && g.state === 'waiting' && g.rating === null} rating={g?.rating ?? null} angry={g?.state === 'angry'}
-              partner={g?.partner !== undefined} name={guestLabel(s.id, lang)} onEl={labelEl} />
+              partner={g?.partner !== undefined} name={guestLabel(s.id, lang)} onEl={labelEl}  lang={lang} />
           </group>
         )
       })}
@@ -9100,9 +9101,9 @@ const JOY_BITS = ['heart', 'star', 'heart', 'star', 'heart', 'star'] as const
 /** one customer's label over their head (what they're saying, or the dots while they wait; their face once they've eaten; their number): drawn
  * again only when one of those changes. Each is a page of its own (drei's Html renders its children into a root of their own), so drawn again
  * with every redraw of the bar, several times a second, every label was laid out again each time */
-const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partner, name, onEl }: { id: number; y: number
+const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partner, name, onEl, lang }: { id: number; y: number
   dots: boolean; rating: number | null; angry: boolean; partner: boolean; name: string
-  onEl: (id: number, el: HTMLElement | null) => void }) {
+  onEl: (id: number, el: HTMLElement | null) => void; lang: Lang }) {
   // (what they're saying, read here from ui/speechStore: only this label drawn again as it changes, not the bar, nor the page)
   const say = useSaid(id)
   const at = useMemo(() => [0, y, 0] as [number, number, number], [y])
@@ -9117,6 +9118,7 @@ const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partne
         {say ? <Say key={say.key} text={say.text} who={name} heart={partner} ms={say.ms} />
           : dots && <span className="g3-bubble"><b className="say-who">{partner && <i className="say-heart"><Glyph id="heart" size="0.9em" /></i>}{name}</b>…</span>}
         {rating !== null && <MoodFace guest={{ rating, state: angry ? 'angry' : 'done' }} />}
+        {rating === null && !angry && <CalmButton id={id} lang={lang} />}
         {loved && (
           <span className="boss-joy guest-joy" aria-hidden="true">
             {JOY_BITS.map((c, i) => <i key={i} className={`is-${c}`} style={{ '--i': i } as CSSProperties}>{c === 'star' ? <StarIcon size={17} /> : <Glyph id="heart" size={17} />}</i>)}
@@ -9126,6 +9128,46 @@ const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partne
     </Html>
   )
 })
+
+/**
+ * (item 348) a customer kept waiting, getting cross (game/calm's canCalm: a third and more of their patience gone): a button by their label
+ * to see to them, opening its ways (a word, an apology, a dish on the house), each once; asked of the kitchen (bar's CALM_ASK), done there.
+ * Its own little clock (FUMING, what they've been given), so only it is drawn again as those change
+ */
+function CalmButton({ id, lang }: { id: number; lang: Lang }) {
+  const [st, setSt] = useState<{ f: number; used: CalmKind[] }>({ f: 0, used: [] })
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const f = FUMING.get(id) ?? 0, used = CALM_ASK.used.get(id) ?? []
+      setSt((s) => (Math.abs(s.f - f) < 0.02 && s.used.length === used.length ? s : { f, used }))
+    }, 300)
+    return () => window.clearInterval(t)
+  }, [id])
+  const shown = canCalm(st.f, st.used)
+  usePanelSound(open && shown)
+  if (!shown) return null
+  const t3 = (zh: string, ja: string, en: string) => tl(lang, zh, ja, en)
+  const pct = (k: CalmKind) => Math.round(CALM[k].back * 100)
+  const label: Record<CalmKind, string> = { greet: t3('招呼', '声かけ', 'A word'), sorry: t3('道歉', 'お詫び', 'Apologise'),
+    side: t3(`送小菜 NT$${CALM.side.cost}`, `お通し NT$${CALM.side.cost}`, `A dish NT$${CALM.side.cost}`) }
+  const tip: Record<CalmKind, string> = {
+    greet: t3(`跟他說馬上就好：可以多等 ${pct('greet')}%`, `すぐですと声をかける：${pct('greet')}% 長く待てる`, `Tell them it's nearly done: ${pct('greet')}% more patience`),
+    sorry: t3(`跟他道歉：可以多等 ${pct('sorry')}%`, `お詫びする：${pct('sorry')}% 長く待てる`, `Apologise: ${pct('sorry')}% more patience`),
+    side: t3(`招待一盤毛豆（NT$${CALM.side.cost}）：可以多等 ${pct('side')}%`, `枝豆をサービス（NT$${CALM.side.cost}）：${pct('side')}% 長く待てる`,
+      `Edamame on the house (NT$${CALM.side.cost}): ${pct('side')}% more patience`),
+  }
+  return (
+    <span className="calm">
+      <button type="button" className="calm-btn" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+        title={t3('客人等太久了：安撫他', 'お待たせしすぎ：なだめる', 'Kept waiting too long: calm them')}>{t3('安撫', 'なだめる', 'Calm')}</button>
+      {open && calmLeft(st.used).map((k) => (
+        <button key={k} type="button" className="calm-opt" title={tip[k]} onClick={(e) => { e.stopPropagation(); CALM_ASK.q.push({ id, kind: k }); setOpen(false) }}>
+          {label[k]}</button>
+      ))}
+    </span>
+  )
+}
 
 /** a sake's cup beside its bottle: this much nearer the customer (lay) and along to their right */
 const CUP_AHEAD = 0.07

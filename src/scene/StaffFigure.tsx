@@ -430,6 +430,11 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   }, [fig, own.skin, own.hair])
   // (their name tag's words (App keeps who's who); their role alone before it's known)
   const nameTag = useMemo(() => () => SPEAKERS.get(id) ?? ROLE_TAG[role], [id, role])
+  /** (what a click on them does, in the page's language (item 348)) */
+  const staffHint = useMemo(() => () => {
+    const l = document.documentElement.lang
+    return l.startsWith('ja') ? 'クリック：褒める・急かす' : l.startsWith('en') ? 'Click: praise or hurry them' : '點一下：稱讚或催促'
+  }, [])
   // (their face (setExpression): what they're doing says it; a squash and stretch as it changes, or as they start to say something)
   const faceWas = useRef<{ face: CrewFace; at: number; said: number; saidAt: number; carry: boolean; wipe: boolean }>({ face: 'idle', at: -1e9, said: 0, saidAt: -1e9, carry: false, wipe: false })
   // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
@@ -702,7 +707,12 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   return (
     <group ref={outer} userData={{ staffRole: role }}>
       {/* (named as the pointer's over them: their role and name; never to be dragged, they keep to their work. Not in the viewer) */}
-      {!id.startsWith('viewer-') && <FigureHit title={nameTag} />}
+      {/* (and clicked: the owner's ways with them, praise or a push (App's popover, item 348)) */}
+      {!id.startsWith('viewer-') && <FigureHit title={nameTag} hint={staffHint} onPointerDown={(e) => {
+        if ((e.nativeEvent as PointerEvent).button !== 0) return
+        e.stopPropagation()
+        window.dispatchEvent(new CustomEvent('jgs-staff', { detail: { id, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY } }))
+      }} />}
       {/* (a server's tray with a cup of tea on it, the stock keeper's clipboard: parts of the one mesh, shown as they're held) */}
       <primitive object={fig.root} />
     </group>

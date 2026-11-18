@@ -48,12 +48,12 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { ATMOS, CREW_ROLES, dutyDay, moodFor, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { ATMOS, CREW_ROLES, dutyDay, moodFor, URGED, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
 import { BOARD_SLOTS } from '@/game/fireSlots'
-import { BOARD, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, TASTED_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, payIn, RIDERS, setDrinkPanel, SHOP_PURSE, SIDE_SALE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
+import { BOARD, CALM_ASK, COAL_BRIDGE, DRINK_PANEL, DRINKS, DRINKS_KEY, TASTED_KEY, type DrinkId, onDrinkPanel, onPantryAsk, onPantryShut, PANTRY, payIn, RIDERS, setDrinkPanel, SHOP_PURSE, SIDE_SALE, TILL_CASH, TILL_STATE } from '@/shops/grill/bar'
 import { unitCost } from '@/game/drinkStock'
 import { RICE_SIDE, riceName } from '@/data/sides'
 import { deselectAll, getEdit, offsetOf, positionOf, rotationOf, setCharHidden, setEditLang, setViewCams, toggleEdit, useEditSel, type V3 } from '@/shops/grill/edit'
@@ -68,6 +68,10 @@ import { HoverTip } from '@/ui/HoverTip'
 import { DustPuffs } from '@/scene/DustPuffs'
 import { RegisterManual } from '@/ui/RegisterManual'
 import { TillPanel, type TillDay } from '@/ui/TillPanel'
+import { StaffPop, type StaffPopAt } from '@/ui/StaffPop'
+import { CALM } from '@/game/calm'
+import { URGE_BOND, urgeOk, urgeWait } from '@/game/urge'
+import { URGE_OWNER, URGE_STAFF } from '@/data/calmLines'
 import { REGISTER } from '@/shops/grill/cashRegister'
 import type { Restock } from '@/ui/Menu'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
@@ -97,7 +101,7 @@ import { CANDIDATES, pickHires, refreshApplicants, ROLLS_PER_DAY, valueOf } from
 import { arrange, onShift, openDay, shutDay, type Rota, type Shift } from '@/game/shifts'
 import { crewChatTick } from '@/shops/grill/crewTalk'
 import { atmosphere, bondAfter, bondOf, bondPace, canPraise, CUT_BOND, CUT_MAX, dayBond, dayPairs, givesNotice, LOW_BOND, MEAL_COST, moodPace, pairKey, payBond, QUIT_AFTER,
-  RAISE_MAX, RAISE_STEP, raiseBond, WORN_AT } from '@/game/affinity'
+  PRAISE_AFTER_H, RAISE_MAX, RAISE_STEP, raiseBond, WORN_AT } from '@/game/affinity'
 import { asksToday, DORM_CAP, hasRoom, lodgeDayBond, lodgeWhy, MOVE_OUT_BOND, movesOut, NO_BOND, takesOffer, wantsLodging } from '@/game/lodging'
 import { wageOf } from '@/game/hiring'
 import { canConfess, canDate, confess, DATE_COST, dayRomance, goOnDate, ROMANCE_ATMOS } from '@/game/romance'
@@ -1661,6 +1665,27 @@ export default function App() {
     // (and on their face in the room a while: shy at it (item 368))
     moodFor(w.id, 'shy', 3600)
   }
+  /** (item 348, game/urge) one of the staff urged on: quicker a while, a little less fond, not again for a while; the owner's word and theirs */
+  const urge = (dishId: string, w: Hand) => {
+    const now = performance.now()
+    if (!urgeOk(URGED.get(w.id), now)) return
+    URGED.set(w.id, now)
+    setHired((h) => {
+      const r = h[dishId]?.[w.id]
+      return r ? { ...h, [dishId]: { ...h[dishId], [w.id]: { ...r, bond: Math.max(0, Math.min(100, bondOf(r.bond) + URGE_BOND)) } } } : h
+    })
+    moodFor(w.id, 'surprised', 1600)
+    sayStaff.current('owner', URGE_OWNER, SHOP.day, Math.floor(Math.random() * 3))
+    window.setTimeout(() => sayStaff.current(w.id, URGE_STAFF, SHOP.day, Math.floor(Math.random() * 3)), 1100)
+  }
+  // (one of the staff clicked in the room (StaffFigure's jgs-staff): the owner's ways with them by the pointer (ui/StaffPop))
+  const [staffPop, setStaffPop] = useState<StaffPopAt | null>(null)
+  const closeStaffPop = useCallback(() => setStaffPop(null), [])
+  useEffect(() => {
+    const on = (e: Event) => setStaffPop((e as CustomEvent<StaffPopAt>).detail)
+    window.addEventListener('jgs-staff', on)
+    return () => window.removeEventListener('jgs-staff', on)
+  }, [])
   /** (item 370) what they're paid an hour: what they were hired at, and their raise (or cut) */
   const payOf = (dishId: string, w: { id: string; wage: number }) => w.wage + (hired[dishId]?.[w.id]?.raise ?? 0)
   /** a raise (dir 1) or a cut (dir -1) of RAISE_STEP an hour (game/affinity): their bond up as the raise is their first or more, or down at
@@ -3458,13 +3483,15 @@ export default function App() {
     // (a bill paid at the till, as the cash key's pressed (bar's payIn): settled; cash into the drawer, apart from the cash in hand till it's
     // taken out; a card's in hand at once)
     SIDE_SALE.sell = (id, guest) => sellSideRef.current(id, guest)
+    // (a customer kept waiting given a dish on the house (item 348, game/calm): its cost the shop's)
+    CALM_ASK.onDone = (_id, kind) => { if (CALM[kind].cost) book('food', CALM[kind].cost) }
     TILL_CASH.onPaid = (guest, amount, card) => {
       for (const tabs of Object.values(bills.current)) { const t = tabs[guest]; if (t) { t.settled = true; owing.current.delete(t) } }
       // (a card's money in the bank at once, less what the card company keeps of it (game/costs, item 210))
       if (card) { setPaidTick((n) => n + 1); book('cardFee', cardFee(amount)) }
       else book('tillIn', amount)
     }
-    return () => { TILL_CASH.onTake = null; TILL_CASH.onPaid = null; SIDE_SALE.sell = () => false }
+    return () => { TILL_CASH.onTake = null; TILL_CASH.onPaid = null; CALM_ASK.onDone = null; SIDE_SALE.sell = () => false }
   }, [])
   // skewers count toward the fire's limit; potatoes in the ash and mochi on the net have their own
   const isSkewer = (id: string) => !!dish.roast && id in dish.roast.times && !dish.roast.loose.includes(id)
@@ -4118,6 +4145,19 @@ export default function App() {
           onSkipTime={() => setClock({ ...getClock(), minute: OPEN_AT })} onDone={guideDone} />
       )}
       <RegisterManual lang={lang} />
+      {(() => {
+        const w = staffPop ? staffOf(dish.id).find((x) => x.id === staffPop.id) : undefined
+        const r = w ? hired[dish.id]?.[w.id] : undefined
+        const h = w ? hoursToday(w.id) : 0, done = r?.praised === dutyDay(ai), ok = !!w && !!r && canPraise(h, done)
+        return (
+          <StaffPop lang={lang} at={w ? staffPop : null} name={w ? (SPEAKERS.get(w.id) ?? personName(w, lang)) : ''} praiseOk={ok}
+            praiseWhy={done ? tl(lang, '今天已經稱讚過了', '今日はもう褒めた', 'Already praised today')
+              : ok ? tl(lang, `上了 ${h.toFixed(1)} 小時的班：稱讚（好感 +3）`, `${h.toFixed(1)} 時間勤務：褒める（好感度 +3）`, `On ${h.toFixed(1)} h: praise (bond +3)`)
+                : tl(lang, `上班滿 ${PRAISE_AFTER_H} 小時後才能稱讚`, `${PRAISE_AFTER_H} 時間働いてから褒められる`, `Praise after ${PRAISE_AFTER_H} hours on`)}
+            urgeWait={w ? urgeWait(URGED.get(w.id), performance.now()) : 0}
+            onPraise={() => { if (w) praise(dish.id, w); setStaffPop(null) }} onUrge={() => { if (w) urge(dish.id, w); setStaffPop(null) }} onClose={closeStaffPop} />
+        )
+      })()}
       <TillPanel lang={lang} open={tillOpen} cash={cash} read={tillDrawer} locked={tillLocked} onTake={tillTake} onTakings={tillTakings} onAll={tillAll}
         onLedger={tillLedger} onClose={closeTill}
         today={((): TillDay => {

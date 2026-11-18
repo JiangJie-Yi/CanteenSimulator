@@ -1,5 +1,6 @@
 import { paceBoost, paceOf, SLACK_AFTER, TIRED_AT, type Role, type SkillId } from '@/data/staff'
 import { keep } from './hotKeep'
+import { urgePace } from './urge'
 
 /**
  * Where the shop is in closing (App writes it, the scenes read it): `closing` once the owner has shut up for the day, so no
@@ -47,8 +48,14 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * App keeps both (item 323) */
 export const STAFF_BOND = keep(import.meta.hot, 'STAFF_BOND', new Map<string, number>())
 export const ATMOS = keep(import.meta.hot, 'ATMOS', { value: 50, pace: 1 })
+/** when each of the staff was last urged on (performance.now(); game/urge, item 348): quicker a while after */
+export const URGED = keep(import.meta.hot, 'URGED', new Map<string, number>())
 export const paceOfStaff = (id: string | null | undefined) =>
   !id ? 1 : paceOf(STAFF_TIRED.has(id) ? TIRED_AT : 0, paceBoost({ skills: STAFF_SKILLS.get(id) }, LATE.on)) * (STAFF_BOND.get(id) ?? 1) * ATMOS.pace
+    * urgePace(URGED.get(id), typeof performance === 'undefined' ? 0 : performance.now())
+/** a customer looking at something in the room a while (item 348: the shrine, the round window, the fridge, the lucky cat, as they say a word
+ * of it): where (the world's x, z), till when (performance.now()); FolkFigure turns their head to it */
+export const GAZE = keep(import.meta.hot, 'GAZE', new Map<number, { x: number; z: number; until: number }>())
 
 /** a word said by one of the staff (or the owner, 'owner'), shown over their head till `until` (performance.now()) */
 export type StaffWord = { key: number; id: string; text: string; until: number }

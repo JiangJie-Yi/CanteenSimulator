@@ -3,7 +3,9 @@ import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 import { TONG_S, TONG_TAKE_S, TRAY_PLACES, trayPlace } from '@/game/tray'
-import { DORM_LIFE, FIRE_FLARE, FUMING, KAKUBAT } from './bar'
+import { CALM_ASK, DORM_LIFE, FIRE_FLARE, FUMING, KAKUBAT } from './bar'
+import { calmedSince } from '@/game/calm'
+import { CALM_GUEST, CALM_OWNER, PROP_TALK } from '@/data/calmLines'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -91,7 +93,9 @@ import { EditBlock, Movable } from './Movable'
 import { PLATE_SPREAD, plateFor, plateSide, type PlateKind } from '@/game/plateSize'
 import { BAMBOO_WARE, forPhone, PLUM_WARE, wareGeometry } from './ware'
 import { wareDesign } from './wareDesigns'
-import { SHOP, clockIn, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
+import { GAZE, SHOP, STAFF_SAY, clockIn, idleTick, paceOfStaff, LATE, LAST_CALL, RATING_FLOW, STAFF_TALK } from '@/game/shopState'
+/** (where a customer's looking, worked out) */
+const GAZE_AT = new THREE.Vector3()
 import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
@@ -132,6 +136,8 @@ const SIDE_EAT_S = 12
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
   /** the one they came in with (a couple, sat side by side) */
   partner?: number
+  /** (shop clock) when they'll say a word of the room's things, if they do (item 348); -1 once it's come */
+  propAt?: number
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
   leftAt?: number; cleared?: boolean
   /** (shop clock) till when they're eating their bowl of rice or soup (item 205: set down, it was eaten that moment, and one whose last it
@@ -6731,6 +6737,36 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // fire never reached them: up and off mid-meal, refunded, a bad word left)
     // (how near the end of their patience each one waiting for their first dish is, for their face and the steam off them (item 347))
     for (const id of [...FUMING.keys()]) if (!seated.some((g) => g.id === id)) FUMING.delete(id)
+    for (const id of [...CALM_ASK.used.keys()]) if (!seated.some((g) => g.id === id)) CALM_ASK.used.delete(id)
+    // (the owner seeing to those kept waiting (item 348, game/calm): each way once, their wait's start moved on; the owner's word, then theirs)
+    {
+      const limit = PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience
+      for (const a of CALM_ASK.q.splice(0)) {
+        const g = seated.find((x) => x.id === a.id)
+        const used = CALM_ASK.used.get(a.id) ?? []
+        if (!g || g.lastAte !== undefined || used.includes(a.kind)) continue
+        g.since = calmedSince(g.since, now, limit, a.kind)
+        CALM_ASK.used.set(a.id, [...used, a.kind])
+        CALM_ASK.onDone?.(a.id, a.kind)
+        STAFF_SAY.say('owner', CALM_OWNER[a.kind])
+        const back = CALM_GUEST[a.kind][lang]
+        window.setTimeout(() => onSay?.('guest', back[Math.floor(Math.random() * back.length)], a.id), 1500)
+      }
+    }
+    // (a customer sat at ease, now and then, of the room's things: a look at it and a word (item 348); once a visit at most, a third of them)
+    for (const g of seated) {
+      g.propAt ??= now + 18 + Math.random() * 50
+      if (g.propAt < 0 || now < g.propAt) continue
+      g.propAt = -1
+      if (Math.random() > 0.35 || (FUMING.get(g.id) ?? 0) > 0.3) continue
+      const things = (['altar', 'window', 'fridge', 'cat'] as const).map((k) => [k, room.getObjectByName(k === 'cat' ? 'lucky-cat' : `look-${k}`)] as const).filter(([, o]) => !!o)
+      if (!things.length) continue
+      const [k, o] = things[Math.floor(Math.random() * things.length)]
+      o!.getWorldPosition(GAZE_AT)
+      GAZE.set(g.id, { x: GAZE_AT.x, z: GAZE_AT.z, until: performance.now() + 4200 })
+      const lines = PROP_TALK[k][lang]
+      onSay?.('guest', lines[Math.floor(Math.random() * lines.length)], g.id)
+    }
     for (const g of seated) {
       const limit = PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience
       FUMING.set(g.id, g.lastAte === undefined ? Math.min(1, (now - g.since) / limit) : 0)

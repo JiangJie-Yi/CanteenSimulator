@@ -2961,6 +2961,57 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   translate: 0 -50%;
 }
 
+/* (item 348) a customer getting cross: the button to see to them under their label, its three ways beside it; pointed at and clicked (the label
+   itself lets the pointer through) */
+.g3-label .calm { display: inline-flex; gap: 4px; align-items: center; pointer-events: auto; }
+.g3-label .calm button {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: 700 12px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transition: transform 0.12s ease-out, filter 0.12s ease-out;
+}
+.g3-label .calm-btn { background: #e8823a; color: #fff; animation: calm-pop 0.36s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.g3-label .calm-btn[aria-expanded='true'] { background: #c4612a; }
+.g3-label .calm-opt { background: #fffaf0; color: #3b2a20; animation: calm-pop 0.28s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.g3-label .calm button:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.g3-label .calm button:active { transform: none; filter: brightness(0.9); transition-duration: 0s; }
+@keyframes calm-pop { from { scale: 0.6; opacity: 0; } }
+
+/* (item 348) one of the staff clicked in the room: the owner's ways with them, by the pointer */
+.staff-pop {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px 9px;
+  border-radius: 10px;
+  border: 2px solid #5a3d28;
+  background: rgb(251 246 234 / 0.97);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.35);
+  font: 14px/1.3 var(--brush);
+  color: #2a1a10;
+  animation: sheet-in 0.24s cubic-bezier(0.32, 0.72, 0, 1) backwards;
+}
+.staff-pop-name { font-size: 13px; color: #6a4a2a; white-space: nowrap; }
+.staff-pop-acts { display: flex; gap: 6px; }
+.staff-pop-acts > button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #1d6b34;
+  color: #fff;
+  font: 700 13px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.staff-pop-acts > button + button { background: #c4612a; }
+.staff-pop-acts > button:hover:not(:disabled) { filter: brightness(1.1); }
+.staff-pop-acts > button:disabled { opacity: 0.45; cursor: default; }
+
 .g3-label .mood-face {
   width: 22px;
   height: 22px;
