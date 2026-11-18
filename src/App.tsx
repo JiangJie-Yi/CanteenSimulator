@@ -32,7 +32,7 @@ import { CHEF_TALK } from '@/data/chefTalk'
 import { CHARCOAL, charcoalOrder, crateRefill, dabFrom, isSupply, GARNISH_GOODS, SEASON_GOODS, seasonId, startingSupplies, supplyName } from '@/game/supplies'
 import { menuPrice, restockOrder, topUpOrder, averageOrder, eachOrder, roomFor, coalCharge, STICKS_PER_PORTION, afterCharcoal, heatStep, canAddCharcoal, canServe, CAPITAL, cashInHand, costOf, entryCost, goodsOf, needOf, partCost, partsOf,
   keepsDry, portionsLeft, SHOP_COST, takesOf, bankrupt, savingsOf, warningsDue } from '@/game/economy'
-import { drawerFrom, drawerTotal, owedAtTill, paysByCard, refundFor, tabTotal, tenderOf, type Tab } from '@/game/till'
+import { drawerFrom, drawerTotal, owedAtTill, paysByCard, refundFor, tabTotal, takeAll, takeOut, takeTakings, tenderOf, type Denom, type DrawerCash, type Tab } from '@/game/till'
 import { Menu } from '@/ui/Menu'
 import { Crash } from '@/ui/Crash'
 import { OpeningSpot } from '@/scene/OpeningSpot'
@@ -67,6 +67,8 @@ import { Bgm } from '@/ui/Bgm'
 import { HoverTip } from '@/ui/HoverTip'
 import { DustPuffs } from '@/scene/DustPuffs'
 import { RegisterManual } from '@/ui/RegisterManual'
+import { TillPanel, type TillDay } from '@/ui/TillPanel'
+import { REGISTER } from '@/shops/grill/cashRegister'
 import type { Restock } from '@/ui/Menu'
 import { BAR_AT, BAR_TOP } from '@/shops/grill/Roasting'
 import type { GuestView, Notes, Step, Talk } from '@/game/types'
@@ -108,7 +110,7 @@ import { MOBILE } from '@/scene/flatGate'
 import { platerOf } from '@/game/kitchenCrew'
 import { HOUSE_CHEF, PIT_LIFT, Roasting, type CrewMember } from '@/shops/grill/Roasting'
 import { PhoneClosed } from '@/ui/PhoneClosed'
-import { boxesSound, dayTurnSound, stampSound, usePanelSound } from '@/ui/uiSound'
+import { boxesSound, coinSound, dayTurnSound, stampSound, usePanelSound } from '@/ui/uiSound'
 import { DaySummary } from '@/ui/DaySummary'
 import { ClosedDown } from '@/ui/ClosedDown'
 import { Glyph, StarIcon } from '@/ui/GameIcons'
@@ -1990,7 +1992,32 @@ export default function App() {
   }, [])
   const [office, setOffice] = useState<null | OfficeTab>(null)
   /** the ledger opened or shut from the cash (the same function every time: the cash chip's drawn again only as the cash changes) */
-  const openLedger = useCallback(() => setOffice((o) => (o ? null : 'ledger')), [])
+  // (the ledger and the till's panel (item 366) one at a time: the one opened puts the other away)
+  const openLedger = useCallback(() => { setTillOpen(false); setOffice((o) => (o ? null : 'ledger')) }, [])
+  // ---- the till's own panel (item 366, the owner's 「收銀櫃的錢要另外畫個介面，可以與總金額結合」): from its chip beside the cash, or the
+  // register's drawer pulled out by hand in the room (GuestBar3D's jgs-till); shut, the drawer pushed home if it was out by hand
+  const [tillOpen, setTillOpen] = useState(false)
+  const tillSum = useCallback(() => drawerTotal(TILL_CASH.drawer), [])
+  const tillDrawer = useCallback(() => TILL_CASH.drawer, [])
+  const tillLocked = useCallback(() => REGISTER.state.drawerLocked, [])
+  const toggleTill = useCallback(() => setTillOpen((o) => { if (!o) setOffice(null); else if (TILL_STATE.manual) TILL_STATE.manual = false; return !o }), [])
+  const closeTill = useCallback(() => { setTillOpen(false); if (TILL_STATE.manual) TILL_STATE.manual = false }, [])
+  /** money out of the drawer into the cash in hand, as a click on it in the room does (App's onTake: booked, the boss pleased, said) */
+  const fromTill = useCallback((r: { drawer: DrawerCash; amount: number }) => {
+    if (!r.amount || REGISTER.state.drawerLocked) return
+    TILL_CASH.drawer = r.drawer
+    TILL_CASH.onTake?.(r.amount)
+    coinSound()
+  }, [])
+  const tillTake = useCallback((k: Denom) => fromTill(takeOut(TILL_CASH.drawer, k)), [fromTill])
+  const tillTakings = useCallback(() => fromTill(takeTakings(TILL_CASH.drawer)), [fromTill])
+  const tillAll = useCallback(() => fromTill(takeAll(TILL_CASH.drawer)), [fromTill])
+  const tillLedger = useCallback(() => { setTillOpen(false); setOffice('ledger') }, [])
+  useEffect(() => {
+    const on = (e: Event) => { const out = !!(e as CustomEvent<boolean>).detail; setTillOpen(out); if (out) setOffice(null) }
+    window.addEventListener('jgs-till', on)
+    return () => window.removeEventListener('jgs-till', on)
+  }, [])
   useEffect(() => { if (office) { setFridgeOpen(false); setDrinkPanel(false) } }, [office])
   useEffect(() => { if (fridgeOpen) { setOffice(null); setDrinkPanel(false) } }, [fridgeOpen])
   useEffect(() => {
@@ -3733,7 +3760,9 @@ export default function App() {
         )}
         {/* (counting up as money comes in, what came in floating out of it: item 209) */}
         <CashChip cash={cash} open={!!office} onClick={openLedger}
-          title={tl(lang, '現金（點一下看帳簿，再點一下關上）', '現金（クリックで帳簿、もう一度で閉じる）', 'Cash (click for the ledger, again to close it)')} />
+          title={tl(lang, '現金（點一下看帳簿，再點一下關上）', '現金（クリックで帳簿、もう一度で閉じる）', 'Cash (click for the ledger, again to close it)')}
+          tillRead={tillSum} tillOpen={tillOpen} onTill={toggleTill}
+          tillTitle={tl(lang, '收銀機裡的錢（點一下打開收銀機，取出來才能用）', 'レジの中のお金（クリックでレジを開く、取り出すと使える）', "The money in the till (click to open it; it's yours to spend once taken out)")} />
         <button type="button" className="office-toggle" onClick={() => setOffice((o) => (o ? null : 'book'))} aria-expanded={!!office}
           aria-label={tl(lang, '經營', '経営', 'Office')} title={tl(lang, '經營（廚房・人事・帳簿）', '開発ノート・人事・帳簿', 'Office (kitchen · staff · ledger)')}>
           <svg className="office-icon" viewBox="0 0 28 28" aria-hidden="true">
@@ -4082,6 +4111,16 @@ export default function App() {
           onSkipTime={() => setClock({ ...getClock(), minute: OPEN_AT })} onDone={guideDone} />
       )}
       <RegisterManual lang={lang} />
+      <TillPanel lang={lang} open={tillOpen} cash={cash} read={tillDrawer} locked={tillLocked} onTake={tillTake} onTakings={tillTakings} onAll={tillAll}
+        onLedger={tillLedger} onClose={closeTill}
+        today={((): TillDay => {
+          // (the day so far, as the closing sheet will reckon it (game/daySummary), from the books at the opening; none before it's opened)
+          const s = dayStart.current
+          if (!tillOpen || !s) return null
+          const sum = daySummary(s.ledger, ledger, [], {})
+          const d = (k: keyof typeof ledger) => Math.max(0, ((ledger[k] as number | undefined) ?? 0) - ((s.ledger[k] as number | undefined) ?? 0))
+          return { from: s.from, revenue: sum.revenue, cashIn: d('tillIn'), taken: d('till'), spent: sum.revenue - sum.profit, profit: sum.profit }
+        })()} />
       <LoadingScreen scene={!NO_WEBGL && !flatGrill} />
     </div>
   )

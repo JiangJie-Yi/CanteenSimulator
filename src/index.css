@@ -4704,7 +4704,7 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 /* edit mode (G) is for arranging the scene alone: the game's own controls are shut while it's on, and greyed (the owner's: the cash, the
    stock's fridge, auto, ×2 and open/shut along the top too; the language and day/night stay) */
 .app.is-editing :is(.menu, .menu-backing, .menu-fold, .tools-toggle, .ai-toggle, .speed-toggle, .office-toggle, .auto-toggle),
-body:has(.app.is-editing) :is(.money-chip, .fridge-toggle, .ai-toggle, .speed-toggle, .auto-toggle, .office-toggle) {
+body:has(.app.is-editing) :is(.cash-pair, .fridge-toggle, .ai-toggle, .speed-toggle, .auto-toggle, .office-toggle) {
   pointer-events: none;
   opacity: 0.4;
   filter: grayscale(1);
@@ -5640,7 +5640,7 @@ html[lang='en'] .heat-label { font-size: 13px; }
 /* ---- 經營 and 自動營運, on a wide screen: round buttons at the left end of the row top right (經營 its shop front, 自動營運 自 with its
    lamp at the rim); the cash on its own at the top left where 經營 was, always in sight (a click opens the books). Narrower screens keep
    the two as they were, the cash in 經營 ---- */
-.money-chip { display: none; }
+.cash-pair { display: none; }
 .auto-toggle .auto-short { display: none; }
 @media (min-width: 600px) {
   .app .office-toggle,
@@ -5665,12 +5665,21 @@ html[lang='en'] .heat-label { font-size: 13px; }
   .app .office-toggle .office-icon { width: 27px; height: 27px; }
   .app .auto-toggle .auto-short { display: inline; font: 700 17px/1 var(--brush); }
   .app .auto-toggle .auto-lamp { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; box-shadow: 0 0 0 1.5px var(--page); }
-  .money-chip {
+  /* (the cash and the till's chip side by side, one capsule (item 366): the pair placed where the cash was) */
+  .cash-pair {
     display: flex;
     position: fixed;
     top: 20px;
     left: auto;
     z-index: 10;
+    gap: 3px;
+    align-items: center;
+    transition: margin-top 0.3s ease;
+  }
+  .money-chip,
+  .till-chip {
+    display: flex;
+    position: relative;
     height: 44px;
     align-items: center;
     padding: 0 16px 0 12px;
@@ -5679,21 +5688,179 @@ html[lang='en'] .heat-label { font-size: 13px; }
     background: var(--page);
     box-shadow: 0 4px 12px -6px rgb(59 42 32 / 0.5);
     font: 700 16px/1 var(--brush);
+    white-space: nowrap;
     cursor: pointer;
-    transition: margin-top 0.3s ease, transform 0.15s, filter 0.12s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;
+    transition: transform 0.15s, filter 0.12s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;
   }
-  .money-chip:hover { transform: translateY(-1px); }
-  .money-chip:active { transform: none; filter: brightness(0.88); transition-duration: 0s; }
-  .app.is-hushed .money-chip { display: none; }
-  .app:not(.is-hushed) .money-chip { animation: ui-pop-top 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 300ms both; }
+  /* (the till's chip the capsule's left half: its outer end round, the side against the cash square-ish) */
+  .till-chip { gap: 6px; padding: 0 12px 0 11px; border-radius: 22px 8px 8px 22px; color: #f3e4bd; }
+  .cash-pair:has(.till-chip) .money-chip { border-radius: 8px 22px 22px 8px; }
+  .till-chip-sum { color: #ffd36b; text-shadow: 0 1px 2px rgb(0 0 0 / 0.55); font-size: 15px; }
+  .till-chip-sum.is-up { display: inline-block; animation: cash-bump 520ms cubic-bezier(0.2, 1.6, 0.4, 1); }
+  .till-chip[aria-expanded='true'] { box-shadow: inset 0 0 0 1.5px #ffd36b88, 0 6px 18px -8px rgb(0 0 0 / 0.5); }
+  .money-chip:hover,
+  .till-chip:hover { transform: translateY(-1px); }
+  .money-chip:active,
+  .till-chip:active { transform: none; filter: brightness(0.88); transition-duration: 0s; }
+  .app.is-hushed .cash-pair { display: none; }
+  .app:not(.is-hushed) .cash-pair { animation: ui-pop-top 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 300ms both; }
   /* (money in (item 209, ui/CashChip): the figure bobs and shines a moment as it counts up; what came in rises out of the chip and fades) */
   .money-chip .money.is-up { display: inline-block; animation: cash-bump 520ms cubic-bezier(0.2, 1.6, 0.4, 1); }
-  .money-chip .cash-up {
+  .cash-pair .cash-up {
     position: absolute; right: 14px; top: 100%; margin-top: 4px; white-space: nowrap; pointer-events: none;
     font: 800 14px/1 var(--brush); color: #4fff85; text-shadow: 0 0 4px rgb(0 0 0 / 0.85), 0 1px 0 #0a2a14;
     animation: cash-up 1.4s ease-out forwards;
   }
+  /* (into the till: in the coins' gold) */
+  .cash-pair .cash-up.is-till { color: #ffd36b; text-shadow: 0 0 4px rgb(0 0 0 / 0.85), 0 1px 0 #3a2a08; }
 }
+
+/* ---- the till's own panel (item 366, ui/TillPanel): a sheet hung under the cash and the till's chip; all the money and its share in hand
+   and in the till; the drawer as it is in the room (the notes in their compartments behind, the coins in their cups in front), each a
+   button that takes it out; the takings or everything out; the day so far ---- */
+.till-chip:hover {
+  background: linear-gradient(180deg, rgb(66 54 40 / 0.62), rgb(32 26 20 / 0.5));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.32), 0 8px 22px -8px rgb(0 0 0 / 0.6), 0 0 18px -2px rgb(255 211 107 / 0.32);
+  filter: brightness(1.1);
+}
+.till-glyph { flex: none; color: #3b2a20; }
+.till-chip .till-glyph { color: #2a1c12; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.4)); }
+.till-panel {
+  position: fixed;
+  z-index: 30;
+  top: 76px;
+  right: 228px;
+  width: min(430px, calc(100vw - 32px));
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+  border-radius: 14px;
+  border: 4px solid #5a3d28;
+  background: linear-gradient(180deg, #fbf5e8, #f1e6cf);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.42), inset 0 0 0 2px #e6d3b0;
+  font: 14px/1.35 var(--brush);
+  color: #2a1a10;
+  animation: sheet-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) backwards;
+}
+.app.has-fridge .till-panel { right: 280px; }
+.till-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  background: var(--wood-bar);
+  color: #f6e8cc;
+}
+.till-head .till-glyph { color: #f6e8cc; }
+.till-head > b { font-size: 16px; letter-spacing: 0.3em; white-space: nowrap; }
+.till-head .panel-x { margin-left: auto; }
+.till-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 16px 4px; white-space: nowrap; }
+.till-total > span { font-weight: 700; letter-spacing: 0.15em; }
+.till-total .money { font-size: 22px; color: #1d6b34 !important; }
+.till-bar { margin: 2px 16px 0; height: 9px; border-radius: 5px; background: #d6a93a; box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25); overflow: hidden; }
+.till-bar > i { display: block; height: 100%; background: linear-gradient(180deg, #3fae5c, #1d7a3a); transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.till-split { display: flex; justify-content: space-between; gap: 10px; margin: 5px 16px 10px; font-size: 12.5px; white-space: nowrap; }
+.till-split .is-cash b { color: #1d6b34; }
+.till-split .is-till b { color: #8a6412; }
+.till-split .is-cash::before, .till-split .is-till::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: 0.05em; }
+.till-split .is-cash::before { background: #2f9a4c; }
+.till-split .is-till::before { background: #d6a93a; }
+/* (the drawer's insert: black, the notes' compartments behind, the coins' cups in front) */
+.till-tray {
+  position: relative;
+  margin: 0 12px;
+  padding: 8px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2c2a28, #1d1c1b);
+  box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.6), 0 1px 0 #fff;
+}
+.till-notes, .till-coins { display: grid; gap: 6px; }
+.till-notes { grid-template-columns: repeat(3, 1fr); }
+.till-coins { grid-template-columns: repeat(6, 1fr); margin-top: 6px; }
+.till-slot {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  padding: 6px 2px 5px;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #3a3835, #2a2826);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.7), inset 0 -1px 0 rgb(255 255 255 / 0.06);
+  color: #f1e6cf;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.12s ease-out, background 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.till-slot:hover:not(:disabled) { background: linear-gradient(180deg, #4a463f, #36332e); box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.6), 0 0 0 1.5px #ffd36b99; transform: translateY(-1px); }
+.till-slot:active:not(:disabled) { transform: translateY(1px); filter: brightness(0.9); transition-duration: 0s; }
+.till-slot:disabled { cursor: default; }
+.till-slot.is-empty .till-art, .till-slot.is-empty .till-face { opacity: 0.25; }
+.till-art { position: relative; display: grid; place-items: center; height: 34px; width: 100%; }
+/* (a note: its colour, its figure, the edges of those under it) */
+.till-slot.is-note .till-art > i {
+  display: grid;
+  place-items: center;
+  width: 78%;
+  max-width: 96px;
+  height: 28px;
+  border-radius: 2px;
+  font-style: normal;
+}
+.till-slot.is-note .till-art > i > b { font: 800 13px/1 var(--brush); letter-spacing: 0.02em; }
+/* (a coin: its metal, a hole for the 5 and the 50, a few in a heap) */
+.till-slot.is-coin .till-art > i { position: absolute; width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 1px 1px rgb(0 0 0 / 0.6); }
+.till-slot.is-coin .till-art > i.has-hole::after {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 6px; height: 6px; border-radius: 50%; background: #2a2826;
+}
+.till-face { font-size: 12px; color: #f1e6cf; }
+.till-n { font-style: normal; font-size: 11.5px; color: #ffd36b; }
+.till-sum { font-size: 10.5px; color: #c9bba0; }
+.till-tray.is-locked .till-slot { filter: grayscale(0.7) brightness(0.8); }
+.till-lock {
+  position: absolute; inset: 0; display: grid; place-items: center; margin: 0; border-radius: 10px;
+  background: rgb(20 14 10 / 0.55); color: #ffd36b; font-weight: 700; letter-spacing: 0.05em; white-space: nowrap;
+}
+.till-acts { display: flex; gap: 8px; padding: 10px 12px 4px; }
+.till-acts > button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #1d6b34;
+  color: #fff;
+  font: 700 13px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.till-acts > button + button { background: #8a5a1c; }
+.till-acts > button b { color: #d8ffe0; }
+.till-acts > button + button b { color: #ffe9b8; }
+.till-acts > button:hover:not(:disabled) { filter: brightness(1.12); }
+.till-acts > button:disabled { opacity: 0.45; cursor: default; }
+.till-day { margin: 8px 12px 0; padding: 8px 10px; border-radius: 8px; background: rgb(90 61 40 / 0.07); }
+.till-day-head { margin: 0 0 4px; font-weight: 700; letter-spacing: 0.08em; white-space: nowrap; }
+.till-day dl { display: grid; grid-template-columns: max-content max-content; justify-content: space-between; gap: 2px 16px; margin: 0; }
+.till-day dt, .till-day dd { margin: 0; white-space: nowrap; }
+.till-day dd { text-align: right; font-weight: 700; }
+.till-day dd.is-in { color: #1d6b34; }
+.till-day dd.is-out { color: #b03a26; }
+.till-foot { display: flex; justify-content: flex-end; padding: 8px 12px 10px; }
+.till-foot > button {
+  padding: 6px 14px;
+  border: 1.5px solid #5a3d28;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #3b2a20;
+  font: 700 13px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.till-foot > button:hover { background: #f4e6c8; }
 
 /* ---- the drinks' stock, opened from the back stock by the fridges (shops/grill/DrinkStockPanel): a drinks fridge of its own, its two
    fridges' drinks as the pantry's bins, a case to order and the fridge to fill for each, the whole lot filled at its foot ---- */
@@ -5816,12 +5983,13 @@ html[lang='en'] .heat-label { font-size: 13px; }
    (phones keep their 經營 button: the cash isn't shown on its own there) ---- */
 @media (min-width: 600px) {
   .app .office-toggle { display: none; }
-  .money-chip { right: 228px; }
+  .cash-pair { right: 228px; }
   .fridge-toggle { right: 228px; }
   /* (left of the pantry's little fridge when that's there, at the grill) */
-  .app.has-fridge .money-chip { right: 280px; }
+  .app.has-fridge .cash-pair { right: 280px; }
   /* (smoked glass: readable over the bright room by day as over the dark by night; no rim round it (the owner's: not a white frame)) */
-  .money-chip {
+  .money-chip,
+  .till-chip {
     background: linear-gradient(180deg, rgb(46 38 30 / 0.46), rgb(22 18 14 / 0.34));
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     backdrop-filter: blur(12px) saturate(1.4);

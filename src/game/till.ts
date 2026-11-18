@@ -65,6 +65,17 @@ export const deposit = (d: DrawerCash, bill: number): DrawerCash => {
 
 /** the owner takes everything in one note's compartment or coin's cup: the drawer without it, and how much was taken */
 export const takeOut = (d: DrawerCash, k: Denom): { drawer: DrawerCash; amount: number } => ({ drawer: { ...d, [k]: 0 }, amount: k * d[k] })
+/** the day's takings taken out (item 366, the till's own panel): what the drawer holds over the float it opened with (`keep`), the biggest
+ * notes first, so as much of the change as can be is left for the change; nothing taken from a drawer down to its float or less */
+export function takeTakings(d: DrawerCash, keep: DrawerCash = openingFloat()): { drawer: DrawerCash; amount: number } {
+  let want = Math.max(0, drawerTotal(d) - drawerTotal(keep))
+  const drawer = { ...d }
+  for (const k of DENOMS) { const n = Math.min(drawer[k], Math.floor(want / k)); drawer[k] -= n; want -= n * k }
+  return { drawer, amount: drawerTotal(d) - drawerTotal(drawer) }
+}
+/** everything out of the drawer, the change too */
+export const takeAll = (d: DrawerCash): { drawer: DrawerCash; amount: number } =>
+  ({ drawer: Object.fromEntries(DENOMS.map((k) => [k, 0])) as DrawerCash, amount: drawerTotal(d) })
 
 
 /**

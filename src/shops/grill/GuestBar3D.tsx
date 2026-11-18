@@ -2023,6 +2023,8 @@ function RegisterLive({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
           // (opened by hand only if it isn't locked; pushed shut whether or not)
           if (!TILL_STATE.manual && REGISTER.state.drawerLocked) { rattle(); return }
           TILL_STATE.manual = !TILL_STATE.manual
+          // (and the till's own panel with it, the drawer's money in sight to take (App's, item 366))
+          window.dispatchEvent(new CustomEvent('jgs-till', { detail: TILL_STATE.manual }))
         }} onPointerMove={(e) => {
           e.stopPropagation()
           // (only its front can be taken hold of, and only where it can be seen: not through the case from the side or behind)
