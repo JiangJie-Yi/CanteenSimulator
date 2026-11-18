@@ -6,7 +6,8 @@ import { RECEIPT } from '@/game/receipts'
 import { DISH_SOAP, HOUSEHOLD_PACK, TOILET_CLEANER } from '@/game/household'
 import { feature, scenario } from './bdd'
 import { DISHES } from '@/data/menu'
-import { PAR, REORDER_AT, SIDE_LOW, SIDE_PAR, inPacks, parOf, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
+import { LEAN_PAR, PAR, REORDER_AT, SIDE_LOW, SIDE_PAR, inPacks, orderedLean, parOf, restockOrder, topUpOrder, goodsOf, costOf, type Stock } from '@/game/economy'
+import { storageOf } from '@/data/storage'
 import { CHARCOAL, SEASON_GOODS, SEASON_PAR } from '@/game/supplies'
 import type { Entry } from '@/data/recipes'
 
@@ -99,5 +100,41 @@ feature('倉儲自動補貨', () => {
   scenario('一鍵補滿也補到一天的量', ({ when, then }) => {
     when('什麼都沒有時按「補滿」', (w) => { w.o = topUpOrder(grill, {}) })
     then('白米與味噌湯補到一天的量', (w) => { expect(w.o.buy.Onigiri).toBe(SIDE_PAR.Onigiri); expect(w.o.buy.MisoSoup).toBe(SIDE_PAR.MisoSoup) })
+  })
+})
+
+feature('會壞的東西不囤（第 343 項）', () => {
+  scenario('冷藏的備三份、常溫的兩份，用到剩一份才再叫；冷凍的照舊備到十份', ({ given, then, and }) => {
+    given('菜單上一樣冷藏、一樣常溫、一樣冷凍的，各只剩一份', (w) => {
+      const lean = grill.items.filter((x) => orderedLean(x.id))
+      w.chilled = lean.find((x) => storageOf(x.id) === 'chilled')!.id
+      w.ambient = lean.find((x) => storageOf(x.id) === 'ambient')!.id
+      w.frozen = grill.items.find((x) => storageOf(x.id) === 'frozen')!.id
+      w.menu = [entryOf(w.chilled), entryOf(w.ambient), entryOf(w.frozen)]
+      w.stock = { [w.chilled]: 1, [w.ambient]: 1, [w.frozen]: 1, ...SIDES_FULL } as Stock
+      w.o = restockOrder(grill, w.menu, w.stock, 1e9, 60)
+    })
+    then('冷藏的補到三份', (w) => { expect(w.o.buy[w.chilled]).toBe(LEAN_PAR.chilled - 1) })
+    and('常溫的補到兩份', (w) => { expect(w.o.buy[w.ambient]).toBe(LEAN_PAR.ambient - 1) })
+    and('冷凍的照舊補到十份', (w) => { expect(w.o.buy[w.frozen]).toBe(PAR - 1) })
+  })
+  scenario('會壞的還有兩份就不叫', ({ given, then }) => {
+    given('冷藏的剩兩份', (w) => {
+      w.chilled = grill.items.filter((x) => orderedLean(x.id)).find((x) => storageOf(x.id) === 'chilled')!.id
+      w.o = restockOrder(grill, [entryOf(w.chilled)], { [w.chilled]: 2, ...SIDES_FULL } as Stock, 1e9, 60)
+    })
+    then('不叫', (w) => { expect(w.o.buy[w.chilled] ?? 0).toBe(0) })
+  })
+})
+
+feature('會壞的照用量備（第 343 項）', () => {
+  scenario('上一輪到這一輪用掉很多：下一輪備一輪半的量，最多十份', ({ given, then, and }) => {
+    given('一樣冷藏的，上一輪用掉 6 份，現在剩一份', (w) => {
+      w.chilled = grill.items.filter((x) => orderedLean(x.id)).find((x) => storageOf(x.id) === 'chilled')!.id
+      w.o = restockOrder(grill, [entryOf(w.chilled)], { [w.chilled]: 1, ...SIDES_FULL } as Stock, 1e9, 60, { [w.chilled]: 6 })
+      w.o2 = restockOrder(grill, [entryOf(w.chilled)], { [w.chilled]: 1, ...SIDES_FULL } as Stock, 1e9, 60, { [w.chilled]: 20 })
+    })
+    then('補到九份（六份的一倍半）', (w) => { expect(w.o.buy[w.chilled]).toBe(9 - 1) })
+    and('用量再多也不超過十份', (w) => { expect(w.o2.buy[w.chilled]).toBe(PAR - 1) })
   })
 })

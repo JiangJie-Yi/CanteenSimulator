@@ -2670,6 +2670,8 @@ export default function App() {
   const restockRef = useRef({ cash, menuBy, hired, active, lang })
   restockRef.current = { cash, menuBy, hired, active, lang }
   const lastRound = useRef<Record<string, number>>({})
+  /** each shop's stock as the stock keeper left it at their last round (item 343): what's gone since is what's being used */
+  const roundLeft = useRef<Record<string, Record<string, number>>>({})
   useEffect(() => {
     const id = window.setInterval(() => {
       if (paused()) return
@@ -2683,12 +2685,17 @@ export default function App() {
         if (now - (lastRound.current[d.id] ?? 0) < (45 - keeper.speed * 0.3) * (1 + fatigue / 100) * 1000) continue
         lastRound.current[d.id] = now
         // (what's gone off past eating thrown out first (item 203): counted as stock, it was never reordered, and went on the fire)
+        // (how much of each went since the last round, before anything gone off's thrown out (item 343): what to have for the next)
+        const seen = stockRef.current, last = roundLeft.current[d.id]
+        const use = last ? Object.fromEntries(Object.entries(last).map(([k, n]) => [k, Math.max(0, (n as number) - (seen[k] ?? 0))])) : undefined
         const tossed = Object.keys(stockRef.current).filter((k) => !isSupply(k) && !keepsDry(k)).map((k) => [k, tossRef.current(k)] as const).filter(([, n]) => n > 0)
         if (tossed.length && DISHES[active].id === d.id) talk('stock', UI[lang].tossed(personName(keeper, lang), tossed.map(([k, n]) => {
           const it = ALL_ITEMS.get(k) ?? d.bases.find((b) => b.id === k)
           return `${(it ? nameIn(lang, it) : null) ?? k} ${n}`
         }).join('、')))
-        const { buy, cost, fuel } = restockOrder(d, menuBy[d.id] ?? [], stockRef.current, money, effective(keeper, fatigue, LATE.on) * 100)
+        const { buy, cost, fuel } = restockOrder(d, menuBy[d.id] ?? [], stockRef.current, money, effective(keeper, fatigue, LATE.on) * 100, use)
+        roundLeft.current[d.id] = { ...stockRef.current }
+        for (const [k, n] of Object.entries(buy)) roundLeft.current[d.id][k] = (roundLeft.current[d.id][k] ?? 0) + n
         if (!cost && !fuel) continue
         money -= cost + fuel
         book('bought', cost)

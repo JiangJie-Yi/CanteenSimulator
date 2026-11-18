@@ -9,6 +9,7 @@ import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Season
 import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, GARNISH, GARNISH_GOODS, NORI, NORI_PAR, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
 import { RICE_FULL } from './rice'
 import { SOUP_BOWLS } from './soup'
+import { storageOf } from '@/data/storage'
 
 export type Stock = Record<string, number>
 
@@ -195,6 +196,18 @@ export const roomFor = (id: string, have: number) => {
 /** a stock keeper (倉儲) tops up whatever the menu uses once it's down to this many portions, back up to PAR */
 export const PAR = 10
 export const REORDER_AT = 3
+/**
+ * What goes off soon kept lean (item 343, the owner's: 「自動模式要聰明點，不然食物很容易就搞壞掉」): chilled food is past eating in about half a
+ * day, what's kept out in a quarter (game/freshness), and what's ordered is in stock the moment it's ordered: so only a few portions' worth
+ * of each on hand (a dish's worth for each portion it takes), more ordered once it's down to its last (`LEAN_LOW`); topped up to PAR, most of
+ * it went off before it was used. The frozen (two days and more), the rice and the seasonings, the charcoal and the sake (none of which go
+ * off) as before
+ */
+export const LEAN_PAR: Record<'chilled' | 'ambient', number> = { chilled: 3, ambient: 2 }
+export const LEAN_LOW = 1
+const KEEPS_LONG = new Set(['charcoal', 'Sake'])
+/** whether a good's ordered lean (it goes off soon): not frozen, not the sides' rice or soup, nor what keeps */
+export const orderedLean = (id: string) => storageOf(id) !== 'frozen' && !(id in SIDE_PAR) && !keepsDry(id) && !KEEPS_LONG.has(id) && !isSeasonId(id) && id !== NORI
 /** the rice and the miso soup had alongside the dishes, whatever's on the menu board (items 205, 207: kept to PAR, ten portions, like any good,
  * a pot of rice was cooked with what rice there was, three bowls' worth, the cooker holding twenty; and the miso, not on the board, was never
  * ordered at all: in a rush three of twenty-one who'd asked for rice had it, one of ten their soup): kept to a day's worth, two pots of rice
@@ -210,7 +223,7 @@ export const supplierDiscount = (skill: number) => Math.max(0, Math.min(0.05, (s
  * What a stock keeper orders in for a shop: everything its menu uses that's running low, topped back up to PAR (more
  * for what a dish takes several of). Only what there's cash for is ordered, cheapest first left out last.
  */
-export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number, skill: number) {
+export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number, skill: number, use?: Stock) {
   const per: Stock = {}
   for (const e of menu) for (const [k, q] of Object.entries(needOf(e))) per[k] = Math.max(per[k] ?? 0, q)
   // (and the sides' rice and soup, whatever's on the menu, once there's a menu at all)
@@ -224,8 +237,14 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     const have = stock[id] ?? 0
     // (a seasoning, counted in doses, is kept at its own usual stock: ordered once it's down to a third of it)
     const kept = isSeasonId(id) ? SEASON_PAR : id === NORI ? NORI_PAR : 0
-    const par = kept || Math.max(PAR * q, SIDE_PAR[id] ?? 0)
-    if (!g || have > (kept ? kept / 3 : Math.max(REORDER_AT * q, (SIDE_LOW[id] ?? 0) - 1))) continue
+    // (what goes off soon, a few portions' worth on hand, ordered again at its last (item 343))
+    const lean = !kept && orderedLean(id)
+    const where = storageOf(id)
+    // (and enough of it for one and a half of what went since the last round, where that's known (`use`), so what sells fast doesn't run out
+    // before the next; never more than PAR)
+    const want = lean ? Math.min(PAR * q, Math.max(LEAN_PAR[where === 'ambient' ? 'ambient' : 'chilled'] * q, Math.ceil((use?.[id] ?? 0) * 1.5))) : 0
+    const par = kept || (lean ? want : Math.max(PAR * q, SIDE_PAR[id] ?? 0))
+    if (!g || have > (kept ? kept / 3 : lean ? Math.max(LEAN_LOW * q, Math.ceil((use?.[id] ?? 0) * 0.5)) : Math.max(REORDER_AT * q, (SIDE_LOW[id] ?? 0) - 1))) continue
     const n = Math.min(inPacks(id, par - have), roomFor(id, have))
     if (n <= 0) continue
     const c = Math.round(costOf(g) * n * off)
