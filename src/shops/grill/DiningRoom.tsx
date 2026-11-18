@@ -3130,6 +3130,40 @@ function WcFloor({ wx, wz, at }: { wx: number; wz: number; at: [number, number, 
  * owner had the dark beams taken away), a paper lamp on a wall of each room, lit on the switch by the door. Its frame: x from the door's wall back
  * (WC_ROOM.D deep), z across the door from its middle; the toilet's room is on the side `s`.
  */
+/** a pair of slippers set side by side, toes out: rounded soles, a cloth band over the toes, in `sole` and `band` */
+function SlipperPair({ sole, band }: { sole: string; band: string }) {
+  return (
+    <>
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[0.15, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
+          <mesh position-y={0.008} scale={[0.13, 0.016, 0.046]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={sole} /></mesh>
+          <mesh position-y={0.017} scale={[0.125, 0.004, 0.042]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={band} /></mesh>
+          <mesh position={[-0.055, 0.024, 0]} rotation-x={Math.PI / 2} scale={[1, 1, 0.8]}><torusGeometry args={[0.04, 0.016, 6, 16, Math.PI]} /><meshToonMaterial color={band} /></mesh>
+        </group>
+      ))}
+    </>
+  )
+}
+/**
+ * The slippers at a toilet's door (item 244, of item 203's review: the toilet slippers stood there whoever was in): its own pair, in the
+ * toilet's colour, by the door while nobody's in; someone in, theirs are on their feet and the shop's house slippers they stepped out of are
+ * left there instead, toes out, a plainer brown pair (the figures have no feet to show it on: the floor by the door does). Back out, the
+ * other way round. Both made at the start (two little batches), only which shows changed.
+ */
+function WcSlippers({ who }: { who: 'm' | 'f' }) {
+  const own = useRef<THREE.Group>(null), house = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const inside = TOILETS[who].inside > 0
+    if (own.current && own.current.visible === inside) own.current.visible = !inside
+    if (house.current && house.current.visible !== inside) house.current.visible = inside
+  })
+  return (
+    <>
+      <group ref={own}><StaticBatch plain><SlipperPair sole="#e8dcc4" band={who === 'm' ? '#2c3e66' : '#9a2a2a'} /></StaticBatch></group>
+      <group ref={house} visible={false}><StaticBatch plain><SlipperPair sole="#d9c6a2" band="#6b4a2e" /></StaticBatch></group>
+    </>
+  )
+}
 function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
   const { D, E, X0 } = WC_ROOM
   const s = who === 'm' ? -1 : 1
@@ -3258,16 +3292,8 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
         {[-1, 1].map((sd) => <mesh key={sd} position={[0, 0.008, sd * 0.2]}><boxGeometry args={[0.2, 0.016, 0.03]} /><meshToonMaterial color="#6a4a28" /></mesh>)}
       </group>
       </StaticBatch></Movable>
-      <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${name}）`}><StaticBatch plain>
-      {/* (a pair of toilet slippers by the door: rounded soles, a cloth band over the toes, the toilet's own colour, set side by side toes out) */}
-      {[-1, 1].map((sd) => (
-        <group key={sd} position={[0.15, 0.03, sd * 0.055]} rotation-y={sd * 0.06}>
-          <mesh position-y={0.008} scale={[0.13, 0.016, 0.046]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color="#e8dcc4" /></mesh>
-          <mesh position-y={0.017} scale={[0.125, 0.004, 0.042]}><cylinderGeometry args={[1, 1, 1, 18]} /><meshToonMaterial color={who === 'm' ? '#2c3e66' : '#9a2a2a'} /></mesh>
-          <mesh position={[-0.055, 0.024, 0]} rotation-x={Math.PI / 2} scale={[1, 1, 0.8]}><torusGeometry args={[0.04, 0.016, 6, 16, Math.PI]} /><meshToonMaterial color={who === 'm' ? '#2c3e66' : '#9a2a2a'} /></mesh>
-        </group>
-      ))}
-      </StaticBatch></Movable>
+      {/* (the toilet slippers by the door, and the house slippers left there in their place while someone's in (item 244)) */}
+      <Movable id={`wc-${who}-slippers`} label={`室內拖鞋（${name}）`}><WcSlippers who={who} /></Movable>
       <Movable id={`wc2-${who}-lamp`} label={`紙燈（${name}）`}>
       {/* a paper lamp on the wall toward the other toilet, on its arm: on a motion sensor, bright while someone's in or the door's open, dim
           otherwise */}
