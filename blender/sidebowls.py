@@ -148,24 +148,39 @@ def bar(name, pts, w, mat):
 N = 512
 u, v = grid01(N)
 
-# (the rice bowl's glaze: a warm white porcelain, a cobalt line under the rim and another round the foot, between them a ring of waves (青海
-# 波) painted by hand, each arc a little uneven; the foot ring left unglazed; the inside white with a thin line under the rim)
-glaze = np.stack([np.full_like(u, 0.93), np.full_like(u, 0.915), np.full_like(u, 0.87)], -1)
-cobalt = np.array([0.12, 0.2, 0.52])
-band = ((v > 0.86) & (v < 0.9)) | ((v > 0.2) & (v < 0.225))
-glaze[band] = cobalt
-# (the waves: rows of concentric arcs, three to a scale, round the outer wall's middle)
-wx, wy = (u * 18.0), (v - 0.3) / 0.5 * 4.0
-row = np.floor(wy)
-cx = np.floor(wx + 0.5 * (row % 2)) - 0.5 * (row % 2)
-d = np.sqrt((wx - cx - 0.5) ** 2 + ((wy - row) * 1.15) ** 2)
-ring = (np.abs(np.sin(d * math.pi * 3.0)) > 0.82) & (d < 0.62) & (v > 0.3) & (v < 0.8)
-glaze[ring] = cobalt * 1.15
-# (the brush's unevenness: the blue lighter here, deeper there)
-shade = 0.9 + 0.2 * fbm(N, 6, 3)
-blue = band | ring
-glaze[blue] = np.clip(glaze[blue] * shade[blue][:, None], 0, 1)
-glaze[v < 0.13] = [0.78, 0.7, 0.58]     # the bare foot ring
+# (the rice bowl's glaze (item 278, the owner's, 2026-11-17, after an oil-spot tenmoku: 「目前碗盤的樣子還不OK」): 油滴天目, a blue-black
+# glaze thick and glossy, silvery-blue spots all over it where the iron came up through it as it was fired (round on the bowl: the picture's
+# u round it is 0.33 m, its v up it 0.0585, so each spot is drawn that much taller than wide), the glaze run thin and rust-brown over the rim
+# (口縁の柿), pooled thick and dark above the foot in a line with a few runs hanging from it, and the foot left bare, its dark iron clay
+# gritty; the inside the same glaze (its picture shared up the height)
+ASPECT = 0.33 / 0.0585
+dark = mix(np.array([0.025, 0.035, 0.06]), np.array([0.07, 0.1, 0.17]), fbm(N, 5, 3))
+glaze = dark.copy()
+spot_rng = np.random.default_rng(278)
+yy_, xx_ = np.mgrid[0:N, 0:N].astype(np.float32)
+for _ in range(1500):
+    cx_, cy_ = spot_rng.uniform(0, N), spot_rng.uniform(N * 0.18, N * 0.95)
+    r_ = spot_rng.uniform(0.6, 1.6)
+    x0, x1 = int(max(0, cx_ - 3)), int(min(N, cx_ + 4))
+    y0, y1 = int(max(0, cy_ - r_ * ASPECT - 1)), int(min(N, cy_ + r_ * ASPECT + 2))
+    if x1 <= x0 or y1 <= y0:
+        continue
+    d_ = np.sqrt(((xx_[y0:y1, x0:x1] - cx_) / r_) ** 2 + ((yy_[y0:y1, x0:x1] - cy_) / (r_ * ASPECT)) ** 2)
+    k_ = np.clip(1.25 - d_, 0, 1)[..., None]
+    tone = np.array([0.5, 0.6, 0.76]) * spot_rng.uniform(0.75, 1.15)
+    glaze[y0:y1, x0:x1] = glaze[y0:y1, x0:x1] * (1 - k_ * 0.9) + tone * k_ * 0.9
+# (the rim: rust where the glaze ran thin, blending in)
+glaze = mix(glaze, np.array([0.42, 0.22, 0.1]), smooth(0.93, 0.975, v))
+# (the pool above the foot: darker and a little blue-green, its lower edge wavy with runs hanging down to it)
+edge = 0.2 + 0.018 * np.sin(u * 2 * math.pi * 7 + 1.3) + 0.012 * np.sin(u * 2 * math.pi * 17)
+for c_ in spot_rng.uniform(0, 1, 9):
+    edge = np.minimum(edge, np.where(np.abs(((u - c_ + 0.5) % 1.0) - 0.5) < 0.008, 0.155, 1.0))
+pool = (v < edge + 0.05) & (v >= edge)
+glaze[pool] = glaze[pool] * 0.55 + np.array([0.02, 0.05, 0.05]) * 0.45
+# (the bare foot: iron-rich clay, dark brown, gritty, where the glaze stops)
+clay = np.stack([np.full_like(u, 0.3), np.full_like(u, 0.19), np.full_like(u, 0.12)], -1) * (0.85 + 0.3 * fbm(N, 40, 8))[..., None]
+glaze = np.where((v < edge)[..., None], clay, glaze)
+glaze = np.clip(glaze, 0, 1)
 CHAWAN_GLAZE = pbr("ChawanGlaze", tex=image("T_ChawanGlaze", glaze), rough=0.22)
 
 # (the rice: a heap of grains, each a little oval catching the light, a soft shadow between them; drawn with a height for its normals)

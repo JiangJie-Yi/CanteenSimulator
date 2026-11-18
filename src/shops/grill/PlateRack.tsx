@@ -1,7 +1,7 @@
 // The dish racks (碗盤架): two low wooden stands side by side against the kitchen's wall with the customers' plates on them, standing on
 // their edges in the slots along the lower shelf and in piles on the upper, each on a low cupboard of its own (blender/platecabinet.py: two
 // drawers, two sliding doors); low enough that the kitchen's seen over them (the one tall cabinet stood in the way of the view). Each plate has
-// one of the designs of wareDesigns.ts; every design is drawn as one instanced mesh.
+// one of the round plates' glazes of wareGlazes.ts (item 278); every design is drawn as one instanced mesh.
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
@@ -15,7 +15,7 @@ import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { wareGeometry } from './ware'
 import { mergeByMaterial, StaticBatch } from '@/scene/StaticBatch'
-import { DESIGN_COUNT, wareDesign } from './wareDesigns'
+import { ROUND_GLAZES as DESIGN_COUNT, roundGlaze } from './wareGlazes'
 
 // (each of the two: a metre across, two shelves, its 25 plates; low)
 const W = 0.95, H = 0.86, D = 0.44
@@ -219,7 +219,7 @@ function Plates({ design, list, geo = GEO, ink: inked = true, map }: { design: n
   return (
     <>
       <instancedMesh ref={ref} args={[geo, undefined, list.length]} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={map === undefined ? wareDesign(design) : map} />
+        <meshToonMaterial color="#ffffff" map={map === undefined ? roundGlaze(design) : map} />
       </instancedMesh>
       {/* (an ink line round each; not for the bowls, whose piles' rims would show it as dark bands) */}
       {inked && <instancedMesh ref={ink} args={[geo, undefined, list.length]}>

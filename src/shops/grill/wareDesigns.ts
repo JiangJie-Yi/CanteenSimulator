@@ -315,71 +315,7 @@ export function wareDesign(n: number): THREE.CanvasTexture | null {
   return (made[i] = t)
 }
 
-/**
- * The long plate's pictures (長角皿, item 228: blender/longplate.py, its picture laid flat from above over its whole outline, u along it, v
- * across), in the round plates' 染付 (cobalt line drawing on white): the brown lip all round its edge and a fine double line inside it, and
- * at its two ends (the middle left white for the fish) either a band of 青海波 (overlapping wave scales) or a breaking wave's crest rolling
- * in from each end. Drawn on first use, one canvas each; 1024 by 392, so a pixel's as long one way as the other (the plate's 0.30 by 0.115).
- */
-const LONG_DESIGNS: Paint[] = [
-  // 青海波 at both ends
-  (g, S) => {
-    const W = S, H = Math.round(S * 0.383), px = W / 0.3
-    g.strokeStyle = COBALT
-    g.lineWidth = px * 0.0011
-    const r = px * 0.012
-    for (const end of [0, 1]) {
-      g.save()
-      const x0 = end ? W - px * 0.06 : px * 0.022, x1 = end ? W - px * 0.022 : px * 0.06
-      g.beginPath(); g.rect(x0, px * 0.02, x1 - x0, H - px * 0.04); g.clip()
-      for (let row = 0, y = px * 0.02; y < H + r; row++, y += r * 0.5) {
-        for (let x = x0 - r + (row % 2) * r; x < x1 + r; x += r * 2) {
-          for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(x, y, r * (1 - k * 0.3), Math.PI, 0); g.fillStyle = '#f7f6f1'; if (k === 0) g.fill(); g.stroke() }
-        }
-      }
-      g.restore()
-    }
-  },
-  // a wave's crest rolling in from each end, spray off it
-  (g, S, rnd) => {
-    const W = S, H = Math.round(S * 0.383), px = W / 0.3
-    g.strokeStyle = COBALT
-    g.fillStyle = COBALT
-    g.lineWidth = px * 0.0009
-    g.lineCap = 'round'
-    crest(g, px * 0.05, H * 0.62, px * 0.02, 1, rnd, 5)
-    crest(g, W - px * 0.05, H * 0.42, px * 0.02, -1, rnd, 5)
-  },
-]
-const madeLong: (THREE.CanvasTexture | null)[] = []
-/** the n-th of the long plate's pictures (any whole number: it wraps) */
-export function longDesign(n: number): THREE.CanvasTexture | null {
-  const i = ((Math.floor(n) % LONG_DESIGNS.length) + LONG_DESIGNS.length) % LONG_DESIGNS.length
-  if (madeLong[i] !== undefined) return madeLong[i]
-  if (typeof document === 'undefined') return (madeLong[i] = null)
-  const W = 1024, H = Math.round(W * 0.383), px = W / 0.3
-  const c = document.createElement('canvas')
-  c.width = W
-  c.height = H
-  const g = c.getContext('2d')!
-  // (the brown lip over the rim's top (the outline in to 7 mm), the glaze inside it, its own picture, and a fine double line round the well)
-  g.fillStyle = LIP
-  g.fillRect(0, 0, W, H)
-  const inset = (d: number) => { const r = Math.max(0.002, 0.026 - d) * px; g.beginPath(); g.roundRect(d * px, d * px, W - 2 * d * px, H - 2 * d * px, r) }
-  inset(0.006)
-  g.fillStyle = '#f7f6f1'
-  g.fill()
-  g.save()
-  inset(0.006); g.clip()
-  LONG_DESIGNS[i](g, W, seeded(211 + i * 53))
-  g.restore()
-  g.strokeStyle = COBALT
-  for (const [d, w] of [[0.0105, 0.0016], [0.0135, 0.0008]] as const) { g.lineWidth = w * px; inset(d); g.stroke() }
-  const t = new THREE.CanvasTexture(forPhone(c))
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 8
-  return (madeLong[i] = t)
-}
+// (the long plates' 染付 pictures (item 228) gave way to Oribe (item 278): wareGlazes' oribeLong)
 
 /** a plate's design from anything that names it: a number or a string */
 export function designOf(key: number | string) {

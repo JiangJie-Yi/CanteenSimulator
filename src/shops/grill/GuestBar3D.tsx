@@ -60,7 +60,8 @@ import { shrineDoor } from './shrineSound'
 import { getLights, setLightSwitch } from '@/scene/lightsStore'
 import { Later } from '@/scene/Later'
 import { wareGeometry } from './ware'
-import { designOf, longDesign, wareDesign } from './wareDesigns'
+import { designOf } from './wareDesigns'
+import { mameGlaze, oribeLong, roundGlaze } from './wareGlazes'
 import { HAND_MS } from './Restroom'
 import { DiningWall, DrinkBottle, DrinkFridge, FridgeDoor, FridgeStock, DrinkWarm, ShopProps, SakeCup, DrinkCup, cupped } from './DiningRoom'
 import { Tokkuri } from './Tokkuri'
@@ -3435,7 +3436,8 @@ function PlateImpl({ kind = 'round', dirty = false, dirt = 1, design = 0, sticks
     <group>
       <group scale={KIND_SCALE[long ? 'long' : kind === 'long' ? 'round' : kind]}>
       <mesh geometry={geo} castShadow receiveShadow>
-        <meshToonMaterial color="#ffffff" map={long ? longDesign(design) : wareDesign(design)} />
+        {/* (each kind its own glaze (item 278): the long ones Oribe, the round ones white crackle with iron and green, the little ones Kiseto) */}
+        <meshToonMaterial color="#ffffff" map={long ? oribeLong(design) : kind === 'mame' ? mameGlaze(design) : roundGlaze(design)} />
       </mesh>
       <mesh geometry={geo} scale={long ? [1.012, 1.05, 1.03] : [1.03, 1.05, 1.03]}>
         <meshBasicMaterial color={INK} side={THREE.BackSide} />
@@ -4813,10 +4815,11 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     // (every plate drawn there: a PlateKinds has a round one and a long one (item 228))
     g?.traverse((q) => {
       const m = q as THREE.Mesh
-      if (!m.isMesh || (m.geometry !== PLATE_GEO && m.geometry !== LONG_GEO)) return
+      // (the round plate's own shape too (item 251's ROUND_GEO): it was left out, and a round plate kept its old pattern in hand)
+      if (!m.isMesh || (m.geometry !== PLATE_GEO && m.geometry !== ROUND_GEO && m.geometry !== LONG_GEO)) return
       const mat = m.material as THREE.MeshToonMaterial
       if (!mat.map) return
-      const t = m.geometry === PLATE_GEO ? wareDesign(design) : longDesign(design)
+      const t = m.geometry === LONG_GEO ? oribeLong(design) : roundGlaze(design)
       if (mat.map !== t) mat.map = t
     })
   }
