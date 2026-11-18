@@ -2383,6 +2383,13 @@ export default function App() {
   }, [clockSky])
   // the menu can be folded away to give the food the whole screen
   const [menuFolded, setMenuFolded] = useState(false)
+  // (the menu's tags on the wall clicked (item 364, the owner's 「可以按會開菜單」): the shop open, its menu's board unfolded; shut, the
+  // office's menu book, where what's on the menu is chosen)
+  useEffect(() => {
+    const ask = () => { if (ai) setMenuFolded(false); else setOffice('book') }
+    window.addEventListener('jgs-menu', ask)
+    return () => window.removeEventListener('jgs-menu', ask)
+  }, [ai])
   // (every panel heard as it opens and as it shuts (the owner's): the rating's drawer, the office, the stock, the drinks, the views' menu,
   // the menu folded away and back, the developer's panel)
   usePanelSound(showRating)

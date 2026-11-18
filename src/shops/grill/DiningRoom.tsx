@@ -1527,7 +1527,12 @@ function MenuTags({ z0, z1 }: { z0: number; z1: number }) {
       TAG_TEX.needsUpdate = true
     }).catch(() => {})
   })
-  return <primitive object={parts.g} />
+  // (pointed at, it lights and says it's the menu; clicked, the menu's opened (item 364, the owner's 「可以按會開菜單」): App's, as it
+  // stands (the board open, the book shut))
+  return (
+    <primitive object={parts.g} {...tipOver('菜單', '點一下打開菜單')}
+      onClick={(ev: { stopPropagation: () => void }) => { ev.stopPropagation(); if (getEdit().on) return; window.dispatchEvent(new CustomEvent('jgs-menu')) }} />
+  )
 }
 /**
  * The corner by the way in where the visitors have left their mark (item 295, the owner's, 2026-11-17: 「靠近玄關的門處牆壁會有些美食家的簽名及

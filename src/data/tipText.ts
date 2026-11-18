@@ -14,6 +14,8 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   '【觀賞盆栽】垂柳': ['【観葉鉢】枝垂れ柳', '[Potted plant] Weeping willow'],
   '墨色粗陶盆裡的垂柳，枝條隨意垂下，盆面鋪著青苔': ['墨色の焼き締め鉢に枝垂れ柳、鉢の土には苔', 'A weeping willow in a dark stoneware pot, moss over its soil'],
   料理台: ['調理台', 'Cook counter'],
+  菜單: ['お品書き', 'Menu'],
+  點一下打開菜單: ['クリックでお品書きを開く', 'Click to open the menu'],
   魚骨: ['魚の骨', 'Fish bones'],
   吃剩的魚骨: ['食べ終えた魚の骨', 'All that’s left of the fish'],
   點一下丟進廚餘桶: ['クリックで生ゴミ入れへ', 'Click to put them in the food waste bin'],
