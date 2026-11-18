@@ -28,6 +28,9 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   冷藏櫃門: ['冷蔵庫の扉', 'Fridge door'],
   櫃門: ['戸棚の扉', 'Cupboard door'],
   味噌湯鍋: ['味噌汁の鍋', 'Miso soup pot'],
+  點一下掀開鍋蓋: ['クリックで蓋を開ける', 'Click to lift the lid'],
+  點一下煮一鍋味噌湯: ['クリックで味噌汁を一鍋作る', 'Click to make a pot of miso soup'],
+  '味噌湯的料沒了，到庫存訂貨': ['味噌汁の材料がない、在庫から注文を', 'Out of the soup’s makings: order some from the stock'],
   員工專用門: ['従業員用ドア', 'Staff door'],
   圓窗: ['丸窓', 'Round window'],
   // (the round window's blind (item 338), the helmet cabinet's doors (292), the staff's trip photo (296), the signature wall (295))
@@ -298,7 +301,10 @@ const SHAPES: [RegExp, (m: string[]) => string, (m: string[]) => string][] = [
   [/^資源回收滿了 (\d+)%，等倉儲來倒$/, (m) => `びん・かんが一杯 ${m[1]}%、倉庫係を待つ`, (m) => `Recycling full ${m[1]}%: waiting for the stock keeper`],
   [/^點抽屜推回去$/, () => '引き出しをクリックで戻す', () => 'Click the drawer to push it in'],
   [/^煮飯中⋯⋯還要 (\d+) 秒$/, (m) => `炊飯中……あと ${m[1]} 秒`, (m) => `Cooking… ${m[1]} s to go`],
-  [/^保溫中，還有 (\d+) 份飯$/, (m) => `保温中、残り ${m[1]} 人前`, (m) => `Keeping warm: ${m[1]} portions left`],
+  [/^保溫中，還有 (\d+)\/(\d+) 份飯$/, (m) => `保温中、残り ${m[1]}/${m[2]} 人前`, (m) => `Keeping warm: ${m[1]} of ${m[2]} portions left`],
+  // (the miso pot, as the rice cooker (item 260))
+  [/^加熱中⋯⋯還要 (\d+) 秒$/, (m) => `温め中……あと ${m[1]} 秒`, (m) => `Heating… ${m[1]} s to go`],
+  [/^熱騰騰的，還有 (\d+)\/(\d+) 碗$/, (m) => `熱々、残り ${m[1]}/${m[2]} 杯`, (m) => `Piping hot: ${m[1]} of ${m[2]} bowls left`],
   [/^(馬鈴薯|地瓜|洋蔥|紅蘿蔔|牛蒡|清酒|小番茄|小黃瓜|茄子|青椒|甜椒) (\d+)$/, (m) => `${{ 馬鈴薯: 'じゃがいも', 地瓜: 'さつまいも', 洋蔥: '玉ねぎ', 紅蘿蔔: '人参', 牛蒡: 'ごぼう', 清酒: '日本酒', 小番茄: 'ミニトマト', 小黃瓜: 'きゅうり', 茄子: 'なす', 青椒: 'ピーマン', 甜椒: 'パプリカ' }[m[1]]} ${m[2]}`,
     (m) => `${{ 馬鈴薯: 'Potato', 地瓜: 'Sweet potato', 洋蔥: 'Onion', 紅蘿蔔: 'Carrot', 牛蒡: 'Burdock', 清酒: 'Sake', 小番茄: 'Cherry tomatoes', 小黃瓜: 'Cucumber', 茄子: 'Eggplant', 青椒: 'Green pepper', 甜椒: 'Bell pepper' }[m[1]]} ${m[2]}`],
   [/^還有 (\d*) 根$/, (m) => `残り ${m[1]} 本`, (m) => `${m[1]} sticks left`],

@@ -23,7 +23,7 @@ import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
 import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
-import { HEAT_S, heatNow, nextHeat, SOUP_BOWLS } from '@/game/soup'
+import { HEAT_S, heatNow, nextHeat, setSoup, soupGoes, SOUP_BOWLS } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
 import { SINK_SETS, STEP_STOOL_AT, SinkModel, SinkPart, StepStoolModel } from './Sink'
 import { CharcoalSack, ProduceSacks, VegBasket, type VegNode } from './KitchenStores'
@@ -1013,13 +1013,38 @@ function MisoPot() {
     // drawn only when there's soup in it (game/soup: empty when the day starts)
     const soup = r.getObjectByName('MisoSoup')!
     plainColours(r)
-    mergeByMaterial(r, (o) => o === soup)
-    return { root: r, soup, soupY: soup.position.y }
+    // (its lid kept out too, to be lifted off and back on a click (item 260))
+    mergeByMaterial(r, (o) => o === soup || (!!lid && (o === lid || o.parent === lid)))
+    return { root: r, soup, soupY: soup.position.y, lid, lidY: lid?.position.y ?? 0, lidZ: lid?.position.z ?? 0 }
   }, [gltf])
+  // (item 260, the owner's, 2026-11-17: 「味僧湯鍋不能互動」: as the rice cooker is: pointed at, how it's getting on, kept up to date; clicked,
+  // its lid lifted up and back to see the soup (and on again), or, empty with the makings in stock, a pot of it made)
+  const open = useRef(false), openK = useRef(0), hov = useRef(false)
+  const say = () => {
+    const st = SOUP.pot.state, lidSays = `點一下${open.current ? '蓋上' : '掀開鍋蓋'}`
+    if (st === 'heating') return `加熱中⋯⋯還要 ${Math.ceil(SOUP.pot.left)} 秒｜${lidSays}`
+    if (st === 'hot') return `熱騰騰的，還有 ${SOUP.left}/${SOUP_BOWLS} 碗｜${lidSays}`
+    return open.current ? '空的｜點一下蓋上' : anyInStock(['MisoSoup']) ? '空的｜點一下煮一鍋味噌湯' : '空的｜味噌湯的料沒了，到庫存訂貨'
+  }
+  const click = () => {
+    if (soupGoes(SOUP.pot) && !open.current) {
+      if (anyInStock(['MisoSoup'])) { SOUP.pot = setSoup(); SOUP.batch = batchOf('MisoSoup', SOUP_BOWLS); lightSwitchSound(false) }
+    } else open.current = !open.current
+    setTip({ title: '味噌湯鍋', hint: say() })
+  }
   const steam = useRef<THREE.Group>(null)
   // (empty: no soup in it (shrunk to nothing, not hidden: its material drawn from the start), no steam; made, it fills and steams faintly as
   // it heats, fully once hot)
-  useFrame(() => {
+  useFrame((_, dt) => {
+    if (hov.current) setTip({ title: '味噌湯鍋', hint: say() })
+    // (the lid: lifted up off the rim and back over the far side, tipped back, eased; on again as eased)
+    openK.current += ((open.current ? 1 : 0) - openK.current) * Math.min(1, dt * 7)
+    if (pot.lid) {
+      const o = openK.current * openK.current * (3 - 2 * openK.current)
+      pot.lid.position.y = pot.lidY + o * 0.1
+      pot.lid.position.z = pot.lidZ - o * 0.16
+      pot.lid.rotation.x = -o * 0.95
+    }
     const st = SOUP.pot.state
     const k = st === 'empty' ? 0.0001 : 1
     pot.soup.scale.set(k, 1, k)
@@ -1036,8 +1061,11 @@ function MisoPot() {
   const p = new THREE.Vector3().addScaledVector(ALONG, MISO_AT.along).addScaledVector(LAY, MISO_AT.lay)
   return (
     <group position={[p.x, 0, p.z]} rotation-y={Math.atan2(-ALONG.z, ALONG.x)} name="miso-pot">
-      {/* (nothing to do with it: named when pointed at, no glow, no pointing hand (bar.ts's nameOver)) */}
-      <group position-y={MISO_TOP} scale={MISO_SCALE} {...nameOver('味噌湯鍋', '一直保溫著的味噌湯（豆腐、海帶芽、蔥）')}>
+      {/* (pointed at, how it's getting on; clicked, its lid off or on, or a pot made (item 260)) */}
+      <group position-y={MISO_TOP} scale={MISO_SCALE}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; click() }}
+        onPointerOver={(e) => { e.stopPropagation(); hov.current = true; setTip({ title: '味噌湯鍋', hint: say() }) }}
+        onPointerOut={() => { hov.current = false; setTip(null) }}>
         <primitive object={pot.root} />
         <group ref={steam} position={[0, 0.4, 0]} visible={false}>
           <Steam width={0.36} height={0.5} opacity={0.3} layers={2} />
@@ -1063,6 +1091,36 @@ const DENKI_AT = { along: 4.3, lay: 1.742 - 1.1 - 0.937 }
 const DENKI_SCALE = 1.45
 const DENKI_TOP = COUNTER_TOP
 const LAMP_OFF = new THREE.Color('#3a1a14'), LAMP_COOK = new THREE.Color('#ff3a20'), LAMP_WARM = new THREE.Color('#ffb030')
+/** cooked rice from above: grains packed, each a little oval catching the light, a soft shadow between them; and lit a little from within,
+ * so it reads white down in the pot's shadow (item 260, the owner's, 2026-11-17: 「電鍋打開沒飯」: five bowls' worth was there, a plain pale
+ * disc on the pot's floor, and read as the empty floor) */
+const COOKER_RICE_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const S = 256, c = document.createElement('canvas')
+  c.width = c.height = S
+  const g = c.getContext('2d')!
+  g.fillStyle = '#d6d0c0'
+  g.fillRect(0, 0, S, S)
+  let r = 260
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  for (let k = 0; k < 1400; k++) {
+    g.save()
+    g.translate(rnd() * S, rnd() * S)
+    g.rotate(rnd() * Math.PI)
+    g.fillStyle = 'rgba(120, 108, 86, 0.35)'
+    g.beginPath(); g.ellipse(0.8, 0.9, 4.6, 2.3, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = k % 3 ? '#f7f4ec' : '#fffdf8'
+    g.beginPath(); g.ellipse(0, 0, 4.2, 2.0, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    g.beginPath(); g.ellipse(-1.4, -0.6, 1.6, 0.7, 0, 0, Math.PI * 2); g.fill()
+    g.restore()
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+})()
+const COOKER_RICE_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: COOKER_RICE_TEX, emissive: '#fff8ec', emissiveMap: COOKER_RICE_TEX, emissiveIntensity: 0.35 })
 function DenkiNabe() {
   const gltf = useGLTF(DENKI_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
@@ -1090,6 +1148,13 @@ function DenkiNabe() {
     const lid = r.getObjectByName('DenkiLid')!, lever = r.getObjectByName('DenkiLever')!, rice = r.getObjectByName('DenkiRice')!
     plainColours(r)
     mergeByMaterial(r, (o) => o === lid || o.parent === lid || o === lever || o.parent === lever || o === rice)
+    // (the rice its grains (item 260): its picture laid flat from above over it, the grains big enough to read down in the pot)
+    if ((rice as THREE.Mesh).isMesh) {
+      const rm = rice as THREE.Mesh, pos = rm.geometry.attributes.position, uv = new Float32Array(pos.count * 2)
+      for (let i = 0; i < pos.count; i++) { uv[i * 2] = pos.getX(i) * 3.6; uv[i * 2 + 1] = pos.getZ(i) * 3.6 }
+      rm.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+      rm.material = COOKER_RICE_MAT
+    }
     return { root: r, lid, lidY: lid.position.y, lidZ: lid.position.z, lever, leverY: lever.position.y, lamp, rice, riceY: rice.position.y }
   }, [gltf])
   const steam = useRef<THREE.Group>(null)
