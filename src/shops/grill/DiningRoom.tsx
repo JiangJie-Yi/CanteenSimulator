@@ -18,6 +18,7 @@ import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts }
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { toChineseNumber } from '@/data/menu'
+import { paintOuting } from './wallPhotos'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -3934,6 +3935,45 @@ useGLTF.preload(KSTAND_URL)
 // front was 0.42 out, and all who went along the wall into the side counter's aisle (the servers to their gate, the stock keeper, the staff
 // coming in) brushed it, their middles 2 cm off it (item 48, tests/e2e/_nearpiece.mjs))
 const KSTAND_H = 0.7, KSTAND_OFF = 0.215, KSTAND_ALONG = 0.68
+/**
+ * The photograph of the owner and the staff out together (item 296, the owner's, 2026-11-17: 「員工專用與美人圖這邊加一張老闆與員工出遊的
+ * 合照」), in the middle of the plaster between the staff's door's frame and the beauty scroll: a thin board, its face the photograph in its
+ * frame and mat (wallPhotos' paintOuting: the shop's people as they're drawn, by a lake under Fuji), its edges the frame's wood, hung a
+ * little off the wall (clear of the light that spills from the stair by it, behind where the door's panel slides open past it)
+ */
+const OUTING_W = 0.46, OUTING_H = 0.36, OUTING_T = 0.02
+/** its middle along the wall from the staff door's (the door's frame ends 0.47 along, the scroll starts 1.33 along: the middle of between) */
+const OUTING_ALONG = 0.9
+let OUTING_ZH = true
+const OUTING_TEX = signTexture(640, 500, (g, w, h) => paintOuting(g, w, h, OUTING_ZH))
+const OUTING_FACE = new THREE.MeshToonMaterial({ color: '#ffffff', map: OUTING_TEX })
+const OUTING_EDGE = new THREE.MeshToonMaterial({ color: '#3a2416' })
+function OutingPhoto() {
+  const obj = useMemo(() => {
+    const g = new THREE.Group()
+    // (its face to the room (-x): the box's -x side the photograph, the rest the frame's wood)
+    const m = new THREE.Mesh(new THREE.BoxGeometry(OUTING_T, OUTING_H, OUTING_W), [OUTING_EDGE, OUTING_FACE, OUTING_EDGE, OUTING_EDGE, OUTING_EDGE, OUTING_EDGE])
+    m.name = 'outing-photo'
+    g.add(m)
+    const ink = inkTogether([m], { width: 0.0012, weld: true })
+    if (ink) g.add(ink)
+    return g
+  }, [])
+  useEffect(() => () => { obj.traverse((o) => (o as THREE.Mesh).geometry?.dispose()) }, [obj])
+  // (its sign in the page's language, painted again as that changes; once more as the brush hand's letters are in)
+  const lang = useRef('')
+  useFrame(() => {
+    const l = document.documentElement.lang
+    if (l === lang.current || !OUTING_TEX) return
+    lang.current = l
+    OUTING_ZH = l !== 'ja' && l !== 'en'
+    const c = OUTING_TEX.image as HTMLCanvasElement
+    const repaint = () => { paintOuting(c.getContext('2d')!, c.width, c.height, OUTING_ZH); OUTING_TEX.needsUpdate = true }
+    repaint()
+    void document.fonts?.load('700 40px "LXGW WenKai TC"', '員工旅遊社員旅行').then(repaint).catch(() => {})
+  })
+  return <primitive object={obj} {...nameOver('【照片】員工旅遊合照', '老闆與店裡的大家一起出遊，在湖邊與富士山合影')} />
+}
 /** how far each sliding door goes to open (the inside's half, less where they overlap) */
 const KSTAND_SLIDE = 0.126
 function KabutoStandModel() {
@@ -5084,6 +5124,10 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
         {/* (the staff's door, where asked: up the stairs behind it, 員工專用) */}
         {staffDoor !== undefined && <Movable id="staffdoor" label="員工專用門"><group position={[0, 0, staffDoor]}><StaffDoor /></group></Movable>}
         {/* (just past its frame, the little wooden stand and the samurai helmet on it, facing into the room (the owner's, 2026-11-12)) */}
+        {/* (the photograph of everyone out together, on the plaster between the staff's door and the scroll (item 296)) */}
+        {staffDoor !== undefined && <Movable id="outingphoto" label="員工旅遊合照">
+          <group position={[-0.0135 - OUTING_T / 2, 1.52, staffDoor + OUTING_ALONG]}><OutingPhoto /></group>
+        </Movable>}
         {/* (its doors slide (item 292): not in a batch, which would hold them still; it's drawn by material itself) */}
         {staffDoor !== undefined && <Movable id="kabutostand" label="頭盔木台">
           <group position={[-KSTAND_OFF, 0, staffDoor + KSTAND_ALONG]} rotation-y={-Math.PI / 2}><KabutoStandModel /></group>
