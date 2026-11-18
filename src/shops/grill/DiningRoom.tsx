@@ -1251,6 +1251,9 @@ const rollR = (foot: number) => Math.sqrt(ROLL_MIN * ROLL_MIN + (SLAT_T * (foot 
 /** the blind as it hangs now (its foot), and how much of the window's round (-0.4..0.4) it's over, and of the window's lower half */
 const blindCover = (foot: number) => ({ all: THREE.MathUtils.clamp((0.4 - foot) / 0.8, 0, 1), low: THREE.MathUtils.clamp(-foot / 0.4, 0, 1) })
 const BLIND = { foot: BLIND_FOOT.half, cover: blindCover(BLIND_FOOT.half).all, coverLow: blindCover(BLIND_FOOT.half).low, drawn: -1 }
+/** how far the round window's shoji is slid open (0..1, RoundShoji each frame): the air through it moves the blind (item 365) */
+const ROUND_AIR = { k: 0 }
+if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __roundAir: ROUND_AIR })
 /** what of the window's light gets through it over what it covers */
 const BLIND_PASS = 0.25
 function Sudare() {
@@ -1297,8 +1300,16 @@ function Sudare() {
       (b) => new THREE.Vector3(0, b.max.y, 0))).filter((x): x is NonNullable<typeof x> => !!x)
     // (a cord's drop as it was made, from its knot to its foot under the roll)
     const cordDrop = cords.length ? -cords[0].h : 0.54
-    return { r, blind, pos, feet, tops, roll: roll?.m ?? null, rollMade, cords: cords.map((c) => c.m), cordDrop }
+    // (the pole's axis, where it swings from as the air takes it (item 365))
+    const poleM = r.getObjectByName('SudarePole') as THREE.Mesh | undefined
+    const pivot = poleM ? new THREE.Box3().setFromObject(poleM).getCenter(new THREE.Vector3()) : new THREE.Vector3(BLIND_X, BLIND_KNOT, 0)
+    return { r, blind, pos, feet, tops, roll: roll?.m ?? null, rollMade, cords: cords.map((c) => c.m), cordDrop, pivot }
   }, [gltf])
+  // (the window slid open, the air through it takes the blind (item 365, the owner's 「窗簾如果打開，竹簾會擺動」): it swings on its pole, out
+  // into the room, back under its own weight, the breeze coming and going in gusts; the more of it hangs, the more it's taken; shut, it
+  // settles. Its swing eased toward the air's push each frame, so it never jumps, and it lags a gust a little as a hanging thing does)
+  const swing = useRef<THREE.Group>(null)
+  const sw = useRef({ a: 0, v: 0 })
   const st = useRef<{ way: BlindWay; from: number; t: number; dur: number }>({ way: 'half', from: BLIND_FOOT.half, t: 1, dur: 1 })
   const pick = useRef<THREE.Mesh>(null)
   /** the blind hung at `foot`: its square's foot and its picture, the roll under it, the cords round the roll, the place to point at */
@@ -1326,7 +1337,19 @@ function Sudare() {
     }
   }
   useLayoutEffect(() => { hang(BLIND.foot) })
-  useFrame((_, dt) => {
+  useFrame(({ clock }, dt) => {
+    // (its swing: a spring toward where the air holds it, the air a gusting push into the room)
+    const g = swing.current
+    if (g) {
+      const t = clock.elapsedTime, air = ROUND_AIR.k
+      const gust = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.41) * Math.sin(t * 0.17 + 1.3))
+      const push = air * (0.05 + 0.07 * gust) * (0.55 + 0.45 * BLIND.cover) * (1 + 0.35 * Math.sin(t * 2.3) + 0.15 * Math.sin(t * 5.1 + 0.6))
+      const h = Math.min(dt, 0.05), w = sw.current
+      w.v += ((push - w.a) * 26 - w.v * 3.2) * h
+      w.a += w.v * h
+      if (air < 0.001 && Math.abs(w.a) < 1e-4 && Math.abs(w.v) < 1e-4) { w.a = 0; w.v = 0 }
+      g.rotation.z = -w.a
+    }
     const s = st.current
     // (let down or rolled up over a time as far as it goes, eased: a hand on its cord)
     s.t = Math.min(1, s.t + Math.min(dt, 0.1) / s.dur)
@@ -1354,7 +1377,7 @@ function Sudare() {
   }
   return (
     <group>
-      <primitive object={parts.r} />
+      <group position={parts.pivot}><group ref={swing}><group position={parts.pivot.clone().negate()}><primitive object={parts.r} /></group></group></group>
       {/* (where it's pointed at and clicked: an unseen square over all of it as it hangs, a little in front of it (the shoji's click is
           behind it, where the window's not under the blind)) */}
       <mesh ref={pick} name="sudare-pick" rotation-y={-Math.PI / 2} visible={false}
@@ -2156,6 +2179,7 @@ function RoundShoji() {
     s.k += Math.sign(want - s.k) * Math.min(Math.abs(want - s.k), Math.min(dt, 0.1) * 1.6)
     const e = s.k * s.k * (3 - 2 * s.k)
     halves.current.forEach((h, i) => { if (h) h.position.z = (i ? 1 : -1) * e * (R + 0.02) })
+    ROUND_AIR.k = e
   })
   const says = () => (st.current.open ? '點一下關上' : '點一下打開（左右拉開）')
   return (
