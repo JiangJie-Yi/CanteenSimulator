@@ -2398,6 +2398,29 @@ const STONE_FOOT = new THREE.MeshToonMaterial({ color: '#ffffff', map: STONE_MAS
 const STONE_TILE = { along: 0.6, across: 0.3 }
 /** how far out each of the doorway's stone steps reaches (the bar's units: a tread a third of a metre deep, the dining room's metres) */
 const STEP_GO = 0.17
+/** the steps themselves (item 352, the owner's 「石階梯太假了吧」: they were boxes in the base's masonry picture, bricks stacked): a slab of
+ * granite each, its edges eased and its tread's front worn (blender/stonesteps.py); made at the doorway's measure as it stood, each scaled
+ * to it as it stands (within a percent) */
+const STEPS_URL = import.meta.env.BASE_URL + 'models/stonesteps.glb'
+useGLTF.preload(STEPS_URL)
+const STEP_MADE: [number, number, number][] = [[1.2329, 0.2247, 0.168], [1.2289, 0.1123, 0.168]]
+function useStepSlabs() {
+  const gltf = useGLTF(STEPS_URL) as unknown as { scene: THREE.Group }
+  return useMemo(() => {
+    const made = new Map<THREE.Material, THREE.Material>()
+    return [1, 2].map((k) => {
+      const src = gltf.scene.getObjectByName(`StoneStep${k}`) as THREE.Mesh
+      const m = src.clone()
+      const sm = src.material as THREE.MeshStandardMaterial
+      let t = made.get(sm)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: sm.map ?? null, normalMap: sm.normalMap ?? null }); made.set(sm, t) }
+      m.material = t
+      m.position.set(0, 0, 0)
+      m.receiveShadow = true
+      return m
+    })
+  }, [gltf])
+}
 /**
  * The shop's base: a thick plinth of wood under the whole room (the customers' floor on a solid fill, the kitchen's lower
  * floor in a well in it), a pale rim of boards round its top edge, a dark body, a toe board at its foot, standing
@@ -2425,6 +2448,7 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   // (its street side in steps (item 342, the owner's: 「這邊做成石階」: it stood a sheer wall of three courses at the door): two treads of the
   // same granite down from the genkan's stone toward the street, each a third of the way down and STEP_GO further out, the doorway's width)
   const rise = (gTop - gFoot) / 3
+  const slabs = useStepSlabs()
   return (
     <>
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
@@ -2432,8 +2456,9 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
         geometry={timberBox(gly[1] - gly[0], gTop - gFoot, gal[1] - gal[0], STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
       {[1, 2].map((k) => {
         const yTop = gTop - rise * k, z0 = gal[1] + STEP_GO * (k - 1) + 0.002, z1 = gal[1] + STEP_GO * k
-        return <mesh key={`step${k}`} position={[-(gly[0] + gly[1]) / 2, (yTop + gFoot) / 2, (z0 + z1) / 2]}
-          geometry={timberBox(gly[1] - gly[0] - 0.004 * k, yTop - gFoot, z1 - z0, STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
+        const [w0, h0, d0] = STEP_MADE[k - 1]
+        return <primitive key={`step${k}`} object={slabs[k - 1]} position={[-(gly[0] + gly[1]) / 2, (yTop + gFoot) / 2, (z0 + z1) / 2]}
+          scale={[(gly[1] - gly[0] - 0.004 * k) / w0, (yTop - gFoot) / h0, (z1 - z0) / d0]} />
       })}
     </>
   )
