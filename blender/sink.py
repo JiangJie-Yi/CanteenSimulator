@@ -46,7 +46,7 @@ import sys
 import bmesh
 import bpy
 import numpy as np
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import *  # noqa: E402,F403
@@ -1152,14 +1152,98 @@ for o_, x_ in ((rub_heap, BX), (rec_heap, RX)):
 BAG = [(0.07, 0.0), (0.105, 0.04), (0.115, 0.13), (0.09, 0.2), (0.035, 0.245), (0.016, 0.26), (0.026, 0.285), (0.01, 0.3)]
 for nm, x_, mat, sd in (("SinkBinBag", BX, "liner", 3), ("SinkBinRecBag", RX, "liner_rec", 5)):
     b_ = lathe(nm, x_, PLINTH + 0.02, BZ, BAG, 8, mat, wob=0.07, seed_=sd)
+    # (and its tie's two ears standing up out of the knot, as a tied bin bag's handles do (item 369): two flat lobes, out each way; joined to
+    # it (neither has UVs to lose))
+    for sd_ in (-1, 1):
+        e_ = bpy.data.objects.new(nm + "Ear", bpy.data.meshes.new(nm + "Ear"))
+        bpy.context.collection.objects.link(e_)
+        bme = bmesh.new()
+        bmesh.ops.create_cube(bme, size=1.0)
+        bmesh.ops.scale(bme, vec=Vector((0.026, 0.0045, 0.05)), verts=bme.verts)
+        bmesh.ops.translate(bme, vec=Vector((0.0, 0.0, 0.024)), verts=bme.verts)
+        bmesh.ops.rotate(bme, cent=Vector((0, 0, 0)), matrix=Matrix.Rotation(sd_ * 0.8, 3, "Y"), verts=bme.verts)
+        bme.to_mesh(e_.data)
+        bme.free()
+        e_.location = P(x_, PLINTH + 0.02 + 0.288, BZ)
+        e_.data.materials.append(M[mat])
+        bpy.ops.object.select_all(action="DESELECT"); e_.select_set(True); b_.select_set(True); bpy.context.view_layer.objects.active = b_
+        bpy.ops.object.join()
     bpy.context.scene.cursor.location = P(x_, PLINTH + 0.02 + 0.285, BZ)
     bpy.ops.object.select_all(action="DESELECT"); b_.select_set(True); bpy.context.view_layer.objects.active = b_
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
-# (a new bag, folded, brought back to go in: a flat black square)
-nb = box("SinkBinNewBag", BX - 0.06, BX + 0.06, PLINTH + 0.02, PLINTH + 0.035, BZ - 0.045, BZ + 0.045, "liner", bev=0.004, seg=1)
-bpy.context.scene.cursor.location = P(BX, PLINTH + 0.0275, BZ)
-bpy.ops.object.select_all(action="DESELECT"); nb.select_set(True); bpy.context.view_layer.objects.active = nb
-bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+# (a new bag brought back to go in (item 369, the owner's 「黃圈是?」: a flat black square at his belly read as nothing): a roll of black bin
+# bags, as they're sold: twelve sides round, a paper sleeve round its middle, its cardboard core's hole through it (kraft inside it and at
+# its ends), the first bag torn loose and hanging off its front, curling out a little. Its axis across his hands (x), its middle its origin,
+# where he holds it. 99 quads: no fan (the ends are rings to the core, the core a tube); its rims hard (each face its own corners there)
+M["bagroll"] = pbr("SinkBagRoll", lin("#151517"), rough=0.32)
+M["bagcore"] = pbr("SinkBagCore", lin("#b48a58"), rough=0.85)
+M["bagband"] = pbr("SinkBagBand", lin("#ece7da"), rough=0.7)
+M["bagsheet"] = pbr("SinkBagSheet", lin("#18181a"), rough=0.36)
+M["bagsheet"].use_backface_culling = False
+ROLL_R, ROLL_CORE, ROLL_EDGE, ROLL_HALF, ROLL_BAND, ROLL_SEG = 0.026, 0.0085, 0.0018, 0.06, 0.024, 12
+
+
+def bag_roll(name, x0, y0, z0):
+    bm_ = bmesh.new()
+    me = bpy.data.meshes.new(name)
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    mats = ("bagroll", "bagband", "bagcore", "bagsheet")
+    for m_ in mats:
+        o.data.materials.append(M[m_])
+
+    def ring(x, r):
+        # (round the axis (x) in the game's frame: y up, z out of the front)
+        return [bm_.verts.new(P(x, r * math.sin(k / ROLL_SEG * 2 * math.pi), r * math.cos(k / ROLL_SEG * 2 * math.pi))) for k in range(ROLL_SEG)]
+
+    def band(r0, r1, mat, want):
+        """quads between two rings, each turned to face `want` at its middle (a function of the face's centre, Blender's frame)"""
+        for k in range(ROLL_SEG):
+            k2 = (k + 1) % ROLL_SEG
+            f = bm_.faces.new((r0[k], r0[k2], r1[k2], r1[k]))
+            f.material_index = mats.index(mat)
+            f.normal_update()
+            if f.normal.dot(want(f.calc_center_median())) < 0:
+                f.normal_flip()
+    outward = lambda c: Vector((0.0, c.y, c.z))
+    inward = lambda c: Vector((0.0, -c.y, -c.z))
+    # (its outside, along it: the black, the paper sleeve, the black)
+    xs = (-ROLL_HALF, -ROLL_BAND, ROLL_BAND, ROLL_HALF)
+    outer = [ring(x, ROLL_R) for x in xs]
+    for i, mat in enumerate(("bagroll", "bagband", "bagroll")):
+        band(outer[i], outer[i + 1], mat, outward)
+    # (its ends, their own rims (hard edges): the plastic's wound edge in to the core's, then the core's own edge; the core a tube through,
+    # kraft inside)
+    cores = []
+    for x, sd in ((-ROLL_HALF, -1.0), (ROLL_HALF, 1.0)):
+        rim, mid, inn = ring(x, ROLL_R), ring(x, ROLL_CORE + ROLL_EDGE), ring(x, ROLL_CORE)
+        band(rim, mid, "bagroll", lambda c, sd=sd: Vector((sd, 0.0, 0.0)))
+        band(mid, inn, "bagcore", lambda c, sd=sd: Vector((sd, 0.0, 0.0)))
+        cores.append(ring(x, ROLL_CORE))
+    band(cores[0], cores[1], "bagcore", inward)
+    # (the first bag torn loose: off the roll's foot at its front, down and curling out, a little narrower than the roll)
+    W = 0.05
+    drop = [(-ROLL_R - 0.0006, 0.0), (-ROLL_R - 0.02, 0.004), (-ROLL_R - 0.04, 0.011), (-ROLL_R - 0.056, 0.021)]
+    rows = [(bm_.verts.new(P(-W, y, z)), bm_.verts.new(P(W, y, z))) for (y, z) in drop]
+    for (l0, r0), (l1, r1) in zip(rows, rows[1:]):
+        f = bm_.faces.new((l0, r0, r1, l1))
+        f.material_index = mats.index("bagsheet")
+        f.normal_update()
+        if f.normal.dot(P(0.0, 0.0, 1.0)) < 0:
+            f.normal_flip()
+    bm_.to_mesh(me)
+    bm_.free()
+    # (smooth round the roll and the core; the sheet flat)
+    for poly in o.data.polygons:
+        poly.use_smooth = mats[poly.material_index] != "bagsheet"
+    o.location = P(x0, y0, z0)
+    parts.append(o)
+    return o
+
+
+nb = bag_roll("SinkBinNewBag", BX, PLINTH + 0.02 + ROLL_R + 0.06, BZ)
+assert len(nb.data.polygons) <= 100, ("the roll's over a small piece's faces", len(nb.data.polygons))
+print("NEW_BAG_ROLL", len(nb.data.polygons), "faces")
 # (each one's plaque on its front, high up over the lattice: pale hinoki, a sugi edge to it)
 PLQ_W, PLQ_H, PLQ_Y = 0.17, 0.085, BH - TOPF - 0.11
 PLQ_Z = BZ + BW / 2 + 0.006   # its face
