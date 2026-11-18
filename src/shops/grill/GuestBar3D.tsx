@@ -6406,13 +6406,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             away(true)
           // (made before the plates are seen to when someone's waiting for a bowl of it (item 205: in a rush the plates always wanted, and the
           // soup and the rice were never made: the bowls waited all evening))
-          } else if (open && !SHOP.leaving && (soupGoes(SOUP.pot) || topUpGoes(SOUP.pot, SOUP.left)) && anyInStock(['MisoSoup']) && (BOWLS.want.some((x) => x.soup) || topUpGoes(SOUP.pot, SOUP.left) || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
-            // (or run low, hot: the next pot's worth made and added, the pot kept hot (item 207))
-            // (the soup's pot empty (the day's start): to it to make it, water and dashi in and the miso stirred in, then it heats in its well)
-            pl.pos.copy(home())
-            pl.making = true
-            setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
-            away(true)
+          // (the rice first when both are empty (item 346): the cooker's the longest to come (washed, then a quarter minute cooking), and the soup
+          // heats in its well by itself once it's made; soup first, the first bowls of rice came half a minute after the doors opened)
           } else if (open && !SHOP.leaving && riceGoes(RICE.kama) && anyInStock(['Onigiri']) && (BOWLS.want.some((x) => x.rice) || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
             // (the cooker's empty: to the open sack for the next pot's rice, over the kitchen's edge to it, then to the sink to wash it)
             pl.pos.copy(home())
@@ -6421,6 +6416,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             pl.len = pathLength(pl.path)
             pl.phase = 'toSack'
             pl.t = 0
+            away(true)
+          } else if (open && !SHOP.leaving && (soupGoes(SOUP.pot) || topUpGoes(SOUP.pot, SOUP.left)) && anyInStock(['MisoSoup']) && (BOWLS.want.some((x) => x.soup) || topUpGoes(SOUP.pot, SOUP.left) || !platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n))) {
+            // (or run low, hot: the next pot's worth made and added, the pot kept hot (item 207))
+            // (the soup's pot empty (the day's start): to it to make it, water and dashi in and the miso stirred in, then it heats in its well)
+            pl.pos.copy(home())
+            pl.making = true
+            setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
             away(true)
           } else if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
             goPlates()
