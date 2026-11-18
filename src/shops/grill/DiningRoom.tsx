@@ -18,7 +18,7 @@ import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts }
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { toChineseNumber } from '@/data/menu'
-import { paintOuting, paintWallSigns, WALL_SIGNS } from './wallPhotos'
+import { paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -1573,7 +1573,7 @@ const SIGN_BOARDS = (end: number): WallBoard[] => [
   { z: end - 0.48, y: 1.43, w: 0.2, h: 0.15, t: 0.012, rect: WALL_SIGNS.photos[1], edge: WALL_SIGNS.wood },
 ]
 let SIGNS_ZH = true
-const SIGNS_TEX = signTexture(WALL_SIGNS.size[0], WALL_SIGNS.size[1], (g) => paintWallSigns(g, SIGNS_ZH))
+const SIGNS_TEX = signTexture(WALL_SIGNS.size[0] * SIGNS_PX, WALL_SIGNS.size[1] * SIGNS_PX, (g) => paintWallSigns(g, SIGNS_ZH))
 const SIGNS_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: SIGNS_TEX })
 function signsGeometry(boards: WallBoard[]) {
   const [W, H] = WALL_SIGNS.size

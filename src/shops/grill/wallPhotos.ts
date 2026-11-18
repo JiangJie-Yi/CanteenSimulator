@@ -260,6 +260,8 @@ export function paintOuting(g: CanvasRenderingContext2D, W: number, H: number, z
  * noren, signed across in pen, and the shop on its first day in sepia. All one canvas (WALL_SIGNS' places on it), for the boards that carry
  * them.
  */
+/** the wall signs' canvas over WALL_SIGNS.size (its pixels per place) */
+export const SIGNS_PX = 2
 export const WALL_SIGNS = {
   /** each piece's place on the canvas (x, y, w, h, its pixels) */
   shikishi: [[0, 0, 160, 180], [168, 0, 160, 180], [336, 0, 160, 180]] as [number, number, number, number][],
@@ -311,7 +313,8 @@ function snapshot(g: CanvasRenderingContext2D, [x, y, w, h]: number[], draw: (fr
 }
 export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
   const [W, H] = WALL_SIGNS.size
-  g.setTransform(1, 0, 0, 1, 0, 0)
+  // (painted at twice its places' pixels (item 356: close to, it blurred): the canvas is WALL_SIGNS.size times SIGNS_PX)
+  g.setTransform(SIGNS_PX, 0, 0, SIGNS_PX, 0, 0)
   g.clearRect(0, 0, W, H)
   g.fillStyle = '#3a2416'; g.fillRect(...WALL_SIGNS.wood)
   g.fillStyle = '#c9a24a'; g.fillRect(...WALL_SIGNS.gold)
@@ -319,59 +322,153 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
   shikishi(g, WALL_SIGNS.shikishi[0], '炭火の香り最高', '食い倒れ山野', '二〇二六年九月', 7)
   shikishi(g, WALL_SIGNS.shikishi[1], '好吃到想哭', '美食家林小雨', '二〇二六年六月', 11)
   shikishi(g, WALL_SIGNS.shikishi[2], '魚が主役の店', '料理評論黒川', '二〇二五年冬', 23)
-  // (the cork board: its wood frame, the cork, the notes and the postcard pinned on it)
+  // (the cork board (item 356, the owner's 「不OK」 over it: flat coloured squares each with a line and a squiggle, dots for pins, a lighthouse
+  // postcard that had nothing to do with the shop): its frame's wood eased at the edge, the cork's grains of every size and shade, and pinned
+  // on it what a shop's regulars leave: sticky notes with a corner curling up, a page torn off a lined pad, a till slip, a kraft card with a
+  // little cake drawn on, a print of the grilled fish and one of the shop at night; each casting its shadow on the cork, held by a pin with a
+  // shine on its head and its own shadow)
   {
     const [x, y, w, h] = WALL_SIGNS.board
-    g.fillStyle = '#4a2e1a'; g.fillRect(x, y, w, h)
-    g.fillStyle = '#c8a070'; g.fillRect(x + 12, y + 12, w - 24, h - 24)
     let r = 5
     const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
-    for (let k = 0; k < 900; k++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '120,80,40' : '230,200,150'},0.35)`; g.fillRect(x + 12 + rnd() * (w - 24), y + 12 + rnd() * (h - 24), 2, 2) }
-    const notes: [number, number, number, number, string, string, number][] = [
-      [26, 24, 92, 70, '#fff3a0', zh ? '謝謝招待' : 'ごちそうさま', -0.06],
-      [130, 30, 84, 66, '#ffd0dc', zh ? '下次再來' : 'また来ます', 0.05],
-      [228, 22, 88, 70, '#cfe6ff', zh ? '烤魚超讚' : '焼き魚最高', -0.03],
-      [40, 118, 96, 72, '#ffffff', zh ? '老闆好帥' : '大将最高', 0.04],
-      [150, 112, 90, 74, '#d8f2c8', zh ? '生日快樂' : 'お誕生日', -0.05],
-      [30, 206, 104, 70, '#ffe2b8', zh ? '鹽烤鯖魚' : '鯖の塩焼き', 0.03],
-    ]
+    // (the frame: dark wood, a lighter bevel inside, its grain)
+    g.fillStyle = '#3e2615'; g.fillRect(x, y, w, h)
+    g.strokeStyle = 'rgba(160,110,70,0.35)'; g.lineWidth = 1
+    for (let k = 0; k < 24; k++) { const yy = y + 2 + k * 12.3; g.beginPath(); g.moveTo(x, yy); g.bezierCurveTo(x + w * 0.3, yy - 2, x + w * 0.6, yy + 3, x + w, yy); g.stroke() }
+    g.fillStyle = '#7a5232'; g.fillRect(x + 9, y + 9, w - 18, h - 18)
+    g.fillStyle = '#2a180c'; g.fillRect(x + 11, y + 11, w - 22, h - 22)
+    // (the cork: a warm ground, darker toward the frame, its grains, a few darker crumbs and pale chips)
+    const cx0 = x + 12, cy0 = y + 12, cw = w - 24, ch = h - 24
+    const cg = g.createRadialGradient(cx0 + cw / 2, cy0 + ch / 2, 20, cx0 + cw / 2, cy0 + ch / 2, cw * 0.7)
+    cg.addColorStop(0, '#c99c66'); cg.addColorStop(1, '#a97c4a')
+    g.fillStyle = cg; g.fillRect(cx0, cy0, cw, ch)
+    const cols = ['138,90,48', '216,176,124', '168,116,66', '232,200,148', '110,70,38']
+    for (let k = 0; k < 5200; k++) {
+      const sz = rnd() < 0.82 ? 1 : rnd() < 0.8 ? 2 : 3
+      g.fillStyle = `rgba(${cols[Math.floor(rnd() * cols.length)]},${0.35 + rnd() * 0.45})`
+      g.fillRect(cx0 + rnd() * cw, cy0 + rnd() * ch, sz, sz * (0.7 + rnd() * 0.6))
+    }
+    // (a pushpin at (px, py): its shadow, its body, its head with a shine)
+    const pin = (px: number, py: number, col: string) => {
+      g.fillStyle = 'rgba(30,18,8,0.35)'; g.beginPath(); g.ellipse(px + 4, py + 5, 6, 4, 0.4, 0, Math.PI * 2); g.fill()
+      const hg = g.createRadialGradient(px - 2, py - 2, 0.5, px, py, 6)
+      hg.addColorStop(0, '#ffffff'); hg.addColorStop(0.25, col); hg.addColorStop(1, shade(col, -0.45))
+      g.fillStyle = hg; g.beginPath(); g.arc(px, py, 5.6, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = shade(col, -0.6); g.lineWidth = 0.8; g.stroke()
+    }
+    // (a paper's shadow on the cork, offset down and to the right, soft)
+    const shadow = (nw: number, nh: number) => {
+      g.fillStyle = 'rgba(40,24,10,0.14)'; g.fillRect(-nw / 2 + 2, -nh / 2 + 3, nw + 3, nh + 3)
+      g.fillStyle = 'rgba(40,24,10,0.18)'; g.fillRect(-nw / 2 + 3, -nh / 2 + 4, nw, nh)
+    }
+    // (handwriting: a line of it, as big as fits, a touch uneven)
+    const hand = (text: string, cx: number, cy: number, size: number, maxW: number, col = '#23284a') => {
+      g.fillStyle = col
+      g.font = `700 ${size}px ${BRUSH}`
+      const fit = Math.min(1, maxW / Math.max(1, g.measureText(text).width))
+      g.font = `700 ${Math.floor(size * fit)}px ${BRUSH}`
+      g.textAlign = 'center'; g.textBaseline = 'middle'
+      g.fillText(text, cx, cy)
+    }
     g.textAlign = 'center'; g.textBaseline = 'middle'
-    notes.forEach(([nx, ny, nw, nh, col, text, rot], k) => {
-      g.save()
-      g.translate(x + nx + nw / 2, y + ny + nh / 2)
-      g.rotate(rot)
-      g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(-nw / 2 + 3, -nh / 2 + 4, nw, nh)
-      g.fillStyle = col; g.fillRect(-nw / 2, -nh / 2, nw, nh)
-      g.fillStyle = '#2a2a3a'
-      // (its words as big as the note takes: ごちそうさま is wider than the note at the others' size)
-      g.font = `700 ${Math.round(nh * 0.24)}px ${BRUSH}`
-      const fit = Math.min(1, (nw * 0.84) / Math.max(1, g.measureText(text).width))
-      if (fit < 1) g.font = `700 ${Math.floor(nh * 0.24 * fit)}px ${BRUSH}`
-      g.fillText(text, 0, -nh * 0.08)
-      // (a scribble under it, a little heart drawn in red)
-      g.strokeStyle = '#2a2a3a'; g.lineWidth = 1.4
-      g.beginPath(); g.moveTo(-nw * 0.3, nh * 0.25); g.bezierCurveTo(-nw * 0.1, nh * 0.15, nw * 0.05, nh * 0.35, nw * 0.25, nh * 0.22); g.stroke()
-      g.fillStyle = '#d23a4a'
-      g.beginPath(); g.arc(nw * 0.33 - 3, nh * 0.22, 3, 0, Math.PI * 2); g.arc(nw * 0.33 + 3, nh * 0.22, 3, 0, Math.PI * 2); g.fill()
-      g.beginPath(); g.moveTo(nw * 0.33 - 6, nh * 0.24); g.lineTo(nw * 0.33, nh * 0.33); g.lineTo(nw * 0.33 + 6, nh * 0.24); g.fill()
-      // (its pin)
-      g.fillStyle = ['#d23a2a', '#2a5ad2', '#2aa04a'][k % 3]
-      g.beginPath(); g.arc(0, -nh / 2 + 6, 5, 0, Math.PI * 2); g.fill()
-      g.restore()
-    })
-    // (a postcard of the sea and a lighthouse, its stamp, pinned at its corner)
-    g.save()
-    g.translate(x + 330, y + 210)
-    g.rotate(0.04)
-    g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(-62, -44, 128, 92)
-    g.fillStyle = '#ffffff'; g.fillRect(-66, -48, 128, 92)
-    const sea = g.createLinearGradient(0, -42, 0, 38)
-    sea.addColorStop(0, '#8ec5ea'); sea.addColorStop(0.55, '#d8eef8'); sea.addColorStop(0.56, '#3a7ab0'); sea.addColorStop(1, '#2a5a8a')
-    g.fillStyle = sea; g.fillRect(-60, -42, 116, 80)
-    g.fillStyle = '#f2f2f2'; g.fillRect(20, -26, 10, 30); g.fillStyle = '#c03a2a'; g.fillRect(20, -30, 10, 6); g.fillRect(20, -10, 10, 4)
-    g.fillStyle = '#e8c45a'; g.fillRect(36, -40, 18, 22)
-    g.fillStyle = '#d23a2a'; g.beginPath(); g.arc(-60, -46, 5, 0, Math.PI * 2); g.fill()
+    // 1 (a yellow sticky note, its lower right corner curling up off the cork; a little fish drawn under the words)
+    g.save(); g.translate(x + 74, y + 66); g.rotate(-0.06)
+    shadow(96, 82)
+    const yg = g.createLinearGradient(0, -41, 0, 41); yg.addColorStop(0, '#fff6a6'); yg.addColorStop(1, '#f6e47c')
+    g.fillStyle = yg; g.beginPath(); g.moveTo(-48, -41); g.lineTo(48, -41); g.lineTo(48, 25); g.lineTo(32, 41); g.lineTo(-48, 41); g.closePath(); g.fill()
+    g.fillStyle = '#e8d266'; g.beginPath(); g.moveTo(48, 25); g.lineTo(32, 41); g.lineTo(36, 27); g.closePath(); g.fill()
+    g.fillStyle = 'rgba(40,24,10,0.2)'; g.beginPath(); g.moveTo(48, 25); g.lineTo(52, 30); g.lineTo(34, 44); g.lineTo(32, 41); g.closePath(); g.fill()
+    hand(zh ? '謝謝招待！' : 'ごちそうさま！', 0, -12, 20, 84)
+    g.strokeStyle = '#23284a'; g.lineWidth = 1.6
+    g.beginPath(); g.ellipse(-6, 16, 14, 6, 0, 0, Math.PI * 2); g.stroke()
+    g.beginPath(); g.moveTo(8, 16); g.lineTo(18, 10); g.lineTo(18, 22); g.closePath(); g.stroke()
+    g.fillStyle = '#23284a'; g.beginPath(); g.arc(-14, 15, 1.4, 0, Math.PI * 2); g.fill()
     g.restore()
+    pin(x + 74, y + 30, '#d23a2a')
+    // 2 (a pink sticky note)
+    g.save(); g.translate(x + 172, y + 62); g.rotate(0.05)
+    shadow(86, 74)
+    const pg = g.createLinearGradient(0, -37, 0, 37); pg.addColorStop(0, '#ffd9e4'); pg.addColorStop(1, '#f9c2d2')
+    g.fillStyle = pg; g.fillRect(-43, -37, 86, 74)
+    hand(zh ? '下次再來～' : 'また来ます～', 0, -6, 19, 76)
+    hand(zh ? '小美' : 'みき', 22, 22, 12, 40, '#7a3a50')
+    g.restore()
+    pin(x + 172, y + 28, '#2a5ad2')
+    // 3 (a print of the grilled fish on its plate, a white border, words written under it)
+    g.save(); g.translate(x + 266, y + 78); g.rotate(-0.04)
+    shadow(92, 108)
+    g.fillStyle = '#fbfaf6'; g.fillRect(-46, -54, 92, 108)
+    g.fillStyle = '#3a2a22'; g.fillRect(-40, -48, 80, 70)
+    const pl = g.createRadialGradient(0, -12, 4, 0, -12, 36); pl.addColorStop(0, '#f4f0e8'); pl.addColorStop(1, '#cfc7b8')
+    g.fillStyle = pl; g.beginPath(); g.ellipse(0, -13, 34, 22, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#b7712f'; g.beginPath(); g.ellipse(-3, -14, 22, 8, -0.08, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.moveTo(17, -15); g.lineTo(28, -22); g.lineTo(28, -7); g.closePath(); g.fill()
+    g.strokeStyle = '#5a3216'; g.lineWidth = 1.6
+    for (const k of [-12, -4, 4]) { g.beginPath(); g.moveTo(-3 + k - 3, -20); g.lineTo(-3 + k + 3, -8); g.stroke() }
+    g.fillStyle = '#e8e2c8'; g.beginPath(); g.ellipse(14, 0, 6, 3, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#f2d23a'; g.beginPath(); g.ellipse(-24, -2, 5, 3, 0.3, 0, Math.PI * 2); g.fill()
+    hand(zh ? '烤魚超讚' : '焼き魚最高', 0, 38, 17, 80)
+    g.restore()
+    pin(x + 266, y + 28, '#2aa04a')
+    // 4 (a page torn off a lined pad: its blue lines, its torn top edge)
+    g.save(); g.translate(x + 86, y + 166); g.rotate(0.04)
+    shadow(100, 80)
+    g.fillStyle = '#fdfdf8'
+    g.beginPath(); g.moveTo(-50, -34)
+    for (let i = 0; i <= 20; i++) g.lineTo(-50 + i * 5, -40 + (i % 2 ? 3 : 0) + (rnd() - 0.5) * 2)
+    g.lineTo(50, 40); g.lineTo(-50, 40); g.closePath(); g.fill()
+    g.strokeStyle = 'rgba(80,120,200,0.45)'; g.lineWidth = 1
+    for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(-46, -18 + k * 16); g.lineTo(46, -18 + k * 16); g.stroke() }
+    g.strokeStyle = 'rgba(210,70,70,0.4)'; g.beginPath(); g.moveTo(-34, -36); g.lineTo(-34, 40); g.stroke()
+    hand(zh ? '老闆好帥' : '大将かっこいい', 6, -4, 21, 80)
+    hand(zh ? '— 隔壁桌' : '— となりの席', 18, 22, 11, 60, '#4a4a60')
+    g.restore()
+    pin(x + 86, y + 130, '#e0a020')
+    // 5 (a kraft card with a little cake drawn on it)
+    g.save(); g.translate(x + 192, y + 168); g.rotate(-0.05)
+    shadow(90, 78)
+    g.fillStyle = '#d6b88a'; g.fillRect(-45, -39, 90, 78)
+    g.strokeStyle = 'rgba(120,80,40,0.25)'; g.lineWidth = 1
+    for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(-45, -30 + k * 13); g.lineTo(45, -28 + k * 13); g.stroke() }
+    hand(zh ? '生日快樂' : 'お誕生日', 0, -16, 19, 80, '#5a2a18')
+    g.fillStyle = '#f6e6d0'; g.fillRect(-14, 6, 28, 14)
+    g.fillStyle = '#e05a6a'; g.fillRect(-14, 6, 28, 4)
+    g.fillStyle = '#f0f0f0'; g.fillRect(-1.5, -4, 3, 10)
+    g.fillStyle = '#ffb030'; g.beginPath(); g.ellipse(0, -6, 2.4, 4, 0, 0, Math.PI * 2); g.fill()
+    hand('2026.10', 0, 30, 10, 60, '#5a2a18')
+    g.restore()
+    pin(x + 192, y + 133, '#d23a2a')
+    // 6 (a till slip, its torn foot zigzag, a dish written on it and circled)
+    g.save(); g.translate(x + 52, y + 248); g.rotate(0.07)
+    shadow(64, 64)
+    g.fillStyle = '#fbf9f2'
+    g.beginPath(); g.moveTo(-32, -32); g.lineTo(32, -32); g.lineTo(32, 28)
+    for (let i = 0; i <= 8; i++) g.lineTo(32 - i * 8, 28 + (i % 2 ? 4 : 0))
+    g.closePath(); g.fill()
+    g.strokeStyle = 'rgba(60,60,60,0.35)'; g.setLineDash([3, 3]); g.lineWidth = 1
+    g.beginPath(); g.moveTo(-26, -18); g.lineTo(26, -18); g.stroke(); g.setLineDash([])
+    hand(zh ? '鹽烤鯖魚' : '鯖の塩焼き', 0, -2, 14, 56, '#2a2a2a')
+    hand(zh ? '必點！' : '必食！', 0, 16, 13, 50, '#c0281c')
+    g.strokeStyle = '#c0281c'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, 6, 30, 20, 0.05, 0, Math.PI * 2); g.stroke()
+    g.restore()
+    pin(x + 52, y + 218, '#2a5ad2')
+    // 7 (a print of the shop at night: its front, the red lantern lit, the noren; pinned at both top corners)
+    g.save(); g.translate(x + 316, y + 214); g.rotate(0.035)
+    shadow(128, 92)
+    g.fillStyle = '#fbfaf6'; g.fillRect(-64, -46, 128, 92)
+    const ng = g.createLinearGradient(0, -40, 0, 40); ng.addColorStop(0, '#141a30'); ng.addColorStop(1, '#2a2430')
+    g.fillStyle = ng; g.fillRect(-58, -40, 116, 80)
+    g.fillStyle = '#2a1a12'; g.fillRect(-50, -22, 100, 8)
+    g.fillStyle = '#3a2a20'; g.fillRect(-42, -14, 84, 52)
+    g.fillStyle = 'rgba(255,190,110,0.85)'; g.fillRect(-20, -6, 40, 44)
+    g.fillStyle = '#26345a'; for (const k of [0, 1, 2]) g.fillRect(-20 + k * 13.6, -6, 12.6, 16)
+    const lg = g.createRadialGradient(-30, 4, 1, -30, 4, 18); lg.addColorStop(0, 'rgba(255,120,60,0.9)'); lg.addColorStop(1, 'rgba(255,120,60,0)')
+    g.fillStyle = lg; g.fillRect(-48, -14, 36, 36)
+    g.fillStyle = '#e8402a'; g.beginPath(); g.ellipse(-30, 4, 7, 11, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = 'rgba(255,240,220,0.9)'; g.font = `700 8px ${BRUSH}`; g.fillText('聞', -30, 4)
+    hand(zh ? '聞野・夜' : '聞野・夜', 34, -32, 10, 40, '#f2ead8')
+    g.restore()
+    pin(x + 316 - 58, y + 214 - 44, '#2aa04a'); pin(x + 316 + 58, y + 214 - 40, '#d23a2a')
   }
   // (the owner with a famous guest before the noren, signed across in silver pen)
   snapshot(g, WALL_SIGNS.photos[0], (fr) => {
