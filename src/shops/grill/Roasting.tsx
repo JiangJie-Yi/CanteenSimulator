@@ -3,7 +3,7 @@ import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 import { TONG_S, TONG_TAKE_S, TRAY_PLACES, trayPlace } from '@/game/tray'
-import { FIRE_FLARE, KAKUBAT } from './bar'
+import { DORM_LIFE, FIRE_FLARE, KAKUBAT } from './bar'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -1302,6 +1302,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
           const w = performance.now() - SHOP.openedAt < 4000 ? wayOf(placeOf().clone(), o) : null
           if (w && w.length > 2) commute.current = makeTrip(id, 'in', w.reverse(), delayOf(id, SHOP.day + 0.5) * 0.8, paceOf(id))
           else { arrived.current = true; clockIn(id, minutesNow()) }
+          // (living upstairs: off down the stair up there as they set off (item 339))
+          if (commuteOf(role) === 'dorm') { DORM_LIFE.downAt.set(id, performance.now()); DORM_LIFE.upAt.delete(id) }
         }
         if (!arrived.current) {
           if (!stepCommute(o, dt)) return
@@ -1359,7 +1361,11 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
       commute.current = makeTrip(id, 'out', wayOf(o.position.clone().setY(way[0].y), o), delayOf(id, SHOP.day), paceOf(id))
       SHOP.walking.add(id)
     }
-    if (stepCommute(o, dt)) SHOP.walking.delete(id)
+    if (stepCommute(o, dt)) {
+      // (through the staff door, living upstairs: on the stair up there now (item 339))
+      if (SHOP.walking.has(id) && commuteOf(role) === 'dorm') { DORM_LIFE.upAt.set(id, performance.now()); DORM_LIFE.downAt.delete(id) }
+      SHOP.walking.delete(id)
+    }
   })
   // (their place the same Vector3 while it's the same place: a new one each time the grill redraws had React put them back there for a frame,
   // and anyone walking home as the shop closed jumped back to their place and on again)

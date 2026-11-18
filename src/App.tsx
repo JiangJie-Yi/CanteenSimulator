@@ -479,6 +479,9 @@ type SceneProps = {
   chefOf: (dishId: string) => Chef
   crowdOf: (dishId: string) => number
   crewOf: (dishId: string) => CrewMember[]
+  /** everyone hired who lives upstairs, on today's shift or not (item 339: the room upstairs drew today's crew, and as the shop shut and the
+   * shift turned over to tomorrow's the one who'd just come up the stair was swapped for another, there in bed already) */
+  livingOf?: (dishId: string) => CrewMember[]
   onWalkOut: (ids: string[], dish: DishInfo, guest?: number, why?: string) => void
   /** a customer's visit scored as they go (game/reputation): for the shop's rating */
   onVisit: (v: Visit) => void
@@ -638,7 +641,7 @@ function ViewCamsImpl({ editing, lang, pose }: { editing: boolean; lang: Lang; p
  * the GPU process died); never drawn finer than the screen either */
 const DPR_MAX = 1.25
 const HOLD_POSE = { next: false }
-function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, guestsBy, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
+function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, livingOf, guestsBy, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
@@ -1091,8 +1094,9 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
         shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04} shadow-radius={shadowSoft(theme === 'dark')}
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
-      {/* (the staff room upstairs, a scene of its own off to the side (item 325)) */}
-      <DormRoom />
+      {/* (the staff room upstairs, a scene of its own off to the side (item 325)); those living in it up there while the shop's shut (item 339) */}
+      <DormRoom crew={(livingOf ?? crewOf)(DISHES[active]?.id ?? DISHES[0].id)} open={ai} fallback={HOUSE_CHEF}
+        working={crewOf(DISHES[active]?.id ?? DISHES[0].id).map((m) => m.id)} />
       {/* (where things meet what they stand on, darker: their contact shades, one mesh (item 306)) */}
       <ContactShades />
       <hemisphereLight args={[look.sky, look.ground, look.hemi * dim]} />
@@ -2978,7 +2982,10 @@ export default function App() {
     const t0 = performance.now()
     const poll = window.setInterval(() => {
       const gone = performance.now() - t0
-      if ((gone > 1500 && SHOP.walking.size === 0) || gameMinutes() - closingAt.current >= CLOSE_HARD) {
+      // (the latest by the wall's clock, 40 s from when they set off, or 45 of the game's minutes past the hour customers are seen out at
+      // (item 339: it was that same hour, so when the last customers were seen out at it the shop shut a moment later, whoever was still
+      // on their way out: those going up the stair gone mid-walk, never reaching it))
+      if ((gone > 1500 && SHOP.walking.size === 0) || gone > 40000 || gameMinutes() - closingAt.current >= CLOSE_HARD + 45) {
         window.clearInterval(poll)
         SHOP.walking.clear()
         SHOP.hurry = false
@@ -3434,6 +3441,7 @@ export default function App() {
             omiki={omikiProp} onDrink={onDrink} onWalkOut={refund} onVisit={addVisit} entriesOf={entriesOf} onOrderEntry={onOrderEntry}
             guestsBy={guestsBy}
             crewOf={(id) => staffOf(id).map((w) => ({ id: w.id, role: w.role, look: w.look }))} onGuests={setShopGuests}
+            livingOf={(id) => (CANDIDATES[id] ?? []).filter((w) => hired[id]?.[w.id] && commuteOf(w.role) === 'dorm').map((w) => ({ id: w.id, role: w.role, look: w.look }))}
             phone={phone} inUse={DISHES.map((d) => d.id).filter((id) => [ordersBy.closed[id], ordersBy.open[id]].some((o) => Object.values(o ?? {}).some((n) => n > 0)))} />}
         </Canvas>}
         </Crash>

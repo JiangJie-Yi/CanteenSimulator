@@ -173,6 +173,10 @@ export const SEAT_PULL = keep(import.meta.hot, 'SEAT_PULL', new Map<number, numb
  * where it stands sat at: none in SEAT_PULL is put away; its seat clear under the drawer case, its far edge clear of the counter's base */
 export const STOOL_TUCK = 0.3
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __seatPull?: unknown }).__seatPull = SEAT_PULL
+/** those living upstairs on their way (item 339): when each set foot on the stair coming up after their walk out at the day's end, and when
+ * each set off down it as the shop opens (performance.now()); the room upstairs (DormRoom) plays them from these */
+export const DORM_LIFE = keep(import.meta.hot, 'DORM_LIFE', { upAt: new Map<string, number>(), downAt: new Map<string, number>() })
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dormLife: DORM_LIFE })
 export const SHOE_CELLS = keep(import.meta.hot, 'SHOE_CELLS', { shoes: new Map<number, string>(), kick: new Map<number, number>(), at: new THREE.Vector3(), ready: false })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shoes?: typeof SHOE_CELLS }).__shoes = SHOE_CELLS
 export const TISSUES_KEY = 'jgs-tissues-1'
