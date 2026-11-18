@@ -274,7 +274,36 @@ function grain(base: string, line: string) {
   return t
 }
 let woods: { light: THREE.Texture; dark: THREE.Texture; back: THREE.Texture } | null = null
-const TILED = new Map<string, THREE.Texture>()
+/**
+ * (item 367, the draws: each board was its own copy of its wood's picture with its own repeat, so a material of its own, and the rack, merged
+ * by material, still drew seven woods (and their ink) where there are three) each wood's one material, its picture repeating; each box's
+ * repeat put in its UVs instead, so every board of a wood merges into one draw
+ */
+const WOOD_MAT = new Map<THREE.Texture, THREE.MeshToonMaterial>()
+const woodMat = (tex: THREE.Texture) => {
+  let m = WOOD_MAT.get(tex)
+  if (!m) {
+    const t = tex.clone()
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.needsUpdate = true
+    m = new THREE.MeshToonMaterial({ map: t })
+    WOOD_MAT.set(tex, m)
+  }
+  return m
+}
+const WOOD_BOX = new Map<string, THREE.BoxGeometry>()
+/** a box `w` by `h` by `d` its picture `rx` by `ry` times over (in its UVs), made once and kept */
+const woodBox = (w: number, h: number, d: number, rx: number, ry: number) => {
+  const key = `${w}|${h}|${d}|${rx}|${ry}`
+  let g = WOOD_BOX.get(key)
+  if (!g) {
+    g = new THREE.BoxGeometry(w, h, d)
+    const uv = g.attributes.uv as THREE.BufferAttribute
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rx, uv.getY(i) * ry)
+    WOOD_BOX.set(key, g)
+  }
+  return g
+}
 const woodsOf = () => (woods ??= { light: grain(WOOD, '#6a4426'), dark: grain(WOOD_DARK, '#4a2e16'), back: grain('#8b5e38', '#5a3a1e') })
 
 /** one of the two racks (`part` 0 or 1) and its plates, origin at the middle of its foot, its front toward +z. The plates on them are all
@@ -293,15 +322,9 @@ export function PlateRack({ part = 0 }: { part?: number }) {
   useFrame(() => { if (PLATE_RACK.n !== count) setCount(PLATE_RACK.n) })
   const { whole, cols } = useMemo(() => thinPiles(all.slice(0, Math.max(0, Math.min(PER_RACK, count - part * PER_RACK)))), [all, count, part])
   const w = woodsOf()
-  const wood = (tex: THREE.Texture, rx: number, ry: number) => {
-    // (each tiling made once and kept)
-    const key = `${tex.uuid}|${rx}|${ry}`
-    let t = TILED.get(key)
-    if (!t) { t = tex.clone(); t.repeat.set(rx, ry); t.needsUpdate = true; TILED.set(key, t) }
-    return t
-  }
+  // (each board a wood's one material, its repeat in its box's UVs (item 367): merged, a draw a wood)
   const post = (x: number, z: number) => (
-    <mesh key={`${x}${z}`} position={[x, H / 2, z]} rotation-z={Math.PI / 2} castShadow><boxGeometry args={[H, 0.06, 0.06]} /><meshToonMaterial map={wood(w.dark, 2, 0.3)} /></mesh>
+    <mesh key={`${x}${z}`} position={[x, H / 2, z]} rotation-z={Math.PI / 2} castShadow geometry={woodBox(H, 0.06, 0.06, 2, 0.3)} material={woodMat(w.dark)} />
   )
   return (
     <group>
@@ -324,17 +347,17 @@ export function PlateRack({ part = 0 }: { part?: number }) {
         {/* (the shelves, their front edges a darker lip) */}
         {SHELVES.map((y) => (
           <group key={y}>
-            <mesh position={[0, y, 0]} castShadow receiveShadow><boxGeometry args={[W, 0.035, D]} /><meshToonMaterial map={wood(w.light, 2, 1)} /></mesh>
-            <mesh position={[0, y, D / 2 - 0.005]}><boxGeometry args={[W, 0.045, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+            <mesh position={[0, y, 0]} castShadow receiveShadow geometry={woodBox(W, 0.035, D, 2, 1)} material={woodMat(w.light)} />
+            <mesh position={[0, y, D / 2 - 0.005]} geometry={woodBox(W, 0.045, 0.02, 3, 0.2)} material={woodMat(w.dark)} />
           </group>
         ))}
         {/* (the crown: a cornice over the top, stepped, and a kick board at the foot) */}
-        <mesh position={[0, H - 0.02, 0]} castShadow><boxGeometry args={[W + 0.06, 0.05, D + 0.06]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
-        <mesh position={[0, H + 0.025, 0.01]} castShadow><boxGeometry args={[W + 0.12, 0.04, D + 0.1]} /><meshToonMaterial map={wood(w.dark, 2, 0.4)} /></mesh>
-        <mesh position={[0, 0.05, D / 2 - 0.02]}><boxGeometry args={[W - 0.06, 0.1, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.3)} /></mesh>
+        <mesh position={[0, H - 0.02, 0]} castShadow geometry={woodBox(W + 0.06, 0.05, D + 0.06, 2, 0.4)} material={woodMat(w.dark)} />
+        <mesh position={[0, H + 0.025, 0.01]} castShadow geometry={woodBox(W + 0.12, 0.04, D + 0.1, 2, 0.4)} material={woodMat(w.dark)} />
+        <mesh position={[0, 0.05, D / 2 - 0.02]} geometry={woodBox(W - 0.06, 0.1, 0.02, 3, 0.3)} material={woodMat(w.dark)} />
         {/* (a low lip along the front of each shelf, so nothing slides off, kept low so it hides nothing that stands on it) */}
         {SHELVES.map((y) => (
-          <mesh key={`r${y}`} position={[0, y + 0.03, D / 2 - 0.012]}><boxGeometry args={[W - 0.06, 0.03, 0.02]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+          <mesh key={`r${y}`} position={[0, y + 0.03, D / 2 - 0.012]} geometry={woodBox(W - 0.06, 0.03, 0.02, 3, 0.2)} material={woodMat(w.dark)} />
         ))}
         {/* (the lowest shelf's slots: a dowel either side of each plate, a row at the front and one at the back, set in a rail along the foot) */}
         {[-1, 1].flatMap((zs) => Array.from({ length: SLOTS + 1 }, (_, k) => (
@@ -343,15 +366,15 @@ export function PlateRack({ part = 0 }: { part?: number }) {
           </mesh>
         )))}
         {[-1, 1].map((zs) => (
-          <mesh key={`dr${zs}`} position={[0, SHELVES[0] + 0.0175 + 0.008, zs * 0.12]}><boxGeometry args={[SLOTS * SLOT + 0.02, 0.016, 0.03]} /><meshToonMaterial map={wood(w.dark, 3, 0.2)} /></mesh>
+          <mesh key={`dr${zs}`} position={[0, SHELVES[0] + 0.0175 + 0.008, zs * 0.12]} geometry={woodBox(SLOTS * SLOT + 0.02, 0.016, 0.03, 3, 0.2)} material={woodMat(w.dark)} />
         ))}
         {/* (the sides: a frame with three rails across) */}
         {[-1, 1].flatMap((sd) => [0.32, 0.7].map((y) => (
-          <mesh key={`s${sd}${y}`} position={[sd * W / 2, y, 0]}><boxGeometry args={[0.03, 0.03, D - 0.04]} /><meshToonMaterial map={wood(w.dark, 1, 0.2)} /></mesh>
+          <mesh key={`s${sd}${y}`} position={[sd * W / 2, y, 0]} geometry={woodBox(0.03, 0.03, D - 0.04, 1, 0.2)} material={woodMat(w.dark)} />
         )))}
         {/* (the back, in tongue-and-groove boards, a dark line between each) */}
         {Array.from({ length: 6 }, (_, k) => (
-          <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 5), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2}><boxGeometry args={[H - 0.1, 0.152, 0.015]} /><meshToonMaterial map={wood(w.back, 1, 0.4)} /></mesh>
+          <mesh key={`b${k}`} position={[-W / 2 + 0.08 + k * ((W - 0.16) / 5), H / 2, -D / 2 + 0.01]} rotation-z={Math.PI / 2} geometry={woodBox(H - 0.1, 0.152, 0.015, 1, 0.4)} material={woodMat(w.back)} />
         ))}
       </group>
       </StaticBatch>

@@ -14,7 +14,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "bump": "node scripts/bump-version.js",
-    "bench": "node tests/e2e/bench.mjs"
+    "bench": "node tests/e2e/bench.mjs",
+    "assets:report": "node scripts/asset-report.mjs",
+    "assets:optimize": "node scripts/optimize-glb.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
