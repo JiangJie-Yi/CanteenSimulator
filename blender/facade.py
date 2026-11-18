@@ -88,7 +88,8 @@ def under(z):
 
 # (the eave swept up over the big lantern (軒唐破風, item 341): its middle and half width along the front, how high its crown rises at the
 # edge; the lift dies away up the slope from KARA_FROM)
-KARA_X, KARA_HW, KARA_H = -0.12, 0.42, 0.16
+# (raised (item 349, the owner's 「拱形的弧度不夠」): 0.16 high over 0.42 either side read as a bump, not an arch)
+KARA_X, KARA_HW, KARA_H = -0.12, 0.47, 0.27
 KARA_FROM = 0.5
 
 
@@ -258,6 +259,104 @@ def eave_tile_picture(W=512, H=64):
     return rgb
 
 
+def hongawara_picture(W=1024, H=512, COLS=8, ROWS=6):
+    """the tiles' faces, painted (item 357, the owner's 「請善用貼圖OK?」 over the roof: its tiles were grey waves, a flat shade, their shape
+    all geometry): over each column's trough (平瓦) a round tile's roll (丸瓦) running down the slope, lit from the upper left, a silver sheen
+    along its crest, the trough's hollow in its shadow and darkest where it meets the rolls; each course's lower edge a lip, the next course in
+    its shadow under it; every tile its own shade of smoked grey, a fired mottle, the weather's streaks down the troughs and a little green
+    in the lowest ones. Returns (colour, height) for its normal map; u across (COLS tiles a repeat, the roll's crest at 0.84 of each, as the
+    geometry's), v up the slope (ROWS courses, row 0 the eave's edge)"""
+    rng_ = np.random.default_rng(357)
+    U, V = np.meshgrid((np.arange(W) + 0.5) / W, (np.arange(H) + 0.5) / H)
+    cu = (U * COLS) % 1.0
+    ci = np.floor(U * COLS).astype(int) % COLS
+    # (down each course from its top (0) to its lapped lower edge (1): v's row 0 is the edge, so a course's top is up the picture)
+    rv = 1.0 - ((V * ROWS) % 1.0)
+    ri = np.floor(V * ROWS).astype(int) % ROWS
+    roll = np.clip(1 - ((cu - 0.84) / 0.14) ** 2, 0, 1)
+    h = np.where(roll > 0, np.sqrt(roll) * 0.9 + 0.1, 0.32 * (1 - np.sin(np.clip(cu / 0.70, 0, 1) * math.pi)))
+    # (each course's lip, and the next one tucked under it)
+    lip = np.exp(-((rv - 0.93) / 0.025) ** 2) * 0.12
+    under_ = smooth(0.95, 1.0, rv)
+    h = h + lip - under_ * 0.18
+    gx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) * W / COLS * 0.035
+    gy = (np.roll(h, -1, 0) - np.roll(h, 1, 0)) * H / ROWS * 0.02
+    n = np.stack([-gx, -gy, np.ones_like(h)], -1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True)
+    L = np.array([-0.45, 0.55, 0.7], np.float32)
+    L /= np.linalg.norm(L)
+    dif = np.clip((n * L).sum(-1), 0, 1)
+    tone = (0.88 + 0.18 * rng_.random((ROWS, COLS)))[ri, ci]
+    base = np.array((0.4, 0.41, 0.44), np.float32)
+    k = (0.42 + 0.78 * dif) * tone * (0.94 + 0.12 * fbm(W, 40, 20, 3)[:H])
+    ao = 1 - 0.38 * np.exp(-((cu - 0.70) / 0.035) ** 2) - 0.3 * np.exp(-((cu - 0.985) / 0.03) ** 2)
+    k = k * ao * (1 - 0.45 * under_)
+    col = base[None, None, :] * k[..., None]
+    # (the sheen along each roll's crest, silver)
+    sheen = np.clip(roll - 0.6, 0, 1) / 0.4 * (0.6 + 0.4 * dif)
+    col = mix(col, (0.74, 0.76, 0.8), sheen * 0.45)
+    # (the weather: dark streaks down the troughs, a little moss in the lowest courses' hollows)
+    streak = (np.sin(U * W * 0.9 + fbm(W, 6, 2, 3)[:H] * 9) * 0.5 + 0.5) ** 6 * (roll == 0)
+    col = col * (1 - 0.18 * streak)[..., None]
+    moss = smooth(0.6, 0.85, vnoise(W, 30, 16)[:H]) * (roll == 0) * (ri <= 1)
+    col = mix(col, (0.3, 0.34, 0.25), moss * 0.35)
+    return np.clip(col, 0, 1).astype(np.float32), h.astype(np.float32)
+
+
+def tomoe_picture(N=128):
+    """an eave's round end tile from the front (軒丸瓦) and the ridge plate's crest: a ring of beads round a swirl of three commas (巴), all in
+    the tile's smoked grey, its raised parts lit"""
+    yy, xx = np.mgrid[0:N, 0:N].astype(np.float32)
+    x, y = (xx + 0.5) / N * 2 - 1, (yy + 0.5) / N * 2 - 1
+    r = np.hypot(x, y)
+    a = np.arctan2(y, x)
+    base = np.array((0.34, 0.35, 0.38), np.float32)
+    k = np.ones((N, N), np.float32) * 0.82
+    k = np.where(r > 0.9, 0.62, k)                                         # (its rim, a step back)
+    k = np.where((r > 0.78) & (r < 0.9), 1.02, k)                           # (the ring the beads sit on)
+    for j in range(16):
+        b = j * 2 * math.pi / 16
+        d = np.hypot(x - 0.69 * math.cos(b), y - 0.69 * math.sin(b))
+        k = np.where(d < 0.055, 1.25 - d * 3, k)
+    sw = ((a + 3.2 * r) % (2 * math.pi / 3)) / (2 * math.pi / 3)
+    tom = (sw < 0.42 - 0.3 * r) & (r < 0.6)
+    k = np.where(tom, 1.22 - 0.25 * sw, k)
+    col = base[None, None, :] * k[..., None]
+    return np.clip(col, 0, 1).astype(np.float32)
+
+
+def lantern_picture(W=256, H=128):
+    """the band's little lanterns' paper (item 349, the owner's 「牌子換成一排排的燈籠」): two of them side by side in the picture, u round each
+    (its front, toward the street, at a quarter), v up it: on the left one red paper with the shop's fish in white in a ring, on the right
+    white paper with red bands and the red ring; the bamboo ribs a fine darker line every few centimetres, the paper a little brighter down
+    its middle (lit from inside)"""
+    rgb = np.zeros((H, W, 3), np.float32)
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    for side in (0, 1):
+        x0 = side * W // 2
+        u = (xx[:, x0:x0 + W // 2] + 0.5 - x0) / (W // 2)
+        v = (yy[:, x0:x0 + W // 2] + 0.5) / H
+        mid = 1 - 0.25 * np.abs(v - 0.5) * 2
+        if side == 0:
+            col = np.ones(u.shape + (3,), np.float32) * np.array((0.78, 0.12, 0.08), np.float32) * mid[..., None]
+            ink = (0.98, 0.95, 0.88)
+        else:
+            col = np.ones(u.shape + (3,), np.float32) * np.array((0.96, 0.93, 0.86), np.float32) * mid[..., None]
+            ink = (0.72, 0.1, 0.07)
+            band = ((np.abs(v - 0.14) < 0.05) | (np.abs(v - 0.86) < 0.05)).astype(np.float32)
+            col = mix(col, (0.72, 0.1, 0.07), band)
+        ribs = (np.abs(((v * 14) % 1) - 0.5) > 0.45).astype(np.float32)
+        col = col * (1 - 0.18 * ribs)[..., None]
+        for cu_ in (0.25, 0.75):
+            dx, dy = (u - cu_) * 2.6, (v - 0.5) * 1.15
+            rr_ = np.hypot(dx, dy)
+            ring = (np.abs(rr_ - 0.32) < 0.035).astype(np.float32)
+            fish = (((dx / 0.2) ** 2 + (dy / 0.1) ** 2) < 1) | ((dx > 0.14) & (dx < 0.27) & (np.abs(dy) < (dx - 0.14) * 0.9))
+            col = mix(col, ink, np.maximum(ring, fish.astype(np.float32)))
+        rgb[:, x0:x0 + W // 2] = col
+    return np.clip(rgb, 0, 1).astype(np.float32)
+
+
 def lattice_picture(N=128):
     """the lattice behind the big lantern: thin square slats standing close (the gaps between cut out), two rails across"""
     rgb = np.zeros((N, N, 3), np.float32)
@@ -279,14 +378,18 @@ def lattice_picture(N=128):
 # The parts
 # =====================================================================
 bpy.ops.wm.read_factory_settings(use_empty=True)
+_hg = hongawara_picture()
 M = {
     "wood": pbr("FacadeWood", (1, 1, 1), tex=image("facadewood", wood_picture()), rough=0.75),
     "rafter": pbr("FacadeRafter", (1, 1, 1), tex=image("facaderafter", wood_picture(base=(0.30, 0.19, 0.11), seed=5)), rough=0.75),
     "soffit": pbr("FacadeSoffit", (1, 1, 1), tex=image("facadesoffit", wood_picture(base=(0.42, 0.29, 0.18), seed=8)), rough=0.8),
     "tiles": pbr("FacadeTiles", (1, 1, 1), tex=image("facadetiles", tile_picture()), rough=0.55),
     "eavetiles": pbr("FacadeEaveTiles", (1, 1, 1), tex=image("facadeeavetiles", eave_tile_picture()), rough=0.55),
-    "tileshape": pbr("FacadeTileFaces", (1, 1, 1), tex=image("facadetilefaces", tile_tone_picture()), rough=0.5),
-    "roundend": pbr("FacadeRoundEnds", (0.36, 0.37, 0.4), rough=0.45),
+    "tileshape": pbr("FacadeTileFaces", (1, 1, 1), tex=image("facadetilefaces", _hg[0]),
+                     nrm=image("facadetilenormal", to_normal(_hg[1], 3.0), data=True), nrm_strength=1.0, rough=0.45),
+    "roundend": pbr("FacadeRoundEnds", (1, 1, 1), tex=image("facaderoundends", tomoe_picture()), rough=0.45),
+    "lanternpaper": pbr("FacadeLanternPaper", (1, 1, 1), tex=image("facadelanternpaper", lantern_picture()), rough=0.8),
+    "lanterncap": pbr("FacadeLanternCap", (0.06, 0.05, 0.05), rough=0.4),
     "trim": pbr("FacadeTrim", (0.86, 0.8, 0.66), rough=0.6),
     "gold": pbr("FacadeGegyo", (0.62, 0.48, 0.22), rough=0.4, metal=0.5),
     "back": pbr("FacadeBack", (0.11, 0.075, 0.05), rough=0.9),
@@ -307,20 +410,80 @@ def keep(o, mat):
 keep(box_obj("FacadePost", [((POST_X[0], 0.002, POST_Z[0]), (POST_X[1], BEAM[0] - 0.003, POST_Z[1]), "y")]), M["wood"])
 keep(box_obj("FacadeBeam", [((XL, BEAM[0], Z0), (XR, BEAM[1], Z1))]), M["wood"])
 
-# the band's frame over the eave: its foot rail, the stiles between the bays (and at its ends), its top rail and the coping on it; and the
-# wall behind, from the beam up
-stiles = sorted(set([round(c + 0.0675, 4) for c in SIGN_L] + [round(c - 0.0675, 4) for c in SIGN_L]
-                    + [round(c + 0.0675, 4) for c in SIGN_R] + [round(c - 0.0675, 4) for c in SIGN_R]))
-frame = [((XL, RAIL[0], Z0), (XR, RAIL[1], Z1)), ((XL, FOOT[0], Z0), (XR, FOOT[1], Z1 + 0.02)),
-         ((XL - 0.02, COPING["y"][0], COPING["z"][0]), (XR + 0.02, COPING["y"][1], COPING["z"][1]))]
-for sx in stiles:
-    x0, x1 = max(XL, sx - STILE_W / 2), min(XR, sx + STILE_W / 2)
-    frame.append(((x0, BAY[0], BACK_Z[1]), (x1, BAY[1], Z1 - 0.01), "y"))
-# (its two ends: the stile at each end runs the bays' height, the full depth)
-frame.append(((XL, BAY[0], Z0), (XL + 0.026, BAY[1], Z1), "y"))
-frame.append(((stiles[-1] + STILE_W / 2, BAY[0], Z0), (XR, BAY[1], Z1), "y"))
+# the band over the eave (item 349, the owner's, 2026-11-18: 「有缺口、牌子換成一排排的燈籠」): from the eave's one end to the other (it stopped
+# at the north wall's face, the eave going on 45 cm past it, the sky over that stretch); its foot rail, its top rail and the coping on it, a
+# stile at each end and either side of the lattice bay; the wall behind it from the beam up; and in it, for the menu's boards, two rows of
+# little lanterns hung from a rail each, red and white by turns, either side of the lattice bay over the big lantern
+XB0, XB1 = EAVE_X[0] + 0.004, EAVE_X[1] - 0.004
+frame = [((XB0, RAIL[0], Z0), (XB1, RAIL[1], Z1)), ((XB0, FOOT[0], Z0), (XB1, FOOT[1], Z1 + 0.02)),
+         ((XB0 - 0.02, COPING["y"][0], COPING["z"][0]), (XB1 + 0.02, COPING["y"][1], COPING["z"][1])),
+         ((XB0, BAY[0], Z0), (XB0 + 0.026, BAY[1], Z1), "y"), ((XB1 - 0.026, BAY[0], Z0), (XB1, BAY[1], Z1), "y")]
+for sx in LATTICE_X:
+    frame.append(((sx - STILE_W / 2, BAY[0], BACK_Z[1]), (sx + STILE_W / 2, BAY[1], Z1 - 0.01), "y"))
 keep(box_obj("FacadeFrame", frame), M["wood"])
-keep(box_obj("FacadeBack", [((XL + 0.004, BEAM[1], BACK_Z[0]), (XR - 0.004, RAIL[0], BACK_Z[1]))]), M["back"])
+keep(box_obj("FacadeBack", [((XB0 + 0.004, BEAM[1], BACK_Z[0]), (XB1 - 0.004, RAIL[0], BACK_Z[1]))]), M["back"])
+
+LZ = 0.295                                   # the lanterns' middles, out from the wall
+LANT_ROWS = [(3.03, 2.862), (2.846, 2.676)]  # each row: its rail's top, its lanterns' feet
+LANT_P = [(0.022, 0.0), (0.034, 0.018), (0.042, 0.048), (0.043, 0.075), (0.042, 0.102), (0.034, 0.132), (0.022, 0.15)]
+LSEG = 8
+lant_x = []
+_x = XB0 + 0.08
+while _x < XB1 - 0.07:
+    if not (LATTICE_X[0] - 0.06 < _x < LATTICE_X[1] + 0.06):
+        lant_x.append(_x)
+    _x += 0.112
+rails = []
+for ry, _ in LANT_ROWS:
+    for a_, b_ in ((XB0 + 0.026, LATTICE_X[0] - STILE_W / 2), (LATTICE_X[1] + STILE_W / 2, XB1 - 0.026)):
+        rails.append(((a_, ry - 0.008, LZ - 0.006), (b_, ry, LZ + 0.006)))
+keep(box_obj("FacadeLanternRails", rails), M["wood"])
+bm_p = bmesh.new()
+uvp = bm_p.loops.layers.uv.new()
+bm_c = bmesh.new()
+uvc = bm_c.loops.layers.uv.new()
+
+
+def cap_ring(x, ya, yb, r, top):
+    """a lantern's lacquered rim, top or foot: a short ring, closed (a ladder) at its outer end"""
+    ring = [[bm_c.verts.new(P(x + r * math.cos(2 * math.pi * i / LSEG), yy, LZ + r * math.sin(2 * math.pi * i / LSEG))) for i in range(LSEG)]
+            for yy in (ya, yb)]
+    for i in range(LSEG):
+        i2 = (i + 1) % LSEG
+        bm_c.faces.new((ring[0][i], ring[0][i2], ring[1][i2], ring[1][i]))
+    end = ring[1] if top else ring[0][::-1]
+    n_ = len(end)
+    bm_c.faces.new((end[0], end[1], end[n_ - 1]))
+    lo, hi = 1, n_ - 1
+    while hi - lo > 2:
+        bm_c.faces.new((end[lo], end[lo + 1], end[hi - 1], end[hi]))
+        lo += 1
+        hi -= 1
+    if hi - lo == 2:
+        bm_c.faces.new((end[lo], end[lo + 1], end[hi]))
+
+
+for row, (ry, y0) in enumerate(LANT_ROWS):
+    for j, x in enumerate(lant_x):
+        side = (j + row) % 2
+        rings = [[bm_p.verts.new(P(x + r * math.cos(2 * math.pi * i / LSEG), y0 + h, LZ + r * math.sin(2 * math.pi * i / LSEG)))
+                  for i in range(LSEG)] for r, h in LANT_P]
+        for k in range(len(LANT_P) - 1):
+            for i in range(LSEG):
+                i2 = (i + 1) % LSEG
+                f = bm_p.faces.new((rings[k][i], rings[k][i2], rings[k + 1][i2], rings[k + 1][i]))
+                for lp, (kk, ii) in zip(f.loops, ((k, i), (k, i2), (k + 1, i2), (k + 1, i))):
+                    if ii == 0 and i == LSEG - 1:
+                        ii = LSEG
+                    lp[uvp].uv = (side * 0.5 + (ii / LSEG) * 0.5, LANT_P[kk][1] / 0.15)
+        cap_ring(x, y0 - 0.008, y0 + 0.002, 0.024, False)
+        cap_ring(x, y0 + 0.148, y0 + 0.158, 0.024, True)
+        # (its cord up to the rail)
+        add_box(bm_c, uvc, (x - 0.0015, y0 + 0.158, LZ - 0.0015), (x + 0.0015, ry - 0.008, LZ + 0.0015), "y")
+bmesh.ops.recalc_face_normals(bm_p, faces=bm_p.faces)
+bmesh.ops.recalc_face_normals(bm_c, faces=bm_c.faces)
+keep(mesh_obj("FacadeLanternPapers", bm_p, smooth_shade=True), M["lanternpaper"])
+keep(mesh_obj("FacadeLanternCaps", bm_c), M["lanterncap"])
 
 # the lattice: the band's middle bay (over the big lantern), a little in front of the wall; and the strip along the wall between the beam and
 # the eave (its slats' picture laid along it at the same size: u by length)
@@ -341,9 +504,16 @@ n_r = 10
 for k in range(n_r):
     x = EAVE_X[0] + 0.05 + k * (EAVE_X[1] - EAVE_X[0] - 0.1) / (n_r - 1)
     za, zb = BACK_Z[1] + 0.01, EAVE_Z[1] - 0.03
-    ya, yb = under(za), under(zb) + lift(x, zb)
-    corners = [(xx, yy, zz) for zz, ytop in ((za, ya), (zb, yb)) for yy in (ytop - RAFTER_H, ytop - 0.001) for xx in (x - RAFTER_W / 2, x + RAFTER_W / 2)]
-    rafters.append({"corners": corners, "grain": "z"})
+    # (in five lengths, each under the boards as they curve up into the sweep: one straight from end to end stood up through the tiles
+    # where the sweep's lift curves, the higher sweep's more (item 349: a red sliver of rafter over the tiles))
+    NS_ = 5
+    zz_ = [za + (zb - za) * j / NS_ for j in range(NS_ + 1)]
+    for j in range(NS_):
+        z_a, z_b = zz_[j], zz_[j + 1]
+        y_a, y_b = under(z_a) + lift(x, z_a), under(z_b) + lift(x, z_b)
+        corners = [(xx, yy, zq) for zq, ytop in ((z_a, y_a), (z_b, y_b)) for yy in (ytop - RAFTER_H, ytop - 0.001)
+                   for xx in (x - RAFTER_W / 2, x + RAFTER_W / 2)]
+        rafters.append({"corners": corners, "grain": "z"})
 keep(box_obj("FacadeRafters", rafters, "z"), M["rafter"])
 
 # the roof (item 341): its boards (the soffit seen between the rafters, their ends at the edge), lifted where the eave sweeps up; on them the
@@ -445,7 +615,8 @@ bm.faces.new(tuple(band[-1]))
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 keep(mesh_obj("FacadeEaveTiles", bm), M["eavetiles"])
 bm = bmesh.new()
-RR, SEG = 0.024, 10
+uvl = bm.loops.layers.uv.new()
+RR, SEG = 0.024, 12
 for i in range(20):
     x = EAVE_X[0] + (i + 0.84) * TW
     cy = board_top(x, z1) + 0.026
@@ -453,8 +624,13 @@ for i in range(20):
              for zz in (z1 - 0.05, z1 + 0.03)]
     for k in range(SEG):
         k2 = (k + 1) % SEG
-        bm.faces.new((rings[0][k], rings[0][k2], rings[1][k2], rings[1][k]))
-    bm.faces.new(rings[1])
+        f = bm.faces.new((rings[0][k], rings[0][k2], rings[1][k2], rings[1][k]))
+        for lp in f.loops:
+            lp[uvl].uv = (0.97, 0.5)
+    f = bm.faces.new(rings[1])
+    for lp in f.loops:
+        k = rings[1].index(lp.vert)
+        lp[uvl].uv = (0.5 + 0.5 * math.cos(2 * math.pi * k / SEG), 0.5 + 0.5 * math.sin(2 * math.pi * k / SEG))
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 keep(mesh_obj("FacadeRoundEnds", bm), M["roundend"])
 
@@ -495,8 +671,15 @@ crown = gable_edge(KARA_X)
 # (the ridge plate on the crown: tile-grey, as the end tiles are)
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
-add_box(bm, uvl, (KARA_X - 0.04, crown + 0.012, gz0 - 0.03), (KARA_X + 0.04, crown + 0.07, gz1 + 0.006), "x")
+onita = add_box(bm, uvl, (KARA_X - 0.05, crown + 0.012, gz0 - 0.03), (KARA_X + 0.05, crown + 0.085, gz1 + 0.006), "x")
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+# (its face to the street the crest, its sides the rim's grey)
+for f in onita:
+    f.normal_update()
+    front_ = f.normal.y < -0.9
+    for lp in f.loops:
+        co = lp.vert.co
+        lp[uvl].uv = ((co.x - (KARA_X - 0.05)) / 0.1, (co.z - (crown + 0.012)) / 0.073) if front_ else (0.97, 0.5)
 keep(mesh_obj("FacadeOnita", bm), M["roundend"])
 bm = bmesh.new()
 # (the ornament under the crown: a six-sided board, wider than tall, its point down)

@@ -52,6 +52,7 @@ import { Omamori } from './Omamori'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
+import { drawStreetView, type Sky } from '@/scene/streetView'
 import { activityOf, type Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel, inkTogether } from '@/scene/inkHull'
@@ -806,165 +807,16 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
  * front: a wooden eave over its door, a big red lantern hung under it in the middle, lit menu boards either side, wooden lattice). The
  * model (blender/facade.py, in the doorway's own frame): the head beam over the doorway on a post (the noren's rod just under it); the eave
  * low over it, tiled, its eave-end tiles along its edge, its rafters out from the wall, a strip of lattice along the wall under it; the band
- * of the menu's boards on the wall over the eave (over it and not under it, as the picture's are: this camera never looks up, and from over
- * it an eave hides what's under it), its middle bay lattice; the bar the red and the grill's lanterns hang from. And here, in the band's
- * bays, the boards: each a dish off the menu as it stands and its price, written down it in a brush hand, lit from inside as the lanterns are
- * and with them (the door's switch: no light of their own, their paper as bright as the lanterns' (rule 6)). Read right to left from the
- * street, as such boards are: the menu's first four right of the middle, its next seven left of it; while it's short of them, the shop's
- * standing words.
+ * on the wall over the eave (over it and not under it, as the picture's are: this camera never looks up, and from over it an eave hides
+ * what's under it), from one end of the eave to the other, its middle bay lattice, and either side of it two rows of little lanterns (item
+ * 349, the owner's 「有缺口、牌子換成一排排的燈籠」: they were the menu's boards, and the band stopped short of the eave's end); the bar the red
+ * and the grill's lanterns hang from. The lanterns' paper lit here with the door lanterns (the door's switch: no light of their own (rule 6)).
  */
 const FACADE_URL = import.meta.env.BASE_URL + 'models/facade.glb'
 useGLTF.preload(FACADE_URL)
-/** the boards' middles along the front (the model's bays), right to left from the street */
-const BOARD_X = [0.595, 0.46, 0.325, 0.19, -0.43, -0.565, -0.7, -0.835, -0.97, -1.105, -1.24]
-/** each board's width, its foot and top, how far out (in its bay, between the stiles), and its picture's size on the boards' one canvas */
-const BOARD_W = 0.1, BOARD_Y: [number, number] = [2.69, 3.01], BOARD_Z = 0.3
-const BOARD_PX: [number, number] = [92, 294]
-/** the title board in the band's middle bay (over the doorway's middle: お品書き, the menu), its width, and its picture's width on the canvas (the
- * boards' row over it) */
-const TITLE_X: [number, number] = [-0.32, 0.08]
-const TITLE_PX = 368
-/** the boards' hand: LXGW WenKai, the brush (楷書) the menu's own tags are in, every character there (the shop's lettering has only its own) */
-const BOARD_FONT = '"LXGW WenKai TC", "Noto Serif TC", serif'
-/** what the boards say while the menu's short of them: the shop's standing words, its fire and its drink */
-const BOARD_SPARE: Record<'zh' | 'ja', string[]> = {
-  zh: ['炭火燒', '當季鮮魚', '生啤酒', '日本酒', '燒酎', '威士忌蘇打', '白飯', '味噌湯', '醬菜', '今日推薦', '定食'],
-  ja: ['炭火焼', '旬の魚', '生ビール', '日本酒', '焼酎', 'ハイボール', 'ご飯', '味噌汁', '香の物', '本日のおすすめ', '定食'],
-}
-type BoardRow = { name: string; price?: number }
-/** a vertical line's dash (ー and its kin) turned to run down it, as written down a board */
-const DOWN_TURN = /[ー－—―〜～…]/
-function paintBoards(g: CanvasRenderingContext2D, rows: BoardRow[], title: string) {
-  const [w, h] = BOARD_PX
-  g.setTransform(1, 0, 0, 1, 0, 0)
-  g.clearRect(0, 0, w * BOARD_X.length, h * 2)
-  // (the title board, the canvas's second row: the same lit paper, the word across it in a bigger hand between two fine red rules)
-  {
-    const gr = g.createLinearGradient(0, h, 0, h * 2)
-    gr.addColorStop(0, '#eadbb8'); gr.addColorStop(0.5, '#fffaee'); gr.addColorStop(1, '#eadbb8')
-    g.fillStyle = gr
-    g.fillRect(0, h, TITLE_PX, h)
-    g.strokeStyle = 'rgba(70,36,16,0.6)'
-    g.lineWidth = 3
-    g.strokeRect(7, h + 7, TITLE_PX - 14, h - 14)
-    g.fillStyle = '#b02218'
-    g.fillRect(28, h + 52, TITLE_PX - 56, 4)
-    g.fillRect(28, h * 2 - 56, TITLE_PX - 56, 4)
-    const chars = [...title]
-    const size = Math.min(88, Math.floor((TITLE_PX - 60) / Math.max(1, chars.length)))
-    g.fillStyle = '#1b0f08'
-    g.font = `700 ${size}px ${BOARD_FONT}`
-    g.textAlign = 'center'
-    g.textBaseline = 'middle'
-    chars.forEach((ch, i) => g.fillText(ch, TITLE_PX / 2 + (i - (chars.length - 1) / 2) * size, h * 1.5))
-  }
-  rows.forEach((r, k) => {
-    const x0 = k * w
-    // (the paper lit from behind: warm white, brightest down its middle; a fine dark rule round it inside its frame)
-    const gr = g.createLinearGradient(x0, 0, x0 + w, 0)
-    gr.addColorStop(0, '#eadbb8'); gr.addColorStop(0.5, '#fffaee'); gr.addColorStop(1, '#eadbb8')
-    g.fillStyle = gr
-    g.fillRect(x0, 0, w, h)
-    g.strokeStyle = 'rgba(70,36,16,0.6)'
-    g.lineWidth = 3
-    g.strokeRect(x0 + 7, 7, w - 14, h - 14)
-    // (the dish down it in black, as big as fits over its price, its price at its foot in red; a long one in two columns, read right then
-    // left, as a board's written: split where its seasoning starts (佐…, …焼き), or in half)
-    const room = h - 26 - (r.price != null ? 50 : 0)
-    const cols = boardColumns(r.name)
-    const most = Math.max(...cols.map((c) => c.length))
-    const size = Math.min(cols.length > 1 ? 38 : 56, Math.floor(room / Math.max(1, most)))
-    g.fillStyle = '#1b0f08'
-    g.font = `700 ${size}px ${BOARD_FONT}`
-    g.textAlign = 'center'
-    g.textBaseline = 'middle'
-    cols.forEach((col, j) => {
-      const cx = x0 + (cols.length > 1 ? (j === 0 ? 0.7 : 0.3) : 0.5) * w
-      const top = 14 + (j === 0 ? (room - size * col.length) / 2 : (room - size * most) / 2 + size * 0.5)
-      col.forEach((ch, i) => {
-        const y = top + size * (i + 0.5)
-        if (!DOWN_TURN.test(ch)) { g.fillText(ch, cx, y); return }
-        g.save()
-        g.translate(cx, y)
-        g.rotate(Math.PI / 2)
-        g.fillText(ch, 0, 0)
-        g.restore()
-      })
-    })
-    if (r.price != null) {
-      g.fillStyle = '#b02218'
-      g.font = `700 28px ${BOARD_FONT}`
-      g.fillText(String(r.price), x0 + w / 2, h - 38)
-    }
-  })
-}
-/** a dish's name as written down a board: one column, or two if it's long (more than 6) */
-function boardColumns(name: string): string[][] {
-  const chars = [...name]
-  if (chars.length <= 6) return [chars]
-  const at = name.indexOf('佐') > 1 ? [...name.slice(0, name.indexOf('佐'))].length
-    : name.indexOf('焼き') > 1 ? [...name.slice(0, name.indexOf('焼き'))].length : Math.ceil(chars.length / 2)
-  return [chars.slice(0, at), chars.slice(at)]
-}
-let BOARD_ROWS: BoardRow[] = []
-let BOARD_TITLE = ''
-const BOARD_TEX = signTexture(BOARD_PX[0] * BOARD_X.length, BOARD_PX[1] * 2, (g) => paintBoards(g, BOARD_ROWS, BOARD_TITLE))
-/** the boards' own canvas, painted on (the texture's picture may be a smaller copy of it: scene/textureCap, which draws this into it again
- * each time it's marked changed) */
-const BOARD_CANVAS = BOARD_TEX?.image as HTMLCanvasElement | undefined
-const BOARD_MAT = new THREE.MeshBasicMaterial({ map: BOARD_TEX, toneMapped: false })
-/** the boards: a square each in its bay, and the title board in the middle one, all one mesh on the one canvas (the boards its top row, the
- * title its second) */
-const BOARD_GEO = (() => {
-  const pos: number[] = [], uv: number[] = [], idx: number[] = []
-  const quad = (x0: number, x1: number, u0: number, u1: number, v0: number, v1: number) => {
-    const b = pos.length / 3
-    pos.push(x0, BOARD_Y[0], BOARD_Z, x1, BOARD_Y[0], BOARD_Z, x1, BOARD_Y[1], BOARD_Z, x0, BOARD_Y[1], BOARD_Z)
-    uv.push(u0, v0, u1, v0, u1, v1, u0, v1)
-    idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
-  }
-  BOARD_X.forEach((x, k) => quad(x - BOARD_W / 2, x + BOARD_W / 2, k / BOARD_X.length, (k + 1) / BOARD_X.length, 0.5, 1))
-  quad(TITLE_X[0], TITLE_X[1], 0, TITLE_PX / (BOARD_PX[0] * BOARD_X.length), 0, 0.5)
-  const g = new THREE.BufferGeometry()
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
-  g.setIndex(idx)
-  g.computeVertexNormals()
-  return g
-})()
-/** what the boards say now: the menu's dishes in its order, in the page's language (the shop's Japanese in English), the rest the spare words */
-function boardRows(lang: string): BoardRow[] {
-  const ja = lang === 'ja' || lang === 'en'
-  // (each dish once: the menu may hold one with two seasonings under the same name)
-  const rows: BoardRow[] = []
-  for (const d of SHOP_MENU.dishes) {
-    const name = ja ? d.ja || d.name : d.name
-    if (rows.length < BOARD_X.length && !rows.some((r) => r.name === name)) rows.push({ name, price: d.price })
-  }
-  for (const s of BOARD_SPARE[ja ? 'ja' : 'zh']) {
-    if (rows.length >= BOARD_X.length) break
-    if (!rows.some((r) => r.name === s)) rows.push({ name: s })
-  }
-  return rows
-}
-/** write the boards out again (the menu or the language changed); again once the brush font's letters for them are in */
-function writeBoards(lang: string) {
-  const rows = boardRows(lang)
-  const title = lang === 'ja' || lang === 'en' ? 'お品書き' : '御品書'
-  BOARD_ROWS = rows
-  BOARD_TITLE = title
-  const c = BOARD_CANVAS
-  if (!BOARD_TEX || !c) return
-  const g = c.getContext('2d')!
-  paintBoards(g, rows, title)
-  BOARD_TEX.needsUpdate = true
-  const text = title + rows.map((r) => r.name + (r.price ?? '')).join('')
-  void document.fonts?.load(`700 40px "LXGW WenKai TC"`, text).then(() => {
-    if (BOARD_ROWS !== rows) return
-    paintBoards(g, rows, title)
-    BOARD_TEX.needsUpdate = true
-  }).catch(() => {})
-}
+/** the band's little lanterns' paper (item 349, the owner's 「牌子換成一排排的燈籠」: the menu's boards gone for two rows of them): lit with
+ * the door lanterns (their switch, their breath), no light of its own (rule 6); made at load, its colour all that changes */
+const LANTERN_PAPER = new THREE.MeshBasicMaterial({ toneMapped: false })
 function FacadeModel() {
   const gltf = useGLTF(FACADE_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -975,8 +827,13 @@ function FacadeModel() {
       let t = made.get(src)
       if (!t) {
         // (the lattice's gaps cut out (tested, not blended), seen from either side, as the other lattices are)
-        t = /Lattice/.test(src.name) ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, alphaTest: 0.5, side: THREE.DoubleSide })
-          : new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color.clone(), map: src.map ?? null })
+        // (the lanterns' paper lit as the door's lanterns are (item 349); the tiles' painted relief given its normal map too (item 357))
+        if (/LanternPaper/.test(src.name)) {
+          LANTERN_PAPER.map = src.map ?? null
+          LANTERN_PAPER.needsUpdate = true
+          t = LANTERN_PAPER
+        } else t = /Lattice/.test(src.name) ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, alphaTest: 0.5, side: THREE.DoubleSide })
+          : new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color.clone(), map: src.map ?? null, normalMap: src.normalMap ?? null })
         t.name = src.name
         made.set(src, t)
       }
@@ -996,28 +853,15 @@ function FacadeModel() {
   return <primitive object={obj} />
 }
 function ShopFrontImpl() {
-  const said = useRef({ v: -1, lang: '' })
   const lit = useRef(getLights().door ? 1 : 0)
   useFrame(({ clock }, dt) => {
-    const lang = typeof document === 'undefined' ? 'zh-Hant' : document.documentElement.lang
-    if (said.current.v !== SHOP_MENU.v || said.current.lang !== lang) {
-      said.current = { v: SHOP_MENU.v, lang }
-      writeBoards(lang)
-    }
-    // (lit with the door lanterns, their switch's way over some 0.4 s; their light breathing a little as theirs does)
+    // (the band's lanterns lit with the door lanterns, their switch's way over some 0.4 s; their light breathing a little as theirs does)
     lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
-    paperColour(BOARD_MAT, lit.current, 0.95 + 0.03 * Math.sin(clock.elapsedTime * 1.9), '#fff3dc')
+    paperColour(LANTERN_PAPER, lit.current, 0.95 + 0.03 * Math.sin(clock.elapsedTime * 1.9), '#fff3dc')
   })
-  return (
-    <>
-      <StaticBatch><FacadeModel /></StaticBatch>
-      <mesh geometry={BOARD_GEO} material={BOARD_MAT} raycast={NO_RAY} />
-    </>
-  )
+  return <StaticBatch><FacadeModel /></StaticBatch>
 }
 const ShopFront = memo(ShopFrontImpl)
-// (dev: what the boards say, and the menu they read it from)
-if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __boards: { rows: () => BOARD_ROWS, menu: SHOP_MENU } })
 /** the big red lantern under the eave: hung in the doorway's middle, out in front of the noren, from the eave's boards (its cord's top: the
  * eave's underside there, blender/facade.py's `under`) */
 const BIG_HANG: [number, number] = [2.469, 0.64]
@@ -1033,12 +877,11 @@ const BIG_CHOCHIN: [number, number, number] = [1.8, 0.95, 1.8]
 const DOOR_LIGHT = (() => {
   if (typeof document === 'undefined') return { out: null, spill: null }
   const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
+  // (the street itself out there (item 360, the owner's 「這個角度要看的到外面」: it was a plain pale wash, white past the noren): scene/
+  // streetView's, painted again as the part of the day turns (doorLight))
   const o = document.createElement('canvas')
-  o.width = 32; o.height = 128
-  const g = o.getContext('2d')!
-  const gr = g.createLinearGradient(0, 0, 0, 128)
-  gr.addColorStop(0, '#dfe9f4'); gr.addColorStop(0.45, '#fbf4e6'); gr.addColorStop(0.7, '#efe2cc'); gr.addColorStop(1, '#bfb2a0')
-  g.fillStyle = gr; g.fillRect(0, 0, 32, 128)
+  o.width = 512; o.height = 1024
+  drawStreetView(o.getContext('2d')!, 512, 1024, 'day')
   const s = document.createElement('canvas')
   s.width = 64; s.height = 128
   const h = s.getContext('2d')!
@@ -1056,7 +899,7 @@ const DOOR_OUT = new THREE.MeshBasicMaterial({ map: DOOR_LIGHT.out, toneMapped: 
 const DOOR_SPILL = new THREE.MeshBasicMaterial({ map: DOOR_LIGHT.spill, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
 /** the street's light and the spill on the stones, by the part of the day (the page's data-sky): colour, and the spill's strength */
 const DOOR_LOOKS: Record<string, [string, string, number]> = {
-  day: ['#ffffff', '#fff0d6', 0.34], dawn: ['#ffd9cc', '#ffd6c8', 0.16], dusk: ['#ffb98a', '#ffb46e', 0.3], night: ['#28314a', '#8fa6d8', 0.07],
+  day: ['#ffffff', '#fff0d6', 0.34], dawn: ['#ffffff', '#ffd6c8', 0.16], dusk: ['#ffffff', '#ffb46e', 0.3], night: ['#ffffff', '#8fa6d8', 0.07],
 }
 let doorSky = ''
 function doorLight() {
@@ -1064,6 +907,9 @@ function doorLight() {
   if (s === doorSky) return
   doorSky = s
   const [c, sc, so] = DOOR_LOOKS[s] ?? DOOR_LOOKS.day
+  // (the street painted for this part of the day: its own colours, the lights coming on by dusk (item 360))
+  const cv = DOOR_LIGHT.out?.image as HTMLCanvasElement | undefined
+  if (cv && DOOR_LIGHT.out) { drawStreetView(cv.getContext('2d')!, cv.width, cv.height, (['dawn', 'day', 'dusk', 'night'].includes(s) ? s : 'day') as Sky); DOOR_LIGHT.out.needsUpdate = true }
   DOOR_OUT.color.set(c)
   DOOR_SPILL.color.set(sc)
   DOOR_SPILL.opacity = so
