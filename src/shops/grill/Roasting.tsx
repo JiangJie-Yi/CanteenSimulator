@@ -2925,7 +2925,9 @@ const BarTableware = memo(function BarTableware() {
                         分配不均?」)) */}
                     <group ref={keep(k++)} userData={{ soySeat: seat }} position={[x + sauceSide(c, gate, x), BAR_TOP + 0.001, PLACE.sauce[1]]}
                       {...nameOver('醬油碟', '染付的小碟，客人坐下時倒醬油、放一點蘿蔔泥')}>
-                      <StaticBatch plain><BarPiece name="BarSoyDish" design={n} flat /></StaticBatch>
+                      {/* (itself, its little well and rim in the round (item 344, the owner's: 「醬油碟是平的?」): one flat sheet with its picture from
+                          above it was (item 144), and the soy poured into it lay on nothing) */}
+                      <StaticBatch plain><BarPiece name="BarSoyDish" design={n} /></StaticBatch>
                     </group>
                   </Movable>
                 </group>
