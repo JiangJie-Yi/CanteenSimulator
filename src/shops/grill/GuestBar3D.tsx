@@ -4036,6 +4036,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     /** the server carrying them out; lifting them onto the tray (0..1); setting them down at the place (0..1) */
     server?: number; up?: number; down?: number }
   const bowlJob = useRef<BowlJob | null>(null)
+  // (in development, the bowl being filled and who's at it, to look at from the console)
+  if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __bowlJob: bowlJob, __waiters: waiters, __platerRun: platerRun })
   /** (item 207) customers' bowls filled and set at the counter (each in its `row` there), or out on a server's tray (`server`; `up`, how far
    * they're lifted onto it, `down`, how far set down at the place; `row` -1: filled by the server and taken straight out): the oldest first */
   type PassBowls = { guest: number; seat: number; rice: boolean; soup: boolean; row: number; server?: number; up: number; down: number

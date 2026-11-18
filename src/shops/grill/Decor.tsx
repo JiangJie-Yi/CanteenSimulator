@@ -1033,6 +1033,8 @@ function MisoPot() {
     setTip({ title: '味噌湯鍋', hint: say() })
   }
   const steam = useRef<THREE.Group>(null)
+  /** how much steam (item 242): a thread through the lid's slot with it on, the soup's own with it off, eased between */
+  const steamLv = useRef(0.4)
   // (empty: no soup in it (shrunk to nothing, not hidden: its material drawn from the start), no steam; made, it fills and steams faintly as
   // it heats, fully once hot)
   useFrame((_, dt) => {
@@ -1056,6 +1058,8 @@ function MisoPot() {
       steam.current.visible = st !== 'empty'
       const s = st === 'hot' ? 1 : st === 'heating' ? 0.4 + 0.6 * (1 - SOUP.pot.left / HEAT_S) : 0
       steam.current.scale.setScalar(Math.max(0.01, s))
+      const lidOff = openK.current * openK.current * (3 - 2 * openK.current)
+      steamLv.current += (0.4 + 0.75 * lidOff - steamLv.current) * (1 - Math.exp(-dt * 4))
     }
   })
   const p = new THREE.Vector3().addScaledVector(ALONG, MISO_AT.along).addScaledVector(LAY, MISO_AT.lay)
@@ -1068,7 +1072,7 @@ function MisoPot() {
         onPointerOut={() => { hov.current = false; setTip(null) }}>
         <primitive object={pot.root} />
         <group ref={steam} position={[0, 0.4, 0]} visible={false}>
-          <Steam width={0.36} height={0.5} opacity={0.3} layers={2} />
+          <Steam width={0.36} height={0.5} opacity={0.3} layers={2} level={steamLv} face />
         </group>
       </group>
     </group>
@@ -1158,6 +1162,9 @@ function DenkiNabe() {
     return { root: r, lid, lidY: lid.position.y, lidZ: lid.position.z, lever, leverY: lever.position.y, lamp, rice, riceY: rice.position.y }
   }, [gltf])
   const steam = useRef<THREE.Group>(null)
+  /** how much steam (item 242: the same faint thread whatever it was doing; opened on a pot of hot rice, nothing to see): a thread from its
+   * vent keeping warm, a jet as it boils, the rice's own steam with the lid up, and a billow as it's first lifted */
+  const steamLv = useRef(0.25), billowed = useRef(false)
   const was = useRef(RICE.kama.state)
   // (opened by a click (the owner's, 2026-11-11: the cooker to be used), its lid lifted up and back off the rim, the rice in it seen, as high as
   // what's left of the pot's twenty; empty and shut, a click washes a pot's rice and sets it on)
@@ -1198,6 +1205,17 @@ function DenkiNabe() {
     model.rice.position.y = model.riceY + Math.max(0, left) * 0.15
     model.rice.scale.setScalar(left > 0 ? 1 : 0.0001)
     if (steam.current) steam.current.visible = k.state !== 'empty'
+    const want = cooking ? 0.45 + 0.6 * boil : k.state === 'done' ? 0.25 + 0.6 * o : 0
+    if (k.state === 'done' && o > 0.45 && !billowed.current) { billowed.current = true; steamLv.current = Math.max(steamLv.current, 1.35) }
+    if (o < 0.15) billowed.current = false
+    steamLv.current += (want - steamLv.current) * (1 - Math.exp(-dt * 2.5))
+    // (from the vent on the lid's top shut, from the pot's mouth open, as wide as it is; wider still in the billow (measured: the rim 0.26 up
+    // in its frame, the lid's top 0.36; the steam began at 0.42, floating clear of both))
+    if (steam.current) {
+      const wide = 1 + 0.9 * o + 0.6 * Math.max(0, steamLv.current - 1)
+      steam.current.position.y = 0.36 - 0.09 * o
+      steam.current.scale.set(wide, 1, wide)
+    }
   })
   const floor = GRILL_OFFSET.y - KITCHEN_DROP
   const p = new THREE.Vector3().addScaledVector(ALONG, DENKI_AT.along).addScaledVector(LAY, DENKI_AT.lay)
@@ -1209,7 +1227,7 @@ function DenkiNabe() {
         onPointerOut={() => { hov.current = false; setTip(null) }}>
         <primitive object={model.root} />
         <group ref={steam} visible={false}>
-          <Steam position={[0, 0.42, 0]} width={0.22} height={0.4} opacity={0.32} layers={2} />
+          <Steam width={0.22} height={0.4} opacity={0.42} layers={2} level={steamLv} face />
         </group>
         {/* (where the rice goes in and comes out; and its foot, on the counter (the one scooping holds the bowl a little over it, item 206)) */}
         <group name="cooker-top" position={[0, 0.3, 0]} />

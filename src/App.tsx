@@ -1190,12 +1190,12 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
                 // (more, fainter sheets crossed at more angles, so from above it's a soft haze and not a few bright blades)
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width} height={dish.smoke.height} layers={7}
                   opacity={theme === 'dark' ? 0.3 : 0.4} speed={0.05}
-                  level={dish.heat === 'fire' ? grillSmoke : undefined} />
+                  level={dish.heat === 'fire' ? grillSmoke : undefined} face />
               )}
               {dish.smoke && dish.heat === 'fire' && (
                 // burning food: thick dark smoke that boils up faster and rolls about more than the pale smoke
                 <Steam position={[0, dish.smoke.y, 0]} width={dish.smoke.width * 1.25} height={dish.smoke.height * 1.2}
-                  layers={5} opacity={0.75} speed={0.11} color="#3a3430" shade="#1c1916" level={grillBlackSmoke} />
+                  layers={5} opacity={0.75} speed={0.11} color="#3a3430" shade="#1c1916" level={grillBlackSmoke} face />
               )}
               </group>
             </Suspense>}

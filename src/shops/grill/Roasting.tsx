@@ -12,6 +12,7 @@ import { BONES_GEO, HEAD_GEO, BONE_MAT, BONE_HEAD_MAT } from './fishBones'
 import { heard } from '@/scene/sfx'
 import type { Gripe, Visit } from '@/game/reputation'
 import { BASE_MATERIAL } from '@/scene/baseMaterial'
+import { SOFT_DOT } from '@/scene/softDot'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { keepOut, type HearthZones } from '@/game/hearthGuard'
@@ -2175,13 +2176,18 @@ function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [num
  * it), the side counter's outer edge squared up with the first's end, joined into an L and given rounded edges.
  */
 const BAR_DEPTH = 0.62
-/** how near someone has to come for a gate to swing open for them (the bar's sizes); how far it opens (rad), how quickly (a rate: about
- * 0.2 s), and its spring shutting again (a stiffness and damping: back past shut by some 12 degrees, then 4, settled in about half a second) */
-const GATE_NEAR = 0.75
+/** how near someone has to come for a gate to swing open for them (the bar's sizes); how far it opens (rad), how quickly (a rate, the share
+ * of the way a second: half open in about a ninth of a second of the shop's time, nine tenths as they reach it), and its spring shutting
+ * again (a stiffness and damping: back past shut by some 12 degrees, then 2, settled in about a second). (Item 242: it was flung open
+ * from three quarters of a metre off, at 14 a frame's share, a slow frame or double speed all of it at once: 0.98 rad in one frame, 83
+ * times a minute; now it swings as they come up to it, and goes on with the way it was moving when they're by) */
+const GATE_NEAR = 0.55
 const GATE_OPEN = 1.4
-const GATE_PUSH = 14
-const GATE_K = 196
-const GATE_C = 14
+const GATE_PUSH = 6
+// (the spring a swing door's hinge has: shut again in a third of a second it was (14 rad/s, flicked back faster than it was pushed); now
+// a little under a second's swing back, past shut and back, the same 12 degrees over and settled in about a second)
+const GATE_K = 64
+const GATE_C = 8
 const GATE_AT = new THREE.Vector3()
 /**
  * The swing door across a counter's gate: a leaf of slatted wood as high as the bar, its top capped in the bar's own
@@ -2291,8 +2297,10 @@ function BarGateImpl({ c, gate }: { c: Counter; gate: Gate }) {
         if (g.side === 0 && par) gateSound(par.localToWorld(GATE_AT.copy(middle)), 'push')
         g.side = side > 0 ? -1 : 1
       }
-      g.ang += (-end * GATE_OPEN * g.side - g.ang) * Math.min(1, dt * GATE_PUSH)
-      g.vel = 0
+      const was = g.ang
+      g.ang += (-end * GATE_OPEN * g.side - g.ang) * (1 - Math.exp(-dt * GAME_SPEED.value * GATE_PUSH))
+      // (how fast it's swinging, kept for the spring: let go, it goes on the way it was moving)
+      g.vel = dt > 0 ? (g.ang - was) / dt : 0
       g.swinging = true
     } else if (g.swinging) {
       // (let go: sprung back shut, past it and back, and still; a tap as it first swings through shut)
@@ -5092,13 +5100,16 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   }
   // sparks and ash flung up where the sticks land: two little point clouds, each particle with its own life
   const SPARKS = 80
-  const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean }[]>([])
+  const sparkPts = useRef<{ x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; ash: boolean; s: number }[]>([])
   const sparkGeo = useMemo(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); return g }, [])
-  const ashGeo = useMemo(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); return g }, [])
+  // (the ash's colours carry their alpha (item 242): it fades out into the air; with its colour only, it went to black, grey tiles over the fire)
+  const ashGeo = useMemo(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKS * 4), 4)); return g }, [])
   const burst = (x: number, y: number, z: number) => {
     for (let i = 0; i < 9; i++) {
       const a = Math.random() * Math.PI * 2, v = 0.15 + Math.random() * 0.35
-      sparkPts.current.push({ x, y, z, vx: Math.cos(a) * v, vy: 0.5 + Math.random() * 0.9, vz: Math.sin(a) * v, life: 0.5 + Math.random() * 0.7, ash: i % 3 === 0 })
+      // (sparks short-lived, thrown and falling; the ash lifted, lingering as it drifts down (item 242))
+      const ash = i % 3 === 0
+      sparkPts.current.push({ x, y, z, vx: Math.cos(a) * v, vy: 0.5 + Math.random() * 0.9, vz: Math.sin(a) * v, life: ash ? 1.3 + Math.random() * 0.9 : 0.5 + Math.random() * 0.7, ash, s: Math.random() * 6.28 })
     }
     if (sparkPts.current.length > SPARKS * 2) sparkPts.current.splice(0, sparkPts.current.length - SPARKS * 2)
   }
@@ -7066,7 +7077,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     geometry.setAttribute('color', new THREE.BufferAttribute(col, 3))
     return { pos, col, vel, life, geometry, next: 0 }
   }, [])
-  const grainMaterial = useMemo(() => new THREE.PointsMaterial({ size: 0.024, sizeAttenuation: true, vertexColors: true }), [])
+  // (round grains and drops, crisp-edged (item 242: they were squares))
+  const grainMaterial = useMemo(() => new THREE.PointsMaterial({ size: 0.024, sizeAttenuation: true, vertexColors: true, map: SOFT_DOT, alphaTest: 0.5 }), [])
   const emit = (kind: Seasoning, from: THREE.Vector3, count: number) => {
     const { pos, col, vel, life } = grains
     const c = GRAIN_COLORS[kind]
@@ -7940,21 +7952,30 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         const q = sp[i]
         q.life -= cdt
         if (q.life <= 0) { sp.splice(i, 1); continue }
-        q.vy -= (q.ash ? 0.9 : 3.2) * cdt
+        if (q.ash) {
+          // (a flake of ash (item 242): light, held up by the air, its rise slowed and its fall a slow drift, side to side as it goes)
+          const drag = Math.exp(-2.4 * cdt)
+          q.vx *= drag; q.vz *= drag
+          q.vy = q.vy * drag - 0.55 * cdt
+          q.x += Math.sin(q.life * 7 + q.s) * 0.05 * cdt
+          q.z += Math.cos(q.life * 5.3 + q.s) * 0.05 * cdt
+        } else q.vy -= 3.2 * cdt
         q.x += q.vx * cdt
         q.y += q.vy * cdt
         q.z += q.vz * cdt
         const k = Math.min(1, q.life / 0.5)
         if (q.ash) {
           if (na >= SPARKS) continue
-          pb.setXYZ(na, q.x, q.y, q.z); cb.setXYZ(na, 0.8 * k, 0.78 * k, 0.74 * k); na++
+          // (pale grey, catching the light as it turns over; fading out over its last moments)
+          const tumble = 0.82 + 0.18 * Math.sin(q.life * 15 + q.s)
+          pb.setXYZ(na, q.x, q.y, q.z); cb.setXYZW(na, 0.86 * tumble, 0.84 * tumble, 0.8 * tumble, 0.9 * Math.min(1, q.life / 0.6)); na++
         } else {
           if (ns >= SPARKS) continue
           pa.setXYZ(ns, q.x, q.y, q.z); ca.setXYZ(ns, k, 0.45 * k * k, 0.08 * k ** 3); ns++
         }
       }
       for (let i = ns; i < SPARKS; i++) { pa.setXYZ(i, 0, -9, 0); ca.setXYZ(i, 0, 0, 0) }
-      for (let i = na; i < SPARKS; i++) { pb.setXYZ(i, 0, -9, 0); cb.setXYZ(i, 0, 0, 0) }
+      for (let i = na; i < SPARKS; i++) { pb.setXYZ(i, 0, -9, 0); cb.setXYZW(i, 0, 0, 0, 0) }
       pa.needsUpdate = ca.needsUpdate = pb.needsUpdate = cb.needsUpdate = true
     }
     if (!embers.current || !embers.current.length) {
@@ -8944,6 +8965,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
 
     // smoke rises once food over the coals starts to cook through (fat and juices dripping onto the charcoal):
     // none from a bare fire, more with every done piece, most when it's charring
+    // (from four tenths cooked, as the fat begins to run (item 242: from seven, the fire stood smokeless half the evening, fish on it))
     if (smoke) {
       let s = 0
       let b = 0
@@ -8951,7 +8973,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (!present(p) || p.collected || waiting(p)) continue
         const r = p.progress / roast.times[p.id]
         // (pale smoke while it cooks; once it's burning there's only the black)
-        s += THREE.MathUtils.smoothstep(r, 0.7, 1.1) * 0.35 * (1 - THREE.MathUtils.smoothstep(r, 1.8, 2.2))
+        s += THREE.MathUtils.smoothstep(r, 0.4, 1.05) * 0.32 * (1 - THREE.MathUtils.smoothstep(r, 1.8, 2.2))
         // food left to burn sends up thick black smoke
         b += THREE.MathUtils.smoothstep(r, 2.0, 2.8) * 0.45
       }
@@ -9038,8 +9060,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       <EmberBed fuel={fuel} />
       {/* (the sticks on the fire, their ink, and the crumbs they break into: a few instanced meshes, written each frame) */}
       <primitive object={coalDraw.group} />
-      <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial size={0.024} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>
-      <points geometry={ashGeo} frustumCulled={false}><pointsMaterial size={0.05} vertexColors transparent opacity={0.6} depthWrite={false} toneMapped={false} /></points>
+      {/* (round, both (item 242: squares they were, the ash 5 cm grey tiles): the sparks hot dots, the ash small soft flakes) */}
+      <points geometry={sparkGeo} frustumCulled={false}><pointsMaterial map={SOFT_DOT} size={0.02} vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></points>
+      <points geometry={ashGeo} frustumCulled={false}><pointsMaterial map={SOFT_DOT} size={0.022} vertexColors transparent depthWrite={false} toneMapped={false} /></points>
       {shards.map((sh) => (
         <mesh key={sh.id} position={[sh.x, sh.y, sh.z]} rotation={[-Math.PI / 2, 0, sh.r]}>
           <circleGeometry args={[sh.s, 3]} /><meshToonMaterial color="#efece4" side={THREE.DoubleSide} />

@@ -251,7 +251,7 @@ function ladleAt(W: FillAt, cup: THREE.Vector3, lift: number, tip: number, back 
  * taken up from the shelf under the counter into the left hand, the paddle off its hook, two scoops lifted out and tipped into the bowl, the
  * heap patted round, the paddle hung back, the lid down on */
 export function riceFillPose(W: FillAt, t: number): FillPose {
-  const { beat, k } = beatAt(RICE_BEATS, t)
+  const { beat, k, n } = beatAt(RICE_BEATS, t)
   const C = W.top, f = W.face, r = W.right
   const at = (dr: number, df: number, du: number) => C.clone().addScaledVector(r, dr).addScaledVector(f, df).addScaledVector(UP, du)
   const B = W.put.clone()
@@ -265,12 +265,13 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
   const outOfHolder = hang.blade.clone().addScaledVector(hang.dir, -(HOLDER_H + 0.015))
   let left = restL, right = restR, bowl: THREE.Vector3 | null = B.clone(), lid = 1, load = 0
   // (the paddle held: its blade's middle at `blade`, pointing along `dir`, its face toward `face`, rolled `roll`)
-  const hold = (blade: THREE.Vector3, dir: THREE.Vector3, face: THREE.Vector3, roll = 0) => {
-    held.q.copy(along(dir, face, roll))
-    held.grip.copy(blade).addScaledVector(dir.clone().normalize(), -BLADE)
+  const holdQ = (blade: THREE.Vector3, q: THREE.Quaternion) => {
+    held.q.copy(q)
+    held.grip.copy(blade).addScaledVector(new THREE.Vector3(0, 0, 1).applyQuaternion(q), -BLADE)
     held.held = true
     right = held.grip.clone()
   }
+  const hold = (blade: THREE.Vector3, dir: THREE.Vector3, face: THREE.Vector3, roll = 0) => holdQ(blade, along(dir, face, roll))
   const inPot = at(0.005, 0.0, -0.025), outPot = at(0.0, -0.02, 0.1), overBowl = B.clone().addScaledVector(UP, 0.1)
   const down = UP.clone().negate().addScaledVector(f, 0.45), level = f.clone().multiplyScalar(0.6).addScaledVector(r, -0.55).addScaledVector(UP, 0.15)
   switch (beat) {
@@ -289,32 +290,44 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
       left = rim
       if (k < 0.5) right = keyed(k, [[0, at(W.r * 0.7, -W.r - 0.06, 0).setY(W.low + 0.1)], [0.5, hang.grip]])
       else {
-        // (drawn straight up out of its holder, then over the cooker's mouth, turning to lie level)
-        const kk = (k - 0.5) / 0.5, e = sm((kk - 0.3) / 0.7)
-        hold(keyed(kk, [[0, hang.blade], [0.3, outOfHolder], [1, outPot]]), hang.dir.clone().lerp(level, e), hang.face.clone().lerp(r.clone().negate(), e))
+        // (drawn straight up out of its holder, then over the cooker's mouth, turning to point down into it, its face up, as the scoop
+        // begins (item 242: it turned to lie level, and the scoop began pointing down: snapped round in one frame))
+        // (turned the shortest way from how it hung to how the scoop begins: the two ways it points eased between, a face crossed the line
+        // it points along and it flipped right round)
+        const kk = (k - 0.5) / 0.5, e = sm((kk - 0.1) / 0.9)
+        holdQ(keyed(kk, [[0, hang.blade], [0.3, outOfHolder], [1, outPot]]), hang.q.clone().slerp(along(down, UP, 0), e))
       }
       break
     case 'scoop': {
       left = rim
       // (down into the rice, the blade turned to cut under it, up out with a lump on it, over to the bowl and tipped off it, with a little
-      // shake as it goes)
-      const blade = keyed(k, [[0, outPot], [0.28, inPot], [0.42, at(-0.02, -0.015, -0.015)], [0.58, outPot], [0.72, overBowl], [1, overBowl]])
-      const dir = k < 0.5 ? down.clone().lerp(level, sm((k - 0.3) / 0.2)) : level
-      const roll = k < 0.72 ? 0 : 1.95 * Math.sin(Math.PI * Math.min(1, (k - 0.72) / 0.28)) + Math.sin(k * 60) * 0.05 * (k > 0.8 ? 1 : 0)
+      // shake as it goes; the first scoop then back over the pot, pointing down again, for the second (item 242: it ended over the bowl,
+      // lying level, and the second began over the pot pointing down: the paddle jumped across and snapped round 2 rad in one frame))
+      const back = n === 0 ? 0.8 : 1, u = k / back
+      const blade = u <= 1 ? keyed(u, [[0, outPot], [0.28, inPot], [0.42, at(-0.02, -0.015, -0.015)], [0.58, outPot], [0.72, overBowl], [1, overBowl]])
+        : overBowl.clone().lerp(outPot, sm((k - back) / (1 - back)))
+      const dir = u < 0.5 ? down.clone().lerp(level, sm((u - 0.3) / 0.2)) : u <= 1 ? level : level.clone().lerp(down, sm((k - back) / (1 - back)))
+      const roll = u < 0.72 || u > 1 ? 0 : 1.95 * Math.sin(Math.PI * Math.min(1, (u - 0.72) / 0.28)) + Math.sin(u * 60) * 0.05 * (u > 0.8 ? 1 : 0)
       hold(blade, dir, UP, roll)
-      load = k > 0.38 && k < 0.86 ? 1 - sm((k - 0.76) / 0.1) : 0
+      load = u > 0.38 && u < 0.86 ? 1 - sm((u - 0.76) / 0.1) : 0
       break
     }
-    case 'pat':
+    case 'pat': {
       left = rim
-      hold(B.clone().addScaledVector(UP, 0.066 + 0.014 * Math.abs(Math.sin(k * Math.PI * 2))), level.clone().addScaledVector(UP, -0.5), UP, 0)
+      // (eased down from over the bowl into the pats and up again to where it's taken back from (item 242: it jumped to the pats' tilt and
+      // back, half a radian each way in a frame))
+      const e = sm(k / 0.2) * (1 - sm((k - 0.8) / 0.2))
+      const pat = B.clone().addScaledVector(UP, 0.066 + 0.014 * Math.abs(Math.sin(k * Math.PI * 2)))
+      const from = B.clone().addScaledVector(UP, k < 0.5 ? 0.1 : 0.09)
+      hold(from.lerp(pat, e), level.clone().lerp(level.clone().addScaledVector(UP, -0.5), e), UP, 0)
       break
+    }
     case 'paddleBack':
       left = rim
       // (over the holder, stood up as it goes, and down into it)
       if (k < 0.75) {
         const kk = k / 0.75, e = sm(kk / 0.7)
-        hold(keyed(kk, [[0, B.clone().addScaledVector(UP, 0.09)], [0.7, outOfHolder], [1, hang.blade]]), level.clone().lerp(hang.dir, e), UP.clone().lerp(hang.face, e))
+        holdQ(keyed(kk, [[0, B.clone().addScaledVector(UP, 0.09)], [0.7, outOfHolder], [1, hang.blade]]), along(level, UP, 0).slerp(hang.q, e))
       } else right = hang.grip.clone()
       break
     case 'lidOn':
@@ -374,10 +387,12 @@ export function soupFillPose(W: FillAt, t: number): FillPose {
       break
     case 'pour': {
       left = rim
-      const tip = 1.75 * sm((k - 0.35) / 0.45)
-      hold(keyed(k, [[0, above], [0.35, overBowl], [1, overBowl]]), 0.35, -tip)
-      load = 1 - sm((k - 0.4) / 0.45)
-      if (k > 0.42 && k < 0.85) {
+      // (over to the bowl, tipped and poured, and up level again back over the pot's mouth, where the next dip or the putting back begins
+      // (item 242: it ended over the bowl, tipped, and the next beat began over the pot: the ladle jumped a pot's width in one frame))
+      const tip = 1.75 * sm((k - 0.25) / 0.3) * (1 - sm((k - 0.72) / 0.24))
+      hold(keyed(k, [[0, above], [0.25, overBowl], [0.72, overBowl], [1, above]]), 0.35, -tip)
+      load = 1 - sm((k - 0.32) / 0.33)
+      if (k > 0.34 && k < 0.68) {
         const lip = overBowl.clone().addScaledVector(r, -0.022)
         stream = [lip, B.clone().addScaledVector(UP, 0.02 + 0.03 * fillAt(SOUP_BEATS, 'pour', t))]
       }

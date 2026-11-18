@@ -61,7 +61,13 @@ type SteamProps = ThreeElements['group'] & {
   speed?: number
   /** 0..1, read every frame and multiplied into the opacity (e.g. how hard the soup is boiling) */
   level?: RefObject<number>
+  /** turned about the upright to face the camera, its sheets fanned a little either side of facing it, not crossed all round (item 242: the
+   * grill's smoke, seen from above in the grill view, was its crossed sheets edge-on, near nothing even with the fire smoking hard) */
+  face?: boolean
 }
+const FACE_AT = new THREE.Vector3()
+const FACE_Q = new THREE.Quaternion()
+const FACE_E = new THREE.Euler()
 
 /** each size of steam's planes, made once and shared by every steam of that size (each dish's had its own, let go as it went: in development,
  * where React makes each twice and keeps one, the other was never let go) */
@@ -105,7 +111,7 @@ function steamMaterial(seed: number) {
 // (drawn again only when its props change: a position handed down as a new [x, y, z] with the same numbers is the same place)
 export const Steam = memo(SteamImpl, sameProps)
 function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, color = '#ffffff', shade = '#e6f0fc',
-  speed = 0.07, level, ...props }: SteamProps) {
+  speed = 0.07, level, face = false, ...props }: SteamProps) {
   const geometry = useMemo(() => planeOf(width, height), [width, height])
 
   // (taken as it's shown and put by as it goes: made while drawing, a copy React makes and drops (in development) would never come back)
@@ -117,10 +123,18 @@ function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, colo
   }, [layers])
   const time = useRef(0)
   const group = useRef<THREE.Group>(null)
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
     time.current += delta
     // gentle steam is also lower: wisps hug the surface, a full boil rises its whole height
     if (group.current && level) group.current.scale.y = 0.35 + 0.65 * level.current
+    // (facing the camera: its turn in the world toward it, less what its parent's turned)
+    if (face && group.current?.parent) {
+      const g = group.current
+      g.getWorldPosition(FACE_AT)
+      const yaw = Math.atan2(camera.position.x - FACE_AT.x, camera.position.z - FACE_AT.z)
+      g.parent!.getWorldQuaternion(FACE_Q)
+      g.rotation.y = yaw - FACE_E.setFromQuaternion(FACE_Q, 'YXZ').y
+    }
     for (const m of materials) {
       m.uniforms.uTime.value = time.current
       m.uniforms.uOpacity.value = opacity * (level ? level.current : 1)
@@ -133,7 +147,7 @@ function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, colo
   return (
     <group ref={group} {...props}>
       {materials.map((m, i) => (
-        <mesh key={i} geometry={geometry} material={m} rotation-y={(i * Math.PI) / layers} renderOrder={1} />
+        <mesh key={i} geometry={geometry} material={m} rotation-y={face ? (i / Math.max(1, layers - 1) - 0.5) * 0.8 : (i * Math.PI) / layers} renderOrder={1} />
       ))}
     </group>
   )
