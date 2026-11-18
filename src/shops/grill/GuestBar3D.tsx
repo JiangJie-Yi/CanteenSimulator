@@ -2268,6 +2268,11 @@ let SHOE_WOOD_MAT: THREE.MeshToonMaterial | null = null
 const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#fbf6ef'), ShoeTop: new THREE.Color('#ece0d0'), ShoeSlat: new THREE.Color('#ffffff') }
 /** one of a pair of shoes put away in a cubby */
 const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
+/** the cupboard's shoes, all of them one instanced mesh in this material, each shoe its customer's colour (item 227) */
+const SHOES_IN_MAT = new THREE.MeshToonMaterial({ color: '#ffffff' })
+const SHOE_NONE = new THREE.Matrix4().makeScale(0, 0, 0)
+const SHOE_M = new THREE.Matrix4()
+const SHOE_C = new THREE.Color()
 function ShoeCupboard() {
   const gltf = useGLTF(SHOE_URL) as unknown as { scene: THREE.Group }
   const model = useMemo(() => {
@@ -2342,9 +2347,19 @@ function ShoeCupboard() {
   /** the cubbies opened by a click, each on its own (item 256, the owner's: 「這櫃子我點一下就全開，能否一個一個開」) */
   const st = useRef({ cells: new Set<number>() })
   const g = useRef<THREE.Group>(null)
-  const pairs = useRef<(THREE.Group | null)[]>([])
-  const mats = useMemo(() => model.cells.map(() => new THREE.MeshToonMaterial({ color: '#444444' })), [model])
-  useEffect(() => () => { for (const m of mats) m.dispose() }, [mats])
+  // (every cubby's pair of shoes one instanced mesh, each shoe its customer's colour (item 227: two meshes a pair, a material each, some
+  // thirty draws with the cupboard full); a cubby with none, its two drawn at nothing; made with the rest, its program at load)
+  const shoes = useMemo(() => {
+    const m = new THREE.InstancedMesh(SHOE_PAIR_GEO, SHOES_IN_MAT, Math.max(1, model.cells.length * 2))
+    m.name = 'shoe-pairs'
+    m.frustumCulled = false
+    m.raycast = () => {}
+    for (let i = 0; i < m.count; i++) { m.setMatrixAt(i, SHOE_NONE); m.setColorAt(i, SHOE_C.set('#444444')) }
+    return m
+  }, [model])
+  useEffect(() => () => shoes.dispose(), [shoes])
+  /** each cubby's colour as last drawn ('' none): the instances written only when one changes */
+  const drawn = useRef<string[]>([])
   useFrame((_, dt) => {
     const s = st.current
     const now = performance.now()
@@ -2357,12 +2372,18 @@ function ShoeCupboard() {
     })
     // (shut, the one drawing of them all; the doors themselves hidden (still pointed at: the pointer's rays don't mind))
     model.shut.home(model.doors.every((d) => d.o.rotation.y === 0))
-    pairs.current.forEach((p, i) => {
-      const c = SHOE_CELLS.shoes.get(i)
-      if (!p) return
-      p.visible = !!c
-      if (c) mats[i].color.set(c)
+    let changed = false
+    model.cells.forEach((at, i) => {
+      const c = SHOE_CELLS.shoes.get(i) ?? ''
+      if (drawn.current[i] === c || !at) return
+      drawn.current[i] = c
+      changed = true
+      for (let sd = 0; sd < 2; sd++) {
+        if (c) { SHOE_M.makeTranslation(at.x + (sd ? 0.045 : -0.045), at.y + 0.026, at.z); shoes.setMatrixAt(i * 2 + sd, SHOE_M); shoes.setColorAt(i * 2 + sd, SHOE_C.set(c)) }
+        else shoes.setMatrixAt(i * 2 + sd, SHOE_NONE)
+      }
     })
+    if (changed) { shoes.instanceMatrix.needsUpdate = true; if (shoes.instanceColor) shoes.instanceColor.needsUpdate = true }
     if (g.current) { g.current.getWorldPosition(SHOE_CELLS.at); SHOE_CELLS.ready = true }
   })
   return (
@@ -2381,14 +2402,8 @@ function ShoeCupboard() {
       {...tipOver('【下駄箱】', '點一格的門，開那一格')}>
       <primitive object={model.root} />
       <group ref={g}>
-        {/* (the shoes in each cubby: a pair, the customer's colour, toes out) */}
-        {model.cells.map((c, i) => (
-          <group key={i} name={`shoe-pair-${i}`} ref={(o) => { pairs.current[i] = o }} position={c} visible={false}>
-            {[-1, 1].map((sd) => (
-              <mesh key={sd} geometry={SHOE_PAIR_GEO} material={mats[i]} position={[sd * 0.045, 0.026, 0]} raycast={() => {}} />
-            ))}
-          </group>
-        ))}
+        {/* (the shoes in each cubby: a pair, the customer's colour, toes out; all of them one instanced mesh) */}
+        <primitive object={shoes} />
       </group>
     </group>
   )

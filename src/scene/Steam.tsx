@@ -127,6 +127,9 @@ function SteamImpl({ layers = 4, width = 1.1, height = 1.6, opacity = 0.55, colo
     time.current += delta
     // gentle steam is also lower: wisps hug the surface, a full boil rises its whole height
     if (group.current && level) group.current.scale.y = 0.35 + 0.65 * level.current
+    // (none at all: not drawn (item 227: the grill's black smoke, at nothing but while something burns, and its pale smoke between batches,
+    // were their sheets drawn see-through every frame, a dozen draws for nothing); the same program as the rest of the steam, made at load)
+    if (group.current && level) group.current.visible = level.current > 0.004
     // (facing the camera: its turn in the world toward it, less what its parent's turned)
     if (face && group.current?.parent) {
       const g = group.current
