@@ -36,6 +36,7 @@ import { PILE_LINE, bossCleans, pileLeft, staffSink } from '@/game/sinkPile'
 import { HAND_WASH_LINES, SPONGE_S, WASH_WET, beatLength, handClean, handSays, handStops, scrubbed, washBeat, washPlateS, type HandAt } from '@/game/handWash'
 import { POUR_TOTAL, SAKE_SET_S, SAKE_UP_S, pourBeat, pouredBy, streaming } from '@/game/sakePour'
 import { SAKE_BOTTLE_ML, STATION_GO, TOKKURI_ML, stationGo } from '@/game/sakeStand'
+import { PLATE_NAME, plateSays } from '@/game/plateTip'
 import { newWashPose, spongePose, washPose, type WashPoints } from '@/scene/washMotion'
 import { PLATE_DIMS, PLATE_SPREAD, plateSide, type PlateKind } from '@/game/plateSize'
 import { PathMap } from './PathMap'
@@ -54,7 +55,7 @@ import { brushText, followSign, signTexture } from '@/scene/signFont'
 import { activityOf, type Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel, inkTogether } from '@/scene/inkHull'
-import { setTip } from '@/scene/hoverTip'
+import { setTip, shownOver } from '@/scene/hoverTip'
 import { shrineDoor } from './shrineSound'
 import { getLights, setLightSwitch } from '@/scene/lightsStore'
 import { Later } from '@/scene/Later'
@@ -8439,11 +8440,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
           of the shop's plates, it goes with the food) */}
       {given && Array.from({ length: READY_SLOTS }, (_, k) => (
-        <group key={`carrier${k}`} name={`plating-carrier-${k}`} ref={(o) => { carriers.current[k] = o }} position={platingPlace(readyAlong(k))} scale={ON_TABLE * 0.8} visible={false}><Plate design={k + 3} /></group>
+        <group key={`carrier${k}`} name={`plating-carrier-${k}`} ref={(o) => { carriers.current[k] = o }} position={platingPlace(readyAlong(k))} scale={ON_TABLE * 0.8} visible={false}
+          {...shownOver('盤子', '裝盤處｜下一道菜放在這裡等')}><Plate design={k + 3} /></group>
       ))}
       {/* the plating place's stack of clean plates (the kitchen brings them from the racks; one's laid for a seat as its first food comes off the fire) */}
       {given && (
-        <group ref={plateStack} name="plating-stack" position={platingPlace(PLATE_STACK_ALONG).addScaledVector(plating.across, PLATE_STACK_ACROSS)}>
+        <group ref={plateStack} name="plating-stack" position={platingPlace(PLATE_STACK_ALONG).addScaledVector(plating.across, PLATE_STACK_ACROSS)}
+          {...shownOver('乾淨的盤子', '裝盤處的備用盤｜菜一烤好就拿一個來裝')}>
           {Array.from({ length: PASS_STACK_SHOWN }, (_, i) => (
             <group key={i} position={[0, i * STACK_GAP * ON_TABLE, 0]} rotation-y={i * 1.1} scale={ON_TABLE} visible={false}><Plate design={i + 5} /></group>
           ))}
@@ -8452,13 +8455,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
       {/* the washed plates standing in the dish dryer under the sink's counter (seen through its glass door), and the used sticks in the bin
           beside it (cleared off the customers' plates with them) */}
       {given && (
-        <group ref={dryerPlates}>
+        <group ref={dryerPlates} {...shownOver('洗好的盤子', '在烘碗機裡烘乾｜乾了外場搬回碗盤架')}>
           {Array.from({ length: DRYER_CAP }, (_, i) => <group key={i} scale={IN_SINK} visible={false}><Plate design={i + 1} /></group>)}
         </group>
       )}
       {/* (and those washed by hand while the washer was busy, standing in the draining basket on the sink's counter) */}
       {given && (
-        <group ref={drainPlates} name="drain-plates">
+        <group ref={drainPlates} name="drain-plates" {...shownOver('洗好的盤子', '手洗的，立在瀝水籃裡瀝乾')}>
           {/* (drawn shallower than they are, so thirty stood in their notches show a gap between each (the owner's, 2026-11-12): the shop's
               plates are deep, and at the notches' pitch they lay nested into one another) */}
           {Array.from({ length: DRAIN_CAP }, (_, i) => <group key={i} scale={IN_DRAIN} visible={false}><PlateKinds design={i + 2} /></group>)}
@@ -8544,13 +8547,13 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </group>
       )}
       {given && (
-        <group ref={platerStack} visible={false}>
+        <group ref={platerStack} visible={false} {...shownOver('乾淨的盤子', '從碗盤櫃補到裝盤處')}>
           {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * STACK_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK}><Plate design={i + 7} /></group>)}
         </group>
       )}
       {/* (a server's stack of dried plates, on their tray on the way from the dryer back to the racks) */}
       {waiters.current.map((_, wi) => (
-        <group key={`stack${wi}`} ref={(o) => { stackObjs.current[wi] = o }} visible={false}>
+        <group key={`stack${wi}`} ref={(o) => { stackObjs.current[wi] = o }} visible={false} {...shownOver('洗好的盤子', '外場搬回碗盤架')}>
           {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * STACK_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK} name={`stack-plate-${i}`}><Plate design={i + 3} /></group>)}
         </group>
       ))}
@@ -8561,7 +8564,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
         </mesh>
       ))}
       {runs.current.map((r) => (
-        <group key={r.key} name={`plate-run-${r.key}`} ref={(o) => {
+        // (pointed at, it says whose it is and where it is in its round (item 279): read as the pointer comes onto it, the run as it is then)
+        <group key={r.key} name={`plate-run-${r.key}`}
+          {...shownOver(PLATE_NAME[r.kind ?? 'round'], () => plateSays({ phase: r.phase, seat: r.seat, bones: r.bones, sticks: r.sticks, tissue: !!r.tissue, drink: !!r.glass }))}
+          ref={(o) => {
           if (!o) { const was = runObjs.current.get(r.key); if (was) PLATE_FACES.delete(was); return void runObjs.current.delete(r.key) }
           runObjs.current.set(r.key, o)
           // (a plate a piece can be rested on, its face found by a ray (Roasting, item 258))

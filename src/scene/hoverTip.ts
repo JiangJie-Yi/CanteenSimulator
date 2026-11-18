@@ -46,4 +46,20 @@ export const whoOver = (title: () => string, hint: () => string = () => '') => (
     if (el?.style && el.style.cursor === 'pointer') el.style.cursor = ''
   },
 })
+/** whether it and everything it hangs from is shown (R3F points at hidden meshes too) */
+const shown = (o: THREE.Object3D | null | undefined) => { for (let q = o ?? null; q; q = q.parent) if (!q.visible) return false; return true }
+/**
+ * A thing only named when pointed at, as bar's nameOver, that may be hidden (item 279: the plates, in stacks drawn only while there are
+ * any, hidden otherwise and still taking the pointer): its tag only over what's shown, over a hidden one the pointer goes on to what's
+ * behind; leaving, it takes down only its own tag. `hint` may be asked as the pointer comes onto it (a plate's state as it is then).
+ */
+export const shownOver = (title: string, hint: string | (() => string)) => ({
+  onPointerOver: (e: { stopPropagation: () => void; object?: THREE.Object3D; eventObject?: THREE.Object3D; camera?: THREE.Camera; nativeEvent?: Event }) => {
+    if (HOVER.paused || !shown(e.object)) return
+    e.stopPropagation()
+    aimTip(e)
+    setTip({ title, hint: typeof hint === 'function' ? hint() : hint })
+  },
+  onPointerOut: () => { if (!HOVER.paused && tip?.title === title) setTip(null) },
+})
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __tip?: typeof setTip }).__tip = setTip
