@@ -18,7 +18,7 @@ import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts }
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { toChineseNumber } from '@/data/menu'
-import { paintOuting } from './wallPhotos'
+import { paintOuting, paintWallSigns, WALL_SIGNS } from './wallPhotos'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -1528,6 +1528,77 @@ function MenuTags({ z0, z1 }: { z0: number; z1: number }) {
     }).catch(() => {})
   })
   return <primitive object={parts.g} />
+}
+/**
+ * The corner by the way in where the visitors have left their mark (item 295, the owner's, 2026-11-17: 「靠近玄關的門處牆壁會有些美食家的簽名及
+ * 留言板+照片」): on the plaster over the shoe cupboard, past the shrine's shelf, short of the doorway: three signed boards in a row, the cork
+ * board of notes under them, the two photographs beside it under the exit sign (wallPhotos' paintWallSigns, all made up). Each a thin board
+ * hung just off the wall, its face its part of the one canvas, its edges the frame's wood or the boards' gold; all one mesh, one line.
+ * `end` the wall's end by the way in: each placed back from it (the switches 1.2 to 1.4 back, under the cork board; the exit sign 0.42 to
+ * 0.82 back, over the photographs; the shrine's shelf ends 1.48 back, the doorway's front starts 0.26 back)
+ */
+type WallBoard = { z: number; y: number; w: number; h: number; t: number; rect: number[]; edge: number[] }
+const SIGN_BOARDS = (end: number): WallBoard[] => [
+  ...[0, 1, 2].map((k) => ({ z: end - 1.3 + k * 0.185, y: 1.75, w: 0.16, h: 0.18, t: 0.006, rect: WALL_SIGNS.shikishi[k], edge: WALL_SIGNS.gold })),
+  { z: end - 1.12, y: 1.4, w: 0.42, h: 0.3, t: 0.02, rect: WALL_SIGNS.board, edge: WALL_SIGNS.wood },
+  { z: end - 0.72, y: 1.475, w: 0.2, h: 0.15, t: 0.012, rect: WALL_SIGNS.photos[0], edge: WALL_SIGNS.wood },
+  { z: end - 0.48, y: 1.43, w: 0.2, h: 0.15, t: 0.012, rect: WALL_SIGNS.photos[1], edge: WALL_SIGNS.wood },
+]
+let SIGNS_ZH = true
+const SIGNS_TEX = signTexture(WALL_SIGNS.size[0], WALL_SIGNS.size[1], (g) => paintWallSigns(g, SIGNS_ZH))
+const SIGNS_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: SIGNS_TEX })
+function signsGeometry(boards: WallBoard[]) {
+  const [W, H] = WALL_SIGNS.size
+  const pos: number[] = [], uv: number[] = [], idx: number[] = []
+  const face = (pts: number[][], uvs: number[][]) => {
+    const b = pos.length / 3
+    for (const p of pts) pos.push(...p)
+    for (const q of uvs) uv.push(...q)
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
+  }
+  const rectUV = ([x, y, w, h]: number[]) => [x / W, 1 - (y + h) / H, (x + w) / W, 1 - y / H]
+  for (const b of boards) {
+    const [u0, v0, u1, v1] = rectUV(b.rect), [e0, f0, e1, f1] = rectUV(b.edge)
+    const xb = -0.004, xf = xb - b.t, za = b.z - b.w / 2, zb = b.z + b.w / 2, ya = b.y - b.h / 2, yb = b.y + b.h / 2
+    const E = [[e0, f0], [e1, f0], [e1, f1], [e0, f1]]
+    face([[xf, ya, za], [xf, ya, zb], [xf, yb, zb], [xf, yb, za]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]])
+    face([[xb, ya, za], [xf, ya, za], [xf, yb, za], [xb, yb, za]], E)
+    face([[xf, ya, zb], [xb, ya, zb], [xb, yb, zb], [xf, yb, zb]], E)
+    face([[xf, yb, za], [xf, yb, zb], [xb, yb, zb], [xb, yb, za]], E)
+    face([[xb, ya, za], [xb, ya, zb], [xf, ya, zb], [xf, ya, za]], E)
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  g.setIndex(idx)
+  g.computeVertexNormals()
+  return g
+}
+function WallSigns({ end }: { end: number }) {
+  const obj = useMemo(() => {
+    const g = new THREE.Group()
+    g.name = 'wall-signs'
+    const m = new THREE.Mesh(signsGeometry(SIGN_BOARDS(end)), SIGNS_MAT)
+    m.receiveShadow = true
+    g.add(m)
+    const ink = inkTogether([m], { width: 0.0012, weld: true })
+    if (ink) g.add(ink)
+    return g
+  }, [end])
+  useEffect(() => () => { obj.traverse((o) => (o as THREE.Mesh).geometry?.dispose()) }, [obj])
+  // (its notes in the page's language, painted again as that changes; once more as the brush hand's letters are in)
+  const lang = useRef('')
+  useFrame(() => {
+    const l = document.documentElement.lang
+    if (l === lang.current || !SIGNS_TEX) return
+    lang.current = l
+    SIGNS_ZH = l !== 'ja' && l !== 'en'
+    const c = SIGNS_TEX.image as HTMLCanvasElement
+    const repaint = () => { paintWallSigns(c.getContext('2d')!, SIGNS_ZH); SIGNS_TEX.needsUpdate = true }
+    repaint()
+    void document.fonts?.load('700 40px "LXGW WenKai TC"', '炭火の香り最高食い倒れ山野好吃到想哭美食家林小雨魚が主役の店料理評論黒川謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念二〇六年九月冬').then(repaint).catch(() => {})
+  })
+  return <primitive object={obj} {...nameOver('【簽名牆】美食家的簽名與留言', '來過的美食家留下的簽名色紙、客人的留言板與合照')} />
 }
 /** the round window's frame's tint over its keyaki: a deep walnut */
 const ROUND_WOOD_TINT = new THREE.Color('#7a5136')
@@ -5160,6 +5231,8 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
           {/* (half as long down the wall as they were (the owner's, 2026-11-11), from the shelf's underside) */}
           {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]} scale-y={0.5}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
+        {/* (the visitors' signed boards, notes and photographs on the plaster over the shoe cupboard, by the way in (item 295)) */}
+        {altar && <Movable id="wallsigns" label="簽名留言牆"><WallSigns end={to} /></Movable>}
         {/* (the menu's wooden tags on the plaster between the round window and the shrine's shelf (item 293)) */}
         {altar && tagSpan && <Movable id="menutags" label="菜單木札"><MenuTags z0={tagSpan[0]} z1={tagSpan[1]} /></Movable>}
         {/* (the omiki poured, the motes rising over the shrine: not merged) */}
