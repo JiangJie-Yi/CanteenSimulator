@@ -1593,7 +1593,9 @@ function PrepCounter() {
     // (inked as the room's things are (item 254, the owner's, 2026-11-17: 「這風格明顯不符」: the rice-ball set was plain colour with no line,
     // unlike all round it), the kitchen counters' line; not what lies flat on another (the towel's stripe, the box's label, the water in
     // the bowl, the fillings in their dishes, the pickles, the nori's bands and sheets, the leaves under the finished ones))
-    inkModel(r, (m) => /towelband|wraplabel|bowlin|fill\d|takuan|sasa|nori/i.test(m.name), { width: 0.0016, weld: true })
+    // (item 353: each thing its own node now, all of one picture (blender/atlas_kit): the water, the inside of the bowl, the heaps in the dishes,
+    // the pickles, the leaves and the nori still without a line)
+    inkModel(r, (m) => /water|bowlin|fill\d|takuan|sasa|nori/i.test(m.name), { width: 0.0016, weld: true })
     plainColours(r)
     // (the finished rice balls on the tray left whole, shown as many as it holds (item 129))
     mergeByMaterial(r, (o) => /^PrepDone/.test(o.name))

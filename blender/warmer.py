@@ -25,6 +25,9 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import *  # noqa: E402,F403
+from atlas_kit import (Atlas, _obj, boxed, ladder, p_bento, p_band, p_black, p_cloth, p_dish, p_hinoki, p_kombu,  # noqa: E402
+                       p_lacquer, p_lacquer_black, p_lid, p_nori, p_plastic, p_porcelain, p_rice, p_salmon, p_sasa, p_stoneware,
+                       p_takuan, p_tape, p_tenugui, p_fukin, p_ume, p_water, p_weave, p_wood, p_wrap, slab, turned)
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 PROJECT = argv[0] if argv else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -303,6 +306,30 @@ def counter(L, pre, doors, cx=0.0):
     return (body_, leaves) if pre == "Warmer" else body_
 
 
+# (what's kept in the rice-ball side's cupboard, painted (item 353, the owner's 「品質不OK」 with its doors open: plain white boxes with blue
+# slabs on, a stack of flat colours): one picture for them, one material)
+SA = Atlas("StoreAtlas", size=(1024, 512))
+for _k, _w, _h, _p in (("plastic", 2, 2, p_plastic), ("lid", 2, 2, p_lid), ("clothw", 2, 2, p_cloth),
+                       ("clothi", 2, 2, lambda w, h: p_cloth(w, h, base=(0.17, 0.25, 0.42), line=(0.9, 0.9, 0.86))),
+                       ("weave", 2, 2, p_weave), ("bento", 2, 2, p_bento), ("band", 2, 1, p_band), ("tape", 2, 1, p_tape)):
+    SA.put(_k, _w, _h, _p)
+SAM = SA.material(rough=0.6)
+
+
+def _facing(o, outward=True):
+    me = o.data
+    cx = sum(v.co.x for v in me.vertices) / len(me.vertices)
+    cy = sum(v.co.y for v in me.vertices) / len(me.vertices)
+    s_ = sum(p.normal.x * (p.center.x - cx) + p.normal.y * (p.center.y - cy) for p in me.polygons)
+    if (s_ > 0) != outward:
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+        bm.to_mesh(me)
+        bm.free()
+    return o
+
+
 T_ = 0.025       # the cupboards' boards
 STORES = []      # what's kept in them: joined into one node of its own (WarmerStores), ink round it as round the rest
 
@@ -381,19 +408,27 @@ def stores(inn, yf, ys, zb, zs):
     l, r = inn[1]
     put(box("trays", l + 0.04, l + 0.56, ys, ys + 0.16, zc - 0.2, zc + 0.17, "s_black", bev=0.008))
 
-    # (the rice-ball side's cupboard: food boxes in two stacks and the cloths on its floor; the bamboo trays and the takeaway boxes above)
+    # (the rice-ball side's cupboard (item 353, the owner's 「品質不OK」 with its doors open): food tubs of milky plastic with blue lids, three
+    # to a stack, a strip of masking tape written on across each one's front; folded cloths, white with a blue stripe and indigo with a white
+    # one; on the shelf two zaru of woven bamboo, and the takeaway boxes, black with a red rim, a paper band round them. Each stacked right on
+    # the one under it (a hair apart), no two faces in one plane)
     l, r = inn[2]
     for n_, bx in enumerate((l + 0.06, l + 0.42)):
         for q in range(3):
-            y_ = yf + q * 0.12
-            put(box(f"food{n_}{q}", bx, bx + 0.3, y_, y_ + 0.1, zc - 0.13, zc + 0.11, "s_white", bev=0.01))
-            put(box(f"foodlid{n_}{q}", bx - 0.005, bx + 0.305, y_ + 0.1, y_ + 0.118, zc - 0.135, zc + 0.115, "s_blue", bev=0.004))
-    for q, m_ in enumerate(("s_white", "s_indigo", "s_white", "s_indigo")):
-        put(box(f"cloth{q}", l + 0.84 + 0.006 * q, l + 1.12 + 0.006 * q, yf + q * 0.04, yf + q * 0.04 + 0.038, zc - 0.1, zc + 0.12, m_, bev=0.01))
+            y_ = yf + q * 0.1145
+            put(SA.uv_to(boxed(f"food{n_}{q}", bx, bx + 0.3, y_ + 0.0005, y_ + 0.098, zc - 0.13, zc + 0.11, parts, SAM, bev=0.012, segs=2), "plastic"))
+            put(SA.uv_to(boxed(f"foodlid{n_}{q}", bx - 0.004, bx + 0.304, y_ + 0.098, y_ + 0.114, zc - 0.134, zc + 0.114, parts, SAM, bev=0.005, segs=2), "lid"))
+            put(SA.uv_to(boxed(f"foodtape{n_}{q}", bx + 0.09, bx + 0.21, y_ + 0.045, y_ + 0.075, zc + 0.1105, zc + 0.1125, parts, SAM), "tape"))
+    for q, key in enumerate(("clothw", "clothi", "clothw", "clothi")):
+        y_ = yf + q * 0.0385
+        put(SA.uv_to(boxed(f"cloth{q}", l + 0.84 + 0.006 * q, l + 1.12 + 0.006 * q, y_ + 0.0005, y_ + 0.038, zc - 0.1, zc + 0.12, parts, SAM, bev=0.012, segs=2), key))
     for n_, bx in enumerate((l + 0.2, l + 0.56)):
-        put(lathe(f"zaru{n_}", bx, ys, zc, [(0.13, 0.0), (0.17, 0.035), (0.172, 0.045), (0.17, 0.09)], "s_bamboo", segs=16))
-    put(box("takeaway", l + 0.82, l + 1.14, ys, ys + 0.18, zc - 0.13, zc + 0.11, "s_black", bev=0.006))
-    put(box("takeawayband", l + 0.82 - 0.002, l + 1.14 + 0.002, ys + 0.05, ys + 0.08, zc - 0.132, zc + 0.112, "s_red"))
+        put(SA.uv_to(_facing(turned(f"zaru{n_}", bx, ys + 0.0005, zc, [(0.11, 0.0), (0.15, 0.02), (0.17, 0.045), (0.175, 0.052), (0.168, 0.05),
+                                                                       (0.145, 0.028), (0.105, 0.008)], parts, SAM, segs=20, cap=True), True), "weave"))
+    for q in range(3):
+        put(SA.uv_to(boxed(f"takeaway{q}", l + 0.82, l + 1.14, ys + 0.0005 + q * 0.052, ys + 0.0505 + q * 0.052, zc - 0.13, zc + 0.11, parts, SAM,
+                           bev=0.006, segs=2), "bento"))
+    put(SA.uv_to(boxed("takeawayband", l + 0.875, l + 0.955, ys + 0.002, ys + 0.158, zc - 0.133, zc + 0.113, parts, SAM), "band"))
 
 
 def root_of(name, objs):
@@ -447,6 +482,12 @@ for o in ctrl:
                 co = me.vertices[me.loops[li].vertex_index].co
                 uvl.data[li].uv = ((co.x - o.location.x) / 0.056 + 0.5, (co.z - o.location.z) / 0.056 + 0.5)
 warmer_ctrl = join(ctrl, "WarmerControls")
+# (each one's UVs under one name before they're joined (item 353): the join keeps the first one's map and drops a differently named one's,
+# and the painted ones came out all one corner of their picture, grey)
+for _o in STORES:
+    if _o.data.uv_layers:
+        _o.data.uv_layers[0].name = "UVMap"
+        _o.data.uv_layers.active_index = 0
 warmer_stores = join(STORES, "WarmerStores")
 root = root_of("Warmer", [body, warmer_wells, warmer_ctrl, warmer_stores] + warmer_doors)
 if PREVIEW:
@@ -459,10 +500,67 @@ for o in list(bpy.data.objects):
     bpy.data.objects.remove(o, do_unlink=True)
 parts = []
 set_ = []
+# (item 353, the owner's, 2026-11-19: 「品質不OK」 (a second time: item 254 gave them a line and a few pictures): its things were boxes and
+# discs in flat colours, the rice balls paper-white, the dishes stickers, the leaves cucumbers. Each made over as the thing it is, and all of
+# them painted into one picture (atlas_kit): one material, one draw, the more detail)
+A = Atlas("PrepAtlas")
+for key, w_, h_, painter in (("rice", 2, 2, p_rice), ("nori", 2, 2, p_nori), ("hinoki", 2, 2, p_hinoki), ("dish", 2, 2, p_dish),
+                             ("tenugui", 2, 2, p_fukin), ("bamboo", 2, 2, lambda w, h: bamboo_slats(w)), ("sasa", 2, 2, p_sasa),
+                             ("salmon", 2, 2, p_salmon), ("ume", 2, 2, p_ume), ("kombu", 2, 2, p_kombu), ("takuan", 2, 2, p_takuan),
+                             ("stoneware", 2, 2, p_stoneware), ("lacq", 1, 1, p_lacquer), ("lacqin", 1, 1, p_lacquer_black),
+                             ("water", 1, 1, p_water), ("porcelain", 1, 1, p_porcelain), ("wood", 1, 1, p_wood), ("wrap", 1, 1, p_wrap),
+                             ("black", 1, 1, p_black)):
+    A.put(key, w_, h_, painter)
+AM = A.material(rough=0.55)
+
+
+def made(o, key, into=set_):
+    A.uv_to(o, key)
+    into.append(o)
+    return o
+
+
+def facing(o, outward=True, up=None):
+    """a turned surface's faces turned the way they're seen: out from its axis (`outward`), or in toward it; or up (`up`)"""
+    me = o.data
+    cx = sum(v.co.x for v in me.vertices) / len(me.vertices)
+    cy = sum(v.co.y for v in me.vertices) / len(me.vertices)
+    s = 0.0
+    for p in me.polygons:
+        if up is not None:
+            s += p.normal.z
+        else:
+            c = p.center
+            s += p.normal.x * (c.x - cx) + p.normal.y * (c.y - cy)
+    want = (up if up is not None else outward)
+    if (s > 0) != want:
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+        bm.to_mesh(me)
+        bm.free()
+    return o
+
+
+def jitter(o, amount, seed_):
+    """a soft heap's edge made uneven: each vertex out or in from the axis a little, by a noise of its angle"""
+    rr = np.random.default_rng(seed_)
+    me = o.data
+    cx = sum(v.co.x for v in me.vertices) / len(me.vertices)
+    cy = sum(v.co.y for v in me.vertices) / len(me.vertices)
+    ph = rr.uniform(0, 6.3, 3)
+    for v in me.vertices:
+        a = math.atan2(v.co.y - cy, v.co.x - cx)
+        k = 1 + amount * (math.sin(3 * a + ph[0]) * 0.5 + math.sin(5 * a + ph[1]) * 0.3 + math.sin(7 * a + ph[2]) * 0.2)
+        v.co.x = cx + (v.co.x - cx) * k
+        v.co.y = cy + (v.co.y - cy) * k
+    return o
+
+
 def rice_ball(name, x, y0, z, r, t):
-    """a rice ball as it's shaped by hand (item 129, the owner's, 2026-11-15: the counter too plain; they were three-sided cylinders with
-    their edges rounded): a rounded triangle, a corner up, 4 points round each corner, its faces puffed out (four rings front to back, the
-    outer two drawn in), its flat foot at y0; and its band of nori wrapped up from under its foot onto its front and back faces. Returns
+    """a rice ball as it's shaped by hand (item 129): a rounded triangle, a corner up, 4 points round each corner, its faces puffed out (four
+    rings front to back, the outer two drawn in), its flat foot at y0; its band of nori wrapped up from under its foot onto its front and
+    back faces. Its rice's picture laid on it from the front (item 353: the grains, not a paper white); the nori's along its band. Returns
     (rice, nori)."""
     bm = bmesh.new()
     rc = r * 0.42
@@ -475,7 +573,6 @@ def rice_ball(name, x, y0, z, r, t):
     ybot = min(p[1] for p in sec)
     rings = [(-t / 2, 0.8), (-t * 0.3, 0.97), (t * 0.3, 0.97), (t / 2, 0.8)]
     g = 0.0015
-    # (its middle rings' foot a nori's thickness and a hair over y0, the nori under it; the outer rings drawn in, their foot a little up)
     lift = y0 + g + 0.0005 - ybot * 0.97
     vs = [[bm.verts.new(P(x + px * s, lift + py * s, z + dz)) for px, py in sec] for dz, s in rings]
     n = len(sec)
@@ -483,66 +580,149 @@ def rice_ball(name, x, y0, z, r, t):
         for j in range(n):
             j2 = (j + 1) % n
             bm.faces.new((vs[k][j], vs[k][j2], vs[k + 1][j2], vs[k + 1][j]))
-    bm.faces.new(vs[0][::-1])
-    bm.faces.new(vs[-1])
+    ladder(bm, vs[0][::-1])
+    ladder(bm, vs[-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    uvl = bm.loops.layers.uv.new("UVMap")
+    for f in bm.faces:
+        for lp in f.loops:
+            c = lp.vert.co
+            lp[uvl].uv = (0.5 + (c.x - x) / (2.3 * r), 0.5 + (c.z - lift) / (2.3 * r))
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
-    finish(o, name, M["rice"])
+    finish(o, name, AM)
     parts.append(o)
-    # (the nori: up the back face, under the foot along the puffed rings, up the front face; a hair off the rice all the way)
+    A.uv_to(o, "rice")
     w, hb = r * 0.62, r * 0.75
-    yo = lift + ybot * 0.8 - y0              # (the outer rings' foot, over y0)
+    yo = lift + ybot * 0.8 - y0
     path = [(-t / 2 - g, yo + hb), (-t / 2 - g, yo), (-t * 0.3, 0.0005), (t * 0.3, 0.0005), (t / 2 + g, yo), (t / 2 + g, yo + hb)]
+    acc = [0.0]
+    for (z0_, y0_), (z1_, y1_) in zip(path, path[1:]):
+        acc.append(acc[-1] + math.hypot(z1_ - z0_, y1_ - y0_))
     bm = bmesh.new()
     row = [[bm.verts.new(P(x + sx * w / 2, y0 + yy, z + zz)) for sx in (-1, 1)] for zz, yy in path]
     for k in range(len(row) - 1):
         bm.faces.new((row[k][0], row[k][1], row[k + 1][1], row[k + 1][0]))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    uvl = bm.loops.layers.uv.new("UVMap")
+    for f in bm.faces:
+        for lp in f.loops:
+            k = next(i for i, rw in enumerate(row) if lp.vert in rw)
+            lp[uvl].uv = (0.0 if lp.vert is row[k][0] else 1.0, acc[k] / acc[-1])
     me = bpy.data.meshes.new(name + "nori")
     bm.to_mesh(me)
     bm.free()
     nori = bpy.data.objects.new(name + "nori", me)
     bpy.context.collection.objects.link(nori)
-    finish(nori, name + "nori", M["nori"], smooth_shade=False)
+    finish(nori, name + "nori", AM, smooth_shade=False)
     parts.append(nori)
+    A.uv_to(nori, "nori")
     return o, nori
 
-# (the hinoki board, its rice balls on it: rounded triangles stood up, a band of nori round each one's foot)
-set_.append(box("board", BOARD_X - 0.36, BOARD_X + 0.36, H, H + 0.035, -0.2, 0.22, "hinoki", bev=0.008))
-# (two on it now, shaped, and the third cook's one in the making between them is the game's (item 129))
+
+# (the hinoki board, its edges eased; two rice balls on it, shaped, and the third cook's one in the making between them is the game's)
+made(boxed("board", BOARD_X - 0.36, BOARD_X + 0.36, H, H + 0.035, -0.2, 0.22, parts, AM, bev=0.006, segs=2), "hinoki")
 for i, dx in enumerate((-0.2, 0.2)):
     set_.extend(rice_ball(f"onigiri{i}", BOARD_X + dx, H + 0.035, 0.04, 0.072, 0.056))
-# (the bowl of hand water: lacquered red without, black within, the water in it)
-set_.append(disc("bowl", BOARD_X - 0.62, H + 0.045, 0.02, 0.1, 0.09, "lacquer", segs=16, r1=0.13))
-set_.append(disc("bowlin", BOARD_X - 0.62, H + 0.088, 0.02, 0.115, 0.004, "lacquerin", segs=16))
-set_.append(disc("water", BOARD_X - 0.62, H + 0.07, 0.02, 0.1, 0.004, "water", segs=16))
-# (the box of nori sheets, its lid off beside it, and the little salt pot)
-set_.append(box("noribox", BOARD_X + 0.5, BOARD_X + 0.78, H, H + 0.06, -0.22, 0.0, "lacquerin", bev=0.006))
-set_.append(box("norisheets", BOARD_X + 0.52, BOARD_X + 0.76, H + 0.06, H + 0.066, -0.2, -0.02, "nori"))
-set_.append(disc("salt", BOARD_X + 0.62, H + 0.04, 0.12, 0.045, 0.08, "salt", segs=12, r1=0.038))
-# (the owner's, 2026-11-12: the counter's top was bare, a board, three rice balls, a bowl, a box and a pot: the fillings in their dishes before the
-# board, the rice paddle and the pickles and the sesame behind it, a folded towel, the box of wrap, and a bamboo tray of the finished ones at the
-# right end, each wrapped with its band of nori)
-M.update({
-    "dish": pbr("PrepDish", lin("#f1eee4"), rough=0.3),
-    "ume": pbr("PrepUme", lin("#b3262a"), rough=0.45),
-    "salmon": pbr("PrepSalmon", lin("#ee8a66"), rough=0.6),
-    "kombu": pbr("PrepKombu", lin("#2c261e"), rough=0.5),
-    "takuan": pbr("PrepTakuan", lin("#e8c23a"), rough=0.5),
-    "sesame": pbr("PrepSesame", lin("#3a3128"), rough=0.5),
-    "towel": pbr("PrepTowel", lin("#eef0ea"), rough=0.9),
-    "towelband": pbr("PrepTowelBand", lin("#3a5f8f"), rough=0.9),
-    # (the bamboo: slats a centimetre wide side by side, each its own tone, dark seams, a node's mark here and there, its fibres along it
-    # (item 254, the owner's, 2026-11-17: 「這風格明顯不符」: the rice-ball set was plain colour, no picture, no line))
-    "bamboo": pbr("PrepBamboo", (1, 1, 1), tex=image("prep_bamboo", np.clip(bamboo_slats(), 0, 1).astype(np.float32)), rough=0.55),
-    "card": pbr("PrepCard", lin("#c9a26c"), rough=0.8),
-    "label": pbr("PrepLabel", lin("#f4f0e4"), rough=0.7),
-})
 
+# (the bowl of hand water (手水): a lacquered bowl on a foot ring, red without and black within, the water a little under its rim)
+WX, WZ = BOARD_X - 0.62, 0.02
+made(facing(turned("bowl", WX, H, WZ, [(0.068, 0.0), (0.072, 0.012), (0.076, 0.016), (0.096, 0.034), (0.116, 0.066), (0.125, 0.092),
+                                        (0.123, 0.0985), (0.119, 0.0992), (0.117, 0.097)], parts, AM, segs=20, cap=False), True), "lacq")
+made(facing(turned("bowlin", WX, H, WZ, [(0.117, 0.097), (0.114, 0.088), (0.1, 0.058), (0.082, 0.036), (0.06, 0.026)], parts, AM, segs=20,
+                   cap=True, uv="cyl"), False), "lacqin")
+made(facing(turned("water", WX, H, WZ, [(0.104, 0.072)], parts, AM, segs=20, cap=True, uv="polar"), up=True), "water")
+
+# (the fillings, each in a little sometsuke dish before the board: pickled plums, flaked salmon, kombu)
+DISH = [(0.03, 0.0), (0.034, 0.006), (0.05, 0.016), (0.055, 0.0225), (0.05, 0.0215), (0.037, 0.012), (0.032, 0.0095)]
+for i, (fill, dx) in enumerate((("ume", -0.2), ("salmon", 0.0), ("kombu", 0.2))):
+    x = BOARD_X + dx
+    made(facing(turned(f"dish{i}", x, H, 0.345, DISH, parts, AM, segs=16, cap=True, uv="polar", R=0.056), True), "dish")
+    if fill == "ume":
+        for k, (ox, oz) in enumerate(((-0.012, -0.006), (0.011, -0.008), (0.0, 0.011))):
+            rr_ = 0.0125 - 0.001 * k
+            prof = [(rr_ * math.sin(t_), rr_ * (1 - math.cos(t_)) * 0.85) for t_ in (0.45, 0.9, 1.35, 1.8, 2.25, 2.6)]
+            made(facing(turned(f"fill{i}u{k}", x + ox, H + 0.0095 + 0.0008 * k, 0.345 + oz, prof, parts, AM, segs=8, cap=True, uv="cyl"), True), "ume")
+    else:
+        prof = [(0.031, 0.0), (0.03, 0.006), (0.025, 0.012), (0.016, 0.0165), (0.007, 0.0185)]
+        o = turned(f"fill{i}", x, H + 0.0096, 0.345, prof, parts, AM, segs=16, cap=True, uv="polar", R=0.032)
+        made(facing(jitter(o, 0.06, 353 + i), True), fill)
+
+# (behind the board: the rice paddle on its little rest, a dish of pickled daikon, the pot of sesame)
+made(slab("paddlehandle", [(-0.12, -0.012), (0.02, -0.014), (0.02, 0.014), (-0.12, 0.012), (-0.126, 0.0)], H + 0.0005, 0.008, parts, AM,
+          x=BOARD_X - 0.12, z=-0.31), "bamboo")
+head = [(0.055 * math.cos(a), 0.046 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 18, endpoint=False)]
+made(slab("paddlehead", head, H + 0.0005, 0.0095, parts, AM, x=BOARD_X - 0.1 + 0.044, z=-0.31), "bamboo")
+made(facing(turned("pickledish", BOARD_X + 0.3, H, -0.32, DISH, parts, AM, segs=16, cap=True, uv="polar", R=0.056), True), "dish")
+half = [(0.022 * math.cos(a), 0.022 * math.sin(a)) for a in np.linspace(0, math.pi, 9)]
+half = [(0.018 * math.cos(a), 0.018 * math.sin(a)) for a in np.linspace(0, math.pi, 9)]
+for k in range(3):
+    made(slab(f"takuan{k}", half, H + 0.0098 + k * 0.0032, 0.003, parts, AM, x=BOARD_X + 0.3 - 0.012 + k * 0.012, z=-0.326 + 0.006 * k,
+              turn=-0.3 + k * 0.25), "takuan")
+made(facing(turned("sesamepot", BOARD_X + 0.46, H, -0.32, [(0.025, 0.0), (0.03, 0.006), (0.034, 0.025), (0.033, 0.048), (0.027, 0.062),
+                                                         (0.025, 0.068)], parts, AM, segs=16, cap=False), True), "stoneware")
+made(facing(turned("sesamelid", BOARD_X + 0.46, H, -0.32, [(0.0285, 0.067), (0.03, 0.072), (0.027, 0.077), (0.014, 0.0795)], parts, AM,
+                   segs=16, cap=True, uv="cyl"), True), "wood")
+made(facing(turned("sesameknob", BOARD_X + 0.46, H, -0.32, [(0.006, 0.0792), (0.0075, 0.084), (0.005, 0.088)], parts, AM, segs=8, cap=True), True), "wood")
+
+# (a folded tenugui, its indigo dots, between the water bowl and the board's front corner)
+made(boxed("towel", BOARD_X - 0.5, BOARD_X - 0.34, H, H + 0.034, 0.28, 0.4, parts, AM, bev=0.011, segs=2), "tenugui")
+
+# (the box of nori sheets, black lacquer, its lid slid back off half of it; the box of food wrap behind it; the little porcelain salt pot)
+NX0, NX1, NZ0, NZ1 = BOARD_X + 0.5, BOARD_X + 0.78, -0.22, 0.0
+made(boxed("noribox", NX0, NX1, H, H + 0.055, NZ0, NZ1, parts, AM, bev=0.004), "black")
+made(boxed("norisheets", NX0 + 0.012, NX1 - 0.012, H + 0.0552, H + 0.0585, NZ0 + 0.136, NZ1 - 0.012, parts, AM), "nori")
+made(boxed("norilid", NX0 - 0.004, NX1 + 0.004, H + 0.0552, H + 0.0672, NZ0 - 0.004, NZ0 + 0.13, parts, AM, bev=0.004), "black")
+made(boxed("wrapbox", BOARD_X + 0.52, BOARD_X + 0.78, H, H + 0.06, -0.4, -0.3, parts, AM, bev=0.003), "wrap")
+made(facing(turned("salt", BOARD_X + 0.5, H, 0.12, [(0.026, 0.0), (0.033, 0.01), (0.036, 0.045), (0.03, 0.064), (0.031, 0.07)], parts, AM,
+                   segs=16, cap=False), True), "porcelain")
+made(facing(turned("saltlid", BOARD_X + 0.5, H, 0.12, [(0.0335, 0.0695), (0.034, 0.074), (0.026, 0.08), (0.012, 0.083)], parts, AM,
+                   segs=16, cap=True), True), "porcelain")
+
+# (the bamboo tray of finished rice balls at the right end: its floor and four low walls, eased; bamboo leaves laid on it under them)
+TX0, TX1, TZ0, TZ1 = BOARD_X + 0.62, BOARD_X + 1.05, 0.04, 0.36
+made(boxed("trayfloor", TX0, TX1, H, H + 0.008, TZ0, TZ1, parts, AM, bev=0.002), "bamboo")
+for nm, a0, a1, b0, b1 in (("traywallb", TX0, TX1, TZ0, TZ0 + 0.012), ("traywallf", TX0, TX1, TZ1 - 0.012, TZ1),
+                          ("traywalll", TX0, TX0 + 0.012, TZ0 + 0.012, TZ1 - 0.012), ("traywallr", TX1 - 0.012, TX1, TZ0 + 0.012, TZ1 - 0.012)):
+    made(boxed(nm, a0, a1, H + 0.008, H + 0.045, b0, b1, parts, AM, bev=0.003), "bamboo")
+
+
+def sasa(name, lx, y, lz, ang, L_=0.24, W_=0.07):
+    """a bamboo leaf laid down (item 353: they were six-sided plates and read as cucumbers): long and pointed, folded a little along its
+    midrib, arched along its length; u along it, v across it (its picture's midrib down the middle)"""
+    bm = bmesh.new()
+    st = 10
+    rows = []
+    for k in range(st + 1):
+        t = k / st
+        wd = (W_ / 2) * (math.sin(math.pi * min(1.0, 0.04 + t * 0.96)) ** 0.8)
+        arch = 0.004 * math.sin(math.pi * t)
+        px = (t - 0.5) * L_
+        row_ = []
+        for s_ in (-1, 0, 1):
+            pz = s_ * wd
+            hy = y + arch + (0.0025 if s_ == 0 else 0.0)
+            row_.append(bm.verts.new(P(lx + px * math.cos(ang) - pz * math.sin(ang), hy, lz + px * math.sin(ang) + pz * math.cos(ang))))
+        rows.append((t, wd, row_))
+    for (t0, w0, r0), (t1, w1, r1) in zip(rows, rows[1:]):
+        bm.faces.new((r0[0], r1[0], r1[1], r0[1]))
+        bm.faces.new((r0[1], r1[1], r1[2], r0[2]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    uvl = bm.loops.layers.uv.new("UVMap")
+    for t, wd, row_ in rows:
+        for s_, vt in zip((-1, 0, 1), row_):
+            for lp in vt.link_loops:
+                lp[uvl].uv = (t, 0.5 + s_ * 0.5 * (wd / (W_ / 2) if W_ else 0))
+    o = _obj(bm, name, parts, AM, smooth_shade=True)
+    facing(o, up=True)
+    return made(o, "sasa")
+
+
+for k in range(3):
+    sasa(f"sasa{k}", TX0 + 0.075 + k * 0.14, H + 0.0095 + 0.0006 * k, (TZ0 + TZ1) / 2 - 0.02, math.pi / 2 + (k - 1) * 0.18)
 
 done_ = []
 
@@ -554,61 +734,11 @@ def onigiri_at(name, x, y0, z):
     done_.append(join([o, nori], name))
 
 
-# (the fillings, each in a small white dish before the board: a pickled plum, flaked salmon, kombu)
-for i, (fill, dx) in enumerate((("ume", -0.2), ("salmon", 0.0), ("kombu", 0.2))):
-    x = BOARD_X + dx
-    set_.append(disc(f"dish{i}", x, H + 0.015, 0.345, 0.034, 0.03, "dish", segs=14, r1=0.055))
-    set_.append(disc(f"fill{i}", x, H + 0.034, 0.345, 0.042, 0.016, fill, segs=12, r1=0.026))
-# (behind the board: the paddle on its rest, a dish of pickled radish, the pot of sesame)
-set_.append(box("paddle", BOARD_X - 0.32, BOARD_X + 0.02, H + 0.012, H + 0.02, -0.33, -0.29, "bamboo", bev=0.003))
-set_.append(box("paddlehead", BOARD_X + 0.02, BOARD_X + 0.14, H + 0.012, H + 0.02, -0.36, -0.26, "bamboo", bev=0.004))
-set_.append(box("paddlerest", BOARD_X - 0.2, BOARD_X - 0.17, H, H + 0.012, -0.34, -0.28, "bamboo"))
-set_.append(disc("pickledish", BOARD_X + 0.3, H + 0.015, -0.32, 0.034, 0.03, "dish", segs=14, r1=0.06))
 for k in range(3):
-    set_.append(disc(f"takuan{k}", BOARD_X + 0.3 + (k - 1) * 0.022, H + 0.034 + k * 0.004, -0.32 + (k % 2) * 0.01, 0.026, 0.008, "takuan", segs=10))
-set_.append(disc("sesamepot", BOARD_X + 0.46, H + 0.04, -0.32, 0.034, 0.08, "sesame", segs=12, r1=0.03))
-set_.append(disc("sesamelid", BOARD_X + 0.46, H + 0.088, -0.32, 0.034, 0.012, "bamboo", segs=12))
-# (a folded towel with a blue stripe, between the water bowl and the board's front corner)
-set_.append(box("towel", BOARD_X - 0.5, BOARD_X - 0.34, H, H + 0.04, 0.28, 0.4, "towel", bev=0.008))
-set_.append(box("towelband", BOARD_X - 0.4, BOARD_X - 0.38, H + 0.0005, H + 0.0405, 0.2795, 0.4005, "towelband"))
-# (the box of wrap behind the nori box, its label on its front)
-set_.append(box("wrapbox", BOARD_X + 0.52, BOARD_X + 0.78, H, H + 0.06, -0.4, -0.3, "card", bev=0.004))
-set_.append(box("wraplabel", BOARD_X + 0.58, BOARD_X + 0.72, H + 0.012, H + 0.048, -0.3, -0.2985, "label"))
-# (the bamboo tray of finished rice balls at the right end: a floor, four low walls, three of them stood in it)
-TX0, TX1, TZ0, TZ1 = BOARD_X + 0.62, BOARD_X + 1.05, 0.04, 0.36
-set_.append(box("trayfloor", TX0, TX1, H, H + 0.008, TZ0, TZ1, "bamboo"))
-set_.append(box("traywallb", TX0, TX1, H, H + 0.05, TZ0, TZ0 + 0.012, "bamboo"))
-set_.append(box("traywallf", TX0, TX1, H, H + 0.05, TZ1 - 0.012, TZ1, "bamboo"))
-set_.append(box("traywalll", TX0, TX0 + 0.012, H, H + 0.05, TZ0, TZ1, "bamboo"))
-set_.append(box("traywallr", TX1 - 0.012, TX1, H, H + 0.05, TZ0, TZ1, "bamboo"))
-# (bamboo leaves laid under them, as rice balls are set out (item 129): long pointed blades, a little apart, a hair over the tray's floor)
-M["sasa"] = pbr("PrepSasa", (1, 1, 1), tex=image("prep_sasa", np.clip(sasa_leaf(), 0, 1).astype(np.float32)), rough=0.5)
-for k in range(3):
-    bm_ = bmesh.new()
-    lx, lz, L_, W_ = TX0 + 0.075 + k * 0.14, (TZ0 + TZ1) / 2 - 0.02, 0.24, 0.07
-    pts = [(-L_ / 2, 0), (-L_ / 4, -W_ / 2), (L_ / 4, -W_ / 2 * 0.9), (L_ / 2, 0), (L_ / 4, W_ / 2 * 0.9), (-L_ / 4, W_ / 2)]
-    ang = math.pi / 2 + (k - 1) * 0.18
-    vs_ = [bm_.verts.new(P(lx + px * math.cos(ang) - pz * math.sin(ang), H + 0.0095 + 0.0004 * k, lz + px * math.sin(ang) + pz * math.cos(ang))) for px, pz in pts]
-    fs_ = [bm_.faces.new((vs_[0], vs_[1], vs_[5])), bm_.faces.new((vs_[1], vs_[2], vs_[4], vs_[5])), bm_.faces.new((vs_[2], vs_[3], vs_[4]))]
-    # (its picture laid along it: its length u, across it v (item 254))
-    uv_ = bm_.loops.layers.uv.new("UVMap")
-    for f_ in fs_:
-        for lp in f_.loops:
-            px, pz = pts[vs_.index(lp.vert)]
-            lp[uv_].uv = (px / L_ + 0.5, pz / W_ + 0.5)
-    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
-    me_ = bpy.data.meshes.new(f"sasa{k}")
-    bm_.to_mesh(me_)
-    bm_.free()
-    lf = bpy.data.objects.new(f"sasa{k}", me_)
-    bpy.context.collection.objects.link(lf)
-    finish(lf, f"sasa{k}", M["sasa"], smooth_shade=False)
-    parts.append(lf)
-    set_.append(lf)
-for k in range(3):
-    onigiri_at(f"PrepDone{k}", TX0 + 0.075 + k * 0.14, H + 0.0105, (TZ0 + TZ1) / 2 - 0.02)
-prep_set = join(set_, "PrepSet")
-root = root_of("PrepCounter", [prep_set] + done_)
+    onigiri_at(f"PrepDone{k}", TX0 + 0.075 + k * 0.14, H + 0.017, (TZ0 + TZ1) / 2 - 0.02)
+# (each thing its own node, under the root: the game inks each but the flat ones (the water, the leaves, the nori, the heaps) before it draws
+# them all as one by material)
+root = root_of("PrepCounter", set_ + done_)
 if PREVIEW:
     preview_cam()
 export_dish(root, parts + [root], os.path.join(PROJECT, "public", "models", "prepcounter.glb"), os.path.join(PROJECT, "blender", "prepcounter.blend"),
