@@ -29,6 +29,7 @@ import { inkModel } from '@/scene/inkHull'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { GAME_SPEED } from '@/scene/speed'
 import { brushText, signTexture } from '@/scene/signFont'
+import { paintShikigami, SHIKI_SIZE } from './shikigami'
 import { FloorPiece } from '@/scene/FloorPiece'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CHEFS, type Chef } from '@/data/chefs'
@@ -2809,6 +2810,24 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
 }
 
 /**
+ * The paper laid at each place (敷紙, item 310: shikigami.ts paints its print): 0.60 along the counter by 0.34 across (wide enough for the soy
+ * dish on either side; the shared soy pot's bin, between two places, 5 cm clear of it),
+ * from the plate's near side to 5 mm short of the step up to the lip (the chopsticks lie 5 cm before it), half a millimetre over the top; its
+ * print the right way up for the one sitting there (its top toward the cook). One geometry and one material for every place, painted again
+ * once the brush hand's letters are in
+ */
+const SHIKI_W = 0.6, SHIKI_D = 0.34, SHIKI_Z = 0.063
+const SHIKI_GEO = new THREE.PlaneGeometry(SHIKI_W, SHIKI_D).rotateX(-Math.PI / 2).rotateY(Math.PI)
+const SHIKI_TEX = signTexture(SHIKI_SIZE[0], SHIKI_SIZE[1], (g) => paintShikigami(g))
+if (SHIKI_TEX) SHIKI_TEX.anisotropy = 8
+const SHIKI_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: SHIKI_TEX })
+if (typeof document !== 'undefined') void document.fonts?.load('700 40px "LXGW WenKai TC"', '聞野炭火焼魚炭の香や串の雫に秋の声').then(() => {
+  const c = SHIKI_TEX?.image as HTMLCanvasElement | undefined
+  if (!c) return
+  paintShikigami(c.getContext('2d')!)
+  SHIKI_TEX!.needsUpdate = true
+}).catch(() => {})
+/**
  * The bar's tableware, each piece its own (the owner's, 2026-11-10: they were part of the bar's one batch, nothing when pointed at and not
  * to be moved in edit mode): at each place its chopsticks on their rest (one piece: they go together) and its little soy dish; each two
  * places' soy pot and wasabi on their tray. Pointed at, each is named (nameOver: there's nothing to do with them, so no glow); in edit mode
@@ -2864,6 +2883,10 @@ const BarTableware = memo(function BarTableware() {
               const x = seatAlong(c, n), seat = base + n, no = seatLabel(seat)
               return (
                 <group key={n}>
+                  {/* (the place's printed paper (item 310), under its plate, its chopsticks and its soy dish: drawn with the rest of the tableware) */}
+                  <group ref={keep(k++)} name={`shiki-${seat}`} position={[x - 0.0125, BAR_TOP + 0.0005, SHIKI_Z]} {...nameOver('敷紙', '和紙的餐墊，印著本店的木版畫｜每個座位一張')}>
+                    <mesh geometry={SHIKI_GEO} material={SHIKI_MAT} receiveShadow />
+                  </group>
                   {/* (the chopstick rest: its own piece (the owner's, 2026-11-12: the chopsticks themselves a piece to be moved, said three times)) */}
                   <Movable id={`chopsticks${seat}`} label={`筷架（座位 ${no}）`}>
                     <group ref={keep(k++)} name={`chop-set-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷架', '靛藍釉的筷架，黑漆塗箸擱在上面')}>

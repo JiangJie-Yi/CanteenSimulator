@@ -15,7 +15,10 @@ import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { wareGeometry } from './ware'
 import { mergeByMaterial, StaticBatch } from '@/scene/StaticBatch'
-import { ROUND_GLAZES as DESIGN_COUNT, roundGlaze } from './wareGlazes'
+import { roundGlaze } from './wareGlazes'
+/** how many of the round plates' designs the racks show: each is one instanced mesh, so five, as the racks had (item 278: all eight of the
+ * glazes made it six draws more); the plates at the places show all eight */
+const DESIGN_COUNT = 5
 
 // (each of the two: a metre across, two shelves, its 25 plates; low)
 const W = 0.95, H = 0.86, D = 0.44

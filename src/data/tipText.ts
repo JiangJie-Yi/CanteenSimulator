@@ -255,6 +255,10 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   空的: ['空', 'Empty'],
   // (the plates (item 279): their names, and what they say of where they are in their round (game/plateTip))
   盤子: ['皿', 'Plate'],
+  // (each place's printed paper (item 310))
+  敷紙: ['敷紙', 'Place paper'],
+  '和紙的餐墊，印著本店的木版畫': ['店の木版画を刷った和紙の敷紙', 'A washi place mat printed with the shop’s own woodblock picture'],
+  每個座位一張: ['一席に一枚', 'One at every place'],
   長角皿: ['長角皿', 'Long plate'],
   丸皿: ['丸皿', 'Round plate'],
   豆皿: ['豆皿', 'Little plate'],
