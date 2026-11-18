@@ -47,7 +47,7 @@ import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
 import { pickOrders, takesAt } from '@/game/orderPick'
 import { fairPrice } from '@/game/economy'
 import { getClock, minutesNow } from '@/ui/clockStore'
-import { crewEcho } from './crewTalk'
+import { crewAnswer, crewEcho } from './crewTalk'
 import { sideChance } from '@/game/sides'
 import { overstayed } from '@/game/stay'
 import { RICE_SIDE, riceName } from '@/data/sides'
@@ -6404,11 +6404,15 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       if (handLive && ready.collected && !inBasket(ready) && (ready.via === 'plated' ? ready.readyAt !== undefined : !!ready.container)) carry(ready, 'toPlate')
       say(L().done(nameOfP(ready)))
       // (and called out over his head, as a real kitchen calls a dish ready (item 180, the owner's: "the owner's words don't sound natural"))
-      // (once for a dish however many of its pieces come off together: the same called three times running in two seconds (item 324))
+      // (once for a dish however many of its pieces come off together: the same called three times running in two seconds (item 324));
+      // and none within 2.5 s of the last, whatever it was, one on the floor answering it (item 372: the owner's voice was over everything)
       {
-        const text = L().callDone(nameOfP(ready)), now = performance.now()
-        if (text !== lastCall.current.text || now - lastCall.current.at > 3500) STAFF_TALK.push({ key: now, id: 'owner', text, until: now + 2400 })
-        lastCall.current = { text, at: now }
+        const text = L().callDone(nameOfP(ready)), now = performance.now(), gap = now - lastCall.current.at
+        if (gap > 3500 || (text !== lastCall.current.text && gap > 2500)) {
+          STAFF_TALK.push({ key: now, id: 'owner', text, until: now + 2400 })
+          lastCall.current = { text, at: now }
+          crewAnswer(lang)
+        }
       }
       for (const k of planOf(ready)) if (!ready.dabs[k] && bestStage(k) === 'after') dab(ready, k)
       return

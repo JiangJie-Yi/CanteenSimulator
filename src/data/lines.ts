@@ -5,7 +5,10 @@ import type { Lang } from './i18n'
 const pick = <T,>(k: number, ways: T[]) => ways[Math.abs(Math.trunc(k)) % ways.length]
 
 /** the part of the day an hour (0..23) is in, for what's said at the till: morning 6 to 13, afternoon 14 to 17, night the rest */
-export const partOfDay = (hour: number): 'morning' | 'afternoon' | 'night' => (hour >= 6 && hour < 14 ? 'morning' : hour >= 14 && hour < 18 ? 'afternoon' : 'night')
+/** the part of the day by the game's hour (item 372: 「晚了，路上小心」 was said from six in the evening): the morning 5:00-10:59, the afternoon
+ * to 16:59, the evening to 21:59, the late night the rest */
+export const partOfDay = (hour: number): 'morning' | 'afternoon' | 'evening' | 'late' =>
+  hour >= 5 && hour < 11 ? 'morning' : hour >= 11 && hour < 17 ? 'afternoon' : hour >= 17 && hour < 22 ? 'evening' : 'late'
 
 /** an order's dishes, each said once: one ordered twice or more with how many after it (item 52, from a whole day's log: 「外帶一份：
  * 味噌烤白蘿蔔、味噌烤白蘿蔔」 read as the same said twice), in the order they first come */
@@ -112,9 +115,9 @@ const ZH = {
     '撐死我了……老闆，麻煩算一下！',
   ]),
   payThanks: (_id: number, k: number) => pick(k, ['謝謝招待，很好吃！', 'ごちそうさまでした！', '吃得好飽，謝謝老闆！', '下次再來！']),
-  // (by the game's hour (the owner's: "late at night, mind the road" at half past eight in the morning): morning to 13:59, afternoon to
-  // 17:59, night the rest)
-  cashierThanks: (bill: string, hour = 20) => `謝謝，一共 ${bill}。${partOfDay(hour) === 'morning' ? '祝您今天順利！' : partOfDay(hour) === 'afternoon' ? '慢走喔！' : '晚了，路上小心！'}`,
+  // (by the game's hour (the owner's: "late at night, mind the road" at half past eight in the morning; item 372: and at six in the evening):
+  // data/lines' partOfDay)
+  cashierThanks: (bill: string, hour = 20) => `謝謝，一共 ${bill}。${({ morning: '祝您今天順利！', afternoon: '慢走喔！', evening: '慢走，歡迎再來！', late: '晚了，路上小心！' } as const)[partOfDay(hour)]}`,
   wcBack: (_id: number, k: number) => pick(k, [
     '呼～神清氣爽！滿血復活，繼續開吃！',
     '洗完手了，這撲鼻的炭烤香氣真受不了！',
@@ -224,7 +227,7 @@ const JA: typeof ZH = {
     'もう食べられない……大将、お勘定！',
   ]),
   payThanks: (_id: number, k: number) => pick(k, ['ごちそうさまでした！', 'おいしかったです！', 'お腹いっぱい、ありがとう！', 'また来ます！']),
-  cashierThanks: (bill: string, hour = 20) => `ありがとうございます、${bill}になります。${partOfDay(hour) === 'morning' ? '良い一日を！' : partOfDay(hour) === 'afternoon' ? 'お気をつけて！' : '夜道、お気をつけて！'}`,
+  cashierThanks: (bill: string, hour = 20) => `ありがとうございます、${bill}になります。${({ morning: '良い一日を！', afternoon: 'お気をつけて！', evening: 'またお越しください！', late: '夜道、お気をつけて！' } as const)[partOfDay(hour)]}`,
   wcBack: (_id, k) => pick(k, [
     'ふぅ～すっきりした！さあ、焼き魚の続きを平らげるぞ！',
     'さっぱりした！香ばしい匂いに胃袋がまた刺激されるな！',
@@ -335,7 +338,7 @@ const EN: typeof ZH = {
     'I can’t eat another thing… check, please!',
   ]),
   payThanks: (_id: number, k: number) => pick(k, ['Thanks, that was great!', 'Gochisousama!', 'So full, thank you!', 'We will be back!']),
-  cashierThanks: (bill: string, hour = 20) => `Thank you, that is ${bill}. ${partOfDay(hour) === 'morning' ? 'Have a good day!' : partOfDay(hour) === 'afternoon' ? 'Take care!' : 'Safe home tonight!'}`,
+  cashierThanks: (bill: string, hour = 20) => `Thank you, that is ${bill}. ${({ morning: 'Have a good day!', afternoon: 'Take care!', evening: 'Enjoy your evening!', late: 'Safe home tonight!' } as const)[partOfDay(hour)]}`,
   wcBack: (_id, k) => pick(k, [
     'Whew, refreshed and recharged! Back to the grilled fish feast!',
     'All washed up! That charcoal smoke aroma has my appetite roaring again!',

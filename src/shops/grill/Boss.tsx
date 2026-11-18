@@ -8,7 +8,9 @@ import { airbrush, gradientMap } from '@/scene/Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
-import { bossLineText, bossSituation, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
+import { bossLineText, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
+import { bossSituation } from '@/game/talkTime'
+import { getClock } from '@/ui/clockStore'
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
 import { FIGURES, FRIDGE_STOCK, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
@@ -252,7 +254,9 @@ export function bossStep(at: [number, number], goal: [number, number], aisle?: B
  * mutters in `lang` */
 export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }: { to?: [number, number]; aisle?: BossAisle; open?: boolean; lang?: Lang
   children?: ReactNode }) {
-  // ---- muttering to himself, always: a line every few seconds, by day or night, open or shut (data/bossLines), never the same twice running
+  // ---- muttering to himself, always: by the game's clock, open or shut (game/talkTime's bossSituation, data/bossLines; item 372), never the
+  // same twice running. Shut, with the place to himself, a line every 7 to 11 s; open, he's at the grill and the shop's talk is the crew's
+  // (crewTalk): a line every 14 to 24 s (it was every 5 to 7 s, open or shut, and over the shop's own calls he was never quiet)
   const [say, setSay] = useState<{ text: string; key: number } | null>(null)
   /** (he's said he's munching, this taste) */
   const chewSaid = useRef(false)
@@ -269,11 +273,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       // (one bubble over him at a time (the owner's): while he's saying something to the shop (a greeting, a welcome: STAFF_TALK), his
       // muttering waits)
       if (STAFF_TALK.some((w) => (w.id === 'owner' || SPEAKERS.get(w.id) === SPEAKERS.get('owner')) && w.until > performance.now())) { h = window.setTimeout(next, 800); return }
-      const s = bossSituation(document.documentElement.dataset.theme === 'dark', open)
+      const s = bossSituation(getClock().minute, open)
       const i = nextBossLine(s, last?.s === s ? last.i : null, Math.random())
       last = { s, i }
       setSay({ text: bossLineText(s, i, lang), key: ++n })
-      h = window.setTimeout(() => { setSay(null); h = window.setTimeout(next, 1000 + Math.random() * 1800) }, 4200)
+      h = window.setTimeout(() => { setSay(null); h = window.setTimeout(next, open ? 10000 + Math.random() * 10000 : 3000 + Math.random() * 4000) }, 4200)
     }
     h = window.setTimeout(next, 1500)
     // (a line said in the language just left goes with it)

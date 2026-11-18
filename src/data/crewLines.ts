@@ -3,7 +3,10 @@
 // customer out, thanks together; busy, calls to each other (the plates, the coal); quiet, a few words between two, warm or curt as they get
 // on (game/affinity). Each in Chinese, Japanese and English; shops/grill/crewTalk picks who says what and never the same twice running.
 import type { Lang } from './i18n'
+import type { Role } from './staff'
 
+/** the part of the night it is, as game/talkTime's talkPart says it (a type only: data imports no game) */
+export type TalkPart = 'early' | 'peak' | 'night' | 'late' | 'last'
 type Pool = Record<Lang, readonly string[]>
 
 /** the welcome, each one's own way of calling it as it's passed along the floor */
@@ -23,6 +26,12 @@ export const CREW_ECHO: Record<Lang, readonly ((dish: string) => string)[]> = {
   zh: [(d) => `${d}一份，好的！`, (d) => `好的～${d}！`, (d) => `${d}，馬上來！`],
   ja: [(d) => `${d}一丁、はいよー！`, (d) => `${d}、喜んでー！`, (d) => `${d}入りまーす！`],
   en: [(d) => `One ${d}, coming up!`, (d) => `${d}, you got it!`, (d) => `${d}, on its way!`],
+}
+/** a dish called ready at the grill, answered from the floor (item 372) */
+export const CREW_ANSWER: Pool = {
+  zh: ['來了！', '好，我來端！', '收到！'],
+  ja: ['はーい！', '今行きます！', 'はい、持っていきます！'],
+  en: ['Coming!', 'On my way!', 'Got it!'],
 }
 /** busy: the plates running short, the fire wanting coal */
 export const CREW_PLATES: Pool = {
@@ -54,6 +63,88 @@ export const CREW_CHAT: Record<'warm' | 'usual' | 'cold', Record<Lang, readonly 
     zh: [['你那邊快一點。', '……知道啦。'], ['又是我洗？', '不然呢。'], ['……', '……嗯。']],
     ja: [['そっち、早くして。', '……わかってる。'], ['また私が洗うの？', '他に誰がいるの。'], ['……', '……うん。']],
     en: [['Hurry up over there.', '...I know.'], ['Me washing again?', 'Who else.'], ['...', '...yeah.']],
+  },
+}
+/** busy (item 372, the owner's 「員工都沒說話很怪」: the shop full, they used to fall silent but for the welcome): calls between two at their
+ * work, and the other's answer: the floor asking the kitchen, the kitchen calling the floor, the cooks to each other */
+export const CREW_BUSY: Record<'ask' | 'call' | 'kitchen', Record<Lang, readonly [string, string][]>> = {
+  ask: {
+    zh: [['三號的魚好了嗎？', '馬上好！'], ['白飯還有嗎？', '剛煮好一鍋！'], ['客人問今天推薦什麼。', '跟他說紅喉很肥！'], ['清酒一合，幫我溫一下！', '好，溫上了！'],
+      ['外帶兩份，要快一點喔。', '收到，排前面！'], ['吧台那位要加一碗飯。', '好，馬上盛！']],
+    ja: [['三番の魚、上がりますか？', 'すぐ上がるよ！'], ['ご飯まだありますか？', '今炊けたとこ！'], ['お客さんがおすすめ聞いてます。', 'のどぐろが脂のってるって！'],
+      ['お酒一合、燗お願いします！', 'はいよ、つけた！'], ['お持ち帰り二つ、急ぎで！', '了解、先にやる！'], ['カウンターの方、ご飯おかわりです。', 'はい、すぐよそう！']],
+    en: [['Is the fish for three ready?', 'Coming right up!'], ['Any rice left?', 'Fresh pot just done!'], ['They want to know what is good today.', 'Tell them the rosy seabass is rich!'],
+      ['One flask of sake, warmed please!', 'On it, warming!'], ['Two takeaways, quick as you can.', 'Got it, they go first!'], ['Counter wants another bowl of rice.', 'Scooping it now!']],
+  },
+  call: {
+    zh: [['鹽烤好了，端出去！', '來了！'], ['這盤小心燙！', '好！'], ['吧台那位的味噌湯！', '馬上送！'], ['盤子！盤子！', '來了來了！'], ['一號桌可以收了。', '我去收！']],
+    ja: [['塩焼き上がり、お願い！', 'はーい！'], ['これ熱いから気をつけて！', 'はい！'], ['カウンターの方の味噌汁！', 'すぐ持っていきます！'], ['皿！皿！', '今行きます！'],
+      ['一番さん、下げていいよ。', '下げてきます！']],
+    en: [['Salt-grilled is up, take it out!', 'Coming!'], ['Careful, this one is hot!', 'Right!'], ['Miso soup for the counter!', 'On its way!'], ['Plates! Plates!', 'Coming, coming!'],
+      ['Table one can be cleared.', 'I will clear it!']],
+  },
+  kitchen: {
+    zh: [['炭再加一點！', '好，馬上！'], ['串子還有嗎？', '剛洗好一批！'], ['這條翻面了嗎？', '翻了！'], ['飯還要多久？', '再五分鐘！'], ['鹽遞給我一下。', '給你！']],
+    ja: [['炭、もう少し！', 'はい、すぐ！'], ['串、まだある？', '今洗ったのがある！'], ['これ、返した？', '返しました！'], ['ご飯あとどれくらい？', 'あと五分！'], ['塩、取って。', 'はい！']],
+    en: [['Bit more coal!', 'Right away!'], ['Any skewers left?', 'Just washed a batch!'], ['Has this one been turned?', 'Turned!'], ['How long on the rice?', 'Five more minutes!'],
+      ['Pass the salt.', 'Here!']],
+  },
+}
+/** a word to themselves at their own work (item 372), each job its own */
+export const CREW_SELF: Record<Role, Pool> = {
+  chef: {
+    zh: ['這條魚真肥。', '串好了，下一批。', '冰箱的蔥快用完了。', '刀要再磨一下。'],
+    ja: ['この魚、脂のってるな。', '串打ち完了、次。', 'ネギ、そろそろなくなる。', '包丁、研ぎ直さないと。'],
+    en: ['Fat one, this fish.', 'Skewered; next batch.', 'Running low on spring onion.', 'This knife wants honing.'],
+  },
+  sous: {
+    zh: ['飯快好了。', '炭火還很旺。', '這盤擺得漂亮。', '串子洗好了。'],
+    ja: ['ご飯、もうすぐ炊ける。', '炭はまだ元気。', 'この盛り付け、きれいにできた。', '串、洗い終わり。'],
+    en: ['Rice is nearly done.', 'The coals are still going strong.', 'That plate looks good.', 'Skewers washed.'],
+  },
+  server: {
+    zh: ['今天客人好多喔。', '那桌的茶要加了。', '筷子要補了。', '笑容、笑容。'],
+    ja: ['今日はお客さん多いなあ。', 'あの卓、お茶足さなきゃ。', 'お箸、補充しとこう。', '笑顔、笑顔。'],
+    en: ['Busy today.', 'That table needs more tea.', 'Chopsticks need topping up.', 'Keep smiling.'],
+  },
+  cashier: {
+    zh: ['零錢要補了。', '收據紙還夠。', '今天的帳很漂亮。', '十元的快沒了。'],
+    ja: ['小銭、補充しないと。', 'レシートの紙はまだある。', '今日の売上、いい感じ。', '十円玉がなくなりそう。'],
+    en: ['Need more change.', 'Plenty of receipt roll.', "Today's takings look good.", 'Running out of small coins.'],
+  },
+  stock: {
+    zh: ['啤酒剩兩箱了。', '冷藏櫃該整理了。', '明天要記得叫貨。', '米還夠撐到週末。'],
+    ja: ['ビール、あと二ケース。', '冷蔵庫、整理しないと。', '明日、発注忘れずに。', '米は週末までもつな。'],
+    en: ['Two crates of beer left.', 'The fridge needs sorting.', "Don't forget tomorrow's order.", 'Rice will last to the weekend.'],
+  },
+}
+/** a word to themselves about the part of the night it is (item 372; game/talkTime's talkPart): the opening, the rush, the drinkers' evening,
+ * the deep night, the last orders */
+export const CREW_SELF_TIME: Record<TalkPart, Pool> = {
+  early: {
+    zh: ['今天也加油！', '天黑得好快。', '第一桌客人來囉。'],
+    ja: ['今日も頑張ろう！', '日が暮れるの早いなあ。', '最初のお客さんだ。'],
+    en: ['Here we go again!', 'Gets dark so early.', 'First table of the night.'],
+  },
+  peak: {
+    zh: ['好忙好忙！', '腳都不用停。', '尖峰時間到了。'],
+    ja: ['忙しい忙しい！', '足が止まらない。', 'ピークだ。'],
+    en: ['Busy, busy!', 'Never stop moving.', 'Here comes the rush.'],
+  },
+  night: {
+    zh: ['尖峰總算過了。', '喝酒的客人變多了。', '肚子有點餓。'],
+    ja: ['やっとピーク過ぎた。', '飲みのお客さんが増えてきた。', 'ちょっとお腹すいた。'],
+    en: ['Rush is finally over.', 'More drinkers now.', 'Bit hungry.'],
+  },
+  late: {
+    zh: ['好睏……再撐一下。', '深夜了，外面好安靜。', '撐住，還有幾個小時。'],
+    ja: ['眠い……もうちょっと。', '深夜だ、外静か。', 'あと何時間か、頑張ろう。'],
+    en: ['Sleepy… hang on.', 'Late now, so quiet outside.', 'A few more hours, keep going.'],
+  },
+  last: {
+    zh: ['最後點餐了，加油。', '快收工了！', '等一下要把桌子都擦一遍。'],
+    ja: ['ラストオーダーだ、もう少し。', 'もうすぐ上がりだ！', 'あとでテーブル全部拭かなきゃ。'],
+    en: ['Last orders, nearly there.', 'Almost home time!', 'All the tables to wipe after this.'],
   },
 }
 /** the owner, the air gone cold: a word to lift it */

@@ -48,7 +48,7 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { ATMOS, dutyDay, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { ATMOS, CREW_ROLES, dutyDay, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -2629,6 +2629,10 @@ export default function App() {
     SPEAKERS.set('owner', boss)
     for (const w of crew) SPEAKERS.set(w.id, tag(w.role, personName(w, lang)))
     SPEAKERS.set('house-server', tag('server', ''))
+    // (and each one's job, for who says what (crewTalk, item 372))
+    CREW_ROLES.clear()
+    for (const w of crew) CREW_ROLES.set(w.id, w.role)
+    CREW_ROLES.set('house-server', 'server')
     const cashier = crew.find((w) => w.role === 'cashier')
     SPEAKERS.set('role:cashier', cashier ? tag('cashier', personName(cashier, lang)) : boss)
   }
@@ -2968,7 +2972,8 @@ export default function App() {
         return changed ? next : h
       })
       // (open and not busy (few waiting for their food): now and then two of the crew have a word, as they get on (crewTalk, item 324))
-      if (aiRef.current.ai) crewChatTick(langRef.current, 1, (guestsRef.current[aiRef.current.shop] ?? []).filter((g) => g.state === 'waiting').length > 5, pairsNow.current)
+      if (aiRef.current.ai) crewChatTick(langRef.current, 1, (guestsRef.current[aiRef.current.shop] ?? []).filter((g) => g.state === 'waiting').length > 5, pairsNow.current,
+        getClock().minute)
       // (the game's clock: a minute of the game's for each second (the owner's), sped up with the game; only its face redraws, and the page
       // at dusk, at dawn and at midnight)
       const was = getClock().minute

@@ -23,17 +23,18 @@ export const LAST_ORDER: Lines = {
   ja: ['本日はこれで閉店です～ごゆっくりどうぞ！', '閉店のお時間です、ありがとうございました！お食事はごゆっくり。', '閉店です～提灯ももう下ろしました、ごゆっくり。'],
   en: ["We're closed for today~ take your time, no rush!", "That's closing time, everyone. Thank you for coming! No rush finishing up.", "We're closed~ the lanterns are already in, take your time."],
 }
-/** the owner, or one coming down the stair, in the morning */
+/** the owner, or one coming down the stair, as the shop opens: at half past four in the afternoon or later, so no good morning (item 372,
+ * the owner's 「老闆的話要能對得上時間」: 「早安」 at the opening) */
 export const OPEN_DORM: Lines = {
-  zh: ['早安！先把炭火升起來，準備迎接今天的客人吧。', '昨晚睡得真好，今天也要大幹一場！'],
-  ja: ['おはよう！まず炭を熾して、今日のお客さんを迎えよう。', 'よく寝た！今日もひと仕事いくか！'],
-  en: ["Morning! Let's get the charcoal going and ready for today's customers.", 'Slept like a log. Big day today!'],
+  zh: ['大家好！先把炭火升起來，準備迎接今天的客人吧。', '好，今天也要大幹一場！'],
+  ja: ['よし、炭を熾して、今日のお客さんを迎えよう！', 'さあ、今日もひと仕事いくか！'],
+  en: ["Right, everyone! Let's get the charcoal going for today's customers.", 'Here we go, another big day!'],
 }
-/** coming in at the front door in the morning */
+/** coming in at the front door as the shop opens (in Japanese the trade's お疲れさまです, said coming in at any hour) */
 export const OPEN_HOME: Lines = {
-  zh: ['早安～！今天天氣真好，我來開外場囉！', '老闆早！路上買了咖啡，今天也請多指教！', '大家早安，我先去把桌上的調味瓶補滿。'],
-  ja: ['おはようございます～！いい天気ですね、ホール開けます！', '店長おはようございます！コーヒー買ってきました、今日もよろしくお願いします！', 'みなさんおはようございます、卓の調味料を補充してきます。'],
-  en: ["Morning~! Lovely day, I'll get the floor open!", 'Morning, boss! Picked up coffee on the way. Here we go again!', "Morning, all. I'll top up the condiments on the counters first."],
+  zh: ['大家好～！我來開外場囉！', '老闆好！路上買了咖啡，今天也請多指教！', '大家好，我先去把桌上的調味瓶補滿。'],
+  ja: ['お疲れさまです～！ホール開けます！', '店長、お疲れさまです！コーヒー買ってきました、今日もよろしくお願いします！', 'みなさんお疲れさまです、卓の調味料を補充してきます。'],
+  en: ["Hi, everyone~! I'll get the floor open!", 'Hi, boss! Picked up coffee on the way. Here we go again!', "Hello, all. I'll top up the condiments on the counters first."],
 }
 /** coming in at the front door to a dark shop, on the way to the switch by the door (the owner's) */
 export const LIGHTS_ON: Lines = {

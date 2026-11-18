@@ -1,4 +1,4 @@
-import { paceBoost, paceOf, SLACK_AFTER, TIRED_AT, type SkillId } from '@/data/staff'
+import { paceBoost, paceOf, SLACK_AFTER, TIRED_AT, type Role, type SkillId } from '@/data/staff'
 import { keep } from './hotKeep'
 
 /**
@@ -63,6 +63,9 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
 /** each speaker's tag over their words (the owner's: every bubble says who): a staff member's id, 'owner', 'role:cashier' (whoever's at the
  * till) to their role and name (老闆 江老闆, 外場 小美…); App keeps it up to date with who's hired and the owner's name */
 export const SPEAKERS = keep(import.meta.hot, 'SPEAKERS', new Map<string, string>())
+/** each of the staff's job, by id (the shop's own server 'house-server' a server): who calls the welcome, who answers an order, who asks the
+ * kitchen (shops/grill/crewTalk, item 372). App keeps it with SPEAKERS */
+export const CREW_ROLES = keep(import.meta.hot, 'CREW_ROLES', new Map<string, Role>())
 /** when a customer last complained of the wait (performance.now(), shops/grill/bar's gripe): the owner and the staff look alarmed a moment
  * (the owner's: Overcooked's panic as the orders pile up) */
 export const RUSH = keep(import.meta.hot, 'RUSH', { at: -1e9 })
