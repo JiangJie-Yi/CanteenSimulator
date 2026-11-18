@@ -5,7 +5,7 @@ import { HOUSEHOLD } from '@/game/household'
 import { cornerStack } from '@/game/cornerStock'
 import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
-import { blindSound, bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound } from './restroomSound'
+import { blindSound, bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound, throwWhoosh } from './restroomSound'
 import { landingOf } from '@/game/spills'
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
@@ -6279,6 +6279,14 @@ const SPIN_AXIS = new THREE.Vector3(0, 1, 0)
 const TIP_Q = new THREE.Quaternion()
 const SPIN_Q = new THREE.Quaternion()
 const ROLL_R = 0.035
+/** a carried drink's lean, and a thrown one's tumble, about this (scratch) */
+const LEAN_AXIS = new THREE.Vector3()
+const TUMBLE_Q = new THREE.Quaternion()
+const TUMBLE_UP = new THREE.Vector3()
+/** how a thrown drink goes (item 248): the floor's friction once it's down (m/s²), how much of its way it keeps from a bounce, the room it
+ * has before the fridge (its frame, metres: between the tables, it stops short against what's in the way) */
+const SLIDE_FRICTION = 4, BOUNCE_KEEP = 0.55
+const THROW_X = 1.4, THROW_Z: [number, number] = [0.3, 1.8]
 const LIFT_BOX = new THREE.Box3()
 const LIFT_AT = new THREE.Vector3()
 function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
@@ -6441,6 +6449,21 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           // (down on the boards' real top (floorAt), not the fridge's own floor a centimetre under it (the owner's: nothing laid on the floor
           // sinks into it)): found once where it's put down, however it got there
           if (o.base === undefined) { const w = host.localToWorld(new THREE.Vector3(o.x, 0, o.z)); o.base = host.worldToLocal(w.setY(floorAt(scene, w))).y }
+          // (thrown (item 248): it goes the way it was thrown, through the air tumbling end over end, then sliding on the boards till their
+          // friction stops it; kept before the fridge, between the tables (against their edge it stops short, a little back the way it came))
+          if (o.vx !== undefined || o.vz !== undefined) {
+            const h = Math.min(dt, 0.05)
+            o.x += (o.vx ?? 0) * h
+            o.z += (o.vz ?? 0) * h
+            if (Math.abs(o.x) > THROW_X) { o.x = THREE.MathUtils.clamp(o.x, -THROW_X, THROW_X); o.vx = -(o.vx ?? 0) * 0.2 }
+            if (o.z < THROW_Z[0] || o.z > THROW_Z[1]) { o.z = THREE.MathUtils.clamp(o.z, THROW_Z[0], THROW_Z[1]); o.vz = -(o.vz ?? 0) * 0.2 }
+            if (o.fy === undefined) {
+              const s = Math.hypot(o.vx ?? 0, o.vz ?? 0), d = Math.max(0, s - SLIDE_FRICTION * h)
+              if (d < 0.03) { o.vx = undefined; o.vz = undefined; o.base = undefined; o.lift = undefined }
+              else { o.vx = ((o.vx ?? 0) * d) / s; o.vz = ((o.vz ?? 0) * d) / s }
+            }
+          }
+          if (o.spin !== undefined && o.fy !== undefined) o.ang = (o.ang ?? 0) + o.spin * Math.min(dt, 0.05)
           // (let go in mid-air, it falls: gravity, and a small bounce on the floor)
           if (o.fy !== undefined) {
             o.fell = Math.max(o.fell ?? 0, o.fy)
@@ -6454,8 +6477,18 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
               if (!o.hit) {
                 o.hit = true
                 const at = host.localToWorld(new THREE.Vector3(o.x + (o.roll ?? 0), 0, o.z))
-                const land = landingOf(KIND_OF[o.id], o.fell ?? 0)
+                // (thrown, it hits harder than its height alone: its speed along as much more fall again (item 248: thrown hard, a glass
+                // bottle breaks as one let fall from high)
+                const along2 = (o.vx ?? 0) ** 2 + (o.vz ?? 0) ** 2
+                const land = landingOf(KIND_OF[o.id], (o.fell ?? 0) + (along2 / (2 * 9.8)) * 0.6)
                 if (land === 'shatter') { broken.push(i); breakBottle(o.id, at.setY(floorAt(scene, at)), host.getWorldScale(LIFT_AT).y); return }
+                if (KIND_OF[o.id] === 'glass' && along2 > 0.5) bottleClink(false, at)
+                // (it tumbled over in the air (more than a quarter turn from upright, or still turning hard): it lands on its side)
+                if (o.spin !== undefined) {
+                  const a = ((o.ang ?? 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)
+                  if ((Math.abs(Math.sin(a)) > 0.5 || Math.cos(a) < 0 || o.spin > 6) && !o.tipped) { o.tipped = true; o.tip = 0; o.roll = 0 }
+                  o.spin = undefined; o.ang = undefined
+                }
                 if (land === 'roll' && !o.tipped) { o.tipped = true; o.tip = 0; o.roll = 0; canClatter(at) }
                 // (a paper pack: onto its side with a dull thud of board (a box doesn't roll); a little drop, a softer one)
                 if (KIND_OF[o.id] === 'pack') {
@@ -6465,6 +6498,9 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
               }
               // (landing: a hard fall from high enough can't keep it upright, a tall bottle least of all: it tips over, and rolls)
               if (!o.tipped && o.vy < -2.2 && Math.random() < Math.min(0.95, (o.fell ?? 0) * 0.9 + 0.15)) { o.tipped = true; o.tip = 0; o.roll = 0 }
+              // (a bounce keeps some of its way along, the rest lost to the floor)
+              if (o.vx !== undefined) o.vx *= BOUNCE_KEEP
+              if (o.vz !== undefined) o.vz *= BOUNCE_KEEP
               if (o.vy < -0.8) o.vy = -o.vy * 0.25
               else { o.fy = undefined; o.vy = undefined; o.fell = 0 }
             }
@@ -6489,6 +6525,12 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
               if (still) o.lift = lift
               g.position.y += lift
             } else g.position.y += o.lift
+          } else if (o.ang !== undefined && o.ax !== undefined) {
+            // (tumbling in the air about its own middle, end over end the way it flies)
+            const mid = shelfTall(o.id) / 2
+            TUMBLE_Q.setFromAxisAngle(LEAN_AXIS.set(o.ax, 0, o.az ?? 0), o.ang)
+            g.quaternion.copy(TUMBLE_Q)
+            g.position.set(o.x, (o.fy ?? 0) + (o.base ?? 0) + mid, o.z).sub(TUMBLE_UP.set(0, mid, 0).applyQuaternion(TUMBLE_Q))
           } else {
             g.position.set(o.x, (o.fy ?? 0) + (o.base ?? 0), o.z)
             g.quaternion.identity()
@@ -6546,7 +6588,7 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     // (a drink in the fridge only with its door open: the glass is in the way otherwise)
     if (from.kind === 'slot' && !doorOpen()) return
     ev.stopPropagation()
-    if (from.kind === 'out') { const o = FRIDGE_STOCK.out[from.i]; if (o) { o.tipped = false; o.tip = 0; o.roll = 0; o.lift = undefined } }
+    if (from.kind === 'out') { const o = FRIDGE_STOCK.out[from.i]; if (o) { o.tipped = false; o.tip = 0; o.roll = 0; o.lift = undefined; o.vx = o.vz = o.spin = o.ang = undefined } }
     // (lifted from its place among the others: its clink against them)
     const lifting = from.kind === 'slot' ? FRIDGE_STOCK.units[n][from.r]?.[from.k] : null
     if (lifting) bottleClink(isCan(lifting), FRIDGE_AT[n])
@@ -6562,6 +6604,16 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
     document.body.classList.add('is-carrying')
     const plane = new THREE.Plane()
     let onTable: THREE.Vector3 | null = null
+    // (item 248, the owner's, 2026-11-17: 「飲料從冰箱甩出去沒感覺」: where it's been the last tenth of a second, out on the level, for how
+    // fast and which way it's going: it leans that way as it's carried (its weight felt), and let go moving, it's thrown so)
+    const trail: { t: number; x: number; y: number; z: number }[] = []
+    const trailV = () => {
+      const a = trail[0], b = trail[trail.length - 1]
+      if (!a || !b || b.t - a.t < 16 || performance.now() - b.t > 90) return new THREE.Vector3()
+      const s = (b.t - a.t) / 1000
+      return new THREE.Vector3((b.x - a.x) / s, (b.y - a.y) / s, (b.z - a.z) / s)
+    }
+    let leanX = 0, leanZ = 0
     dragKey.current = key
     if (from.kind === 'slot') setLifted(key)
     // (carried on a level through where it was picked up (the owner's: on the fridge's upright front alone it lagged and swung off from the
@@ -6627,6 +6679,15 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
       if (!flat) return
       grip = null
       grp.position.copy(host.worldToLocal(flat)).add(heldMid)
+      const now = performance.now()
+      trail.push({ t: now, x: grp.position.x, y: grp.position.y, z: grp.position.z })
+      while (trail.length > 2 && now - trail[0].t > 110) trail.shift()
+      // (leaning the way it's carried, the top ahead of the hand, as far as it's going fast (a half radian at most), eased)
+      const v = trailV()
+      leanX += (v.x - leanX) * 0.35
+      leanZ += (v.z - leanZ) * 0.35
+      const sp = Math.hypot(leanX, leanZ)
+      if (sp > 0.05) grp.quaternion.setFromAxisAngle(LEAN_AXIS.set(leanZ / sp, 0, -leanX / sp), Math.min(0.5, sp * 0.09))
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
@@ -6695,6 +6756,17 @@ function FridgeStockImpl({ n = 0 }: { n?: number }) {
           o.vy = 0
           o.fell = py
           o.hit = false
+          // (let go moving, it's thrown (item 248): on the way it was going and as fast (6 m/s at most), up a little as a throw goes,
+          // tumbling end over end about the way it flies, as fast as it was thrown; fast, the air's heard past it)
+          const v = trailV(), sp = Math.hypot(v.x, v.z)
+          if (sp > 0.6) {
+            const k = Math.min(1, 6 / sp)
+            o.vx = v.x * k; o.vz = v.z * k
+            o.vy = Math.min(2.2, sp * k * 0.3)
+            o.spin = Math.min(14, sp * k * 3.2); o.ang = 0; o.ax = v.z / sp; o.az = -v.x / sp
+            o.x = px; o.z = Math.max(THROW_Z[0], pz)
+            if (sp > 2.2) throwWhoosh(host.localToWorld(new THREE.Vector3(px, py, pz)), (sp - 2) / 4)
+          }
           // (what's out moved there; a place's own stays at its place, its others still in it)
           if (from.kind === 'out') grp.position.set(o.x, py, o.z)
         }

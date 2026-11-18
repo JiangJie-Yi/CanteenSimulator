@@ -517,8 +517,10 @@ export const FRIDGE_STOCK = keep(import.meta.hot, 'FRIDGE_STOCK', {
   // (`lift`: how far a fallen one lying still is raised to rest on the floor, measured once it's come to rest (DiningRoom); `hit`: it's
   // landed from this fall (what landing does to it, game/spills, done once, not at every bounce); `base`: the boards' real top there, in the
   // fridge's frame (its own floor is a centimetre under it))
+  // (`vx`, `vz`: thrown (item 248), how fast it's going along the floor, in the air and sliding after; `spin`, `ang`: how fast it tumbles
+  // end over end in the air and how far it's gone round, about (`ax`, 0, `az`); none of it kept in the save, which keeps only the places)
   out: [] as { id: DrinkId; unit: number; x: number; z: number; w?: [number, number, number]; fy?: number; vy?: number; fell?: number; tip?: number; roll?: number; tipped?: boolean; lift?: number; hit?: boolean
-    base?: number }[],
+    base?: number; vx?: number; vz?: number; spin?: number; ang?: number; ax?: number; az?: number }[],
   ver: 0,
 })
 /** a fridge's places as game/drinkStock takes them (its own rows and counts, changed in place) */

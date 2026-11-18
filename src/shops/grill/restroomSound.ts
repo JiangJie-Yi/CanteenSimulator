@@ -625,6 +625,21 @@ export function canClatter(at: THREE.Vector3) {
 }
 
 /**
+ * A drink thrown hard (item 248), heard at `at` as it leaves the hand: the air past it, a breathy rush falling in pitch as it goes (noise
+ * through a band sweeping down), as loud as it's thrown (`k` 0..1)
+ */
+export function throwWhoosh(at: THREE.Vector3, k: number) {
+  const a = ctx()
+  const { near, pan } = heard(at)
+  if (!a || near < 0.02 || !gate('whoosh', 200)) return
+  const t = a.currentTime, o = out(a, 0.3 * near * Math.min(1, Math.max(0.3, k)), pan)
+  const n = noise(a, 0.34, (x) => Math.min(1, x * 7) * (1 - x) ** 1.6, 0.3)
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1
+  bp.frequency.setValueAtTime(1600, t); bp.frequency.exponentialRampToValueAtTime(380, t + 0.32)
+  n.connect(bp).connect(o); n.start(t)
+}
+
+/**
  * A paper pack dropped on the floor (game/spills), heard at `at`: a dull thud of board and the drink in it, no ring (`k` how hard: a small
  * drop half as loud), and, a hard one, a second softer as it settles on its side
  */
