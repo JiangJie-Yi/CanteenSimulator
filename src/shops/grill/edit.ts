@@ -69,7 +69,8 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   // shrine's, the same way along its wall), made its place: X -0.8 now, 2.2 back toward the door)
   // (and 20 cm lower (item 303, the owner's, 2026-11-17: 「小神龕的高度矮一些」): its shelf's foot 2.25 off the floor, 39 cm over a standing
   // head, its brackets 32 cm over the heads of those sat waiting on the bench under it)
-  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-0.6466, -0.075, 0.4712] },
+  // (and the owner's, 2026-11-18 (item 351): 「小神龕區，整體Y:0.6 然後Reset」: the group's Y in its panel 0.6, made its place)
+  'grp-altar': { zh: '小神龕組', ja: '神棚', members: ['altar', 'altarfittings'], t: [-0.6466, 0.6, 0.4712] },
   // (the till and all of it: the counter, what stands on it and in it, its two seats, to be moved, turned and sized as one)
   'grp-till': { zh: '收銀櫃組', ja: 'レジ一式', members: ['till-counter', 'till-register', 'till-card', 'till-printer', 'till-tray', 'till-pens', 'till-bell',
     'till-mat', 'till-ingot', 'till-tree', 'till-cat', 'till-manual', 'till-ipad', 'till-stool-hi', 'till-stool-lo'] },
@@ -192,6 +193,13 @@ const loadGroups = (): Record<string, Group> => {
     if (!localStorage.getItem('jgs-edit-groupshift-6')) {
       if (g['grp-altar']) g['grp-altar'] = { ...g['grp-altar'], t: [...DEFAULT_GROUPS['grp-altar'].t!] as V3 }
       localStorage.setItem('jgs-edit-groupshift-6', '1'); localStorage.setItem(KEY_G, JSON.stringify(g))
+    }
+  } catch { /* storage blocked */ }
+  // (and up to Y 0.6 (item 351): its place kept in a browser given way to it once more)
+  try {
+    if (!localStorage.getItem('jgs-edit-groupshift-7')) {
+      if (g['grp-altar']) g['grp-altar'] = { ...g['grp-altar'], t: [...DEFAULT_GROUPS['grp-altar'].t!] as V3 }
+      localStorage.setItem('jgs-edit-groupshift-7', '1'); localStorage.setItem(KEY_G, JSON.stringify(g))
     }
   } catch { /* storage blocked */ }
   try {
