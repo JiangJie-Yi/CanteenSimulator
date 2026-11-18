@@ -351,7 +351,9 @@ export function oribeLong(n: number): THREE.CanvasTexture | null {
     return d > 0.007 ? 0 : Math.min(1, (0.007 - d) / 0.004)
   }
   glaze(g, W, H, [234, 224, 200], 0.08, cracksOf(W, H, 40, 9), 0.4, 21 + i, lipAt)
-  const left = i % 2 === 0
+  // (the green always over the end at the customer's left, where a fish's head lies (item 272): their right front is the garnish's, on the
+  // cream (on the green a shiso leaf was lost); the canvas's left is the plate's -x, the customer's right)
+  const left = false
   // (the green over one end: from the end in about a third, its edge a slow wave)
   greenPour(g, W, H, (q) => {
     q.beginPath()

@@ -3410,10 +3410,82 @@ const SIPS = 4
   warmLater(g)
 }
 
+/**
+ * What's set on a plate with the food (item 272, the owner's, 2026-11-17: 「擺盤跟比例也是，會讓人覺得遊戲有點隨便做的感覺」): at the front
+ * and to the right of the one it's set before (前盛り, as a Japanese grill plates it), on a long plate a shiso leaf, a little mound of grated
+ * daikon on it and a stick of pickled ginger shoot (はじかみ) leaning on that, pink at its foot; on a round one a half-moon of lemon and a
+ * pinch of daikon; nothing on a little one. Left when the food's eaten: the leaf and the ginger (the daikon's eaten with the fish). Each set
+ * one mesh in its colours (one draw a plate), in the plate's own units, the customer's side its -z and their right its -x (measured)
+ */
+const GARNISH_MAT = new THREE.MeshToonMaterial({ vertexColors: true, side: THREE.DoubleSide })
+const tint = (g: THREE.BufferGeometry, hex: string) => {
+  const c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b }
+  const out = g.index ? g.toNonIndexed() : g
+  if (out !== g) { const m = out.attributes.position.count, b = new Float32Array(m * 3); for (let i = 0; i < m; i++) { b[i * 3] = c.r; b[i * 3 + 1] = c.g; b[i * 3 + 2] = c.b } out.setAttribute('color', new THREE.BufferAttribute(b, 3)); out.deleteAttribute('uv'); return out }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3))
+  g.deleteAttribute('uv')
+  return g
+}
+/** a shiso leaf lying flat, its edge toothed, cupped a little along its midrib; `len` long, its tip toward +x */
+function shisoLeaf(len: number) {
+  const s = new THREE.Shape(), N = 12, pts: [number, number][] = []
+  for (let k = 0; k <= N; k++) {
+    const t = k / N, w = len * 0.36 * Math.sin(Math.PI * t) ** 0.8 * (k % 2 && k < N ? 1.08 : 1)
+    pts.push([len * (t - 0.5), w])
+  }
+  for (let k = N - 1; k >= 1; k--) { const [x, w] = pts[k]; pts.push([x, -w]) }
+  s.moveTo(pts[0][0], pts[0][1])
+  for (const [x, y] of pts.slice(1)) s.lineTo(x, y)
+  const g = new THREE.ShapeGeometry(s).rotateX(-Math.PI / 2)
+  const p = g.attributes.position
+  for (let i = 0; i < p.count; i++) p.setY(i, Math.abs(p.getZ(i)) / (len * 0.36) * len * 0.07)
+  g.computeVertexNormals()
+  return g
+}
+/** a little lumpy mound (grated daikon), `r` across */
+function mound(r: number, seed: number) {
+  const g = new THREE.IcosahedronGeometry(r, 1)
+  const p = g.attributes.position
+  let k = seed
+  for (let i = 0; i < p.count; i++) {
+    k = (k * 16807) % 2147483647
+    const j = 0.85 + 0.3 * (k / 2147483647)
+    p.setXYZ(i, p.getX(i) * j, Math.max(0, p.getY(i)) * 0.6 * j, p.getZ(i) * j)
+  }
+  g.computeVertexNormals()
+  return g
+}
+const GARNISHES = (() => {
+  if (typeof document === 'undefined') return null
+  // (the long plate's: the leaf front right, its tip out toward the plate's end, the daikon on its middle, the ginger leaning on it)
+  const leaf = tint(shisoLeaf(0.06), '#3d7a35').rotateY(0.5).translate(-0.085, FLOOR_LONG + 0.0015, -0.03)
+  const dai = tint(mound(0.012, 7), '#f3f0e6').translate(-0.085, FLOOR_LONG + 0.004, -0.03)
+  const stem = (from: number, to: number, hex: string) => tint(new THREE.CylinderGeometry(0.0016, 0.0019, to - from, 6).translate(0, (from + to) / 2, 0), hex)
+  const ginger = mergeGeometries([stem(0, 0.016, '#e5839c'), stem(0.016, 0.05, '#e9ecd2')])!.rotateZ(-1.15).rotateY(0.35).translate(-0.066, FLOOR_LONG + 0.003, -0.022)
+  const leftLong = mergeGeometries([leaf.clone(), ginger.clone()])!
+  const fullLong = mergeGeometries([leaf, dai, ginger])!
+  // (the round plate's: a half-moon of lemon lying on its side front right, its rind yellow, its flesh paler; a pinch of daikon by it)
+  const half = new THREE.Shape()
+  half.absarc(0, 0, 0.017, 0, Math.PI, false)
+  half.lineTo(0.017, 0)
+  const lemon = new THREE.ExtrudeGeometry(half, { depth: 0.008, bevelEnabled: false, curveSegments: 8 })
+  const lemonC = tint(lemon, '#efd65a')
+  lemonC.rotateX(-Math.PI / 2).rotateY(-0.6).translate(-0.04, FLOOR_ROUND + 0.0015, -0.032)
+  const pinch = tint(mound(0.008, 11), '#f3f0e6').translate(-0.018, FLOOR_ROUND + 0.003, -0.045)
+  const fullRound = mergeGeometries([lemonC, pinch])!
+  const leftRound = lemonC.clone()
+  return { long: { full: fullLong, left: leftLong }, round: { full: fullRound, left: leftRound } }
+})()
+// (made with the rest at load: shown only once there's food out)
+if (GARNISHES) { const g = new THREE.Group(); g.add(new THREE.Mesh(GARNISHES.long.full, GARNISH_MAT)); warmLater(g) }
+
 /** a customer's plate, of the shop's one set of painted ware (dirty: a smear of sauce and the sticks left on it, of what was eaten off it,
  * thrown away with it at the sink (the owner's)); drawn again only when it gets dirty */
 const Plate = memo(PlateImpl)
-function PlateImpl({ kind = 'round', dirty = false, dirt = 1, design = 0, sticks = 1, bones = 0, glass, tissue, drink, level = 0 }: { dirty?: boolean; dirt?: number; design?: number; sticks?: number; bones?: number
+function PlateImpl({ kind = 'round', dirty = false, dirt = 1, design = 0, sticks = 1, bones = 0, glass, tissue, drink, level = 0, garnish }: { dirty?: boolean; dirt?: number; design?: number; sticks?: number; bones?: number
+  /** what's set with the food (item 272): all of it with the food on it, what's left of it once it's eaten, none on a plate with nothing */
+  garnish?: 'full' | 'left'
   /** which of the shop's plates it is (game/plateSize, item 228): the long one, a round one, a little one; it and what's left on it, not
    * what stands beside it */
   kind?: PlateKind
@@ -3442,6 +3514,9 @@ function PlateImpl({ kind = 'round', dirty = false, dirt = 1, design = 0, sticks
       <mesh geometry={geo} scale={long ? [1.012, 1.05, 1.03] : [1.03, 1.05, 1.03]}>
         <meshBasicMaterial color={INK} side={THREE.BackSide} />
       </mesh>
+      {garnish && GARNISHES && kind !== 'mame' && (
+        <mesh geometry={GARNISHES[long ? 'long' : 'round'][garnish]} material={GARNISH_MAT} raycast={() => {}} />
+      )}
       {dirty && (
         <>
           {/* (its smear, as dirty as it was left (game/plates' plateDirt): the more eaten off it, the bigger and the darker; in the sink it
@@ -8581,6 +8656,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           }
         }}>
           <Plate kind={r.kind ?? 'round'} dirty={r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken'} dirt={r.dirt ?? 1} design={designOf(r.key)} sticks={r.sticks ?? 1} bones={r.bones ?? 0} glass={r.glass && (r.phase === 'taken' ? GLASS_ON : r.glass)} drink={r.drink} level={r.level}
+            garnish={r.phase === 'home' ? undefined : r.phase === 'clear' || r.phase === 'dirty' || r.phase === 'taken' ? 'left' : 'full'}
             tissue={r.tissue && (r.phase === 'taken' ? TISSUE_ON : r.tissue)} />
         </group>
       ))}
