@@ -4,6 +4,7 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { BOWL_LIFT } from './bowlLift'
+import { SOFT_DOT } from './softDot'
 import { footDust, newSteps } from './DustPuffs'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { kindOf, type GuestKind } from '@/data/guests'
@@ -143,6 +144,37 @@ const BITE_UP = new THREE.Vector3(0, 0.05, 0)
 /** a mouthful of miso soup (item 345), in the body's frame: the bowl's middle with nothing on the bar to go to, at the mouth (a little out in
  * front of it and below, the rim at the lips), where the right hand and the left hold it from its middle; the bowl's foot is that far under
  * its middle (its place on the bar is its foot) */
+/** the anger mark (怒りマーク, item 347): four red veins bulging toward a middle, white-edged, drawn, not a character; the steam's puffs soft
+ * white dots; both drawn as sprites facing the camera, their program made at load */
+const VEIN_TEX = (() => {
+  if (typeof document === 'undefined') return null
+  const n = 64, c = document.createElement('canvas')
+  c.width = c.height = n
+  const g = c.getContext('2d')!
+  g.lineCap = 'round'
+  for (const [w, col] of [[11, '#ffffff'], [6, '#d4253a']] as const) {
+    g.strokeStyle = col
+    g.lineWidth = w
+    // (four veins, one in each corner, each the quarter of a circle nearest the middle: together a star of four points with its sides
+    // curved in, mirrored left to right and top to bottom (never turning one way round: drawn so, it read as a 卍))
+    for (const [sx, sy] of [[1, 1], [-1, 1], [-1, -1], [1, -1]] as const) {
+      const cx = 32 + sx * 17, cy = 32 + sy * 17
+      const a0 = Math.atan2(0, -sx), a1 = Math.atan2(-sy, 0)
+      g.beginPath()
+      // (the short way round from the one to the other, a gap left at each point)
+      const d = ((a1 - a0 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI
+      g.arc(cx, cy, 14, a0 + d * 0.1, a0 + d * 0.9, d < 0)
+      g.stroke()
+    }
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+})()
+// (drawn over everything, as an emote is: by the head it stood inside the hair and was never seen)
+const VEIN_MAT = new THREE.SpriteMaterial({ map: VEIN_TEX, transparent: true, depthWrite: false, depthTest: false })
+const PUFF_MAT = new THREE.SpriteMaterial({ map: SOFT_DOT, color: '#f6f3ee', transparent: true, depthWrite: false, depthTest: false, opacity: 0.85 })
+if (typeof document !== 'undefined') { const g = new THREE.Group(); g.add(new THREE.Sprite(VEIN_MAT), new THREE.Sprite(PUFF_MAT)); warmLater(g) }
 const SOUP_REST = new THREE.Vector3(0.05, 0.36, 0.46)
 const SOUP_MOUTH = new THREE.Vector3(-0.01, 0.6, 0.3)
 const SOUP_GRIP_R = new THREE.Vector3(-0.075, 0.015, 0)
@@ -396,7 +428,7 @@ export function FolkWarm() {
  * passing the time (looking about, at their phone, chin in hand), their mood on their face, a hop of delight when their food comes,
  * fading as they go; `fit`: their size in the frame they're drawn in (the boss's height there).
  */
-export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false, bite, soup, soupAt, soupKey }: {
+export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false, bite, soup, soupAt, soupKey, fume }: {
   id: number; eating: boolean; walking: boolean; still?: () => boolean; clock?: { current: number }; talk?: number; mood?: Mood | null
   fade?: () => number; slippers?: () => boolean; pose?: string; held?: ReactNode; fit?: number
   /** (sat eating) where their food is, in the world: their plate's middle, for the chopsticks to come down on */
@@ -415,6 +447,9 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   soup?: () => number
   soupAt?: () => THREE.Vector3 | null
   soupKey?: string
+  /** (sat waiting) how near the end of their patience they are (0..1, item 347): past a half, an anger mark beside the head, pulsing; past
+   * seven tenths the cross face; past eight, steam off the top of the head, more as it goes on */
+  fume?: () => number
   /** (eating) how far into their dish they are, in bites, a bite taken out of it as each passes x.65 (none known: their own pace) */
   bite?: () => number | undefined
   /** stood on the floor, not sat on a stool's seat, when not walking (the character viewer's turntable: there's no stool there, and sat
@@ -471,6 +506,18 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
   }, [fig, spec, pictures])
 
   const heldRef = useRef<THREE.Group>(null)
+  // (the anger mark and the steam: on the head, made with the figure, shown as they get cross (item 347))
+  const fx = useMemo(() => {
+    const g = new THREE.Group()
+    const vein = new THREE.Sprite(VEIN_MAT)
+    // (up at the head's top corner, out past the hair)
+    vein.position.set(0.3, 0.42, 0.1)
+    vein.renderOrder = 20
+    const puffs = [0, 1, 2].map(() => new THREE.Sprite(PUFF_MAT))
+    g.add(vein, ...puffs)
+    g.visible = false
+    return { g, vein, puffs }
+  }, [])
   // (a drink in their hand rides with it: handL is at the figure's -x, which facing +z is its right hand (the chopsticks and a drink in the
   // right, the phone and the briefcase in the left: parts of the one mesh))
   useEffect(() => {
@@ -786,7 +833,21 @@ export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood =
     const joy = mood === 'joy' || delighted
     const blink = !joy && (t * 0.9 + id * 0.37) % 4 < 0.12
     const talking = !!talk && !eating && Math.sin(t * 11 + id) > 0.1 && Math.sin(t * 1.3 + id) > -0.2
-    setExpr(chew ? 'chew' : joy ? 'joy' : blink ? 'blink' : mood === 'mad' ? 'mad' : mood === 'sad' ? 'sad' : talking ? 'talk' : 'neutral')
+    // (getting cross, sat waiting: the mark by the head, the face, the steam (item 347); walked out angry, all of it)
+    const f = Math.max(fume?.() ?? 0, mood === 'mad' ? 1 : 0)
+    if (fig.head && fx.g.parent !== fig.head) fig.head.add(fx.g)
+    fx.g.visible = f > 0.55
+    if (fx.g.visible) {
+      const beat = Math.max(0, Math.sin(t * (f > 0.8 ? 9 : 6)))
+      fx.vein.scale.setScalar((0.1 + 0.08 * Math.min(1, (f - 0.55) / 0.3)) * (1 + 0.18 * beat))
+      fx.puffs.forEach((p, i) => {
+        const k = (t * 0.85 + i / 3) % 1
+        p.visible = f > 0.8
+        p.position.set(Math.sin((t + i) * 2.3) * 0.03 * k + (i - 1) * 0.04, 0.3 + 0.32 * k, 0)
+        p.scale.setScalar((0.05 + 0.11 * Math.sin(Math.PI * k)) * (0.7 + 0.6 * Math.min(1, (f - 0.8) / 0.2)))
+      })
+    }
+    setExpr(chew ? 'chew' : joy ? 'joy' : blink ? 'blink' : mood === 'mad' || (f >= 0.7 && !eating) ? 'mad' : mood === 'sad' ? 'sad' : talking ? 'talk' : 'neutral')
   })
 
   const k = fit * spec.size

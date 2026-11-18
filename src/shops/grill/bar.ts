@@ -178,6 +178,10 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
  * each set off down it as the shop opens (performance.now()); the room upstairs (DormRoom) plays them from these */
 export const DORM_LIFE = keep(import.meta.hot, 'DORM_LIFE', { upAt: new Map<string, number>(), downAt: new Map<string, number>() })
 if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __dormLife: DORM_LIFE })
+/** how cross each customer sat waiting for their first dish is getting (item 347, the owner's: 「應該要有生氣的表情與符號，頭上冒煙之類的，比方說員工
+ * 動作太慢」): how far through their patience they are (0..1, Roasting each tick), by their id; none, or 0, once their food's come */
+export const FUMING = keep(import.meta.hot, 'FUMING', new Map<number, number>())
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __fuming: FUMING })
 export const SHOE_CELLS = keep(import.meta.hot, 'SHOE_CELLS', { shoes: new Map<number, string>(), kick: new Map<number, number>(), at: new THREE.Vector3(), ready: false })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shoes?: typeof SHOE_CELLS }).__shoes = SHOE_CELLS
 export const TISSUES_KEY = 'jgs-tissues-1'

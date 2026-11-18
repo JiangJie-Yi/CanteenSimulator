@@ -3,7 +3,7 @@ import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 import { TONG_S, TONG_TAKE_S, TRAY_PLACES, trayPlace } from '@/game/tray'
-import { DORM_LIFE, FIRE_FLARE, KAKUBAT } from './bar'
+import { DORM_LIFE, FIRE_FLARE, FUMING, KAKUBAT } from './bar'
 import { SkewerStore } from './SkewerStore'
 import { clinkSound, pierceSound } from './skewerSound'
 import { coolerDoorSound, gateSound, sizzleBurst } from './restroomSound'
@@ -6725,8 +6725,12 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
     // someone kept waiting too long goes: till something off the fire's come, a soup or a sake before it no reason to wait longer for the rest
     // (item 203: a bowl of soup started the between-dishes clock, half an hour, and a fish that takes three quarters of an hour at a middling
     // fire never reached them: up and off mid-meal, refunded, a bad word left)
+    // (how near the end of their patience each one waiting for their first dish is, for their face and the steam off them (item 347))
+    for (const id of [...FUMING.keys()]) if (!seated.some((g) => g.id === id)) FUMING.delete(id)
     for (const g of seated) {
-      if (g.lastAte === undefined && now - g.since > PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience) {
+      const limit = PATIENCE * flowerBuffs(SHRINE_FLOWERS).patience * patienceIn(mood) * RATING_FLOW.patience
+      FUMING.set(g.id, g.lastAte === undefined ? Math.min(1, (now - g.since) / limit) : 0)
+      if (g.lastAte === undefined && now - g.since > limit) {
         g.state = 'angry'
         if (mood === 'dark') gripe(g.id, 'dark')
         const owed = [...g.orders]
