@@ -13,7 +13,9 @@ import { ROLL, SOAP, SOAP_FULL, takeOne, TOWEL, TOWEL_FULL } from '@/game/washro
 import { getEdit } from './edit'
 import { roundMirror } from './mirror'
 import { shrineDoor } from './shrineSound'
-import { basinPour, drainGurgle, dryerSound, flushSound, knockSound, otohimeNear, otohimeSound, overflowTrickle, plugSound, pumpSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
+import { basinPour, drainGurgle, dryerSound, flushSound, knockSound, otohimeNear, otohimeSound, overflowTrickle, plipSound, plugSound, pumpSound, rollSound, scrubSound, tapRunning, tapTurnSound } from './restroomSound'
+import { drip } from '@/scene/Drips'
+import { inkTogether } from '@/scene/inkHull'
 import { basinStep, draining, overflowing, DRAIN_S, FILM } from '@/game/basin'
 import { reflectStudio } from '@/scene/studio'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -1009,8 +1011,13 @@ const BASIN_LOOK = { m: basinLooks(), f: basinLooks() }
 const WASH_STREAM = new THREE.MeshBasicMaterial({ color: '#cfeaf6', transparent: true, opacity: 0.62, depthWrite: false, toneMapped: false })
 /** the hand soap's bottle (item 199, the owner's 「庫存的東西沒對上」: celadon china, how much was in it never seen): celadon-tinted glass,
  * the soap in it seen through it, the studio's gleams on it; no transmission */
-const SOAP_GLASS = new THREE.MeshStandardMaterial({ color: '#a9c7b4', transparent: true, opacity: 0.4, depthWrite: false, roughness: 0.06, metalness: 0.1,
+// (its depth written (item 290): the line round it drawn after it, so what of the line is behind the glass is hidden by it)
+const SOAP_GLASS = new THREE.MeshStandardMaterial({ color: '#a9c7b4', transparent: true, opacity: 0.4, depthWrite: true, roughness: 0.06, metalness: 0.1,
   envMapIntensity: 1.4, emissive: '#1e3a2c' })
+/** the soap's glass's line (item 290, the owner's: 「為何這兩者風格有差? 有黑線與沒黑線」: the washing-up liquid's bottle had its line, the hand
+ * soap's none, left out (item 199) for the line showed through the glass, a dark ring in it): round its outside only, drawn after the glass
+ * (the transparent pass, after it in order) so the glass hides the rest of it; the room's own line's program */
+let SOAP_GLASS_INK: THREE.Material | null = null
 reflectStudio(SOAP_GLASS)
 /**
  * The washroom's washstand (blender/wc.py: its back to +x, against the back wall facing the door, so it's the first thing seen as the door
@@ -1064,7 +1071,18 @@ export function WashstandLive({ who }: { who: Who }) {
     // (its glass seen through, and the soap in it a piece of its own, stood as high as there's soap left (item 199: celadon china, how much
     // was in it never seen))
     const liquid = soapBits.find((o) => o.name.startsWith('WashSoapLiquid')) ?? null
-    for (const o of soapBits) if (o.name.startsWith('WashSoapGlass')) { (o as THREE.Mesh).material = SOAP_GLASS; o.castShadow = false }
+    for (const o of soapBits) if (o.name.startsWith('WashSoapGlass')) {
+      const g = o as THREE.Mesh
+      g.material = SOAP_GLASS
+      g.castShadow = false
+      // (its own line, under it, round its outside: item 290)
+      const ink = inkTogether([g], { width: 0.0012, weld: true })
+      if (ink) {
+        SOAP_GLASS_INK ??= Object.assign((ink.material as THREE.ShaderMaterial).clone(), { transparent: true })
+        ink.material = SOAP_GLASS_INK
+        g.add(ink)
+      }
+    }
     // (its pump's head and nozzle a piece of their own, pressed down as it's used (the owner's, 2026-11-10: it can be pressed, and it's used
     // up): by a click, or by a guest as they wash their hands)
     const pump = new THREE.Group()
@@ -1085,6 +1103,8 @@ export function WashstandLive({ who }: { who: Who }) {
     mergeByMaterial(root, (o) => doors.includes(o as THREE.Group) || o === soap || o === mirrorSet)
     mergeByMaterial(soap, (o) => o === pump || o === liquid)
     mergeByMaterial(pump)
+    // (the glass drawn first, then its line, both in the see-through pass (item 290))
+    soap.traverse((o) => { const m = o as THREE.Mesh; if (!m.isMesh) return; if (m.material === SOAP_GLASS) m.renderOrder = 1; else if (m.material === SOAP_GLASS_INK) m.renderOrder = 2 })
     // (where the bottle stands, in the stand's own frame: what takes the pointer for it, a little bigger)
     root.updateMatrixWorld(true)
     const soapBox = new THREE.Box3().setFromObject(soap)
@@ -1241,11 +1261,32 @@ export function WashstandLive({ who }: { who: Who }) {
   const cabSays = () => (cab.current.open ? '點擊關上' : '點擊打開・備用的衛生紙、擦手紙與洗手乳補充包')
   const says = () => (TOILETS[who].tap ? '點一下關水' : '點一下開水（開著會一直計水費）')
   const plugSays = () => (TOILETS[who].basin.plugged ? '點一下拔起塞子（放水）' : '點一下壓下塞子（蓄水）')
+  /** a dollop of foam out of the pump's nozzle as its head goes down (item 289), into the bowl under it, a little in toward the plug, onto the
+   * water if there's any; heard as it lands */
+  const foam = (camera: THREE.Camera) => {
+    const r = parts.root
+    r.updateWorldMatrix(true, true)
+    // (the nozzle's end: the pump's head's furthest point toward the bowl's middle, a little under its top)
+    const box = new THREE.Box3().setFromObject(parts.pump)
+    const bowl = r.localToWorld(parts.floor.clone())
+    const c = box.getCenter(new THREE.Vector3())
+    const way = new THREE.Vector3(bowl.x - c.x, 0, bowl.z - c.z).normalize()
+    const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
+    const tip = c.clone().add(new THREE.Vector3(way.x * half.x, 0, way.z * half.z)).setY(box.max.y - half.y * 0.6)
+    // (where it lands: inside the bowl, 9 cm out from the plug on the soap's side, on its slope there or on the water if that's higher (the
+    // nozzle doesn't reach over the rim: let fall straight down it went into the china); flung over the rim to it)
+    const B = TOILETS[who].basin, wet = B.level > 0.004
+    const tipIn = r.worldToLocal(tip.clone()), mid = parts.floor
+    const toward = new THREE.Vector3(tipIn.x - mid.x, 0, tipIn.z - mid.z).normalize()
+    const rad = 0.09
+    const landIn = new THREE.Vector3(mid.x + toward.x * rad, mid.y + Math.max(floorAt(rad), wet ? waterY(B.level) : 0) + 0.003, mid.z + toward.z * rad)
+    drip({ from: tip, to: r.localToWorld(landIn), kind: 'foam', delay: 0.14, arc: 0.25, onLand: () => plipSound(nearOf(r, camera), wet) })
+  }
   /** the soap pressed at a click: a press, if there's any; empty, a refill put in from the spares in stock, if there's one; else only its
    * pump's dry click */
   const press = (camera: THREE.Camera) => {
     const t = TOILETS[who]
-    if (t.soap > 0) { const k = takeOne(t.soap); t.soap = k.left; t.pumpAt = now(); return }
+    if (t.soap > 0) { const k = takeOne(t.soap); t.soap = k.left; t.pumpAt = now(); foam(camera); return }
     if (SUPPLIES.take(SOAP, 1)) { t.soap = SOAP_FULL; rollSound(nearOf(parts.root, camera)); return }
     pumpSound(nearOf(parts.root, camera), true)
   }

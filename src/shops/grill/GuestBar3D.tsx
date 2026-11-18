@@ -39,6 +39,7 @@ import { SAKE_BOTTLE_ML, STATION_GO, TOKKURI_ML, stationGo } from '@/game/sakeSt
 import { newWashPose, spongePose, washPose, type WashPoints } from '@/scene/washMotion'
 import { PLATE_DIMS, PLATE_SPREAD, plateSide, type PlateKind } from '@/game/plateSize'
 import { PathMap } from './PathMap'
+import { Drips } from '@/scene/Drips'
 import { ServeCounter } from './ServeCounter'
 import { PathVias, PathZones } from './PathZone'
 import { unlitShade } from '@/game/roomLights'
@@ -8337,6 +8338,8 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (the walking paths' map, in edit mode when asked for (item 168)) */}
       <PathMap />
+      {/* (what a press of the soap or a squeeze of the washing-up liquid gives out, seen (item 289): one small pool of them for the shop) */}
+      <Drips />
       {/* (the keep-clear patches (item 168): put down by the serving counter, moved and sized by hand) */}
       <PathZones home={zoneHome} />
       <PathVias home={viaHome} />

@@ -23,7 +23,8 @@ import { glowOff, glowOn } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
 import { getEdit } from './edit'
-import { coolerDoorSound, tapRunning, tapTurnSound, washerBeep, washerChime } from './restroomSound'
+import { coolerDoorSound, plipSound, pumpSound, tapRunning, tapTurnSound, washerBeep, washerChime } from './restroomSound'
+import { drip } from '@/scene/Drips'
 
 const URL = import.meta.env.BASE_URL + 'models/sink.glb'
 /** the brass, the copper and the dryer's stainless: real metal, reflecting the studio (it only reads as metal by what it reflects) */
@@ -603,6 +604,29 @@ export function SinkPart({ node }: { node: string }) {
     // (taken up by the owner to wash with (item 174): his hand has it, drawn there)
     lift.current.visible = !(node === 'SinkSpongeSet' && HAND_WASH.spongeHeld)
   })
+  /** a drop of the washing-up liquid out of its pump's spout (item 289), as the pump's pressed, flung a little way: into the water if the
+   * basin's filled, else onto the sponge (where it's lying, or held up); heard as it's pumped and as it lands */
+  const dripSoap = () => {
+    obj.updateWorldMatrix(true, true)
+    const box = solidBox(obj)
+    const wet = SINK.water >= WASH_WET
+    let to: THREE.Vector3 | null = null
+    if (wet) {
+      const pool = obj.parent?.parent?.getObjectByName('SinkWater') ?? null
+      if (pool) to = pool.getWorldPosition(new THREE.Vector3())
+    }
+    if (!to && WASH_GUIDE.sponge) {
+      const b = solidBox(WASH_GUIDE.sponge)
+      to = b.getCenter(new THREE.Vector3()).setY(b.max.y + 0.002)
+    }
+    pumpSound(0.45)
+    if (!to) return
+    // (out of the spout's end: the pump head's furthest reach toward where it's going, just under its top)
+    const c = box.getCenter(new THREE.Vector3()), half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5)
+    const way = new THREE.Vector3(to.x - c.x, 0, to.z - c.z).normalize()
+    const from = c.clone().add(new THREE.Vector3(way.x * half.x * 0.6, 0, way.z * half.z * 0.6)).setY(box.max.y - 0.012)
+    drip({ from, to, kind: 'dishSoap', delay: 0.05, arc: 0.3, onLand: () => plipSound(0.4, wet) })
+  }
   // (the washing-up liquid squeezed into the water, the sponge taken up or put down: steps of washing up by hand (item 103), clicked)
   if (node === 'SinkDetergentSet' || node === 'SinkSpongeSet') return (
     <group ref={(g) => { lift.current = g; WASH_GUIDE[node === 'SinkDetergentSet' ? 'soap' : 'sponge'] = g }} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver(name, partSays(node)).onPointerOver(e) }}
@@ -610,7 +634,7 @@ export function SinkPart({ node }: { node: string }) {
       onClick={(e) => {
         e.stopPropagation(); if (getEdit().on) return
         // (out of the bottle in use, a new one opened from stock as it runs out: none at all, nothing comes (item 203))
-        if (node === 'SinkDetergentSet') { if (squeezeSoap()) { SINK.soap = pumpSoap(SINK.soap); tapTurnSound(true, 0.25) } } else SINK.sponge = !SINK.sponge
+        if (node === 'SinkDetergentSet') { if (squeezeSoap()) { SINK.soap = pumpSoap(SINK.soap); dripSoap() } } else SINK.sponge = !SINK.sponge
         guideOff()
         window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
       }}>
@@ -654,6 +678,18 @@ export function SinkPart({ node }: { node: string }) {
       <primitive object={obj} />
     </group>
   )
+}
+/** a thing's own box, its ink line and its unseen box to point at left out (both bigger than the thing: a drop aimed at a box's top with
+ * them landed in the air over the sponge) */
+function solidBox(o: THREE.Object3D) {
+  const b = new THREE.Box3()
+  o.traverse((m) => {
+    const mesh = m as THREE.Mesh
+    if (!mesh.isMesh || !mesh.visible) return
+    if (([] as THREE.Material[]).concat(mesh.material).every((x) => x.side === THREE.BackSide)) return
+    b.expandByObject(mesh, false)
+  })
+  return b
 }
 /** what each of the rest of what stands on the sink says pointed at */
 function partSays(node: string) {

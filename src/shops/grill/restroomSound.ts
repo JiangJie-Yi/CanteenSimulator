@@ -225,6 +225,20 @@ export function pumpSound(near: number, empty = false) {
   s2.start(t + 0.03)
 }
 
+/** a drop of soap landing (item 289): a soft little plip */
+export function plipSound(near: number, wet = false) {
+  const a = ctx()
+  if (!a || near < 0.02) return
+  const t = a.currentTime
+  const o = a.createOscillator(), g = a.createGain()
+  o.type = 'sine'
+  o.frequency.setValueAtTime(wet ? 900 : 620, t)
+  o.frequency.exponentialRampToValueAtTime(wet ? 1500 : 380, t + 0.06)
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07 * near, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09)
+  o.connect(g).connect(a.destination)
+  o.start(t); o.stop(t + 0.1)
+}
+
 /** taps left running or washing (the sink's, the toilets' washstands'): one splashing loop for them all, as loud as the nearest running one;
  * each tap says how near it's running each frame (0: shut) */
 const taps = new Map<string, number>()
