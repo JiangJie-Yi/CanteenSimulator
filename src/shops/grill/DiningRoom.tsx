@@ -16,7 +16,8 @@ import { warmLater } from '@/scene/Prewarm'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts } from '@/scene/StaticBatch'
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
-import { inkModel } from '@/scene/inkHull'
+import { inkModel, inkTogether } from '@/scene/inkHull'
+import { toChineseNumber } from '@/data/menu'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -26,7 +27,7 @@ import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE, depthOf } from '@/game/drinkStock'
 import { CARTON_CASES, cartonStack } from '@/game/cartonStack'
 import { cartonMaterials } from './drinkCartons'
-import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, type Counter, type DrinkId } from './bar'
+import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, SHOP_MENU, type Counter, type DrinkId } from './bar'
 import { EditBlock, Movable } from './Movable'
 import { getEdit } from './edit'
 import { askView } from './DormRoom'
@@ -1365,6 +1366,168 @@ function Sudare() {
   )
 }
 useGLTF.preload(SUDARE_URL)
+/**
+ * The menu's wooden tags (品書き木札; item 293, the owner's, 2026-11-17: 「菜單的木條可以貼在這，會隨著菜單數量做變更」, the plaster between the
+ * round window and the shrine's shelf over the wainscot): a tag of pale hinoki for each dish on the menu as it stands (bar's SHOP_MENU, as
+ * the shop front's boards read it; each name once), its name brushed down it and its price in kanji under it, as the menu board writes it,
+ * hung in a row from a dark rail and read right to left from the room; a second row on its own rail under it once there are more than a
+ * row holds. Written out again as the menu or the language changes: as many tags as dishes, laid out afresh. Each a thin board (its front
+ * its picture on the one canvas, its edges plain wood), all one mesh and one ink line.
+ */
+const TAG_W = 0.075, TAG_H = 0.34, TAG_T = 0.012, TAG_GAP = 0.012
+/** each row's top (the wall's height), and how many a row holds; each tag's picture's size on the canvas (two rows of them) */
+const TAG_ROWS = [1.64, 1.24], TAG_COLS = 17
+const TAG_PX: [number, number] = [56, 256]
+const TAG_FONT = '"LXGW WenKai TC", "Noto Serif TC", serif'
+type TagRow = { name: string; price: number }
+function paintTags(g: CanvasRenderingContext2D, rows: TagRow[]) {
+  const [w, h] = TAG_PX
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.clearRect(0, 0, w * TAG_COLS, h * 2)
+  rows.forEach((r, k) => {
+    const x0 = (k % TAG_COLS) * w, y0 = Math.floor(k / TAG_COLS) * h
+    // (pale hinoki, its grain running down it, each its own shade)
+    const tone = 0.94 + 0.06 * Math.sin(k * 2.7)
+    g.fillStyle = `rgb(${Math.round(222 * tone)},${Math.round(200 * tone)},${Math.round(156 * tone)})`
+    g.fillRect(x0, y0, w, h)
+    for (let i = 0; i < 9; i++) {
+      const x = x0 + 4 + ((i * 37 + k * 11) % (w - 8))
+      g.fillStyle = `rgba(150,110,60,${0.08 + 0.05 * (i % 3)})`
+      g.fillRect(x, y0, 1, h)
+    }
+    // (the nail it hangs from, near its top)
+    g.fillStyle = '#3a2a1c'
+    g.beginPath(); g.arc(x0 + w / 2, y0 + 9, 2.6, 0, Math.PI * 2); g.fill()
+    // (the dish down it, as big as fits, a long one in two columns read right then left, split where its seasoning starts (佐…, …焼き);
+    // its price in kanji under it, smaller)
+    const chars = [...r.name], price = [...toChineseNumber(r.price)]
+    const at = chars.length <= 6 ? chars.length : r.name.indexOf('佐') > 1 ? [...r.name.slice(0, r.name.indexOf('佐'))].length
+      : r.name.indexOf('焼き') > 1 ? [...r.name.slice(0, r.name.indexOf('焼き'))].length : Math.ceil(chars.length / 2)
+    const cols = at >= chars.length ? [chars] : [chars.slice(0, at), chars.slice(at)]
+    const most = Math.max(...cols.map((c) => c.length))
+    const size = Math.min(cols.length > 1 ? 24 : 40, Math.floor(150 / Math.max(1, most)))
+    const ps = Math.min(22, Math.floor(70 / Math.max(1, price.length)))
+    g.fillStyle = '#1b120a'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.font = `700 ${size}px ${TAG_FONT}`
+    cols.forEach((col, j) => {
+      const cx = x0 + (cols.length > 1 ? (j === 0 ? 0.69 : 0.31) : 0.5) * w
+      const top = y0 + 24 + (j === 0 ? 0 : size * 0.5)
+      col.forEach((ch, i) => g.fillText(ch, cx, top + size * (i + 0.5)))
+    })
+    g.font = `700 ${ps}px ${TAG_FONT}`
+    const py = y0 + h - 12 - ps * price.length
+    price.forEach((ch, i) => g.fillText(ch, x0 + w / 2, py + ps * (i + 0.5)))
+  })
+}
+let TAG_ROWS_NOW: TagRow[] = []
+const TAG_TEX = signTexture(TAG_PX[0] * TAG_COLS, TAG_PX[1] * 2, (g) => paintTags(g, TAG_ROWS_NOW))
+/** the tags' own canvas (the texture's may be a smaller copy: scene/textureCap) */
+const TAG_CANVAS = TAG_TEX?.image as HTMLCanvasElement | undefined
+const TAG_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: TAG_TEX })
+const TAG_RAIL_MAT = new THREE.MeshToonMaterial({ color: '#3b2618' })
+/** the tags for `n` dishes along the wall from z0 to z1 (read from z1, the room's right), each a thin board out from the wall */
+function tagsGeometry(n: number, z0: number, z1: number) {
+  const pos: number[] = [], uv: number[] = [], idx: number[] = []
+  const W = TAG_PX[0] * TAG_COLS, H = TAG_PX[1] * 2
+  const face = (pts: number[][], uvs: number[][]) => {
+    const b = pos.length / 3
+    for (const p of pts) pos.push(...p)
+    for (const q of uvs) uv.push(...q)
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
+  }
+  const per = TAG_W + TAG_GAP
+  for (let k = 0; k < n; k++) {
+    const row = Math.floor(k / TAG_COLS), col = k % TAG_COLS
+    const inRow = Math.min(TAG_COLS, n - row * TAG_COLS)
+    // (each row centred on the stretch, from its right)
+    const mid = (z0 + z1) / 2, start = mid + ((inRow - 1) * per) / 2
+    const zc = start - col * per
+    const ya = TAG_ROWS[row] - TAG_H, yb = TAG_ROWS[row]
+    const za = zc - TAG_W / 2, zb = zc + TAG_W / 2, xf = -0.004 - TAG_T, xb = -0.004
+    // (its picture: the canvas's column and row, v up from the canvas's foot)
+    const u0 = (col * TAG_PX[0]) / W, u1 = ((col + 1) * TAG_PX[0]) / W
+    const v1 = 1 - (row * TAG_PX[1]) / H, v0 = v1 - TAG_PX[1] / H
+    // (the front, facing the room (-x): read with the room's right to +z)
+    face([[xf, ya, za], [xf, ya, zb], [xf, yb, zb], [xf, yb, za]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]])
+    // (its edges: a strip of its own plain wood, by its border)
+    const e = [[u0 + 0.0005, v1 - 0.02], [u0 + 0.002, v1 - 0.02], [u0 + 0.002, v1 - 0.01], [u0 + 0.0005, v1 - 0.01]]
+    face([[xb, ya, za], [xf, ya, za], [xf, yb, za], [xb, yb, za]], e)
+    face([[xf, ya, zb], [xb, ya, zb], [xb, yb, zb], [xf, yb, zb]], e)
+    face([[xf, yb, za], [xf, yb, zb], [xb, yb, zb], [xb, yb, za]], e)
+    face([[xb, ya, za], [xb, ya, zb], [xf, ya, zb], [xf, ya, za]], e)
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  g.setIndex(idx)
+  g.computeVertexNormals()
+  return g
+}
+/** what the tags say: the menu's dishes in its order, each name once, in the page's language (the shop's Japanese in English) */
+function tagRows(lang: string): TagRow[] {
+  const ja = lang === 'ja' || lang === 'en'
+  const rows: TagRow[] = []
+  for (const d of SHOP_MENU.dishes) {
+    const name = ja ? d.ja || d.name : d.name
+    if (rows.length < TAG_COLS * 2 && !rows.some((r) => r.name === name)) rows.push({ name, price: d.price })
+  }
+  return rows
+}
+function MenuTags({ z0, z1 }: { z0: number; z1: number }) {
+  const parts = useMemo(() => {
+    const g = new THREE.Group()
+    g.name = 'menu-tags'
+    const tags = new THREE.Mesh(new THREE.BufferGeometry(), TAG_MAT)
+    tags.castShadow = false
+    tags.receiveShadow = true
+    g.add(tags)
+    // (a rail for each row: a dark strip along the wall just over its tags)
+    const rails = TAG_ROWS.map((top) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 1), TAG_RAIL_MAT)
+      m.position.set(-0.01, top + 0.011, (z0 + z1) / 2)
+      m.visible = false
+      g.add(m)
+      return m
+    })
+    return { g, tags, rails, ink: null as THREE.Mesh | null }
+  }, [z0, z1])
+  useEffect(() => () => { parts.tags.geometry.dispose(); parts.ink?.geometry.dispose(); for (const r of parts.rails) r.geometry.dispose() }, [parts])
+  const said = useRef({ v: -1, lang: '' })
+  useFrame(() => {
+    const lang = document.documentElement.lang
+    if (said.current.v === SHOP_MENU.v && said.current.lang === lang) return
+    said.current = { v: SHOP_MENU.v, lang }
+    const rows = tagRows(lang)
+    TAG_ROWS_NOW = rows
+    // (laid out again for so many: the tags, their line, the rails over them as wide as the rows they hang)
+    parts.tags.geometry.dispose()
+    parts.tags.geometry = tagsGeometry(rows.length, z0, z1)
+    if (parts.ink) { parts.ink.removeFromParent(); parts.ink.geometry.dispose(); parts.ink = null }
+    if (rows.length) {
+      parts.ink = inkTogether([parts.tags], { width: 0.0012, weld: true })
+      if (parts.ink) parts.g.add(parts.ink)
+    }
+    parts.rails.forEach((r, i) => {
+      const inRow = Math.max(0, Math.min(TAG_COLS, rows.length - i * TAG_COLS))
+      r.visible = inRow > 0
+      r.scale.z = Math.max(0.01, inRow * (TAG_W + TAG_GAP) + 0.04)
+    })
+    const c = TAG_CANVAS
+    if (!TAG_TEX || !c) return
+    const g = c.getContext('2d')!
+    paintTags(g, rows)
+    TAG_TEX.needsUpdate = true
+    const text = rows.map((r) => r.name + toChineseNumber(r.price)).join('')
+    void document.fonts?.load(`700 40px "LXGW WenKai TC"`, text).then(() => {
+      if (TAG_ROWS_NOW !== rows) return
+      paintTags(g, rows)
+      TAG_TEX.needsUpdate = true
+    }).catch(() => {})
+  })
+  return <primitive object={parts.g} />
+}
 /** the round window's frame's tint over its keyaki: a deep walnut */
 const ROUND_WOOD_TINT = new THREE.Color('#7a5136')
 /** the round window's radius (its paper's) */
@@ -4802,6 +4965,13 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
       .concat(hang.map((h) => ({ z: h.z, scroll: undefined, print: h.print, round: false, bare: false })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [l, from, to, mid, shelfZ, c.length, door, shelf, clear, staffDoor, hang.map((h) => `${h.z}${h.print}`).join()])
+  // (the menu's tags' stretch of wall (item 293): from past the round window's frame to short of the shrine's shelf)
+  const tagSpan = useMemo(() => {
+    const r = art.find((a) => a.round)
+    if (!r) return null
+    const a = r.z + 0.58, b = shelfZ - 0.61
+    return b - a > 0.4 ? ([Math.min(a, b), Math.max(a, b)] as [number, number]) : null
+  }, [art, shelfZ])
   // (the pictures just past the staff's door hung a little further along, clear of its frame (the owner's: the scroll there was right up
   // against it); each one's piece keeps its name, so where it's been moved by hand still holds)
   const nudgeArt = (z: number) => (staffDoor !== undefined && z > staffDoor && z - staffDoor < 1.6 ? 0.42 : 0)
@@ -4946,6 +5116,8 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
           {/* (half as long down the wall as they were (the owner's, 2026-11-11), from the shelf's underside) */}
           {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]} scale-y={0.5}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
+        {/* (the menu's wooden tags on the plaster between the round window and the shrine's shelf (item 293)) */}
+        {altar && tagSpan && <Movable id="menutags" label="菜單木札"><MenuTags z0={tagSpan[0]} z1={tagSpan[1]} /></Movable>}
         {/* (the omiki poured, the motes rising over the shrine: not merged) */}
         {altar && <Movable id="altarfittings" label="供桌上的供品"><group name="look-altar" position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><Altar omiki={altar === true ? undefined : altar} /></group></Movable>}
         </EditBlock>
