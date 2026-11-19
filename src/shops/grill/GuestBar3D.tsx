@@ -53,7 +53,7 @@ import { Omamori } from './Omamori'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
-import { drawStreetView, type Sky } from '@/scene/streetView'
+import { StreetOutside } from './StreetOutside'
 import { activityOf, type Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel, inkTogether } from '@/scene/inkHull'
@@ -891,13 +891,9 @@ const BIG_CHOCHIN: [number, number, number] = [1.8, 0.95, 1.8]
  * by the part of the day: bright by day, amber at dusk, rose at dawn, the night's dark blue (the street's own lanterns are the door's)
  */
 const DOOR_LIGHT = (() => {
-  if (typeof document === 'undefined') return { out: null, spill: null }
+  if (typeof document === 'undefined') return { spill: null }
   const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
-  // (the street itself out there (item 360, the owner's 「這個角度要看的到外面」: it was a plain pale wash, white past the noren): scene/
-  // streetView's, painted again as the part of the day turns (doorLight))
-  const o = document.createElement('canvas')
-  o.width = 512; o.height = 1024
-  drawStreetView(o.getContext('2d')!, 512, 1024, 'day')
+  // (the street itself out there is StreetOutside's now, with depth (item 386); it was a picture on a card here (item 360))
   const s = document.createElement('canvas')
   s.width = 64; s.height = 128
   const h = s.getContext('2d')!
@@ -909,9 +905,8 @@ const DOOR_LIGHT = (() => {
     row.addColorStop(1, 'rgba(255,255,255,0)')
     h.fillStyle = row; h.fillRect(0, y, 64, 1)
   }
-  return { out: tex(o), spill: tex(s) }
+  return { spill: tex(s) }
 })()
-const DOOR_OUT = new THREE.MeshBasicMaterial({ map: DOOR_LIGHT.out, toneMapped: false })
 const DOOR_SPILL = new THREE.MeshBasicMaterial({ map: DOOR_LIGHT.spill, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
 /** the street's light and the spill on the stones, by the part of the day (the page's data-sky): colour, and the spill's strength */
 const DOOR_LOOKS: Record<string, [string, string, number]> = {
@@ -922,11 +917,7 @@ function doorLight() {
   const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
   if (s === doorSky) return
   doorSky = s
-  const [c, sc, so] = DOOR_LOOKS[s] ?? DOOR_LOOKS.day
-  // (the street painted for this part of the day: its own colours, the lights coming on by dusk (item 360))
-  const cv = DOOR_LIGHT.out?.image as HTMLCanvasElement | undefined
-  if (cv && DOOR_LIGHT.out) { drawStreetView(cv.getContext('2d')!, cv.width, cv.height, (['dawn', 'day', 'dusk', 'night'].includes(s) ? s : 'day') as Sky); DOOR_LIGHT.out.needsUpdate = true }
-  DOOR_OUT.color.set(c)
+  const [, sc, so] = DOOR_LOOKS[s] ?? DOOR_LOOKS.day
   DOOR_SPILL.color.set(sc)
   DOOR_SPILL.opacity = so
 }
@@ -937,6 +928,9 @@ function doorLight() {
 // (drawn again only if the door's place or the shop's mark changes: the bar above it redraws several times a second while the shop's open, and
 // the way in is a dozen pieces, each in edit mode's wrapper)
 export const Entrance = memo(EntranceImpl, (a, b) => a.mark === b.mark && a.at.equals(b.at))
+/** the doorway's opening in the wall (its frame: x across from the noren's middle line, y up), the street seen only through it (item 386):
+ * the noren's width (1.05, its middle 0.12 toward the till) and a hair, from under the sill to the head */
+const STREET_HOLE = { x0: -0.12 - 0.545, x1: -0.12 + 0.545, y0: -0.4, y1: 2.2 }
 function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const lantern = mark === '聞野' ? '燒' : mark
   // (the grill's noren reads 烤魚, the shop's trade, with a fish on it; the other shops' name their own)
@@ -1036,7 +1030,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </Movable>
       <group position-x={DX}>
       {/* (the street's light out through the doorway, facing in only; and the day spilling in on the genkan's stones (item 306)) */}
-      <mesh position={[0, H / 2 - 0.1, NZ + 0.2]} rotation-y={Math.PI} material={DOOR_OUT} renderOrder={-2} raycast={NO_RAY}><planeGeometry args={[W + 0.24, H + 0.3]} /></mesh>
+      {/* (the street out there, with depth (item 386): it was a picture on a card here, 20 cm past the door) */}
+      <StreetOutside floor={-GENKAN.depth} hole={STREET_HOLE} />
       <mesh position={[0, -GENKAN.depth + 0.012, NZ - 0.6]} rotation-x={-Math.PI / 2} material={DOOR_SPILL} renderOrder={2} raycast={NO_RAY}><planeGeometry args={[W * 0.95, 1.2]} /></mesh>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
