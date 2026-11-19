@@ -18,7 +18,7 @@ import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts }
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { toChineseNumber } from '@/data/menu'
-import { paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
+import { MARKER_WALL, paintMarkerSigns, paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -1575,6 +1575,13 @@ const SIGN_BOARDS = (end: number): WallBoard[] => [
 let SIGNS_ZH = true
 const SIGNS_TEX = signTexture(WALL_SIGNS.size[0] * SIGNS_PX, WALL_SIGNS.size[1] * SIGNS_PX, (g) => paintWallSigns(g, SIGNS_ZH))
 const SIGNS_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: SIGNS_TEX })
+/** (item 384, the owner's 「牆壁可以有一些用簽字筆的簽名」) the guests' signatures in marker on the plaster round the boards (wallPhotos'
+ * paintMarkerSigns): a sheet 1.5 mm off the wall, under the boards (theirs 4 mm off), lit as the wall is, its bare places see-through and
+ * drawn over the wall's face (no two faces fighting for it) */
+const MARKER_TEX = signTexture(Math.round((MARKER_WALL.z1 - MARKER_WALL.z0) * MARKER_WALL.px), Math.round((MARKER_WALL.y1 - MARKER_WALL.y0) * MARKER_WALL.px),
+  (g, w, h) => paintMarkerSigns(g, w, h))
+const MARKER_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: MARKER_TEX, transparent: true, depthWrite: false, polygonOffset: true,
+  polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
 function signsGeometry(boards: WallBoard[]) {
   const [W, H] = WALL_SIGNS.size
   const pos: number[] = [], uv: number[] = [], idx: number[] = []
@@ -1611,6 +1618,13 @@ function WallSigns({ end }: { end: number }) {
     g.add(m)
     const ink = inkTogether([m], { width: 0.0012, weld: true })
     if (ink) g.add(ink)
+    // (the marker signatures on the plaster round them, facing into the room (-x), the picture's left toward the wall's far end)
+    const { z0, z1, y0, y1 } = MARKER_WALL
+    const mk = new THREE.Mesh(new THREE.PlaneGeometry(z1 - z0, y1 - y0).rotateY(-Math.PI / 2), MARKER_MAT)
+    mk.position.set(-0.0015, (y0 + y1) / 2, end + (z0 + z1) / 2)
+    mk.receiveShadow = true
+    mk.name = 'wall-marker-signs'
+    g.add(mk)
     return g
   }, [end])
   useEffect(() => () => { obj.traverse((o) => (o as THREE.Mesh).geometry?.dispose()) }, [obj])

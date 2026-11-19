@@ -532,3 +532,147 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     g.fillText(zh ? '開店紀念 2024' : '開店記念 2024', fr.x + 6, fr.y + 16)
   })
 }
+
+/**
+ * The guests' signatures in marker straight on the plaster round the signed boards, as the regulars and the visitors leave them on an
+ * eatery's wall (item 384, the owner's, 2026-11-20: 「牆壁可以有一些用簽字筆的簽名」): a name scrawled big with its flourish, a date, a line
+ * of thanks, a fish or a face or a heart drawn by it; black, blue, red and green, each a little askew, in the wall's bare places between the
+ * boards (clear of the cards, the cork board, the photographs and the light switches). All made up. A sheet the size of MARKER_WALL laid on
+ * the plaster just under the boards; transparent where nothing's written.
+ */
+export const MARKER_WALL = {
+  /** its span along the wall from the wall's end (z0..z1, metres) and up it (y0..y1), and its pixels a metre */
+  z0: -1.4, z1: -0.28, y0: 1.05, y1: 2.0, px: 1000,
+}
+const HAND = '"LXGW WenKai TC", "Segoe Print", "Comic Sans MS", cursive'
+const PENS = { black: '#1c1c22', blue: '#1f3c9e', red: '#c3282d', green: '#1d6a3c' }
+/** (a marker's ink: a soft bleed into the plaster round its strokes) */
+function ink(g: CanvasRenderingContext2D, col: string, draw: () => void) {
+  g.save()
+  g.shadowColor = col
+  g.shadowBlur = 2.2
+  g.fillStyle = col; g.strokeStyle = col
+  g.lineCap = 'round'; g.lineJoin = 'round'
+  draw()
+  g.restore()
+}
+/** a line written by hand: each character its own a little up or down, turned a little, a little bigger or smaller, the line on a slant */
+function said(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, col: string, rot = 0, weight = 700) {
+  let r = 7 + text.length * 131 + Math.round(x)
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  ink(g, col, () => {
+    g.translate(x, y); g.rotate(rot)
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic'
+    let at = 0
+    for (const ch of text) {
+      const k = 0.9 + rnd() * 0.22
+      g.font = `${weight} ${Math.round(size * k)}px ${HAND}`
+      g.save()
+      g.translate(at, (rnd() - 0.5) * size * 0.12)
+      g.rotate((rnd() - 0.5) * 0.16)
+      g.fillText(ch, 0, 0)
+      g.restore()
+      at += g.measureText(ch).width * (0.94 + rnd() * 0.08)
+    }
+  })
+}
+/** a signature scrawled as a hand runs one off: a big initial, a tall loop up and back down through itself; then the rest of the name in a
+ * run of small strokes, each its own height and width, a tall one or two among them (an l, a k); a stroke crossing it and a dot; its tail
+ * swept out and back under the whole of it. Leaning a little forward */
+function scrawl(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string, seed: number, lw = 4) {
+  let r = seed
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  const base = y + h * 0.78
+  ink(g, col, () => {
+    g.lineWidth = lw
+    g.translate(x, 0)
+    g.transform(1, 0, -0.18, 1, 0.18 * base, 0)
+    g.translate(-x, 0)
+    g.beginPath()
+    // (the initial: up from under the line, a big loop over, down through its own stem)
+    g.moveTo(x + w * 0.02, base + h * 0.1)
+    g.bezierCurveTo(x + w * 0.02, y - h * 0.1, x + w * 0.2, y - h * 0.05, x + w * 0.12, base - h * 0.35)
+    g.bezierCurveTo(x + w * 0.06, base - h * 0.1, x + w * 0.0, base, x + w * 0.1, base)
+    // (the rest: a run of strokes, each its own height and width)
+    let px = x + w * 0.1
+    const end = x + w * 0.82
+    while (px < end) {
+      const tall = rnd() < 0.2, step = w * (0.04 + rnd() * 0.06), up = tall ? h * (0.75 + rnd() * 0.2) : h * (0.18 + rnd() * 0.32)
+      const nx = Math.min(end, px + step)
+      g.bezierCurveTo(px + step * 0.15, base - up, nx - step * (tall ? 0.6 : 0.1), base - up * 1.05, nx - step * 0.25, base - h * 0.02)
+      g.quadraticCurveTo(nx - step * 0.1, base + h * 0.05, nx, base - h * 0.04)
+      px = nx
+    }
+    // (the tail: out past the last stroke and swept back under the whole name)
+    g.bezierCurveTo(px + w * 0.12, base - h * 0.3, px + w * 0.2, base + h * 0.25, px - w * 0.15, base + h * 0.3)
+    g.quadraticCurveTo(x + w * 0.4, base + h * 0.42, x - w * 0.04, base + h * 0.18)
+    g.stroke()
+    // (a stroke across it, and a dot)
+    g.beginPath()
+    const cx = x + w * (0.35 + rnd() * 0.25)
+    g.moveTo(cx - w * 0.08, base - h * (0.5 + rnd() * 0.15)); g.lineTo(cx + w * 0.1, base - h * (0.55 + rnd() * 0.1))
+    g.stroke()
+    g.beginPath(); g.arc(x + w * (0.6 + rnd() * 0.2), base - h * 0.75, lw * 0.8, 0, Math.PI * 2); g.fill()
+  })
+}
+function fish(g: CanvasRenderingContext2D, x: number, y: number, s: number, col: string, lw = 3) {
+  ink(g, col, () => {
+    g.lineWidth = lw
+    g.beginPath(); g.ellipse(x, y, s, s * 0.45, 0, 0, Math.PI * 2); g.stroke()
+    g.beginPath(); g.moveTo(x + s * 0.95, y); g.lineTo(x + s * 1.5, y - s * 0.4); g.lineTo(x + s * 1.5, y + s * 0.4); g.closePath(); g.stroke()
+    g.beginPath(); g.arc(x - s * 0.55, y - s * 0.08, s * 0.08, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.moveTo(x - s * 0.2, y - s * 0.35); g.quadraticCurveTo(x - s * 0.05, y, x - s * 0.2, y + s * 0.35); g.stroke()
+  })
+}
+function face(g: CanvasRenderingContext2D, x: number, y: number, s: number, col: string, lw = 3) {
+  ink(g, col, () => {
+    g.lineWidth = lw
+    g.beginPath(); g.arc(x, y, s, 0, Math.PI * 2); g.stroke()
+    g.beginPath(); g.arc(x - s * 0.35, y - s * 0.2, s * 0.1, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.arc(x + s * 0.35, y - s * 0.2, s * 0.1, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.arc(x, y + s * 0.05, s * 0.55, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke()
+  })
+}
+function heart(g: CanvasRenderingContext2D, x: number, y: number, s: number, col: string, lw = 3) {
+  ink(g, col, () => {
+    g.lineWidth = lw
+    g.beginPath()
+    g.moveTo(x, y + s * 0.9)
+    g.bezierCurveTo(x - s * 1.4, y - s * 0.1, x - s * 0.6, y - s * 1.0, x, y - s * 0.35)
+    g.bezierCurveTo(x + s * 0.6, y - s * 1.0, x + s * 1.4, y - s * 0.1, x, y + s * 0.9)
+    g.stroke()
+  })
+}
+export function paintMarkerSigns(g: CanvasRenderingContext2D, w: number, h: number) {
+  g.clearRect(0, 0, w, h)
+  const { z0, y1, px } = MARKER_WALL
+  // (a place on the wall: along it from its end, up it)
+  const X = (z: number) => (z - z0) * px, Y = (y: number) => (y1 - y) * px
+  // (over the photographs: a big black name, its date and a fish)
+  scrawl(g, X(-0.79), Y(1.92), 170, 60, PENS.black, 11, 5)
+  said(g, '2026.10.05', X(-0.77), Y(1.76), 22, PENS.black, -0.05, 400)
+  said(g, '炭火香到不行！', X(-0.79), Y(1.71), 26, PENS.black, -0.04)
+  fish(g, X(-0.6), Y(1.75), 26, PENS.black)
+  // (beside it, blue, in Japanese: a name, a line, a face)
+  said(g, 'さくら', X(-0.5), Y(1.86), 44, PENS.blue, 0.06)
+  said(g, 'また来ます！', X(-0.51), Y(1.79), 28, PENS.blue, 0.05)
+  scrawl(g, X(-0.5), Y(1.74), 120, 34, PENS.blue, 29, 3)
+  face(g, X(-0.34), Y(1.69), 20, PENS.blue)
+  // (under the photographs: red, a regular's, a heart by it)
+  said(g, '阿翔', X(-0.84), Y(1.27), 48, PENS.red, -0.08)
+  said(g, '鹽烤鯖魚讚！', X(-0.84), Y(1.2), 26, PENS.red, -0.06)
+  heart(g, X(-0.64), Y(1.25), 18, PENS.red)
+  // (and black, two names together and their day)
+  scrawl(g, X(-0.55), Y(1.31), 150, 48, PENS.black, 47, 4)
+  said(g, 'Ken & Yui', X(-0.54), Y(1.19), 30, PENS.black, 0.04)
+  said(g, '2026.11.08', X(-0.53), Y(1.14), 20, PENS.black, 0.04, 400)
+  // (over the cards, green, a class's reunion and its names round it)
+  said(g, '大學同學會 2026.11', X(-1.3), Y(1.92), 30, PENS.green, -0.02)
+  for (const [k, nx] of [[61, -1.3], [73, -1.18], [89, -1.06], [97, -0.96]] as const) scrawl(g, X(nx), Y(1.9), 70, 22, PENS.green, k, 2.5)
+  // (between the cards and the cork board: blue, a little line and a fish)
+  said(g, '老闆加油！', X(-1.28), Y(1.58), 24, PENS.blue, 0.03)
+  fish(g, X(-1.06), Y(1.6), 16, PENS.blue, 2.5)
+  // (under the cork board, clear of the switches: black, a traveller's)
+  scrawl(g, X(-1.16), Y(1.2), 140, 44, PENS.black, 83, 4)
+  said(g, 'From Osaka', X(-1.15), Y(1.1), 24, PENS.black, -0.03)
+}
