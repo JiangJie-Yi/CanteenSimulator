@@ -92,6 +92,80 @@ def box(name, x0, x1, y0, y1, z0, z1, mat):
     return o
 
 
+def rounded_loop(x0, x1, y0, y1, r, seg, corners=(True, True, True, True)):
+    """a rectangle's outline in the game's x-y, counter-clockwise from its lower left, the chosen corners (lower left, lower right, upper
+    right, upper left) rounded r in seg steps"""
+    pts = []
+    cs = [((x0, y0), (x0 + r, y0 + r), math.pi), ((x1, y0), (x1 - r, y0 + r), 1.5 * math.pi), ((x1, y1), (x1 - r, y1 - r), 0.0),
+          ((x0, y1), (x0 + r, y1 - r), 0.5 * math.pi)]
+    for on, (corner, c, a0) in zip(corners, cs):
+        if on and r > 1e-6:
+            for i in range(seg + 1):
+                a = a0 + 0.5 * math.pi * i / seg
+                pts.append((c[0] + r * math.cos(a), c[1] + r * math.sin(a)))
+        else:
+            pts.append(corner)
+    return pts
+
+
+def slab(name, loops, z0, z1, mat, bev, segs=2):
+    """(item 379, docs/MODELING.md's 造型感) a flat shape stood up in the game's x-y, its outline `loops` (the first its outside, any more
+    holes through it), from z0 to z1 (the game's z, out toward the door), its edges round its faces front and back rounded `bev` in `segs`
+    steps, its normals hardened (the faces flat, the rounds smooth); the round's corners as the outline's own (its steps under 30 degrees
+    are left as they are). Through a filled curve (holes and all), made a mesh"""
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "2D"
+    cu.fill_mode = "BOTH"
+    cu.extrude = (z1 - z0) / 2
+    for loop in loops:
+        sp = cu.splines.new("POLY")
+        sp.points.add(len(loop) - 1)
+        for pt, (x, y) in zip(sp.points, loop):
+            pt.co = (x, y, 0.0, 1.0)
+        sp.use_cyclic_u = True
+    o = bpy.data.objects.new(name, cu)
+    bpy.context.collection.objects.link(o)
+    # (its own x-y the game's x-y, its own z the game's z: P's turn, a quarter about x)
+    o.location = P(0, 0, (z0 + z1) / 2)
+    o.rotation_euler = (math.pi / 2, 0, 0)
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.convert(target="MESH")
+    o = active()
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    for pg in o.data.polygons:
+        pg.use_smooth = True
+    m = o.modifiers.new("b", "BEVEL")
+    m.width, m.segments, m.limit_method, m.angle_limit, m.harden_normals = bev, segs, "ANGLE", math.radians(40), True
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    o.name = name
+    o.data.materials.clear()
+    o.data.materials.append(M[mat])
+    parts.append(o)
+    return o
+
+
+def rod(name, a, b, r, mat, segs=12, round_ends=True):
+    """a round bar from a to b (the game's frame), `segs` round, its ends rounded over (a third of its radius), its normals hardened"""
+    a, b = P(*a), P(*b)
+    d = b - a
+    bpy.ops.mesh.primitive_cylinder_add(vertices=segs, radius=r, depth=d.length, location=(a + b) / 2)
+    o = active()
+    o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+    for pg in o.data.polygons:
+        pg.use_smooth = True
+    if round_ends:
+        m = o.modifiers.new("b", "BEVEL")
+        m.width, m.segments, m.limit_method, m.angle_limit, m.harden_normals = r * 0.45, 2, "ANGLE", math.radians(60), True
+        bpy.ops.object.modifier_apply(modifier=m.name)
+    o.name = name
+    o.data.materials.append(M[mat])
+    parts.append(o)
+    return o
+
+
 def quad(name, corners, mat, uv=((0, 0), (1, 0), (1, 1), (0, 1))):
     """one four-cornered face, corners in the game's frame, counter-clockwise seen from its front"""
     me = bpy.data.meshes.new(name)
@@ -124,11 +198,17 @@ def join(objs, name):
 x0, x1 = -W / 2, W / 2
 zb, zf = -D / 2, D / 2
 open_y0, open_y1 = PLINTH, H - HEAD
+# (item 379, docs/MODELING.md's 造型感: the sides and the top one piece, an upside-down U from the front, its top corners rounded off (SHELL_R)
+# and every edge of it front and back rounded over (SHELL_ROUND), as a cartoon's fridge is; it was three boxes, every edge sharp. The back
+# under its top now, inside the round)
+SHELL_R, SHELL_ROUND = 0.07, 0.014
+shell_out = rounded_loop(x0, x1, 0.0, H, SHELL_R, 6, (False, False, True, True))
+# (the outline from its outer foot on the left in along the foot, up the inside, across under the top, down the inside, out along the right
+# foot, up round the top and back down: counter-clockwise)
+shell_in = [(x0 + T, 0.0), (x0 + T, H - T), (x1 - T, H - T), (x1 - T, 0.0)]
 body = [
-    box("side-l", x0, x0 + T, 0, H, zb, zf, "shell"),
-    box("side-r", x1 - T, x1, 0, H, zb, zf, "shell"),
-    box("back", x0 + T, x1 - T, 0, H, zb, zb + T, "shell"),
-    box("top", x0 + T, x1 - T, H - T, H, zb + T, zf, "shell"),
+    slab("shell", [[shell_out[0]] + shell_in + shell_out[1:]], zb, zf, "shell", SHELL_ROUND),
+    box("back", x0 + T, x1 - T, 0, H - T, zb, zb + T, "shell"),
     box("head", x0 + T, x1 - T, open_y1, H - T, zf - 0.06, zf, "shell"),
     # (under the floor, not up into it: its top and its front lay in the floor's planes and fought them)
     box("plinth", x0 + T, x1 - T, 0.0, PLINTH - 0.02, zf - 0.08, zf - 0.02, "louver"),
@@ -200,21 +280,23 @@ fridge_shelves = join(shelves, "FridgeShelves")
 dz0, dz1 = zf - 0.005, zf + 0.025
 fx0, fx1, fy0, fy1 = x0 + 0.008, x1 - 0.008, open_y0 - 0.01, open_y1 + 0.006
 fw = 0.04
+DOOR_R, DOOR_ROUND = 0.035, 0.008
 doors = []
 for side, (ax, bx) in (("L", (fx0, -0.002)), ("R", (0.002, fx1))):
     inner = bx if side == "L" else ax
     # (the handle on the inner stile's face: a bar on two posts; the stile by the middle a little wider, the mullion)
     hx0, hx1 = (inner - fw * 0.75, inner - fw * 0.35) if side == "L" else (inner + fw * 0.35, inner + fw * 0.75)
+    # (item 379: each door's frame one piece round its pane, its corners rounded (DOOR_R, the pane's opening a little), its edges front and
+    # back rounded over; the handle a round bar on two round posts, its ends rounded. They were four boxes and a square bar, every edge sharp)
+    hx = (hx0 + hx1) / 2
     parts_ = [
-        box(f"dframe-t{side}", ax, bx, fy1 - fw, fy1, dz0, dz1, "shell"),
-        box(f"dframe-b{side}", ax, bx, fy0, fy0 + fw * 1.4, dz0, dz1, "shell"),
-        box(f"dframe-l{side}", ax, ax + fw, fy0, fy1, dz0, dz1, "shell"),
-        box(f"dframe-r{side}", bx - fw, bx, fy0, fy1, dz0, dz1, "shell"),
+        slab(f"dframe{side}", [rounded_loop(ax, bx, fy0, fy1, DOOR_R, 4),
+                               rounded_loop(ax + fw, bx - fw, fy0 + fw * 1.4, fy1 - fw, 0.012, 2)], dz0, dz1, "shell", DOOR_ROUND),
         quad(f"pane{side}", [(ax + fw, fy0 + fw * 1.4, (dz0 + dz1) / 2), (bx - fw, fy0 + fw * 1.4, (dz0 + dz1) / 2),
                              (bx - fw, fy1 - fw, (dz0 + dz1) / 2), (ax + fw, fy1 - fw, (dz0 + dz1) / 2)], "glass"),
-        box(f"handle{side}", hx0, hx1, 0.75, 1.55, dz1 + 0.03, dz1 + 0.046, "metal"),
-        box(f"post-t{side}", hx0 + 0.003, hx1 - 0.003, 1.5, 1.53, dz1, dz1 + 0.031, "metal"),
-        box(f"post-b{side}", hx0 + 0.003, hx1 - 0.003, 0.77, 0.8, dz1, dz1 + 0.031, "metal"),
+        rod(f"handle{side}", (hx, 0.75, dz1 + 0.038), (hx, 1.55, dz1 + 0.038), 0.011, "metal"),
+        rod(f"post-t{side}", (hx, 1.515, dz1 - 0.004), (hx, 1.515, dz1 + 0.036), 0.0065, "metal", segs=8, round_ends=False),
+        rod(f"post-b{side}", (hx, 0.785, dz1 - 0.004), (hx, 0.785, dz1 + 0.036), 0.0065, "metal", segs=8, round_ends=False),
     ]
     doors.append(join(parts_, f"FridgeDoor{side}"))
 

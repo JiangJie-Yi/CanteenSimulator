@@ -81,9 +81,10 @@ M.update({
 parts = []
 
 
-def beam(name, x, y, z, mat, fit=False, bev=0.003):
+def beam(name, x, y, z, mat, fit=False, bev=0.003, segs=1):
     """a box over x[0]..x[1], y[0]..y[1], z[0]..z[1] (the game's frame), its UVs on each face from that face's own axes, the box's longest
-    axis along v (the grain along the member); `fit`: the picture laid once over each face"""
+    axis along v (the grain along the member); `fit`: the picture laid once over each face. `segs` over 1: its edges rounded over in that
+    many steps, its normals hardened (the faces flat, the rounds smooth: item 379's 造型感); 1, a chamfer, shaded flat"""
     lo, hi = (x[0], y[0], z[0]), (x[1], y[1], z[1])
     size = [hi[i] - lo[i] for i in range(3)]
     long_ax = max(range(3), key=lambda i: size[i])
@@ -115,14 +116,23 @@ def beam(name, x, y, z, mat, fit=False, bev=0.003):
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
     o.data.materials.append(mat)
-    if bev:
-        m = o.modifiers.new("b", "BEVEL"); m.width = min(bev, min(size) * 0.25); m.segments = 1
+    if bev and segs > 1:
+        for f in o.data.polygons:
+            f.use_smooth = True
+        m = o.modifiers.new("b", "BEVEL"); m.width = min(bev, min(size) * 0.45); m.segments = segs; m.harden_normals = True
         bpy.context.view_layer.objects.active = o
         o.select_set(True)
         bpy.ops.object.modifier_apply(modifier="b")
         o.select_set(False)
-    for f in o.data.polygons:
-        f.use_smooth = False
+    else:
+        if bev:
+            m = o.modifiers.new("b", "BEVEL"); m.width = min(bev, min(size) * 0.25); m.segments = 1
+            bpy.context.view_layer.objects.active = o
+            o.select_set(True)
+            bpy.ops.object.modifier_apply(modifier="b")
+            o.select_set(False)
+        for f in o.data.polygons:
+            f.use_smooth = False
     parts.append(o)
     return o
 
@@ -133,30 +143,31 @@ T = 0.025                         # (the boards' thickness)
 PL = 0.07                         # (the plinth's height)
 TOP = 0.035                       # (the top board's)
 # (the carcass: its sides, the bottom over the plinth, the back, a divider down the middle; the plinth set back; the top board over all,
-# standing a little proud at the front and the sides)
+# standing a little proud at the front and the sides. Item 379, docs/MODELING.md's 造型感: the top's edges rounded right over (1.4 cm), the
+# sides', the drawers', the doors' frames' and the pulls' rounded too; they were chamfered 3 to 6 mm and shaded flat)
 for sd in (-1, 1):
-    beam(f"CabSide{sd}", (x0, x0 + T) if sd < 0 else (x1 - T, x1), (0, CH - TOP), (zb, zf - 0.005), M["carcass"])
+    beam(f"CabSide{sd}", (x0, x0 + T) if sd < 0 else (x1 - T, x1), (0, CH - TOP), (zb, zf - 0.005), M["carcass"], bev=0.008, segs=2)
 beam("CabBottom", (x0 + T, x1 - T), (PL, PL + T), (zb, zf - 0.01), M["carcass"])
 beam("CabBack", (x0 + T, x1 - T), (PL, CH - TOP), (zb, zb + 0.012), M["dark"], bev=0)
 beam("CabPlinth", (x0 + T, x1 - T), (0, PL), (zf - 0.06, zf - 0.04), M["dark"])
-beam("CabTop", (x0 - 0.015, x1 + 0.015), (CH - TOP, CH), (zb, zf + 0.02), M["carcass"], bev=0.006)
+beam("CabTop", (x0 - 0.015, x1 + 0.015), (CH - TOP, CH), (zb, zf + 0.02), M["carcass"], bev=0.014, segs=3)
 # (the drawers: two across under the top, each a front of the darker wood with a small brass pull; a rail under them)
 DR = 0.13
 y_dr0, y_dr1 = CH - TOP - DR, CH - TOP
 beam("CabRail", (x0 + T, x1 - T), (y_dr0 - 0.022, y_dr0), (zf - 0.03, zf - 0.005), M["carcass"])
 for k, (a, b) in enumerate(((x0 + T + 0.004, -0.004), (0.004, x1 - T - 0.004))):
-    beam(f"CabDrawer{k}", (a, b), (y_dr0 + 0.006, y_dr1 - 0.006), (zf - 0.028, zf - 0.006), M["dark"])
+    beam(f"CabDrawer{k}", (a, b), (y_dr0 + 0.006, y_dr1 - 0.006), (zf - 0.028, zf - 0.006), M["dark"], bev=0.006, segs=2)
     beam(f"CabDrawerPull{k}", ((a + b) / 2 - 0.05, (a + b) / 2 + 0.05), ((y_dr0 + y_dr1) / 2 - 0.009, (y_dr0 + y_dr1) / 2 + 0.009), (zf - 0.006, zf + 0.008),
-         M["brass"], bev=0.002)
+         M["brass"], bev=0.004, segs=2)
 # (the sliding doors under them, in two tracks: the left in front, the right behind it, overlapping a little in the middle; each a frame of
 # the darker wood round a figured panel, its pull sunk by its meeting edge)
 y_d0, y_d1 = PL + T + 0.006, y_dr0 - 0.028
 for k, (a, b, z) in enumerate(((x0 + T + 0.003, 0.03, zf - 0.008), (-0.03, x1 - T - 0.003, zf - 0.032))):
     st = 0.055
-    beam(f"CabDoorStileA{k}", (a, a + st), (y_d0, y_d1), (z - 0.02, z), M["dark"])
-    beam(f"CabDoorStileB{k}", (b - st, b), (y_d0, y_d1), (z - 0.02, z), M["dark"])
-    beam(f"CabDoorRailT{k}", (a + st, b - st), (y_d1 - st, y_d1), (z - 0.02, z), M["dark"])
-    beam(f"CabDoorRailB{k}", (a + st, b - st), (y_d0, y_d0 + st), (z - 0.02, z), M["dark"])
+    beam(f"CabDoorStileA{k}", (a, a + st), (y_d0, y_d1), (z - 0.02, z), M["dark"], bev=0.005, segs=2)
+    beam(f"CabDoorStileB{k}", (b - st, b), (y_d0, y_d1), (z - 0.02, z), M["dark"], bev=0.005, segs=2)
+    beam(f"CabDoorRailT{k}", (a + st, b - st), (y_d1 - st, y_d1), (z - 0.02, z), M["dark"], bev=0.005, segs=2)
+    beam(f"CabDoorRailB{k}", (a + st, b - st), (y_d0, y_d0 + st), (z - 0.02, z), M["dark"], bev=0.005, segs=2)
     beam(f"CabDoorPanel{k}", (a + st - 0.004, b - st + 0.004), (y_d0 + st - 0.004, y_d1 - st + 0.004), (z - 0.014, z - 0.006), M["panel"], fit=True, bev=0)
     # (the pull, by the edge the other door meets: a black oval in a brass rim, sunk in the stile)
     px = (b - st / 2) if k == 0 else (a + st / 2)
