@@ -3,7 +3,7 @@
 // 2. A sweep: views 1 to 9 and 0 (the owner) in turn, HOLD ms on each (default 1000, after the 0.9 s flight), the room's lights off and on
 //    again, developer mode in and out (the character viewer with it); every frame's time recorded: average fps, the 1% low, the worst frame,
 //    and the heap before and after (it shouldn't keep growing).
-// Writes a Markdown table (OUT=<file>, default bench.md) and the numbers as JSON beside it; BEFORE=<an earlier run's .json> puts that run in a
+// WAIT=<ms>: how long after loading before measuring (default 6000). Writes a Markdown table (OUT=<file>, default bench.md) and the numbers as JSON beside it; BEFORE=<an earlier run's .json> puts that run in a
 // column of its own, with the change. BASE=<url> (default the dev server; `npx vite preview` at http://localhost:4173/GrilledFishBusiness/
 // measures the build, without the dev-only hooks: the lights and the counts the page gives (__gl) are then skipped where they're missing).
 import { chromium } from 'playwright-core'
@@ -17,7 +17,9 @@ const page = await (await browser.newContext({ viewport: { width: 1920, height: 
 const cdp = await page.context().newCDPSession(page)
 await page.goto(BASE + (BASE.includes('?') ? '&' : '?') + 'pace=0', { timeout: 120000 })
 await page.waitForFunction(() => window.__scene && !document.querySelector('.loading-screen'), null, { timeout: 180000 }).catch(() => {})
-await page.waitForTimeout(6000)
+// (WAIT ms more before measuring (default 6000): the room's merge (?world=1, scene/WorldBatch) is made some twenty seconds in and added to as
+// the room fills)
+await page.waitForTimeout(Number(process.env.WAIT ?? 6000))
 
 const heap = async () => {
   await cdp.send('HeapProfiler.collectGarbage')

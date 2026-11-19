@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { replaces } from './hot'
-import { lift } from './worldMerge'
+import { lift, mergedAway, mergeState } from './worldMerge'
 import { tapSound } from './tapSound'
 
 /**
@@ -47,7 +47,7 @@ export function glowOn(root: THREE.Object3D | null | undefined) {
     const m = o as THREE.Mesh
     if (!m.isMesh || !m.material || WAS.has(m)) return
     // (drawn as part of the room's merge (item 367): taken out of it while it's lit, drawn by itself in its glowing copy)
-    if (m.userData.worldHidden) lift(m, true)
+    if (mergedAway(m)) lift(m, true)
     // (the ink outlines, drawn inside out, stay as they were)
     const mats = ([] as THREE.Material[]).concat(m.material)
     if (mats.every((x) => x.side === THREE.BackSide)) return
@@ -68,7 +68,7 @@ export function glowOff(root: THREE.Object3D | null | undefined) {
     m.material = was
     WAS.delete(m)
     // (back into the room's merge, if it was taken out of it to be lit)
-    if (m.userData.worldHidden) lift(m, false)
+    if (mergeState(m)) lift(m, false)
   })
 }
 

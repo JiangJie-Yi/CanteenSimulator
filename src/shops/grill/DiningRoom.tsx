@@ -4480,6 +4480,7 @@ function kamidanaOf(scene: THREE.Group) {
   if (kamidanaParts) return kamidanaParts
   const r = scene.clone(true)
   const mats = new Map<THREE.Material, THREE.Material>()
+  const lineMats = new Map<THREE.Material, THREE.Material>()
   r.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh) return
@@ -4514,6 +4515,20 @@ function kamidanaOf(scene: THREE.Group) {
       mats.set(src, t)
     }
     m.material = t
+    // (the lines drawn on the shrine's parts (its KamiJ*Line meshes, lying on their faces): pulled a little toward the eye, so they stay over
+    // the face they're on whichever is drawn first (item 374: they won a tie of depth by being drawn after it, and in the room's merge,
+    // ?world=1, the order isn't kept); a copy of their material where it's the parts' own too)
+    if (/^KamiJ\d+Line/.test(m.name)) {
+      let l = lineMats.get(t)
+      if (!l) {
+        l = t.clone()
+        l.polygonOffset = true
+        l.polygonOffsetFactor = -1
+        l.polygonOffsetUnits = -2
+        lineMats.set(t, l)
+      }
+      m.material = l
+    }
     m.castShadow = true
     m.receiveShadow = true
   })
@@ -5174,7 +5189,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
   return (
     <group position={c.at} rotation-y={yaw}>
       {/* (local x is away from the cook: the wall stands at the floor's far edge, facing back toward the bar) */}
-      <group ref={wall} position-x={-far} name="room-wall" userData={{ from, to, shelf }}>
+      <group ref={wall} position-x={-far} name="room-wall" userData={{ from, to, shelf, hideRoot: true }}>
         {/* (the wall stands in edit mode's way: a press on it doesn't go on through to what's behind it, the toilets', the lanterns
             out at the door (scene/pickable's blocksEdit); the pieces on it are still their own) */}
         <EditBlock>
