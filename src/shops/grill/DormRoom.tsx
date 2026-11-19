@@ -55,6 +55,18 @@ export const DORM_AT = new THREE.Vector3(60, -1.16, -1.69)
 const DORM_SCALE = 2
 /** the stair's well in the room's frame (blender/dorm.py: the board strip's front, 0.84 by 1.45), to be clicked */
 const STAIR = { x: 1.35, z: 0.625, w: 0.8, d: 1.4 }
+/** where the owner's clothes are kept, in the room's frame (blender/dorm.py): the closet's sliding doors (its front at the left wall,
+ * x = -1.8, from z -0.6 to 1.2, 1.8 high) and the chest of drawers in the back left corner (x -1.78 to -1.22, z -1.33 to -0.91, 0.95
+ * high), each a box a little round it; pointed at, named; clicked, his clothes to choose (item 376) */
+const WARDROBE = [
+  { at: [-1.8 + 0.03, 0.92, 0.3], size: [0.06, 1.7, 1.76], zh: '押入（壁櫥）', ja: '押入れ', en: 'Closet' },
+  { at: [-1.5, 0.5, -1.11], size: [0.6, 0.94, 0.48], zh: '衣櫃', ja: '箪笥', en: 'Chest of drawers' },
+] as const
+const wardrobeTip = (w: (typeof WARDROBE)[number]) => {
+  const l = typeof document === 'undefined' ? 'zh' : document.documentElement.lang
+  return l.startsWith('ja') ? { title: w.ja, hint: 'クリック：店主の服を着替える' } : l.startsWith('en') ? { title: w.en, hint: "Click: change the owner's clothes" }
+    : { title: w.zh, hint: '點一下：換老闆的衣服' }
+}
 /** a cook's figure here as big as in the shop (measured there: 1.646 of the world) */
 const FIG_SCALE = 1.646 / DORM_SCALE
 /** the pieces shown or put away by what's going on: the table and its tea, the table folded away, each futon laid */
@@ -318,6 +330,15 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
         onPointerOut={() => { document.body.style.cursor = ''; setTip(null) }}>
         <boxGeometry args={[STAIR.w, 0.16, STAIR.d]} />
       </mesh>
+      {/* (the closet's doors and the chest: pointed at, named; clicked, the owner's clothes to choose (App's panel, as a click on him opens)) */}
+      {WARDROBE.map((w) => (
+        <mesh key={w.en} position={w.at as unknown as THREE.Vector3Tuple} visible={false}
+          onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip(null); window.dispatchEvent(new CustomEvent('jgs-outfit')) }}
+          onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; setTip(wardrobeTip(w)) }}
+          onPointerOut={() => { document.body.style.cursor = ''; setTip(null) }}>
+          <boxGeometry args={w.size as unknown as THREE.Vector3Tuple} />
+        </mesh>
+      ))}
     </group>
   )
 }

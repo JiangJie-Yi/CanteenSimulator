@@ -874,6 +874,8 @@ def _sample(img, u, v):
 _coat = _sample(_ct, _bu, _by_ / 1.64)
 _pant = _sample(_weave_at(PANTS, 256, 256, 0.1), _bu, _by_ / 1.64)
 _body = np.where((_by_ < HEM)[..., None], _pant, _coat)
+# (which part each pixel's of: 1 the coat, 2 the apron, 3 the trousers, 0 the rest (item 376: written out for the game to recolour))
+_kind = np.where(_by_ < HEM, 3, 1).astype(np.uint8)
 # (the coat's hem: a soft shade just over it, where it stood off the trousers)
 _body = _body * np.where(((_by_ >= HEM) & (_by_ < HEM + 0.01))[..., None], 0.84, 1.0)
 if CREW not in ("serverF", "stock"):
@@ -882,6 +884,7 @@ if CREW not in ("serverF", "stock"):
     # (its sides a touch darker, as a cloth's edge turning away)
     _edge = np.clip((AP_A - np.abs(_aw)) / 0.08, 0.75, 1.0)
     _body = np.where(_ain[..., None], _apc * _edge[..., None], _body)
+    _kind = np.where(_ain, 2, _kind)
 
 
 def _seg(x, y, p0, p1):
@@ -894,8 +897,10 @@ def _seg(x, y, p0, p1):
 
 def _band(img, mask_d, w, col):
     """a band of `col` where mask_d < w / 2 (on the front), a darker line along its edges"""
+    global _kind
     inside = _front & (mask_d < w / 2)
     edge = _front & (np.abs(mask_d - w / 2) < 0.004)
+    _kind = np.where(inside | edge, 0, _kind)
     img = np.where(inside[..., None], np.array(col, np.float32), img)
     return np.where(edge[..., None], img * 0.72, img)
 
@@ -911,19 +916,23 @@ if CREW != "serverF":
     # (the apron's cord round the waist, and its bow at his left side with two short tails)
     CORD = (0.91, 0.86, 0.75)
     _cord = np.abs(_by_ - BELT) < 0.009
+    _kind = np.where(_cord, 0, _kind)
     _body = np.where(_cord[..., None], np.array(CORD, np.float32) * (1 - 0.25 * np.abs(_by_ - BELT)[..., None] / 0.009), _body)
     _bs = (_aw - math.radians(60)) * rb(BELT)
     for sd in (-1, 1):
         _lp = np.hypot((_bs - sd * 0.022) / 0.022, (_by_ - BELT - 0.004) / 0.014)
         _body = np.where(((_lp > 0.55) & (_lp < 1.0))[..., None], np.array(CORD, np.float32), _body)
+        _kind = np.where(_lp < 1.15, 0, _kind)
         _body = np.where((np.abs(_lp - 1.0) < 0.12)[..., None], _body * 0.7, _body)
         _tl = _seg(_bs, _by_, (sd * 0.006, BELT), (sd * 0.016, BELT - 0.05)) < 0.004
+        _kind = np.where(_seg(_bs, _by_, (sd * 0.006, BELT), (sd * 0.016, BELT - 0.05)) < 0.006, 0, _kind)
         _body = np.where(_tl[..., None], np.array(CORD, np.float32) * 0.92, _body)
 if not CREW:
     # (his gold fish pin on his chest, painted (it was a lump stuck on him))
     _px, _py = 0.12, 0.33 * BH + 0.06
     _fish = _front & (np.hypot((_bx - _px) / 0.026, (_by_ - _py) / 0.012) < 1)
     _tail = _front & (_bx > _px + 0.02) & (_bx < _px + 0.036) & (np.abs(_by_ - _py) < (_bx - _px - 0.02) * 0.8)
+    _kind = np.where(_fish | _tail | (_front & (np.hypot((_bx - _px) / 0.03, (_by_ - _py) / 0.016) < 1)), 0, _kind)
     _body = np.where((_fish | _tail)[..., None], np.array((0.88, 0.69, 0.25), np.float32) * (1 + 0.25 * ((_by_ - _py) / 0.012)[..., None]).clip(0.7, 1.2), _body)
     _body = np.where((_front & (np.hypot(_bx - _px + 0.014, _by_ - _py - 0.003) < 0.0035))[..., None], np.array((0.12, 0.08, 0.06), np.float32), _body)
 if CREW == "serverF":
@@ -935,6 +944,17 @@ if CREW == "serverF":
     _body = np.where((np.abs(np.abs(_by_ - BELT) - 0.058) < 0.004)[..., None], _body * 0.7, _body)
     _body = np.where((np.abs(_by_ - BELT) < 0.006)[..., None], np.array((0.78, 0.19, 0.16), np.float32), _body)
 M["body"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_body", np.clip(_body, 0, 1).astype(np.float32)), rough=0.8)
+if not CREW:
+    # (the parts' map beside his picture, the same size and way up: red the coat, green the apron, blue the trousers (item 376))
+    _rgm = np.stack([(_kind == 1), (_kind == 2), (_kind == 3), np.ones_like(_kind, bool)], -1).astype(np.float32)
+    _rg = bpy.data.images.new("boss_regions", _TW, _TH, alpha=False)
+    _rg.colorspace_settings.name = "Non-Color"
+    _rg.pixels.foreach_set(_rgm.ravel())
+    _rg.filepath_raw = os.path.join(PROJECT, "public", "textures", "boss_regions.png")
+    _rg.file_format = "PNG"
+    _rg.save()
+    bpy.data.images.remove(_rg)
+    print("BOSS_REGIONS", int((_kind == 1).sum()), int((_kind == 2).sum()), int((_kind == 3).sum()))
 _bm = bmesh.new()
 _uvl = _bm.loops.layers.uv.new()
 _prof = PROFILE[1:]

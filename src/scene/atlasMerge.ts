@@ -10,13 +10,40 @@ import { isDummyMap } from './materialNormalize'
  * rest are left as they are); `make` makes the one material from the atlas. The meshes' geometries are made their own (copies) first.
  * Their UVs must lie within 0..1 (a picture tiled over a mesh can't be packed).
  */
+type Patch = { img: CanvasImageSource; w: number; h: number; x: number; y: number }
+/** a picture into its patch (`p`), and round it a margin of itself as it wraps: drawn three by three, kept to its own patch */
+function drawPatch(g: CanvasRenderingContext2D, p: Patch, img: CanvasImageSource, pad: number) {
+  g.save()
+  g.beginPath()
+  g.rect(p.x - pad, p.y - pad, p.w + 2 * pad, p.h + 2 * pad)
+  g.clip()
+  // (a see-through picture (a face's features, the glasses' frames: scene/faceSheet) kept see-through: the white under it cleared)
+  if ((img as { seeThrough?: boolean }).seeThrough) g.clearRect(p.x - pad, p.y - pad, p.w + 2 * pad, p.h + 2 * pad)
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.drawImage(img, p.x + dx * p.w, p.y + dy * p.h)
+  g.restore()
+}
+/**
+ * A picture of an atlas made by `atlasModel` drawn again (the owner's clothes recoloured, item 376): `was`, the picture it was made with
+ * (its image), its patch drawn over with `now` (the same size), its wrapped margin with it, and the atlas sent to the GPU again. Nothing
+ * else of the figure is made again (its shape, its material, its shader). False when the material isn't an atlas or had no such picture.
+ */
+export function repaintPatch(mat: THREE.Material, was: unknown, now: CanvasImageSource): boolean {
+  const made = mat.userData.atlas as { patches: Map<unknown, Patch>; pad: number; canvas: HTMLCanvasElement } | undefined
+  const p = made?.patches.get(was)
+  const atlas = (mat as THREE.MeshStandardMaterial).map
+  if (!p || !atlas) return false
+  // (into the atlas as it was made, at its full size: what's uploaded may be a smaller copy of it (scene/textureCap), drawn from it again
+  // as the atlas is marked changed)
+  drawPatch(made!.canvas.getContext('2d')!, p, now, made!.pad)
+  atlas.needsUpdate = true
+  return true
+}
 export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolean, make: (atlas: THREE.Texture) => THREE.Material, pad = 16): THREE.Material | null {
   if (typeof document === 'undefined') return null
   const meshes: THREE.Mesh[] = []
   root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !Array.isArray(m.material) && pick(m)) meshes.push(m) })
   if (!meshes.length) return null
-  type Pic = { img: CanvasImageSource; w: number; h: number; x: number; y: number }
-  const pics = new Map<unknown, Pic>()
+  const pics = new Map<unknown, Patch>()
   // (a picture of its own: not the white one scene/materialNormalize gives a material without, which is data, not a picture to draw)
   const picOf = (mt: THREE.MeshStandardMaterial) => (mt.map && !isDummyMap(mt.map) ? mt.map : null)
   for (const m of meshes) {
@@ -49,17 +76,7 @@ export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolea
   // view, never takes in a see-through black corner (the figure's fade is hashed on its alpha, and the plain parts greyed with it))
   g.fillStyle = '#ffffff'
   g.fillRect(0, 0, W, H)
-  for (const p of list) {
-    // (the picture, and round it a margin of itself as it wraps: drawn three by three, kept to its own patch)
-    g.save()
-    g.beginPath()
-    g.rect(p.x - pad, p.y - pad, p.w + 2 * pad, p.h + 2 * pad)
-    g.clip()
-    // (a see-through picture (a face's features, the glasses' frames: scene/faceSheet) kept see-through: the white under it cleared)
-    if ((p.img as { seeThrough?: boolean }).seeThrough) g.clearRect(p.x - pad, p.y - pad, p.w + 2 * pad, p.h + 2 * pad)
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.drawImage(p.img, p.x + dx * p.w, p.y + dy * p.h)
-    g.restore()
-  }
+  for (const p of list) drawPatch(g, p, p.img, pad)
   g.fillStyle = '#ffffff'
   g.fillRect(white.x - WHITE / 2, white.y - WHITE / 2, WHITE, WHITE)
   const atlas = new THREE.CanvasTexture(canvas)
@@ -69,6 +86,8 @@ export function atlasModel(root: THREE.Object3D, pick: (m: THREE.Mesh) => boolea
   const mat = make(atlas)
   // (where the white patch is, for what's added to the figure after (a clipboard, a tray): plain colours, their UVs on it)
   mat.userData.whiteUv = [white.x / W, white.y / H]
+  // (and where each picture went, to be drawn again (repaintPatch))
+  mat.userData.atlas = { patches: pics, pad, canvas }
   for (const m of meshes) {
     const src = m.material as THREE.MeshStandardMaterial
     const pic = picOf(src)

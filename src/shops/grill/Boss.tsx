@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { Html, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { bakeable } from '@/scene/StaticBatch'
-import { atlasModel } from '@/scene/atlasMerge'
+import { OUTFIT_DEFAULT, colourOf, getOutfit, outfitKey, recolourPixels, subscribeOutfit, type Dye, type Outfit } from '@/game/bossOutfit'
+import { OUTFIT_PARTS, type OutfitPart } from '@/data/bossOutfit'
+import { atlasModel, repaintPatch } from '@/scene/atlasMerge'
 import { airbrush, gradientMap } from '@/scene/Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
 import { getEdit } from './edit'
@@ -27,6 +29,8 @@ const skinOf = (r: THREE.Object3D) => {
 }
 /** his name tag's words: his role, and his name when he's been given one */
 const bossName = () => SPEAKERS.get('owner') ?? '老闆'
+/** what a click on him does, in the page's language (item 376) */
+const outfitHint = () => { const l = document.documentElement.lang; return l.startsWith('ja') ? 'クリック：着替える' : l.startsWith('en') ? 'Click: change his clothes' : '點一下：換衣服' }
 import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { turnEase } from './commuteWalk'
@@ -49,6 +53,95 @@ const URL = import.meta.env.BASE_URL + 'models/boss.glb'
 const HEAD = /^Boss(Head|Face|Glass|Nose|Moustache|Ear|Hair|Tenugui|Knot|Sideburn|Comb|Cap|Pencil)/
 const UNINKED = /(Eye|Shine|Brow|Cheek|Moustache|Mouth|Tongue|Print|Collar|Knot|Band|Cord|Nose|Thumb|Glass|Hem|Tongs|Fan|Sideburn|Pencil|Pin|Towel)/
 let made: THREE.Object3D | null = null
+
+// ---- his clothes recoloured (item 376, the owner's 「老闆可客製化服裝」: game/bossOutfit): he's made once; a change of clothes draws his
+// atlas's patches of them again (repaintPatch: his body's one picture, the coat, the apron and the trousers in it (textures/boss_regions.png
+// says which pixel's which, blender/boss.py), his headband's pictures) and colours his towel's vertices, and nothing else of him is made
+// again (his shape, his material, his shader, his bones' picture)
+const REGIONS_URL = import.meta.env.BASE_URL + 'textures/boss_regions.png'
+/** each part's own colour as painted (blender/boss.py's COAT, APRON, PANTS and the tenugui's), the recolouring's measure */
+const PART_BASE: Record<'coat' | 'apron' | 'trousers' | 'headband', [number, number, number]> = {
+  coat: [0.96, 0.94, 0.9], apron: [0.12, 0.16, 0.28], trousers: [0.2, 0.25, 0.4], headband: [0.16, 0.22, 0.42],
+}
+type Pic = CanvasImageSource & { width: number; height: number }
+/** what of him is dressed, found as he's made: his atlas's material, the pictures it was made with (his body's, his headband's), his
+ * towel's vertices in his one shape (their colour as made) */
+const DRESS: { mat: THREE.Material | null; body: Pic | null; bands: Pic[]; towel: { geo: THREE.BufferGeometry; from: number; count: number; was: Float32Array }[]; worn: string } =
+  { mat: null, body: null, bands: [], towel: [], worn: '' }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __dress?: typeof DRESS }).__dress = DRESS
+/** a picture's pixels as made, and a canvas of its size to draw its recolouring in (kept: a click draws in it again) */
+const PIXELS = new Map<unknown, { src: Uint8ClampedArray; c: HTMLCanvasElement; g: CanvasRenderingContext2D; d: ImageData }>()
+function pixelsOf(img: Pic) {
+  let p = PIXELS.get(img)
+  if (!p) {
+    const c = document.createElement('canvas')
+    c.width = img.width
+    c.height = img.height
+    const g = c.getContext('2d', { willReadFrequently: true })!
+    g.drawImage(img, 0, 0)
+    const d = g.getImageData(0, 0, c.width, c.height)
+    p = { src: new Uint8ClampedArray(d.data), c, g, d }
+    PIXELS.set(img, p)
+  }
+  return p
+}
+/** which part each of the body's pixels is (0 none, 1 the coat, 2 the apron, 3 the trousers), from the regions' picture at its size */
+let partsOf: { img: unknown; at: Uint8Array } | null = null
+function regionsAt(regions: Pic, w: number, h: number) {
+  if (partsOf?.img === regions && partsOf.at.length === w * h) return partsOf.at
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const g = c.getContext('2d', { willReadFrequently: true })!
+  g.drawImage(regions, 0, 0, w, h)
+  const m = g.getImageData(0, 0, w, h).data
+  const at = new Uint8Array(w * h)
+  for (let p = 0; p < at.length; p++) at[p] = m[p * 4] > 127 ? 1 : m[p * 4 + 1] > 127 ? 2 : m[p * 4 + 2] > 127 ? 3 : 0
+  partsOf = { img: regions, at }
+  return at
+}
+const dye = (part: keyof typeof PART_BASE, to: [number, number, number] | null) => (to ? { base: PART_BASE[part], target: to } : null)
+/** a picture of him drawn again in its dyes (`partOf` null: all of it by the first) */
+function repaint(img: Pic, partOf: Uint8Array | null, dyes: (Dye | null)[]) {
+  const p = pixelsOf(img)
+  recolourPixels(p.src, p.d.data, partOf, dyes)
+  p.g.putImageData(p.d, 0, 0)
+  repaintPatch(DRESS.mat!, img, p.c)
+}
+/** him dressed as chosen now and as it changes (an effect's: its clean-up stops it) */
+const wearing = (regions: Pic | null) => {
+  const go = () => dressBoss(getOutfit(), regions)
+  go()
+  return subscribeOutfit(go)
+}
+/** him (as made once) in `outfit`: what's changed since he was last dressed drawn again */
+export function dressBoss(outfit: Outfit, regions: Pic | null) {
+  if (!DRESS.mat || typeof document === 'undefined') return
+  const key = outfitKey(outfit) + (regions ? '' : '|plain')
+  if (key === DRESS.worn) return
+  const was = DRESS.worn ? DRESS.worn.split('|') : OUTFIT_PARTS.map((p) => OUTFIT_DEFAULT[p])
+  // (the body's picture left as made while there was no regions' picture to dress it by)
+  const wasPlain = DRESS.worn.endsWith('|plain')
+  const changed = (...ps: OutfitPart[]) => ps.some((p) => outfit[p] !== was[OUTFIT_PARTS.indexOf(p)]) || (!!regions && wasPlain)
+  DRESS.worn = key
+  if (DRESS.body && regions && changed('coat', 'apron', 'trousers')) {
+    repaint(DRESS.body, regionsAt(regions, DRESS.body.width, DRESS.body.height),
+      [dye('coat', colourOf(outfit, 'coat')), dye('apron', colourOf(outfit, 'apron')), dye('trousers', colourOf(outfit, 'trousers'))])
+  }
+  if (changed('headband')) for (const b of DRESS.bands) repaint(b, null, [dye('headband', colourOf(outfit, 'headband'))])
+  if (changed('towel')) {
+    const to = colourOf(outfit, 'towel')
+    const c = to && new THREE.Color().setRGB(to[0], to[1], to[2], THREE.SRGBColorSpace)
+    for (const t of DRESS.towel) {
+      const col = t.geo.attributes.color as THREE.BufferAttribute
+      const a = col.array as Float32Array
+      if (c) for (let i = 0; i < t.count; i++) { a[(t.from + i) * 3] = c.r; a[(t.from + i) * 3 + 1] = c.g; a[(t.from + i) * 3 + 2] = c.b }
+      else a.set(t.was, t.from * 3)
+      col.addUpdateRange(t.from * 3, t.count * 3)
+      col.needsUpdate = true
+    }
+  }
+}
 
 /** where his hands hang at rest (as modelled, the node's own frame) */
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
@@ -152,6 +245,16 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as
 function styledBoss(scene: THREE.Group) {
   if (!made) {
     const r = scene.clone(true)
+    // (what's to be dressed (item 376): his body's picture (the coat's material on his body), his headband's, his towel's meshes)
+    DRESS.bands = []
+    r.traverse((o) => {
+      const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+      if (!mm || Array.isArray(mm)) return
+      const img = mm.map?.image as Pic | undefined
+      if (/^BossCoat/.test(mm.name) && o.name === 'BossBody' && img) DRESS.body = img
+      else if (/^BossTenugui/.test(mm.name) && img && !DRESS.bands.includes(img)) DRESS.bands.push(img)
+      else if (/^BossTowel/.test(mm.name)) o.userData.towel = true
+    })
     r.updateMatrixWorld(true)
     // ---- the groups that move his eyes and his mouth, at their middles (the rest are his own nodes)
     const holder = (name: string, test: RegExp) => {
@@ -190,15 +293,26 @@ function styledBoss(scene: THREE.Group) {
     r.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh) })
     let mat: THREE.Material | null = null
     let face = -1
+    const towels: number[] = []
     for (const m of meshes) {
       mat = m.material as THREE.Material
       if (m.name === 'BossFace') face = pieces.length
+      if (m.userData.towel) towels.push(pieces.length)
       pieces.push({ geo: bakeable(m.geometry, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)), bone: boneOf(m), inked: !UNINKED.test(m.name), shadowless: HEAD.test(m.name), decal: m.name === 'BossFace' })
       m.removeFromParent()
       m.geometry.dispose()
     }
     const { mesh } = rigidFigure(r, pieces, mat!, bones, 0.006)
     markFace(mesh, faceRange(pieces, face))
+    // (his towel's vertices in his one shape, their colour as made, and his atlas: what dressBoss changes)
+    DRESS.mat = mat
+    DRESS.worn = ''
+    DRESS.towel = towels.map((k) => {
+      let from = 0
+      for (let i = 0; i < k; i++) from += pieces[i].geo.attributes.position.count
+      const count = pieces[k].geo.attributes.position.count
+      return { geo: mesh.geometry, from, count, was: (mesh.geometry.attributes.color.array as Float32Array).slice(from * 3, (from + count) * 3) }
+    })
     for (const p of pieces) p.geo.dispose()
     mesh.castShadow = true
     mesh.receiveShadow = true
@@ -211,7 +325,10 @@ function styledBoss(scene: THREE.Group) {
 /** the owner standing still, a copy of him (developer mode's character viewer) */
 export function BossModel({ face = 'idle' }: { face?: CrewFace }) {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
+  const regions = useLoader(THREE.TextureLoader, REGIONS_URL)
   const obj = useMemo(() => cloneFigure(styledBoss(gltf.scene)), [gltf])
+  // (dressed as chosen: his atlas and his shape are the room's own, shared)
+  useLayoutEffect(() => wearing(regions.image as Pic), [obj, regions])
   useEffect(() => () => releaseFigure(obj), [obj])
   // (his face his own here (its UVs), so what he shows doesn't change him in the room)
   useLayoutEffect(() => ownShape(obj), [obj])
@@ -288,7 +405,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   sayRef.current = say
   const openRef = useRef(open)
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
+  // (dressed as chosen (item 376): his clothes' patches of his atlas drawn again as they change, nothing else of him made again, nor drawn
+  // again by React)
+  const regions = useLoader(THREE.TextureLoader, REGIONS_URL)
   const root = useMemo(() => styledBoss(gltf.scene), [gltf])
+  useLayoutEffect(() => wearing(regions.image as Pic), [root, regions])
   const mover = useRef<THREE.Group>(null)
   useEffect(() => {
     const m = mover.current
@@ -773,7 +894,12 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     <group ref={mover} name="BossFollow">
       {children}
       {/* (named as the pointer's over him; never to be dragged) */}
-      <FigureHit title={bossName} />
+      {/* (clicked: his clothes to choose (item 376, App's panel)) */}
+      <FigureHit title={bossName} hint={outfitHint} onPointerDown={(e) => {
+        if ((e.nativeEvent as PointerEvent).button !== 0) return
+        e.stopPropagation()
+        window.dispatchEvent(new CustomEvent('jgs-outfit'))
+      }} />
       {/* (what he's muttering, over his head) */}
       {say && !getEdit().on && (
         <Html position={[0, 1.42, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>

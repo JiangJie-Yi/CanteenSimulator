@@ -5913,6 +5913,61 @@ html[lang='en'] .heat-label { font-size: 13px; }
 }
 .till-foot > button:hover { background: #f4e6c8; }
 
+/* ---- the owner's clothes (ui/OutfitPanel, item 376): opened by a click on him; a row a part, its colours as round swatches, the one he's
+   wearing ringed; the till panel's wood and paper, at the left (where nothing's docked) ---- */
+.outfit-panel {
+  position: fixed;
+  z-index: 30;
+  top: 76px;
+  left: 16px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+  border-radius: 14px;
+  border: 4px solid #5a3d28;
+  background: linear-gradient(180deg, #fbf5e8, #f1e6cf);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.42), inset 0 0 0 2px #e6d3b0;
+  font: 14px/1.35 var(--brush);
+  color: #2a1a10;
+  animation: sheet-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) backwards;
+}
+.outfit-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; background: var(--wood-bar); color: #f6e8cc; }
+.outfit-head > b { font-size: 16px; letter-spacing: 0.3em; white-space: nowrap; }
+.outfit-head .panel-x { margin-left: auto; }
+.outfit-rows { display: grid; grid-template-columns: max-content max-content; gap: 8px 14px; align-items: center; padding: 12px 14px 4px; }
+.outfit-row { display: contents; }
+.outfit-part { display: grid; gap: 1px; font-weight: 700; letter-spacing: 0.12em; white-space: nowrap; }
+.outfit-part > small { font-weight: 400; font-size: 11.5px; letter-spacing: 0.04em; color: #7a6450; }
+.outfit-swatches { display: flex; gap: 7px; }
+.outfit-swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid #fffaf0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px #5a3d2866, inset 0 -3px 5px rgb(0 0 0 / 0.18), inset 0 2px 3px rgb(255 255 255 / 0.25);
+  cursor: pointer;
+  transition: transform 0.14s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.15s ease-out;
+}
+.outfit-swatch:hover { transform: translateY(-2px) scale(1.08); box-shadow: 0 0 0 1.5px #e0a866, 0 3px 6px rgb(0 0 0 / 0.25), inset 0 -3px 5px rgb(0 0 0 / 0.18); }
+.outfit-swatch:active { transform: scale(0.94); transition-duration: 0.05s; }
+.outfit-swatch.is-on { box-shadow: 0 0 0 2.5px #2a1a10, 0 0 0 4.5px #e0a866, inset 0 -3px 5px rgb(0 0 0 / 0.18); }
+.outfit-swatch:focus-visible { outline: 2px solid #2a1a10; outline-offset: 3px; }
+.outfit-foot { display: flex; justify-content: flex-end; padding: 10px 14px 12px; }
+.outfit-foot > button {
+  padding: 6px 14px;
+  border: 1.5px solid #5a3d28;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #3b2a20;
+  font: 700 13px/1 var(--brush);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.outfit-foot > button:hover:not(:disabled) { background: #f4e6c8; }
+.outfit-foot > button:disabled { opacity: 0.45; cursor: default; }
+
 /* ---- the drinks' stock, opened from the back stock by the fridges (shops/grill/DrinkStockPanel): a drinks fridge of its own, its two
    fridges' drinks as the pantry's bins, a case to order and the fridge to fill for each, the whole lot filled at its foot ---- */
 .drink-stock {

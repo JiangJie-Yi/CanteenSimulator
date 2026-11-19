@@ -68,6 +68,8 @@ import { HoverTip } from '@/ui/HoverTip'
 import { DustPuffs } from '@/scene/DustPuffs'
 import { RegisterManual } from '@/ui/RegisterManual'
 import { TillPanel, type TillDay } from '@/ui/TillPanel'
+import { OutfitPanel } from '@/ui/OutfitPanel'
+import { OUTFIT_KEY, readOutfit, setOutfit } from '@/game/bossOutfit'
 import { WorldBatch } from '@/scene/WorldBatch'
 import { StaffPop, type StaffPopAt } from '@/ui/StaffPop'
 import { CALM } from '@/game/calm'
@@ -146,6 +148,8 @@ import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, tossSpoiled, type Lo
 import { RING_SLOTS } from '@/game/fireSlots'
 import { orderSaid, saidAgain, withOrder, type OrderSaid } from '@/game/orderTally'
 import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
+// (the owner's clothes as last chosen (item 376), on him before he's first drawn: kept across visits and a new game alike, his look, not the game's)
+try { setOutfit(readOutfit(JSON.parse(localStorage.getItem(OUTFIT_KEY) ?? 'null'))) } catch { /* (storage blocked, or nothing kept: as he's made) */ }
 
 // distance between dishes on the carousel
 const SPACING = 6
@@ -2051,6 +2055,15 @@ export default function App() {
     const on = (e: Event) => { const out = !!(e as CustomEvent<boolean>).detail; setTillOpen(out); if (out) setOffice(null) }
     window.addEventListener('jgs-till', on)
     return () => window.removeEventListener('jgs-till', on)
+  }, [])
+  // ---- the owner's clothes (item 376, the owner's 「老闆可客製化服裝」): their panel opened by a click on him in the room (Boss's jgs-outfit,
+  // a second click shuts it); what's chosen is the panel's and his own (game/bossOutfit's store), nothing here drawn again for it
+  const [outfitOpen, setOutfitOpen] = useState(false)
+  const closeOutfit = useCallback(() => setOutfitOpen(false), [])
+  useEffect(() => {
+    const on = () => setOutfitOpen((o) => !o)
+    window.addEventListener('jgs-outfit', on)
+    return () => window.removeEventListener('jgs-outfit', on)
   }, [])
   useEffect(() => { if (office) { setFridgeOpen(false); setDrinkPanel(false) } }, [office])
   useEffect(() => { if (fridgeOpen) { setOffice(null); setDrinkPanel(false) } }, [fridgeOpen])
@@ -4172,6 +4185,7 @@ export default function App() {
           const d = (k: keyof typeof ledger) => Math.max(0, ((ledger[k] as number | undefined) ?? 0) - ((s.ledger[k] as number | undefined) ?? 0))
           return { from: s.from, revenue: sum.revenue, cashIn: d('tillIn'), taken: d('till'), spent: sum.revenue - sum.profit, profit: sum.profit }
         })()} />
+      <OutfitPanel lang={lang} open={outfitOpen} onClose={closeOutfit} />
       <LoadingScreen scene={!NO_WEBGL && !flatGrill} />
     </div>
   )
