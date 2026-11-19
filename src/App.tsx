@@ -4,7 +4,7 @@ import { setTip } from '@/scene/hoverTip'
 import { normalizeRenderer } from '@/scene/materialNormalize'
 import { useLowPower } from '@/scene/power'
 import { wheelIntent } from '@/game/navInput'
-import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject, type UIEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { setEar } from '@/scene/sfx'
@@ -133,6 +133,23 @@ import { ViewToast } from '@/ui/ViewToast'
 /** closing up, by the game's minutes past closing time: those still in hurried out (half an hour), the shop shut whoever's left (an hour) */
 /** the most lines the log keeps (a day's worth, the oldest written over past it) */
 const LOG_MAX = 300
+type LogLine = { id: number; who: 'chef' | 'guest' | 'stock' | 'order' | 'staff' | 'owner'; text: string }
+/** the day's log, as an online game's chat window: drawn again only when a line's added or the language changes (item 374). In the page
+ * itself it was drawn again each time the page was, a few times a second while the shop's open, every line of it, up to LOG_MAX by the
+ * night's end: the longer the night, the more of it each time */
+const ChatLog = memo(function ChatLog({ chat, lang, listRef, onScroll }: { chat: LogLine[]; lang: Lang; listRef: RefObject<HTMLUListElement | null>
+  onScroll: (e: UIEvent<HTMLUListElement>) => void }) {
+  return (
+    <ul ref={listRef} className="ai-chat" aria-live="polite" onScroll={onScroll}>
+      {chat.map((m) => (
+        <li key={m.id} className={`ai-line ai-${m.who}`}>
+          <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : m.who === 'order' ? (tl(lang, '點單', '注文', 'Orders'))
+            : m.who === 'staff' ? tl(lang, '員工', 'スタッフ', 'Staff') : m.who === 'owner' ? tl(lang, '老闆', '店主', 'Owner') : UI[lang].guest}</span>{m.text}
+        </li>
+      ))}
+    </ul>
+  )
+})
 const CLOSE_HURRY = 30
 const CLOSE_HARD = 60
 /** where the clock's put when the day's sheet is put away: the next day's getting ready, half an hour before opening (16:30) */
@@ -2467,6 +2484,8 @@ export default function App() {
   // (the log's list, and whether it's at its newest (not scrolled up to read back): kept at the foot as lines come in while it is)
   const chatEl = useRef<HTMLUListElement>(null)
   const chatPinned = useRef(true)
+  // (held at the newest unless it's been scrolled up to read)
+  const onChatScroll = useCallback((e: UIEvent<HTMLUListElement>) => { const el = e.currentTarget; chatPinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24 }, [])
   useLayoutEffect(() => { const el = chatEl.current; if (el && chatPinned.current) el.scrollTop = el.scrollHeight }, [chat])
   // (the wheel over the log scrolls it, though the pointer goes through it: taken before the view's zoom has it)
   useEffect(() => {
@@ -3957,15 +3976,7 @@ export default function App() {
           // back; held at the newest unless it's been scrolled up to read)
           // (not dragged about, and not in the way (the owner's, 2026-11-10: it took the pointer over the room's corner, so a drag there moved
           // it instead of turning the view or carrying a customer): the pointer goes through it to the room; the wheel over it reads back)
-          <ul ref={chatEl} className="ai-chat" aria-live="polite"
-            onScroll={(e) => { const el = e.currentTarget; chatPinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24 }}>
-            {chat.map((m) => (
-              <li key={m.id} className={`ai-line ai-${m.who}`}>
-                <span className="ai-who">{m.who === 'chef' ? UI[lang].chef : m.who === 'stock' ? UI[lang].stock : m.who === 'order' ? (tl(lang, '點單', '注文', 'Orders'))
-                  : m.who === 'staff' ? tl(lang, '員工', 'スタッフ', 'Staff') : m.who === 'owner' ? tl(lang, '老闆', '店主', 'Owner') : UI[lang].guest}</span>{m.text}
-              </li>
-            ))}
-          </ul>
+          <ChatLog chat={chat} lang={lang} listRef={chatEl} onScroll={onChatScroll} />
         )}
         <DishSwitcher dishes={DISHES} index={active} onChange={setActive} lang={lang} />
         <button type="button" className={`view-reset${viewMenu ? ' is-open' : ''}`} onClick={() => setViewMenu((o) => !o)}

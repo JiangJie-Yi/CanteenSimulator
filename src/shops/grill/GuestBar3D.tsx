@@ -239,7 +239,9 @@ const OWNER_BONE = new THREE.Vector3()
 /** the owner's tray: a server's rimmed lacquered one (scene/trayGeometry, item 249: a flat black disc, it read as "a black plate") */
 const OWNER_TRAY_GEO = rimmedTray(0.15, 0.024, 0.008)
 /** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a lacquered tray held in front */
-function OwnerWalker({ moving }: { moving: boolean }) {
+// (item 374: drawn again only when he starts or stops walking, not each time the bar's drawn)
+const OwnerWalker = memo(OwnerWalkerImpl)
+function OwnerWalkerImpl({ moving }: { moving: boolean }) {
   const g = useRef<THREE.Group>(null)
   const tray = useRef<THREE.Mesh>(null)
   /** his hands (the model's own nodes) and where they rest, found once he's drawn */
@@ -2260,7 +2262,9 @@ function ShoeCupboard() {
 }
 /** the shoes of those waiting on the bench, on the genkan's stone where they stepped up (item 203): a pair each, their colour, at the
  * cupboard's shoes' size; placed each frame from the sitters' own (nothing re-rendered for it) */
-function BenchShoes({ sitters }: { sitters: { current: Map<number, { id: number; shoes?: { at: THREE.Vector3; yaw: number } }> } }) {
+// (item 374: its pairs placed frame by frame; drawn again only if its list's ref changes)
+const BenchShoes = memo(BenchShoesImpl)
+function BenchShoesImpl({ sitters }: { sitters: { current: Map<number, { id: number; shoes?: { at: THREE.Vector3; yaw: number } }> } }) {
   const pairs = useRef<(THREE.Group | null)[]>([])
   const mats = useMemo(() => Array.from({ length: BENCH_SEATS }, () => new THREE.MeshToonMaterial({ color: '#444444' })), [])
   useEffect(() => () => { for (const m of mats) m.dispose() }, [mats])
@@ -3504,16 +3508,22 @@ const setWaiterMoving = (i: number, on: boolean) => { if (!!WAITER_MOVING[i] ===
 const subMoving = (f: () => void) => { movingSubs.add(f); return () => { movingSubs.delete(f) } }
 const useWaiterMoving = (i: number) => useSyncExternalStore(subMoving, () => !!WAITER_MOVING[i])
 /** the owner serving, walking or not, as his figure has it */
-function OwnerWalking() {
+// (item 374: drawn again only when his walking flag changes)
+const OwnerWalking = memo(OwnerWalkingImpl)
+function OwnerWalkingImpl() {
   return <OwnerWalker moving={useWaiterMoving(0)} />
 }
 /** the owner gone to wash the stack on the sink's counter (item 103): his figure as he walks there and back, his own walking flag */
 const BOSS_WASH_I = 63
-function BossWashWalking() {
+// (item 374: likewise)
+const BossWashWalking = memo(BossWashWalkingImpl)
+function BossWashWalkingImpl() {
   return <OwnerWalker moving={useWaiterMoving(BOSS_WASH_I)} />
 }
 /** a server's figure, walking or not */
-function ServerWalking({ i, id, look }: { i: number; id: string; look: StaffLook }) {
+// (item 374: likewise)
+const ServerWalking = memo(ServerWalkingImpl)
+function ServerWalkingImpl({ i, id, look }: { i: number; id: string; look: StaffLook }) {
   return <StaffFigure id={id} role="server" look={look} moving={useWaiterMoving(i)} />
 }
 
@@ -3528,7 +3538,7 @@ function pickupReady(slot: number | undefined, t: number) {
   return t > 0.4 && plateGoes(sl?.onTray ?? 0, sl?.flying ?? 0)
 }
 
-export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
+function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, top = 0.465, people = true, mark = '食堂', counters: given, scale = 1, offset,
   servers = [], plater = null, stocker = null, omiki, onDrink, onSay, open = true }:
   { guests: GuestView[]; at: THREE.Vector3; length?: number; drawCounter?: boolean; lang: Lang
     /** where the customers sit (the first counter's middle is at, and its door past its far end); one of four if not given */
@@ -8360,6 +8370,162 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sakeVer, seats, counters, top])
 
+  // (item 374) what's here from the first and never changes with what goes on: the plating place's carrier dishes and its spare stack, the
+  // dryer's and the draining basket's plates, the plate washed by hand and its suds; and what the kitchen carries (coal, the dipper, the
+  // skewers, a rice ball, the rice bowl, a stack of plates): hidden or shown, moved and filled frame by frame through their refs. Made once:
+  // made afresh each time the bar was drawn (several times a second while the shop's open), some two hundred elements went through React
+  // again each time for nothing
+  const sinkKit = useMemo(() => (<>
+        {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
+            of the shop's plates, it goes with the food) */}
+        {given && Array.from({ length: READY_SLOTS }, (_, k) => (
+          <group key={`carrier${k}`} name={`plating-carrier-${k}`} ref={(o) => { carriers.current[k] = o }} position={platingPlace(readyAlong(k))} scale={ON_TABLE * 0.8} visible={false}
+            {...shownOver('盤子', '裝盤處｜下一道菜放在這裡等')}><Plate design={k + 3} /></group>
+        ))}
+        {/* the plating place's stack of clean plates (the kitchen brings them from the racks; one's laid for a seat as its first food comes off the fire) */}
+        {given && (
+          <group ref={plateStack} name="plating-stack" position={platingPlace(PLATE_STACK_ALONG).addScaledVector(plating.across, PLATE_STACK_ACROSS)}
+            {...shownOver('乾淨的盤子', '裝盤處的備用盤｜菜一烤好就拿一個來裝')}>
+            {Array.from({ length: PASS_STACK_SHOWN }, (_, i) => (
+              <group key={i} position={[0, i * NEST_GAP * ON_TABLE, 0]} rotation-y={i * 1.1} scale={ON_TABLE} visible={false}><Plate design={i + 5} /></group>
+            ))}
+          </group>
+        )}
+        {/* the washed plates standing in the dish dryer under the sink's counter (seen through its glass door), and the used sticks in the bin
+            beside it (cleared off the customers' plates with them) */}
+        {given && (
+          <group ref={dryerPlates} {...shownOver('洗好的盤子', '在烘碗機裡烘乾｜乾了外場搬回碗盤架')}>
+            {Array.from({ length: DRYER_CAP }, (_, i) => <group key={i} scale={IN_SINK} visible={false}><Plate design={i + 1} /></group>)}
+          </group>
+        )}
+        {/* (and those washed by hand while the washer was busy, standing in the draining basket on the sink's counter) */}
+        {given && (
+          <group ref={drainPlates} name="drain-plates" {...shownOver('洗好的盤子', '手洗的，立在瀝水籃裡瀝乾')}>
+            {/* (drawn shallower than they are, so thirty stood in their notches show a gap between each (the owner's, 2026-11-12): the shop's
+                plates are deep, and at the notches' pitch they lay nested into one another) */}
+            {Array.from({ length: DRAIN_CAP }, (_, i) => <group key={i} scale={IN_DRAIN} visible={false}><PlateKinds design={i + 2} /></group>)}
+          </group>
+        )}
+        {/* (the owner washing up by hand (item 174): the plate in his hand, the suds on it; the drops off its edge) */}
+        {given && (
+          <group ref={washHeld} name="wash-plate" visible={false}>
+            <group ref={washPlateIn} scale={IN_SINK}>
+              <PlateKinds dirty design={0} />
+              <group ref={washFoam}>
+                {FOAM_AT.map(([x, z], i) => <mesh key={i} geometry={FOAM_GEO} material={FOAM_MAT} position={[x, 0.016, z]} visible={false} raycast={() => {}} />)}
+              </group>
+            </group>
+          </group>
+        )}
+        {/* (the plate the player's washing by hand (item 224): at the pointer, under the tap or in the water; its suds) */}
+        <group ref={handObj} name="hand-plate" visible={false}>
+          <group ref={handIn} scale={IN_SINK}>
+            <PlateKinds dirty design={0} />
+            <group ref={handFoam}>
+              {FOAM_AT.map(([x, z], i) => <mesh key={i} geometry={FOAM_GEO} material={FOAM_MAT} position={[x, 0.016, z]} visible={false} raycast={() => {}} />)}
+            </group>
+          </group>
+        </group>
+        {given && (
+          <group ref={washDrips} name="wash-drips">
+            {[0, 1, 2].map((i) => <mesh key={i} geometry={DRIP_GEO} material={DRIP_MAT} visible={false} raycast={() => {}} />)}
+          </group>
+        )}
+  </>
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [given])
+  const carryKit = useMemo(() => (<>
+        {given && (
+          <group ref={platerCoal} name="plater-coal" visible={false}>
+            {/* (a handful of binchotan held across both hands) */}
+            {Array.from({ length: 5 }, (_, i) => (
+              <mesh key={i} position={[(i - 2) * 0.018, (i % 2) * 0.012, 0]} rotation={[Math.PI / 2, 0, (i - 2) * 0.12]} geometry={COAL_STICK_GEO} material={COAL_STICK_MAT} />
+            ))}
+          </group>
+        )}
+        {given && (
+          <group ref={platerDipper} name="plater-dipper" visible={false}>
+            {/* (a wooden dipper: its cup out front, its handle back to the hands) */}
+            <mesh position={[0, 0, 0.12]} geometry={DIPPER_CUP_GEO} material={DIPPER_MAT} />
+            <mesh name="dipper-water" position={[0, 0.022, 0.12]} rotation-x={-Math.PI / 2} geometry={DIPPER_WATER_GEO} material={DIPPER_WATER_MAT} />
+            <mesh position={[0, 0.02, 0.04]} rotation-x={Math.PI / 2 - 0.25} geometry={DIPPER_HANDLE_GEO} material={DIPPER_MAT} />
+          </group>
+        )}
+        {given && [platerSkewers, serverSkewers].map((ref, k) => (
+          <group key={k} ref={ref} visible={false}>
+            {/* (a bundle of iron skewers held across the hands) */}
+            {Array.from({ length: 7 }, (_, i) => (
+              <mesh key={i} position={[(i - 3) * 0.008, (i % 2) * 0.006, 0]} rotation={[Math.PI / 2, 0, (i - 3) * 0.03]}>
+                <cylinderGeometry args={[0.0022, 0.0022, 0.17, 5]} /><meshStandardMaterial color="#c9ccd1" metalness={0.85} roughness={0.35} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+        {given && (
+          <group ref={platerBall} visible={false}>
+            {/* (a rice ball in the making, and its band of nori) */}
+            <mesh geometry={BALL_GEO}><meshToonMaterial color="#f6f3ea" /></mesh>
+            <mesh name="ball-nori" geometry={BALL_NORI_GEO} position={[0, -0.012, 0]}><meshToonMaterial color="#1d2a1e" /></mesh>
+          </group>
+        )}
+        {given && (
+          <group ref={platerBowl} name="plater-bowl" visible={false}>
+            {/* (a wooden rice-washing bowl, the rice in it) */}
+            <mesh geometry={RICE_BOWL_GEO}><meshToonMaterial color="#b98b56" side={THREE.DoubleSide} /></mesh>
+            <mesh name="bowl-rice" geometry={RICE_IN_GEO} position={[0, 0.045, 0]}><meshToonMaterial color="#f6f2e8" /></mesh>
+          </group>
+        )}
+        {given && (
+          <group ref={platerStack} visible={false} {...shownOver('乾淨的盤子', '從碗盤櫃補到裝盤處')}>
+            {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * NEST_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK}><Plate design={i + 7} /></group>)}
+          </group>
+        )}
+  </>
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [given])
+  // (item 374) each customer's hit box given the same callbacks each time the bar's drawn: made once for each of them, reading them (and the
+  // language) as they are when called; made afresh each time, every customer's hit box was drawn again with the bar, several times a second
+  const langNow = useRef(lang)
+  langNow.current = lang
+  const moveNow = useRef(canMove)
+  moveNow.current = canMove
+  const grabNow = useRef(grab)
+  grabNow.current = grab
+  const hits = useRef(new Map<number, { title: () => string; hint: () => string; onPointerDown: (e: ThreeEvent<PointerEvent>) => void; grabbable: () => boolean }>())
+  const hitOf = (id: number) => {
+    let h = hits.current.get(id)
+    if (h) return h
+    const now = () => shownRef.current.find((x) => x.id === id)
+    h = {
+      title: () => guestLabel(id, langNow.current),
+      hint: () => {
+        const v = now(), l = langNow.current
+        return v && moveNow.current(v) ? (l === 'ja' ? 'ドラッグして空席へ' : l === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : ''
+      },
+      onPointerDown: (e) => { const v = now(); if (v) grabNow.current(v)(e) },
+      grabbable: () => { const v = now(); return !getEdit().on && !!v && moveNow.current(v) },
+    }
+    hits.current.set(id, h)
+    return h
+  }
+  // (and the bench's and the genkan's waiting customers' fading and standing still read through callbacks made once for each of them)
+  const benchFades = useRef(new Map<number, () => number>())
+  const benchFadeOf = (id: number) => {
+    let f = benchFades.current.get(id)
+    if (!f) benchFades.current.set(id, (f = () => sitters.current.get(id)?.fade ?? 0))
+    return f
+  }
+  const visitorCalls = useRef(new Map<number, { fade: () => number; still: () => boolean }>())
+  const visitorOf = (id: number) => {
+    let c = visitorCalls.current.get(id)
+    if (!c) visitorCalls.current.set(id, (c = { fade: () => visitors.current.get(id)?.fade ?? 0, still: () => visitors.current.get(id)?.phase === 'wait' }))
+    return c
+  }
+  // (those gone let go of)
+  useEffect(() => { for (const id of [...hits.current.keys()]) if (!shown.some((x) => x.id === id)) hits.current.delete(id) }, [shown])
+  useEffect(() => { for (const id of [...benchFades.current.keys()]) if (!sitterList.some((x) => x.id === id)) benchFades.current.delete(id) }, [sitterList])
+  useEffect(() => { for (const id of [...visitorCalls.current.keys()]) if (!visitorList.some((x) => x.id === id)) visitorCalls.current.delete(id) }, [visitorList])
+
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (the walking paths' map, in edit mode when asked for (item 168)) */}
@@ -8462,61 +8628,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           // (a press takes the top one up in the player's own hand, to be washed under the tap or in the water (item 224))
           onPointerDown={takeUp}><PlateKinds dirty design={i} /></group>
       ))}
-      {/* (a carrier dish under a later dish at the plating place, its seat's plate out already: never the bare table (the owner's); not one
-          of the shop's plates, it goes with the food) */}
-      {given && Array.from({ length: READY_SLOTS }, (_, k) => (
-        <group key={`carrier${k}`} name={`plating-carrier-${k}`} ref={(o) => { carriers.current[k] = o }} position={platingPlace(readyAlong(k))} scale={ON_TABLE * 0.8} visible={false}
-          {...shownOver('盤子', '裝盤處｜下一道菜放在這裡等')}><Plate design={k + 3} /></group>
-      ))}
-      {/* the plating place's stack of clean plates (the kitchen brings them from the racks; one's laid for a seat as its first food comes off the fire) */}
-      {given && (
-        <group ref={plateStack} name="plating-stack" position={platingPlace(PLATE_STACK_ALONG).addScaledVector(plating.across, PLATE_STACK_ACROSS)}
-          {...shownOver('乾淨的盤子', '裝盤處的備用盤｜菜一烤好就拿一個來裝')}>
-          {Array.from({ length: PASS_STACK_SHOWN }, (_, i) => (
-            <group key={i} position={[0, i * NEST_GAP * ON_TABLE, 0]} rotation-y={i * 1.1} scale={ON_TABLE} visible={false}><Plate design={i + 5} /></group>
-          ))}
-        </group>
-      )}
-      {/* the washed plates standing in the dish dryer under the sink's counter (seen through its glass door), and the used sticks in the bin
-          beside it (cleared off the customers' plates with them) */}
-      {given && (
-        <group ref={dryerPlates} {...shownOver('洗好的盤子', '在烘碗機裡烘乾｜乾了外場搬回碗盤架')}>
-          {Array.from({ length: DRYER_CAP }, (_, i) => <group key={i} scale={IN_SINK} visible={false}><Plate design={i + 1} /></group>)}
-        </group>
-      )}
-      {/* (and those washed by hand while the washer was busy, standing in the draining basket on the sink's counter) */}
-      {given && (
-        <group ref={drainPlates} name="drain-plates" {...shownOver('洗好的盤子', '手洗的，立在瀝水籃裡瀝乾')}>
-          {/* (drawn shallower than they are, so thirty stood in their notches show a gap between each (the owner's, 2026-11-12): the shop's
-              plates are deep, and at the notches' pitch they lay nested into one another) */}
-          {Array.from({ length: DRAIN_CAP }, (_, i) => <group key={i} scale={IN_DRAIN} visible={false}><PlateKinds design={i + 2} /></group>)}
-        </group>
-      )}
-      {/* (the owner washing up by hand (item 174): the plate in his hand, the suds on it; the drops off its edge) */}
-      {given && (
-        <group ref={washHeld} name="wash-plate" visible={false}>
-          <group ref={washPlateIn} scale={IN_SINK}>
-            <PlateKinds dirty design={0} />
-            <group ref={washFoam}>
-              {FOAM_AT.map(([x, z], i) => <mesh key={i} geometry={FOAM_GEO} material={FOAM_MAT} position={[x, 0.016, z]} visible={false} raycast={() => {}} />)}
-            </group>
-          </group>
-        </group>
-      )}
-      {/* (the plate the player's washing by hand (item 224): at the pointer, under the tap or in the water; its suds) */}
-      <group ref={handObj} name="hand-plate" visible={false}>
-        <group ref={handIn} scale={IN_SINK}>
-          <PlateKinds dirty design={0} />
-          <group ref={handFoam}>
-            {FOAM_AT.map(([x, z], i) => <mesh key={i} geometry={FOAM_GEO} material={FOAM_MAT} position={[x, 0.016, z]} visible={false} raycast={() => {}} />)}
-          </group>
-        </group>
-      </group>
-      {given && (
-        <group ref={washDrips} name="wash-drips">
-          {[0, 1, 2].map((i) => <mesh key={i} geometry={DRIP_GEO} material={DRIP_MAT} visible={false} raycast={() => {}} />)}
-        </group>
-      )}
+      {sinkKit}
       {/* (the kitchen's plater, off their place on the way to the racks and back with plates for the plating place; at their place, Roasting draws them;
           the plates in their hands) */}
       {given && !ownerServes && (
@@ -8531,51 +8643,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           {plater ? <StaffFigure id={plater.id} role={plater.role} look={plater.look} moving={platerMoving} /> : <OwnerWalker moving={platerMoving} />}
         </group>
       )}
-      {given && (
-        <group ref={platerCoal} name="plater-coal" visible={false}>
-          {/* (a handful of binchotan held across both hands) */}
-          {Array.from({ length: 5 }, (_, i) => (
-            <mesh key={i} position={[(i - 2) * 0.018, (i % 2) * 0.012, 0]} rotation={[Math.PI / 2, 0, (i - 2) * 0.12]} geometry={COAL_STICK_GEO} material={COAL_STICK_MAT} />
-          ))}
-        </group>
-      )}
-      {given && (
-        <group ref={platerDipper} name="plater-dipper" visible={false}>
-          {/* (a wooden dipper: its cup out front, its handle back to the hands) */}
-          <mesh position={[0, 0, 0.12]} geometry={DIPPER_CUP_GEO} material={DIPPER_MAT} />
-          <mesh name="dipper-water" position={[0, 0.022, 0.12]} rotation-x={-Math.PI / 2} geometry={DIPPER_WATER_GEO} material={DIPPER_WATER_MAT} />
-          <mesh position={[0, 0.02, 0.04]} rotation-x={Math.PI / 2 - 0.25} geometry={DIPPER_HANDLE_GEO} material={DIPPER_MAT} />
-        </group>
-      )}
-      {given && [platerSkewers, serverSkewers].map((ref, k) => (
-        <group key={k} ref={ref} visible={false}>
-          {/* (a bundle of iron skewers held across the hands) */}
-          {Array.from({ length: 7 }, (_, i) => (
-            <mesh key={i} position={[(i - 3) * 0.008, (i % 2) * 0.006, 0]} rotation={[Math.PI / 2, 0, (i - 3) * 0.03]}>
-              <cylinderGeometry args={[0.0022, 0.0022, 0.17, 5]} /><meshStandardMaterial color="#c9ccd1" metalness={0.85} roughness={0.35} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      {given && (
-        <group ref={platerBall} visible={false}>
-          {/* (a rice ball in the making, and its band of nori) */}
-          <mesh geometry={BALL_GEO}><meshToonMaterial color="#f6f3ea" /></mesh>
-          <mesh name="ball-nori" geometry={BALL_NORI_GEO} position={[0, -0.012, 0]}><meshToonMaterial color="#1d2a1e" /></mesh>
-        </group>
-      )}
-      {given && (
-        <group ref={platerBowl} name="plater-bowl" visible={false}>
-          {/* (a wooden rice-washing bowl, the rice in it) */}
-          <mesh geometry={RICE_BOWL_GEO}><meshToonMaterial color="#b98b56" side={THREE.DoubleSide} /></mesh>
-          <mesh name="bowl-rice" geometry={RICE_IN_GEO} position={[0, 0.045, 0]}><meshToonMaterial color="#f6f2e8" /></mesh>
-        </group>
-      )}
-      {given && (
-        <group ref={platerStack} visible={false} {...shownOver('乾淨的盤子', '從碗盤櫃補到裝盤處')}>
-          {Array.from({ length: 5 }, (_, i) => <group key={i} position={[0, i * NEST_GAP * IN_SINK, 0]} rotation-y={i * 1.1} scale={IN_SINK}><Plate design={i + 7} /></group>)}
-        </group>
-      )}
+      {carryKit}
       {/* (a server's stack of dried plates, on their tray on the way from the dryer back to the racks) */}
       {waiters.current.map((_, wi) => (
         <group key={`stack${wi}`} ref={(o) => { stackObjs.current[wi] = o }} visible={false} {...shownOver('洗好的盤子', '外場搬回碗盤架')}>
@@ -8661,8 +8729,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
               <PersonClock s={s} phase={s.wcSit ? 'wcSit' : s.phase === 'sit' && s.wipeAt ? 'wipe' : s.phase} drink={s.drink} eating={s.phase === 'sit' && FED.has(s.id)}
                 clock={clock} talk={talkSide(s)} mood={g ? moodOf(g) : null} plateOf={plateWorld} drinkOf={drinkWorld} soupOf={soupWorld} drunk={s.drunk} />
               {/* (named as the pointer's over them; picked up and carried to another stool while they wait) */}
-              <FigureHit title={() => guestLabel(s.id, lang)} hint={() => (canMove(s) ? (lang === 'ja' ? 'ドラッグして空席へ' : lang === 'en' ? 'Drag to a free seat' : '拖曳到空位換座位') : '')}
-                onPointerDown={grab(s)} grabbable={() => !getEdit().on && canMove(s)} />
+              <FigureHit {...hitOf(s.id)} />
             </group>
             {/* (their label just over their head, sat up on the seat or standing) */}
             <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.08}
@@ -8718,7 +8785,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <BlobShadow r={0.17 * PEOPLE_SCALE} />
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
-              <FolkFigure id={v.id} eating={false} walking={!v.sat} clock={clock} fade={() => sitters.current.get(v.id)?.fade ?? 0} fit={FOLK_FIT} />
+              <FolkFigure id={v.id} eating={false} walking={!v.sat} clock={clock} fade={benchFadeOf(v.id)} fit={FOLK_FIT} />
             </Suspense>
           </group>
         </group>
@@ -8731,10 +8798,10 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
           <BlobShadow r={0.17 * PEOPLE_SCALE} />
           <group scale={PEOPLE_SCALE}>
             <Suspense fallback={null}>
-              <FolkFigure id={v.id} eating={false} walking still={() => visitors.current.get(v.id)?.phase === 'wait'} clock={clock}
-                fade={() => visitors.current.get(v.id)?.fade ?? 0} fit={FOLK_FIT} held={v.has ? <TakeoutBag /> : undefined} />
+              <FolkFigure id={v.id} eating={false} walking still={visitorOf(v.id).still} clock={clock}
+                fade={visitorOf(v.id).fade} fit={FOLK_FIT} held={v.has ? <TakeoutBag /> : undefined} />
             </Suspense>
-            {v.rider && <RiderGear id={v.id} size={folkSpec(v.id).size} fade={() => visitors.current.get(v.id)?.fade ?? 0} />}
+            {v.rider && <RiderGear id={v.id} size={folkSpec(v.id).size} fade={visitorOf(v.id).fade} />}
           </group>
         </group>
       ))}
@@ -8747,6 +8814,31 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
     </group>
   )
 }
+/** (item 374) the bar drawn again only when what it's given has changed: the page draws it a few times a second while the shop's open (its
+ * clock, its log), each time with its crew made afresh (the same people in new objects) and its place a new vector; drawn again with them,
+ * all of the bar (some five hundred elements) went through React again for nothing. Its crew compared by who they are, a place by where */
+type BarProps = Parameters<typeof GuestBar3DImpl>[0]
+type BarWorker = { id: string; role?: string; look: unknown } | null | undefined
+const sameWorker = (a: BarWorker, b: BarWorker) => a === b || (!!a && !!b && a.id === b.id && a.role === b.role && a.look === b.look)
+function sameBar(a: BarProps, b: BarProps) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof BarProps>
+  for (const k of keys) {
+    const x = a[k] as unknown, y = b[k] as unknown
+    if (Object.is(x, y)) continue
+    if (k === 'servers') {
+      const p = (x ?? []) as BarWorker[], q = (y ?? []) as BarWorker[]
+      if (p.length === q.length && p.every((w, i) => sameWorker(w, q[i]))) continue
+      return false
+    }
+    if (k === 'plater' || k === 'stocker') { if (sameWorker(x as BarWorker, y as BarWorker)) continue; return false }
+    if (x instanceof THREE.Vector3 && y instanceof THREE.Vector3 && x.equals(y)) continue
+    // (no one in yet, either time: a new empty list)
+    if (Array.isArray(x) && Array.isArray(y) && !x.length && !y.length) continue
+    return false
+  }
+  return true
+}
+export const GuestBar3D = memo(GuestBar3DImpl, sameBar)
 
 /**
  * A takeaway: in a kraft paper bag (KraftBag, below), in a server's hands, on the stand behind the till, in the cashier's; and in the

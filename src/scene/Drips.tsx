@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -46,7 +46,9 @@ const POOL = 6
 /** how long it swells at the nozzle; how much slower than a real fall it's drawn (a real one's over in a tenth of a second, too quick to see) */
 const SWELL = 0.18, SLOW = 1.8
 
-export function Drips() {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const Drips = memo(DripsImpl)
+function DripsImpl() {
   // (put straight in the scene: where they go is the world's, whatever the shop's own group is turned and scaled by)
   const scene = useThree((s) => s.scene)
   const meshes = useMemo(() => Array.from({ length: POOL }, () => {

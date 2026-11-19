@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { memo, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useEditSel } from './edit'
@@ -38,7 +38,9 @@ export function PathZone() {
 
 /** the keep-clear patches put down in edit mode, each a piece of its own: listened to here, not in GuestBar3D (it'd draw it all again at
  * every change of edit mode's) */
-export function PathZones({ home }: { home: THREE.Vector3 }) {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const PathZones = memo(PathZonesImpl)
+function PathZonesImpl({ home }: { home: THREE.Vector3 }) {
   const zones = useEditSel((s) => s.zones)
   return (
     <>
@@ -73,7 +75,9 @@ function PathVia({ who }: { who: string }) {
 
 /** the waypoints set by hand on the staff's usual ways (item 189), each a piece of its own, moved with edit mode's arrows: the way goes through
  * them (GuestBar3D's kitchenRoute); added from the paths' list, taken away with Delete */
-export function PathVias({ home }: { home: THREE.Vector3 }) {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const PathVias = memo(PathViasImpl)
+function PathViasImpl({ home }: { home: THREE.Vector3 }) {
   const vias = useEditSel((s) => s.vias)
   return (
     <>

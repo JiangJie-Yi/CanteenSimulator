@@ -7,7 +7,7 @@
 // whatever's on it, never pointed at.
 // Item 189 (the owner's, 2026-11-16: "mark clearly whose each way is, and let them be edited by hand"): each person's ways in their own colour,
 // the places and the people named on the floor; the way or the person the editor's list points at (PATH_MAP.hot) bright, the rest faint.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -47,7 +47,9 @@ function band(out: number[], col: number[], a: THREE.Vector3, b: THREE.Vector3, 
 
 type Place = { key: string; at: [number, number, number] }
 
-export function PathMap() {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const PathMap = memo(PathMapImpl)
+function PathMapImpl() {
   const on = useEditSel((s) => s.on), paths = useEditSel((s) => s.paths)
   const made = useMemo(() => {
     const noRay = () => {}

@@ -4,7 +4,7 @@
  * bowl (game/sides' RICE_BEATS, SOUP_BEATS), and the bowls at the customers' places, eaten down. GuestBar3D walks the one filling them and
  * the one carrying them out, and poses these from what's here; all in the bar's frame.
  */
-import { useMemo, useRef, useLayoutEffect } from 'react'
+import { memo, useMemo, useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -442,7 +442,9 @@ type Part = { geo: THREE.BufferGeometry; mat: THREE.Material; kind: 'body' | 'ri
  * The bowls set at the customers' places, eaten down (item 205: the soup's bowl stood full till it was cleared): each part of the rice bowl
  * and the soup bowl one draw for all of them (instanced), laid out where GuestBar3D says (the bar's frame), as full as each has been eaten to.
  */
-export function SeatBowls({ rice, soup }: { rice: { key: string; at: THREE.Vector3; yaw: number }[]; soup: { key: string; at: THREE.Vector3; yaw: number }[] }) {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const SeatBowls = memo(SeatBowlsImpl)
+function SeatBowlsImpl({ rice, soup }: { rice: { key: string; at: THREE.Vector3; yaw: number }[]; soup: { key: string; at: THREE.Vector3; yaw: number }[] }) {
   const gltf = useGLTF(SIDEBOWLS_URL) as unknown as { scene: THREE.Group }
   const parts = useMemo(() => {
     const grab = (name: string, kind: Part['kind']) => {

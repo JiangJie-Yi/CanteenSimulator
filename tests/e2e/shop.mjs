@@ -14,6 +14,9 @@ export async function boot({ width = 1440, height = 860, url = process.env.URL ?
   const page = await (await browser.newContext({ viewport: { width, height } })).newPage()
   // (the first day's guide (item 175) taken as done: its card at the foot of the screen would stand over what's clicked)
   await page.addInitScript(() => { try { localStorage.setItem('jgs-guide-1', 'done') } catch { /* (blocked) */ } })
+  // (every file the page loads kept in its resource timings: rush() finds the game's modules there by name, and past the browser's own 250
+  // (the customers' 92 pictures, item 377) the later ones, game/flow.ts among them, were dropped)
+  await page.addInitScript(() => performance.setResourceTimingBufferSize(20000))
   page.setDefaultTimeout(15000)
   page.on('pageerror', (e) => console.log('ERR', e.message))
   page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', m.text().slice(0, 240)) })

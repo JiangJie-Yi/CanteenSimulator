@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStudio } from '@/scene/studio'
@@ -160,7 +160,9 @@ export const STATION_STREAM_TO = () => STATION.jug.clone().add(new THREE.Vector3
 const SAKESTAND_URL = import.meta.env.BASE_URL + 'models/sakestand.glb'
 /** the open bottle: one of the stand's 1.8-litre bottles (the same make, its label to the front), dressed as the stand's are */
 const OPEN_BOTTLE = 'SakeBottle1'
-export function SakeStation() {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const SakeStation = memo(SakeStationImpl)
+function SakeStationImpl() {
   useStudio()
   const gltf = useGLTF(SAKESTAND_URL) as unknown as { scene: THREE.Group }
   const bottle = useMemo(() => {

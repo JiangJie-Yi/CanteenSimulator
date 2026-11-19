@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { GUEST_FACES, guestFaceStrip, guestFrame, type FaceKind, type GuestFace } from './faceSheet'
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { GAZE, LATE } from '@/game/shopState'
@@ -437,7 +437,9 @@ function template(scene: THREE.Group, hair: string, acc: string[], briefcase: bo
  * let go), so it isn't let go and linked again when the shop has emptied and the next one comes.
  */
 const folkWarmed = new WeakSet<object>()
-export function FolkWarm() {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const FolkWarm = memo(FolkWarmImpl)
+function FolkWarmImpl() {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const pictures = usePictures()
   useEffect(() => {
@@ -458,7 +460,9 @@ export function FolkWarm() {
  * passing the time (looking about, at their phone, chin in hand), their mood on their face, a hop of delight when their food comes,
  * fading as they go; `fit`: their size in the frame they're drawn in (the boss's height there).
  */
-export function FolkFigure({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false, bite, soup, soupAt, soupKey, fume }: {
+// (item 374: drawn again only when its own props change: what it does frame by frame it reads through its callbacks)
+export const FolkFigure = memo(FolkFigureImpl)
+function FolkFigureImpl({ id, eating, walking, still, clock, talk = 0, mood = null, fade, pose, held, fit = 1, ground = false, plate, sip, drinkAt, heldShown, cup = false, bite, soup, soupAt, soupKey, fume }: {
   id: number; eating: boolean; walking: boolean; still?: () => boolean; clock?: { current: number }; talk?: number; mood?: Mood | null
   fade?: () => number; slippers?: () => boolean; pose?: string; held?: ReactNode; fit?: number
   /** (sat eating) where their food is, in the world: their plate's middle, for the chopsticks to come down on */

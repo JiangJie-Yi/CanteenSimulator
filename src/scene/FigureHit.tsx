@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { whoOver } from './hoverTip'
@@ -18,7 +18,9 @@ const ALL = new THREE.Box3()
  */
 /** someone being carried just now (GuestBar3D's drag): their glow and the closed hand kept on while the pointer slips off them */
 export const GRABBING = { on: false }
-export function FigureHit({ title, hint, onPointerDown, grabbable }: { title: () => string; hint?: () => string
+// (item 374: drawn again only when its callbacks are new ones: a customer's are made once for them, GuestBar3D's hitOf)
+export const FigureHit = memo(FigureHitImpl)
+function FigureHitImpl({ title, hint, onPointerDown, grabbable }: { title: () => string; hint?: () => string
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
   /** whether they can be picked up just now: the open hand over them, and they glow (the owner's), as the things in the room that can */
   grabbable?: () => boolean }) {

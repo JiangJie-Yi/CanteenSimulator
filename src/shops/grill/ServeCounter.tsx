@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeByMaterial } from '@/scene/StaticBatch'
@@ -12,7 +12,9 @@ import { inkModel } from '@/scene/inkHull'
  */
 const URL = import.meta.env.BASE_URL + 'models/servecounter.glb'
 useGLTF.preload(URL)
-export function ServeCounter() {
+// (item 374: drawn again only when its own props change, not each time what holds it is drawn)
+export const ServeCounter = memo(ServeCounterImpl)
+function ServeCounterImpl() {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
     const r = gltf.scene.clone(true)
