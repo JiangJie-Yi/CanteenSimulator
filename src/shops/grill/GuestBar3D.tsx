@@ -8742,6 +8742,10 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   useEffect(() => { for (const id of [...benchFades.current.keys()]) if (!sitterList.some((x) => x.id === id)) benchFades.current.delete(id) }, [sitterList])
   useEffect(() => { for (const id of [...visitorCalls.current.keys()]) if (!visitorList.some((x) => x.id === id)) visitorCalls.current.delete(id) }, [visitorList])
 
+  // (what mounts a stage later, made once for what it's made with: it was made again with every redraw of the bar, three times a second,
+  // its stage's wrappers drawn again each time (item 374))
+  const shopPropsLater = useMemo(() => <Later stage={2}><ShopProps counters={counters} /></Later>, [counters])
+  const fridgesLater = useMemo(() => (fridges ? <Later stage={2}><Fridges fridges={fridges} /></Later> : null), [fridges])
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (the walking paths' map, in edit mode when asked for (item 168)) */}
@@ -8779,7 +8783,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
               {/* (and past the bar's end, a strip more behind the till for the cashier to stand on; a shop laid out
                   in full has one floor under all of it instead) */}
               {given && <RoomFloor counters={counters} drop={KITCHEN_DROP / scale} />}
-              {given && <Later stage={2}><ShopProps counters={counters} /></Later>}
+              {given && shopPropsLater}
               {given && <DiningWall c={c} from={back} to={c.length / 2 + 1.45} far={FLOOR_FAR} lampId="barlamp" lampName="長吧台" top={top} altar={omiki ?? true} corner={wallBack}
                 staffDoor={STAFF_DOOR_AT} />}
             </group>
@@ -8826,7 +8830,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       {fridges && QUALITY.tier === 'high' && (
         <pointLight position={fridges[0].at.clone().lerp(fridges[1].at, 0.5).setY(FRIDGE.H * 0.55)} color="#eaf4ff" intensity={1.1} distance={FRIDGE.H * 2.4} decay={1.4} />
       )}
-      {fridges && <Later stage={2}><Fridges fridges={fridges} /></Later>}
+      {fridges && fridgesLater}
       {/* what each has fetched from the fridge, stood beside their plate, toward the cook (a sake's cup a little nearer them): drunk down sip by
           sip, off the bar in their hand while it's up at their mouth */}
       {given && shown.filter((s) => s.drink && s.phase !== 'leave' && !(s.phase.startsWith('wc') && s.wc?.who === 'drink')).map((s) => (
