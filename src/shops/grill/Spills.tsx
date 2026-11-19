@@ -4,7 +4,7 @@
 // ramune water-clear), a few drops thrown further; and a puff of glass dust up off it, gone in a third of a second. Swept up (`left` going to
 // nothing), the shards, crumbs, neck and base go a piece at a time, each brushed in and gone at its own moment, and the puddle shrinks away. Drawn in the scene's own frame, each spill a few meshes made as it
 // comes and let go as it's swept; their materials one for each colour, kept (a handful: the drinks' and the glasses' colours).
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { reflectStudio, useStudio } from '@/scene/studio'
@@ -117,7 +117,9 @@ type Made = {
 const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), S = new THREE.Vector3()
 
 /** the spills on the floor: made as they come (SPILLS), moved as they go, let go once swept away */
-export function Spills() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const Spills = memo(function Spills() {
   useStudio()
   const root = useRef<THREE.Group>(null)
   const made = useRef(new Map<number, Made>())
@@ -242,4 +244,4 @@ export function Spills() {
     }
   })
   return <group ref={root} name="spills" />
-}
+})

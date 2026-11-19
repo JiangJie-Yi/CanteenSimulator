@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { memo, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Lang } from '@/data/i18n'
 import { REGISTER_MANUAL } from '@/data/registerManual'
 import { tl } from '@/data/i18n'
@@ -49,7 +49,8 @@ const turn = (set: (n: number) => void, by: number) => {
 }
 
 /** the manual, opened: a booklet's pages, one at a time, turned with the arrows, shut with × or Esc or a click outside */
-export function RegisterManual({ lang }: { lang: Lang }) {
+// (item 374: drawn again only as its own props change; it was with every redraw of the page, 3.3 a second)
+export const RegisterManual = memo(function RegisterManual({ lang }: { lang: Lang }) {
   const isOpen = useOpen()
   usePanelSound(isOpen)
   const [page, setPage] = useState(0)
@@ -92,7 +93,7 @@ export function RegisterManual({ lang }: { lang: Lang }) {
       </div>
     </div>
   )
-}
+})
 
 /** a step's keys or words with each " → " (one key, then the next) drawn as the game's own arrow, not a character (the game's guide too,
  * item 388) */

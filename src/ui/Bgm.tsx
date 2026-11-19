@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { getBgmOff, useBgmOff } from './bgmStore'
 import { sfxMuted, useSfxMuted } from '@/scene/sfx'
 
@@ -11,7 +11,8 @@ const NAMES = ['LateNightTavern.mp3', 'IzakayaNight.mp3', 'izakaya-night.mp3', '
 const VOLUME = 0.35
 const SRCS = NAMES.map((n) => import.meta.env.BASE_URL + 'music/' + encodeURIComponent(n))
 
-export function Bgm() {
+// (item 374: drawn again only as its own props change; it was with every redraw of the page, 3.3 a second)
+export const Bgm = memo(function Bgm() {
   const audio = useRef<HTMLAudioElement | null>(null)
   // (the clock's mute silences the music too (the owner's): the speaker's own switch left as it was, it plays again unmuted)
   const bgmOff = useBgmOff(), muted = useSfxMuted()
@@ -41,4 +42,4 @@ export function Bgm() {
     else a.play().catch(() => {})
   }, [off])
   return null
-}
+})

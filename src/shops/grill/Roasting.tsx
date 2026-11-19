@@ -3949,7 +3949,8 @@ const TakeoutBox = memo(function TakeoutBox({ at }: { at: () => THREE.Vector3 })
   )
 })
 /** one order's box, at its tier: shown from its first piece in, its lid on once all of it is */
-function OneBox({ tier }: { tier: number }) {
+// (item 374: drawn again only as its own props change; it was with every redraw of the takeaway boxes, 5.8 a second, its one prop the same)
+const OneBox = memo(function OneBox({ tier }: { tier: number }) {
   const g = useRef<THREE.Group>(null)
   const lid = useRef<THREE.Group>(null)
   useFrame(() => {
@@ -3966,7 +3967,7 @@ function OneBox({ tier }: { tier: number }) {
       </group>
     </group>
   )
-}
+})
 const TasteBowl = memo(TasteBowlImpl, sameProps)
 /** (item 317) how long the bowl and the tray take to change places as the shop opens or shuts (s); and how far through that it is (0 the
  * bowl, 1 the tray) and how big the tray's drawn now (the tongs at rest go with it; the pointer's tag names which is there) */

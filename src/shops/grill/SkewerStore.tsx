@@ -105,7 +105,8 @@ function bundle(n: number, seed: number) {
 }
 
 /** one holder: its tube, lip, node, hoops, plate and screws, and its rods (as many as SKEWERS says) */
-function Holder({ kind, rods }: { kind: 'clean' | 'used'; rods: React.RefObject<THREE.InstancedMesh | null> }) {
+// (item 374: drawn again only as its own props change; they were with the store's own redraws (its pointer's tag), 3.9 a second)
+const Holder = memo(function Holder({ kind, rods }: { kind: 'clean' | 'used'; rods: React.RefObject<THREE.InstancedMesh | null> }) {
   return (
     <>
       <mesh geometry={CUP} material={SKIN_MAT[kind]} position={[0, CUP_H / 2, 0]} />
@@ -120,7 +121,7 @@ function Holder({ kind, rods }: { kind: 'clean' | 'used'; rods: React.RefObject<
       <instancedMesh ref={rods} args={[ROD, kind === 'clean' ? STEEL : SOOTY, kind === 'clean' ? SHOWN_CLEAN : SHOWN_DIRTY]} frustumCulled={false} />
     </>
   )
-}
+})
 
 /**
  * The skewers' places (the owner's: fifty iron skewers, game/skewers): two copper-bound little wooden buckets hung on the cook table's front either

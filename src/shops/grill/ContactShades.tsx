@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { memo, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { HANGS, registryEntries, useEditSel } from './edit'
 
@@ -89,7 +89,9 @@ function build(): THREE.BufferGeometry | null {
   return g
 }
 
-export function ContactShades() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const ContactShades = memo(function ContactShades() {
   const mesh = useMemo(() => {
     const m = new THREE.Mesh(new THREE.BufferGeometry(), MAT)
     m.name = 'contact-shades'
@@ -113,4 +115,4 @@ export function ContactShades() {
   }, [editing, mesh])
   useEffect(() => () => mesh.geometry.dispose(), [mesh])
   return <primitive object={mesh} />
-}
+})

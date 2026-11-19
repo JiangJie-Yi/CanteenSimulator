@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import * as THREE from 'three'
 import { getEdit, setSceneTris } from './edit'
 
@@ -7,7 +7,9 @@ import { getEdit, setSceneTris } from './edit'
  * While edit mode is on, the whole scene's triangles counted every second and a half for the panel: every mesh drawn (it and everything
  * over it shown, on a layer the camera sees), instanced ones times their count, the ink outlines included (they're drawn too).
  */
-export function SceneTally() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const SceneTally = memo(function SceneTally() {
   const scene = useThree((s) => s.scene)
   const t = useRef(0)
   useFrame(({ camera }, dt) => {
@@ -30,4 +32,4 @@ export function SceneTally() {
     setSceneTris(Math.round(tris))
   })
   return null
-}
+})

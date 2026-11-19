@@ -345,16 +345,20 @@ function usePrefersReducedMotion() {
 }
 
 /** tells the loading veil how many draws each frame took (scene/Later's noteDrawn): it waits for the shop to be drawn, not only loaded */
-function DrawnProbe() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+const DrawnProbe = memo(function DrawnProbe() {
   useFrame(({ gl }) => noteDrawn(gl.info.render.calls))
   return null
-}
+})
 /** the camera the sound effects are heard from (scene/sfx: how near each is, and which side) */
-function SfxEar() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+const SfxEar = memo(function SfxEar() {
   const camera = useThree((s) => s.camera)
   useEffect(() => { setEar(camera) }, [camera])
   return null
-}
+})
 /**
  * A phone, by its size or by its word (game/device's showsFlat; the owner's): no 3D at all, none of its models downloaded (scene/flatGate), a
  * card saying the game isn't open on phones yet (PhoneClosed; the flat 2D version for phones was taken out, item 188); anything else, a
@@ -376,7 +380,9 @@ function usePhone() {
  * tests layers against the view's camera, not the light's, so this is done by castShadow) */
 const CASTER_R = 0.3
 
-function ShadowPacer() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+const ShadowPacer = memo(function ShadowPacer() {
   const gl = useThree((st) => st.gl)
   const scene = useThree((st) => st.scene)
   const n = useRef(0)
@@ -408,7 +414,7 @@ function ShadowPacer() {
     if (++n.current % 3 === 0) gl.shadowMap.needsUpdate = true
   })
   return null
-}
+})
 /** the water and power meter, the month so far (game/utilities), kept in the browser; cleared with a fresh start */
 const METER_KEY = 'jgs-utilities-1'
 /** the customers' visits (game/reputation), kept in the browser; cleared with a fresh start */
@@ -600,7 +606,9 @@ function ViewMarkers({ lang, onPick }: { lang: Lang; onPick: (v: ViewId) => void
 }
 
 /** where the fire is on the screen (as parts of the window), for the grill's shallow focus (.grill-focus) to centre on, every few frames */
-function FocusTracker() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+const FocusTracker = memo(function FocusTracker() {
   const n = useRef(0)
   const v = useMemo(() => new THREE.Vector3(), [])
   useFrame(({ camera, gl }) => {
@@ -613,7 +621,7 @@ function FocusTracker() {
     st.setProperty('--focus-y', `${(y * 100).toFixed(1)}%`)
   })
   return null
-}
+})
 
 /** the turn (X, Y, Z degrees) a view's camera starts with, set by the owner in edit mode (its place is in edit.ts's BASES) */
 const VIEWCAM_TURN: Partial<Record<ViewId, V3>> = { free: [0, 15, 5] }
@@ -694,7 +702,8 @@ function Drawn({ onDrawn }: { onDrawn?: () => void }) {
 }
 /** the cover over the move between the shop and the room upstairs (item 350): a dark veil, where they're going, a bar filling (to half as
  * the room's made, to the end as the camera gets there), gone once it's done */
-function FloorCover({ go, lang }: { go: { dir: 'up' | 'down'; stage: number } | null; lang: Lang }) {
+// (item 374: drawn again only as its own props change; it was with every redraw of the page, 3.3 a second)
+const FloorCover = memo(function FloorCover({ go, lang }: { go: { dir: 'up' | 'down'; stage: number } | null; lang: Lang }) {
   const [shown, setShown] = useState(go)
   useEffect(() => {
     if (go) { setShown(go); return }
@@ -713,11 +722,13 @@ function FloorCover({ go, lang }: { go: { dir: 'up' | 'down'; stage: number } | 
       </div>
     </div>
   )
-}
+})
 function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, frame, onOffFire, onEat, onNotice, resetView, pins = false, view, onView, ai, research, lang, spotOn, chefOf, crowdOf, crewOf, livingOf, guestsBy, onWalkOut, onVisit, onGuests, notes, inUse, phone, entriesOf, onOrderEntry,
   onOrder, onAddCharcoal, onSay, blessed = false, onDrink, dorm = false, onDormDrawn }: SceneProps) {
   const groups = useRef<(THREE.Group | null)[]>([])
   const controls = useRef<OrbitControlsImpl>(null)
+  // (what the walls fade for: the view's target, asked each time; the same function from one redraw to the next (item 374))
+  const occluderTarget = useCallback(() => controls.current?.target, [])
   // (in development, the view can be set from the console: __ctl.target, __cam.position)
   useEffect(() => { if (import.meta.env.DEV) Object.assign(window, { __ctl: controls.current }) })
   const camera = useThree((s) => s.camera)
@@ -1286,7 +1297,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
       })}
 
       {/* (the hangings that come between the camera and what it's looking at fade out of the way) */}
-      <OccluderFade target={() => controls.current?.target} />
+      <OccluderFade target={occluderTarget} />
       {/* (how each piece is drawn, as set piece by piece in developer mode's Render section) */}
       <RenderPrefsApply />
       <SceneTally />
@@ -1951,6 +1962,8 @@ export default function App() {
     return () => { LATE_GRIPE.add = gripe }
   }, [])
   const [showRating, setShowRating] = useState(false)
+  // (the sign's click, the same from one redraw to the next (item 374: the sign was drawn again with every redraw of the page))
+  const toggleRating = useCallback(() => setShowRating((v) => !v), [])
   const closeRating = useCallback(() => setShowRating(false), [])
   const openRating = useCallback(() => setShowRating(true), [])
   // (reviews bought (the owner's, 2026-11-10): a pack's worth of four and five stars, numbered below every real customer's, dated today, paid
@@ -3814,7 +3827,7 @@ export default function App() {
       <div className="stage" ref={stageRef}>
         {flatGrill && <PhoneClosed lang={lang} />}
         <Brand night={theme === 'dark'} late={lateNow} lang={lang} shop={dish.id} dark={!opened[dish.id]} ignite={ignite}
-          onClick={editOn ? undefined : () => setShowRating((v) => !v)} />
+          onClick={editOn ? undefined : toggleRating} />
         {/* (the shop's rating, from its sign (the owner's): every customer's satisfaction made into its stars; a drawer out from the left, kept
             drawn so it slides back in as it slid out) */}
         {!editOn && <Reputation open={showRating} lang={lang} rating={shopRating} visits={shopReviews} today={clockDay} cash={cash} onBuy={onBuyReviews} onClose={closeRating} />}

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { nameIn, type Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
 import { Glyph } from './GameIcons'
@@ -10,7 +11,8 @@ type DishSwitcherProps = {
 }
 
 /** Carousel controls under the 3D stage: previous / next, the dish name, and one dot per dish. */
-export function DishSwitcher({ dishes, index, onChange, lang }: DishSwitcherProps) {
+// (item 374: drawn again only as its own props change; it was with every redraw of the page, 3.3 a second)
+export const DishSwitcher = memo(function DishSwitcher({ dishes, index, onChange, lang }: DishSwitcherProps) {
   const n = dishes.length
   const prev = (index - 1 + n) % n
   const next = (index + 1) % n
@@ -39,4 +41,4 @@ export function DishSwitcher({ dishes, index, onChange, lang }: DishSwitcherProp
       </button>
     </nav>
   )
-}
+})

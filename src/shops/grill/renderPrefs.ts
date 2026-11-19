@@ -1,4 +1,4 @@
-import { useRef, useSyncExternalStore } from 'react'
+import { memo, useRef, useSyncExternalStore } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { clearPref, prefOf, readPrefs, setPref, sigOf, writePrefs, type RenderPref, type RenderPrefs } from '@/game/renderPrefs'
@@ -99,7 +99,9 @@ function walk(o: THREE.Object3D, id: string | null) {
 }
 
 /** lays the settings onto the scene: at once when they change, and every second while there are any (for what's loaded since) */
-export function RenderPrefsApply() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const RenderPrefsApply = memo(function RenderPrefsApply() {
   const scene = useThree((s) => s.scene)
   const ver = useRenderPrefsVersion()
   const last = useRef({ ver: -1, t: -9 })
@@ -111,4 +113,4 @@ export function RenderPrefsApply() {
     walk(scene, null)
   })
   return null
-}
+})

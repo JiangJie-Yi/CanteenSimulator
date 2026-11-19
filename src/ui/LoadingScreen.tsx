@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useProgress } from '@react-three/drei'
 import { GrillingFish } from './GrillingFish'
 import { laterPending, laterSeen, sceneDrawn } from '@/scene/Later'
@@ -11,7 +11,8 @@ const STALL_MS = 20000
  * shows when its counts go wrong), and, when nothing has come in for a while or a file failed (a model being rewritten while it's read, the
  * dev server restarting), a word saying so and a button to load the page again.
  */
-export function LoadingScreen({ scene = true }: { scene?: boolean }) {
+// (item 374: drawn again only as its own props change; it was with every redraw of the page, 3.3 a second)
+export const LoadingScreen = memo(function LoadingScreen({ scene = true }: { scene?: boolean }) {
   // (read a few times a second, not on every file: dozens of textures finishing at once fired an update apiece, and that storm of renders
   // tripped React's guard against runaway updates)
   const [prog, setProg] = useState(() => useProgress.getState())
@@ -74,4 +75,4 @@ export function LoadingScreen({ scene = true }: { scene?: boolean }) {
       )}
     </div>
   )
-}
+})

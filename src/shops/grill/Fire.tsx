@@ -1,4 +1,4 @@
-import { useMemo, useRef, type RefObject } from 'react'
+import { memo, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
 import { snoise } from '@/scene/shaders/noise'
@@ -90,7 +90,8 @@ type FireProps = ThreeElements['group'] & {
 }
 
 /** Campfire flames (crossed noise planes), rising embers and a flickering firelight. */
-export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, baseIntensity = 7, level, ...props }: FireProps) {
+// (item 374: drawn again only as its own props change (the same numbers and the same fire's level each time the scene was drawn, three times a second))
+export const Fire = memo(function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, baseIntensity = 7, level, ...props }: FireProps) {
   const flameGeometry = useMemo(() => {
     const g = new THREE.PlaneGeometry(width, height, 16, 48)
     g.translate(0, height / 2, 0)
@@ -243,4 +244,4 @@ export function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, base
         decay={2} />
     </group>
   )
-}
+})

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { warmLater } from './Prewarm'
@@ -15,7 +15,11 @@ const FADED = 0.18
 /** the rays: a grid round where what's looked at is on the screen (in the screen's -1..1, about a third of it across) */
 const AIM: [number, number][] = [-0.3, -0.15, 0, 0.15, 0.3].flatMap((x) => [-0.3, -0.15, 0, 0.15, 0.3].map((y) => [x, y] as [number, number]))
 
-type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; drawn: THREE.Mesh[]; ink: THREE.Mesh[]; low: number; k: number; want: number; own: Map<THREE.Material, THREE.Material> }
+type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; box: THREE.Box3; drawn: THREE.Mesh[]; ink: THREE.Mesh[]; low: number; k: number; want: number; own: Map<THREE.Material, THREE.Material> }
+
+/** (scratch for the rays, none made anew each time (item 374): where the target is on the screen, a ray's point on it, what a ray hit, which
+ * hangings are in the way) */
+const AIM_C = new THREE.Vector3(), AIM_P = new THREE.Vector2(), RAY_HITS: THREE.Intersection[] = [], IN_WAY = new Set<Fader>()
 
 /** a hanging's own see-through copy of one of its materials, made once: remembering how it was, so the original stays as it is for everything else */
 function ownCopy(own: Map<THREE.Material, THREE.Material>, mat: THREE.Material) {
@@ -32,7 +36,9 @@ function ownCopy(own: Map<THREE.Material, THREE.Material>, mat: THREE.Material) 
   return c
 }
 
-export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefined }) {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const OccluderFade = memo(function OccluderFade({ target }: { target: () => THREE.Vector3 | undefined }) {
   const { scene, camera } = useThree()
   const faders = useRef<Fader[]>([])
   const seen = useRef(0)
@@ -69,7 +75,7 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
           warmLater(new THREE.Mesh(mesh.geometry, ownCopy(own, mat)))
         }
       }
-      list.push({ root: o, hit, drawn, ink, low, k: was?.k ?? 1, want: 1, own })
+      list.push({ root: o, hit, box: was?.box ?? new THREE.Box3(), drawn, ink, low, k: was?.k ?? 1, want: 1, own })
     })
     faders.current = list
   }
@@ -113,17 +119,26 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
     // (the rays every few frames; the fading every frame)
     if (++tick.current % 3 === 0) {
       const far = camera.position.distanceTo(aim) * 0.97
-      const hits = new Set<Fader>()
+      const hits = IN_WAY
+      hits.clear()
+      // (each hanging's box as it stands now, round the meshes its rays are tried on: a ray that misses it misses them all, and most do
+      // (item 374: every ray was tried on every mesh of every hanging, some 10,000 meshes a second, a million and a quarter triangles))
+      for (const f of faders.current) {
+        f.box.makeEmpty()
+        for (const m of f.hit) f.box.expandByObject(m)
+      }
       // (round where the target is on the screen, which needn't be its middle: the view is shifted to frame the stage)
-      const c = aim.clone().project(camera)
+      const c = AIM_C.copy(aim).project(camera)
       for (const [x, y] of AIM) {
-        ray.current.setFromCamera(new THREE.Vector2(c.x + x, c.y + y), camera)
+        ray.current.setFromCamera(AIM_P.set(c.x + x, c.y + y), camera)
         ray.current.far = far
         for (const f of faders.current) {
-          if (hits.has(f)) continue
-          if (ray.current.intersectObjects(f.hit, false).length) hits.add(f)
+          if (hits.has(f) || f.box.isEmpty() || !ray.current.ray.intersectsBox(f.box)) continue
+          RAY_HITS.length = 0
+          if (ray.current.intersectObjects(f.hit, false, RAY_HITS).length) hits.add(f)
         }
       }
+      RAY_HITS.length = 0
       for (const f of faders.current) f.want = hits.has(f) ? f.low : 1
     }
     for (const f of faders.current) {
@@ -136,4 +151,4 @@ export function OccluderFade({ target }: { target: () => THREE.Vector3 | undefin
     }
   })
   return null
-}
+})

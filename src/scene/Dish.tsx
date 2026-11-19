@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 import { BASE_MATERIAL } from './baseMaterial'
 import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
+import { alike } from './steadyProps'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { CopyLayout } from '@/data/menu'
 import { reflectStudio, useStudio } from './studio'
@@ -245,7 +246,9 @@ type DishProps = ThreeElements['group'] & {
 }
 
 /** A dish exported from blender/*.py, drawn in a hand-painted toon style, with menu items that pop in and out. */
-export function Dish({ url, itemIds, quantities, hidden, layout, instant = false,
+// (item 374: drawn again only as what it's given changes, by value: the scene draws it about three times a second, its servings a new
+// object of the same counts each time)
+export const Dish = memo(function Dish({ url, itemIds, quantities, hidden, layout, instant = false,
   ...props }: DishProps) {
   const { scene } = useGLTF(url)
   // (the studio its real metal reflects)
@@ -495,4 +498,4 @@ export function Dish({ url, itemIds, quantities, hidden, layout, instant = false
       <primitive object={scene} {...props} />
     </>
   )
-}
+}, alike)

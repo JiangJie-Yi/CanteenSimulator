@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Vector2 } from 'three'
 
@@ -9,7 +9,9 @@ import { Vector2 } from 'three'
  */
 const SIZE = new Vector2()
 const SHOW_KEY = 'canteen_show_fps'
-export function FpsMeter() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const FpsMeter = memo(function FpsMeter() {
   const gl = useThree((s) => s.gl)
   const el = useRef<HTMLDivElement | null>(null)
   const acc = useRef({ frames: 0, time: 0, worst: 0, last: -1 })
@@ -70,5 +72,5 @@ export function FpsMeter() {
     a.worst = 0
   })
   return null
-}
+})
 

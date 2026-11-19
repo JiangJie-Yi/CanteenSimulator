@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { memo, useEffect, useRef, useSyncExternalStore } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { PACE, holdPace, newPace, paceFrame } from '@/game/framePace'
 import { GAME_SPEED } from './speed'
@@ -43,7 +43,9 @@ export const usePacedDpr = () => useSyncExternalStore((f) => { pacedSubs.add(f);
  * Either way, once the loop's ours each frame's real time is measured in seconds and clamped, so the clock never
  * jumps.
  */
-export function FramePacer() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const FramePacer = memo(function FramePacer() {
   const { setDpr, setFrameloop, advance, clock, gl, get } = useThree()
   const pace = useRef(newPace())
   const capped = useRef(false)
@@ -116,4 +118,4 @@ export function FramePacer() {
     }
   }, [setFrameloop, advance, clock, get])
   return null
-}
+})

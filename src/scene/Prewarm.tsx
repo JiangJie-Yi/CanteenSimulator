@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { memo, useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import type * as THREE from 'three'
 import { holdVeil, laterPending, laterSeen, sceneDrawn } from './Later'
@@ -47,7 +47,9 @@ function compileSafe(gl: THREE.WebGLRenderer, o: THREE.Object3D, camera: THREE.C
   }
 }
 
-export function Prewarm() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const Prewarm = memo(function Prewarm() {
   const { gl, scene, camera } = useThree()
   useEffect(() => {
     const release = holdVeil('prewarm')
@@ -70,4 +72,4 @@ export function Prewarm() {
     return () => { window.clearInterval(tick); release(); warmNow = null }
   }, [gl, scene, camera])
   return null
-}
+})

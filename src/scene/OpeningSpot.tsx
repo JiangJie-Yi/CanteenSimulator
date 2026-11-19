@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -10,7 +10,9 @@ import * as THREE from 'three'
 
 const FROM = new THREE.Vector3(-4.2, 7.5, 2.6)
 
-export function OpeningSpot({ on, focusY }: { on: boolean; focusY: number }) {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const OpeningSpot = memo(function OpeningSpot({ on, focusY }: { on: boolean; focusY: number }) {
   const scene = useThree((s) => s.scene)
   const light = useRef<THREE.SpotLight>(null)
   const pool = useRef<THREE.Mesh>(null)
@@ -113,4 +115,4 @@ export function OpeningSpot({ on, focusY }: { on: boolean; focusY: number }) {
       <mesh ref={shaft} geometry={shaftGeo} position={FROM} material={shaftMat} />
     </>
   )
-}
+})

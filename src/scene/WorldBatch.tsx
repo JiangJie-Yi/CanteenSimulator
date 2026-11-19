@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -120,7 +120,9 @@ const hexOf = (m: THREE.Material, k: 'color' | 'emissive') => ((m as THREE.MeshT
  * twice so and it's left out after); a quarter taken out, or the editor left, and it's made again. The editor on, it's all given back.
  * Nothing new to draw with (their own materials), nothing to point at (the originals are what the pointer finds), the same shadows.
  */
-export function WorldBatch() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const WorldBatch = memo(function WorldBatch() {
   const scene = useThree((s) => s.scene)
   /** what's merged: its meshes (`base` of them as it was made, the rest added since) and what's watched */
   const built = useRef<{ meshes: THREE.Mesh[]; watch: Watch[]; base: number } | null>(null)
@@ -279,4 +281,4 @@ export function WorldBatch() {
     if (!b && keep.length > 1 && (keep.length >= 200 || now - mountedAt.current > 20_000) && !anyLit()) { build(keep); madeAt.current = now }
   })
   return null
-}
+})

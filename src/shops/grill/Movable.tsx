@@ -5,7 +5,7 @@
 // pointer (scene/pickable: not a lamp's glow, its pool of light, an unseen hit box, a piece hidden by hand (H)); clicked again in the same
 // place, the next piece back is chosen. Wrap it round a StaticBatch, not inside one: the batch's baked meshes then move with the group.
 
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ALONG } from './bar'
@@ -182,7 +182,9 @@ function chainMatrix(gs: Group[], out: THREE.Matrix4) {
 /** the selected group's handles: the arrows, rings or boxes at its pivot (where it's been moved to), along the room's axes; they move, turn and
  * size the group as one, as a piece's own handles do it. A group inside another (the till's, in its view's area) has them inside that one's
  * move, turn and size, as what it holds is */
-export function GroupGizmo() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const GroupGizmo = memo(function GroupGizmo() {
   // (redrawn as the group chosen, its move, turn or size, or the axes change (item 186))
   useEditSel((s) => (s.on && s.selected && s.groups[s.selected] ? `${s.selected}|${s.space}|${groupSigOf(s.selected)}|${s.groups[s.selected].t}|${s.groups[s.selected].yaw}|${s.groups[s.selected].s}|${s.groups[s.selected].pivot}` : ''))
   const { on, selected, groups, space } = getEdit()
@@ -199,7 +201,7 @@ export function GroupGizmo() {
       </group>
     </group>
   )
-}
+})
 
 /** the materials' own wireframe settings while it's shown, kept for every view of it (the scene's and the character viewer's share materials) */
 const WIRE_WAS = new Map<THREE.Material, boolean>()
@@ -230,7 +232,9 @@ function releaseLines(gs: Iterable<THREE.BufferGeometry>) {
 /** a wireframe view begun again: what was waiting to be let go is drawn as lines again, kept (let go once this view's left) */
 const keepLines = () => { releaseQ.length = 0 }
 
-export function WireView() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const WireView = memo(function WireView() {
   const wire = useEditSel((s) => s.shade === 'wire'), on = useEditSel((s) => s.on)
   const scene = useThree((st) => st.scene)
   useEffect(() => {
@@ -285,7 +289,7 @@ export function WireView() {
     }
   }, [wire, on, scene])
   return null
-}
+})
 
 /** (item 191) the materials the other views draw with: made once each, kept for the next time */
 const SURFACES = new Set(['MeshToonMaterial', 'MeshStandardMaterial', 'MeshPhysicalMaterial', 'MeshBasicMaterial', 'MeshLambertMaterial', 'MeshPhongMaterial'])
@@ -349,7 +353,9 @@ const clayWarm = new WeakSet<THREE.Scene>()
  * lit scene, each model's lines laid over it); the wireframe itself is WireView's. All it changed is put back as the view's left, or the
  * edit mode is; a mesh whose material something else changed meanwhile (a piece's render setting) is taken as that left it.
  */
-export function ShadeView() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const ShadeView = memo(function ShadeView() {
   const shade = useEditSel((s) => (s.on ? s.shade : 'lit'))
   const scene = useThree((st) => st.scene), gl = useThree((st) => st.gl), camera = useThree((st) => st.camera)
   // (in the editor, once it's open and the page is idle: the clay compiled in the background for everything that'd take it, as a dry run put
@@ -431,7 +437,7 @@ export function ShadeView() {
     }
   }, [shade, scene])
   return null
-}
+})
 
 export function AxisGizmo({ id, at, theta = 0, own, pivotGroup, tilt }: { id: string; at: V3; size?: number; theta?: number; own?: number; pivotGroup?: { current: THREE.Group | null }
   /** (object axes) the piece's whole turn in the parent's frame, pitch and roll too: the move arrows stand on it, as Maya's object axes do */

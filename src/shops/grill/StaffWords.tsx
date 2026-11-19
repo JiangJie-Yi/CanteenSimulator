@@ -78,7 +78,8 @@ export const StaffWords = memo(function StaffWords() {
   return <>{words.map((w) => <Word key={w.key} word={w} />)}</>
 })
 
-function Word({ word }: { word: StaffWord }) {
+// (item 374: drawn again only as its own props change; every word over a head, and its Html, was drawn again as any one came or went, 5.2 a second)
+const Word = memo(function Word({ word }: { word: StaffWord }) {
   // (faded out over its last 0.3 s, as it's taken away)
   const [fadeAt] = useState(() => ({ '--out': `${Math.max(0, word.until - performance.now() - 300)}ms` }) as CSSProperties)
   const g = useRef<THREE.Group>(null)
@@ -113,7 +114,7 @@ function Word({ word }: { word: StaffWord }) {
       </Html>
     </group>
   )
-}
+})
 
 /** right over the head, in its middle (the owner's: beside it, it hung behind the cap), in the figure's own frame; the bubble's over it */
 const SIDE = new THREE.Vector3(0, 1.43, 0)

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import type { Lang } from '@/data/i18n'
 import { tl } from '@/data/i18n'
 import { setTip } from '@/scene/hoverTip'
@@ -32,7 +32,8 @@ const FISH_RULE = 'M3 25Q6 11 18 7Q40 3 64 7Q76 10 83 22L94 9Q91 25 94 41L83 28Q
  * The shop's sign, top-left: it hangs from two cords and sways a little in the breeze, and at night its lettering
  * lights up; past midnight a 深夜 stamp is pressed on beside it.
  */
-export function Brand({ night, late = false, lang, shop = 'grilledfish', dark = false, ignite = 0, onClick }:
+// (item 374: drawn again only as its own props change; it was with every redraw of the page, 3.3 a second, its click a new one each time)
+export const Brand = memo(function Brand({ night, late = false, lang, shop = 'grilledfish', dark = false, ignite = 0, onClick }:
   { night: boolean; late?: boolean; lang: Lang; shop?: string; dark?: boolean; ignite?: number; onClick?: () => void }) {
   const { main, sub } = (NAMES[shop] ?? NAMES.grilledfish)[lang]
   // (its tag taken down if the sign goes (lit afresh, as when the shop's founded) with the pointer still on it)
@@ -86,4 +87,4 @@ export function Brand({ night, late = false, lang, shop = 'grilledfish', dark = 
       )}
     </h1>
   )
-}
+})

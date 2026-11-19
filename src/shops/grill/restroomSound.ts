@@ -21,12 +21,26 @@ if (typeof window !== 'undefined') {
   replaces(import.meta.hot, () => { window.removeEventListener('pointerdown', go); void ac?.close() })
 }
 
-function noise(a: AudioContext, seconds: number, shape: (t: number) => number, smooth = 0.4) {
-  const n = Math.max(1, Math.floor(a.sampleRate * seconds))
-  const b = a.createBuffer(1, n, a.sampleRate)
-  const d = b.getChannelData(0)
-  let last = 0
-  for (let i = 0; i < n; i++) { last = last * smooth + (Math.random() * 2 - 1) * (1 - smooth); d[i] = last * shape(i / n) }
+/**
+ * A burst of noise shaped by `shape` (0 to 1 through it). `pool`: the sounds heard over and over while the shop's busy (a sizzle as the chef
+ * seasons, a plate scrubbed, a stool) made a few ways the first times and then one of those picked each time (item 374: a new buffer worked out
+ * on the page's own thread every time, the sizzle's 34,000 samples four times a second, was most of what the shop's sounds made to be thrown
+ * away); their pitch, loudness and side still each time's own
+ */
+const POOLS = new Map<string, AudioBuffer[]>()
+function noise(a: AudioContext, seconds: number, shape: (t: number) => number, smooth = 0.4, pool?: { key: string; ways: number }) {
+  const kept = pool ? POOLS.get(pool.key) ?? [] : null
+  if (pool && kept && !POOLS.has(pool.key)) POOLS.set(pool.key, kept)
+  let b: AudioBuffer
+  if (kept && kept.length >= (pool?.ways ?? 0) && kept[0].sampleRate === a.sampleRate) b = kept[Math.floor(Math.random() * kept.length)]
+  else {
+    const n = Math.max(1, Math.floor(a.sampleRate * seconds))
+    b = a.createBuffer(1, n, a.sampleRate)
+    const d = b.getChannelData(0)
+    let last = 0
+    for (let i = 0; i < n; i++) { last = last * smooth + (Math.random() * 2 - 1) * (1 - smooth); d[i] = last * shape(i / n) }
+    if (kept) { if (kept.length && kept[0].sampleRate !== a.sampleRate) kept.length = 0; kept.push(b) }
+  }
   const s = a.createBufferSource()
   s.buffer = b
   return s
@@ -683,7 +697,7 @@ export function sizzleBurst(at: THREE.Vector3, level = 1) {
   const { near, pan } = heard(at)
   if (!a || near < 0.02 || !gate('sizzle', 250)) return
   const t = a.currentTime, o = out(a, 0.16 * near * level, pan)
-  const s = noise(a, 0.7, (x) => Math.min(1, x * 12) * (1 - x) ** 1.6 * (0.55 + 0.45 * Math.random() ** 6), 0.05)
+  const s = noise(a, 0.7, (x) => Math.min(1, x * 12) * (1 - x) ** 1.6 * (0.55 + 0.45 * Math.random() ** 6), 0.05, { key: 'sizzle', ways: 6 })
   const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600
   s.connect(hp).connect(o); s.start(t)
 }
@@ -694,7 +708,7 @@ export function washSplash(at: THREE.Vector3) {
   const { near, pan } = heard(at)
   if (!a || near < 0.02 || !gate('wash', 280)) return
   const t = a.currentTime, o = out(a, 0.17 * near, pan)
-  const s = noise(a, 0.38, (x) => Math.min(1, x * 6) * (1 - x) * (0.6 + 0.4 * Math.sin(x * 60)), 0.5)
+  const s = noise(a, 0.38, (x) => Math.min(1, x * 6) * (1 - x) * (0.6 + 0.4 * Math.sin(x * 60)), 0.5, { key: 'wash', ways: 6 })
   const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.7
   s.connect(bp).connect(o); s.start(t)
   for (let k = 0; k < 2; k++) {

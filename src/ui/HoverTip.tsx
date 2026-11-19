@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { TIP_AIM, useTip } from '@/scene/hoverTip'
 import { Glyph } from './GameIcons'
@@ -16,7 +16,8 @@ const FADE_MS = 110
  * switch, a cup) it stands just above that thing's top, kept inside the window (the owner's: by the pointer, among the fridge's bottles it lay
  * over the next ones); over a big one (a wall, the counter) it follows the pointer as before. It fades in.
  */
-export function HoverTip({ hidden = false }: { hidden?: boolean }) {
+// (item 374: drawn again only as its own props change; it was with every redraw of the page, 3.3 a second)
+export const HoverTip = memo(function HoverTip({ hidden = false }: { hidden?: boolean }) {
   const live = useTip()
   // (the last tag kept a moment once the pointer's left it, fading out, not snapped away)
   const [tip, setShown] = useState(live)
@@ -101,4 +102,4 @@ export function HoverTip({ hidden = false }: { hidden?: boolean }) {
       </span>
     </div>
   )
-}
+})

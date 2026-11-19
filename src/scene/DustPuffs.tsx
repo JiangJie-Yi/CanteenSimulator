@@ -1,7 +1,7 @@
 // Overcooked's little puffs of dust at a walker's heels (the owner's): every so often as anyone walks, one round cream puff at the back of
 // a foot, left and right in turn, that swells like cotton wool, drifts back and up a little and shrinks away, under half a second. All of
 // them one instanced mesh of eighty: one draw, nothing made or thrown away as they come and go.
-import { useEffect, useMemo } from 'react'
+import { memo, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -64,7 +64,9 @@ const Q = new THREE.Quaternion()
 const S = new THREE.Vector3()
 const P = new THREE.Vector3()
 /** the puffs, drawn: put once in the scene (App's canvas), from the start (its program made with the rest at loading) */
-export function DustPuffs() {
+// (item 374: drawn again only as its own props change: it does its work in its frames and effects, and was drawn again with every redraw
+// of the page or the scene, about three times a second, for nothing)
+export const DustPuffs = memo(function DustPuffs() {
   const mesh = useMemo(() => {
     const m = new THREE.InstancedMesh(GEO, MAT, MAX)
     m.name = 'dust-puffs'
@@ -102,4 +104,4 @@ export function DustPuffs() {
     mesh.count = n
   })
   return <primitive object={mesh} />
-}
+})
