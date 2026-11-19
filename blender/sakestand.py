@@ -596,81 +596,70 @@ wood *= (0.97 + 0.03 * np.sin(wu * 2600 + wv * 50))[..., None]
 wood *= (0.97 + 0.04 * fbm(WW, 40, 8, 3)[:WH])[..., None]
 stand_col = wood.astype(np.float32)
 
-# ---- (item 380) the display's pictures. Seigaiha (青海波): gold lines on black lacquer, rows of circles each half over the row behind
-# it (each lower row over the one above, as it's drawn by hand), four rings each; tiling every way (WAVE metres a picture)
-def seigaiha(w=512, h=512, r=64, rings=4, line=2.6):
-    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32) + 0.5
-    dist = np.full((h, w), 1e9, np.float32)
-    best = np.full((h, w), -1e9, np.float32)
-    # (rows from the top down (image rows count up from the bottom: the top is h), every half radius, alternate ones shifted a radius;
-    # the picture's period r up and 2r across, so it tiles)
-    for jr in range(-2, int(2 * h / r) + 3):
-        cy = h - jr * r / 2
-        off = r if jr % 2 else 0
-        for ic in range(-2, int(w / (2 * r)) + 3):
-            cx = ic * 2 * r + off
-            for dx in (-w, 0, w):
-                for dy in (-h, 0, h):
-                    d = np.hypot(xx - (cx + dx), yy - (cy + dy))
-                    key = -(cy + dy)
-                    over = (d < r) & (key >= best)
-                    dist[over] = d[over]
-                    best[over] = key
-    ring_ = (dist / r) * rings
-    fr = np.abs(ring_ - np.round(ring_)) * r / rings
-    gold_ = np.clip(1.0 - (fr - line * 0.5) / 1.2, 0, 1) * (dist > 2)
-    base = np.array([0.03, 0.024, 0.026], np.float32)
-    gold = np.array([0.86, 0.64, 0.25], np.float32)
-    img = base[None, None, :] * (1 - gold_[..., None]) + gold[None, None, :] * gold_[..., None]
-    # (the lacquer's depth: a faint mottle)
-    img *= (0.94 + 0.06 * fbm(max(w, h), 8, 6, 3)[:h, :w])[..., None]
+# ---- (item 383) the stand's woods and pictures: keyaki (欅) for its feet, plinth, posts and beams (the hinoki's own grain stained a warm
+# mid brown); a figured burl (玉杢) for the plinth's long faces, as the screen's lower panel; the risers' shoji (格子): keyaki bars over warm
+# paper, a cell across a picture and the riser's height up it; the plaque's two faces, pale wood in a keyaki edge, brushed in sumi
+keyaki_col = (stand_col * np.array([0.7, 0.5, 0.33], np.float32)).astype(np.float32)
+
+
+def burl(n=512, seed=383):
+    """burl (玉杢): a burr cut through, its curling eyes (rings whorled round a dark knot), the grain swirling between them; a warm mid
+    brown, its lines darker; tiling"""
+    r_ = np.random.default_rng(seed)
+    yy, xx = (np.mgrid[0:n, 0:n].astype(np.float32) + 0.5) / n
+    ph = np.zeros((n, n), np.float32)
+    knots = np.zeros((n, n), np.float32)
+    for _ in range(14):
+        cx, cy = r_.random(), r_.random()
+        dx = (xx - cx + 0.5) % 1.0 - 0.5
+        dy = (yy - cy + 0.5) % 1.0 - 0.5
+        d = np.hypot(dx * 1.6, dy)
+        sz = 0.05 + 0.06 * r_.random()
+        ph += np.exp(-(d / (3 * sz)) ** 2) * (d / sz) * 6.0
+        knots = np.maximum(knots, np.exp(-(d / (0.12 * sz)) ** 2))
+    g = np.zeros((n, n), np.float32)
+    for k in range(1, 5):
+        a = r_.random() * 2 * math.pi
+        g += np.sin((xx * k * 2 + yy * (5 - k)) * 2 * math.pi + a) * (0.6 / k)
+    lines = smooth(0.55, 0.98, np.abs(np.sin((ph + yy * 26 + g * 1.4) * math.pi)))
+    img = mix((0.55, 0.32, 0.15), (0.27, 0.13, 0.05), lines * 0.75)
+    img = mix(img, (0.12, 0.06, 0.02), knots * 0.9)
     return img.astype(np.float32)
 
 
-def sign_pic(w=128, h=332):
-    """two columns: the front's (銘酒) left, the back's (聞野) right; black lacquer, a fine gold line inset, the two characters brushed down
-    it in gold"""
+def shoji_pic(w=128, h=128):
+    """one cell of the risers' lattice: warm paper, a keyaki bar at each side (half of it: they tile across), along its top and its foot
+    and across its middle; a faint shade along each bar on the paper"""
+    U, V = np.meshgrid((np.arange(w) + 0.5) / w, (np.arange(h) + 0.5) / h)
+    r_ = np.random.default_rng(3831)
+    paper = np.array([0.97, 0.92, 0.8], np.float32)[None, None, :] * (0.95 + 0.05 * r_.random((h, w, 1)).astype(np.float32))
+    dist = np.minimum.reduce([np.minimum(U, 1 - U) - 0.06, V - 0.13, 0.87 - V, np.abs(V - 0.5) - 0.045])
+    bar = dist < 0
+    paper = paper * (0.86 + 0.14 * smooth(0.0, 0.05, np.maximum(dist, 0)))[..., None]
+    img = np.where(bar[..., None], np.array([0.4, 0.24, 0.12], np.float32)[None, None, :], paper)
+    return img.astype(np.float32)
+
+
+def plaque_pic(w=128, h=168):
+    """the plaque's two faces side by side: the customers' (銘酒) left, the owner's (聞野) right; pale hinoki in a keyaki edge, the two
+    characters brushed down it in sumi"""
     out = np.zeros((h, 2 * w, 3), np.float32)
-    out[:] = (0.03, 0.024, 0.026)
-    gold = np.array([0.9, 0.68, 0.27], np.float32)
+    ink = np.array([0.05, 0.04, 0.04], np.float32)
+    edge = np.array([0.42, 0.25, 0.12], np.float32)
     for col, chars in ((0, "銘酒"), (1, "聞野")):
         x0 = col * w
+        cell = np.array(stand_col[:h, x0 * 3:x0 * 3 + w], np.float32)
         m = np.zeros((h * SS, w * SS), bool)
-        size = w * 0.9
-        for n, ch in enumerate(chars):
+        size = w * 0.7
+        for n_, ch in enumerate(chars):
             # (down the board: the first character above)
-            fill_tris(m, glyph(ch, True), (w / 2) * SS, (h / 2 + (0.5 - n) * size * 1.08) * SS, size * SS, size * SS)
+            fill_tris(m, glyph(ch, True), (w / 2) * SS, (h / 2 + (0.5 - n_) * size * 1.06) * SS, size * SS, size * SS)
         cov = m.reshape(h, SS, w, SS).mean(axis=(1, 3))
-        cell = out[:, x0:x0 + w]
-        cell[:] = cell * (1 - cov[..., None]) + gold * cov[..., None]
+        cell = cell * (1 - cov[..., None]) + ink * cov[..., None]
         yy, xx = np.mgrid[0:h, 0:w]
-        inset = 8
-        ln = ((np.abs(xx - inset) < 1.5) | (np.abs(xx - (w - 1 - inset)) < 1.5)) & (yy >= inset) & (yy <= h - 1 - inset)
-        ln |= ((np.abs(yy - inset) < 1.5) | (np.abs(yy - (h - 1 - inset)) < 1.5)) & (xx >= inset) & (xx <= w - 1 - inset)
-        cell[ln] = gold
-    return out
-
-
-def plaque_pic(w=640, h=128):
-    """two rows: the back's (聞野) below, the front's (銘酒) above; black lacquer, a fine gold line inset round it, the two characters
-    brushed big in gold"""
-    out = np.zeros((2 * h, w, 3), np.float32)
-    out[:] = (0.03, 0.024, 0.026)
-    gold = np.array([0.9, 0.68, 0.27], np.float32)
-    for row, chars in ((0, "聞野"), (1, "銘酒")):
-        y0 = row * h
-        m = np.zeros((h * SS, w * SS), bool)
-        for n, ch in enumerate(chars):
-            fill_tris(m, glyph(ch, True), (w / 2 + (n - 0.5) * h * 1.12) * SS, (h / 2) * SS, h * 1.02 * SS, h * 1.02 * SS)
-        cov = m.reshape(h, SS, w, SS).mean(axis=(1, 3))
-        cell = out[y0:y0 + h]
-        cell[:] = cell * (1 - cov[..., None]) + gold * cov[..., None]
-        # (the inset line)
-        yy, xx = np.mgrid[0:h, 0:w]
-        inset = 9
-        ln = ((np.abs(xx - inset) < 1.6) | (np.abs(xx - (w - 1 - inset)) < 1.6)) & (yy >= inset) & (yy <= h - 1 - inset)
-        ln |= ((np.abs(yy - inset) < 1.6) | (np.abs(yy - (h - 1 - inset)) < 1.6)) & (xx >= inset) & (xx <= w - 1 - inset)
-        cell[ln] = gold
+        e = 7
+        cell[(xx < e) | (xx >= w - e) | (yy < e) | (yy >= h - e)] = edge
+        out[:, x0:x0 + w] = cell
     return out
 
 
@@ -681,22 +670,13 @@ M = {
     "liquid": pbr("SakeLiquid", (0.96, 0.92, 0.74), rough=0.05),
     # (the cloudy sake (にごり, item 285): white, near opaque, the game its own see-through for it)
     "nigori": pbr("SakeLiquidNigori", (0.95, 0.94, 0.9), rough=0.25),
-    # (the display's (item 380): black and vermilion lacquer, glossy; the risers' gold waves; gold; the glow along the risers' feet; the
-    # plaques; the braided cord's vermilion)
-    "black": pbr("SakeLacquerBlack", (0.028, 0.022, 0.024), rough=0.16),
-    "red": pbr("SakeLacquerRed", (0.37, 0.018, 0.01), rough=0.28),
-    "wave": pbr("SakeLacquerWave", (1, 1, 1), tex=image("sake_wave", seigaiha()), rough=0.2),
-    "plaque": pbr("SakeLacquerPlaque", (1, 1, 1), tex=image("sake_plaque", plaque_pic()), rough=0.2),
-    "sign": pbr("SakeLacquerSign", (1, 1, 1), tex=image("sake_sign", sign_pic()), rough=0.2),
-    "gold": pbr("SakeGold", (0.86, 0.64, 0.25), rough=0.26, metal=1.0),
-    "glow": pbr("SakeGlow", (1.0, 0.8, 0.52), emit=(1.0, 0.8, 0.52), emit_strength=3.0),
-    "cord": pbr("SakeCordRed", (0.66, 0.08, 0.06), rough=0.75),
-    # (the stand's brass corner fittings)
-    "brass": pbr("SakeStandBrass", (0.78, 0.6, 0.28), rough=0.3, metal=0.8),
+    # (the stand's woods (item 383): its hinoki, its keyaki, the burl of the plinth's faces, the risers' shoji (the game lights its paper
+    # softly), the plaque)
     "wood": pbr("SakeStandWood", (1, 1, 1), tex=image("sake_stand_wood", stand_col), rough=0.6),
-    "lacquer": pbr("SakeStandLacquer", (0.04, 0.03, 0.03), rough=0.3),
-    # (the end boards' wood: the stand's own grain stained a deep chestnut (item 131))
-    "dark": pbr("SakeStandEnd", (1, 1, 1), tex=image("sake_stand_end", (stand_col * np.array([0.42, 0.27, 0.17], np.float32)).astype(np.float32)), rough=0.45),
+    "keyaki": pbr("SakeWoodKeyaki", (1, 1, 1), tex=image("sake_keyaki", keyaki_col), rough=0.5),
+    "burl": pbr("SakeWoodBurl", (1, 1, 1), tex=image("sake_burl", burl()), rough=0.45),
+    "shoji": pbr("SakeShoji", (1, 1, 1), tex=image("sake_shoji", shoji_pic()), rough=0.7),
+    "plaque": pbr("SakeWoodPlaque", (1, 1, 1), tex=image("sake_plaque", plaque_pic()), rough=0.5),
 }
 parts = []
 
@@ -892,47 +872,102 @@ def bottle(k, prof, at, turn):
 
 
 # =====================================================================
-# The stand (item 380, the owner's, 2026-11-19: 「我要看到灶台上的酒臺是很華麗標準的」, after items 177, 197 and 285: it was a two-stepped
-# hinoki plank, the bottles on it as on a kitchen shelf). Now a sake display as a good shop dresses one, both its sides seen (its front to
-# the bar's customers, its back to the owner at the hearth): a black-lacquered plinth, a gold rod round it under its rounded top and a
-# plaque on it brushed in gold, 銘酒 to the front and the shop's 聞野 to the back; two steps on it, their tops vermilion lacquer, their
-# risers black lacquer with gold seigaiha (青海波) waves, a gold rod under each lip and a warm glow along each riser's foot (the display's
-# light, drawn: no light added); each bottle on a coaster of its own, black with a gold rim; the best one up on its own vermilion dais; two
-# black posts at the back corners, gold giboshi (擬宝珠) on them, a vermilion braided cord slung between them behind the bottles, a gold
-# knot and a tassel at its middle and at each end. Its shapes full and their edges well rounded, the flat faces flat and the rounds smooth
-# (a bevel with its normals hardened: item 379, the owner's 「造型感」: bold, chunky shapes that read at a glance from across the room)
+# The stand (item 383, the owner's, 2026-11-20: 「酒台的風格不行，要日式，木造」, after a woodblock print's 衝立: a wooden screen, its frame
+# on two feet, a lattice in its upper half, a panel of figured wood under it, a top rail over its posts run on past them. Item 380's black
+# lacquer, gold and vermilion didn't go with the shop's Edo wood (the bar's lip, item 313, after a 衝立 too)). All of it wood now, joined
+# as a joiner joins it: a keyaki plinth up on two bracket feet (脚), its long faces figured burl (玉杢) as the screen's lower panel; two
+# steps on it, their tops pale hinoki, their risers a shoji lattice (格子) of keyaki bars over paper, lit softly from within; each bottle
+# on a hinoki coaster, the best one up on a white-wood dais; behind them a gate of keyaki at the back corners: two posts standing on the
+# feet, the top rail (笠木) over them, its ends run on past them and cut slanting, the tie beam (貫) under it through the posts, and at
+# the middle between the two the plaque (額束) brushed in sumi, 銘酒 to the customers and 聞野 to the owner. Bold rounded shapes (item
+# 379's 造型感: bevels with their normals hardened). The steps' heights and the bottles' places as they were (the pour, the tasting)
 # =====================================================================
 L, D = 0.93, 0.25
 FRONT_D = 0.11
-PL = 0.056           # (the plinth's height: its plaque's to be read)
+PL = 0.056           # (the plinth's top)
 T1 = PL + 0.042      # (the front step's top)
 T2 = T1 + 0.06       # (the back step's top)
 CO = 0.006           # (a coaster's height)
 DAI = 0.045          # (the best bottle's dais)
-PX = L / 2 + 0.046   # (the plinth's half length: the posts stand on its flat past the steps' ends)
-PY0, PY1 = -D / 2 - 0.02, D / 2 + 0.02
-POST_X, POST_Y, POST_W, POST_TOP = L / 2 + 0.018, D / 2 - 0.007, 0.03, 0.461
-WAVE = 0.16          # (the seigaiha's picture: so many metres of the risers across it, and as many up it again)
+PX = L / 2 + 0.046   # (the plinth's half length)
+PY0, PY1 = -D / 2 - 0.02, D / 2 + 0.035     # (its depth: deeper behind, the gate's posts on it behind the steps)
+FOOT_H = 0.022       # (the feet: the plinth stands up on them, the table seen under it between them)
+POST_X, POST_Y, POST_W = L / 2 + 0.018, D / 2 + 0.017, 0.032
+NUKI_Z, KASA_Z = 0.515, 0.6      # (the tie beam's top; the top rail's foot)
+KASA_H, KASA_D, KASA_RUN = 0.028, 0.048, 0.055
+CELL = 0.05          # (the risers' lattice: a cell across)
 
 
 def rounded_box(name, x0, x1, y0, y1, z0, z1, bw, segs, top_mat, side_mat, bottom=False):
     """the shared chunky box (common.chunky_box: rounded, its normals hardened), kept with the stand's parts"""
-    o = chunky_box(name, x0, x1, y0, y1, z0, z1, bw, segs, top_mat, side_mat, bottom=bottom, uv_scale=WAVE)
+    o = chunky_box(name, x0, x1, y0, y1, z0, z1, bw, segs, top_mat, side_mat, bottom=bottom, uv_scale=0.16)
     parts.append(o)
     return o
 
 
-def bar(name, x0, x1, y0, y1, z0, z1, mat):
-    """a small square bar (a rod, a strip, a plaque's frame): flat-shaded"""
+def relay_uv(o, fn):
+    """each corner's place on its picture from its face's normal, its place and its material (through the mesh: the hardened normals
+    kept)"""
+    me = o.data
+    if not me.uv_layers:
+        me.uv_layers.new(name="UVMap")
+    uvl = me.uv_layers[0]
+    for pg in me.polygons:
+        for li in pg.loop_indices:
+            uvl.data[li].uv = fn(pg.normal, me.vertices[me.loops[li].vertex_index].co, pg.material_index)
+
+
+def along_uv(scale):
+    """the grain along the stand (x) on every face, `scale` metres a picture: across the tops, up the faces"""
+    def f(n, c, mi):
+        if abs(n.z) > 0.7:
+            return (c.x / scale, c.y / scale)
+        return ((c.x if abs(n.y) >= abs(n.x) else c.y) / scale, c.z / scale)
+    return f
+
+
+def upright_uv(scale):
+    """the grain up a post"""
+    def f(n, c, mi):
+        if abs(n.z) > 0.7:
+            return (c.x / scale, c.y / scale)
+        return (c.z / scale, (c.x if abs(n.y) >= abs(n.x) else c.y) / scale)
+    return f
+
+
+def shoji_uv(z0, z1):
+    """the risers' lattice: a cell every CELL along the face, the riser's height (z0 to z1) up it; the tops their hinoki's grain"""
+    def f(n, c, mi):
+        if mi == 0:
+            return (c.x / 0.16, c.y / 0.16)
+        return ((c.x if abs(n.y) >= abs(n.x) else c.y) / CELL, min(1.0, max(0.0, (c.z - z0) / (z1 - z0))))
+    return f
+
+
+def profile(name, pts, axis, a0, a1, mat, bev, segs=2, uv=None):
+    """an outline (`pts` round the plane across `axis`: (y, z) for 'x', (x, z) for 'y') given its thickness from a0 to a1 along `axis`,
+    its edges rounded `bev` (a bevel by angle, its normals hardened)"""
     bm_ = bmesh.new()
-    uv_ = bm_.loops.layers.uv.new()
-    bmesh.ops.create_cube(bm_, size=1.0)
-    bmesh.ops.transform(bm_, matrix=Matrix.Translation(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)) @ Matrix.Diagonal((x1 - x0, y1 - y0, z1 - z0, 1)),
-                        verts=bm_.verts)
-    for f in bm_.faces:
-        for l in f.loops:
-            l[uv_].uv = (0.5, 0.5)
-    return mesh_obj(name, bm_, mat, smooth_=False)
+
+    def at(p, a):
+        return Vector((a, p[0], p[1])) if axis == "x" else Vector((p[0], a, p[1]))
+    lo = [bm_.verts.new(at(p, a0)) for p in pts]
+    hi = [bm_.verts.new(at(p, a1)) for p in pts]
+    bm_.faces.new(lo)
+    bm_.faces.new(hi[::-1])
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        bm_.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    o = mesh_obj(name, bm_, mat)
+    m = o.modifiers.new("b", "BEVEL")
+    m.width, m.segments, m.limit_method, m.angle_limit, m.harden_normals = bev, segs, "ANGLE", math.radians(40), True
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    relay_uv(o, uv or along_uv(0.16))
+    return o
 
 
 def lathe(name, prof, at, segs, mats, mat_of=None, smooth_=True, top_mat=None, foot=True):
@@ -958,46 +993,26 @@ def lathe(name, prof, at, segs, mats, mat_of=None, smooth_=True, top_mat=None, f
     return mesh_obj(name, bm_, mats, smooth_=smooth_)
 
 
-# ---- the plinth, its gold rod under the round of its top, its plaques
-rounded_box("SakeStandPlinth", -PX, PX, PY0, PY1, 0.001, PL, 0.011, 3, M["black"], M["wave"])
-for sy, y in ((-1, PY0), (1, PY1)):
-    for sx, (xa, xb) in ((-1, (-PX + 0.012, -0.085 - 0.008)), (1, (0.085 + 0.008, PX - 0.012))):
-        bar(f"SakeStandPlinthRod{sy}{sx}", xa, xb, y - 0.0016 if sy < 0 else y - 0.0004, y + 0.0004 if sy < 0 else y + 0.0016, PL - 0.019, PL - 0.013, M["gold"])
+# ---- the feet: two keyaki bracket feet under the plinth's ends, front to back, each its two toes and the arch cut up between them, the
+# tops of its ends rounded off (the screen's feet)
+FY0, FY1 = PY0 - 0.018, PY1 + 0.018
+TOE, ARCH, FR = 0.036, 0.007, 0.011
+foot_pts = [(FY0, 0.0), (FY0 + TOE, 0.0), (FY0 + TOE + 0.01, ARCH), (FY1 - TOE - 0.01, ARCH), (FY1 - TOE, 0.0), (FY1, 0.0), (FY1, FOOT_H - FR)]
+foot_pts += [(FY1 - FR + FR * math.cos(a), FOOT_H - FR + FR * math.sin(a)) for a in (math.pi / 6, math.pi / 3)] + [(FY1 - FR, FOOT_H), (FY0 + FR, FOOT_H)]
+foot_pts += [(FY0 + FR - FR * math.cos(a), FOOT_H - FR + FR * math.sin(a)) for a in (math.pi / 3, math.pi / 6)] + [(FY0, FOOT_H - FR)]
 for sx in (-1, 1):
-    x = sx * PX
-    bar(f"SakeStandPlinthRodE{sx}", x - 0.0016 if sx < 0 else x - 0.0004, x + 0.0004 if sx < 0 else x + 0.0016, PY0 + 0.012, PY1 - 0.012, PL - 0.019, PL - 0.013, M["gold"])
-# (the plaques: a black board on the plinth's front and back, its picture 銘酒 / 聞野 in gold, a gold frame proud of it)
-PW, PZ0, PZ1 = 0.085, 0.007, 0.041
-for sy, y, row in ((-1, PY0, 1), (1, PY1, 0)):
-    bm_ = bmesh.new()
-    uv_ = bm_.loops.layers.uv.new()
-    bmesh.ops.create_cube(bm_, size=1.0)
-    y0, y1 = (y - 0.004, y + 0.001) if sy < 0 else (y - 0.001, y + 0.004)
-    bmesh.ops.transform(bm_, matrix=Matrix.Translation((0, (y0 + y1) / 2, (PZ0 + PZ1) / 2)) @ Matrix.Diagonal((2 * PW, y1 - y0, PZ1 - PZ0, 1)), verts=bm_.verts)
-    for f in bm_.faces:
-        out_ = f.normal.y * sy > 0.5
-        for l in f.loops:
-            c = l.vert.co
-            # (the face out: its own half of the picture (the front's the upper, the back's the lower), read the right way round)
-            u = (c.x + PW) / (2 * PW) if sy < 0 else (PW - c.x) / (2 * PW)
-            l[uv_].uv = (u, (row + (c.z - PZ0) / (PZ1 - PZ0)) / 2) if out_ else (0.02, 0.25 + 0.5 * row)
-    mesh_obj(f"SakeStandPlaque{sy}", bm_, M["plaque"], smooth_=False)
-    yf0, yf1 = (y - 0.0055, y - 0.003) if sy < 0 else (y + 0.003, y + 0.0055)
-    bar(f"SakeStandPlaqueT{sy}", -PW - 0.003, PW + 0.003, yf0, yf1, PZ1, PZ1 + 0.003, M["gold"])
-    bar(f"SakeStandPlaqueB{sy}", -PW - 0.003, PW + 0.003, yf0, yf1, PZ0 - 0.003, PZ0, M["gold"])
-    for sx in (-1, 1):
-        bar(f"SakeStandPlaqueS{sy}{sx}", sx * PW - 0.003 if sx > 0 else -PW - 0.003, sx * PW + 0.003 if sx > 0 else -PW + 0.003, yf0, yf1, PZ0 - 0.003, PZ1 + 0.003,
-            M["gold"])
+    profile(f"SakeStandFoot{sx}", foot_pts, "x", sx * POST_X - 0.021, sx * POST_X + 0.021, M["keyaki"], 0.003)
 
-# ---- the two steps: the front one the whole depth, the back one on it behind (sunk a hair into it: no face shared)
-rounded_box("SakeStandStep0", -L / 2, L / 2, -D / 2, D / 2, PL - 0.001, T1, 0.008, 3, M["red"], M["wave"])
-rounded_box("SakeStandStep1", -L / 2, L / 2, -D / 2 + FRONT_D, D / 2, T1 - 0.002, T2, 0.008, 3, M["red"], M["wave"])
-# (a gold rod under each step's rounded lip, front and back; a warm glow along each riser's foot)
-for k_, (yf, top, foot) in enumerate(((-D / 2, T1, PL), (-D / 2 + FRONT_D, T2, T1))):
-    bar(f"SakeStandLipRod{k_}", -L / 2 + 0.008, L / 2 - 0.008, yf - 0.0016, yf + 0.0004, top - 0.016, top - 0.01, M["gold"])
-    bar(f"SakeStandGlow{k_}", -L / 2 + 0.01, L / 2 - 0.01, yf - 0.0022, yf + 0.0004, foot + 0.0004, foot + 0.0042, M["glow"])
-bar("SakeStandLipRodB", -L / 2 + 0.008, L / 2 - 0.008, D / 2 - 0.0004, D / 2 + 0.0016, T2 - 0.016, T2 - 0.01, M["gold"])
-bar("SakeStandGlowB", -L / 2 + 0.01, L / 2 - 0.01, D / 2 - 0.0004, D / 2 + 0.0022, PL + 0.0004, PL + 0.0042, M["glow"])
+# ---- the plinth up on them: keyaki, its long faces figured burl (the screen's lower panel), its edges rounded over, under too
+plinth = rounded_box("SakeStandPlinth", -PX, PX, PY0, PY1, FOOT_H - 0.001, PL, 0.009, 3, M["keyaki"], M["burl"], bottom=True)
+relay_uv(plinth, lambda n, c, mi: (c.x / 0.16, c.y / 0.16) if mi == 0 else (((c.x if abs(n.y) >= abs(n.x) else c.y) / 0.12), (c.z - FOOT_H) / 0.12))
+
+# ---- the two steps: the front one the whole depth, the back one on it behind (sunk a hair into it: no face shared); their tops pale
+# hinoki, their risers and their backs the shoji lattice
+s0_ = rounded_box("SakeStandStep0", -L / 2, L / 2, -D / 2, D / 2, PL - 0.001, T1, 0.007, 3, M["wood"], M["shoji"])
+relay_uv(s0_, shoji_uv(PL, T1))
+s1_ = rounded_box("SakeStandStep1", -L / 2, L / 2, -D / 2 + FRONT_D, D / 2, T1 - 0.002, T2, 0.007, 3, M["wood"], M["shoji"])
+relay_uv(s1_, shoji_uv(T1, T2))
 
 # ---- the bottles, each on its coaster: six tall up the back and the best one between them up on its dais; five along the front, each
 # between two at the back so every label shows, the front's right-hand end kept for the tokkuri (on a coaster of its own)
@@ -1007,16 +1022,16 @@ SPAN = 0.131
 
 
 def coaster(name, x, y, z, r):
-    """a bottle's coaster: black lacquer, its rim gold, its top's edge eased"""
+    """a bottle's coaster: a disc of hinoki, its rim keyaki, its top's edge eased"""
     prof = ((r, 0.0), (r, CO - 0.0015), (r - 0.0015, CO))
-    lathe(name, prof, Vector((x, y, z)), 16, [M["gold"], M["black"]], top_mat=1, foot=False)
+    lathe(name, prof, Vector((x, y, z)), 16, [M["keyaki"], M["wood"]], top_mat=1, foot=False)
 
 
 for k_, j_ in ((8, -3), (1, -2), (0, -1), (9, 1), (2, 2), (5, 3)):
     coaster(f"SakeStandCoaster{k_}", j_ * SPAN, ys_back, T2, 0.056)
     bottle(k_, ISSHO, Vector((j_ * SPAN, ys_back, T2 + CO + 0.0003)), 0.0)
-rounded_box("SakeStandDai", -0.05, 0.05, ys_back - 0.05, ys_back + 0.05, T2 - 0.001, T2 + DAI, 0.006, 2, M["red"], M["wave"])
-bar("SakeStandDaiRod", -0.044, 0.044, ys_back - 0.0516, ys_back - 0.0496, T2 + DAI - 0.014, T2 + DAI - 0.009, M["gold"])
+dai = rounded_box("SakeStandDai", -0.05, 0.05, ys_back - 0.05, ys_back + 0.05, T2 - 0.001, T2 + DAI, 0.007, 3, M["wood"], M["wood"])
+relay_uv(dai, along_uv(0.16))
 coaster("SakeStandCoaster10", 0.0, ys_back, T2 + DAI, 0.043)
 bottle(10, YONGO, Vector((0.0, ys_back, T2 + DAI + CO + 0.0003)), 0.0)
 for k_, j_ in ((3, -2.5), (6, -1.5), (7, -0.5), (4, 0.5), (11, 1.5)):
@@ -1024,54 +1039,39 @@ for k_, j_ in ((3, -2.5), (6, -1.5), (7, -0.5), (4, 0.5), (11, 1.5)):
     bottle(k_, YONGO, Vector((j_ * SPAN, ys_front, T1 + CO + 0.0003)), 0.0)
 coaster("SakeStandCoasterJug", 2.5 * SPAN, ys_front, T1, 0.045)
 
-# ---- the posts at the back corners and their gold giboshi; the vermilion cord slung between them behind the bottles, its knots and tassels
+# ---- the gate behind them: two keyaki posts at the back corners standing on the feet through the plinth; the top rail (笠木) over them,
+# its ends run on past them and cut slanting (its top longer than its foot); the tie beam (貫) under it through the posts, its ends just out
+# past them; between the two at the middle the plaque (額束)
 for sx in (-1, 1):
     x = sx * POST_X
-    rounded_box(f"SakeStandPost{sx}", x - POST_W / 2, x + POST_W / 2, POST_Y - POST_W / 2, POST_Y + POST_W / 2, PL - 0.001, POST_TOP, 0.004, 2, M["black"], M["black"])
-    # (the giboshi: a collar, a waist, the onion-shaped jewel and its point (its last ring capped small, not drawn to one point))
-    gib = tuple((r * 1.2, z * 1.2) for r, z in ((0.0165, 0.0), (0.0165, 0.006), (0.011, 0.0105), (0.0165, 0.019), (0.0172, 0.028), (0.0115, 0.04), (0.0045, 0.05), (0.0008, 0.057)))
-    lathe(f"SakeStandGiboshi{sx}", gib, Vector((x, POST_Y, POST_TOP - 0.0005)), 12, [M["gold"]])
-# (a low black rail between the posts behind the back step, a hand's height over it, as a bridge's railing between its giboshi posts; its
-# ends let into the posts. A cord slung between them at the bottles' shoulders read, from the owner's side, as a rope barring them off)
-RAIL_Z = T2 + 0.026
-rounded_box("SakeStandRail", -POST_X + POST_W / 2 - 0.002, POST_X - POST_W / 2 + 0.002, POST_Y - 0.006, POST_Y + 0.006, RAIL_Z, RAIL_Z + 0.012, 0.003, 2,
-            M["black"], M["black"], bottom=True)
-# (a gold knot and a vermilion tassel hung on each post's outer face, under its cap)
-for sx in (-1, 1):
-    x = sx * (POST_X + POST_W / 2 + 0.0085)
-    z = POST_TOP - 0.022
-    knot = ((0.0015, 0.0), (0.0055, 0.0015), (0.0075, 0.0045), (0.0075, 0.0075), (0.0055, 0.0105), (0.0015, 0.012))
-    lathe(f"SakeStandKnot{sx}", knot, Vector((x, POST_Y, z - 0.012)), 10, [M["gold"]])
-    tassel = ((0.0035, 0.0), (0.0062, 0.004), (0.0082, 0.014), (0.0095, 0.026), (0.0098, 0.031), (0.004, 0.0325))
-    lathe(f"SakeStandTassel{sx}", tuple((r, -z_) for r, z_ in tassel)[::-1], Vector((x, POST_Y, z - 0.012)), 10, [M["cord"]])
-    # (and the loop it hangs by, over the post's cap: a short gold band round the post)
-    bar(f"SakeStandPostBand{sx}", sx * POST_X - POST_W / 2 - 0.0015, sx * POST_X + POST_W / 2 + 0.0015, POST_Y - POST_W / 2 - 0.0015, POST_Y + POST_W / 2 + 0.0015,
-        POST_TOP - 0.024, POST_TOP - 0.018, M["gold"])
-# (the hanging sign on the right post's front, a shop's board on its pillar: 銘酒 brushed down it in gold to the customers, 聞野 on its
-# back; a gold frame round each face. Up at the bottles' height: the bar's own front edge hides the plinth from the stools)
-SX, SW, SZ0, SZ1 = POST_X, 0.026, POST_TOP - 0.165, POST_TOP - 0.03
-sy0, sy1 = POST_Y - POST_W / 2 - 0.011, POST_Y - POST_W / 2 + 0.001
+    post = rounded_box(f"SakeStandPost{sx}", x - POST_W / 2, x + POST_W / 2, POST_Y - POST_W / 2, POST_Y + POST_W / 2, FOOT_H - 0.001, KASA_Z + 0.004,
+                       0.005, 2, M["keyaki"], M["keyaki"])
+    relay_uv(post, upright_uv(0.16))
+XK = POST_X + POST_W / 2 + KASA_RUN
+profile("SakeStandKasagi", [(-XK + 0.016, KASA_Z), (XK - 0.016, KASA_Z), (XK, KASA_Z + KASA_H), (-XK, KASA_Z + KASA_H)], "y",
+        POST_Y - KASA_D / 2, POST_Y + KASA_D / 2, M["keyaki"], 0.006, 3)
+XN = POST_X + POST_W / 2 + 0.018
+nuki = rounded_box("SakeStandNuki", -XN, XN, POST_Y - 0.011, POST_Y + 0.011, NUKI_Z - 0.018, NUKI_Z, 0.004, 2, M["keyaki"], M["keyaki"], bottom=True)
+relay_uv(nuki, along_uv(0.16))
+# (the plaque: a board from the tie beam up into the top rail, its faces the picture's two halves, each read the right way round from its
+# side; its edges the picture's keyaki edge)
+GW, GT = 0.034, 0.012
+z0g, z1g = NUKI_Z - 0.002, KASA_Z + 0.002
 bm_ = bmesh.new()
 uv_ = bm_.loops.layers.uv.new()
 bmesh.ops.create_cube(bm_, size=1.0)
-bmesh.ops.transform(bm_, matrix=Matrix.Translation((SX, (sy0 + sy1) / 2, (SZ0 + SZ1) / 2)) @ Matrix.Diagonal((2 * SW, sy1 - sy0, SZ1 - SZ0, 1)), verts=bm_.verts)
+bmesh.ops.transform(bm_, matrix=Matrix.Translation((0, POST_Y, (z0g + z1g) / 2)) @ Matrix.Diagonal((2 * GW, GT, z1g - z0g, 1)), verts=bm_.verts)
 for f in bm_.faces:
     for l in f.loops:
         c = l.vert.co
-        v = (c.z - SZ0) / (SZ1 - SZ0)
+        v = (c.z - z0g) / (z1g - z0g)
         if f.normal.y < -0.5:
-            l[uv_].uv = ((c.x - (SX - SW)) / (2 * SW) * 0.5, v)
+            l[uv_].uv = ((c.x + GW) / (2 * GW) * 0.5, v)
         elif f.normal.y > 0.5:
-            l[uv_].uv = (0.5 + ((SX + SW) - c.x) / (2 * SW) * 0.5, v)
+            l[uv_].uv = (0.5 + (GW - c.x) / (2 * GW) * 0.5, v)
         else:
-            l[uv_].uv = (0.02, 0.02)
-mesh_obj("SakeStandSign", bm_, M["sign"], smooth_=False)
-for k_, (ya, yb) in enumerate(((sy0 - 0.0025, sy0 + 0.0005), (sy1 - 0.0005, sy1 + 0.0025))):
-    bar(f"SakeStandSignT{k_}", SX - SW - 0.003, SX + SW + 0.003, ya, yb, SZ1 - 0.003, SZ1 + 0.002, M["gold"])
-    bar(f"SakeStandSignB{k_}", SX - SW - 0.003, SX + SW + 0.003, ya, yb, SZ0 - 0.002, SZ0 + 0.003, M["gold"])
-    for sx in (-1, 1):
-        x0_, x1_ = (SX + SW - 0.002, SX + SW + 0.003) if sx > 0 else (SX - SW - 0.003, SX - SW + 0.002)
-        bar(f"SakeStandSignS{k_}{sx}", x0_, x1_, ya, yb, SZ0 - 0.002, SZ1 + 0.002, M["gold"])
+            l[uv_].uv = (0.01, 0.5)
+mesh_obj("SakeStandGakuzuka", bm_, M["plaque"], smooth_=False)
 
 # (joined by material)
 by = {}

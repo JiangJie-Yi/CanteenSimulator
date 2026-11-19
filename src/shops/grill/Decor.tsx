@@ -1682,21 +1682,10 @@ export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Mat
         const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.9, roughness: 0.3 })
         reflectStudio(g)
         t = g
-      } else if (/SakeGold/.test(src.name)) {
-        // (the display's gold (item 380): the rods, the coasters' rims, the giboshi, the knots, the plaques' frames; metal, the studio in it)
-        const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 1.0, roughness: 0.28 })
-        reflectStudio(g)
-        t = g
-      } else if (/SakeLacquer/.test(src.name)) {
-        // (its lacquer, black and vermilion, the risers' gold waves and the plaques: glossy, the studio's gleams on it as on lacquer)
-        // (the vermilion less of the studio in it: glossed over at a slant it read as coral)
-        const red = /Red/.test(src.name)
-        const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), map: src.map ?? null, roughness: red ? 0.3 : 0.22, metalness: 0.0, envMapIntensity: red ? 0.5 : 0.9 })
-        reflectStudio(g)
-        t = g
-      } else if (/SakeGlow/.test(src.name)) {
-        // (the warm light along each riser's foot: drawn lit, whatever the room's light (no light added))
-        t = new THREE.MeshBasicMaterial({ color: '#ffd9a6' })
+      } else if (/SakeShoji/.test(src.name)) {
+        // (the risers' shoji (item 383): its paper lit softly from within, as an andon's, whatever the room's light (no light added): the
+        // picture its own glow, its keyaki bars dark in it)
+        t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, emissive: '#ffd08f', emissiveMap: src.map ?? null, emissiveIntensity: 0.32 })
       } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
       made.set(src, t)
     }
@@ -1704,13 +1693,11 @@ export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Mat
     const see = /Glass|Liquid/.test(src.name)
     // (the drink drawn before its glass, the glass over it)
     if (see) m.renderOrder = /Liquid/.test(src.name) ? 1 : 2
-    // (the glow's a light: it casts no shadow and takes none)
-    const glow = /SakeGlow/.test(src.name)
-    m.castShadow = !see && !glow
-    m.receiveShadow = !see && !glow
+    m.castShadow = !see
+    m.receiveShadow = !see
   })
   // (no ink round the drink inside: its outline would show through the glass)
-  inkModel(r, (m) => /Liquid|Glow/.test((m.material as THREE.Material).name) || /Liquid|Cord|Glow/.test(m.name), { width: 0.0012, weld: true })
+  inkModel(r, (m) => /Liquid/.test((m.material as THREE.Material).name) || /Liquid|Cord/.test(m.name), { width: 0.0012, weld: true })
 }
 const SAKESTAND_URL = import.meta.env.BASE_URL + 'models/sakestand.glb'
 useGLTF.preload(SAKESTAND_URL)
