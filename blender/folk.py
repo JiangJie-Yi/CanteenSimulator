@@ -1207,11 +1207,59 @@ def lift(img, mask, k):
     img[:] = img + (1 - img) * (np.clip(mask.astype(np.float32), 0, 1) * k)[..., None]
 
 
+def drape():
+    """(item 375, the owner's 「衣服質感陰影要有」: the clothes were flat, a shade and a seam) the cloth's folds over the body, as a height (0
+    flat, + raised, - in a crease): broad folds hanging from the chest, unevenly spaced, deeper toward the hem; a few creases fanning down
+    from under each arm; two or three soft creases round the waist; the hem turned up. Every customer's the same body, so one for all"""
+    h = np.zeros((OH, OW), np.float32)
+    ph = U * 2 * np.pi
+    hang = np.clip((NECK - 0.12 - V) / (NECK - 0.12), 0, 1) ** 1.2
+    # (the hanging folds: a few sines at odd ratios, so no two folds alike, their ridges round, their valleys sharper)
+    f = 0.6 * np.sin(ph * 5 + 0.7) + 0.35 * np.sin(ph * 8.3 + 2.0 + 1.5 * V) + 0.2 * np.sin(ph * 13.7 + 4.1)
+    h += hang * (np.tanh(f * 1.6) * 0.95)
+    # (under each arm: creases fanning down and in from the armpit, each a valley tapering away)
+    for sd in (-1, 1):
+        ax, ay = sd * 0.25, 0.8
+        for k, ang in enumerate((-0.3, 0.0, 0.3)):
+            dx, dy = np.sin(ang) * -sd, -np.cos(ang)
+            px, py = DU - ax, (V - ay) * 0.5
+            along = px * dx + py * dy
+            across = px * dy - py * dx
+            m = (along > 0) * np.exp(-along / 0.075) * np.exp(-(across / 0.016) ** 2)
+            h -= m * 0.85
+    # (round the waist: two or three soft creases, a little wavy)
+    for k, dv in enumerate((-0.03, 0.0, 0.035)):
+        line = WAIST + dv + 0.006 * np.sin(ph * 7 + k * 2)
+        h -= 0.4 * np.exp(-((V - line) / 0.006) ** 2) * (0.6 + 0.4 * np.sin(ph * 3 + k))
+    # (the hem turned up)
+    h += 0.6 * np.exp(-((V - 0.04) / 0.016) ** 2)
+    return h
+
+
+def fold_shade(img, h):
+    """the folds painted in: a crease's shadow, a fold's top lighter (the normal map gives them light and shade as they're lit; this keeps them
+    there in the dark and from far off)"""
+    dim(img, np.clip(-h, 0, 1.2), 0.4)
+    lift(img, np.clip(h, 0, 1.2), 0.1)
+
+
+def fold_normals():
+    """the folds' normal map (tangent space, +y up the body), with a twill's fine weave over it: one picture for every customer's clothes"""
+    h = drape() * 1.0
+    weave_ = 0.055 * np.sin((U * OW + V * OH) * 2 * np.pi / 5.0) + 0.03 * np.sin(U * OW * 2 * np.pi / 2.5)
+    hh = h + weave_
+    gy, gx = np.gradient(hh)
+    k = 5.0
+    nx, ny, nz = -gx * k, -gy * k, np.ones_like(hh)
+    n = np.sqrt(nx * nx + ny * ny + nz * nz)
+    return np.stack([nx / n * 0.5 + 0.5, ny / n * 0.5 + 0.5, nz / n * 0.5 + 0.5], axis=-1).astype(np.float32)
+
+
 def body_shade(img):
     """the body's own light and shade, soft: darker toward its sides and back, under the collar, at the hem; a little light down the chest"""
-    side = np.clip((np.abs(DU) - 0.16) / 0.34, 0, 1)
-    dim(img, side ** 1.4, 0.16)
-    dim(img, np.clip((0.08 - V) / 0.08, 0, 1), 0.2)
+    side = np.clip((np.abs(DU) - 0.14) / 0.34, 0, 1)
+    dim(img, side ** 1.3, 0.28)
+    dim(img, np.clip((0.1 - V) / 0.1, 0, 1), 0.24)
     dim(img, np.clip(1 - np.abs(V - (NECK - 0.03)) / 0.035, 0, 1) * (np.abs(DU) < 0.2), 0.12)
     lift(img, np.clip(1 - np.abs(DU) / 0.12, 0, 1) * np.clip((V - 0.45) / 0.3, 0, 1) * (V < NECK - 0.06), 0.06)
 
@@ -1449,6 +1497,7 @@ def outfit(kind, n):
     else:
         img = fill("#888888")
     body_shade(img)
+    fold_shade(img, drape())
     seams(img)
     weave(img)
     return img
@@ -1458,6 +1507,7 @@ KINDS = ["salaryman", "officeLady", "schoolgirl", "schoolboy", "grandma", "grand
          "bosozoku", "foreignTourist", "civilServant", "maidCoser", "gyaru"]
 # (written as a PNG, then made a JPEG at 88 (item 347): at twice the pixels each way the weave's grain made the PNGs four times the bytes; a
 # JPEG holds the clothes as well at less than the old PNGs. The PNG let go)
+write_png(os.path.join(TEX_DIR, "outfit_normal.png"), fold_normals())
 _jpg = bpy.context.scene.render.image_settings
 _jpg.file_format = "JPEG"
 _jpg.quality = 88

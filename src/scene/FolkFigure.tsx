@@ -233,9 +233,12 @@ export function folkSpec(id: number): FolkSpec {
 /** the pictures: every kind's clothes (two colours each) and the four faces, loaded together before any customer's drawn */
 const KINDS: GuestKind[] = ['salaryman', 'officeLady', 'schoolgirl', 'schoolboy', 'grandma', 'grandpa', 'kid', 'uncle', 'collegeStudent', 'yukataLady',
   'delinquent', 'bosozoku', 'foreignTourist', 'civilServant', 'maidCoser', 'gyaru']
-const PICTURES = [...KINDS.flatMap((k) => [`outfit_${k}_0`, `outfit_${k}_1`]), 'face_male', 'face_female', 'face_elder', 'face_kid']
+const PICTURES = [...KINDS.flatMap((k) => [`outfit_${k}_0`, `outfit_${k}_1`]), 'face_male', 'face_female', 'face_elder', 'face_kid', 'outfit_normal']
+/** the clothes' folds and weave as a normal map (item 375, blender/folk.py's fold_normals): one for every customer's clothes, set as the
+ * pictures load, on every customer's material (one program for them all) */
+const FOLD_N: { t: THREE.Texture | null } = { t: null }
 // (the clothes JPEGs (item 347: at twice the pixels, PNGs were four times the bytes), the faces PNGs (their strip's painted afresh anyway))
-const PICTURE_URLS = PICTURES.map((n) => TEX + n + (n.startsWith('outfit') ? '.jpg' : '.png'))
+const PICTURE_URLS = PICTURES.map((n) => TEX + n + (n.startsWith('outfit_') && n !== 'outfit_normal' ? '.jpg' : '.png'))
 const prepared = new WeakSet<THREE.Texture>()
 function usePictures() {
   const list = useLoader(THREE.TextureLoader, PICTURE_URLS)
@@ -249,6 +252,8 @@ function usePictures() {
         t.flipY = false
         t.anisotropy = 4
         if (PICTURES[i].startsWith('outfit')) t.wrapS = THREE.RepeatWrapping
+        // (the folds' normal map: data, not a colour)
+        if (PICTURES[i] === 'outfit_normal') { t.colorSpace = THREE.NoColorSpace; FOLD_N.t = t }
         // (the faces painted afresh, as the owner's and the staff's are (scene/faceSheet: Overcooked's bold eyes, brows and mouths), in the
         // file's strip of eight and its order)
         if (PICTURES[i].startsWith('face_')) (t as THREE.Texture<unknown>).image = guestFaceStrip(PICTURES[i].slice(5) as FaceKind)
@@ -275,7 +280,9 @@ function folkMaterial(outfit: THREE.Texture | null, face: THREE.Texture | null, 
   // (hashed from the start, so a fade (theirs as they come in and go) only moves its opacity: switched on and off for each, the last fade
   // over let the hashed program go and the next one linked it again, a hitch at every customer's coming and going; at full opacity nothing's
   // cut)
-  const m = paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: outfit, vertexColors: true, gradientMap, alphaHash: true })))
+  const m = paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: outfit, vertexColors: true, gradientMap, alphaHash: true,
+    // (the clothes' folds and weave in the light (item 375): on the clothes alone, below)
+    ...(FOLD_N.t ? { normalMap: FOLD_N.t, normalScale: new THREE.Vector2(1, 1) } : {}) })))
   m.userData.hashed = true
   const before = m.onBeforeCompile
   m.onBeforeCompile = (sh, r) => {
@@ -288,6 +295,14 @@ function folkMaterial(outfit: THREE.Texture | null, face: THREE.Texture | null, 
 #endif`)
       // (the face over the skin once the skin's colour and the airbrush are in (the face's own colours not shaded by them, as its own sheet
       // had them), its faintest edges cut as they were (that sheet's alpha test))
+      // (the folds' normal map on the clothes alone (their paint's 1): the face and the head, on the same UVs' other pictures, left smooth)
+      .replace('#include <normal_fragment_maps>', `#ifdef USE_NORMALMAP_TANGENTSPACE
+  if (vPaint.z > 0.5 && vPaint.z < 1.5) {
+    vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
+    mapN.xy *= normalScale;
+    normal = normalize( tbn * mapN );
+  }
+#endif`)
       .replace('#include <alphamap_fragment>', `#ifdef USE_MAP
   if (vPaint.z > 1.5 && vPaint.z < 2.5) { vec4 fc = texture2D(faceMap, vec2(vMapUv.x + faceOffset.x, vMapUv.y * 0.5 + faceOffset.y)); diffuseColor.rgb = mix(diffuseColor.rgb, fc.rgb, fc.a < 0.35 ? 0.0 : fc.a); }
 #endif
