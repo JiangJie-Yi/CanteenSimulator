@@ -9242,6 +9242,14 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
   if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __pieces: pieces, __collect: collect, __moved: moved,
     __table: () => containerKeys().map((k) => ({ k, at: containerAt(k).toArray().map((v) => +v.toFixed(3)), r: footprint(k) })) })
 
+  // (the crew at their places, and their figures: made once for the crew there is (item 374: made in the drawing, their places' ways new
+  // arrays each time, every one of them and all they hold were drawn again with every redraw of the fire, 7 times a second))
+  const crewWalks = useMemo(() => crewPlaces(crew.some((m) => m.role === 'chef') ? crew : [HOUSE_CHEF, ...crew]).map(({ m, at, yaw, way, seat }, i, all) => (
+    <CrewWalk key={m.id} id={m.id} role={m.role} at={at} yaw={yaw} way={way} seat={seat} round={m.role === 'chef' || m.role === 'sous'}
+      fetcher={m.role === 'chef' && all.findIndex((x) => x.m.role === 'chef') === i}>
+      {!seat && <BlobShadow r={0.17} />}<StaffFigure id={m.id} role={m.role} look={m.look} seated={!!seat} />
+    </CrewWalk>
+  )), [crew])
   return (
     <>
       {Array.from({ length: plateCount }, (_, n) => (
@@ -9313,12 +9321,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         {/* (the staff's outfits drawn a moment under the notch's floor as the shop loads: their programs made then, not as they first walk in) */}
         <Suspense fallback={null}><group position={CHEF_AT}><StaffWarm /></group></Suspense>
       </>)}
-      {space === 'open' && bar && crewPlaces(crew.some((m) => m.role === 'chef') ? crew : [HOUSE_CHEF, ...crew]).map(({ m, at, yaw, way, seat }, i, all) => (
-        <CrewWalk key={m.id} id={m.id} role={m.role} at={at} yaw={yaw} way={way} seat={seat} round={m.role === 'chef' || m.role === 'sous'}
-          fetcher={m.role === 'chef' && all.findIndex((x) => x.m.role === 'chef') === i}>
-          {!seat && <BlobShadow r={0.17} />}<StaffFigure id={m.id} role={m.role} look={m.look} seated={!!seat} />
-        </CrewWalk>
-      ))}
+      {space === 'open' && bar && crewWalks}
       </group>
       {bar && <Bar />}
       </group>

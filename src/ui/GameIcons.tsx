@@ -1,3 +1,4 @@
+import { memo } from 'react'
 // The game's own small icons, drawn here (the owner's: designed, never an emoji or a special character): each a 16-unit picture in the
 // colour of the text around it (currentColor), for the staff's special skills (data/staff's SKILLS), the badges beside them (up for a buff,
 // down for a debuff), the dice that draws the applicants again, and the stars of a rating (whole, half, empty).
@@ -48,7 +49,9 @@ export function DiceIcon({ size = 14 }: { size?: number }) {
 
 const STAR = 'M8 1.4 10 5.7l4.7.5-3.5 3.2 1 4.6L8 11.6 3.8 14l1-4.6L1.3 6.2 6 5.7Z'
 /** a star of a rating: whole, half (its left half), or empty */
-export function StarIcon({ fill = 1, size = 14 }: { fill?: 0 | 0.5 | 1; size?: number | string }) {
+// (item 374: the icons drawn again only as their own props change: as children of whatever's drawn again (the menu's strips, the panels)
+// they were, 9 and 5 times a second at the shop's busiest, their props the same)
+export const StarIcon = memo(function StarIcon({ fill = 1, size = 14 }: { fill?: 0 | 0.5 | 1; size?: number | string }) {
   return (
     <svg {...box} width={size} height={size} className="game-icon game-star">
       {fill === 0.5 && <defs><clipPath id="star-half"><rect x="0" y="0" width="8" height="16" /></clipPath></defs>}
@@ -56,7 +59,7 @@ export function StarIcon({ fill = 1, size = 14 }: { fill?: 0 | 0.5 | 1; size?: n
       {fill === 0.5 && <path d={STAR} fill="currentColor" clipPath="url(#star-half)" />}
     </svg>
   )
-}
+})
 /** a rating as five stars, to the half */
 export function Stars({ value, size = 14 }: { value: number; size?: number | string }) {
   const v = Math.round(value * 2) / 2
@@ -64,7 +67,7 @@ export function Stars({ value, size = 14 }: { value: number; size?: number | str
 }
 
 /** one of the small drawn icons of ./glyphs (the speed button's wedges, a fold's caret, the bolt and drop of the meter, a heart...) */
-export function Glyph({ id, size = 12, className = '' }: { id: GlyphId; size?: number | string; className?: string }) {
+export const Glyph = memo(function Glyph({ id, size = 12, className = '' }: { id: GlyphId; size?: number | string; className?: string }) {
   return (
     <svg {...box} width={size} height={size} className={`game-icon${className ? ` ${className}` : ''}`}>
       {GLYPHS[id].map((p, i) => {
@@ -74,4 +77,4 @@ export function Glyph({ id, size = 12, className = '' }: { id: GlyphId; size?: n
       })}
     </svg>
   )
-}
+})

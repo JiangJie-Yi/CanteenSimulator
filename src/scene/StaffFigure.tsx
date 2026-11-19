@@ -1,5 +1,5 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { rimmedTray } from './trayGeometry'
@@ -782,15 +782,18 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // up again at their place, item 249)
     fig.tray?.scale.setScalar(role === 'server' && !job?.broom && job?.floorWipe === undefined && !job?.trayDown && reachK.current < 0.5 ? 1 : 0)
   })
+  // (clicked: the owner's ways with them (App's popover, item 348); the same handler from one redraw to the next (item 374: a new one each
+  // time, their hit box was drawn again with them, 6 times a second))
+  const onHit = useCallback((e: ThreeEvent<PointerEvent>) => {
+    if ((e.nativeEvent as PointerEvent).button !== 0) return
+    e.stopPropagation()
+    window.dispatchEvent(new CustomEvent('jgs-staff', { detail: { id, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY } }))
+  }, [id])
   return (
     <group ref={outer} userData={{ staffRole: role }}>
       {/* (named as the pointer's over them: their role and name; never to be dragged, they keep to their work. Not in the viewer) */}
       {/* (and clicked: the owner's ways with them, praise or a push (App's popover, item 348)) */}
-      {!id.startsWith('viewer-') && <FigureHit title={nameTag} hint={staffHint} onPointerDown={(e) => {
-        if ((e.nativeEvent as PointerEvent).button !== 0) return
-        e.stopPropagation()
-        window.dispatchEvent(new CustomEvent('jgs-staff', { detail: { id, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY } }))
-      }} />}
+      {!id.startsWith('viewer-') && <FigureHit title={nameTag} hint={staffHint} onPointerDown={onHit} />}
       {/* (a server's tray with a cup of tea on it, the stock keeper's clipboard: parts of the one mesh, shown as they're held) */}
       <primitive object={fig.root} />
     </group>

@@ -1,11 +1,12 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { memo, useLayoutEffect, useRef, type ReactNode } from 'react'
 
 /**
  * A bit of text that never breaks onto a second line (the owner's: nothing in the interface on two lines): it keeps to one, and where its
  * box is too narrow for it, it's set a little smaller, down to `min` px, till it fits (a long name in a narrow card: スポーツドリンク,
  * peanut powder). Laid out again whenever its box changes size.
  */
-export function FitLine({ children, className, min = 10 }: { children: ReactNode; className?: string; min?: number }) {
+// (item 374: drawn again only as its own props change (its text, mostly a string): it was, with every redraw of what it's in)
+export const FitLine = memo(function FitLine({ children, className, min = 10 }: { children: ReactNode; className?: string; min?: number }) {
   const el = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const e = el.current
@@ -25,4 +26,4 @@ export function FitLine({ children, className, min = 10 }: { children: ReactNode
     return () => ro.disconnect()
   }, [children, min])
   return <span ref={el} className={`fit-line${className ? ` ${className}` : ''}`}>{children}</span>
-}
+})
