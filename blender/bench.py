@@ -2,7 +2,7 @@
 their turn). Remade (the owner's, 2026-11-11: it looked odd, its proportions off; it was drawn squashed, its thin legs splayed): a bench of
 hinoki as a joiner makes one, drawn at one scale: one thick seat board, its edges eased; two board legs at its ends, set in, each cut away
 at its foot to leave two feet; an apron under the seat's front and back edges between them; a low stretcher through both legs, its tenons
-showing through their outer faces. About 300 triangles.
+showing through their outer faces. About 1,100 triangles (its edges rounded over: item 379).
 
 The game's frame: y up from the floor, x along the bench, z across it; its middle at the origin; SEAT_H the seat's top, LENGTH long, DEPTH
 deep (the people's units: the game draws it at the people's scale, the same every way).
@@ -29,7 +29,10 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 
 # (item 214, the owner's, 2026-11-16: 「後位長凳深度稍微窄一些，然後要褐木色」: 0.28 deep before; narrowed from its front, its back where it
 # was against the wall (BACK), those waiting sat where they were)
-LENGTH, DEPTH, SEAT_H, SEAT_T = 0.86, 0.24, 0.29, 0.036
+# (item 379, docs/MODELING.md's 造型感: the seat a little thicker, 3.6 to 4.4 cm, from below (its top where it was), its edges rounded right
+# over, the legs', the aprons' and the stretcher's rounded too, their normals hardened (flat faces flat, rounds smooth); they were chamfered
+# a few millimetres. Its size and colours as the owner set them (items 214, 291))
+LENGTH, DEPTH, SEAT_H, SEAT_T = 0.86, 0.24, 0.29, 0.044
 BACK = -0.14
 MID = BACK + DEPTH / 2
 
@@ -61,15 +64,18 @@ M = {
 parts = []
 
 
-def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0):
+def box(name, x0, x1, y0, y1, z0, z1, mat, bev=0.0, segs=3):
     bpy.ops.mesh.primitive_cube_add(size=1, location=P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
     o = active()
     o.scale = (x1 - x0, z1 - z0, y1 - y0)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     if bev:
+        for pg in o.data.polygons:
+            pg.use_smooth = True
         m = o.modifiers.new("b", "BEVEL")
         m.width = bev
-        m.segments = 1
+        m.segments = segs
+        m.harden_normals = True
         bpy.ops.object.modifier_apply(modifier=m.name)
     o.name = name
     o.data.materials.append(M[mat])
@@ -92,7 +98,7 @@ def join(objs, name):
 
 
 # (the seat: one board, its edges eased)
-bench_seat = box("BenchSeat", -LENGTH / 2, LENGTH / 2, SEAT_H - SEAT_T, SEAT_H, BACK, BACK + DEPTH, "seat", bev=0.008)
+bench_seat = box("BenchSeat", -LENGTH / 2, LENGTH / 2, SEAT_H - SEAT_T, SEAT_H, BACK, BACK + DEPTH, "seat", bev=0.015)
 legs = []
 UNDER = SEAT_H - SEAT_T + 0.002      # (the seat's underside, a hair into it)
 LEG_X = LENGTH / 2 - 0.07            # (each leg's middle, set in from the seat's ends)
@@ -122,9 +128,12 @@ def leg(name, x):
     bpy.ops.object.select_all(action="DESELECT")
     o.select_set(True)
     bpy.context.view_layer.objects.active = o
+    for pg in o.data.polygons:
+        pg.use_smooth = True
     m = o.modifiers.new("b", "BEVEL")
-    m.width = 0.004
-    m.segments = 1
+    m.width = 0.008
+    m.segments = 2
+    m.harden_normals = True
     bpy.ops.object.modifier_apply(modifier=m.name)
     o.data.materials.append(M["leg"])
     # (its grain up the board: u up it, v across it, in units)
@@ -143,9 +152,9 @@ for sx in (-1, 1):
 # (the aprons under the seat's long edges, between the legs, set in from its edges)
 for sz in (-1, 1):
     z = MID + sz * (DEPTH / 2 - 0.03)
-    legs.append(box(f"apron{sz}", -LEG_X + LEG_T / 2 - 0.002, LEG_X - LEG_T / 2 + 0.002, UNDER - 0.045, UNDER, z - 0.011, z + 0.011, "leg", bev=0.003))
+    legs.append(box(f"apron{sz}", -LEG_X + LEG_T / 2 - 0.002, LEG_X - LEG_T / 2 + 0.002, UNDER - 0.045, UNDER, z - 0.011, z + 0.011, "leg", bev=0.006, segs=2))
 # (the stretcher low through both legs, its tenons showing a little through their outer faces)
-legs.append(box("stretcher", -LEG_X - LEG_T / 2 - 0.012, LEG_X + LEG_T / 2 + 0.012, ARCH + 0.03, ARCH + 0.062, MID - 0.014, MID + 0.014, "leg", bev=0.003))
+legs.append(box("stretcher", -LEG_X - LEG_T / 2 - 0.012, LEG_X + LEG_T / 2 + 0.012, ARCH + 0.03, ARCH + 0.062, MID - 0.014, MID + 0.014, "leg", bev=0.007, segs=2))
 bench_legs = join(legs, "BenchLegs")
 
 root = bpy.data.objects.new("Bench", None)
