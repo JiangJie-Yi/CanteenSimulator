@@ -11,7 +11,7 @@ import { BOWL_LIFT } from './bowlLift'
 import { SOFT_DOT } from './softDot'
 import { footDust, newSteps } from './DustPuffs'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { kindOf, type GuestKind } from '@/data/guests'
+import { KINDS as GUEST_KINDS, kindOf, type GuestKind } from '@/data/guests'
 import { airbrush, gradientMap, hash, lookOf } from './Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, thinWithFade, type SkinPiece } from './rigidSkin'
 import { bakeable, colourVertices } from './StaticBatch'
@@ -46,15 +46,21 @@ const HAIR: Record<GuestKind, string[]> = {
   salaryman: ['part', 'crop'], officeLady: ['bob', 'bunLow'], schoolgirl: ['twin', 'long', 'pony'], schoolboy: ['crop', 'spiky'],
   grandma: ['perm'], grandpa: ['bald'], kid: ['kid'], uncle: ['crop', 'bald'], collegeStudent: ['crop', 'spiky'], yukataLady: ['bunHigh'],
   delinquent: ['pomp'], bosozoku: ['pomp', 'spiky'], foreignTourist: ['crop', 'pony'], civilServant: ['part'], maidCoser: ['twin', 'long'], gyaru: ['gyaru'],
+  // (item 377: those in a hat with their hair cropped under it)
+  housewife: ['bob', 'bunLow', 'pony'], taxiDriver: ['crop'], nurse: ['bunLow', 'bob', 'pony'], constructionWorker: ['crop'], marketWorker: ['crop', 'bald'],
+  bandman: ['long', 'spiky'], offShiftChef: ['crop'],
 }
 const ACC: Partial<Record<GuestKind, string[]>> = {
   kid: ['schoolhat', 'randoseru'], uncle: ['moustache', 'towel'], grandpa: ['moustache'], grandma: ['shawl'], collegeStudent: ['backpack'],
   yukataLady: ['obibow', 'kanzashi'], delinquent: ['collar'], schoolboy: ['collar'], bosozoku: ['hachimaki'], foreignTourist: ['sunhat', 'camera'],
   maidCoser: ['maidcap'], gyaru: ['hoops'],
+  // (item 377: the mother's shopping bag and its leek, the taxi driver's cap, the hard hat, the market hand's cap, the guitar, the cook's band)
+  housewife: ['ecobag'], taxiDriver: ['drivercap'], constructionWorker: ['hardhat', 'towel'], marketWorker: ['cap', 'towel'], bandman: ['guitar'],
+  offShiftChef: ['chefband'],
 }
-const FEMALE = new Set<GuestKind>(['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'gyaru'])
+const FEMALE = new Set<GuestKind>(['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'gyaru', 'housewife', 'nurse'])
 /** what's worn on the head (turns with it) */
-const ON_HEAD = new Set(['glasses', 'moustache', 'phones', 'sunhat', 'schoolhat', 'maidcap', 'hachimaki', 'hoops', 'kanzashi'])
+const ON_HEAD = new Set(['glasses', 'moustache', 'phones', 'sunhat', 'schoolhat', 'maidcap', 'hachimaki', 'hoops', 'kanzashi', 'hardhat', 'drivercap', 'cap', 'chefband'])
 /** where the head turns from (the neck), in the model's frame */
 const NECK = new THREE.Vector3(0, 0.56, 0)
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
@@ -222,18 +228,22 @@ export function folkSpec(id: number): FolkSpec {
   const hair = FORCE_HAIR ?? hairs[Math.floor(hash(id, 31) * hairs.length) % hairs.length]
   const acc = [...(ACC[kind] ?? [])]
   // (glasses and headphones as the old figures had them)
-  if (kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'collegeStudent' && id % 2 === 0) || (kind === 'civilServant' && id % 2 === 1)) acc.push('glasses')
+  if (kind === 'grandpa' || (kind === 'salaryman' && id % 3 === 0) || (kind === 'collegeStudent' && id % 2 === 0) || (kind === 'civilServant' && id % 2 === 1)
+    || (kind === 'taxiDriver' && id % 3 === 0) || (kind === 'nurse' && id % 4 === 1) || (kind === 'offShiftChef' && id % 4 === 2)) acc.push('glasses')
   if (kind === 'collegeStudent' && hash(id, 23) < 0.34) acc.push('phones')
   const face: FaceType = kind === 'kid' ? 'kid' : kind === 'grandma' || kind === 'grandpa' ? 'elder'
     : FEMALE.has(kind) || (kind === 'foreignTourist' && hair === 'pony') ? 'female' : 'male'
-  return { kind, hair, acc, face, outfit: `outfit_${kind}_${id % 2}`, size: l.size, skin: l.skin, hairColor: l.hair, top: l.top,
+  // (item 377, the owner's 「服裝樣式也多變些」: each kind two ways of dressing (its pictures 0 and 1, 2 and 3), each in two colours)
+  const style = hash(id, 41) < 0.5 ? 0 : 2
+  // (dressed as a shrine maiden, no maid's frilled cap)
+  if (kind === 'maidCoser' && style === 2) acc.splice(acc.indexOf('maidcap'), 1)
+  return { kind, hair, acc, face, outfit: `outfit_${kind}_${style + (id % 2)}`, size: l.size, skin: l.skin, hairColor: l.hair, top: l.top,
     briefcase: (kind === 'salaryman' && id % 2 === 0) || kind === 'civilServant' }
 }
 
-/** the pictures: every kind's clothes (two colours each) and the four faces, loaded together before any customer's drawn */
-const KINDS: GuestKind[] = ['salaryman', 'officeLady', 'schoolgirl', 'schoolboy', 'grandma', 'grandpa', 'kid', 'uncle', 'collegeStudent', 'yukataLady',
-  'delinquent', 'bosozoku', 'foreignTourist', 'civilServant', 'maidCoser', 'gyaru']
-const PICTURES = [...KINDS.flatMap((k) => [`outfit_${k}_0`, `outfit_${k}_1`]), 'face_male', 'face_female', 'face_elder', 'face_kid', 'outfit_normal']
+/** the pictures: every kind's clothes (two ways, two colours each: item 377) and the four faces, loaded together before any customer's drawn */
+const KINDS: GuestKind[] = GUEST_KINDS.map((k) => k.kind)
+const PICTURES = [...KINDS.flatMap((k) => [0, 1, 2, 3].map((n) => `outfit_${k}_${n}`)), 'face_male', 'face_female', 'face_elder', 'face_kid', 'outfit_normal']
 /** the clothes' folds and weave as a normal map (item 375, blender/folk.py's fold_normals): one for every customer's clothes, set as the
  * pictures load, on every customer's material (one program for them all) */
 const FOLD_N: { t: THREE.Texture | null } = { t: null }

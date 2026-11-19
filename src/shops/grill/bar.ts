@@ -679,6 +679,12 @@ export const drinkFor = (kind: string, id: number): DrinkId => {
   if (kind === 'salaryman' || kind === 'civilServant') return of(['beerCan', 'coffee', 'highball', 'beer', 'blackCoffee', 'darkBeer', 'shochu'])
   if (kind === 'uncle') return of(['beer', 'sake', 'highball', 'beerCan', 'shochu', 'darkBeer'])
   if (kind === 'delinquent' || kind === 'bosozoku' || kind === 'gyaru' || kind === 'collegeStudent') return of(['shochu', 'grapeSoju', 'chuhai', 'highball', 'beerCan', 'cola'])
+  // (item 377: the taxi driver on duty nothing with alcohol in it; the night's trades after their work a drink of their own)
+  if (kind === 'taxiDriver') return of(['blackCoffee', 'coffee', 'oolong', 'greenTea', 'cola', 'barleyTea'])
+  if (kind === 'housewife') return of(['oolong', 'greenTea', 'yuzuSoda', 'umeshu', 'barleyTea', 'cafeAuLait'])
+  if (kind === 'constructionWorker' || kind === 'marketWorker') return of(['beer', 'shochu', 'sake', 'highball', 'beerCan', 'oolong'])
+  if (kind === 'offShiftChef') return of(['sake', 'shochu', 'beer', 'umeshu', 'darkBeer'])
+  if (kind === 'bandman' || kind === 'nurse') return of(['highball', 'beer', 'chuhai', 'lacticSoda', 'grapeSoju', 'beerCan'])
   return of(['beer', 'highball', 'sake', 'beerCan', 'oolong', 'coffee', 'cola', 'umeshu', 'yuzuSoda', 'cafeAuLait', 'grapeSoju', 'lacticSoda', 'vegJuice', 'barleyTea'])
 }
 

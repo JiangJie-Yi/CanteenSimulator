@@ -128,6 +128,12 @@ M = {
     "cup": pbr("FolkPhonesCup", lin("#e86a4a"), rough=0.4),
     "knit": pbr("FolkKnit", lin("#8a6a9a"), rough=0.9),
     "obi": pbr("FolkObi", lin("#d8a840"), rough=0.5),
+    # (item 377: the taxi driver's cap, the market hand's, the guitar's case, the shopping bag's canvas and the leek in it)
+    "navy": pbr("FolkNavy", lin("#1e2a44"), rough=0.5),
+    "capblue": pbr("FolkCap", lin("#2e4a6e"), rough=0.6),
+    "case": pbr("FolkCase", lin("#1c1c20"), rough=0.5),
+    "canvas": pbr("FolkCanvas", lin("#d8cba8"), rough=0.9),
+    "leek": pbr("FolkLeek", lin("#4a8a3a"), rough=0.6),
 }
 parts = []
 
@@ -1074,6 +1080,66 @@ acc("towel", tw)
 # (a gakuran's stand collar, black, round the neck)
 acc("collar", [lathe("collar", [(0.53, 0.2), (0.57, 0.185), (0.61, 0.16)], M["dark"], seg=10, solid=0.015)])
 
+# ---- (item 377, the owner's 「客人的種類需要多一點」: the new kinds' things. The hats sized over the hair as the school cap is (its crown 0.298
+# over the head's middle, a hat over the hair and never the hair through it); none of them fanned into a point (their tops shut by ladders))
+# (the construction worker's hard hat: yellow, a dome over the hair, a brim all round, a ridge from front to back over its top, the green
+# cross of safety on its front)
+_hd = lathe("hhd", [(C.y + 0.07, R + 0.05), (C.y + 0.2, R + 0.014), (C.y + 0.28, 0.19), (C.y + 0.33, 0.075)], M["yellow"], seg=10, shut=(False, True))
+_hb = lathe("hhb", [(C.y + 0.07, R + 0.048), (C.y + 0.062, R + 0.09)], M["yellow"], seg=10, solid=0.01)
+_hr = tube("hhr", [Vector((0, C.y + 0.205, R + 0.02)), Vector((0, C.y + 0.285, 0.2)), Vector((0, C.y + 0.343, 0.0)), Vector((0, C.y + 0.285, -0.2)),
+                   Vector((0, C.y + 0.205, -(R + 0.02)))], 0.016, M["yellow"])
+_hx = []
+for _k, (_sx, _sy) in enumerate(((0.06, 0.018), (0.018, 0.06))):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(0.0, C.y + 0.14, R + 0.05 - 0.002))
+    _c = active()
+    _c.scale = (_sx, 0.008, _sy)
+    bpy.ops.object.transform_apply(scale=True)
+    _hx.append(fin(_c, f"hhx{_k}", M["leek"], smooth=False))
+acc("hardhat", [_hd, _hb, _hr] + _hx)
+# (the taxi driver's peaked cap: a navy band and its stiff crown wider over it, a black peak, a gold cord over the peak and the badge)
+_dc = lathe("dcb", [(C.y + 0.075, R + 0.038), (C.y + 0.2, R + 0.034), (C.y + 0.262, R + 0.062), (C.y + 0.3, R + 0.066), (C.y + 0.33, R + 0.02),
+                    (C.y + 0.342, 0.12)], M["navy"], seg=12, shut=(False, True))
+_dv = lathe("dcv", [(C.y + 0.085, R + 0.036), (C.y + 0.055, R + 0.13)], M["dark"], seg=6, a0=-0.85, a1=0.85, solid=0.012)
+_ds = lathe("dcs", [(C.y + 0.1, R + 0.043), (C.y + 0.118, R + 0.043)], M["gold"], seg=6, a0=-0.8, a1=0.8)
+_dk = sphere("dck", Vector((0.0, C.y + 0.19, R + 0.048)), 0.024, M["gold"], seg=6, rings=3, scale=(1, 1, 0.35))
+acc("drivercap", [_dc, _dv, _ds, _dk])
+# (the fish market hand's cap: a dome, a peak, a button on its top)
+_cp = lathe("cpd", [(C.y + 0.07, R + 0.048), (C.y + 0.2, R + 0.013), (C.y + 0.28, 0.19), (C.y + 0.325, 0.075)], M["capblue"], seg=10, shut=(False, True))
+_cv = lathe("cpv", [(C.y + 0.088, R + 0.044), (C.y + 0.072, R + 0.16)], M["capblue"], seg=6, a0=-0.75, a1=0.75, solid=0.012)
+_ct = sphere("cpt", Vector((0.0, C.y + 0.327, 0.0)), 0.02, M["capblue"], seg=6, rings=3, scale=(1, 0.6, 1))
+acc("cap", [_cp, _cv, _ct])
+# (the band man's guitar in its soft case on his back, a little to his right, its neck up past his head (behind it: the head's back and its
+# hair are 0.27 back there, the neck 0.31), its strap across his chest)
+GZ = -0.31
+_g1 = sphere("gtl", Vector((0.1, 0.3, GZ)), 0.13, M["case"], seg=8, rings=4, scale=(1, 1.15, 0.38))
+_g2 = sphere("gtu", Vector((0.12, 0.5, GZ)), 0.1, M["case"], seg=8, rings=4, scale=(1, 1.1, 0.42))
+_gn = []
+for _k, (_at, _sz) in enumerate((((0.14, 0.79, GZ), (0.07, 0.48, 0.05)), ((0.145, 1.05, GZ), (0.095, 0.07, 0.056)))):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=P(*_at))
+    _c = active()
+    _c.scale = (_sz[0], _sz[2], _sz[1])
+    bpy.ops.object.transform_apply(scale=True)
+    _gn.append(fin(_c, f"gtn{_k}", M["case"], smooth=False))
+_gs = tube("gts", [Vector((0.15, 0.6, -0.15)), on_body(0.11, 0.55, 0.006), on_body(-0.04, 0.4, 0.006), on_body(-0.19, 0.26, 0.006), Vector((-0.2, 0.22, -0.2))], 0.012, M["case"])
+acc("guitar", [_g1, _g2, _gs] + _gn)
+# (the mother's shopping bag over her shoulder, at her side behind her hand, a leek out of its top: white, then green, two leaves)
+bpy.ops.mesh.primitive_cube_add(size=1, location=P(0.25, 0.25, -0.2))
+_eb = active()
+_eb.scale = (0.07, 0.2, 0.2)
+bpy.ops.object.transform_apply(scale=True)
+_eb = fin(_eb, "ebb", M["canvas"], smooth=False)
+_eh = tube("ebh", [Vector((0.25, 0.34, -0.29)), Vector((0.2, 0.52, -0.17)), Vector((0.12, 0.6, -0.08)), Vector((0.2, 0.52, -0.06)), Vector((0.25, 0.34, -0.11))], 0.009, M["canvas"])
+_l0, _l1, _l2 = Vector((0.24, 0.28, -0.16)), Vector((0.27, 0.45, -0.13)), Vector((0.3, 0.62, -0.1))
+_lk = [tube("lkw", [_l0, _l1], 0.017, M["white"]), tube("lkg", [_l1, _l2], 0.015, M["leek"]),
+       tube("lkl0", [_l2, _l2 + Vector((0.05, 0.07, 0.02))], 0.008, M["leek"]), tube("lkl1", [_l2, _l2 + Vector((-0.02, 0.08, -0.03))], 0.008, M["leek"])]
+acc("ecobag", [_eb, _eh] + _lk)
+# (the cook's white headband, as the bosozoku's but plain, knotted at the back, its two ends hanging)
+_cb = tube("chb", [head_at(2 * math.pi * k / 11, math.asin(0.11 / R) - 0.1 * max(0.0, -math.cos(2 * math.pi * k / 11)), 0.022) for k in range(11)], 0.02, M["white"], cyclic=True, most=11)
+_kn = head_at(math.pi, math.asin(0.11 / R) - 0.1, 0.05)
+_ck = [sphere("chk", _kn, 0.028, M["white"], seg=6, rings=3, scale=(1, 0.8, 0.6)),
+       tube("cht0", [_kn, _kn + Vector((0.035, -0.09, -0.025))], 0.011, M["white"]), tube("cht1", [_kn, _kn + Vector((-0.02, -0.1, -0.03))], 0.011, M["white"])]
+acc("chefband", [_cb] + _ck)
+
 
 
 bpy.context.view_layer.update()
@@ -1310,9 +1376,409 @@ def pleats(img, below, every=0.04, k=0.12):
     dim(img, (V < below) & (np.abs(ph - 0.55) < 0.06), k * 1.6)
 
 
+def band_v(v, h):
+    return np.abs(V - v) < h / 2
+
+
+def crossing(over=0.32, from_v=0.6):
+    """a kimono's or a samue's crossed front: the left side over the right, from the neck down to `from_v` (its edge's line, a band)"""
+    return (np.abs(DU - (V - from_v) * over) < 0.03) & (V > from_v) | (np.abs(DU + (V - from_v) * over) < 0.03) & (V > from_v + 0.06)
+
+
+def plaid(img, mask, a, b, every=0.05):
+    """a plaid (a skirt's, a flannel shirt's) where `mask` is: two crossing sets of bands"""
+    put(img, mask & ((((U / every) % 1.0) < 0.5) ^ (((V * 0.4 / every) % 1.0) < 0.5)), a, 0.35)
+    put(img, mask & ((np.abs(((U / every) % 1.0) - 0.25) < 0.04) | (np.abs(((V * 0.4 / every) % 1.0) - 0.25) < 0.04)), b, 0.55)
+
+
+def zipper(img, x=0.0, top=NECK, foot=0.06, col="#c8ccd0"):
+    put(img, (np.abs(DU - x) < 0.0045) & (V < top) & (V > foot), col)
+    dim(img, (np.abs(DU - x) < 0.009) & (np.abs(DU - x) > 0.0045) & (V < top) & (V > foot), 0.25)
+    put(img, (np.abs(DU - x) < 0.008) & (np.abs(V - (top - 0.03)) < 0.014), col)
+
+
+def reflect(img, v, h=0.022, half=0.5):
+    """a reflective band round at `v` (silver, light on it)"""
+    m = band_v(v, h) & (np.abs(DU) < half)
+    put(img, m, "#dfe3e8")
+    lift(img, m & (np.abs(V - v) < h * 0.2), 0.5)
+    dim(img, m & (np.abs(np.abs(V - v) - h / 2) < 0.002), 0.3)
+
+
+def apron_mask(half=0.18, top=0.64, bib=0.13):
+    """an apron over the front: its skirt from the hem to the waist, its bib up the chest; and its straps over the shoulders"""
+    skirt = (np.abs(DU) < half) & (V < WAIST + 0.04)
+    chest = (np.abs(DU) < bib) & (V >= WAIST + 0.04) & (V < top)
+    straps = (np.abs(np.abs(DU) - bib + 0.01) < 0.012) & (V >= top) & (V < NECK)
+    return skirt | chest | straps
+
+
+def more_outfits(kind, n):
+    """(item 377, the owner's 「服裝樣式也多變些」) each kind's second way of dressing (its pictures 2 and 3, two colours of it), and the new
+    kinds' two ways (0 and 1, 2 and 3): not another colour of the same, another thing to wear"""
+    c = n % 2
+    if kind == "salaryman":
+        # (his jacket off, his tie loosened, braces over his shirt)
+        shirt = ["#f2f2ee", "#cfe0f0"][c]
+        img = fill(shirt)
+        put(img, V < WAIST, "#2b3040")
+        belt(img, "#1a1614", WAIST, 0.024)
+        dim(img, vee(0.09, 0.05), 0.35)
+        w = 0.016 + np.clip(0.76 - V, 0, 1) * 0.05
+        put(img, (np.abs(DU - 0.01) < w) & (V > 0.5) & (V < 0.76), ["#a8322a", "#24345a"][c])
+        put(img, (np.abs(DU - 0.008) < 0.02) & (V > 0.74) & (V < 0.78), ["#8a2820", "#1a2848"][c])
+        for sd in (-1, 1):
+            put(img, (np.abs(DU - sd * 0.1) < 0.008) & (V > WAIST) & (V < NECK), "#4a3a30")
+        dim(img, (np.abs(DU + 0.03) < 0.002) & (V > WAIST) & (V < 0.76), 0.25)
+        pocket(img, -0.1, 0.68, 0.05, 0.04, flap=False)
+    elif kind == "officeLady":
+        # (a soft knit and a long skirt, a fine chain round her neck)
+        img = fill(["#e6d6be", "#9ab0c8"][c])
+        dim(img, (V >= WAIST) & (((U / 0.012) % 1.0) < 0.35), 0.07)
+        put(img, V < WAIST, ["#4a3a30", "#2a3040"][c])
+        dim(img, (V > WAIST - 0.005) & (V < WAIST + 0.035) & (((U / 0.008) % 1.0) < 0.4), 0.15)
+        pleats(img, WAIST, 0.08, 0.06)
+        dim(img, np.abs(V - (NECK - 0.035 + 0.03 * (DU / 0.12) ** 2)) < 0.005, 0.3)
+        put(img, (np.abs(V - (NECK - 0.09 + 0.05 * (DU / 0.1) ** 2)) < 0.0035) & (np.abs(DU) < 0.1), "#e0c060")
+        put(img, np.hypot(DU, (V - (NECK - 0.095)) * 0.42) < 0.008, "#e0c060")
+    elif kind == "schoolgirl":
+        # (the blazer uniform: a navy or a brown blazer, the white shirt, a ribbon at her neck, a plaid skirt)
+        img = fill(["#1e2a44", "#4a3226"][c])
+        put(img, vee(0.26, 0.085), "#f4f1ea")
+        bow = (np.abs(DU) < 0.045) & (np.abs(V - 0.79) < 0.006 + 0.02 * np.abs(DU) / 0.045)
+        put(img, bow, ["#c8302a", "#2a5a3a"][c])
+        put(img, (np.abs(DU) < 0.011) & (np.abs(V - 0.79) < 0.012), ["#a82420", "#1e4a2e"][c])
+        lapels(img, "#10182a", 0.26)
+        shiny_buttons(img, "#d8b050", (0.5, 0.58), 0.0, 0.009)
+        put(img, np.hypot(DU + 0.1, (V - 0.7) * 0.42) < 0.016, "#d8b050")
+        put(img, V < WAIST, ["#33405e", "#6a3a3a"][c])
+        plaid(img, V < WAIST, "#1a2236", "#e8e0c8", 0.04)
+        pleats(img, WAIST, 0.035, 0.12)
+    elif kind == "schoolboy":
+        # (a blazer and a striped tie, grey trousers)
+        img = fill(["#2a3550", "#4a4e58"][c])
+        put(img, vee(0.26, 0.08), "#f4f2ee")
+        tie(img, ["#8a1e2a", "#1e3a6a"][c], "#e8e0c8")
+        lapels(img, "#161c2a")
+        shiny_buttons(img, "#c8a040", (0.5, 0.58), 0.0, 0.009)
+        put(img, np.hypot(DU + 0.1, (V - 0.7) * 0.42) < 0.016, "#c8a040")
+        put(img, V < WAIST, "#5a5e66")
+        belt(img, "#1a1614", WAIST, 0.022)
+    elif kind == "grandma":
+        # (her kappōgi: the white smock over her kimono, its collar crossed at her neck, its hem below)
+        kim = ["#6a4a5a", "#4a5a6a"][c]
+        img = fill("#f4f2ec")
+        put(img, crossing(0.3, 0.7), kim)
+        put(img, (np.abs(DU - (V - 0.7) * 0.3 - 0.024) < 0.006) & (V > 0.7), "#f8f6f0")
+        put(img, V < 0.09, kim)
+        for x_ in (-0.11, 0.11):
+            pocket(img, x_, 0.3, 0.09, 0.07, flap=False)
+        dim(img, (np.abs(V - 0.1) < 0.006) & (((U / 0.012) % 1.0) < 0.5), 0.2)
+    elif kind == "grandpa":
+        # (a samue: the work clothes in indigo or brown, their front crossed and tied at his side, a running stitch along their edges)
+        sam = ["#2e3e5e", "#5a4632"][c]
+        img = fill(sam)
+        put(img, crossing(0.34, 0.56), ["#24324e", "#4a3826"][c])
+        dim(img, (np.abs(np.abs(DU - (V - 0.56) * 0.34) - 0.03) < 0.003) & (V > 0.56) & (((V / 0.012) % 1.0) < 0.5), 0.3)
+        put(img, (np.abs(DU - 0.15) < 0.006) & (np.abs(V - 0.56) < 0.05), "#e8e2d0")
+        put(img, V < WAIST - 0.02, ["#26344e", "#4a3a2a"][c])
+        put(img, ((((U / 0.03) % 1.0) < 0.12) & (((V / 0.03) % 1.0) < 0.5)) & (V > WAIST), "#ffffff", 0.08)
+    elif kind == "kid":
+        # (his gym clothes: a white shirt with its collar's colour, his name on a patch, the shorts)
+        trim = ["#c8302a", "#2a5aa8"][c]
+        img = fill("#f6f4ee")
+        put(img, np.abs(V - (NECK - 0.01)) < 0.014, trim)
+        name = (np.abs(DU) < 0.07) & (np.abs(V - 0.62) < 0.04)
+        put(img, name, "#ffffff")
+        dim(img, name & ((np.abs(np.abs(DU) - 0.07) < 0.003) | (np.abs(np.abs(V - 0.62) - 0.04) < 0.003)), 0.4)
+        for k_ in range(3):
+            put(img, (np.abs(DU - (-0.04 + k_ * 0.04)) < 0.012) & (np.abs(V - 0.62) < 0.018) & (((U / 0.006) % 1.0) < 0.5), "#2a2a2a", 0.8)
+        put(img, V < WAIST, ["#2a3a6a", "#a83a2a"][c])
+        put(img, (V < WAIST) & (np.abs(np.abs(DU) - 0.25) < 0.01), "#f6f4ee")
+    elif kind == "uncle":
+        # (his undershirt and his haramaki: the knitted band round his belly, ribbed; the light trousers under it)
+        img = fill("#f2f0ea")
+        dim(img, (V > 0.5) & (((U / 0.01) % 1.0) < 0.3), 0.06)
+        dim(img, np.abs(V - (NECK - 0.05 + 0.05 * (DU / 0.13) ** 2)) < 0.006, 0.3)
+        hara = (V > 0.27) & (V < 0.5)
+        put(img, hara, ["#c8a060", "#6a7a4a"][c])
+        dim(img, hara & (((V / 0.01) % 1.0) < 0.35), 0.12)
+        put(img, V <= 0.27, "#b8b0a0")
+    elif kind == "collegeStudent":
+        # (a hoodie: its strings, its pocket across the front, a print on the chest; jeans)
+        img = fill(["#8a8f96", "#2a4a3a"][c])
+        for sd in (-1, 1):
+            put(img, (np.abs(DU - sd * 0.03) < 0.004) & (V > 0.66) & (V < NECK - 0.02), "#f2f0ea")
+            put(img, np.hypot(DU - sd * 0.03, (V - 0.66) * 0.42) < 0.007, "#c8c8c0")
+        pocket(img, 0.0, 0.5, 0.22, 0.09, flap=False)
+        dim(img, (np.abs(np.abs(DU) - 0.1) < 0.004) & (V > 0.46) & (V < 0.54), 0.3)
+        ring = np.hypot(DU, (V - 0.7) * 0.42)
+        put(img, (ring < 0.035) & (ring > 0.024), ["#e8b84a", "#e8e0c8"][c])
+        put(img, (np.abs(DU) < 0.03) & (np.abs(V - 0.7) < 0.006), ["#e8b84a", "#e8e0c8"][c])
+        dim(img, (np.abs(DU) > 0.3) & (V > NECK - 0.12), 0.18)
+        put(img, V < WAIST - 0.02, "#3a4a6a")
+        dim(img, (V < WAIST - 0.02) & (np.abs(np.abs(DU) - 0.12) < 0.003), 0.3)
+    elif kind == "yukataLady":
+        # (another yukata: morning glories on white with a red obi, or goldfish on navy with a yellow one)
+        img = fill(["#f4f1ea", "#1e2a4a"][c])
+        if c == 0:
+            dots(img, "#3a4aa0", 0.11, 0.24, 0.032, petals=5)
+            dots(img, "#f4f1ea", 0.11, 0.24, 0.009)
+        else:
+            fu = (U / 0.12 + 0.5 * (np.floor(V / 0.22) % 2)) % 1.0 - 0.5
+            fv = (V / 0.22) % 1.0 - 0.5
+            put(img, np.hypot(fu * 0.12 / 0.026, fv * 0.22 * 0.42 / 0.016) < 1, "#e8502a")
+            put(img, (fu * 0.12 > 0.018) & (fu * 0.12 < 0.04) & (np.abs(fv * 0.22 * 0.42) < (fu * 0.12 - 0.018) * 0.7), "#e8502a")
+        cross = crossing(0.32, 0.6)
+        put(img, cross, ["#3a4aa0", "#f4efe6"][c])
+        put(img, (V > 0.42) & (V < 0.58), ["#c8302a", "#e8c84a"][c])
+        dim(img, (V > 0.42) & (V < 0.58) & ((((V) / 0.02) % 1.0) < 0.3), 0.12)
+        put(img, np.abs(V - 0.5) < 0.008, ["#f4f1ea", "#c8302a"][c])
+    elif kind == "delinquent":
+        # (the tracksuit: a zipped jacket with two stripes down each side, the trousers the same)
+        img = fill(["#3a2a6a", "#1e1e22"][c])
+        stripe = ["#f2f0ea", "#e0b040"][c]
+        for off in (0.19, 0.215):
+            put(img, np.abs(np.abs(DU) - off) < 0.006, stripe)
+        zipper(img, 0.0, NECK, WAIST - 0.02)
+        put(img, V > NECK - 0.025, ["#2a1e4e", "#141416"][c])
+        dim(img, np.abs(V - WAIST) < 0.012, 0.25)
+    elif kind == "bosozoku":
+        # (a sukajan: the satin jacket, its ribbed hem and collar in stripes, an embroidered tiger's head on his back, a small one on his chest)
+        img = fill(["#1c2a4a", "#7a1e2a"][c])
+        lift(img, np.abs(((U + V * 0.5) % 0.25) - 0.12) < 0.03, 0.1)
+        for v0, v1 in ((0.0, 0.07), (NECK - 0.03, 1.0)):
+            m = (V >= v0) & (V < v1)
+            put(img, m, "#1a1a1e")
+            put(img, m & (((V / 0.012) % 1.0) < 0.35), ["#e0b040", "#f2efe8"][c])
+        zipper(img, 0.0, NECK - 0.03, 0.07, "#e0c060")
+        bu = np.where(DU > 0, DU - 0.5, DU + 0.5)
+        r_ = np.hypot(bu, (V - 0.55) * 0.42)
+        put(img, r_ < 0.12, "#e8902a")
+        put(img, (r_ < 0.12) & (np.abs(np.sin(bu * 90 + (V - 0.55) * 20)) < 0.3), "#1a1a1e")
+        for sd in (-1, 1):
+            put(img, np.hypot(bu - sd * 0.045, (V - 0.6) * 0.42) < 0.015, "#f2efe8")
+            put(img, np.hypot(bu - sd * 0.045, (V - 0.6) * 0.42) < 0.007, "#1a1a1e")
+        put(img, np.hypot(DU + 0.1, (V - 0.68) * 0.42) < 0.03, "#e0b040")
+    elif kind == "foreignTourist":
+        # (a souvenir happi coat: its collar band down the front with strokes on it, a crest on the back, waves round its hem; shorts)
+        img = fill(["#2a4aa8", "#c83a2a"][c])
+        eri = (np.abs(np.abs(DU) - 0.05) < 0.022) & (V > 0.08)
+        put(img, eri, "#f4f1ea")
+        put(img, eri & (((V / 0.06) % 1.0) < 0.35) & (np.abs(np.abs(DU) - 0.05) < 0.009), "#1a1a1e", 0.8)
+        bu = np.where(DU > 0, DU - 0.5, DU + 0.5)
+        r_ = np.hypot(bu, (V - 0.6) * 0.42)
+        put(img, (r_ < 0.09) & (r_ > 0.07), "#f4f1ea")
+        put(img, (np.abs(bu) < 0.012) & (np.abs(V - 0.6) < 0.15) | (np.abs(V - 0.6) < 0.005) & (np.abs(bu) < 0.06), "#f4f1ea")
+        wave = V < 0.13 + 0.03 * np.abs(np.sin(U * np.pi * 24))
+        put(img, wave & (V > 0.06), "#f4f1ea")
+        put(img, V < 0.06, "#a8946a")
+        belt(img, "#3a3a3e", WAIST, 0.03, "#3a3a3e")
+    elif kind == "civilServant":
+        # (the city hall's work jacket: zipped, its flapped pockets, a name tag, its collar; grey trousers)
+        img = fill(["#8a96a4", "#7a7e70"][c])
+        zipper(img, 0.0, NECK - 0.02, WAIST - 0.02)
+        for x_ in (-0.11, 0.11):
+            pocket(img, x_, 0.66, 0.08, 0.07)
+        tag = (np.abs(DU + 0.11) < 0.04) & (np.abs(V - 0.75) < 0.016)
+        put(img, tag, "#f8f8f4")
+        put(img, tag & (np.abs(DU + 0.11) < 0.025) & (np.abs(V - 0.75) < 0.003), "#2a2a2a")
+        put(img, V > NECK - 0.03, ["#6a7684", "#5a5e52"][c])
+        put(img, V < WAIST - 0.02, "#4a4c52")
+        put(img, np.abs(V - (WAIST - 0.02)) < 0.014, ["#6a7684", "#5a5e52"][c])
+    elif kind == "maidCoser":
+        # (a shrine maiden's: the white kosode, its collar crossed with a red edge under it, the red hakama pleated, its white cord tied)
+        img = fill("#f8f6f2")
+        hak = ["#c8202a", "#9a2a5a"][c]
+        put(img, V < WAIST + 0.04, hak)
+        cross = crossing(0.3, 0.64)
+        dim(img, cross & ~crossing(0.3, 0.645), 0.2)
+        put(img, (np.abs(DU - (V - 0.64) * 0.3 - 0.028) < 0.005) & (V > 0.64), hak)
+        pleats(img, WAIST + 0.04, 0.05, 0.14)
+        put(img, np.abs(V - (WAIST + 0.04)) < 0.008, "#f8f6f2")
+        put(img, (np.abs(DU) < 0.03) & (np.abs(V - (WAIST + 0.03)) < 0.03), "#f8f6f2")
+    elif kind == "gyaru":
+        # (a leopard print top, a denim mini, a chain belt)
+        img = fill(["#d8a860", "#e8e0d0"][c])
+        spot = ["#3a2414", "#5a5a5a"][c]
+        for off, rr in ((0.0, 0.013), (0.5, 0.009)):
+            cu = (U / 0.06 + off + 0.5 * (np.floor(V / 0.13) % 2)) % 1.0 - 0.5
+            cv = (V / 0.13 + off) % 1.0 - 0.5
+            d = np.hypot(cu * 0.06, cv * 0.13 * 0.42)
+            put(img, (d < rr) & (d > rr * 0.55), spot)
+        put(img, V < 0.46, "#4a6a9a")
+        dim(img, (V < 0.46) & (np.abs(np.abs(DU) - 0.2) < 0.003), 0.3)
+        put(img, (np.abs(V - 0.46) < 0.006) & ((((U / 0.012) % 1.0)) < 0.6), "#e0c060")
+    # ---- the new kinds (item 377): two ways each
+    elif kind == "housewife":
+        if n < 2:
+            # (a sweater and her kitchen apron, gingham, a pocket on it with a frill)
+            img = fill(["#c87a6a", "#7a9aaa"][c])
+            dim(img, (((U / 0.012) % 1.0) < 0.3), 0.05)
+            ap = apron_mask(0.18, 0.64, 0.12)
+            put(img, ap, "#f2ece0")
+            put(img, ap & ((((U / 0.02) % 1.0) < 0.5) ^ (((V * 0.42 / 0.02) % 1.0) < 0.5)), ["#c8402a", "#2a4a8a"][c], 0.35)
+            pocket(img, 0.0, 0.3, 0.14, 0.08, "#f8f4ea", flap=False)
+            put(img, (np.abs(V - 0.34) < 0.006) & (np.abs(DU) < 0.07) & (((U / 0.01) % 1.0) < 0.6), ["#c8402a", "#2a4a8a"][c])
+            put(img, np.abs(V - (WAIST + 0.04)) < 0.01, "#f2ece0")
+        else:
+            # (an open cardigan over a light blouse, buttons, a long printed skirt)
+            img = fill(["#8a6a8a", "#6a8a6a"][c])
+            put(img, (np.abs(DU) < 0.07) & (V > WAIST), "#f4f0e8")
+            dim(img, (np.abs(np.abs(DU) - 0.07) < 0.004) & (V > WAIST), 0.3)
+            shiny_buttons(img, "#f4f0e8", (0.5, 0.6, 0.7), 0.085, 0.008)
+            put(img, V < WAIST, ["#3a3a4a", "#5a4a3a"][c])
+            sk = img.copy()
+            dots(sk, "#e8e0c8", 0.08, 0.16, 0.008, petals=5)
+            img[V < WAIST] = sk[V < WAIST]
+    elif kind == "taxiDriver":
+        if n < 2:
+            # (a white shirt and a navy vest, his tie, his name badge, the vest's buttons; navy trousers)
+            img = fill("#f4f4f0")
+            vest = ~vee(0.34, 0.1) & (V > WAIST - 0.03)
+            put(img, vest, ["#1e2a44", "#2a2a2e"][c])
+            tie(img, ["#7a1e2a", "#1e3a6a"][c])
+            shiny_buttons(img, "#d8d8d0", (0.48, 0.55), 0.0, 0.008)
+            badge = (np.abs(DU + 0.12) < 0.035) & (np.abs(V - 0.7) < 0.022)
+            put(img, badge, "#f8f8f4")
+            put(img, (np.abs(DU + 0.135) < 0.01) & (np.abs(V - 0.7) < 0.014), "#8a9ab0")
+            put(img, V < WAIST - 0.03, "#1e2434")
+        else:
+            # (the company's grey jacket, its emblem on his chest, a tie)
+            img = fill(["#5a6068", "#2a3a5a"][c])
+            put(img, vee(0.26, 0.08), "#f4f4f0")
+            tie(img, ["#24345a", "#7a1e2a"][c])
+            lapels(img, "#3a3e46")
+            shiny_buttons(img, "#e0c060", (0.5, 0.58), 0.0, 0.009)
+            put(img, np.hypot(DU + 0.11, (V - 0.7) * 0.42) < 0.02, "#e0c060")
+            put(img, np.hypot(DU + 0.11, (V - 0.7) * 0.42) < 0.011, ["#5a6068", "#2a3a5a"][c])
+            put(img, V < WAIST, "#2a2e36")
+    elif kind == "nurse":
+        if n < 2:
+            # (scrubs: a V-neck top, piped, a pen in its pocket, her ID card on its cord; the trousers the same)
+            sc = ["#7ab0c8", "#e89ab0"][c]
+            img = fill(sc)
+            dim(img, np.abs(np.abs(DU) - 0.07 * np.clip((V - (NECK - 0.2)) / 0.2, 0, 1)) < 0.005, 0.35)
+            put(img, vee(0.2, 0.065), "#f2f0ea")
+            pocket(img, 0.11, 0.62, 0.07, 0.06, flap=False)
+            put(img, (np.abs(DU - 0.1) < 0.004) & (V > 0.62) & (V < 0.67), "#1a1a2a")
+            for sd in (-1, 1):
+                put(img, (np.abs(DU - sd * (0.025 + (V - 0.62) * 0.1)) < 0.004) & (V > 0.62) & (V < NECK), "#2a5a9a")
+            card = (np.abs(DU) < 0.03) & (np.abs(V - 0.58) < 0.035)
+            put(img, card, "#f8f8f4")
+            put(img, card & (np.abs(V - 0.6) < 0.012) & (np.abs(DU + 0.01) < 0.012), "#9ab0c8")
+            dim(img, np.abs(V - WAIST) < 0.01, 0.2)
+        else:
+            # (a navy cardigan over white scrubs, the night cold; her card on its cord)
+            img = fill("#f2f0ea")
+            cardi = np.abs(DU) > 0.075
+            put(img, cardi, ["#1e2a44", "#4a3a4a"][c])
+            dim(img, cardi & (((U / 0.01) % 1.0) < 0.3), 0.08)
+            shiny_buttons(img, "#d8d8d0", (0.5, 0.6, 0.7), 0.09, 0.008)
+            card = (np.abs(DU) < 0.03) & (np.abs(V - 0.6) < 0.035)
+            put(img, card, "#f8f8f4")
+            put(img, card & (np.abs(V - 0.62) < 0.012), "#9ab0c8")
+            put(img, V < WAIST, "#e8e6e0")
+    elif kind == "constructionWorker":
+        if n < 2:
+            # (a navy shirt under a lime vest with its silver bands; his baggy tobi trousers)
+            img = fill(["#2a3550", "#4a4a3a"][c])
+            # (the vest all the way round, its silver bands too: seen from behind as from in front)
+            vest = (V > WAIST - 0.02) & ~vee(0.3, 0.09)
+            put(img, vest, "#c8e030")
+            for v_ in (0.55, 0.69):
+                reflect(img, v_, 0.024)
+                put(img, vee(0.3, 0.09) & band_v(v_, 0.024), ["#2a3550", "#4a4a3a"][c])
+            put(img, V < WAIST - 0.02, ["#9a8a5a", "#5a5a4a"][c])
+            dim(img, (V < WAIST - 0.02) & (np.abs(np.sin(U * 2 * np.pi * 14)) < 0.15), 0.18)
+            belt(img, "#2a2420", WAIST - 0.02, 0.03, "#b0b0a8")
+        else:
+            # (an orange work jacket, silver bands round it, its zip and pockets; navy trousers)
+            img = fill(["#e86a2a", "#3a5a8a"][c])
+            for v_ in (0.32, 0.62):
+                reflect(img, v_, 0.026)
+            zipper(img, 0.0, NECK - 0.02, WAIST)
+            for x_ in (-0.11, 0.11):
+                pocket(img, x_, 0.72, 0.07, 0.06)
+            put(img, V < WAIST, "#2a3044")
+    elif kind == "marketWorker":
+        if n < 2:
+            # (a hooded top under the long rubber apron, its bib and its neck strap, the light on its rubber)
+            img = fill(["#2a3550", "#5a5a5e"][c])
+            ap = apron_mask(0.21, 0.74, 0.15)
+            put(img, ap, ["#2a4a3a", "#1c1c20"][c])
+            lift(img, ap & (np.abs(((U * 3 + V) % 0.4) - 0.2) < 0.02), 0.18)
+            dim(img, ap & (np.abs(np.abs(DU) - 0.21) < 0.004) & (V < WAIST + 0.04), 0.3)
+            for sd in (-1, 1):
+                put(img, (np.abs(DU - sd * 0.03) < 0.004) & (V > 0.74) & (V < NECK - 0.02), "#d8d8d0")
+        else:
+            # (a quilted vest over a check shirt, the rubber apron below)
+            img = fill(["#c8302a", "#2a5a3a"][c])
+            plaid(img, V > 0, "#1a1a1e", "#e8e0c8", 0.04)
+            vest = (np.abs(DU) > 0.06) & (V > WAIST)
+            put(img, vest, ["#3a3a3a", "#5a3a2a"][c])
+            dim(img, vest & (((V / 0.05) % 1.0) < 0.12), 0.3)
+            zipper(img, 0.06, NECK - 0.02, WAIST)
+            put(img, V < WAIST + 0.02, "#1c1c20")
+            lift(img, (V < WAIST + 0.02) & (np.abs(((U * 3 + V) % 0.4) - 0.2) < 0.02), 0.15)
+    elif kind == "bandman":
+        if n < 2:
+            # (the rider's jacket: black leather, its zip slanting across, silver studs at its collar; a white band tee under it; black jeans)
+            img = fill("#1a1a1e")
+            put(img, (np.abs(DU + 0.02) < 0.06) & (V > 0.55), ["#f2f0ea", "#c8302a"][c])
+            bolt = (np.abs(DU + 0.02 - (V - 0.66) * 0.5) < 0.008) & (np.abs(V - 0.66) < 0.05)
+            put(img, bolt, ["#1a1a1e", "#f2f0ea"][c])
+            zline = np.abs(DU - (0.03 + (V - 0.4) * 0.12)) < 0.004
+            put(img, zline & (V > WAIST - 0.02) & (V < NECK - 0.02), "#c8ccd0")
+            lift(img, (np.abs(((U + V * 0.3) % 0.18) - 0.09) < 0.01) & (V > WAIST), 0.12)
+            for k_ in range(5):
+                put(img, np.hypot(DU - (-0.1 + k_ * 0.05), (V - (NECK - 0.03)) * 0.42) < 0.006, "#d8dce0")
+            put(img, V < WAIST - 0.02, "#22242a")
+            belt(img, "#0e0e10", WAIST - 0.02, 0.026, "#c8ccd0")
+        else:
+            # (a flannel shirt open over a black tee with a star on it, ripped jeans)
+            img = fill(["#a8302a", "#2a5a3a"][c])
+            plaid(img, V > WAIST, "#1a1a1e", "#e8e0c8", 0.035)
+            put(img, (np.abs(DU) < 0.07) & (V > WAIST), "#1a1a1e")
+            a_ = np.arctan2((V - 0.64) * 0.42, DU)
+            put(img, np.hypot(DU, (V - 0.64) * 0.42) < 0.03 * (0.55 + 0.45 * np.cos(5 * a_)), "#e8e0c8")
+            put(img, V < WAIST, "#5a7aa8")
+            put(img, (V < 0.26) & (V > 0.22) & (np.abs(np.abs(DU) - 0.1) < 0.03) & (((V / 0.008) % 1.0) < 0.5), "#e8ecf0")
+    elif kind == "offShiftChef":
+        if n < 2:
+            # (a white chef's coat, double-breasted: two rows of cloth buttons, the stand collar piped; houndstooth trousers)
+            img = fill("#f8f8f4")
+            dim(img, np.abs(DU - 0.03) < 0.003, 0.25)
+            for x_ in (-0.06, 0.08):
+                shiny_buttons(img, ["#f0f0ea", "#1a1a1e"][c], (0.5, 0.58, 0.66, 0.74), x_, 0.01)
+            put(img, (V > NECK - 0.04) & (V < NECK - 0.03), ["#24345a", "#c8302a"][c])
+            put(img, V < WAIST - 0.02, "#2a2a2e")
+            put(img, (V < WAIST - 0.02) & ((((U / 0.012) % 1.0) < 0.5) ^ (((V * 0.42 / 0.012) % 1.0) < 0.5)), "#e8e8e0", 0.6)
+        else:
+            # (a cook's white coat, its front crossed and tied, a navy apron below with a white crest)
+            img = fill("#f8f8f4")
+            put(img, crossing(0.3, 0.6) & ~crossing(0.3, 0.605), "#d8d8d0")
+            dim(img, crossing(0.3, 0.6), 0.08)
+            put(img, (np.abs(DU - 0.16) < 0.005) & (np.abs(V - 0.58) < 0.04), "#f0f0ea")
+            ap = (np.abs(DU) < 0.26) & (V < WAIST + 0.02)
+            put(img, ap, ["#1e2a4a", "#3a2a4a"][c])
+            put(img, np.abs(V - (WAIST + 0.02)) < 0.012, ["#1e2a4a", "#3a2a4a"][c])
+            r_ = np.hypot(DU, (V - 0.24) * 0.42)
+            put(img, (r_ < 0.04) & (r_ > 0.03), "#f4f2ec")
+            put(img, (r_ < 0.03) & (np.abs(DU) < 0.006), "#f4f2ec")
+    else:
+        img = fill("#888888")
+    return img
+
+
+NEW_KINDS = {"housewife", "taxiDriver", "nurse", "constructionWorker", "marketWorker", "bandman", "offShiftChef"}
+
+
 def outfit(kind, n):
     """what `kind` wears (its `n`th colours), as a picture round the body"""
-    if kind == "salaryman":
+    if n >= 2 or kind in NEW_KINDS:
+        img = more_outfits(kind, n)
+    elif kind == "salaryman":
         suit = ["#2b3444", "#3a3e46"][n]
         img = fill(suit)
         pinstripe(img, "#5a6474")
@@ -1504,15 +1970,17 @@ def outfit(kind, n):
 
 
 KINDS = ["salaryman", "officeLady", "schoolgirl", "schoolboy", "grandma", "grandpa", "kid", "uncle", "collegeStudent", "yukataLady", "delinquent",
-         "bosozoku", "foreignTourist", "civilServant", "maidCoser", "gyaru"]
+         "bosozoku", "foreignTourist", "civilServant", "maidCoser", "gyaru",
+         "housewife", "taxiDriver", "nurse", "constructionWorker", "marketWorker", "bandman", "offShiftChef"]
 # (written as a PNG, then made a JPEG at 88 (item 347): at twice the pixels each way the weave's grain made the PNGs four times the bytes; a
 # JPEG holds the clothes as well at less than the old PNGs. The PNG let go)
 write_png(os.path.join(TEX_DIR, "outfit_normal.png"), fold_normals())
 _jpg = bpy.context.scene.render.image_settings
 _jpg.file_format = "JPEG"
 _jpg.quality = 88
+# (item 377: four pictures a kind, two ways of dressing in two colours each: 0 and 1 the first, 2 and 3 the second)
 for kind in KINDS:
-    for n in (0, 1):
+    for n in (0, 1, 2, 3):
         _png = os.path.join(TEX_DIR, f"outfit_{kind}_{n}.png")
         write_png(_png, outfit(kind, n))
         _im = bpy.data.images.load(_png)

@@ -9,6 +9,8 @@ export type GuestView = { id: number; state: 'waiting' | 'eating' | 'done' | 'an
   seat?: number
   /** the one they came in with, if they're a couple */
   partner?: number
+  /** that one a grown-up and their child, not a couple (item 377: the early evening's pairs) */
+  family?: boolean
   /** the plate their order's served on (game/plateSize, item 228): the long one, a round one or a little one */
   plate?: PlateKind }
 

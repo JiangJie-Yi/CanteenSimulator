@@ -3060,7 +3060,7 @@ const SeatBits = memo(function SeatBits({ shoes, soys, soups = NO_SOUPS }: { sho
   )
 })
 /** the women's kinds, who use the women's toilet */
-const HER = new Set(['officeLady', 'schoolgirl', 'yukataLady', 'grandma', 'maidCoser', 'gyaru'])
+const HER = new Set(['officeLady', 'schoolgirl', 'yukataLady', 'grandma', 'maidCoser', 'gyaru', 'housewife', 'nurse'])
 /** how often one sat waiting gets up to go to the toilet (per second), and how long they're in there */
 const WC_RATE = 1 / 240
 const WC_STAY = 6
@@ -8665,7 +8665,7 @@ export function GuestBar3D({ guests, at, length = 3.6, drawCounter = true, lang,
             {/* (their label just over their head, sat up on the seat or standing) */}
             <GuestLabel id={s.id} y={((walking ? 0 : FOLK_SEAT) + FOLK_HEIGHT * FOLK_FIT * folkSpec(s.id).size) * PEOPLE_SCALE + 0.08}
               dots={!!g && !walking && g.state === 'waiting' && g.rating === null} rating={g?.rating ?? null} angry={g?.state === 'angry'}
-              partner={g?.partner !== undefined} name={guestLabel(s.id, lang)} onEl={labelEl}  lang={lang} />
+              partner={g?.partner !== undefined && !g?.family} name={guestLabel(s.id, lang)} onEl={labelEl}  lang={lang} />
           </group>
         )
       })}

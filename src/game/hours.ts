@@ -16,7 +16,8 @@ export const hoursBegin = (was: number, now: number) => !inHours(was) && inHours
 export const hoursEnd = (was: number, now: number) => inHours(was) && !inHours(now)
 /**
  * Deep night (深夜, the owner's): from midnight till the sky lightens (05:00, game/clock's dawn): the staff tire faster (data/staff's
- * LATE_TIRE, but for the night owls), and a different crowd comes in (data/guests' comesLate), ordering more.
+ * LATE_TIRE, but for the night owls), and they order more (data/guests' LATE_MORE); who comes in is by the part of the night (data/guests'
+ * crowdPart and comesAt, item 377).
  */
 export const LATE_FROM = 0
 export const LATE_TO = 5 * 60

@@ -30,6 +30,9 @@ export function lookOf(id: number, kind: Kind): Look {
     delinquent: pick(['#15161c', '#1c2440'], id), bosozoku: pick(['#f2efe8', '#4a2a5e', '#1a1a20'], id),
     foreignTourist: pick(['#e8d24a', '#4aa8d8', '#e86a4a', '#f2f0ea'], id), civilServant: pick(['#4a4e56', '#3a4250'], id), maidCoser: '#1c1c24',
     gyaru: pick(['#f06aa0', '#f2f0ea', '#1c1c22', '#f2c62a'], id),
+    // (item 377)
+    housewife: pick(['#c87a6a', '#7a9aaa', '#8a6a8a'], id), taxiDriver: '#1e2a44', nurse: pick(['#7ab0c8', '#e89ab0'], id), constructionWorker: '#c8e030',
+    marketWorker: '#2a4a3a', bandman: '#1a1a1e', offShiftChef: '#f8f8f4',
   }
   return {
     top: top[kind],
@@ -38,7 +41,9 @@ export function lookOf(id: number, kind: Kind): Look {
         : kind === 'delinquent' ? '#15161c' : kind === 'foreignTourist' ? '#a8946a' : kind === 'civilServant' ? top[kind] : kind === 'maidCoser' ? '#1c1c24' : kind === 'gyaru' ? pick(['#2a2a32', '#3a5a8a', '#c43a6a'], id + 1) : '#2f2f36',
     // (the rough lot bleach it, or dye it red-brown, as often as not)
     hair: kind === 'gyaru' ? pick(['#f0d090', '#e8b860', '#c8884a', '#f2e2b8'], id) : kind === 'foreignTourist' ? pick(['#e8cc80', '#b07a40', '#c0602a', '#2b1d14'], id) : kind === 'maidCoser' ? pick(['#e88ab0', '#1c1c22', '#8a5a3a', '#e8cc80', '#a8c8e8'], id)
-      : old ? '#d4d4d4' : kind === 'delinquent' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id) : pick(HAIR, id * 3),
+      : old ? '#d4d4d4' : kind === 'delinquent' || kind === 'bosozoku' ? pick(['#e2b85a', '#1c1c22', '#a8542a'], id)
+        // (the band man's dyed as often as not (item 377))
+        : kind === 'bandman' ? pick(['#1c1c22', '#8a2a2a', '#e2b85a', '#5a3a6a'], id) : pick(HAIR, id * 3),
     // (a visitor from abroad as like as not fairer, or darker, than anyone local)
     skin: kind === 'gyaru' ? pick(['#c99470', '#b8805a', '#d8a880'], id) : kind === 'foreignTourist' ? pick(['#f8e2d0', '#f6d8c4', '#8a5a3a', '#c99470'], id) : pick(SKIN, id * 7 + 1),
     shoes: kind === 'maidCoser' ? '#1a1a1a' : kind === 'gyaru' ? '#f2f0ea' : kind === 'collegeStudent' || kind === 'kid' || kind === 'foreignTourist' ? '#f2f0ea' : kind === 'yukataLady' ? '#b08a5a' : '#2a2220',

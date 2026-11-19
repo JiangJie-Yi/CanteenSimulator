@@ -70,6 +70,15 @@ const ZH = {
   takeoutOrder: (items: string[], rider: boolean) => rider ? `外送單進來了：${tallyNames(items).join('、')}，外送員在收銀台等！` : `外帶一份：${tallyNames(items).join('、')}，客人在收銀台等！`,
   takeoutHand: (rider: boolean): string => rider ? '外送的餐好了，路上小心！' : '久等了！您的外帶，請慢用～',
   lastCall: '最後點餐囉！接下來只收外帶。' as string,
+  // (item 377: each part of the night's crowd as it comes, in the day's log)
+  crowd: {
+    afterSchool: '放學了，學生、帶小孩的媽媽、早點吃飯的老人家陸續進來。',
+    dinner: '晚餐時間，下班的上班族和一家大小坐滿了吧台。',
+    evening: '九點了，小朋友都回家了。接下來是大人下班喝一杯的時間。',
+    midnight: '十一點半，錯過末班車的、收工的廚師、剛下台的樂團進來了。',
+    deep: '一點半，休息的計程車司機、工地夜班、下班的護理師，還有暴走族。',
+    dawn: '三點半，魚市場的人趕在拍賣前來吃一頓。',
+  } as Record<'afterSchool' | 'dinner' | 'evening' | 'midnight' | 'deep' | 'dawn', string>,
   orphanAgain: (n: string) => `運氣太好了！這份熱騰騰的${n}剛好有客人點，直接送上！`,
 
   // 客人點餐與反應（移除前置編號 #ID）
@@ -185,6 +194,14 @@ const JA: typeof ZH = {
   takeoutOrder: (items: string[], rider: boolean) => rider ? `デリバリー注文：${tallyNames(items).join('、')}、配達員さんがレジで待ってます！` : `お持ち帰り：${tallyNames(items).join('、')}、お客さんがレジでお待ちです！`,
   takeoutHand: (rider: boolean) => rider ? 'お待たせしました、配達お気をつけて！' : 'お待たせしました！お持ち帰りです、どうぞ～',
   lastCall: 'ラストオーダーです！この後はお持ち帰りのみです。' as string,
+  crowd: {
+    afterSchool: '放課後。学生、子ども連れのお母さん、早めの夕食のお年寄りが来はじめた。',
+    dinner: '夕食どき。仕事帰りの会社員と家族連れでカウンターが埋まってきた。',
+    evening: '九時。子どもたちは帰った。ここからは大人が一杯やる時間。',
+    midnight: '十一時半。終電を逃した人、仕事帰りの板前、ライブ帰りのバンドマンがやって来た。',
+    deep: '一時半。休憩のタクシー運転手、夜間工事の職人、夜勤明けの看護師、そして暴走族。',
+    dawn: '三時半。市場の人がセリの前に腹ごしらえに来る。',
+  },
   orphanAgain: (n: string) => `ツイてる！${n}の注文がちょうど入った、出来立てをそのまま出そう！`,
 
   // 客の注文と反応（ID番号除去）
@@ -296,6 +313,14 @@ const EN: typeof ZH = {
   takeoutOrder: (items: string[], rider: boolean) => rider ? `Delivery order: ${tallyNames(items, ' ×').join(', ')}. The rider's waiting at the till!` : `Takeaway: ${tallyNames(items, ' ×').join(', ')}. They're waiting at the till!`,
   takeoutHand: (rider: boolean) => rider ? 'Here you go. Ride safe!' : 'Thanks for waiting! Your takeaway, enjoy~',
   lastCall: 'Last orders! Takeaway only from now.' as string,
+  crowd: {
+    afterSchool: "School's out: students, mothers with their children and the old folk at their early supper are coming in.",
+    dinner: 'Dinner time: the offices let out, and families fill the counter.',
+    evening: "Nine o'clock: the children have gone home. Now it's the grown-ups' time for a drink after work.",
+    midnight: 'Half past eleven: those who missed the last train, cooks off their shift, a band off the stage.',
+    deep: 'Half past one: taxi drivers on their break, the night road crews, nurses off the late shift, and the bikers.',
+    dawn: "Half past three: the fish market's hands come in for a meal before the auction.",
+  },
   orphanAgain: (n: string) => `What luck! An order just rolled in for ${n}—send it out piping hot!`,
 
   // Customer Ordering & Feedback (Stripped #ID prefix)

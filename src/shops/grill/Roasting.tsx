@@ -63,7 +63,7 @@ import { seasonSound, sprinkleTick } from './seasonSound'
 import { biteSound, chewSound } from './chewSound'
 import { comesIn, patienceIn, roomMood } from '@/game/roomLights'
 import { getLights } from '@/scene/lightsStore'
-import { canRide, comesLate, isMinor, kindOf, LATE_MORE, type GuestKind } from '@/data/guests'
+import { canRide, comesAt, drinksAlcohol, familyShare, kindOf, LATE_MORE, pastHour, WITH_CHILD, type GuestKind } from '@/data/guests'
 import { fitsBeforeClose, RIDER_SHARE, TAKEOUT_MAX, takeoutGap, takeoutSize } from '@/game/takeout'
 import { CLOSE_AT } from '@/game/hours'
 import type { Look, Role } from '@/data/staff'
@@ -136,6 +136,8 @@ const SIDE_EAT_S = 12
 type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; since: number; state: GuestView['state']; seat: number
   /** the one they came in with (a couple, sat side by side) */
   partner?: number
+  /** that one a grown-up and their child, not a couple (item 377) */
+  family?: boolean
   /** (shop clock) when they'll say a word of the room's things, if they do (item 348); -1 once it's come */
   propAt?: number
   /** (shop clock) when they got up; their plate and sticks are cleared away a moment later */
@@ -152,8 +154,9 @@ type Guest = { id: number; orders: string[]; ate: string[]; eaten: number[]; sin
 /** at most this many AI customers seated at once; one gives up after waiting this long with nothing to eat */
 const MAX_SEATED = GRILL_SEATS.length
 /** who can come in as a couple: him, and her */
-const COUPLE_HIM = new Set<GuestKind>(['salaryman', 'collegeStudent', 'schoolboy', 'delinquent', 'foreignTourist'])
-const COUPLE_HER = new Set<GuestKind>(['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'collegeStudent'])
+// (and the night's: the band's man and the gyaru, the nurse off her shift (item 377))
+const COUPLE_HIM = new Set<GuestKind>(['salaryman', 'collegeStudent', 'schoolboy', 'delinquent', 'foreignTourist', 'bandman'])
+const COUPLE_HER = new Set<GuestKind>(['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'collegeStudent', 'gyaru', 'nurse'])
 const PATIENCE = 150
 /** the bar the customers sit at, behind the fire (away from the camera): its middle, length, top, and seats */
 const BAR_AT = GRILL_COUNTERS[0].at.clone()
@@ -6136,7 +6139,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
   /** when the kitchen last said a bowl of rice or soup couldn't be had for want of it in stock (item 229) */
   const sideSaid = useRef<Partial<Record<'rice' | 'soup', number>>>({})
   const report = () => onGuests?.(guests.current.filter((g) => !g.takeout).map((g) => ({ id: g.id, state: g.state, items: g.orders.length, ate: [...g.ate],
-    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner, plate: plateFor(g.orders) })))
+    rating: g.eaten.length ? g.eaten.reduce((a, b) => a + b, 0) / g.eaten.length : null, seat: g.seat, partner: g.partner, family: g.family, plate: plateFor(g.orders) })))
   const chefSaid = useRef(0)
   /** when the chef last said there's no clean skewer */
   const noSkewerSaid = useRef(-1e9)
@@ -6577,9 +6580,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       }
       // (and some a tokkuri of sake, sat at the bar (item 89, the owner's: "it's on the menu, the customers order it"; they never did): charged
       // and taken from the stock as any order is, poured from the stand)
-      // (never to one under age (item 203: a pupil was poured one like anyone))
+      // (never to one under age (item 203: a pupil was poured one like anyone), nor to a taxi driver on his break (item 377))
       // (more of them for each make the owner's tasted at the stand: the floor staff speak for it (item 363, game/sakeTasting))
-      if (seated && orders.length && !isMinor(id) && Math.random() < sakeChance(SAKE_SIDE, SAKE_TASTED.list) && onOrder?.('Sake', id, false)) {
+      if (seated && orders.length && drinksAlcohol(id) && Math.random() < sakeChance(SAKE_SIDE, SAKE_TASTED.list) && onOrder?.('Sake', id, false)) {
         orders.push('Sake')
         said.push(nameOf('Sake'))
         // (theirs till it's poured: out of the stock, still in the bottle (item 199))
@@ -6594,7 +6597,8 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       for (const n of SEATS_TAKEN) used.add(n)
       const seat = Array.from({ length: BAR_SEATS }, (_, n) => n).find((n) => !used.has(n))
       for (const id of [...BENCH.ids]) {
-        if (SHOP.closing || LAST_CALL.on || !onOrder || now - (BENCH.since.get(id) ?? now) > BENCH_WAIT) {
+        // (or past their hour while they waited (data/guests' pastHour, item 377): a child, a high schooler, the old folk gone home, not sat down)
+        if (SHOP.closing || LAST_CALL.on || !onOrder || now - (BENCH.since.get(id) ?? now) > BENCH_WAIT || pastHour(id, getClock().minute)) {
           BENCH.ids = BENCH.ids.filter((x) => x !== id)
           BENCH.since.delete(id)
           BENCH.gone.add(id)
@@ -6636,17 +6640,24 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const pairAt = Math.random() < Math.min(0.9, fl.pairs * flowerBuffs(SHRINE_FLOWERS).pairs)
         ? Array.from({ length: BAR_SEATS - 1 }, (_, n) => n).find((n) => free(n) && free(n + 1) && GRILL_SEATS[n].counter === GRILL_SEATS[n + 1].counter)
         : undefined
-      // (in the deep night, a different crowd: the next number that would come in then (data/guests' comesLate))
-      const lateOk = (i: number) => !LATE.on || comesLate(i)
+      // (each part of the night its own crowd: the next number that would come in then (data/guests' comesAt, item 377: no child after eight,
+      // no high schooler after ten, the taxis and the fish market's hands at dawn))
+      const minute = getClock().minute
+      const crowdOk = (i: number) => comesAt(i, minute)
       let first = guestSeq.current + 1
-      while (!lateOk(first) && first < guestSeq.current + 400) first++
+      while (!crowdOk(first) && first < guestSeq.current + 400) first++
       let ids = [first]
+      // (a pair: in the early evening and at dinner as often as not a grown-up and their child (data/guests' familyShare), else a couple)
+      const withChild = pairAt !== undefined && Math.random() < familyShare(minute)
       if (pairAt !== undefined) {
+        const pairOk = (i: number) => (withChild ? WITH_CHILD.has(kindOf(i).kind) && kindOf(i + 1).kind === 'kid'
+          : COUPLE_HIM.has(kindOf(i).kind) && COUPLE_HER.has(kindOf(i + 1).kind)) && crowdOk(i) && crowdOk(i + 1)
         let i = guestSeq.current + 1
-        while (!(COUPLE_HIM.has(kindOf(i).kind) && COUPLE_HER.has(kindOf(i + 1).kind) && lateOk(i) && lateOk(i + 1)) && i < guestSeq.current + 400) i++
-        if (i < guestSeq.current + 400) ids = [i, i + 1]
+        while (!pairOk(i) && i < guestSeq.current + 600) i++
+        if (i < guestSeq.current + 600) ids = [i, i + 1]
       }
       const couple = ids.length === 2
+      const family = couple && kindOf(ids[1]).kind === 'kid'
       for (const [k, id] of ids.entries()) {
         // (a stool for them, before they order: with every one taken, or someone still at it, or others already waiting on the bench, one on
         // their own sits down on the bench to wait their turn if there's room on it (a couple doesn't); else they don't come in)
@@ -6666,7 +6677,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         if (orders.length) {
           const seat = seatFor
           used.add(seat)
-          guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat, partner: couple ? ids[1 - k] : undefined })
+          guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat, partner: couple ? ids[1 - k] : undefined, family: family || undefined })
           if (bar) SAY_SEATED.lines.set(id, L().order(id, said))
           else onSay?.('guest', L().order(id, said), id)
           // (said back as it's taken, by the owner (crewTalk, item 324))
@@ -6696,7 +6707,9 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       const rider = Math.random() < RIDER_SHARE
       // (a rider the next number that'd take the work (data/guests' canRide): a yukata lady came for a delivery, helmet and box on her back)
       let id = guestSeq.current + 1
-      while (rider && !canRide(id) && id < guestSeq.current + 400) id++
+      // (one who comes for it themselves, one who'd be about then (item 377: no child at the till at three in the morning))
+      const minute = getClock().minute
+      while ((rider ? !canRide(id) : !comesAt(id, minute)) && id < guestSeq.current + 400) id++
       guestSeq.current = id
       // (a rider's order is the platform's: it keeps its cut (bar's RIDERS, item 210))
       if (rider) RIDERS.add(id)

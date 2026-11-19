@@ -94,7 +94,7 @@ import { RECEIPT, receiptOrder } from '@/game/receipts'
 import { householdOrder, type Household } from '@/game/household'
 import { LINES, tallyNames } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
-import { guestLabel } from '@/data/guests'
+import { crowdPart, guestLabel, type CrowdPart } from '@/data/guests'
 import { activityOf, effective, isTired, restPerHour, ROLES, tireNow, workFatigue, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
 import { CLOSE_AT, OPEN_AT, crewPay, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy } from '@/game/hours'
 import { cardFee, platformCut, rentDue } from '@/game/costs'
@@ -1497,6 +1497,10 @@ export default function App() {
   // (into the day's log, where the shop's going on is told (talk): it went into the chat with the second cook (addTalk), unseen while the shop's
   // open, and the last half hour began without a word (the owner's item 39, a whole day's log: only the owner's closing words at 04:30))
   lastCallSay.current = () => talk('chef', LINES[lang].lastCall)
+  /** a new part of the night begun while the shop's open: who's coming in now, said in the day's log (item 377, data/guests' crowdPart) */
+  const crowdSay = useRef((_p: CrowdPart) => {})
+  crowdSay.current = (p) => talk('chef', LINES[lang].crowd[p])
+  const crowdWas = useRef<CrowdPart | null>(null)
   /** a new day by the game's clock: the applicants' new lot, the dice back */
   const newDay = useRef<(day: number) => void>(() => {})
   /** the last of the game's days the rent's been paid for (0: none yet) */
@@ -3062,6 +3066,11 @@ export default function App() {
       const lastNow = lastCall(getClock().minute)
       if (lastNow && !LAST_CALL.on && aiRef.current.ai) lastCallSay.current()
       LAST_CALL.on = lastNow
+      // (a new part of the night, and so another crowd (item 377): said as it begins, while the shop's open (not at its opening: its first
+      // part's said then too, once))
+      const partNow = crowdPart(getClock().minute)
+      if (!aiRef.current.ai) crowdWas.current = null
+      else if (partNow !== crowdWas.current) { crowdWas.current = partNow; if (!lastNow) crowdSay.current(partNow) }
       // (the hours over (04:30, the owner's): shut up as by hand, last orders and all)
       if (aiRef.current.ai && hoursEnd(was, getClock().minute)) hoursOver.current()
       // (and the staff's wages while the shop's open, by the game's clock: each tick is GAME_SPEED of its minutes, and an hour of it is an

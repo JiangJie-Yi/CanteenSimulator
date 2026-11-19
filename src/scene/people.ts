@@ -12,5 +12,5 @@ export const moodOf = (g: { rating: number | null; state: string }): Mood | null
  * stooped shuffle; the rest a man's easy stride. And how fast, for the same.
  */
 export const walkOf = (kind: string) => kind === 'grandma' || kind === 'grandpa' ? 'WalkO' : kind === 'uncle' ? 'WalkU'
-  : ['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'gyaru', 'staffF'].includes(kind) ? 'WalkF' : 'Walk'
+  : ['officeLady', 'schoolgirl', 'yukataLady', 'maidCoser', 'gyaru', 'housewife', 'nurse', 'staffF'].includes(kind) ? 'WalkF' : 'Walk'
 export const walkSpeedOf = (kind: string) => ({ WalkO: 0.55, WalkU: 0.82, WalkF: 0.92, Walk: kind === 'kid' ? 1.35 : 1 })[walkOf(kind)]
