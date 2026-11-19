@@ -22,7 +22,7 @@
 // Each model's size, meshes, primitives (draws), materials, textures, vertices and triangles are printed before and after.
 import { readdir, mkdir, stat } from 'node:fs/promises'
 import { basename, join as joinPath, resolve } from 'node:path'
-import { NodeIO, PropertyType } from '@gltf-transform/core'
+import { NodeIO, PropertyType, VertexLayout } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import { dedup, flatten, join, palette, prune, simplify, weld } from '@gltf-transform/functions'
 import { MeshoptSimplifier } from 'meshoptimizer'
@@ -37,7 +37,10 @@ const taken = new Set(['--out', '--simplify', '--error'].flatMap((n) => { const 
 let files = args.filter((a, i) => !a.startsWith('--') && !taken.has(i))
 if (!files.length) files = (await readdir('public/models')).filter((f) => f.endsWith('.glb')).map((f) => joinPath('public/models', f))
 
-const io = new NodeIO().registerExtensions(ALL_EXTENSIONS)
+// (each attribute in its own buffer view, as Blender writes them: glTF-Transform interleaves them by default, and three makes those
+// InterleavedBufferAttributes, which the game's own merging and colouring (StaticBatch, plainColours) can't write into: the whole batch swapped
+// in, the shop never came up, item 367)
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).setVertexLayout(VertexLayout.SEPARATE)
 await MeshoptSimplifier.ready
 
 /** what a model holds: meshes, primitives (each a draw), materials, textures, vertices and triangles */
