@@ -34,6 +34,7 @@ const outfitHint = () => { const l = document.documentElement.lang; return l.sta
 import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from '@/scene/faceSheet'
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { turnEase } from './commuteWalk'
+import { NO_POINTER, zr } from '@/scene/htmlProps'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -902,17 +903,17 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       }} />
       {/* (what he's muttering, over his head) */}
       {say && !getEdit().on && (
-        <Html position={[0, 1.42, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+        <Html position={[0, 1.42, 0]} center zIndexRange={zr(20, 10)} style={NO_POINTER}>
           <div className="g3-label" ref={floatEl}><span key={say.key} className="g3-bubble g3-say boss-say"><b className="say-who">{SPEAKERS.get('owner') ?? '老闆'}</b>{say.text}</span></div>
         </Html>
       )}
       {gulu > 0 && !getEdit().on && (
-        <Html position={[0.18, 1.2, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+        <Html position={[0.18, 1.2, 0]} center zIndexRange={zr(20, 10)} style={NO_POINTER}>
           <span key={gulu} ref={floatEl} className="boss-float boss-gulu">{lang === 'ja' ? 'ゴクゴク〜' : lang === 'en' ? 'Glug glug~' : '咕嚕咕嚕～'}<Glyph id="note" size="0.95em" /></span>
         </Html>
       )}
       {joy > 0 && !getEdit().on && (
-        <Html position={[0, 1.3, 0]} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+        <Html position={[0, 1.3, 0]} center zIndexRange={zr(20, 10)} style={NO_POINTER}>
           <span key={joy} ref={floatEl} className="boss-joy" aria-hidden="true">
             {(['coin', 'heart', 'coin', 'heart', 'coin', 'heart'] as const).map((c, i) => <i key={i} className={`is-${c}`} style={{ '--i': i } as React.CSSProperties}><Glyph id={c} size={18} /></i>)}
           </span>

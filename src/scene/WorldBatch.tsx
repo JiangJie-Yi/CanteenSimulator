@@ -166,6 +166,25 @@ export function WorldBatch() {
       g.list.push(m)
       groups.set(key, g)
     }
+    // (merged away only with every mesh under it merged too (or merged already): the renderer draws nothing under what it's hidden, and a
+    // hull left out (alone in its look) went with its piece, its line gone; a look left with one, not merged at all, and so on round)
+    const going = new Set<THREE.Mesh>()
+    for (let pass = 0; pass < 4; pass++) {
+      going.clear()
+      for (const g of groups.values()) if (g.list.length >= 2) for (const m of g.list) going.add(m)
+      let held = 0
+      for (const g of groups.values()) {
+        if (g.list.length < 2) continue
+        const keep = g.list.filter((m) => {
+          let ok = true
+          m.traverse((d) => { if (ok && d !== m && (d as THREE.Mesh).isMesh && !going.has(d as THREE.Mesh) && !mergeState(d)?.hidden) ok = false })
+          return ok
+        })
+        held += g.list.length - keep.length
+        g.list = keep
+      }
+      if (!held) break
+    }
     const made: THREE.Mesh[] = []
     const watch: Watch[] = []
     for (const g of groups.values()) {
@@ -241,8 +260,8 @@ export function WorldBatch() {
     if (now - lastLook.current < LOOK_MS) return
     lastLook.current = now
     const was = seen.current, next = new Map<THREE.Mesh, THREE.Matrix4>(), keep: THREE.Mesh[] = []
-    scene.traverse((o) => {
-      if (!mergeable(o) || !o.visible) return
+    scene.traverseVisible((o) => {
+      if (!mergeable(o)) return
       const at = was.get(o)
       if (at && sameAt(at, o.matrixWorld)) keep.push(o)
       next.set(o, at && sameAt(at, o.matrixWorld) ? at : o.matrixWorld.clone())

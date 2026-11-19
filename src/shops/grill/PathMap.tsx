@@ -13,6 +13,7 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { PATH_MAP, type PathRoute } from './bar'
 import { editWords, useEditSel } from './edit'
+import { NO_POINTER, zr } from '@/scene/htmlProps'
 
 /** each person's colour on the map (item 189): the servers blue, violet, teal; the owner amber; the plater pink; the customers green */
 const WHO_COLOR: Record<string, string> = { 'server-0': '#3d9bff', 'server-1': '#a970ff', 'server-2': '#2ec4c4', 'server-3': '#7fb2ff', owner: '#ff9f1c',
@@ -108,7 +109,7 @@ export function PathMap() {
         const person = p.key.startsWith('server-') || p.key === 'owner'
         const seat = p.key.startsWith('seat-')
         return (
-          <Html key={p.key} position={p.at} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+          <Html key={p.key} position={p.at} center zIndexRange={zr(20, 0)} style={NO_POINTER}>
             <span className={`pm-tag${person ? ' is-person' : seat ? ' is-seat' : ''}`} style={person ? { background: whoColor(p.key) } : undefined}>{placeName(p.key)}</span>
           </Html>
         )

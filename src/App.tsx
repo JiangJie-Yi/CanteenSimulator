@@ -148,6 +148,7 @@ import { ageLots, lotsFrom, lotsTotal, settleLots, stalest, tossSpoiled, type Lo
 import { RING_SLOTS } from '@/game/fireSlots'
 import { orderSaid, saidAgain, withOrder, type OrderSaid } from '@/game/orderTally'
 import { FREEZER, FREEZER_TEMP } from '@/shops/grill/Decor'
+import { NO_POINTER, zr } from '@/scene/htmlProps'
 // (the owner's clothes as last chosen (item 376), on him before he's first drawn: kept across visits and a new game alike, his look, not the game's)
 try { setOutfit(readOutfit(JSON.parse(localStorage.getItem(OUTFIT_KEY) ?? 'null'))) } catch { /* (storage blocked, or nothing kept: as he's made) */ }
 
@@ -568,7 +569,7 @@ function ViewMarkers({ lang, onPick }: { lang: Lang; onPick: (v: ViewId) => void
           : (() => { const o = v.anchor ? scene.getObjectByName(v.anchor) : null; if (!o) return null; const p = o.getWorldPosition(new THREE.Vector3()); if (p.y < OVERVIEW_TARGET.y - 1.2) p.y += 0.9; return p })()
         if (!at) return null
         return (
-          <Html key={v.id} position={at} center zIndexRange={[40, 0]}>
+          <Html key={v.id} position={at} center zIndexRange={zr(40, 0)}>
             <button type="button" className="view-pin" onClick={(e) => { e.stopPropagation(); onPick(v.id) }}>
               <i>{i + 1}</i>
               <span><b>{viewName(v, lang)}</b>{v.about[lang]}</span>
@@ -614,7 +615,7 @@ function CamIcon({ editing, n, name }: { editing: boolean; n: number | string; n
         <mesh key={z} position={[0, 0.12, z]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.055, 0.055, 0.03, 18]} /><meshBasicMaterial color="#4a4d55" /></mesh>
       ))}
       {editing && (
-        <Html position={[0, 0.24, 0]} center zIndexRange={[40, 0]} style={{ pointerEvents: 'none' }}>
+        <Html position={[0, 0.24, 0]} center zIndexRange={zr(40, 0)} style={NO_POINTER}>
           <span className="view-cam-tag"><i>{n}</i>{name}</span>
         </Html>
       )}

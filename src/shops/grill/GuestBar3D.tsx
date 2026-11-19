@@ -107,6 +107,7 @@ import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWE
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
+import { NO_POINTER, zr } from '@/scene/htmlProps'
 /** where a sound's heard from, worked out in place */
 const SOUND_AT = new THREE.Vector3()
 
@@ -778,7 +779,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     <group ref={(o) => { g.current = o; STOCKER_FIG.o = o; if (o) FIGURES.set(o, 'other') }} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
       <BlobShadow r={0.17} />
       <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
-      <Html position={[0, 1.95, 0]} center zIndexRange={[19, 9]} style={{ pointerEvents: 'none' }}>
+      <Html position={[0, 1.95, 0]} center zIndexRange={zr(19, 9)} style={NO_POINTER}>
         <span ref={statusEl} className="staff-status" />
       </Html>
       <mesh ref={(o) => { held.current.crate = o }} position={[0, HELD_AT[1] + 0.06, HELD_AT[2]]} visible={false}>
@@ -3468,14 +3469,15 @@ function PlateImpl({ kind = 'round', dirty = false, dirt = 1, design = 0, sticks
 
 /** a plate of each kind drawn at one place (item 228), the one it is shown by showKind: for the plates whose kind changes as they're used
  * (the sink's stack, the basket's slots, the plates being washed in hand), so a change is a flag, not a redraw */
-function PlateKinds({ design = 0, dirty = false }: { design?: number; dirty?: boolean }) {
+// (memo: its two numbers the same, it isn't drawn again with whatever holds it (item 374: 167 times a second while the shop was open))
+const PlateKinds = memo(function PlateKinds({ design = 0, dirty = false }: { design?: number; dirty?: boolean }) {
   return (
     <>
       <group name="kind-round"><Plate kind="round" design={design} dirty={dirty} sticks={0} /></group>
       <group name="kind-long" visible={false}><Plate kind="long" design={design} dirty={dirty} sticks={0} /></group>
     </>
   )
-}
+})
 const MAME_OF_ROUND = KIND_SCALE.mame / KIND_SCALE.round
 /** show the kind of plate it is, of a PlateKinds' two (its parts found once, kept on it) */
 const showKind = (g: THREE.Object3D | null | undefined, kind: PlateKind) => {

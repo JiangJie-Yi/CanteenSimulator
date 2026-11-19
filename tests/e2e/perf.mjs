@@ -8,11 +8,11 @@
 //     SUBS=1      each frame callback's own time
 //     PROF=1      a CPU profile: the functions that take the most time, and the game's own code with all it calls
 //     WHO=1       who calls the renderer (a pass into a render target shows up here)
-//     DSF=<n>     the screen's pixel ratio (default 1); Q=<tier> a quality tier
+//     DSF=<n>     the screen's pixel ratio (default 1); Q=<tier> a quality tier; EXTRA=<&a=b...> more on the address (&world=1: the room's merge)
 // The page is opened with ?pace=0, so the frame pacer doesn't step the drawing down while it's measured.
 import { chromium } from 'playwright-core'
 import { toOpeningHours } from './hours.mjs'
-const URL = 'http://localhost:5173/GrilledFishBusiness/?pace=0' + (process.env.Q ? `&q=${process.env.Q}` : '')
+const URL = 'http://localhost:5173/GrilledFishBusiness/?pace=0' + (process.env.Q ? `&q=${process.env.Q}` : '') + (process.env.EXTRA ?? '')
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] })
 const ctx0 = await b.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: +(process.env.DSF ?? 1) })
 const p = await ctx0.newPage()

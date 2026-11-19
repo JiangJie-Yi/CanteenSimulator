@@ -99,6 +99,7 @@ const GAZE_AT = new THREE.Vector3()
 import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
+import { NO_POINTER, zr } from '@/scene/htmlProps'
 
 export { BAR_AT, BAR_TOP }
 
@@ -9138,7 +9139,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       <Decor held={held} lanternAt={containerAt('lantern').toArray() as [number, number, number]} fanAt={fanAt().toArray() as [number, number, number]} />
       {active && decorTip && (
         <Html position={decorTip === 'fan' ? (fanAt().add(new THREE.Vector3(0, 0.3, 0)).toArray() as [number, number, number]) : [DECOR.crate.at[0], 0.5, DECOR.crate.at[1]]}
-          center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
+          center zIndexRange={zr(30, 10)} style={NO_POINTER}>
           <span className="tool-tag">{decorTip === 'fan' ? '團扇' : '備長炭'}<small>{decorTip === 'fan' ? '拿到火上來回搧' : '拖到火上添炭'}</small></span>
         </Html>
       )}
@@ -9199,7 +9200,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       {/* salt is taken with the fingers: a pinching hand follows the pinch while it's carried */}
       {saltInHand && (
         <group ref={hand}>
-          <Html center zIndexRange={[40, 30]} style={{ pointerEvents: 'none' }}><PinchHand /></Html>
+          <Html center zIndexRange={zr(40, 30)} style={NO_POINTER}><PinchHand /></Html>
         </group>
       )}
       <points geometry={grains.geometry} material={grainMaterial} frustumCulled={false} renderOrder={3} />
@@ -9210,18 +9211,18 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
         </mesh>
       ))}
       {active && tasteTip && (
-        <Html position={tasteTip.at} center zIndexRange={[35, 25]} style={{ pointerEvents: 'none' }}>
+        <Html position={tasteTip.at} center zIndexRange={zr(35, 25)} style={NO_POINTER}>
           <span className="taste-tip">美味 <b>{tasteTip.taste}</b></span>
         </Html>
       )}
       {pops.map((x, k) => (
-        <Html key={k} position={x?.at ?? POP_AWAY} center zIndexRange={[36, 26]} style={{ pointerEvents: 'none' }}>
+        <Html key={k} position={x?.at ?? POP_AWAY} center zIndexRange={zr(36, 26)} style={NO_POINTER}>
           {/* (the word's own key: a new one starts its rise again) */}
           {x && <span key={x.id} className={`taste-pop${x.good ? '' : ' is-bad'}`}>{x.text}</span>}
         </Html>
       ))}
       {active && toolLabel && (
-        <Html position={toolLabel.at} center zIndexRange={[30, 10]} style={{ pointerEvents: 'none' }}>
+        <Html position={toolLabel.at} center zIndexRange={zr(30, 10)} style={NO_POINTER}>
           <span className="tool-tag">{tipIn(toolLabel.kind === 'water' ? '水（退火用）' : TOOL_NAMES[toolLabel.kind], lang)}<small>{tipIn(toolLabel.kind === 'water' ? '拖至炭火／爐心' : '拖到食物上', lang)}</small></span>
         </Html>
       )}
@@ -9230,7 +9231,7 @@ export function Roasting({ url, roast, itemIds, quantities, active, instant = fa
       ))}
       {active && showsProgress(modeOf(ai, research)) && tags.map(({ key, id, name, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
-          <Html center zIndexRange={[30, 10]}>
+          <Html center zIndexRange={zr(30, 10)}>
             <button type="button"
               className={`roast-tag roast-${state.stage}${hoveredKey === key ? ' roast-tag-lit' : ''}`}
               aria-label={`${roast.names[id]}，${state.label}，點一下放到盤子上`}
