@@ -503,13 +503,99 @@ set_ = []
 # (item 353, the owner's, 2026-11-19: 「品質不OK」 (a second time: item 254 gave them a line and a few pictures): its things were boxes and
 # discs in flat colours, the rice balls paper-white, the dishes stickers, the leaves cucumbers. Each made over as the thing it is, and all of
 # them painted into one picture (atlas_kit): one material, one draw, the more detail)
+
+
+# (item 392, the owner's, 2026-11-20: 「飯糰料理台，可以專業些，目前看起來很空」「不見得只能料理飯糰」: the counter a prep station for the whole
+# menu: what a grilled fish goes out with (daikon grated on its grater, lemon and sudachi), and over its back a two-tier shelf of what the
+# kitchen keeps to hand (rice bowls, small plates, lacquer bowls, the long plates the fish goes out on, soy and mirin, the tea, the jars);
+# a knife on the board. Painted into the same picture: one material, as before)
+def p_oroshi(w, h):
+    """a ceramic grater from above: white glaze, rows of little raised teeth over its middle, a cobalt line in from its rim"""
+    u, v = grid01(w)
+    col = np.ones((w, w, 3), np.float32) * np.array((0.95, 0.95, 0.92), np.float32)
+    col = col * (0.97 + 0.04 * fbm(w, 5, 5, 3))[..., None]
+    inner = ((np.abs(u - 0.5) < 0.34) & (np.abs(v - 0.5) < 0.38)).astype(np.float32)
+    gx, gy = (u * 20) % 1.0, (v * 26 + (np.floor(u * 20) % 2) * 0.5) % 1.0
+    tooth = np.clip(1 - np.hypot(gx - 0.5, gy - 0.5) / 0.34, 0, 1) * inner
+    col = mix(col, (0.6, 0.6, 0.58), tooth * 0.5)
+    col = mix(col, (1.0, 1.0, 1.0), np.clip(1 - np.hypot(gx - 0.38, gy - 0.62) / 0.14, 0, 1) * inner * 0.7)
+    edge = np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v))
+    col = mix(col, (0.18, 0.27, 0.58), (np.abs(edge - 0.06) < 0.014).astype(np.float32) * 0.9)
+    return col
+
+
+def p_daikon(w, h):
+    """a daikon's skin along it (v from its top): white, faint fibres across it, green at its top"""
+    u, v = grid01(w)
+    col = mix((0.96, 0.96, 0.91), (0.88, 0.9, 0.83), fbm(w, 3, 12, 3) * 0.6)
+    fib = (np.abs(np.sin((v * 38 + fbm(w, 4, 4, 2) * 2) * math.pi)) < 0.07).astype(np.float32)
+    col = mix(col, (0.8, 0.8, 0.74), fib * 0.3)
+    col = mix(col, (0.55, 0.74, 0.38), smooth(0.22, 0.0, v))
+    return col
+
+
+def _citrus(w, peel, pith, flesh, seg=9):
+    """a citrus cut across, from above: its peel round the rim, the white pith in from it, wedges of flesh, pale walls between them"""
+    yy, xx = np.mgrid[0:w, 0:w].astype(np.float32)
+    x, y = (xx + 0.5) / w * 2 - 1, (yy + 0.5) / w * 2 - 1
+    r, a = np.hypot(x, y), np.arctan2(y, x)
+    col = np.ones((w, w, 3), np.float32) * np.array(flesh, np.float32)
+    col = col * (0.9 + 0.14 * fbm(w, 9, 9, 3))[..., None]
+    wall = (np.abs(((a / (2 * math.pi)) * seg) % 1.0 - 0.5) > 0.45).astype(np.float32) * (r < 0.8)
+    col = mix(col, (0.97, 0.95, 0.86), wall * 0.85)
+    col = mix(col, (0.97, 0.95, 0.86), (r < 0.1).astype(np.float32) * 0.85)
+    col = mix(col, pith, smooth(0.78, 0.82, r))
+    col = mix(col, peel, smooth(0.88, 0.92, r))
+    return col
+
+
+def p_lemon(w, h):
+    return _citrus(w, (0.95, 0.78, 0.12), (0.97, 0.95, 0.82), (0.98, 0.88, 0.42))
+
+
+def p_sudachi(w, h):
+    return _citrus(w, (0.22, 0.48, 0.13), (0.9, 0.93, 0.78), (0.86, 0.9, 0.55))
+
+
+def p_steel(w, h):
+    """a knife: its blade's brushed steel along it (u), lighter toward its edge (v low), the edge itself a bright line"""
+    u, v = grid01(w)
+    col = mix((0.78, 0.8, 0.83), (0.5, 0.52, 0.56), v)
+    col = col * (0.92 + 0.12 * fbm(w, 48, 2, 2))[..., None]
+    col = mix(col, (0.95, 0.96, 0.98), smooth(0.1, 0.03, v))
+    return col
+
+
+def p_bottle(w, h):
+    """a bottle of soy, round it (u) and up it (v): near black-brown, a gleam down one side, a paper label round its middle, a red band
+    over it and the maker's name brushed down it"""
+    u, v = grid01(w)
+    col = np.ones((w, w, 3), np.float32) * np.array((0.15, 0.065, 0.03), np.float32)
+    col = mix(col, (0.6, 0.42, 0.3), smooth(0.05, 0.0, np.abs(u - 0.2)) * 0.7)
+    lab = ((v > 0.26) & (v < 0.6)).astype(np.float32)
+    col = mix(col, (0.93, 0.89, 0.78), lab)
+    col = mix(col, (0.72, 0.12, 0.1), ((v > 0.54) & (v < 0.59)).astype(np.float32))
+    name = lab * (np.abs(u - 0.62) < 0.035) * (v > 0.31) * (v < 0.5) * (np.sin(v * 140) > -0.3)
+    col = mix(col, (0.16, 0.1, 0.08), name * 0.85)
+    return col
+
+
+def p_amber(w, h):
+    """mirin's bottle, and the jars' glaze: amber, a gleam down one side"""
+    u, v = grid01(w)
+    col = mix((0.42, 0.2, 0.05), (0.66, 0.38, 0.1), fbm(w, 3, 3, 2))
+    col = mix(col, (0.95, 0.8, 0.55), smooth(0.05, 0.0, np.abs(u - 0.22)) * 0.6)
+    return col
+
+
 A = Atlas("PrepAtlas")
 for key, w_, h_, painter in (("rice", 2, 2, p_rice), ("nori", 2, 2, p_nori), ("hinoki", 2, 2, p_hinoki), ("dish", 2, 2, p_dish),
                              ("tenugui", 2, 2, p_fukin), ("bamboo", 2, 2, lambda w, h: bamboo_slats(w)), ("sasa", 2, 2, p_sasa),
                              ("salmon", 2, 2, p_salmon), ("ume", 2, 2, p_ume), ("kombu", 2, 2, p_kombu), ("takuan", 2, 2, p_takuan),
                              ("stoneware", 2, 2, p_stoneware), ("lacq", 1, 1, p_lacquer), ("lacqin", 1, 1, p_lacquer_black),
                              ("water", 1, 1, p_water), ("porcelain", 1, 1, p_porcelain), ("wood", 1, 1, p_wood), ("wrap", 1, 1, p_wrap),
-                             ("black", 1, 1, p_black)):
+                             ("black", 1, 1, p_black), ("oroshi", 1, 1, p_oroshi), ("daikon", 1, 1, p_daikon), ("lemon", 1, 1, p_lemon),
+                             ("sudachi", 1, 1, p_sudachi), ("steel", 1, 1, p_steel), ("bottle", 1, 1, p_bottle), ("amber", 1, 1, p_amber)):
     A.put(key, w_, h_, painter)
 AM = A.material(rough=0.55)
 
@@ -736,6 +822,94 @@ def onigiri_at(name, x, y0, z):
 
 for k in range(3):
     onigiri_at(f"PrepDone{k}", TX0 + 0.075 + k * 0.14, H + 0.017, (TZ0 + TZ1) / 2 - 0.02)
+# ---- (item 392) the prep station's other things
+from mathutils import Matrix  # noqa: E402
+
+
+def laid(o, at, turn):
+    """a thing made upright at the origin laid down on its side: its upright (the game's y) along the game's x, turned `turn` about the
+    upright, the end it was made from at `at` (the game's x, y, z)"""
+    o.data.transform(Matrix.Translation(P(*at)) @ Matrix.Rotation(turn, 4, 'Z') @ Matrix.Rotation(math.pi / 2, 4, 'Y'))
+    o.data.update()
+    return o
+
+
+# (the garnishes, between the cooker and the hand-water bowl (x -0.74..-0.42): a ceramic grater with half a daikon lying on it, a bowl of
+# grated daikon, a dish of lemon slices and sudachi halves)
+GX = -0.585
+made(slab("grater", [(0.055 * math.cos(a), 0.095 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)], H, 0.012, parts, AM,
+          x=GX, z=0.1), "oroshi")
+# (the daikon its own node, made upright from its top's end at the origin and laid down by its transform, not its vertices: the game takes
+# it up in the third cook's hand as he grates (GuestBar3D's grate, Decor's PrepCounter))
+dk = turned("PrepDaikon", 0.0, 0.0, 0.0, [(0.009, 0.0), (0.02, 0.006), (0.027, 0.02), (0.03, 0.05), (0.032, 0.09), (0.033, 0.125), (0.033, 0.13)],
+            parts, AM, segs=12, cap=True, uv="cyl")
+made(dk, "daikon")
+dk.rotation_euler = (0.0, math.pi / 2, 0.5)
+dk.location = P(GX - 0.07, H + 0.012 + 0.033 + 0.002, 0.05)
+OX, OZ = -0.65, -0.17
+made(facing(turned("oroshibowl", OX, H, OZ, [(0.025, 0.0), (0.03, 0.006), (0.043, 0.02), (0.048, 0.036), (0.045, 0.037), (0.041, 0.03)], parts, AM,
+                   segs=16, cap=False, uv="polar", R=0.048), True), "dish")
+made(facing(turned("oroshi", OX, H + 0.02, OZ, [(0.038, 0.0), (0.034, 0.012), (0.024, 0.021), (0.01, 0.026)], parts, AM, segs=12, cap=True,
+                   uv="polar", R=0.038), True), "daikon")
+LX, LZ = -0.515, -0.2
+made(facing(turned("citrusdish", LX, H, LZ, DISH, parts, AM, segs=16, cap=True, uv="polar", R=0.056), True), "dish")
+for k, (ox, oz) in enumerate(((-0.014, 0.008), (0.002, -0.004), (0.016, 0.01))):
+    made(facing(turned(f"lemon{k}", LX + ox, H + 0.0098 + 0.0025 * k, LZ + oz, [(0.022, 0.0), (0.023, 0.003)], parts, AM, segs=12, cap=True,
+                       uv="polar", R=0.023), True), "lemon")
+for k, (ox, oz) in enumerate(((-0.02, -0.025), (0.018, -0.026))):
+    made(facing(turned(f"sudachi{k}", LX + ox, H + 0.0098, LZ + oz, [(0.006, 0.0), (0.013, 0.003), (0.019, 0.009), (0.021, 0.016)], parts, AM,
+                       segs=12, cap=True, uv="polar", R=0.021), True), "sudachi")
+
+# (a knife laid along the back of the hinoki board, its blade toward the rice balls' side, its handle off to the right)
+blade = [(-0.11, 0.0), (0.06, 0.0), (0.075, 0.004), (0.075, 0.02), (-0.06, 0.02), (-0.1, 0.012)]
+made(slab("knifeblade", blade, H + 0.035, 0.003, parts, AM, x=BOARD_X - 0.06, z=-0.165), "steel")
+made(boxed("knifehandle", BOARD_X + 0.015, BOARD_X + 0.125, H + 0.035, H + 0.053, -0.163, -0.145, parts, AM, bev=0.004), "wood")
+
+# (the shelf over the back of it, two tiers of planks on three uprights, clear of what's on the counter under it)
+SX, SZ0, SZ1 = (-0.725, 0.47, 1.455), -0.49, -0.345
+TIER = (H + 0.2, H + 0.4)
+for k, xx in enumerate(SX):
+    made(boxed(f"shelfpost{k}", xx - 0.012, xx + 0.012, H, H + 0.44, SZ0, SZ1, parts, AM, bev=0.003), "hinoki")
+for k, yy in enumerate(TIER):
+    for j, (a_, b_) in enumerate(zip(SX, SX[1:])):
+        made(boxed(f"shelfboard{k}{j}", a_ + 0.009, b_ - 0.009, yy, yy + 0.022, SZ0, SZ1, parts, AM, bev=0.003), "hinoki")
+SZ = (SZ0 + SZ1) / 2
+L1, L2 = TIER[0] + 0.022, TIER[1] + 0.022
+# (rice bowls, three to a stack, upside down, their rims stepping up)
+STACK = [(0.056, 0.0), (0.056, 0.012), (0.051, 0.016), (0.057, 0.021), (0.053, 0.036), (0.043, 0.055), (0.029, 0.068), (0.026, 0.077)]
+for k, xx in enumerate((-0.63, -0.495)):
+    made(facing(turned(f"bowls{k}", xx, L1, SZ, STACK, parts, AM, segs=12, cap=True, uv="cyl"), True), "dish")
+# (small plates, a stack of six)
+for k, xx in enumerate((-0.36, -0.245)):
+    made(facing(turned(f"plates{k}", xx, L1, SZ, [(0.045, 0.0), (0.05, 0.004), (0.05, 0.03), (0.046, 0.032)], parts, AM, segs=14, cap=True,
+                       uv="polar", R=0.05), True), "dish")
+# (lacquer soup bowls, three upside down)
+made(facing(turned("soupbowls", -0.1, L1, SZ, STACK, parts, AM, segs=12, cap=True, uv="cyl"), True), "lacq")
+# (the salt in its wooden box, a jar of pickled plums)
+made(boxed("saltbox", 0.07, 0.17, L1, L1 + 0.07, SZ - 0.045, SZ + 0.045, parts, AM, bev=0.004), "wood")
+made(facing(turned("umejar", 0.33, L1, SZ, [(0.038, 0.0), (0.05, 0.02), (0.056, 0.055), (0.047, 0.09), (0.036, 0.1), (0.037, 0.108)], parts, AM,
+                   segs=14, cap=False), True), "amber")
+made(facing(turned("umelid", 0.33, L1, SZ, [(0.039, 0.106), (0.04, 0.112), (0.03, 0.12), (0.012, 0.124)], parts, AM, segs=14, cap=True), True),
+     "wood")
+# (past the middle upright: the long plates a grilled fish goes out on, four stacked; a bamboo sieve; the tea; a spare box of nori)
+made(boxed("longplates", 0.53, 0.81, L1, L1 + 0.05, SZ - 0.05, SZ + 0.05, parts, AM, bev=0.006), "porcelain")
+made(facing(turned("zaru", 0.95, L1, SZ, [(0.05, 0.0), (0.062, 0.012), (0.066, 0.024), (0.064, 0.026)], parts, AM, segs=16, cap=True,
+                   uv="polar", R=0.066), True), "bamboo")
+made(facing(turned("teacan", 1.12, L1, SZ, [(0.035, 0.0), (0.035, 0.11), (0.033, 0.113), (0.016, 0.115)], parts, AM, segs=14, cap=True), True),
+     "black")
+made(boxed("norispare", 1.22, 1.42, L1, L1 + 0.05, SZ - 0.05, SZ + 0.05, parts, AM, bev=0.004), "black")
+# (on the top tier: soy, mirin and sake in their bottles, red caps; a second stack of long plates; a jar)
+BOTTLE = [(0.026, 0.0), (0.029, 0.008), (0.029, 0.13), (0.023, 0.156), (0.012, 0.176), (0.012, 0.196)]
+for k, (xx, key) in enumerate(((-0.64, "bottle"), (-0.56, "amber"), (-0.48, "bottle"))):
+    made(facing(turned(f"bottle{k}", xx, L2, SZ, BOTTLE, parts, AM, segs=12, cap=False), True), key)
+    made(facing(turned(f"bottlecap{k}", xx, L2, SZ, [(0.013, 0.194), (0.014, 0.214), (0.008, 0.217)], parts, AM, segs=10, cap=True), True), "lacq")
+made(boxed("longplates2", 0.53, 0.81, L2, L2 + 0.04, SZ - 0.05, SZ + 0.05, parts, AM, bev=0.006), "porcelain")
+made(facing(turned("jar2", 1.05, L2, SZ, [(0.04, 0.0), (0.048, 0.03), (0.048, 0.08), (0.04, 0.1), (0.041, 0.106)], parts, AM, segs=14, cap=True),
+            True), "stoneware")
+for k, xx in enumerate((-0.25, -0.13)):
+    made(facing(turned(f"plates2{k}", xx, L2, SZ, [(0.045, 0.0), (0.05, 0.004), (0.05, 0.022), (0.046, 0.024)], parts, AM, segs=14, cap=True,
+                       uv="polar", R=0.05), True), "dish")
+
 # (each thing its own node, under the root: the game inks each but the flat ones (the water, the leaves, the nori, the heaps) before it draws
 # them all as one by material)
 root = root_of("PrepCounter", set_ + done_)

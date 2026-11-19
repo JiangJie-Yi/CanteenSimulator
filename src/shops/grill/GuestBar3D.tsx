@@ -103,7 +103,7 @@ import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
 import { plateGoes } from '@/game/tray'
-import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
+import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, GRATING, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -285,6 +285,10 @@ const BOWL_HANDS_ON = { v: false }
 /** (item 387) the plater's hands stirring the soup (the world's): the right on the dipper over the pot's near half, the left on its rim */
 const STIR_HANDS = { left: new THREE.Vector3(), right: new THREE.Vector3() }
 const STIR_HANDS_ON = { v: false }
+/** (item 392) the plater's hands grating daikon at the rice-ball counter's grater (the world's): the right on the daikon, up and down the
+ * grater, the left holding the grater's near end */
+const GRATE_HANDS = { left: new THREE.Vector3(), right: new THREE.Vector3() }
+const GRATE_ON = { v: false }
 /** a customer's bowls left at the serving counter for a server (the counter's own frame: its left end, clear of the takeaways in its middle
  * and the sake at its right), and where the one setting them down or taking them up stands */
 // (0.04 further left since the counter's 0.1 longer (items 254, 286))
@@ -3270,6 +3274,8 @@ const DIPPER_WATER_GEO = new THREE.CircleGeometry(0.037, 12)
 const DIPPER_WATER_MAT = new THREE.MeshToonMaterial({ color: '#9ccbe0', transparent: true, opacity: 0.8 })
 /** how often (seconds) the plater goes to stir the miso soup when there's nothing else, and for how long */
 const SOUP_EVERY = 40, STIR_S = 3
+/** (item 392) how often the plater, with nothing else wanting, grates daikon for the fish's plates (s), and how long at it */
+const GRATE_EVERY = 55, GRATE_S = 4.2
 /** the water bucket up on the cook table by the third cook's bay (Roasting's TABLE_BIN): a plater whose place is nearer it than DIP_NEAR
  * (the third cook, in his bay) steps toward it in his place till it's DIP_REACH off and dips it from there, his arm and the dipper the rest
  * (the bar's units) */
@@ -4027,7 +4033,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     | 'toTillBack' | 'atTill'
     | 'toCrate' | 'takeCoal' | 'toBucket' | 'scoopWater' | 'toHearth' | 'feedCoal' | 'sprinkle' | 'toSoup' | 'stir' | 'rake'
     | 'turnCrate' | 'turnBack' | 'toCoalSack' | 'liftSack' | 'toFill' | 'fillCrate' | 'toSake' | 'pourSake' | 'toShape' | 'shape'
-    | 'toRiceBowl' | 'riceBowl' | 'toSoupBowl' | 'soupBowl' | 'toBowlPass' | 'bowlPut'
+    | 'toRiceBowl' | 'riceBowl' | 'toSoupBowl' | 'soupBowl' | 'toBowlPass' | 'bowlPut' | 'toGrate' | 'grate'
     t: number; path: THREE.Vector3[]; len: number
     pos: THREE.Vector3; yaw: number; n: number
     /** what they've gone for for the fire: the charcoal or the water (what's in their hands to the hearth, whatever the grill asks meanwhile) */
@@ -4347,6 +4353,8 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   const platerDipper = useRef<THREE.Group>(null)
   /** when the plater last stirred the soup (seconds, performance clock) */
   const soupAt = useRef(0)
+  /** and when they last grated daikon (item 392; not straight away as the shop opens) */
+  const grateAt = useRef(performance.now() / 1000)
   /** the plates stacked at the plating place, and those standing in the dryer (drawn as many as there are) */
   const plateStack = useRef<THREE.Group>(null)
   const dryerPlates = useRef<THREE.Group>(null)
@@ -5302,7 +5310,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   const labels = useRef(new Map<number, HTMLElement>())
   const labelEl = useCallback((id: number, el: HTMLElement | null) => { if (el) labels.current.set(id, el); else labels.current.delete(id) }, [])
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __shown?: typeof shownRef }).__shown = shownRef
-  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __sakeJob: sakeJob, __sakeSpot: (n: number) => sakeSpotOf(n), __sakeAround: (n: number) => { const st = seats[n], c = counters[st.counter], x = st.mid.clone().sub(c.at).dot(c.along); return { plate: st.plate.clone(), soup: st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]), drink: new THREE.Vector3(...drinkSpot(n, false)), cup: new THREE.Vector3(...drinkSpot(n, true)) } }, __runs: runs, __sitters: sitters, __tillCall: tillCall, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock })
+  if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __waiters: waiters, __visitors: visitors, __visitorObjs: visitorObjs, __waiterBoxes: waiterBoxes, __takeoutWay: takeoutWay, __inGenkan: (v: THREE.Vector3) => inGenkan(counters, v), __dirty: dirty, __barFrame: frame, __platingAt: plating.at, __platingOut: plating.out, __platerRun: platerRun, __sakeJob: sakeJob, __sakeSpot: (n: number) => sakeSpotOf(n), __sakeAround: (n: number) => { const st = seats[n], c = counters[st.counter], x = st.mid.clone().sub(c.at).dot(c.along); return { plate: st.plate.clone(), soup: st.mid.clone().addScaledVector(c.along, -sauceSide(c, BAR_GATES[st.counter], x) * 1.15).addScaledVector(c.lay, PLACE.sauce[1]), drink: new THREE.Vector3(...drinkSpot(n, false)), cup: new THREE.Vector3(...drinkSpot(n, true)) } }, __runs: runs, __sitters: sitters, __tillCall: tillCall, __kitchenBlocks: () => kitchenBlocks(), __kitchenRoute: (a: THREE.Vector3, b: THREE.Vector3) => kitchenRoute(a, b), __kitchenRoom: () => kitchenOf(counters), __pickupSpot: () => pickupSpot, __homeOf: (wi: number) => homeOf(wi), __flat: (v: THREE.Vector3) => flat(v), __shown: shownRef, __guestGroups: groups, __guestClock: clock, __grateNow: () => { grateAt.current = -1e9 } })
 
   shownRef.current = shown
   // (how many are still in the room: the shop shuts only once they're all out of the door)
@@ -6315,6 +6323,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       /** where they stand at the rice-ball counter's board, and the board (Decor's PrepCounter, item 129) */
       const prepSpot = () => { marks.current.delete('prep-front'); return inBar('prep-front', home()).setY(0) }
       const prepBoard = () => { marks.current.delete('prep-board'); return inBar('prep-board', home()) }
+      // (item 392: the garnishes' grater on the rice-ball counter, and where one stands at it; none drawn, null)
+      const graterAt = () => (markOf('prep-grater') ? inBar('prep-grater', home()) : null)
+      const garnishSpot = () => { marks.current.delete('prep-garnish-front'); return inBar('prep-garnish-front', home()).setY(0) }
       /** the open sack of rice (by the sake, just past the kitchen's edge): its middle, the kitchen's edge nearest it (the route there), and
        * where they stand at it, stepped down off the kitchen's floor to it */
       const sackSpots = () => {
@@ -6537,6 +6548,13 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
             // counter's edge of the kitchen's floor, and the way there went through the counter)
             setOff(soupStand(), 'toSoup')
             away(true)
+          } else if (open && !SHOP.leaving && performance.now() / 1000 - grateAt.current > GRATE_EVERY && graterAt()) {
+            // (nothing else wanting: to the garnishes' corner of the rice-ball counter, to grate daikon for what goes out with the fish (item
+            // 392, the owner's 「不見得只能料理飯糰」), a few strokes on the grater, and back)
+            grateAt.current = performance.now() / 1000
+            pl.pos.copy(home())
+            setOff(garnishSpot(), 'toGrate')
+            away(true)
           }
         }
       } else if (pl.phase === 'toCrate') walk(() => { pl.phase = 'takeCoal'; faceTo(crateAt()) })
@@ -6735,6 +6753,8 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         setOff(home(), 'home')
       }
       else if (pl.phase === 'toShape') walk(() => { pl.phase = 'shape'; faceTo(prepBoard()) })
+      else if (pl.phase === 'toGrate') walk(() => { pl.phase = 'grate'; const g = graterAt(); if (g) faceTo(g) })
+      else if (pl.phase === 'grate' && (pl.t > GRATE_S || (FIRE_TEND.want && !FIRE_TEND.done) || SAKE.want.length)) setOff(home(), 'home')
       else if (pl.phase === 'shape' && pl.t > SHAPE_EACH) {
         // (one shaped, its rice out of the cooker, set on the tray; another while it wants more and nothing's called them, else back)
         const r = takeRice(RICE.rice, RICE.kama)
@@ -6747,7 +6767,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'toRackLow' || pl.phase === 'toLow' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama'
         || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder' || pl.phase === 'toTillBack'
         || pl.phase === 'toCrate' || pl.phase === 'toBucket' || pl.phase === 'toHearth' || pl.phase === 'toSoup' || pl.phase === 'toCoalSack' || pl.phase === 'toFill'
-        || pl.phase === 'toShape'
+        || pl.phase === 'toShape' || pl.phase === 'toGrate'
       setWaiterMoving(PLATER_I, mv)
       // (the way they face turned to the way they're to face, by time (commuteWalk's turnEase): set at once, they snapped round, over a
       // hundred times a minute at double speed (item 242))
@@ -6768,13 +6788,36 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         o.userData.lean = pl.phase === 'liftSack' ? 0.5 * bend(0.8) : pl.phase === 'feedCoal' || pl.phase === 'sprinkle' || pl.phase === 'scoopWater' ? 0.32 * bend(0.8)
           : pl.phase === 'rake' ? 0.26 * bend(RAKE_S)
           : pl.phase === 'takeCoal' ? 0.18 * bend(0.6) : pl.phase === 'fillCrate' ? 0.22 * Math.sin(Math.PI * Math.max(0, Math.min(1, (pl.t - 0.2) / 0.7))) : pl.phase === 'stir' ? 0.14
-          : pl.phase === 'shape' ? 0.12 : pl.phase === 'pourSake' ? 0.06 : 0
+          : pl.phase === 'shape' ? 0.12 : pl.phase === 'grate' ? 0.16 : pl.phase === 'pourSake' ? 0.06 : 0
         // (shaping a rice ball: both hands cupped round it before them, pressed together and turned, three presses to one (StaffFigure))
         o.userData.shape = pl.phase === 'shape' ? pl.t / SHAPE_EACH : undefined
         // (pouring the sake: both hands on the open bottle, a tokkuri, a cup, where the pour has them (item 177))
         o.userData.handsAt = pl.phase === 'pourSake' && SAKE_HANDS_ON.v ? SAKE_HANDS
           : (pl.phase === 'riceBowl' || pl.phase === 'soupBowl') && BOWL_HANDS_ON.v ? BOWL_HANDS
-            : pl.phase === 'stir' && STIR_HANDS_ON.v ? STIR_HANDS : undefined
+            : pl.phase === 'stir' && STIR_HANDS_ON.v ? STIR_HANDS : pl.phase === 'grate' && GRATE_ON.v ? GRATE_HANDS : undefined
+        // (grating: the right hand with the daikon up and down the grater's length, pressed down on the way out, eased back; the left holding
+        // the grater's near end; their places on the grater the world's (item 392))
+        GRATE_ON.v = false
+        GRATING.on = false
+        if (pl.phase === 'grate') {
+          const gm = markOf('prep-grater'), fr = frame.current
+          if (gm && fr) {
+            // (the daikon's cut end down the grater and up it again, pressed down going away from them, lifted a little coming back; held by
+            // its top, slanted back toward them at 51 degrees over the grater (its 13 cm); the left hand on the grater's near end. In the
+            // world, in the counter's own measure (S: its scale in the world), the daikon's: in the bar's, it came 10 cm short of the grater)
+            const gW = gm.getWorldPosition(new THREE.Vector3()), S = gm.getWorldScale(new THREE.Vector3()).y
+            const dir = gW.clone().sub(fr.localToWorld(pl.pos.clone())).setY(0).normalize(), side = new THREE.Vector3(dir.z, 0, -dir.x)
+            const k = (pl.t * 1.7) % 1, out = k < 0.62 ? k / 0.62 : 1 - (k - 0.62) / 0.38
+            const s0 = Math.min(1, pl.t / 0.4)
+            GRATING.cut.copy(gW).addScaledVector(dir, (-0.04 + 0.08 * out) * s0 * S)
+              .add(new THREE.Vector3(0, (k < 0.62 ? 0.002 : 0.012 * Math.sin(Math.PI * (k - 0.62) / 0.38)) * S, 0))
+            GRATING.hand.copy(GRATING.cut).add(new THREE.Vector3(0, 0.101 * S, 0)).addScaledVector(dir, -0.082 * S).addScaledVector(side, -0.008 * S)
+            GRATE_HANDS.right.copy(GRATING.hand)
+            GRATE_HANDS.left.copy(gW).addScaledVector(dir, -0.085 * S).addScaledVector(side, 0.05 * S).add(new THREE.Vector3(0, 0.016 * S, 0))
+            GRATE_ON.v = true
+            GRATING.on = true
+          }
+        }
         // (up on the kitchen's dais)
         // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)
         if (KITCHEN_DROP < 0) {

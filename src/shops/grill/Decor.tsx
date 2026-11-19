@@ -17,7 +17,7 @@ import { glowLeave, glowOnly } from '@/scene/hoverGlow'
 import { brushText, signTexture } from '@/scene/signFont'
 import { DISHES } from '@/data/menu'
 import { storageOf } from '@/data/storage'
-import { ONIGIRI_TRAY, OWNER_GRILL, RICE, SOUP, SAKE, SAKE_TASTED, tasteSake, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf, DRINK_BACK } from './bar'
+import { GRATING, ONIGIRI_TRAY, OWNER_GRILL, RICE, SOUP, SAKE, SAKE_TASTED, tasteSake, ALONG, askPantry, shutPantry, COOK_NOTCH, FIRE_SHIFT, GRILL_OFFSET, KITCHEN_DROP, LAY, handOver, nameOver, SUPPLIES, anyInStock, batchOf, DRINK_BACK } from './bar'
 import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
@@ -1573,6 +1573,9 @@ useGLTF.preload(PREP_URL)
 // cabinet); it stood back in the kitchen at along 5.19, lay 3.4)
 /** the board's middle along the counter and the counter's top, in its own frame (blender/warmer.py's BOARD_X, H + the board) */
 const PREP_BOARD_X = 0.35, PREP_TOP = 1.236 + 0.035
+/** (item 392) the garnishes' grater along the rice-ball counter, between the cooker and the hand-water bowl (blender/warmer.py's GX) */
+const PREP_GRATER_X = -0.585
+const GRATE_V = new THREE.Vector3(), GRATE_W = new THREE.Vector3(), GRATE_UP = new THREE.Vector3(0, 1, 0)
 const PREP_AT = { along: 4.3, lay: -0.5 + 0.7 + 0.02 + 0.002 + 0.02 + 1.5 - 0.937 }
 function PrepCounter() {
   const gltf = useGLTF(PREP_URL) as unknown as { scene: THREE.Group }
@@ -1603,12 +1606,34 @@ function PrepCounter() {
     inkModel(r, (m) => /water|bowlin|fill\d|takuan|sasa|nori/i.test(m.name), { width: 0.0016, weld: true })
     plainColours(r)
     // (the finished rice balls on the tray left whole, shown as many as it holds (item 129))
-    mergeByMaterial(r, (o) => /^PrepDone/.test(o.name))
+    // (and the daikon by the grater (item 392): taken up in the third cook's hand as he grates)
+    mergeByMaterial(r, (o) => /^PrepDone|^PrepDaikon/.test(o.name))
     return r
   }, [gltf])
   const done = useMemo(() => [0, 1, 2].map((k) => model.getObjectByName(`PrepDone${k}`)).filter((o): o is THREE.Object3D => !!o), [model])
+  const daikon = useMemo(() => {
+    const o = model.getObjectByName('PrepDaikon')
+    return o ? { o, at: o.position.clone(), q: o.quaternion.clone() } : null
+  }, [model])
   const shown = useRef(-1)
-  useFrame(() => {
+  /** how far it's up in the hand (0 where it lay, 1 in the hand), and where it was in the hand last (its counter's frame) */
+  const lift = useRef({ k: 0, at: new THREE.Vector3(), q: new THREE.Quaternion() })
+  useFrame((_, dt) => {
+    // (grating: its top in the hand, its cut end down on the grater (its own +y runs from its top to its cut end), taken up from where it
+    // lay over a quarter second as the hand comes to it, and put back so as he lets go)
+    const L = lift.current
+    if (daikon && (GRATING.on || L.k > 0)) {
+      const { o } = daikon
+      if (GRATING.on && o.parent) {
+        const hand = o.parent.worldToLocal(GRATE_V.copy(GRATING.hand)), cut = o.parent.worldToLocal(GRATE_W.copy(GRATING.cut))
+        L.at.copy(hand)
+        L.q.setFromUnitVectors(GRATE_UP, cut.sub(hand).normalize())
+      }
+      L.k = THREE.MathUtils.clamp(L.k + (GRATING.on ? 1 : -1) * Math.min(dt, 0.1) / 0.25, 0, 1)
+      const e = L.k * L.k * (3 - 2 * L.k)
+      o.position.lerpVectors(daikon.at, L.at, e)
+      o.quaternion.slerpQuaternions(daikon.q, L.q, e)
+    }
     if (ONIGIRI_TRAY.n === shown.current) return
     shown.current = ONIGIRI_TRAY.n
     done.forEach((o, k) => { o.visible = k < ONIGIRI_TRAY.n })
@@ -1622,6 +1647,9 @@ function PrepCounter() {
       {/* (where the third cook shapes the rice balls: the board's middle, and a step out from the counter's front before it (item 129)) */}
       <group name="prep-board" position={[PREP_BOARD_X, PREP_TOP + 0.06, 0.04]} />
       <group name="prep-front" position={[PREP_BOARD_X, 0, WARMER_D / 2 + STAND_OFF]} />
+      {/* (the garnishes' grater (item 392: blender/warmer.py's GX), its top's middle; and where the third cook stands to grate the daikon on it) */}
+      <group name="prep-grater" position={[PREP_GRATER_X, PREP_TOP - 0.035 + 0.012, 0.1]} />
+      <group name="prep-garnish-front" position={[PREP_GRATER_X, 0, WARMER_D / 2 + STAND_OFF]} />
     </group>
   )
 }

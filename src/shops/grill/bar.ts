@@ -1077,6 +1077,9 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window,
  * (GuestBar3D's plater), the head chef's fetcher takes an order's off it first (Roasting; with none on it, he shapes them); Decor shows as
  * many. Empty as the shop's first set out (item 229: three stood on it with no rice in stock or cooked; they're shaped from the cooker's) */
 export const ONIGIRI_TRAY = keep(import.meta.hot, 'ONIGIRI_TRAY', { n: 0 })
+/** (item 392) the third cook grating daikon at the rice-ball counter's grater (GuestBar3D): whether now, and in the world, where the hand holds
+ * the daikon's top and where its cut end is on the grater; the counter (Decor's PrepCounter) takes the daikon up into the hand by them */
+export const GRATING = keep(import.meta.hot, 'GRATING', { on: false, hand: new THREE.Vector3(), cut: new THREE.Vector3() })
 if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __onigiri?: typeof ONIGIRI_TRAY }).__onigiri = ONIGIRI_TRAY
 /** the kitchen's miso soup (game/soup): its pot on the warming counter, empty when the day starts until the third cook makes it (GuestBar3D's
  * plater; Decor draws it) */
