@@ -596,6 +596,84 @@ wood *= (0.97 + 0.03 * np.sin(wu * 2600 + wv * 50))[..., None]
 wood *= (0.97 + 0.04 * fbm(WW, 40, 8, 3)[:WH])[..., None]
 stand_col = wood.astype(np.float32)
 
+# ---- (item 380) the display's pictures. Seigaiha (青海波): gold lines on black lacquer, rows of circles each half over the row behind
+# it (each lower row over the one above, as it's drawn by hand), four rings each; tiling every way (WAVE metres a picture)
+def seigaiha(w=512, h=512, r=64, rings=4, line=2.6):
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32) + 0.5
+    dist = np.full((h, w), 1e9, np.float32)
+    best = np.full((h, w), -1e9, np.float32)
+    # (rows from the top down (image rows count up from the bottom: the top is h), every half radius, alternate ones shifted a radius;
+    # the picture's period r up and 2r across, so it tiles)
+    for jr in range(-2, int(2 * h / r) + 3):
+        cy = h - jr * r / 2
+        off = r if jr % 2 else 0
+        for ic in range(-2, int(w / (2 * r)) + 3):
+            cx = ic * 2 * r + off
+            for dx in (-w, 0, w):
+                for dy in (-h, 0, h):
+                    d = np.hypot(xx - (cx + dx), yy - (cy + dy))
+                    key = -(cy + dy)
+                    over = (d < r) & (key >= best)
+                    dist[over] = d[over]
+                    best[over] = key
+    ring_ = (dist / r) * rings
+    fr = np.abs(ring_ - np.round(ring_)) * r / rings
+    gold_ = np.clip(1.0 - (fr - line * 0.5) / 1.2, 0, 1) * (dist > 2)
+    base = np.array([0.03, 0.024, 0.026], np.float32)
+    gold = np.array([0.86, 0.64, 0.25], np.float32)
+    img = base[None, None, :] * (1 - gold_[..., None]) + gold[None, None, :] * gold_[..., None]
+    # (the lacquer's depth: a faint mottle)
+    img *= (0.94 + 0.06 * fbm(max(w, h), 8, 6, 3)[:h, :w])[..., None]
+    return img.astype(np.float32)
+
+
+def sign_pic(w=128, h=332):
+    """two columns: the front's (銘酒) left, the back's (聞野) right; black lacquer, a fine gold line inset, the two characters brushed down
+    it in gold"""
+    out = np.zeros((h, 2 * w, 3), np.float32)
+    out[:] = (0.03, 0.024, 0.026)
+    gold = np.array([0.9, 0.68, 0.27], np.float32)
+    for col, chars in ((0, "銘酒"), (1, "聞野")):
+        x0 = col * w
+        m = np.zeros((h * SS, w * SS), bool)
+        size = w * 0.9
+        for n, ch in enumerate(chars):
+            # (down the board: the first character above)
+            fill_tris(m, glyph(ch, True), (w / 2) * SS, (h / 2 + (0.5 - n) * size * 1.08) * SS, size * SS, size * SS)
+        cov = m.reshape(h, SS, w, SS).mean(axis=(1, 3))
+        cell = out[:, x0:x0 + w]
+        cell[:] = cell * (1 - cov[..., None]) + gold * cov[..., None]
+        yy, xx = np.mgrid[0:h, 0:w]
+        inset = 8
+        ln = ((np.abs(xx - inset) < 1.5) | (np.abs(xx - (w - 1 - inset)) < 1.5)) & (yy >= inset) & (yy <= h - 1 - inset)
+        ln |= ((np.abs(yy - inset) < 1.5) | (np.abs(yy - (h - 1 - inset)) < 1.5)) & (xx >= inset) & (xx <= w - 1 - inset)
+        cell[ln] = gold
+    return out
+
+
+def plaque_pic(w=640, h=128):
+    """two rows: the back's (聞野) below, the front's (銘酒) above; black lacquer, a fine gold line inset round it, the two characters
+    brushed big in gold"""
+    out = np.zeros((2 * h, w, 3), np.float32)
+    out[:] = (0.03, 0.024, 0.026)
+    gold = np.array([0.9, 0.68, 0.27], np.float32)
+    for row, chars in ((0, "聞野"), (1, "銘酒")):
+        y0 = row * h
+        m = np.zeros((h * SS, w * SS), bool)
+        for n, ch in enumerate(chars):
+            fill_tris(m, glyph(ch, True), (w / 2 + (n - 0.5) * h * 1.12) * SS, (h / 2) * SS, h * 1.02 * SS, h * 1.02 * SS)
+        cov = m.reshape(h, SS, w, SS).mean(axis=(1, 3))
+        cell = out[y0:y0 + h]
+        cell[:] = cell * (1 - cov[..., None]) + gold * cov[..., None]
+        # (the inset line)
+        yy, xx = np.mgrid[0:h, 0:w]
+        inset = 9
+        ln = ((np.abs(xx - inset) < 1.6) | (np.abs(xx - (w - 1 - inset)) < 1.6)) & (yy >= inset) & (yy <= h - 1 - inset)
+        ln |= ((np.abs(yy - inset) < 1.6) | (np.abs(yy - (h - 1 - inset)) < 1.6)) & (xx >= inset) & (xx <= w - 1 - inset)
+        cell[ln] = gold
+    return out
+
+
 M = {
     "glass": pbr("SakeBottles", (1, 1, 1), tex=image("sake_bottles", atlas), rough=0.18),
     # (the same picture: the game draws this one see-through, the light through it (item 88))
@@ -603,6 +681,16 @@ M = {
     "liquid": pbr("SakeLiquid", (0.96, 0.92, 0.74), rough=0.05),
     # (the cloudy sake (にごり, item 285): white, near opaque, the game its own see-through for it)
     "nigori": pbr("SakeLiquidNigori", (0.95, 0.94, 0.9), rough=0.25),
+    # (the display's (item 380): black and vermilion lacquer, glossy; the risers' gold waves; gold; the glow along the risers' feet; the
+    # plaques; the braided cord's vermilion)
+    "black": pbr("SakeLacquerBlack", (0.028, 0.022, 0.024), rough=0.16),
+    "red": pbr("SakeLacquerRed", (0.37, 0.018, 0.01), rough=0.28),
+    "wave": pbr("SakeLacquerWave", (1, 1, 1), tex=image("sake_wave", seigaiha()), rough=0.2),
+    "plaque": pbr("SakeLacquerPlaque", (1, 1, 1), tex=image("sake_plaque", plaque_pic()), rough=0.2),
+    "sign": pbr("SakeLacquerSign", (1, 1, 1), tex=image("sake_sign", sign_pic()), rough=0.2),
+    "gold": pbr("SakeGold", (0.86, 0.64, 0.25), rough=0.26, metal=1.0),
+    "glow": pbr("SakeGlow", (1.0, 0.8, 0.52), emit=(1.0, 0.8, 0.52), emit_strength=3.0),
+    "cord": pbr("SakeCordRed", (0.66, 0.08, 0.06), rough=0.75),
     # (the stand's brass corner fittings)
     "brass": pbr("SakeStandBrass", (0.78, 0.6, 0.28), rough=0.3, metal=0.8),
     "wood": pbr("SakeStandWood", (1, 1, 1), tex=image("sake_stand_wood", stand_col), rough=0.6),
@@ -803,105 +891,229 @@ def bottle(k, prof, at, turn):
     bottles.append(lo)
 
 
-# ---- the stand: two steps, hinoki, a black-lacquered band round each step's front edge, on two low feet
-L, D = 0.92, 0.25
-FRONT_D, FRONT_H, BACK_H = 0.11, 0.045, 0.105
-STEP = ((-D / 2, 0.012), (-D / 2, FRONT_H), (-D / 2 + FRONT_D, FRONT_H), (-D / 2 + FRONT_D, BACK_H), (D / 2, BACK_H), (D / 2, 0.012))
-bm = bmesh.new()
-uvl = bm.loops.layers.uv.new()
-ends = []
-for xs in (-L / 2, L / 2):
-    ends.append([bm.verts.new((xs, y, z)) for y, z in STEP])
-per = [0.0]
-for (y0, z0), (y1, z1) in zip(STEP, STEP[1:]):
-    per.append(per[-1] + math.hypot(y1 - y0, z1 - z0))
-for j in range(len(STEP) - 1):
-    f = bm.faces.new((ends[0][j], ends[0][j + 1], ends[1][j + 1], ends[1][j]))
-    for l, (uq, vq) in zip(f.loops, ((0, per[j]), (0, per[j + 1]), (1, per[j + 1]), (1, per[j]))):
-        l[uvl].uv = (uq, vq / per[-1])
-# (the underside, and each end two quads (the step's L), facing out)
-f = bm.faces.new((ends[0][-1], ends[1][-1], ends[1][0], ends[0][0]))
-for e, sgn in ((ends[0], -1), (ends[1], 1)):
-    for quad in ((0, 1, 2, 5), (2, 3, 4, 5)):
-        f = bm.faces.new([e[q] for q in quad])
-        for l in f.loops:
-            l[uvl].uv = (0.5 + l.vert.co.y / D * 0.4, 0.5 + l.vert.co.z * 3)
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-mesh_obj("SakeStandBody", bm, M["wood"], smooth_=False)
-# (the lacquered bands: a thin box along each step's front edge, a hair proud of it; the feet: two low blocks under its ends)
-def block(name, x0, x1, y0, y1, z0, z1, mat):
+# =====================================================================
+# The stand (item 380, the owner's, 2026-11-19: 「我要看到灶台上的酒臺是很華麗標準的」, after items 177, 197 and 285: it was a two-stepped
+# hinoki plank, the bottles on it as on a kitchen shelf). Now a sake display as a good shop dresses one, both its sides seen (its front to
+# the bar's customers, its back to the owner at the hearth): a black-lacquered plinth, a gold rod round it under its rounded top and a
+# plaque on it brushed in gold, 銘酒 to the front and the shop's 聞野 to the back; two steps on it, their tops vermilion lacquer, their
+# risers black lacquer with gold seigaiha (青海波) waves, a gold rod under each lip and a warm glow along each riser's foot (the display's
+# light, drawn: no light added); each bottle on a coaster of its own, black with a gold rim; the best one up on its own vermilion dais; two
+# black posts at the back corners, gold giboshi (擬宝珠) on them, a vermilion braided cord slung between them behind the bottles, a gold
+# knot and a tassel at its middle and at each end. Its shapes full and their edges well rounded, the flat faces flat and the rounds smooth
+# (a bevel with its normals hardened: item 379, the owner's 「造型感」: bold, chunky shapes that read at a glance from across the room)
+# =====================================================================
+L, D = 0.93, 0.25
+FRONT_D = 0.11
+PL = 0.056           # (the plinth's height: its plaque's to be read)
+T1 = PL + 0.042      # (the front step's top)
+T2 = T1 + 0.06       # (the back step's top)
+CO = 0.006           # (a coaster's height)
+DAI = 0.045          # (the best bottle's dais)
+PX = L / 2 + 0.046   # (the plinth's half length: the posts stand on its flat past the steps' ends)
+PY0, PY1 = -D / 2 - 0.02, D / 2 + 0.02
+POST_X, POST_Y, POST_W, POST_TOP = L / 2 + 0.018, D / 2 - 0.007, 0.03, 0.461
+WAVE = 0.16          # (the seigaiha's picture: so many metres of the risers across it, and as many up it again)
+
+
+def rounded_box(name, x0, x1, y0, y1, z0, z1, bw, segs, top_mat, side_mat, bottom=False):
+    """a box, its edges rounded (`bw` wide, `segs` steps; its bottom's edges left square unless `bottom`) with its normals hardened: flat
+    faces shade flat, the rounds smooth. Its top in `top_mat`, its sides and its rounds in `side_mat`; the sides' picture laid along them
+    (WAVE metres a picture, u along the side, v up it), the top's along x and y"""
     bm_ = bmesh.new()
     bmesh.ops.create_cube(bm_, size=1.0)
-    bmesh.ops.transform(bm_, matrix=Matrix.Translation(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)) @ Matrix.Diagonal((x1 - x0, y1 - y0, z1 - z0, 1)), verts=bm_.verts)
+    bmesh.ops.transform(bm_, matrix=Matrix.Translation(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)) @ Matrix.Diagonal((x1 - x0, y1 - y0, z1 - z0, 1)),
+                        verts=bm_.verts)
+    for f in bm_.faces:
+        f.material_index = 0 if f.normal.z > 0.5 else 1
+    wl = bm_.edges.layers.float.get("bevel_weight_edge") or bm_.edges.layers.float.new("bevel_weight_edge")
+    for e in bm_.edges:
+        e[wl] = 0.0 if (not bottom and all(v.co.z < z0 + 1e-6 for v in e.verts)) else 1.0
+    me = bpy.data.meshes.new(name)
+    bm_.to_mesh(me)
+    bm_.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(top_mat)
+    o.data.materials.append(side_mat)
+    for pg in o.data.polygons:
+        pg.use_smooth = True
+    mod = o.modifiers.new("Bevel", "BEVEL")
+    mod.width = bw
+    mod.segments = segs
+    mod.limit_method = "WEIGHT"
+    mod.harden_normals = True
+    mod.material = 1
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    # (each face's picture laid on it by which way it faces, after the rounding: the mesh's own UVs, its hardened normals kept)
+    me = o.data
+    uvl_ = me.uv_layers.new(name="UVMap") if not me.uv_layers else me.uv_layers[0]
+    for pg in me.polygons:
+        n = pg.normal
+        for li in pg.loop_indices:
+            c = me.vertices[me.loops[li].vertex_index].co
+            if abs(n.z) > 0.7:
+                uvl_.data[li].uv = (c.x / WAVE, c.y / WAVE)
+            elif abs(n.y) >= abs(n.x):
+                uvl_.data[li].uv = ((c.x if n.y < 0 else -c.x) / WAVE, c.z / WAVE)
+            else:
+                uvl_.data[li].uv = ((-c.y if n.x < 0 else c.y) / WAVE, c.z / WAVE)
+    parts.append(o)
+    return o
+
+
+def bar(name, x0, x1, y0, y1, z0, z1, mat):
+    """a small square bar (a rod, a strip, a plaque's frame): flat-shaded"""
+    bm_ = bmesh.new()
+    uv_ = bm_.loops.layers.uv.new()
+    bmesh.ops.create_cube(bm_, size=1.0)
+    bmesh.ops.transform(bm_, matrix=Matrix.Translation(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)) @ Matrix.Diagonal((x1 - x0, y1 - y0, z1 - z0, 1)),
+                        verts=bm_.verts)
+    for f in bm_.faces:
+        for l in f.loops:
+            l[uv_].uv = (0.5, 0.5)
     return mesh_obj(name, bm_, mat, smooth_=False)
 
 
-block("SakeStandBand0", -L / 2 - 0.002, L / 2 + 0.002, -D / 2 - 0.003, -D / 2 + 0.006, FRONT_H - 0.008, FRONT_H + 0.003, M["lacquer"])
-block("SakeStandBand1", -L / 2 - 0.002, L / 2 + 0.002, -D / 2 + FRONT_D - 0.003, -D / 2 + FRONT_D + 0.006, BACK_H - 0.008, BACK_H + 0.003, M["lacquer"])
-for xs in (-1, 1):
-    block(f"SakeStandFoot{xs}", xs * L / 2 - (0.05 if xs > 0 else -0.05) - 0.03, xs * L / 2 - (0.05 if xs > 0 else -0.05) + 0.03, -D / 2 + 0.01, D / 2 - 0.01, 0.0, 0.0125, M["lacquer"])
-
-# ---- a frame round it for the customers to look at (item 131, the owner's, 2026-11-15: "designed, mostly for the customers to see, as
-# good-looking as it can be"): an end board each side in chestnut-stained wood, rising from the front step's height at the front to over
-# the back step behind, its top drawn along in a soft curve and its corners eased; a lacquered rail across the back between them, the
-# bottles stood in a little display case
-def end_board(name, x0, x1):
-    pts = [(-D / 2 - 0.004, 0.0)]
-    for k in range(9):
-        t = k / 8
-        # (a soft rise: low at the front, up over the back step, flat along the top behind)
-        y = -D / 2 - 0.004 + t * (D + 0.008)
-        z = FRONT_H + 0.03 + (BACK_H + 0.07 - FRONT_H - 0.03) * (0.5 - 0.5 * math.cos(math.pi * min(1.0, t / 0.75)))
-        pts.append((y, z))
-    pts.append((D / 2 + 0.004, 0.0))
+def lathe(name, prof, at, segs, mats, mat_of=None, smooth_=True, top_mat=None, foot=True):
+    """a turned piece round z at `at`: `prof` (radius, height) up from its foot, its ends capped (the caps laddered at export, no fan);
+    each band's material `mat_of(i)` (an index into `mats`), the caps the first band's and the last's"""
     bm_ = bmesh.new()
     uv_ = bm_.loops.layers.uv.new()
-    a = [bm_.verts.new((x0, y, z)) for y, z in pts]
-    b = [bm_.verts.new((x1, y, z)) for y, z in pts]
-    n = len(pts)
-    for j in range(n):
-        j2 = (j + 1) % n
-        f = bm_.faces.new((a[j], a[j2], b[j2], b[j]))
-        for l in f.loops:
-            l[uv_].uv = (0.5 + l.vert.co.y / D * 0.45, 0.5 + l.vert.co.z * 2.5)
-    for side in (a[::-1], b):
-        f = bm_.faces.new(side)
-        for l in f.loops:
-            l[uv_].uv = (0.5 + l.vert.co.y / D * 0.45, 0.5 + l.vert.co.z * 2.5)
+    rings_ = [[bm_.verts.new((at.x + r * math.cos(2 * math.pi * a / segs), at.y + r * math.sin(2 * math.pi * a / segs), at.z + z)) for a in range(segs)]
+              for r, z in prof]
+    for b_, (ra, rb) in enumerate(zip(rings_, rings_[1:])):
+        for a in range(segs):
+            f = bm_.faces.new((ra[a], ra[(a + 1) % segs], rb[(a + 1) % segs], rb[a]))
+            f.material_index = mat_of(b_) if mat_of else 0
+            for l in f.loops:
+                l[uv_].uv = (0.5, 0.5)
+    if foot and prof[0][0] > 1e-5:
+        f = bm_.faces.new(rings_[0][::-1])
+        f.material_index = mat_of(0) if mat_of else 0
+    if prof[-1][0] > 1e-5:
+        f = bm_.faces.new(rings_[-1])
+        f.material_index = top_mat if top_mat is not None else (mat_of(len(prof) - 2) if mat_of else 0)
     bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
-    bmesh.ops.bevel(bm_, geom=[e for e in bm_.edges if abs(e.verts[0].co.x - e.verts[1].co.x) < 1e-6 and (e.verts[0].co.z > 0.002 or e.verts[1].co.z > 0.002)],
-                    offset=0.003, segments=1, affect="EDGES")
-    return mesh_obj(name, bm_, M["dark"], smooth_=False)
+    return mesh_obj(name, bm_, mats, smooth_=smooth_)
 
 
-end_board("SakeStandEndL", -L / 2 - 0.021, -L / 2 - 0.003)
-end_board("SakeStandEndR", L / 2 + 0.003, L / 2 + 0.021)
-# (the rail: a slim lacquered bar across the back on the boards' tops, its ends let into them)
-block("SakeStandRail", -L / 2 - 0.01, L / 2 + 0.01, D / 2 - 0.012, D / 2 - 0.002, BACK_H + 0.052, BACK_H + 0.064, M["lacquer"])
-# (brass caps over the end boards' top corners (item 285), a little proud of the board all round; the back ones behind the rail's ends)
+# ---- the plinth, its gold rod under the round of its top, its plaques
+rounded_box("SakeStandPlinth", -PX, PX, PY0, PY1, 0.001, PL, 0.011, 3, M["black"], M["wave"])
+for sy, y in ((-1, PY0), (1, PY1)):
+    for sx, (xa, xb) in ((-1, (-PX + 0.012, -0.085 - 0.008)), (1, (0.085 + 0.008, PX - 0.012))):
+        bar(f"SakeStandPlinthRod{sy}{sx}", xa, xb, y - 0.0016 if sy < 0 else y - 0.0004, y + 0.0004 if sy < 0 else y + 0.0016, PL - 0.019, PL - 0.013, M["gold"])
 for sx in (-1, 1):
-    bx0, bx1 = sorted((sx * (L / 2 + 0.001), sx * (L / 2 + 0.023)))
-    block(f"SakeStandBrassF{sx}", bx0, bx1, -D / 2 - 0.006, -D / 2 + 0.008, FRONT_H + 0.02, FRONT_H + 0.032, M["brass"])
-    block(f"SakeStandBrassB{sx}", bx0, bx1, D / 2 - 0.001, D / 2 + 0.006, BACK_H + 0.058, BACK_H + 0.072, M["brass"])
+    x = sx * PX
+    bar(f"SakeStandPlinthRodE{sx}", x - 0.0016 if sx < 0 else x - 0.0004, x + 0.0004 if sx < 0 else x + 0.0016, PY0 + 0.012, PY1 - 0.012, PL - 0.019, PL - 0.013, M["gold"])
+# (the plaques: a black board on the plinth's front and back, its picture 銘酒 / 聞野 in gold, a gold frame proud of it)
+PW, PZ0, PZ1 = 0.085, 0.007, 0.041
+for sy, y, row in ((-1, PY0, 1), (1, PY1, 0)):
+    bm_ = bmesh.new()
+    uv_ = bm_.loops.layers.uv.new()
+    bmesh.ops.create_cube(bm_, size=1.0)
+    y0, y1 = (y - 0.004, y + 0.001) if sy < 0 else (y - 0.001, y + 0.004)
+    bmesh.ops.transform(bm_, matrix=Matrix.Translation((0, (y0 + y1) / 2, (PZ0 + PZ1) / 2)) @ Matrix.Diagonal((2 * PW, y1 - y0, PZ1 - PZ0, 1)), verts=bm_.verts)
+    for f in bm_.faces:
+        out_ = f.normal.y * sy > 0.5
+        for l in f.loops:
+            c = l.vert.co
+            # (the face out: its own half of the picture (the front's the upper, the back's the lower), read the right way round)
+            u = (c.x + PW) / (2 * PW) if sy < 0 else (PW - c.x) / (2 * PW)
+            l[uv_].uv = (u, (row + (c.z - PZ0) / (PZ1 - PZ0)) / 2) if out_ else (0.02, 0.25 + 0.5 * row)
+    mesh_obj(f"SakeStandPlaque{sy}", bm_, M["plaque"], smooth_=False)
+    yf0, yf1 = (y - 0.0055, y - 0.003) if sy < 0 else (y + 0.003, y + 0.0055)
+    bar(f"SakeStandPlaqueT{sy}", -PW - 0.003, PW + 0.003, yf0, yf1, PZ1, PZ1 + 0.003, M["gold"])
+    bar(f"SakeStandPlaqueB{sy}", -PW - 0.003, PW + 0.003, yf0, yf1, PZ0 - 0.003, PZ0, M["gold"])
+    for sx in (-1, 1):
+        bar(f"SakeStandPlaqueS{sy}{sx}", sx * PW - 0.003 if sx > 0 else -PW - 0.003, sx * PW + 0.003 if sx > 0 else -PW + 0.003, yf0, yf1, PZ0 - 0.003, PZ1 + 0.003,
+            M["gold"])
 
-# ---- the bottles: three tall at the back, two short at the front, each turned a touch its own way, a hair over the step
+# ---- the two steps: the front one the whole depth, the back one on it behind (sunk a hair into it: no face shared)
+rounded_box("SakeStandStep0", -L / 2, L / 2, -D / 2, D / 2, PL - 0.001, T1, 0.008, 3, M["red"], M["wave"])
+rounded_box("SakeStandStep1", -L / 2, L / 2, -D / 2 + FRONT_D, D / 2, T1 - 0.002, T2, 0.008, 3, M["red"], M["wave"])
+# (a gold rod under each step's rounded lip, front and back; a warm glow along each riser's foot)
+for k_, (yf, top, foot) in enumerate(((-D / 2, T1, PL), (-D / 2 + FRONT_D, T2, T1))):
+    bar(f"SakeStandLipRod{k_}", -L / 2 + 0.008, L / 2 - 0.008, yf - 0.0016, yf + 0.0004, top - 0.016, top - 0.01, M["gold"])
+    bar(f"SakeStandGlow{k_}", -L / 2 + 0.01, L / 2 - 0.01, yf - 0.0022, yf + 0.0004, foot + 0.0004, foot + 0.0042, M["glow"])
+bar("SakeStandLipRodB", -L / 2 + 0.008, L / 2 - 0.008, D / 2 - 0.0004, D / 2 + 0.0016, T2 - 0.016, T2 - 0.01, M["gold"])
+bar("SakeStandGlowB", -L / 2 + 0.01, L / 2 - 0.01, D / 2 - 0.0004, D / 2 + 0.0022, PL + 0.0004, PL + 0.0042, M["glow"])
+
+# ---- the bottles, each on its coaster: six tall up the back and the best one between them up on its dais; five along the front, each
+# between two at the back so every label shows, the front's right-hand end kept for the tokkuri (on a coaster of its own)
 ys_back = -D / 2 + FRONT_D + (D - FRONT_D) / 2
-# (four up at the back and four at the front now (item 132), set closer: the front's right-hand end kept for the tokkuri)
-# (each row on one line, every label square to the front, as a shop sets out what it pours (item 197, the owner's: the stand no good at
-# all; each bottle was askew on its own and its label turned its own way))
-# (seven up the back and five along the front (item 285), each front one between two at the back so every label shows, the front's
-# right-hand end kept for the tokkuri: up the back amber, green, brown, the black pot in the middle on a little lacquered stand of its
-# own (the best of them, set apart, as a shop shows it), smoky grey, dark green, blue; along the front green, pale blue, amber, black, the
-# white cloudy one)
-SPAN = 0.131
-for k_, j_ in ((8, -3), (1, -2), (0, -1), (9, 1), (2, 2), (5, 3)):
-    bottle(k_, ISSHO, Vector((j_ * SPAN, ys_back, BACK_H + 0.0005)), 0.0)
-DAI = 0.045
-block("SakeStandDai", -0.046, 0.046, ys_back - 0.046, ys_back + 0.046, BACK_H, BACK_H + DAI, M["lacquer"])
-bottle(10, YONGO, Vector((0.0, ys_back, BACK_H + DAI + 0.0005)), 0.0)
 ys_front = -D / 2 + FRONT_D / 2
+SPAN = 0.131
+
+
+def coaster(name, x, y, z, r):
+    """a bottle's coaster: black lacquer, its rim gold, its top's edge eased"""
+    prof = ((r, 0.0), (r, CO - 0.0015), (r - 0.0015, CO))
+    lathe(name, prof, Vector((x, y, z)), 16, [M["gold"], M["black"]], top_mat=1, foot=False)
+
+
+for k_, j_ in ((8, -3), (1, -2), (0, -1), (9, 1), (2, 2), (5, 3)):
+    coaster(f"SakeStandCoaster{k_}", j_ * SPAN, ys_back, T2, 0.056)
+    bottle(k_, ISSHO, Vector((j_ * SPAN, ys_back, T2 + CO + 0.0003)), 0.0)
+rounded_box("SakeStandDai", -0.05, 0.05, ys_back - 0.05, ys_back + 0.05, T2 - 0.001, T2 + DAI, 0.006, 2, M["red"], M["wave"])
+bar("SakeStandDaiRod", -0.044, 0.044, ys_back - 0.0516, ys_back - 0.0496, T2 + DAI - 0.014, T2 + DAI - 0.009, M["gold"])
+coaster("SakeStandCoaster10", 0.0, ys_back, T2 + DAI, 0.043)
+bottle(10, YONGO, Vector((0.0, ys_back, T2 + DAI + CO + 0.0003)), 0.0)
 for k_, j_ in ((3, -2.5), (6, -1.5), (7, -0.5), (4, 0.5), (11, 1.5)):
-    bottle(k_, YONGO, Vector((j_ * SPAN, ys_front, FRONT_H + 0.0005)), 0.0)
+    coaster(f"SakeStandCoaster{k_}", j_ * SPAN, ys_front, T1, 0.045)
+    bottle(k_, YONGO, Vector((j_ * SPAN, ys_front, T1 + CO + 0.0003)), 0.0)
+coaster("SakeStandCoasterJug", 2.5 * SPAN, ys_front, T1, 0.045)
+
+# ---- the posts at the back corners and their gold giboshi; the vermilion cord slung between them behind the bottles, its knots and tassels
+for sx in (-1, 1):
+    x = sx * POST_X
+    rounded_box(f"SakeStandPost{sx}", x - POST_W / 2, x + POST_W / 2, POST_Y - POST_W / 2, POST_Y + POST_W / 2, PL - 0.001, POST_TOP, 0.004, 2, M["black"], M["black"])
+    # (the giboshi: a collar, a waist, the onion-shaped jewel and its point (its last ring capped small, not drawn to one point))
+    gib = tuple((r * 1.2, z * 1.2) for r, z in ((0.0165, 0.0), (0.0165, 0.006), (0.011, 0.0105), (0.0165, 0.019), (0.0172, 0.028), (0.0115, 0.04), (0.0045, 0.05), (0.0008, 0.057)))
+    lathe(f"SakeStandGiboshi{sx}", gib, Vector((x, POST_Y, POST_TOP - 0.0005)), 12, [M["gold"]])
+# (a low black rail between the posts behind the back step, a hand's height over it, as a bridge's railing between its giboshi posts; its
+# ends let into the posts. A cord slung between them at the bottles' shoulders read, from the owner's side, as a rope barring them off)
+RAIL_Z = T2 + 0.026
+rounded_box("SakeStandRail", -POST_X + POST_W / 2 - 0.002, POST_X - POST_W / 2 + 0.002, POST_Y - 0.006, POST_Y + 0.006, RAIL_Z, RAIL_Z + 0.012, 0.003, 2,
+            M["black"], M["black"], bottom=True)
+# (a gold knot and a vermilion tassel hung on each post's outer face, under its cap)
+for sx in (-1, 1):
+    x = sx * (POST_X + POST_W / 2 + 0.0085)
+    z = POST_TOP - 0.022
+    knot = ((0.0015, 0.0), (0.0055, 0.0015), (0.0075, 0.0045), (0.0075, 0.0075), (0.0055, 0.0105), (0.0015, 0.012))
+    lathe(f"SakeStandKnot{sx}", knot, Vector((x, POST_Y, z - 0.012)), 10, [M["gold"]])
+    tassel = ((0.0035, 0.0), (0.0062, 0.004), (0.0082, 0.014), (0.0095, 0.026), (0.0098, 0.031), (0.004, 0.0325))
+    lathe(f"SakeStandTassel{sx}", tuple((r, -z_) for r, z_ in tassel)[::-1], Vector((x, POST_Y, z - 0.012)), 10, [M["cord"]])
+    # (and the loop it hangs by, over the post's cap: a short gold band round the post)
+    bar(f"SakeStandPostBand{sx}", sx * POST_X - POST_W / 2 - 0.0015, sx * POST_X + POST_W / 2 + 0.0015, POST_Y - POST_W / 2 - 0.0015, POST_Y + POST_W / 2 + 0.0015,
+        POST_TOP - 0.024, POST_TOP - 0.018, M["gold"])
+# (the hanging sign on the right post's front, a shop's board on its pillar: 銘酒 brushed down it in gold to the customers, 聞野 on its
+# back; a gold frame round each face. Up at the bottles' height: the bar's own front edge hides the plinth from the stools)
+SX, SW, SZ0, SZ1 = POST_X, 0.026, POST_TOP - 0.165, POST_TOP - 0.03
+sy0, sy1 = POST_Y - POST_W / 2 - 0.011, POST_Y - POST_W / 2 + 0.001
+bm_ = bmesh.new()
+uv_ = bm_.loops.layers.uv.new()
+bmesh.ops.create_cube(bm_, size=1.0)
+bmesh.ops.transform(bm_, matrix=Matrix.Translation((SX, (sy0 + sy1) / 2, (SZ0 + SZ1) / 2)) @ Matrix.Diagonal((2 * SW, sy1 - sy0, SZ1 - SZ0, 1)), verts=bm_.verts)
+for f in bm_.faces:
+    for l in f.loops:
+        c = l.vert.co
+        v = (c.z - SZ0) / (SZ1 - SZ0)
+        if f.normal.y < -0.5:
+            l[uv_].uv = ((c.x - (SX - SW)) / (2 * SW) * 0.5, v)
+        elif f.normal.y > 0.5:
+            l[uv_].uv = (0.5 + ((SX + SW) - c.x) / (2 * SW) * 0.5, v)
+        else:
+            l[uv_].uv = (0.02, 0.02)
+mesh_obj("SakeStandSign", bm_, M["sign"], smooth_=False)
+for k_, (ya, yb) in enumerate(((sy0 - 0.0025, sy0 + 0.0005), (sy1 - 0.0005, sy1 + 0.0025))):
+    bar(f"SakeStandSignT{k_}", SX - SW - 0.003, SX + SW + 0.003, ya, yb, SZ1 - 0.003, SZ1 + 0.002, M["gold"])
+    bar(f"SakeStandSignB{k_}", SX - SW - 0.003, SX + SW + 0.003, ya, yb, SZ0 - 0.002, SZ0 + 0.003, M["gold"])
+    for sx in (-1, 1):
+        x0_, x1_ = (SX + SW - 0.002, SX + SW + 0.003) if sx > 0 else (SX - SW - 0.003, SX - SW + 0.002)
+        bar(f"SakeStandSignS{k_}{sx}", x0_, x1_, ya, yb, SZ0 - 0.002, SZ1 + 0.002, M["gold"])
 
 # (joined by material)
 by = {}

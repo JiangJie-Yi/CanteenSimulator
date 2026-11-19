@@ -1682,6 +1682,21 @@ export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Mat
         const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 0.9, roughness: 0.3 })
         reflectStudio(g)
         t = g
+      } else if (/SakeGold/.test(src.name)) {
+        // (the display's gold (item 380): the rods, the coasters' rims, the giboshi, the knots, the plaques' frames; metal, the studio in it)
+        const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), metalness: 1.0, roughness: 0.28 })
+        reflectStudio(g)
+        t = g
+      } else if (/SakeLacquer/.test(src.name)) {
+        // (its lacquer, black and vermilion, the risers' gold waves and the plaques: glossy, the studio's gleams on it as on lacquer)
+        // (the vermilion less of the studio in it: glossed over at a slant it read as coral)
+        const red = /Red/.test(src.name)
+        const g = new THREE.MeshStandardMaterial({ color: src.color.clone(), map: src.map ?? null, roughness: red ? 0.3 : 0.22, metalness: 0.0, envMapIntensity: red ? 0.5 : 0.9 })
+        reflectStudio(g)
+        t = g
+      } else if (/SakeGlow/.test(src.name)) {
+        // (the warm light along each riser's foot: drawn lit, whatever the room's light (no light added))
+        t = new THREE.MeshBasicMaterial({ color: '#ffd9a6' })
       } else t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
       made.set(src, t)
     }
@@ -1689,11 +1704,13 @@ export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Mat
     const see = /Glass|Liquid/.test(src.name)
     // (the drink drawn before its glass, the glass over it)
     if (see) m.renderOrder = /Liquid/.test(src.name) ? 1 : 2
-    m.castShadow = !see
-    m.receiveShadow = !see
+    // (the glow's a light: it casts no shadow and takes none)
+    const glow = /SakeGlow/.test(src.name)
+    m.castShadow = !see && !glow
+    m.receiveShadow = !see && !glow
   })
   // (no ink round the drink inside: its outline would show through the glass)
-  inkModel(r, (m) => /Liquid/.test((m.material as THREE.Material).name) || /Liquid|Cord/.test(m.name), { width: 0.0012, weld: true })
+  inkModel(r, (m) => /Liquid|Glow/.test((m.material as THREE.Material).name) || /Liquid|Cord|Glow/.test(m.name), { width: 0.0012, weld: true })
 }
 const SAKESTAND_URL = import.meta.env.BASE_URL + 'models/sakestand.glb'
 useGLTF.preload(SAKESTAND_URL)
@@ -1707,16 +1724,19 @@ const SAKESTAND_SCALE = 2.0
 const SHOCHU_URL = import.meta.env.BASE_URL + 'models/shochu.glb'
 useGLTF.preload(SHOCHU_URL)
 /** the shochu's tray beside the stand, in the stand's frame: right of it, between it and the lantern (item 107, measured clear of both) */
-// (the stand 0.92 long now (item 285): its end board and brass to 0.483, the tray's middle 0.11 past them and a little)
-const SHOCHU_AT = new THREE.Vector3(0.623, 0, 0)
+// (the stand 0.92 long now (item 285): its end board and brass to 0.483, the tray's middle 0.11 past them and a little; its plinth to
+// 0.511 since item 380, the tray moved along with it)
+const SHOCHU_AT = new THREE.Vector3(0.655, 0, 0)
 /** the tokkuri, set on the stand's front step at its right-hand end, at the bottles' own size (item 107: it stood at half their size down
  * on the table under where a tipped bottle's mouth came, the stream long and the jug tiny) */
-// (item 285: the front step's last place, between the two bottles behind it, as the front's bottles are)
-const JUG_AT = new THREE.Vector3(2.5 * 0.131, 0.045, 0.07)
+// (item 285: the front step's last place, between the two bottles behind it, as the front's bottles are; item 380: on its coaster, the
+// front step's top now 0.098 up (the plinth under the steps) and the coaster 0.006)
+const JUG_AT = new THREE.Vector3(2.5 * 0.131, 0.104, 0.07)
 /** how long a pour into a cup or the tokkuri takes, held over it (s); how high a bottle's carried, its foot over the table (the stand's
  * frame); how far it's tipped to pour; a cup's pours out of a bottle of shochu */
 const POUR_S = 1.2
-const CARRY_Y = 0.16
+// (over the back step's coasters (0.164, item 380), the bottle clear of them as it's taken up)
+const CARRY_Y = 0.22
 const TIP_MAX = 1.9
 const SHOCHU_CUPS = 8
 /** the shochu left in its bottle (1 full); a new one put out when it's empty, from the spares in the back (item 199) */
