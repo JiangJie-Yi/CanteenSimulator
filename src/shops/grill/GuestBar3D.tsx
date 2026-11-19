@@ -981,9 +981,12 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
         {[[-0.12, 0.44, 0.32, 0.84], [-0.02, 0.24, 0.6, 0.7], [0, 0.2, CAT_TOP, 0.26]].map(([x, d, h, l], i) => (
           <group key={i}>
             <Part geo={REG_GEO.round} color={i === 1 ? '#4a2e1c' : i === 2 ? '#3e2616' : '#5a3a24'} outline={1.02} position={[x, h / 2, 0]} scale={[d, h, l]} />
-            {/* (a red felt (毛氈) laid over each tier, hanging a little down its front, as under a festival's dolls) */}
-            <mesh position={[x, h + 0.004, 0]}><boxGeometry args={[d + 0.01, 0.008, l + 0.01]} /><meshToonMaterial color="#b8261c" /></mesh>
-            <mesh position={[x - d / 2 - 0.004, h - 0.03, 0]}><boxGeometry args={[0.008, 0.06, l + 0.01]} /><meshToonMaterial color="#a8201a" /></mesh>
+            {/* (a red felt (毛氈) laid over each tier, hanging down its front, as under a festival's dolls: one soft piece, its front edge
+                rounded over as cloth drapes (item 379: two thin sheets, 8 mm, their edges sharp), an ink line round it) */}
+            <group position={[x, 0, 0]}>
+              <mesh geometry={feltGeo(d, h, l, 0)}><meshToonMaterial color="#b3241b" /></mesh>
+              <mesh geometry={feltGeo(d, h, l, 0.003)}><meshBasicMaterial color={INK} side={THREE.BackSide} /></mesh>
+            </group>
           </group>
         ))}
       </group>
@@ -992,15 +995,15 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       <group position={[0.4, 0, CAT_STAND_Z]}>
         {DOOR_CATS.map((k, i) => (
           <Movable key={i} id={`doorcat${i}`} label={`招財貓 ${i + 1}`}><StaticBatch plain>
-            <group position={[k.x, k.y, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
+            <group position={[k.x, k.y + FELT_TOP - 0.008, k.z]} rotation-y={-Math.PI / 2 + k.yaw}><LuckyCat kind={k.kind} height={k.h} still /></group>
           </StaticBatch></Movable>
         ))}
         {/* (a koban, the old oval gold coin, on its little stand, up on the top step (the owner's, 2026-11-12: a step more, the coin on top);
             bigger, the step lower (item 96)) */}
-        <Movable id="koban" label="小判金幣"><group position={[0, CAT_TOP + 0.0085, 0]} rotation-y={-Math.PI / 2} scale={1.35}><Koban /></group></Movable>
+        <Movable id="koban" label="小判金幣"><group position={[0, CAT_TOP + FELT_TOP + 0.0005, 0]} rotation-y={-Math.PI / 2} scale={1.35}><Koban /></group></Movable>
         {/* (the shop's own beckoning cat, its paw going, in the middle of the first step between the two small ones, facing the way in
             (item 97, the owner's, 2026-11-14)) */}
-        <Movable id="owncat" label="招財貓（招手）"><group position={[-0.22, 0.328, 0]} rotation-y={-Math.PI / 2} scale={1.15}
+        <Movable id="owncat" label="招財貓（招手）"><group position={[-0.22, 0.32 + FELT_TOP, 0]} rotation-y={-Math.PI / 2} scale={1.15}
           {...nameOver('招財貓', '本店的招財貓，舉著左手招客人進門')}><OwnLuckyCat /></group></Movable>
       </group>
       {/* (the samurai helmet (兜) that sat on the lower tier between the two small cats is on its own little stand by the staff's door now
@@ -2296,6 +2299,40 @@ function BenchShoesImpl({ sitters }: { sitters: { current: Map<number, { id: num
  */
 /** the cats' stand's top step's height, the koban on it (0.84 once: item 96) */
 const CAT_TOP = 0.74
+/**
+ * The felt over one of the cats' stand's tiers (`d` deep, its top at `h`, `l` long; grown `g` all round for its ink): one piece of cloth
+ * across the top and down the front, its front edge rounded over as cloth drapes (the cats stand in it a little, as on a cushion), its
+ * ends softened (item 379, docs/MODELING.md's 造型感). Its faces against the tier sit 2 mm inside it (no two faces in one plane); made once
+ * for each tier
+ */
+const FELT_T = 0.012, FELT_DROP = 0.075
+/** the felt's top over its tier (its thickness and its bevel's swell): what stands on it stands this high */
+const FELT_TOP = FELT_T + 0.0018
+const FELTS = new Map<string, THREE.BufferGeometry>()
+function feltGeo(d: number, h: number, l: number, g: number) {
+  const key = [d, h, l, g].join('|')
+  let geo = FELTS.get(key)
+  if (geo) return geo
+  // (its section across the tier, x out from the wall (its front at -d/2), y up; the outer corners rounded, the cloth's fold at the front
+  // fullest)
+  const xb = d / 2 + 0.004 + g, xf = -d / 2 - FELT_T - g, yt = h + FELT_T + g, yb = h - FELT_DROP - g, xi = -d / 2 + 0.002, yi = h - 0.002
+  const sh = new THREE.Shape()
+  const rf = 0.016 + g, rb = 0.006 + g
+  sh.moveTo(xb, yi)
+  sh.lineTo(xb, yt)
+  sh.lineTo(xf + rf, yt)
+  sh.absarc(xf + rf, yt - rf, rf, Math.PI / 2, Math.PI, false)
+  sh.lineTo(xf, yb + rb)
+  sh.absarc(xf + rb, yb + rb, rb, Math.PI, Math.PI * 1.5, false)
+  sh.lineTo(xi, yb)
+  sh.lineTo(xi, yi)
+  sh.closePath()
+  const b = 0.003
+  geo = new THREE.ExtrudeGeometry(sh, { depth: l + 0.008 + 2 * g - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b * 0.6, bevelSegments: 1, curveSegments: 2 })
+  geo.translate(0, 0, -(l + 0.008 + 2 * g - 2 * b) / 2)
+  FELTS.set(key, geo)
+  return geo
+}
 const DOOR_CATS = [
   // (on the stand: x out from the wall, y the tier's top, z along it; the big white pair on the upper tier)
   // (each its own model and size, in its own colours: two big ones on top, two smaller below)
