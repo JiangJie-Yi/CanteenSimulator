@@ -205,7 +205,7 @@ def _creases(c, specs):
 
 
 _W = 0.30 / 1.64     # (the apron's ties round the waist, where the cloth gathers)
-_ct = _creases(_ct, [
+CREASES = [
     # (behind: radiating from the ties, up toward the shoulders and down to the hem)
     (0.5, _W, 0.4, 0.33, 0.024, 0.22), (0.5, _W, 0.46, 0.345, 0.02, 0.18), (0.5, _W, 0.54, 0.345, 0.02, 0.18), (0.5, _W, 0.6, 0.33, 0.024, 0.22),
     (0.5, _W, 0.42, 0.12, 0.022, 0.2), (0.5, _W, 0.48, 0.113, 0.018, 0.16), (0.5, _W, 0.52, 0.113, 0.018, 0.16), (0.5, _W, 0.58, 0.12, 0.022, 0.2),
@@ -214,7 +214,8 @@ _ct = _creases(_ct, [
     # (across the chest along the crossed front, and a few short gathers at the hem)
     (0.1, 0.345, 0.03, 0.27, 0.018, 0.16), (0.9, 0.345, 0.97, 0.27, 0.018, 0.16),
     (0.15, 0.118, 0.16, 0.155, 0.014, 0.14), (0.32, 0.118, 0.33, 0.15, 0.014, 0.14), (0.68, 0.118, 0.67, 0.15, 0.014, 0.14), (0.85, 0.118, 0.84, 0.155, 0.014, 0.14),
-])
+]
+_ct = _creases(_ct, CREASES)
 M["coat"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_cotton", _ct.astype(np.float32)), rough=0.75)
 if CREW:
     # (the cap's tenugui white, a band's white; the collar a shade of the coat, the kimono's white)
@@ -943,7 +944,74 @@ if CREW == "serverF":
     _body = np.where(_ob[..., None], _gold, _body)
     _body = np.where((np.abs(np.abs(_by_ - BELT) - 0.058) < 0.004)[..., None], _body * 0.7, _body)
     _body = np.where((np.abs(_by_ - BELT) < 0.006)[..., None], np.array((0.78, 0.19, 0.16), np.float32), _body)
-M["body"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_body", np.clip(_body, 0, 1).astype(np.float32)), rough=0.8)
+
+
+def _body_height():
+    """(item 375, the owner's 「衣服質感陰影要有」: the customers' clothes got their folds and weave in the light; the owner's and the crew's
+    now as well) the clothes' folds as a height on the body's own picture (u round it from the front, v up it: the colour's own way; 0 flat,
+    + raised, - in a crease): the coat hanging from the chest in uneven folds, deeper toward its hem; the creases the colour has painted
+    (CREASES) cut as valleys, a ridge beside each; the apron's few long gathers down from its cord; the trousers' folds and the coat's hem
+    turned up; flat above the shoulders"""
+    ph = _bu * 2 * math.pi
+    h = np.zeros_like(_bu, dtype=np.float32)
+    top = 0.40 * BH
+    # (the coat's hanging folds, from under the chest to the hem, a few sines at odd ratios so no two are alike, deeper downward)
+    coat = (_by_ >= HEM) & (_by_ <= top)
+    hang = np.clip((top - _by_) / max(1e-6, top - HEM), 0, 1) ** 1.2
+    f = 0.6 * np.sin(ph * 7 + 0.7) + 0.35 * np.sin(ph * 11.3 + 2.0 + 3.0 * _by_) + 0.2 * np.sin(ph * 17.7 + 4.1)
+    h += np.where(coat, hang * np.tanh(f * 1.6) * 0.9, 0)
+    # (the creases painted into the colour, as valleys with a light ridge beside: the same lines, the colour's v the height over 1.64)
+    cv = _by_ / 1.64
+    for (u0, v0, u1, v1, w, d) in CREASES:
+        du = ((_bu - u0 + 0.5) % 1.0) - 0.5
+        dv = cv - v0
+        ex, ey = ((u1 - u0 + 0.5) % 1.0) - 0.5, v1 - v0
+        L = math.hypot(ex, ey)
+        tx, ty = ex / L, ey / L
+        along = du * tx + dv * ty
+        across = -du * ty + dv * tx
+        t = np.clip(along / L, 0, 1)
+        taper = np.where((along > 0) & (along < L), np.sin(np.pi * t) ** 0.7, 0)
+        h -= (np.exp(-(across / w) ** 2) - 0.35 * np.exp(-((across - w * 1.2) / w) ** 2)) * taper * d * 6.0
+    # (the apron's long gathers from its cord down, on its front, softer toward its sides)
+    if CREW not in ("serverF", "stock"):
+        _ain = (np.abs(_aw) < AP_A) & (_by_ >= AP[0][0]) & (_by_ <= AP[-1][0])
+        g = 0.5 * np.sin(_aw * 11 + 0.9) + 0.25 * np.sin(_aw * 23 + 2.3)
+        fall = np.clip((AP[-1][0] - _by_) / max(1e-6, AP_H), 0, 1) ** 0.8
+        h = np.where(_ain, g * fall * 0.7, h)
+    # (the trousers' folds, and the coat's hem turned up over them)
+    legs = _by_ < HEM
+    h += np.where(legs, (0.4 * np.sin(ph * 9 + 1.3) + 0.2 * np.sin(ph * 15 + 0.4)) * np.clip((HEM - _by_) / HEM, 0, 1), 0)
+    h += 0.5 * np.exp(-((_by_ - HEM - 0.008) / 0.01) ** 2)
+    # (nothing above the shoulders: the head sits down into the body there)
+    h *= np.clip((0.46 * BH - _by_) / 0.04, 0, 1)
+    return h.astype(np.float32)
+
+
+_bh = _body_height()
+
+
+def _body_normals():
+    """the folds (_bh) and a twill's fine weave over them as a normal map: tangent space, +y up the picture, at half its pixels"""
+    px, py = _bu * _TW, _bv * _TH
+    h = _bh + 0.06 * np.sin((px + py) * 2 * math.pi / 6.0) + 0.035 * np.sin(px * 2 * math.pi / 3.0)
+    # (at half the picture's pixels each way: the folds are broad, and the weave's fine noise at full size made it 120 KB, the colour 20; the
+    # game draws it into the atlas at its picture's size)
+    h = h.reshape(_TH // 2, 2, _TW // 2, 2).mean(axis=(1, 3))
+    gy, gx = np.gradient(h)
+    k = 6.0
+    nx, ny, nz = -gx * k, -gy * k, np.ones_like(h)
+    n = np.sqrt(nx * nx + ny * ny + nz * nz)
+    return np.stack([nx / n * 0.5 + 0.5, ny / n * 0.5 + 0.5, nz / n * 0.5 + 0.5], axis=-1).astype(np.float32)
+
+
+# (the folds' shade painted into the colour too, as the customers' (blender/folk.py's fold_shade): a crease darker, a fold's top a little
+# lighter, so they show in the dark and from far off where the normals' light is little; lighter than theirs, the creases being painted once
+# already)
+_body = _body * (1 - np.clip(-_bh, 0, 1.2)[..., None] * 0.25)
+_body = _body + (1 - _body) * (np.clip(_bh, 0, 1.2)[..., None] * 0.08)
+M["body"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_body", np.clip(_body, 0, 1).astype(np.float32)),
+                nrm=image(f"{CREW or 'boss'}_body_normal", _body_normals(), data=True), rough=0.8)
 if not CREW:
     # (the parts' map beside his picture, the same size and way up: red the coat, green the apron, blue the trousers (item 376))
     _rgm = np.stack([(_kind == 1), (_kind == 2), (_kind == 3), np.ones_like(_kind, bool)], -1).astype(np.float32)

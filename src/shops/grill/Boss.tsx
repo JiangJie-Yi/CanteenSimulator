@@ -280,7 +280,9 @@ function styledBoss(scene: THREE.Group) {
       if (mm?.name === 'BossFace') { mm.map = crewFaceSheet('boss'); mm.color.copy(skinOf(r)) }
     })
     // ---- all of him one material, his face's sheet in it too
-    atlasModel(r, () => true, (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap })), { decal: true }))
+    // (his clothes' folds and weave in the light (item 375): their normal map packed beside his picture (blender/boss.py's _body_normals))
+    atlasModel(r, () => true, (atlas, normals) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap,
+      ...(normals ? { normalMap: normals } : {}) })), { decal: true }))
     // ---- each piece of him in his frame, with its part, inked or not, flat or not
     r.updateMatrixWorld(true)
     const inv = r.matrixWorld.clone().invert()

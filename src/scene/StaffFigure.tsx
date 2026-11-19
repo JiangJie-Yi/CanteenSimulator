@@ -317,7 +317,9 @@ function build(scene: THREE.Group, v: Variant): Built {
     // (the face is the head's own front: its sheet over each person's skin (their tint), where nothing's drawn the skin)
     if (n === 'CrewFace') (m.material as THREE.MeshStandardMaterial).map = crewFaceSheet(v === 'chefF' || v === 'serverF' ? 'female' : 'male')
   })
-  const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap, alphaHash: true })), { decal: true }))!
+  // (their clothes' folds and weave in the light (item 375), as the owner's: blender/boss.py's _body_normals, packed beside their picture)
+  const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas, normals) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap,
+    alphaHash: true, ...(normals ? { normalMap: normals } : {}) })), { decal: true }))!
   // (every piece of it in the figure's frame, its part, inked or not, flat or not, skin or hair)
   const pieces: (SkinPiece & { tint?: Tint['tint'] })[] = []
   let face = -1
