@@ -192,21 +192,31 @@ export function StaticBatch({ children, parts, plain = false }: { children: Reac
  * moved and lit up as a whole. For a model whose parts never move on their own; skinned, instanced and multi-material meshes are left be.
  */
 /**
- * Pieces of one material shown a few at a time, always the first so many in a set order (the sticks standing up out of a sack, the outer
- * ones going first): one mesh and one ink line round them all, their draw ranges cut to the first `n`, not a mesh and a line each (the sack
- * of charcoal was 28 draws). The pieces (each with its ink hull under it, as inkModel puts it) are taken out of `root` and the two merged
- * meshes put in its place; `show(n)` shows the first n (none: nothing's drawn at all). Pointed at, only what's shown is hit.
+ * Pieces shown a few at a time, always the first so many in a set order (the sticks standing up out of a sack, the outer ones going first):
+ * one mesh for each material among them and one ink line round them all, their draw ranges cut to the first `n`, not a mesh and a line each
+ * (the sack of charcoal was 28 draws). The pieces (each with its ink hull under it, as inkModel puts it) are taken out of `root` and the
+ * merged meshes put in its place; `show(n)` shows the first n (none: nothing's drawn at all). Pointed at, only what's shown is hit.
+ * (Each material merged on its own (item 389): the onions' heap is of two (the onions baked onto it, and their roots, plain-coloured), and
+ * everything was drawn in the first piece's; with only the roots carrying their colours by their vertices nothing merged at all: the sack's
+ * onions were left out, and their ink drawn round nothing, black lumps in the sack.)
  */
 export function countedBatch(root: THREE.Object3D, pieces: THREE.Mesh[]) {
   root.updateWorldMatrix(true, true)
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert()
-  const body: THREE.BufferGeometry[] = [], ink: THREE.BufferGeometry[] = []
-  const bodyEnds: number[] = [], inkEnds: number[] = []
+  // (each material's pieces, and for each piece in the order, how many of that material's vertices are in it and the ones before it)
+  const sets = new Map<THREE.Material, { geos: THREE.BufferGeometry[]; ends: number[]; count: number; shadow: boolean; lit: boolean; name: string }>()
+  const ink: THREE.BufferGeometry[] = [], inkEnds: number[] = []
   let inkMat: THREE.Material | null = null
   for (const p of pieces) {
+    const mat = p.material as THREE.Material
+    const set = sets.get(mat) ?? { geos: [], ends: [], count: 0, shadow: false, lit: false, name: p.name }
+    sets.set(mat, set)
     const b = bakeable(p.geometry, new THREE.Matrix4().multiplyMatrices(inv, p.matrixWorld))
-    body.push(b)
-    bodyEnds.push((bodyEnds.at(-1) ?? 0) + b.attributes.position.count)
+    set.geos.push(b)
+    set.count += b.attributes.position.count
+    set.shadow ||= p.castShadow
+    set.lit ||= p.receiveShadow
+    for (const s of sets.values()) s.ends.push(s.count)
     const h = p.children.find((c) => (c as THREE.Mesh).isMesh && c.userData.inked) as THREE.Mesh | undefined
     if (!h) { inkEnds.push(inkEnds.at(-1) ?? 0); continue }
     inkMat = h.material as THREE.Material
@@ -220,15 +230,21 @@ export function countedBatch(root: THREE.Object3D, pieces: THREE.Mesh[]) {
     inkEnds.push((inkEnds.at(-1) ?? 0) + hg.attributes.position.count)
   }
   const merge = (geos: THREE.BufferGeometry[]) => { const g = geos.length ? mergeGeometries(geos) : null; for (const x of geos) x.dispose(); return g }
-  const bodyGeo = merge(body), inkGeo = merge(ink)
-  const mesh = bodyGeo ? new THREE.Mesh(bodyGeo, pieces[0].material as THREE.Material) : null
-  if (mesh) {
-    mesh.name = pieces[0].name
-    mesh.castShadow = pieces.some((p) => p.castShadow)
-    mesh.receiveShadow = pieces.some((p) => p.receiveShadow)
+  const bodies: { mesh: THREE.Mesh; ends: number[] }[] = []
+  for (const [mat, set] of sets) {
+    // (a set started after some pieces of others: none of its own in those)
+    const ends = [...new Array<number>(pieces.length - set.ends.length).fill(0), ...set.ends]
+    const geo = merge(set.geos)
+    if (!geo) continue
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.name = set.name
+    mesh.castShadow = set.shadow
+    mesh.receiveShadow = set.lit
     mesh.userData.inked = true
     root.add(mesh)
+    bodies.push({ mesh, ends })
   }
+  const inkGeo = merge(ink)
   const line = inkGeo && inkMat ? new THREE.Mesh(inkGeo, inkMat) : null
   if (line) {
     line.raycast = () => {}
@@ -239,9 +255,12 @@ export function countedBatch(root: THREE.Object3D, pieces: THREE.Mesh[]) {
   return {
     show(n: number) {
       const k = Math.max(0, Math.min(pieces.length, Math.floor(n)))
-      mesh?.geometry.setDrawRange(0, k ? bodyEnds[k - 1] : 0)
+      for (const { mesh, ends } of bodies) {
+        const upTo = k ? ends[k - 1] : 0
+        mesh.geometry.setDrawRange(0, upTo)
+        mesh.visible = upTo > 0
+      }
       line?.geometry.setDrawRange(0, k ? inkEnds[k - 1] : 0)
-      if (mesh) mesh.visible = k > 0
       if (line) line.visible = k > 0
     },
   }
