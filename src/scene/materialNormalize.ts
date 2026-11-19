@@ -94,12 +94,30 @@ function oneProgramForSides(m: Any, side: THREE.Side) {
 /**
  * A shadow's depth material given the white map and the tiny alphaTest too: three draws the shadow of a material without a picture with a
  * depth material of its own (and one with a picture with a copy of it), each a program; it's handed the source material's map and alphaTest
- * just before each draw, so it's given the missing ones here every time, after.
+ * just before each draw, so it's given the missing map here every time, after. Its alphaTest is held over nothing for good (item 374): set
+ * back to 0 by three before each draw of a caster whose own is 0 (the customers' figures, whose materials change their own shaders and aren't
+ * normalised) and up to 0.002 here after, it crossed 0 twice a draw, and each crossing moved the material's version, so three worked the
+ * draw's program out afresh, its parameters a new object each time: some 440 draws a second while the shop's open. 0.002 or 0 draw the same.
  */
+const heldAlpha = new WeakSet<THREE.Material>()
+/** (the shadows' depth materials for the figures bent by bones and for the meshes drawn as instances, each kind its own: see
+ * normalizeRenderer) */
+const OWN_DEPTH = [new THREE.MeshDepthMaterial(), new THREE.MeshDepthMaterial()], OWN_DISTANCE = [new THREE.MeshDistanceMaterial(), new THREE.MeshDistanceMaterial()]
+function holdAlphaTest(m: Any) {
+  if (heldAlpha.has(m)) return
+  heldAlpha.add(m)
+  const was = m.alphaTest as number
+  Object.defineProperty(m, 'alphaTest', {
+    configurable: true,
+    get() { return this._alphaTest },
+    set(v: number) { this._alphaTest = v > 0 ? v : 0.002 },
+  })
+  if (!(was > 0)) { m._alphaTest = 0.002; m.needsUpdate = true }
+}
 function shadowDepth(m: Any) {
   if (!(m.isMeshDepthMaterial || m.isMeshDistanceMaterial) || m.onBeforeCompile !== plainCompile) return
   if (!m.map) m.map = white
-  if (m.alphaTest === 0) m.alphaTest = 0.002
+  holdAlphaTest(m)
 }
 
 /** every material the renderer draws or compiles, normalised the first time it's met */
@@ -119,6 +137,15 @@ export function normalizeRenderer(r: THREE.WebGLRenderer) {
     material.side = THREE.DoubleSide
   }
   r.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
+    // (a figure bent by bones, or a mesh drawn as instances, casting its shadow: from the next shadow on, with a depth material of its own,
+    // one for each kind; drawn with three's own shared one, that switched program between them and everything else it drew (item 374: some
+    // 77 draws a second worked out afresh))
+    const kind = (object as THREE.SkinnedMesh).isSkinnedMesh ? 0 : (object as THREE.InstancedMesh).isInstancedMesh ? 1 : -1
+    if (kind >= 0) {
+      const o = object as THREE.Object3D & { customDepthMaterial?: THREE.Material; customDistanceMaterial?: THREE.Material }
+      if ((material as Any).isMeshDepthMaterial && !o.customDepthMaterial) o.customDepthMaterial = OWN_DEPTH[kind]
+      else if ((material as Any).isMeshDistanceMaterial && !o.customDistanceMaterial) o.customDistanceMaterial = OWN_DISTANCE[kind]
+    }
     normalizeMaterial(material)
     shadowDepth(material as Any)
     const side = material.side

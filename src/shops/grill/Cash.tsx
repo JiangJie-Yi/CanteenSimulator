@@ -1,7 +1,7 @@
 // The money at the till: yen notes (1000 blue, 5000 violet, 10000 brown, the 2024 series) and coins (1, 5, 10, 50, 100, 500), drawn
 // the way they are in the drawer: stacks of notes, piles of coins, each with its own printed face.
 
-import { useEffect, useMemo } from 'react'
+import { memo, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 
 /** a canvas texture drawn by `draw` */
@@ -397,6 +397,19 @@ const coinMats = (kind: CoinKind) => {
   coinMatsMade.set(kind, out)
   return out
 }
+/** (item 374) the coins' materials as the heaps drawn as instances have them: copies of their own (the same program, the same repeated
+ * sides). Shared with the single coins drawn one at a time (in a hand, on the change tray), three switched each one's program between the
+ * two every frame the drawer was open, its parameters worked out afresh each time */
+const coinMatsInstanced = new Map<CoinKind, THREE.Material[]>()
+const instancedCoinMats = (kind: CoinKind) => {
+  let had = coinMatsInstanced.get(kind)
+  if (!had) {
+    const copies = new Map<THREE.Material, THREE.Material>()
+    had = coinMats(kind).map((m) => { let c = copies.get(m); if (!c) { c = m.clone(); copies.set(m, c) } return c })
+    coinMatsInstanced.set(kind, had)
+  }
+  return had
+}
 /** each bank's colour for a roll of each coin, its paper printed in it */
 const ROLL_INK: Record<CoinKind, string> = { 1: '#2f5ea6', 5: '#8a6a1e', 10: '#2e7d47', 50: '#c4661c', 100: '#c4342e', 500: '#6b3f8f' }
 const rollMatsMade = new Map<CoinKind, { wrap: THREE.Material; end: THREE.Material }>()
@@ -476,8 +489,9 @@ export const isNote = (v: number): v is Note => v >= 1000
  * Coins lying loose in a cup, as they do in a till: `n` of them heaped in a `w` x `d` patch, flat or a little tipped, piling up toward the
  * cup's middle; one instanced mesh, so a full cup is one draw. The same `seed` gives the same heap.
  */
-export function CoinPile({ kind, n, w, d, seed = 1, ...rest }: { kind: CoinKind; n: number; w: number; d: number; seed?: number } & Record<string, unknown>) {
-  const mats = useMemo(() => coinMats(kind), [kind])
+// (item 374: drawn again only as its own props change: with every redraw of the till it was, 2.5 times a second, the same coins)
+export const CoinPile = memo(function CoinPile({ kind, n, w, d, seed = 1, ...rest }: { kind: CoinKind; n: number; w: number; d: number; seed?: number } & Record<string, unknown>) {
+  const mats = useMemo(() => instancedCoinMats(kind), [kind])
   const mesh = useMemo(() => {
     const m = new THREE.InstancedMesh(coinGeo(kind), mats, n)
     let r = seed * 9301 + kind * 49297
@@ -504,4 +518,4 @@ export function CoinPile({ kind, n, w, d, seed = 1, ...rest }: { kind: CoinKind;
   // (the pile made again as the drawer's coins change: the last one's instance buffer let go)
   useEffect(() => () => mesh.dispose(), [mesh])
   return <group {...rest}><primitive object={mesh} /></group>
-}
+})

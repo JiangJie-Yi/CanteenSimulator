@@ -50,6 +50,15 @@ const LEFT_AT_END = 0.12
 
 /** the props' own copies of their materials, once: the room's toon light, the steel too; the ladle's cup open, drawn both sides */
 const dressed = new Map<THREE.Material, THREE.Material>()
+/** (item 374) the bowls' materials as the seats' instanced bowls draw them: a copy of each of their own, the same program. Shared with the
+ * bowls drawn one at a time (in hands, at the counter, on the trays), three switched each material's program between the two every frame
+ * (instanced and not), its parameters worked out afresh each time, some 125 draws a second */
+const instancedCopies = new Map<THREE.Material, THREE.Material>()
+const forInstances = (m: THREE.Material) => {
+  let c = instancedCopies.get(m)
+  if (!c) { c = m.clone(); c.name = m.name; instancedCopies.set(m, c) }
+  return c
+}
 function dress(root: THREE.Object3D) {
   root.traverse((o) => {
     const m = o as THREE.Mesh
@@ -460,7 +469,7 @@ function SeatBowlsImpl({ rice, soup }: { rice: { key: string; at: THREE.Vector3;
       const o = gltf.scene.getObjectByName(name)!.clone(true)
       dress(o)
       const out: Part[] = []
-      o.traverse((m) => { const me = m as THREE.Mesh; if (me.isMesh) out.push({ geo: me.geometry, mat: me.material as THREE.Material, kind }) })
+      o.traverse((m) => { const me = m as THREE.Mesh; if (me.isMesh) out.push({ geo: me.geometry, mat: forInstances(me.material as THREE.Material), kind }) })
       return out
     }
     return { rice: [...grab('ChawanBody', 'body'), ...grab('ChawanRice', 'rice')], soup: [...grab('WanBody', 'body'), ...grab('WanSoup', 'soup')] }
