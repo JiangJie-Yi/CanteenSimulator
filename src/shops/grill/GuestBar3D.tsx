@@ -138,8 +138,10 @@ const AHEAD_S = 0.6, ASIDE_V = 1.5, WALK_MOST = 3.2
 const STOCKER_KEY = -99
 /** those waiting on the genkan's bench, among those stepping aside for each other: keyed apart from the customers (SITTER_KEY less their id) */
 const SITTER_KEY = -1000
-/** the pieces standing against the first counter's wall, behind its aisle: the waiting benches, the helmet's stand and the helmet on it */
-const WALL_PIECES = ['bench', 'bench2', 'kabutostand', 'kabuto']
+/** the pieces standing against the first counter's wall, behind its aisle: the waiting benches, the helmet's stand and the helmet on it; and
+ * the cats' stand by the door with its cats (item 387: moved along the wall into the aisle (the owner's, item 96), the cat at its front
+ * 0.42 from the stools' backs, those going by walked into it: aisleSqueeze) */
+const WALL_PIECES = ['bench', 'bench2', 'kabutostand', 'kabuto', 'doorcats', 'owncat', 'koban', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3']
 const WALL_V = new THREE.Vector3(), WALL_INV = new THREE.Matrix4()
 type WallKeep = { at: number; boxes: { a0: number; a1: number; front: number }[]; roots: Map<string, THREE.Object3D> }
 /**
@@ -179,6 +181,69 @@ function measureWall(scene: THREE.Object3D, frame: THREE.Object3D, c: { at: THRE
     if (front > -Infinity) keep.boxes.push({ a0, a1, front })
   }
 }
+/** a server's half width (their round body; their hands hanging out past it as they walk): the bar's measure */
+const SERVER_HALF = 0.22
+/** how far along the aisle one comes in toward the counter before what stands out from its wall, and goes back out after it */
+const SQUEEZE_RAMP = 0.35
+type Squeeze = { a0: number; a1: number; lay: number }
+/**
+ * (item 387, the owner's 「有個致命的問題動作都會深陷進模型去」) the stretches of the first counter's aisle where what stands against its wall
+ * comes out into the way of those walking it (`half` across, keeping to its line `line`, the lay from the counter's middle, + toward it):
+ * there they keep in toward the counter, just clear of its front if there's room; if there isn't, half way between it and the stools'
+ * backs (`stools`): by the cats' stand there's 0.42 between them, a server's round body 0.44 across, and kept to the aisle's line they went
+ * 0.14 to 0.2 into its lower tier and their heads through the cat on it (tests/e2e/sinkin.mjs). Each stretch with the line to keep to;
+ * those that overlap one, kept to the nearer the counter
+ */
+function aisleSqueeze(boxes: WallKeep['boxes'], line: number, stools: number, half: number): Squeeze[] {
+  const out: Squeeze[] = []
+  for (const b of boxes) {
+    const clear = b.front + half + 0.02
+    if (clear <= line + 0.01) continue
+    const lay = Math.min(clear, (b.front + stools) / 2)
+    if (lay > line + 0.01) out.push({ a0: b.a0 - half, a1: b.a1 + half, lay })
+  }
+  out.sort((p, q) => p.a0 - q.a0)
+  const merged: Squeeze[] = []
+  for (const z of out) {
+    const m = merged.at(-1)
+    if (m && z.a0 <= m.a1 + SQUEEZE_RAMP) { m.a1 = Math.max(m.a1, z.a1); m.lay = Math.max(m.lay, z.lay) } else merged.push({ ...z })
+  }
+  return merged
+}
+/** where in the aisle one keeps to at a place along it (`a`, the first counter's): its own line, or in toward the counter by a stretch
+ * (over SQUEEZE_RAMP before and after it) */
+function squeezeLay(zones: Squeeze[], line: number, a: number) {
+  let l = line
+  for (const z of zones) {
+    const k = a < z.a0 ? 1 - (z.a0 - a) / SQUEEZE_RAMP : a > z.a1 ? 1 - (a - z.a1) / SQUEEZE_RAMP : 1
+    if (k > 0) l = Math.max(l, line + (z.lay - line) * Math.min(1, k))
+  }
+  return l
+}
+/** a way (the bar's frame) bent in round those stretches where it runs along the first counter's aisle (`c`): its corners where each
+ * stretch's ramps begin and end, and its own points on the aisle's line in a stretch drawn in; its first point (where they are now) as
+ * it is, and if that's in a stretch, a step on from it drawn in already (set off from a stool by the cats' stand, they'd have come in
+ * across the whole of it, and gone into its end) */
+function squeezePath(path: THREE.Vector3[], c: Counter, line: number, zones: Squeeze[]) {
+  if (!zones.length || path.length < 2) return path
+  const A = (v: THREE.Vector3) => (v.x - c.at.x) * c.along.x + (v.z - c.at.z) * c.along.z
+  const L = (v: THREE.Vector3) => (v.x - c.at.x) * c.lay.x + (v.z - c.at.z) * c.lay.z
+  const onLine = (v: THREE.Vector3) => Math.abs(L(v) - line) < 0.06
+  const drawn = (a: number) => squeezeLay(zones, line, a) > line + 1e-3
+  const put = (a: number, y: number) => c.at.clone().addScaledVector(c.along, a).addScaledVector(c.lay, squeezeLay(zones, line, a)).setY(y)
+  const out = [path[0]]
+  for (let i = 1; i < path.length; i++) {
+    const p = path[i - 1], q = path[i]
+    if (!onLine(p) || !onLine(q)) { out.push(onLine(q) && drawn(A(q)) ? put(A(q), q.y) : q); continue }
+    const ap = A(p), aq = A(q), dir = Math.sign(aq - ap) || 1
+    const first = i === 1 && drawn(ap) && Math.abs(aq - ap) > 0.2
+    if (first) out.push(put(ap + dir * 0.12, p.y))
+    for (const a of zones.flatMap((z) => [z.a0 - SQUEEZE_RAMP, z.a0, z.a1, z.a1 + SQUEEZE_RAMP]).filter((x) => (x - ap) * dir > (first ? 0.13 : 0.01) && (aq - x) * dir > 0.01)
+      .sort((x, y) => (x - y) * dir)) out.push(put(a, q.y))
+    out.push(drawn(aq) ? put(aq, q.y) : q)
+  }
+  return out
+}
 const INK = '#3b2a20'
 
 /** toon material, and its ink outline (a slightly bigger back-faced shell) */
@@ -217,6 +282,9 @@ const SAKE_HANDS_ON = { v: false }
 /** the hands of the one filling a bowl of rice or of soup (items 205, 206: SideBowls' poses), in the world, and whether one's filling now */
 const BOWL_HANDS = { left: new THREE.Vector3(), right: new THREE.Vector3() }
 const BOWL_HANDS_ON = { v: false }
+/** (item 387) the plater's hands stirring the soup (the world's): the right on the dipper over the pot's near half, the left on its rim */
+const STIR_HANDS = { left: new THREE.Vector3(), right: new THREE.Vector3() }
+const STIR_HANDS_ON = { v: false }
 /** a customer's bowls left at the serving counter for a server (the counter's own frame: its left end, clear of the takeaways in its middle
  * and the sake at its right), and where the one setting them down or taking them up stands */
 // (0.04 further left since the counter's 0.1 longer (items 254, 286))
@@ -3241,6 +3309,17 @@ const SINK_SHOWN = 12
 const IN_DRAIN: [number, number, number] = [IN_SINK, IN_SINK * 0.3, IN_SINK]
 /** the sink's tap running, a plate washed every this many seconds, lifted out and back to the racks */
 const WASH_EACH = 0.5
+/**
+ * Where one stands before a counter across from something on it (`at`), as far out from the counter's front as one stands at another thing on
+ * it (`stand`, before `thing`): on the line through `stand` square across the counter (the way from `stand` to `thing` is into it), across
+ * from `at`. (Item 387: moved back from `at` as far as `stand` is from `thing`, a thing further in on the counter put them in it)
+ */
+function frontOf(at: THREE.Vector3, stand: THREE.Vector3, thing: THREE.Vector3) {
+  const into = thing.clone().sub(stand).setY(0)
+  if (into.lengthSq() < 1e-8) return at.clone().setY(0)
+  into.normalize()
+  return at.clone().setY(0).addScaledVector(into, -at.clone().sub(stand).setY(0).dot(into))
+}
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
 const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegcrate2', 'vegbasket', 'coalsack', 'servecounter'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
@@ -3814,7 +3893,8 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   const standSpots = () => {
     const fb = frame.current, top = standTop.current
     const at = top && fb ? fb.worldToLocal(top.getWorldPosition(new THREE.Vector3())).setY(0) : new THREE.Vector3(STAND_AT.x, 0, STAND_AT.z)
-    const reach = at.clone().add(pickupSpot.clone().sub(at).setY(0).setLength(0.45))
+    // (0.53 out from its middle: at 0.45 their round body was 7 cm into its top as they set a bag on it, item 387)
+    const reach = at.clone().add(pickupSpot.clone().sub(at).setY(0).setLength(0.53))
     const c0 = counters[0], d = reach.clone().sub(c0.at)
     const a = THREE.MathUtils.clamp(d.dot(c0.along), kitchen.along[0] + 0.2, kitchen.along[1] - 0.2)
     const l = THREE.MathUtils.clamp(d.dot(c0.lay), kitchen.lay[0] + 0.2, kitchen.lay[1] - 0.2)
@@ -4140,7 +4220,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   const soupFillAt = (): FillAt => {
     const c = cookerAt(), p = potAt()
     if (!p) return { ...c, put: besideOf(c.top, c.r, c.right, c.face, c.low, null) }
-    const stand = p.top.clone().addScaledVector(c.face, -(c.top.clone().sub(c.stand).setY(0).length())).setY(0)
+    // (across from the pot before the counter's front, as far out as at the cooker (item 387: moved back from the pot as far as the cooker's
+    // place is from the cooker, it stood in the counter: the pot's further in))
+    const stand = frontOf(p.top, c.stand, c.top)
     // (the counter's top the one it stands in: the cooker's (one counter, the two joined))
     return { top: p.top, face: c.face, right: c.right, r: p.r, surface: p.surface, floor: p.floor, rimR: p.rimR, rimTop: p.rimTop, stand, low: c.low, open: p.open,
       put: besideOf(p.top, p.outer, c.right, c.face, c.low, c.top, c.r) }
@@ -5932,6 +6014,19 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         else if (stoolLine && ly < stoolLine.back && al >= stoolLine.a0 && al <= stoolLine.a1) room = Math.max(0, stoolLine.back - R / 2 - 0.02 - ly) / -toWall
         return room
       }
+      // (and those walking the first counter's aisle past what stands out from its wall keep in toward the counter, eased in and out as a
+      // step aside is (item 387: by the cats' stand, kept to the aisle's line, customers went into the cat at its front: aisleSqueeze))
+      if (wallC && stoolLine && keep.boxes.length) {
+        const line = -aisleOf(wallC), zones = aisleSqueeze(keep.boxes, line, stoolLine.back, R / 2)
+        if (zones.length) for (const w of walkers) {
+          if (!w.give) continue
+          const dx = w.p.x - wallC.at.x, dz = w.p.z - wallC.at.z
+          const al = dx * wallC.along.x + dz * wallC.along.z, ly = dx * wallC.lay.x + dz * wallC.lay.z
+          if (ly > line + 0.12 || ly < line - 0.3) continue
+          const want = squeezeLay(zones, line, al) - ly
+          if (want > 0) { w.ax += wallC.lay.x * want; w.az += wallC.lay.z * want }
+        }
+      }
       const met = new Set<string>()
       for (let i = 0; i < walkers.length; i++) for (let j = i + 1; j < walkers.length; j++) {
         const a = walkers[i], b = walkers[j]
@@ -6269,6 +6364,11 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       /** a step or two straight to a spot in his own place: no way round the table to find (the kitchen's ways go round it, out of his bay) */
       const stepTo = (to: THREE.Vector3, phase: typeof pl.phase) => { pl.path = [pl.pos.clone(), to.clone()]; pl.len = pathLength(pl.path); pl.phase = phase; pl.t = 0 }
       const soupPot = () => middleOf('miso-pot')
+      /** where one stands to stir the soup: before the counter's front across from the pot, as far out from it as at the cooker (on the line
+       * through the cooker's own place square across the counter). Item 387: it was the pot's middle moved by the cooker's step back from
+       * its own; the pot stands further in on the counter than the cooker, and that put them in the counter to the chest, the top through
+       * them (the owner's 「有個致命的問題動作都會深陷進模型去」) */
+      const soupStand = () => frontOf(soupPot(), kamaSpot(), kamaTop())
       const hearthAt = () => { marks.current.delete('FirePit'); return inBar('FirePit', home()) }
       /** where the water's thrown from: his own bay at the table's far end (Roasting's SOUS_AT), facing in over the hearth's near side */
       const hearthSpot = () => home()
@@ -6411,7 +6511,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
             // (the soup's pot empty (the day's start): to it to make it, water and dashi in and the miso stirred in, then it heats in its well)
             pl.pos.copy(home())
             pl.making = true
-            setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
+            setOff(soupStand(), 'toSoup')
             away(true)
           } else if (open && !SHOP.leaving && platerGoes(PLATING.stock, PLATING.coming, PLATE_RACK.n + LOW_RACK.n)) {
             goPlates()
@@ -6435,7 +6535,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
             pl.pos.copy(home())
             // (before it, as at the cooker beside it on the warming counter: the nearest clear spot to its middle was round its back, on the
             // counter's edge of the kitchen's floor, and the way there went through the counter)
-            setOff(soupPot().add(kamaSpot().sub(kamaTop()).setY(0)).setY(0), 'toSoup')
+            setOff(soupStand(), 'toSoup')
             away(true)
           }
         }
@@ -6673,7 +6773,8 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         o.userData.shape = pl.phase === 'shape' ? pl.t / SHAPE_EACH : undefined
         // (pouring the sake: both hands on the open bottle, a tokkuri, a cup, where the pour has them (item 177))
         o.userData.handsAt = pl.phase === 'pourSake' && SAKE_HANDS_ON.v ? SAKE_HANDS
-          : (pl.phase === 'riceBowl' || pl.phase === 'soupBowl') && BOWL_HANDS_ON.v ? BOWL_HANDS : undefined
+          : (pl.phase === 'riceBowl' || pl.phase === 'soupBowl') && BOWL_HANDS_ON.v ? BOWL_HANDS
+            : pl.phase === 'stir' && STIR_HANDS_ON.v ? STIR_HANDS : undefined
         // (up on the kitchen's dais)
         // (up on the kitchen's dais while they're over it: stepped down off it at the rice sack)
         if (KITCHEN_DROP < 0) {
@@ -6735,9 +6836,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       // (the charcoal in both hands, crate to hearth, tipped in; the dipper of water, bucket to hearth, splashed; the dipper stirring the soup)
       const pc = platerCoal.current, pd = platerDipper.current
       if (o && pc && pd) {
-        // (where the hands are, bent forward with them)
+        // (where the hands are, bent forward with them (from the waist: drawn back as far as StaffFigure draws them, item 387))
         const hands = heldBase().add(new THREE.Vector3(0, HELD_AT[1] * STAFF_SCALE + 0.02, HELD_AT[2] * STAFF_SCALE)
-          .applyAxisAngle(X_AXIS, o.userData.lean ?? 0).applyAxisAngle(UP_Y, pl.yaw))
+          .applyAxisAngle(X_AXIS, o.userData.lean ?? 0).add(new THREE.Vector3(0, 0, (o.userData.leanBack ?? 0) * STAFF_SCALE)).applyAxisAngle(UP_Y, pl.yaw))
         const coal = (pl.phase === 'takeCoal' && pl.t > 0.3) || (pl.phase === 'toHearth' && pl.fire === 'coal') || pl.phase === 'feedCoal' || pl.phase === 'turnBack'
         // (an armful out of the sack, carried to the crate and set into it)
         const armful = (pl.phase === 'liftSack' && pl.t > 0.45) || pl.phase === 'toFill' || (pl.phase === 'fillCrate' && pl.t < 0.75)
@@ -6768,9 +6869,19 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
             at = hands.clone().lerp(hearthAt().setY(hands.y + 0.05), Math.sin(Math.PI * k) * 0.4)
             tip = Math.sin(Math.PI * k) * 1.4
           } else if (pl.phase === 'stir') {
-            // (round and round in the pot)
-            at = hands.clone().lerp(soupPot().setY(hands.y), 0.45).add(new THREE.Vector3(Math.sin(pl.t * 5) * 0.04, -0.04, Math.cos(pl.t * 5) * 0.04))
+            // (round and round in the pot: the dipper and the hands up over its near half, over the counter's top (item 387: at the hands' rest,
+            // under the top, they went into the counter's front); the left on its rim)
+            const W = soupFillAt(), fr = frame.current
+            const over = W.top.clone().addScaledVector(W.face, -0.7 * W.r).setY((W.rimTop ?? W.top.y) + 0.06)
+            const turn = new THREE.Vector3(Math.sin(pl.t * 5) * 0.04, 0, Math.cos(pl.t * 5) * 0.04)
+            at = over.clone().lerp(W.top.clone().setY(over.y), 0.45).add(turn).add(new THREE.Vector3(0, -0.04, 0))
             tip = 0.6
+            if (fr) {
+              fr.localToWorld(STIR_HANDS.right.copy(over).add(turn))
+              const nearR = W.rimR ? W.rimR(W.face.clone().negate()) : W.r
+              fr.localToWorld(STIR_HANDS.left.copy(W.top).addScaledVector(W.face, -(nearR + 0.05)).addScaledVector(W.right, 0.12).setY((W.rimTop ?? W.top.y) + 0.01))
+              STIR_HANDS_ON.v = true
+            }
           }
           pd.position.copy(at)
           pd.rotation.set(tip, pl.yaw, 0, 'YXZ')
@@ -7130,7 +7241,15 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         .applyAxisAngle(UP_Y, w.look ?? w.yaw)).add(new THREE.Vector3(0, onDais() ? 0 : -rise, 0))
       const run = () => runs.current.find((x) => x.key === w.run)
       const setMove = (on: boolean) => setWaiterMoving(wi, on)
-      const go = (path: THREE.Vector3[], phase: WaiterPhase) => { w.path = path; w.len = pathLength(path); w.phase = phase; w.t = 0; setMove(true) }
+      // (their way bent in past what stands out from the first counter's wall (item 387: aisleSqueeze); the way back's walked from its end,
+      // where they are: bent from there)
+      const go = (path: THREE.Vector3[], phase: WaiterPhase) => {
+        const c0 = counters[0], line = -aisleOf(c0)
+        const zones = stoolLine && wallKeep.current.boxes.length ? aisleSqueeze(wallKeep.current.boxes, line, stoolLine.back, SERVER_HALF) : []
+        const back = phase === 'back'
+        const bent = squeezePath(back ? [...path].reverse() : path, c0, line, zones)
+        w.path = back && bent !== path ? bent.reverse() : bent; w.len = pathLength(w.path); w.phase = phase; w.t = 0; setMove(true)
+      }
       const walk = (then: () => void) => {
         // (from a standstill they pick up their pace over the first fifth of a second, not off at full speed at once (item 183, the owner's:
         // "the staff are far too stiff"))
@@ -8108,8 +8227,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       }
       BOWL_HANDS_ON.v = !!pose && !!f
       if (pose && f) { f.localToWorld(BOWL_HANDS.left.copy(pose.left)); f.localToWorld(BOWL_HANDS.right.copy(pose.right)) }
-      // (lifting the cooker's lid off and putting it back on: the right hand on its knob where it really is, as it lifts and tips back)
-      if (pose && f && j?.stage === 'rice' && (pose.beat === 'lid' || pose.beat === 'lidOn')) {
+      // (lifting the cooker's lid off and putting it back on: the right hand on its knob where it really is, as it lifts and tips back; on
+      // its way there, where the pose has it (item 387: up and over the cooker's front, not through it))
+      if (pose && f && j?.stage === 'rice' && pose.onKnob) {
         const lid = markOf('DenkiLid')
         if (lid) { const b = new THREE.Box3().setFromObject(lid); BOWL_HANDS.right.set((b.min.x + b.max.x) / 2, b.max.y + 0.01, (b.min.z + b.max.z) / 2) }
       }

@@ -1444,7 +1444,11 @@ const CHEF_YAW = Math.atan2(-CHEF_AT.x, -CHEF_AT.z)
  * skewering them): on the kitchen floor before the big chopping board, left of the notch and of where the water bucket stood on the floor by it, facing
  * in at the board (measured: the board along -2.33..-0.73, its front at lay 2.15; the bucket from along -1.05; he's 1.17 across with his
  * arms, which at -1.62 touched it, and the owner's reaching to the board's end)) */
-const BOARD_COOK_AT = new THREE.Vector3().addScaledVector(LAY, 2.55).addScaledVector(ALONG, -1.74).setY(GRILL_OFFSET.y - KITCHEN_DROP)
+// (item 387, the owner's 「有個致命的問題動作都會深陷進模型去」: at -1.74 the produce sacks' row (the owner's, against the side counter, along
+// -2.50..-1.91, its onions' sack out to the board's front) was in his left side to the hip, 19 cm, all the while he skewered; at the board's
+// middle now, his body (-0.45..+0.45 about his feet, his arms to 0.59) clear of the sack and of the skewer holder before the board's right
+// end (along -0.97..-0.74, lay to 2.37: in front of where his right hand hangs))
+const BOARD_COOK_AT = new THREE.Vector3().addScaledVector(LAY, 2.55).addScaledVector(ALONG, -1.42).setY(GRILL_OFFSET.y - KITCHEN_DROP)
 const BOARD_COOK_YAW = Math.atan2(-LAY.x, -LAY.z)
 /** the owner, smaller than the cooks (round and short, as Overcooked's), and how far down the cook's aisle his walk goes, in his own frame */
 const BOSS_SCALE = 1.05 * 0.8 * GRILL_SCALE

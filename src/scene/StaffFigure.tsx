@@ -216,6 +216,8 @@ function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: bo
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
 const REACH_A = new THREE.Vector3(), REACH_B = new THREE.Vector3()
+/** where a lean to their work bends them, a share of their height up from their feet (a counter's top on them) (item 387) */
+const LEAN_WAIST = 0.55
 /** (a scratch vector: the figure's scale, for its emotes' height in its own frame, item 381) */
 const EMOTE_SCALE = new THREE.Vector3()
 /** the hand wiping the bar down: up on the cloth, out in front (GuestBar3D lays the cloth under it, from the same reach) */
@@ -549,7 +551,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
-    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; wipe?: number
+    const job = o.parent?.userData as { carry?: boolean; prep?: boolean; pierce?: number; fanNow?: boolean; fetcher?: boolean; stretch?: boolean; nod?: number; fade?: number; lean?: number; leanBack?: number; wipe?: number
       sweep?: number; broom?: boolean; scrub?: number; shape?: number
       /** wiping the floor (item 164): how long at it, and where the cloth is in their own upright frame */
       floorWipe?: number; wipeAt?: [number, number, number]
@@ -597,9 +599,19 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     // (and standing, never quite still (item 183, the owner's: "the staff are far too stiff"): their weight shifted from foot to foot, slowly)
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07 + (1 - walk) * Math.sin(t * 0.8 + seed * 2.1) * 0.022
     // (a bow of the head and shoulders at the door)
-    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0) + (!id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' ? 0.1 : 0)
+    const workLean = job?.lean ?? 0
+    fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + workLean + (!id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' ? 0.1 : 0)
       // (worn out, their head and shoulders down; pressed, leaning into their stride)
       + 0.13 * B.slump + 0.07 * B.hurry * walk
+    // (a lean to their work bent at the waist, about where a counter's top comes on them, not from their feet: what's under it drawn back as
+    // what's over it goes forward, so they bend over the counter and not into it (item 387, the owner's 「有個致命的問題動作都會深陷進模型去」:
+    // tipped from their feet, the belly went into the counter's front))
+    if (tall.current) {
+      const own = tall.current / (fig.root.getWorldScale(EMOTE_SCALE).y || 1)
+      fig.body.position.z = -LEAN_WAIST * own * Math.sin(workLean)
+      // (for whoever puts things in their hands as they lean (GuestBar3D's plater): how far back they've been drawn, in their own measure)
+      if (job) job.leanBack = fig.body.position.z
+    }
     // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
     // wait (RUSH); talking while a word of theirs is up (STAFF_TALK); a blink every few seconds; the viewer's face over all of it
     const now = performance.now()
@@ -684,9 +696,10 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
         continue
       }
       if (seated) {
-        // (on the counter in front, a little apart; a spell of tapping at the keys every so often, a hand at a time)
+        // (on the counter in front, a little apart; a spell of tapping at the keys every so often, a hand at a time) (0.45 up: at 0.4 they
+        // rested 6 cm down in the till's counter all the while the cashier sat, item 387)
         const tap = (t + seed) % 7 < 2.2 ? Math.max(0, Math.sin(t * 14 + (sd > 0 ? Math.PI : 0))) * 0.03 : 0
-        hand.position.set(sd * 0.15, 0.4 + tap, 0.34)
+        hand.position.set(sd * 0.15, 0.45 + tap, 0.34)
         hand.rotation.set(-0.5, 0, 0)
         continue
       }

@@ -1235,8 +1235,9 @@ function DenkiNabe() {
         <group name="cooker-top" position={[0, 0.3, 0]} />
         <group name="cooker-foot" />
       </group>
-      {/* (where whoever's cooking it stands, before it: a step out from the counter's front (the owner's: 0.35 from its edge)) */}
-      <group name="cooker-front" position={[0, floor, WARMER_D / 2 + 0.35]} />
+      {/* (where whoever's cooking it stands, before it: a step out from the counter's front (the owner's: 0.35 from its edge; item 387: the
+          staff's round bodies come 0.44 out in front of where they stand, and at 0.35 the counter's front was in them to the belly: STAND_OFF)) */}
+      <group name="cooker-front" position={[0, floor, WARMER_D / 2 + STAND_OFF]} />
     </group>
   )
 }
@@ -1255,6 +1256,10 @@ useGLTF.preload(WARMER_URL)
 // lip 0.06 proud of it at the counter's height; the owner's, 2026-11-11: 貼合))
 const WARMER_AT = { along: 4.3, lay: -0.5 - 0.937 }
 const WARMER_D = 1.0
+/** how far out from a counter's front the staff stand to work at it (item 387, the owner's 「有個致命的問題動作都會深陷進模型去」): their round
+ * bodies come 0.44 out in front of where they stand (measured, tests/e2e/sinkin.mjs), and 3 cm clear of it; at 0.35 the counter's front
+ * was 9 cm into them standing up straight, and more as they leaned to their work */
+const STAND_OFF = 0.47
 /**
  * The dry goods in the counter's two other cupboards (items 274, 275, the owner's: 「調料有缺 跟庫存的對不上(比方說鹽巴、味精...)，這些可以
  * 放到料理台下的系統櫃門」「這個遊戲是模擬真實世界，不是亂塞些模型的」): blender/pantry.py's packages, where warmer.py's plain-coloured salt
@@ -1616,7 +1621,7 @@ function PrepCounter() {
       <primitive object={model} />
       {/* (where the third cook shapes the rice balls: the board's middle, and a step out from the counter's front before it (item 129)) */}
       <group name="prep-board" position={[PREP_BOARD_X, PREP_TOP + 0.06, 0.04]} />
-      <group name="prep-front" position={[PREP_BOARD_X, 0, WARMER_D / 2 + 0.35]} />
+      <group name="prep-front" position={[PREP_BOARD_X, 0, WARMER_D / 2 + STAND_OFF]} />
     </group>
   )
 }

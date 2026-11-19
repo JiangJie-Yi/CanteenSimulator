@@ -139,7 +139,10 @@ const carryAt = (W: FillAt) => W.stand.clone().addScaledVector(W.face, 0.315).se
 /** a filling's pose at a moment: where each hand's to be, the bowl (shown or not, and how full), the tool's grip and how it's turned, what's
  * on it, the cooker's lid lifted (rice), the soup's stream (from where, to where) */
 export type FillPose = { beat: string; left: THREE.Vector3; right: THREE.Vector3; bowl: THREE.Vector3 | null; fill: number
-  tool: { grip: THREE.Vector3; q: THREE.Quaternion; held: boolean }; load: number; lid: number; stream: [THREE.Vector3, THREE.Vector3] | null }
+  tool: { grip: THREE.Vector3; q: THREE.Quaternion; held: boolean }; load: number; lid: number; stream: [THREE.Vector3, THREE.Vector3] | null
+  /** (rice) the right hand on the cooker's lid's knob just now: GuestBar3D puts it where the knob really is (item 387: from the first of the
+   * lid's beat it did, and the hand eased there from by the waist in a line through the cooker's front, 0.2 into it) */
+  onKnob?: boolean }
 
 const sm = (x: number) => { const k = Math.max(0, Math.min(1, x)); return k * k * (3 - 2 * k) }
 /** a point through keyframes ([k, point] in order, eased between) */
@@ -264,7 +267,7 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
   const held = { grip: hang.grip.clone(), q: hang.q.clone(), held: false }
   // (its blade's middle just out of the holder, drawn up along its own length (its blade was through the holder's side, item 253))
   const outOfHolder = hang.blade.clone().addScaledVector(hang.dir, -(HOLDER_H + 0.015))
-  let left = restL, right = restR, bowl: THREE.Vector3 | null = B.clone(), lid = 1, load = 0
+  let left = restL, right = restR, bowl: THREE.Vector3 | null = B.clone(), lid = 1, load = 0, onKnob = false
   // (the paddle held: its blade's middle at `blade`, pointing along `dir`, its face toward `face`, rolled `roll`)
   const holdQ = (blade: THREE.Vector3, q: THREE.Quaternion) => {
     held.q.copy(q)
@@ -276,11 +279,16 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
   const inPot = at(0.005, 0.0, -0.025), outPot = at(0.0, -0.02, 0.1), overBowl = B.clone().addScaledVector(UP, 0.1)
   const down = UP.clone().negate().addScaledVector(f, 0.45), level = f.clone().multiplyScalar(0.6).addScaledVector(r, -0.55).addScaledVector(UP, 0.15)
   switch (beat) {
-    case 'lid':
+    case 'lid': {
       lid = sm((k - 0.35) / 0.65)
-      right = keyed(k, [[0, restR], [0.35, knob(0)], [1, knob(1)]])
+      // (up in front of the counter's edge from by the waist, over the cooker's front and down onto its knob (item 387: straight there, the
+      // hand went through the counter's edge and the cooker's front))
+      const upFront = restR.clone().setY(W.low + 0.12), overFront = at(0, -W.r - 0.05, 0.14)
+      right = keyed(k, [[0, restR], [0.12, upFront], [0.25, overFront], [0.35, knob(0)], [1, knob(1)]])
+      onKnob = k >= 0.35
       bowl = null
       break
+    }
     case 'bowl':
       right = at(W.r * 0.7, -W.r - 0.06, 0).setY(W.low + 0.1)
       // (down to the shelf under the counter for one, up and set down on the counter before the cooker)
@@ -337,10 +345,11 @@ export function riceFillPose(W: FillAt, t: number): FillPose {
       bowl = k < 0.45 ? B.clone() : left.clone().addScaledVector(UP, -0.05).addScaledVector(r, 0.05)
       lid = 1 - sm((k - 0.3) / 0.7)
       right = keyed(k, [[0, hang.grip], [0.3, knob(1)], [1, knob(0)]])
+      onKnob = k >= 0.3
       break
   }
   if (beat === 'lid') lid = Math.max(lid, 0)
-  return { beat, left, right, bowl, fill: fillAt(RICE_BEATS, 'scoop', t), tool: held, load, lid, stream: null }
+  return { beat, left, right, bowl, fill: fillAt(RICE_BEATS, 'scoop', t), tool: held, load, lid, stream: null, onKnob }
 }
 
 /** a bowl of miso soup filled at the pot, at a time through SOUP_BEATS: a bowl up from the shelf into the left hand, the ladle taken from
