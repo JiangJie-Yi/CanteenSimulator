@@ -59,20 +59,23 @@ export const studioLight = (on: boolean, night: boolean) => (on ? (night ? 0.6 :
  * and the lamps' besides, so the sun's shadows are light, what's in them still showing (black, they looked cut out of the picture); with the
  * lamps off a little deeper. By night the lamps fill the moon's shadows in, faint; with them off the moon's are plain.
  */
-export const shadowDepth = (on: boolean, night: boolean) => (night ? (on ? 0.28 : 0.75) : on ? 0.5 : 0.62)
-/** how far the shadows' edges blur (in the shadow map's texels, about 1.4 cm each across the shop): soft, as light falls indoors; by day
- * softer still, the noon sun's shadows no more than a soft darkening under things */
-export const shadowSoft = (night: boolean) => (night ? 5 : 8)
+// (item 378, the owner's, 2026-11-19: 「白天的陰影感要明確」: by day they were faint (0.5) and blurred wide (8), straight under what cast them:
+// the day read as flat. Now a day's shadows are deep and clear-edged, thrown across the floor by a sun in at the window)
+export const shadowDepth = (on: boolean, night: boolean) => (night ? (on ? 0.28 : 0.75) : on ? 0.72 : 0.8)
+/** how far the shadows' edges blur (in the shadow map's texels, about 1.4 cm each across the shop): a little, not a hard cut; by day less
+ * than by night (the sun's shadows clear, the moon's and the lamps' softer) */
+export const shadowSoft = (night: boolean) => (night ? 5 : 3)
 /**
- * Where the key light shines from (a unit vector toward it). By day the sun at noon, straight overhead (90 degrees): every shadow falls
- * right under what casts it, none thrown across the room. By night the moon, high up out past the round window (`window`: which way the
- * window faces out, level; none found, straight down too), its shadows short and falling away from the window. At dusk the evening sun,
- * lower, in through the round window too, its shadows long; at dawn the early sun from the room's other side, a little higher than dusk's
- * (low enough to throw the shadows across the floor, high enough that the room's still lit, not all in its walls' shade).
+ * Where the key light shines from (a unit vector toward it). By day the sun high (about 55 degrees) out past the round window (item 378: it
+ * was straight overhead, every shadow right under what cast it, and the day read as flat): its shadows thrown a little across the floor,
+ * each thing's shape there by it. By night the moon, high up out past the round window (`window`: which way the window faces out, level;
+ * none found, straight down), its shadows short and falling away from the window. At dusk the evening sun, lower, in through the round
+ * window too, its shadows long; at dawn the early sun from the room's other side, lower than the day's, higher than dusk's (low enough to
+ * throw the shadows across the floor, high enough that the room's still lit, not all in its walls' shade).
  */
-const KEY_RISE: Record<Sky, [out: number, up: number]> = { day: [0, 1], night: [6, 18], dusk: [14, 11], dawn: [-11, 12] }
+const KEY_RISE: Record<Sky, [out: number, up: number]> = { day: [10, 14], night: [6, 18], dusk: [14, 11], dawn: [-11, 12] }
 export function keyLightFrom(sky: Sky, window: [number, number] | null): [number, number, number] {
-  if (sky === 'day' || !window) return [0, 1, 0]
+  if (!window) return [0, 1, 0]
   const [out, up] = KEY_RISE[sky]
   const l = Math.hypot(window[0], window[1]) || 1
   const v = [(window[0] / l) * out, up, (window[1] / l) * out]

@@ -278,9 +278,10 @@ const LIGHTING: Record<Sky, { sun: string; sunIntensity: number; sky: string; gr
   /** how much of the sky's light the room's environment gives (the soft fill from all round) */
   env: number }> = {
   // golden-hour sun and a cool sky fill
-  // (the even fill from all round a little under the sun (item 306): at 1 it lit every side alike, nothing in shade by day)
-  day: { sun: '#ffe7c2', sunIntensity: 1.9, sky: '#cfe0ff', ground: '#7a6450', hemi: 0.88, spot: 18, fire: 2,
-    shadow: '#000000', shadowOpacity: 0.28, env: 1 },
+  // (the even fill from all round a little under the sun (item 306): at 1 it lit every side alike, nothing in shade by day; item 378, the
+  // owner's 「白天的陰影感要明確」: the fill down further, the sun up, so what's in shade by day reads as shade)
+  day: { sun: '#ffe7c2', sunIntensity: 2.4, sky: '#cfe0ff', ground: '#7a6450', hemi: 0.68, spot: 18, fire: 2,
+    shadow: '#000000', shadowOpacity: 0.28, env: 0.8 },
   // the early sun, rosy and not yet strong, low from the room's far side; the rest of the room still in the cool of the night going
   // (the owner's: dawn and dusk between day and night)
   dawn: { sun: '#ffbfa6', sunIntensity: 1.15, sky: '#a9b4e6', ground: '#54464c', hemi: 0.85, spot: 22, fire: 2.5,
@@ -743,8 +744,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
   const dim = roomDim(lights.on, theme === 'dark')
   // (the polished metal's reflections as bright as the room: no gold or brass shining in the dark)
   useEffect(() => setStudioLight(studioLight(lights.on, theme === 'dark')), [lights.on, theme])
-  // (the key light: by day the noon sun, straight overhead, its shadows right under what casts them; by night the moon, in through the round
-  // window, its shadows falling away from it: game/roomLights' keyLightFrom)
+  // (the key light: by day the sun high out past the round window, its shadows thrown a little across the floor (item 378); by night the moon,
+  // in through the round window, its shadows falling away from it: game/roomLights' keyLightFrom)
   const keyLight = useRef<THREE.DirectionalLight>(null)
   const scene3 = useThree((s) => s.scene)
   const glKey = useThree((s) => s.gl)
@@ -759,9 +760,9 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
     const { on, night, sky: now } = keyNow.current
     k.shadow.intensity = shadowDepth(on, night)
     k.shadow.radius = shadowSoft(night)
-    // (by day the noon sun, straight overhead; by night the moon, high out past the round window (the window's room is toward its -x); at
-    // dusk the evening sun low in through it, at dawn the early sun from the room's other side)
-    const w = now !== 'day' ? scene3.getObjectByName('RoundWindow') : null
+    // (by day the sun high out past the round window (item 378); by night the moon, high out past it too (the window's room is toward its
+    // -x); at dusk the evening sun low in through it, at dawn the early sun from the room's other side)
+    const w = scene3.getObjectByName('RoundWindow')
     let out: [number, number] | null = null
     if (w) {
       w.updateWorldMatrix(true, false)

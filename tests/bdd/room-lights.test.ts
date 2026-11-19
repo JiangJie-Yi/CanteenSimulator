@@ -104,17 +104,25 @@ feature('牆上的電燈開關', () => {
     and('晚上關燈只剩一點點', (w) => { expect(w.k[3]).toBeLessThan(0.2) })
   })
 
-  scenario('白天的影子柔和：邊緣是糊的、也不會黑到底', ({ given, then, and }) => {
+  // (item 378, the owner's 「白天的陰影感要明確」: the day's shadows were faint and wide-blurred, straight under what cast them)
+  scenario('白天的影子明確：深、邊緣清楚，但不是全黑', ({ given, then, and }) => {
     given('白天與晚上、開燈與關燈', (w) => { w.d = [shadowDepth(true, false), shadowDepth(false, false), shadowDepth(true, true), shadowDepth(false, true)] })
-    then('白天開燈的影子淡淡的，透得出底下的東西', (w) => { expect(w.d[0]).toBeLessThan(0.6) })
-    and('白天關燈少了燈光補，影子深一點，但還是不全黑', (w) => { expect(w.d[1]).toBeGreaterThan(w.d[0]); expect(w.d[1]).toBeLessThan(0.8) })
+    then('白天開燈的影子明顯（七成以上的深）', (w) => { expect(w.d[0]).toBeGreaterThanOrEqual(0.7) })
+    and('白天關燈少了燈光補，影子更深一點，但還是不全黑', (w) => { expect(w.d[1]).toBeGreaterThan(w.d[0]); expect(w.d[1]).toBeLessThan(0.9) })
     and('晚上開著燈，影子幾乎被燈補亮；關燈後月光的影子才明顯', (w) => { expect(w.d[2]).toBeLessThan(w.d[0]); expect(w.d[3]).toBeGreaterThan(w.d[2]) })
-    and('影子的邊緣糊開幾格，不是一刀切的硬邊；白天糊得更開', () => { expect(shadowSoft(true)).toBeGreaterThan(2); expect(shadowSoft(false)).toBeGreaterThan(shadowSoft(true)) })
+    and('影子的邊緣糊開一點，不是一刀切的硬邊；白天比晚上清楚', () => { expect(shadowSoft(false)).toBeGreaterThan(1.5); expect(shadowSoft(false)).toBeLessThan(shadowSoft(true)) })
   })
 
-  scenario('白天是日正當中：光從正上方照下來，影子落在東西正下方', ({ given, then, and }) => {
+  scenario('白天的太陽從圓窗那一側高高地斜照進來，影子投到旁邊的地板上', ({ given, then, and }) => {
     given('圓窗朝外的方向', (w) => { w.window = [0.6, -0.8] as [number, number] })
-    then('白天的光從正上方來（90 度），不管窗在哪', (w) => { expect(keyLightFrom('day', w.window)).toEqual([0, 1, 0]); expect(keyLightFrom('day', null)).toEqual([0, 1, 0]) })
+    then('白天的光從窗那一側來，高高的（五、六十度），不是正上方', (w) => {
+      const [x, y, z] = keyLightFrom('day', w.window)
+      expect(Math.hypot(x, y, z)).toBeCloseTo(1, 5)
+      expect(y).toBeGreaterThan(0.7)
+      expect(y).toBeLessThan(0.9)
+      expect(x * w.window[0] + z * w.window[1]).toBeGreaterThan(0.4)
+    })
+    and('找不到窗時，從正上方', () => { expect(keyLightFrom('day', null)).toEqual([0, 1, 0]) })
     and('晚上的月光從圓窗外的高處斜斜照進來', (w) => {
       const [x, y, z] = keyLightFrom('night', w.window)
       expect(Math.hypot(x, y, z)).toBeCloseTo(1, 5)
