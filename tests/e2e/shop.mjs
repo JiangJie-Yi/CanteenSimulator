@@ -8,7 +8,8 @@
 //   await openShop(page, { x2: true, at: 16 * 60 + 35 })
 import { chromium } from 'playwright-core'
 
-export async function boot({ width = 1440, height = 860, url = process.env.URL ?? 'http://localhost:5173/GrilledFishBusiness/?pace=0' } = {}) {
+/** `before(page)`: done before the page is loaded (a model's request served by an older copy of it, for a shot of how it was) */
+export async function boot({ width = 1440, height = 860, url = process.env.URL ?? 'http://localhost:5173/GrilledFishBusiness/?pace=0', before } = {}) {
   const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }), headless: true,
     args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] })
   const page = await (await browser.newContext({ viewport: { width, height } })).newPage()
@@ -20,6 +21,7 @@ export async function boot({ width = 1440, height = 860, url = process.env.URL ?
   page.setDefaultTimeout(15000)
   page.on('pageerror', (e) => console.log('ERR', e.message))
   page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', m.text().slice(0, 240)) })
+  if (before) await before(page)
   await page.goto(url, { timeout: 60000 })
   await page.locator('.loading-screen').waitFor({ state: 'detached', timeout: 120000 }).catch(() => {})
   await page.waitForTimeout(2500)
