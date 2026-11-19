@@ -815,7 +815,8 @@ useGLTF.preload(BROOM_URL)
  * meanwhile): the staff only come in once it opens, and the programs they're drawn with, their shadows' among them (only drawing a thing
  * into the shadow's picture makes its program), were made as they first walked in, a frame stopped each.
  */
-export function StaffWarm() {
+// (item 374: drawn again only as its own state changes: it was with every redraw of the kitchen, its forty frames long over)
+export const StaffWarm = memo(function StaffWarm() {
   // (all the outfits in one call, the hook asked once (item 193: one call per outfit in a loop broke the rules of hooks, lint's one error))
   const gltfs = useGLTF(VARIANTS.map(url)) as unknown as { scene: THREE.Group }[]
   const roots = useMemo(() => VARIANTS.map((v, i) => {
@@ -831,4 +832,4 @@ export function StaffWarm() {
   useEffect(() => () => { for (const r of roots) releaseFigure(r) }, [roots])
   useFrame(() => { if (on && ++frames.current > 40) setOn(false) })
   return on ? <group position={[0, -0.6, 0]}>{roots.map((r, i) => <primitive key={i} object={r} position={[i * 0.3, 0, 0]} />)}</group> : null
-}
+})

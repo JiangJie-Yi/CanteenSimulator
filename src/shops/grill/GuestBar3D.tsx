@@ -9304,7 +9304,8 @@ function TakeoutBag() {
   )
 }
 /** (beside the figure, not in it: faded here with them) */
-function RiderGear({ id, size, fade }: { id: number; size: number; fade: () => number }) {
+// (item 374: drawn again only as its own props change: it was with every redraw of the bar, 6.8 times a second with riders in)
+const RiderGear = memo(function RiderGear({ id, size, fade }: { id: number; size: number; fade: () => number }) {
   // (blender/folk.py's measure: the head a ball of 0.27 about 0.8 up, the body 0.26 round at its widest; all as the figure's scaled)
   const k = FOLK_FIT * size
   const m = useOwnLooks()
@@ -9327,7 +9328,7 @@ function RiderGear({ id, size, fade }: { id: number; size: number; fade: () => n
       ))}
     </group>
   )
-}
+})
 
 /** the drinks fridges, each its own piece for edit mode: drawn again only if they move */
 const Fridges = memo(function Fridges({ fridges }: { fridges: NonNullable<ReturnType<typeof fridgesOf>> }) {
@@ -9418,7 +9419,8 @@ const GuestLabel = memo(function GuestLabel({ id, y, dots, rating, angry, partne
  * to see to them, opening its ways (a word, an apology, a dish on the house), each once; asked of the kitchen (bar's CALM_ASK), done there.
  * Its own little clock (FUMING, what they've been given), so only it is drawn again as those change
  */
-function CalmButton({ id, lang }: { id: number; lang: Lang }) {
+// (item 374: drawn again only as its own props or state change: it was with every redraw of the label it's in)
+const CalmButton = memo(function CalmButton({ id, lang }: { id: number; lang: Lang }) {
   const [st, setSt] = useState<{ f: number; used: CalmKind[] }>({ f: 0, used: [] })
   const [open, setOpen] = useState(false)
   useEffect(() => {
@@ -9451,7 +9453,7 @@ function CalmButton({ id, lang }: { id: number; lang: Lang }) {
       ))}
     </span>
   )
-}
+})
 
 /** a sake's cup beside its bottle: this much nearer the customer (lay) and along to their right */
 const CUP_AHEAD = 0.07

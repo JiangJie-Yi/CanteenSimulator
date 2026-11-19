@@ -608,6 +608,42 @@ const PopWord = memo(function PopWord({ x }: { x: Pop | null }) {
     </Html>
   )
 })
+/**
+ * The little floating words and the wisps of steam, each kept by a small component of its own that the kitchen feeds (`POP_FEED`,
+ * `WISP_FEED`): kept in the kitchen's own state, every word and every wisp drew the whole kitchen again (item 374: 2.3 times a second at the
+ * shop's busiest, the chef seasoning and plating, and everything under it not memoised with it)
+ */
+const POP_FEED: { to: ((p: Pop) => void) | null } = { to: null }
+type WispAt = { key: string; at: [number, number, number] }
+const WISP_FEED: { to: ((w: WispAt) => void) | null } = { to: null }
+const PopWords = memo(function PopWords() {
+  const [pops, setPops] = useState<(Pop | null)[]>(() => Array(POP_SLOTS).fill(null))
+  useEffect(() => {
+    const timers = new Set<number>()
+    POP_FEED.to = (p) => {
+      setPops((all) => {
+        // (the first free place, or the oldest's)
+        let k = all.findIndex((x) => !x)
+        if (k < 0) k = all.reduce((o, x, i) => (x!.id < all[o]!.id ? i : o), 0)
+        const next = all.slice()
+        next[k] = p
+        return next
+      })
+      const t = window.setTimeout(() => { timers.delete(t); setPops((all) => (all.some((x) => x?.id === p.id) ? all.map((x) => (x?.id === p.id ? null : x)) : all)) }, 1500)
+      timers.add(t)
+    }
+    return () => { POP_FEED.to = null; for (const t of timers) window.clearTimeout(t) }
+  }, [])
+  return <>{pops.map((x, k) => <PopWord key={k} x={x} />)}</>
+})
+const Wisps = memo(function Wisps() {
+  const [wisps, setWisps] = useState<WispAt[]>([])
+  useEffect(() => {
+    WISP_FEED.to = (w) => setWisps((all) => [...all.filter((x) => x.key !== w.key), w])
+    return () => { WISP_FEED.to = null }
+  }, [])
+  return <>{wisps.map((w) => <Wisp key={w.key} at={w.at} onDone={() => setWisps((all) => all.filter((x) => x.key !== w.key))} />)}</>
+})
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
 /**
@@ -5514,7 +5550,6 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
     return at
   }
   const [basketCount, setBasketCount] = useState(1)
-  const [wisps, setWisps] = useState<{ key: string; at: [number, number, number] }[]>([])
   /** since when the fire's run past HOT_AT (seconds), for the third cook's water */
   const hotSince = useRef<number | null>(null)
   /** when the grill last asked the third cook for charcoal (seconds) */
@@ -6381,7 +6416,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       FIRE_TEND.done = null; FIRE_TEND.want = null
       if (fire) fire.current = Math.max(0, fire.current - 0.3)
       meterWater('dipper')
-      setWisps((all) => [...all.filter((w) => w.key !== 'douse'), { key: 'douse', at: [0, 0.15, 0] }])
+      WISP_FEED.to?.({ key: 'douse', at: [0, 0.15, 0] })
       return
     }
     if (!tend && FIRE_TEND.want) FIRE_TEND.want = null
@@ -7343,22 +7378,13 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
   // little floating words: how a seasoning changed a piece's 美味
   // (shown in a few places kept mounted, each word taking the next free one: one mounted for each word, a React root and its page element
   // made and thrown away two or three times a second while the chef seasoned, kept in development (the heap rose with them))
-  const [pops, setPops] = useState<(Pop | null)[]>(() => Array(POP_SLOTS).fill(null))
   const popId = useRef(0)
   const pop = (at: THREE.Vector3, delta: number) => {
     if (!delta) return
     const id = ++popId.current
     const word = lang === 'en' ? 'Taste' : '美味'
     const text = delta > 0 ? `${word} +${delta}` : `${word} ${delta}`
-    setPops((all) => {
-      // (the first free place, or the oldest's)
-      let k = all.findIndex((x) => !x)
-      if (k < 0) k = all.reduce((o, x, i) => (x!.id < all[o]!.id ? i : o), 0)
-      const next = all.slice()
-      next[k] = { id, at: at.toArray() as [number, number, number], text, good: delta > 0 }
-      return next
-    })
-    window.setTimeout(() => setPops((all) => (all.some((x) => x?.id === id) ? all.map((x) => (x?.id === id ? null : x)) : all)), 1500)
+    POP_FEED.to?.({ id, at: at.toArray() as [number, number, number], text, good: delta > 0 })
   }
   // the 美味 of whatever's pointed at
   const [tasteTip, setTasteTip] = useState<{ at: [number, number, number]; taste: number } | null>(null)
@@ -7587,7 +7613,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         // water thrown on the coals: they hiss and steam, and the fire drops right down
         if (fire) fire.current = Math.max(0, fire.current - 0.3)
         meterWater('dipper')
-        setWisps((all) => [...all.filter((w) => w.key !== 'douse'), { key: 'douse', at: [0, 0.15, 0] }])
+        WISP_FEED.to?.({ key: 'douse', at: [0, 0.15, 0] })
       }
       // (scooped, it's always poured out where it's let go: on the food, the coals, or just the table)
       if (scooped) pouring.current = { tool: d.tool, left: 0.8, at: d.tool.node.position.clone() }
@@ -8762,7 +8788,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         if (p.flight < 1 && p.flight + dt / FLIGHT_SECONDS >= 1 && STEAMS.test(p.id) && !p.eaten) {
           p.landed = 0
           const at = inBasket(p) ? basketAt(0).add(new THREE.Vector3(0, 0.06, 0)) : p.toP
-          setWisps((all) => [...all.filter((w) => w.key !== p.key), { key: p.key, at: at.toArray() as [number, number, number] }])
+          WISP_FEED.to?.({ key: p.key, at: at.toArray() as [number, number, number] })
         }
         // (served at the bar, it waits in the cook's hand by the fire till the customer's plate is set down for it)
         const plateless = p.container === 'bar' && bar && !SERVICE.servers && !p.via && p.flight === 0 && !PLATES_SET.has(p.seat)
@@ -9373,15 +9399,13 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
           <span className="taste-tip">美味 <b>{tasteTip.taste}</b></span>
         </Html>
       )}
-      {pops.map((x, k) => <PopWord key={k} x={x} />)}
+      <PopWords />
       {active && toolLabel && (
         <Html position={toolLabel.at} center zIndexRange={zr(30, 10)} style={NO_POINTER}>
           <span className="tool-tag">{tipIn(toolLabel.kind === 'water' ? '水（退火用）' : TOOL_NAMES[toolLabel.kind], lang)}<small>{tipIn(toolLabel.kind === 'water' ? '拖至炭火／爐心' : '拖到食物上', lang)}</small></span>
         </Html>
       )}
-      {wisps.map((w) => (
-        <Wisp key={w.key} at={w.at} onDone={() => setWisps((all) => all.filter((x) => x.key !== w.key))} />
-      ))}
+      <Wisps />
       {active && showsProgress(modeOf(ai, research)) && tags.map(({ key, id, name, state }) => (
         <group key={key} ref={(g) => { anchors.current[key] = g }}>
           <Html center zIndexRange={zr(30, 10)}>
