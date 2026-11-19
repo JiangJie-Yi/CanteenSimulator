@@ -818,6 +818,10 @@ BAR_PLANS = [
     [(OX_, OY_), (-OX_, OY_), (-IX_, IY_), (IX_, IY_)],
     [(-OX_, OY_), (-OX_, -OY_), (-IX_, -IY_), (-IX_, IY_)],
 ]
+# (item 379, docs/MODELING.md's 造型感: each bar's two long top edges rounded right over, the outer one ROUND_OUT, the inner one toward the
+# fire ROUND_IN (they were all eased 1.2 cm, the mitres too); the mitres and the foot left square, so the rounds meet round each corner as a
+# moulding's do; the normals hardened, the flat faces flat and the rounds smooth)
+ROUND_OUT, ROUND_IN = 0.025, 0.035
 for k in range(4):
     bm_ = bmesh.new()
     zs = (0.0, IRORI_H)
@@ -829,25 +833,38 @@ for k in range(4):
     for i in range(4):
         bm_.faces.new((lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]))
     bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    # (the plan's outer edge runs hi[0]-hi[1], its inner hi[2]-hi[3]: those two rounded, by their weights' share of the bevel's width)
+    wl = bm_.edges.layers.float.get("bevel_weight_edge") or bm_.edges.layers.float.new("bevel_weight_edge")
+    for e in bm_.edges:
+        vs = set(e.verts)
+        e[wl] = 1.0 if vs == {hi[2], hi[3]} else (ROUND_OUT / ROUND_IN if vs == {hi[0], hi[1]} else 0.0)
     me_ = bpy.data.meshes.new(f"Robuchi{k}")
     bm_.to_mesh(me_); bm_.free()
     o = bpy.data.objects.new(f"Robuchi{k}", me_)
     bpy.context.collection.objects.link(o)
     bpy.context.view_layer.objects.active = o
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True)
-    bevel(o, 0.012, 3, angle=False)
-    bpy.ops.object.modifier_apply(modifier="Bevel")
-    # (the grain along each bar: u along its length; v across its top, or down its sides, at one scale everywhere so nothing stretches)
-    bm_ = bmesh.new(); bm_.from_mesh(o.data)
-    uvl_ = bm_.loops.layers.uv.verify()
+    for pg in o.data.polygons:
+        pg.use_smooth = True
+    mod = o.modifiers.new("Bevel", "BEVEL")
+    mod.width, mod.segments, mod.limit_method, mod.harden_normals = ROUND_IN, 4, "WEIGHT", True
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    # (the grain along each bar: u along its length; v across its top, and on round over its edges and down its sides as if unrolled (so the
+    # grain runs on unbroken over the rounds), at one scale everywhere so nothing stretches. Set through the mesh, not a bmesh: the hardened
+    # normals kept)
+    me_ = o.data
+    uvl_ = me_.uv_layers.new(name="UVMap") if not me_.uv_layers else me_.uv_layers[0]
     along_x = k % 2 == 0
-    for f in bm_.faces:
-        top = abs(f.normal.z) > 0.6
-        for l in f.loops:
-            c = l.vert.co
+    # (which way is out from the frame, across this bar)
+    s_out = 1 if k in (1, 2) else -1
+    for pg in me_.polygons:
+        n_ = pg.normal
+        outer = (n_.y if along_x else n_.x) * s_out > 0
+        for li in pg.loop_indices:
+            c = me_.vertices[me_.loops[li].vertex_index].co
             al, ac = (c.x, c.y) if along_x else (c.y, c.x)
-            l[uvl_].uv = (al * 0.7 + k * 0.31, (ac if top else c.z + ac * 0.3) * 0.7)
-    bm_.to_mesh(o.data); bm_.free()
+            v_ = ac + (s_out if outer else -s_out) * (IRORI_H - c.z)
+            uvl_.data[li].uv = (al * 0.7 + k * 0.31, v_ * 0.7)
     o = finish(o, f"Robuchi{k}", M["robuchi"])
     # (its face toward the fire scorched)
     o.data.materials.append(M["robuchi_burnt"])
@@ -876,7 +893,8 @@ def hull_object(name, pts):
     bm_ = bmesh.new()
     vs_ = [bm_.verts.new(q) for q in pts]
     res = bmesh.ops.convex_hull(bm_, input=vs_, use_existing_faces=False)
-    bmesh.ops.delete(bm_, geom=[g for g in res["geom_interior"] + res["geom_unused"] if isinstance(g, bmesh.types.BMVert)], context="VERTS")
+    # (each once: a point both inside and unused (one of two that fell together) was listed twice)
+    bmesh.ops.delete(bm_, geom=list({g for g in res["geom_interior"] + res["geom_unused"] if isinstance(g, bmesh.types.BMVert)}), context="VERTS")
     bmesh.ops.dissolve_limit(bm_, angle_limit=math.radians(1), verts=bm_.verts[:], edges=bm_.edges[:])
     bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
     me_ = bpy.data.meshes.new(name)
@@ -902,9 +920,21 @@ for k in range(4):
     def end_up(z_):
         # (and the shoe, the cap's mirror: widest at the floor, 45° up toward the corner)
         return CAP_LEG
-    cap = hull_object(f"RobuchiCap{k}", [at(0, 0, Z_TOP), at(CAP_LEG - 2 * CAP_BT, 0, Z_TOP), at(0, CAP_LEG - 2 * CAP_BT, Z_TOP),
-                                          at(CAP_LEG, 0, Z_RIDGE), at(0, CAP_LEG, Z_RIDGE),
-                                          at(0, 0, Z_CAP0), at(end(Z_CAP0), 0, Z_CAP0), at(0, end(Z_CAP0), Z_CAP0)])
+    # (item 379: over the bars' rounded outer edge (ROUND_OUT) the cap rounds with it, CAP_BT out from the wood: the round's profile (in from
+    # the cap's outer face, up) at the corner along the mitre, and at each leg's end where the slant of its long side, run on down over the
+    # round, cuts it; under the round its ends square down the faces as they were. It had come up to a point at the corner and a thin blade
+    # at each leg's end over the round)
+    L_H = CAP_LEG - 2 * CAP_BT
+
+    def hyp(z_):
+        return L_H + (Z_TOP - z_) / (Z_TOP - Z_CAP0) * (CAP_LEG - L_H)
+    R_ = ROUND_OUT + CAP_BT
+    prof = [(CAP_BT + ROUND_OUT - R_ * math.cos(a_), IRORI_H - ROUND_OUT + R_ * math.sin(a_)) for a_ in [i_ * math.pi / 12 for i_ in range(7)]]
+    cap_pts = [at(0, 0, Z_CAP0), at(end(Z_CAP0), 0, Z_CAP0), at(0, end(Z_CAP0), Z_CAP0), at(CAP_LEG, 0, prof[0][1]), at(0, CAP_LEG, prof[0][1])]
+    for u_, z_ in prof:
+        e_ = min(CAP_LEG, hyp(z_) - u_)
+        cap_pts += [at(u_, u_, z_), at(e_, u_, z_), at(u_, e_, z_)]
+    cap = hull_object(f"RobuchiCap{k}", cap_pts)
     shoe = hull_object(f"RobuchiShoe{k}", [at(0, 0, -0.001), at(end_up(-0.001), 0, -0.001), at(0, end_up(-0.001), -0.001),
                                            at(0, 0, Z_FOOT), at(end_up(Z_FOOT), 0, Z_FOOT), at(0, end_up(Z_FOOT), Z_FOOT)])
     bpy.ops.object.select_all(action="DESELECT")
@@ -914,28 +944,34 @@ for k in range(4):
     o = cap
     bevel(o, 0.0025, 1, angle=False)
     bpy.ops.object.modifier_apply(modifier="Bevel")
-    # (the pattern's place on it: see above)
-    bm_ = bmesh.new(); bm_.from_mesh(o.data)
-    uvl_ = bm_.loops.layers.uv.verify()
-    for f in bm_.faces:
-        n_ = f.normal
-        zc = (Z_CAP0 + Z_TOP) / 2 if f.calc_center_median().z > IRORI_H / 2 else Z_FOOT / 2
-        for l in f.loops:
-            c = l.vert.co
+    # (the pattern's place on it: see above. In the layer the bars' grain is in ("UVMap", the mesh's own: a bmesh's new layer is "Float2", and
+    # joined the two were two layers, the brass's pattern left in the one not drawn))
+    me_ = o.data
+    uvl_ = me_.uv_layers.new(name="UVMap") if not me_.uv_layers else me_.uv_layers[0]
+    for pg in me_.polygons:
+        n_ = pg.normal
+        zc = (Z_CAP0 + Z_TOP) / 2 if pg.center.z > IRORI_H / 2 else Z_FOOT / 2
+        for li in pg.loop_indices:
+            c = me_.vertices[me_.loops[li].vertex_index].co
             s_, t_ = X0 - sx * c.x, Y0 - sy * c.y
-            if n_.z > 0.7:
-                l[uvl_].uv = ((s_ - t_) / (math.sqrt(2) * BRASS_P), (s_ + t_) / (math.sqrt(2) * BRASS_P))
+            # (the top flat by its diagonal; the faces down, and the round over onto them, upright, the round as if unrolled up from the face)
+            if n_.z > 0.97:
+                uv_ = ((s_ - t_) / (math.sqrt(2) * BRASS_P), (s_ + t_) / (math.sqrt(2) * BRASS_P))
             elif abs(n_.x) >= abs(n_.y):
-                l[uvl_].uv = (t_ / BRASS_P, (c.z - zc) / BRASS_P)
+                uv_ = (t_ / BRASS_P, (c.z - zc + (max(0.0, s_) if n_.z > 0.05 else 0.0)) / BRASS_P)
             else:
-                l[uvl_].uv = (s_ / BRASS_P, (c.z - zc) / BRASS_P)
-    bm_.to_mesh(o.data); bm_.free()
-    bars.append(finish(o, f"RobuchiBrassCorner{k}", M["brass"], smooth_shade=False))
+                uv_ = (s_ / BRASS_P, (c.z - zc + (max(0.0, t_) if n_.z > 0.05 else 0.0)) / BRASS_P)
+            uvl_.data[li].uv = uv_
+    # (shaded smooth over the round, its edges kept sharp elsewhere (the flats and their chamfers as they were))
+    o = finish(o, f"RobuchiBrassCorner{k}", M["brass"], smooth_shade=True)
+    o.data.set_sharp_from_angle(angle=math.radians(35))
+    bars.append(o)
 for k in range(4):
     # (the inlaid line along each bar's inner edge, plain: all of it on a flat of the pattern's repeat)
     along_x = k % 2 == 0
     sgn = -1 if k < 2 else 1
-    loc = (0.0, sgn * (IY_ + 0.012), IRORI_H + 0.001) if along_x else (sgn * (IX_ + 0.012), 0.0, IRORI_H + 0.001)
+    # (on the top's flat, just past the inner round (item 379); it was 1.2 cm in from the inner edge)
+    loc = (0.0, sgn * (IY_ + ROUND_IN + 0.012), IRORI_H + 0.001) if along_x else (sgn * (IX_ + ROUND_IN + 0.012), 0.0, IRORI_H + 0.001)
     bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
     o = active(); o.scale = (2 * IX_, 0.006, 0.003) if along_x else (0.006, 2 * IY_, 0.003)
     for l in o.data.uv_layers.active.data:

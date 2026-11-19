@@ -1496,6 +1496,12 @@ const COOK_PANEL_WOOD = woodTex('cedar_panel.jpg', 1, 1)
 const BAR_BASE_WOOD = woodTex('bar_base.jpg', 1, 1)
 /** the cook table's dark kick round its foot: as high as the notch steps, so none shows over their backs */
 const KICK_H = 0.09
+/** the cook table's top: how thick (its underside this far under the top), how far its edges are rounded over (up and down), and how far
+ * the round reaches in from its outer face (item 379, docs/MODELING.md's 造型感: a thick slab, its edges rounded right over, as a chunky made
+ * thing reads; it was 8 cm, its edges eased 1.5 cm) */
+const TABLE_T = 0.1
+const TABLE_ROUND = 0.032
+const TABLE_OUT = 0.034
 /** below its top: honed white marble with soft grey veining (blender/marbletex.py), a tile 1.2 across (the owner had it dark a while, and
  * wanted it white again) */
 const COOK_MARBLE = woodTex('marble_panel.jpg', 1, 1)
@@ -1659,7 +1665,7 @@ function backGlowGeo(h: number) {
   return g
 }
 const RecessShade = memo(function RecessShade() {
-  const floor = GRILL_OFFSET.y - KITCHEN_DROP + KICK_H, top = -0.08, h = top - floor
+  const floor = GRILL_OFFSET.y - KITCHEN_DROP + KICK_H, top = -TABLE_T, h = top - floor
   const IN = 0.06, OFF = 0.002
   // (each wall: where along it runs (from, to: the table's frame, along or lay), where it stands across it, the way it faces)
   const walls: { a: [number, number]; at: number; across: 'along' | 'lay'; face: 1 | -1 }[] = [
@@ -1833,14 +1839,17 @@ function roundedShape(pts: [number, number][], radii: number[]) {
     const b: [number, number] = [x + (nx - x) / dn * r, y + (ny - y) / dn * r]
     if (k) sh.lineTo(a[0], a[1])
     else sh.moveTo(a[0], a[1])
-    sh.quadraticCurveTo(x, y, b[0], b[1])
+    // (a true quarter circle (the corners are all square): its middle where the offsets of its two ends meet. A quadratic curve bulged a
+    // centimetre out past the circle at its middle, and the brass caps made to the circle stood off it at their ends (item 379))
+    const cx = a[0] + b[0] - x, cy = a[1] + b[1] - y
+    sh.absarc(cx, cy, r, Math.atan2(a[1] - cy, a[0] - cx), Math.atan2(b[1] - cy, b[0] - cx), (a[0] - cx) * (b[1] - cy) - (a[1] - cy) * (b[0] - cx) < 0)
   })
   sh.closePath()
   return sh
 }
 function tableTopGeometry(grow: number, thick: number) {
   const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
-  const i = 0.025 - grow
+  const i = TABLE_OUT - grow
   const { along: [n0, n1], lay: [nl] } = COOK_NOTCH
   const { along: [s0], lay: [m0, m1] } = SOUS_NOTCH
   // (the notch under the hearth cut in from its front: the outline runs in round it; and round the third cook's bay at its far end)
@@ -1848,35 +1857,38 @@ function tableTopGeometry(grow: number, thick: number) {
     [a1 - i, l1 - i], [n1 + i, l1 - i], [n1 + i, nl + i], [n0 - i, nl + i], [n0 - i, l1 - i], [a0 + i, l1 - i]]
   // (its corners rounded off, as a planed top would be; the outline, grown out, keeps to the same curves)
   const sh = roundedShape(pts, [0.16, 0.16, 0.04, 0.1, 0.1, 0.04, 0.16, 0.04, 0.1, 0.1, 0.04, 0.16].map((r) => r + grow))
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.08 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
-    bevelSegments: 3, curveSegments: 6 })
+  const g = new THREE.ExtrudeGeometry(sh, { depth: TABLE_T - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: TABLE_OUT + grow * 0.6,
+    bevelSegments: 4, curveSegments: 4 })
   g.rotateX(Math.PI / 2)
   g.translate(0, -thick, 0)
   return g
 }
-const TABLE_TOP = tableTopGeometry(0, 0.015)
-const TABLE_TOP_INK = tableTopGeometry(0.012, 0.022)
+const TABLE_TOP = tableTopGeometry(0, TABLE_ROUND)
+const TABLE_TOP_INK = tableTopGeometry(0.012, TABLE_ROUND + 0.007)
 /** (item 79, the owner's, 2026-11-13: "the cook table could be finer"): a black-lacquered band (縁) under the top's edge, all round its
- * outline a hair out from it, as a finished counter's; and brass caps wrapping its four outer rounded corners, as the hearth's frame has at
- * its own */
+ * outline, as a finished counter's; and brass caps wrapping its four outer rounded corners, as the hearth's frame has at its own. (Item 379:
+ * set back under the top's round, a dark apron the slab sits on, its line under the round; a hair out from the top it stuck out under the
+ * round as a lip) */
 const TABLE_BAND = (() => {
-  const g = tableTopGeometry(0.004, 0.004)
-  // (the top's outline, grown a hair, cut down to a band 2.2 cm deep just under the top: the extrusion's own depth scaled)
+  // (set in 2.4 cm: the inside corners' rounds (4 cm) still clear of the band's own bevel)
+  const g = tableTopGeometry(-0.015, 0.004)
+  // (the top's outline, set in, cut down to a band 2.2 cm deep just under the top: the extrusion's own depth scaled)
   g.computeBoundingBox()
   const b = g.boundingBox!
   g.translate(0, -b.max.y, 0)
   g.scale(1, 0.022 / (b.max.y - b.min.y), 1)
-  g.translate(0, -0.082, 0)
+  g.translate(0, -TABLE_T + 0.002, 0)
   return g
 })()
 const TABLE_CORNERS = (() => {
   const { along: [a0, a1], lay: [l0, l1] } = COOK_TABLE
-  // (a hair out from the corner's own curve, which is drawn in six straight steps: at its own radius the cap's middle sank behind them)
-  const i = 0.025, r = 0.16, R = r + 0.025 + 0.009
+  // (a hair out from the corner's own round (a true circle, drawn in eight straight steps), on the edge's straight band between its rounds
+  // over and under (item 379))
+  const i = TABLE_OUT, r = 0.16, R = r + TABLE_OUT + 0.003, hb = TABLE_T - 2 * TABLE_ROUND - 0.008
   // (each corner's middle, and the quarter round it faces: three's cylinder runs from +z toward +x)
   const at: [number, number, number][] = [[a0 + i + r, l0 + i + r, Math.PI], [a1 - i - r, l0 + i + r, Math.PI / 2], [a1 - i - r, l1 - i - r, 0],
     [a0 + i + r, l1 - i - r, Math.PI * 1.5]]
-  const parts = at.map(([x, z, t]) => new THREE.CylinderGeometry(R, R, 0.06, 8, 1, true, t + 0.05, Math.PI / 2 - 0.1).translate(x, -0.042, z))
+  const parts = at.map(([x, z, t]) => new THREE.CylinderGeometry(R, R, hb, 8, 1, true, t + 0.05, Math.PI / 2 - 0.1).translate(x, -TABLE_T / 2, z))
   return mergeGeometries(parts)!
 })()
 function CookTableTop() {
@@ -1915,10 +1927,10 @@ function CubbyFrame() {
   const front = COOK_TABLE.lay[1] - 0.06
   return (
     <>
-      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[-0.3, -0.08]} color={CUBBY_WOOD} />
+      <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[-0.3, -TABLE_T]} color={CUBBY_WOOD} />
       <Block along={[CUBBY.along[0], CUBBY.along[1]]} lay={[CUBBY.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
       {/* (and the second, on the left: the same header, floor and a shelf the whole way across) */}
-      <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[-0.3, -0.08]} color={CUBBY_WOOD} />
+      <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[-0.3, -TABLE_T]} color={CUBBY_WOOD} />
       <Block along={[CUBBY2.along[0], CUBBY2.along[1]]} lay={[CUBBY2.lay[0], front]} y={[floor, CUBBY_FLOOR_Y]} color={CUBBY_WOOD} />
     </>
   )
@@ -2178,7 +2190,7 @@ function CookTableBox({ lay: l, along: a, inset: [i0, i1, j0, j1] }: { lay: [num
   return (
     <group position={mid} rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
       {/* the body, set back a little under the top: clad in honed white marble, a dark kick at its foot */}
-      <mesh position-y={(floor - 0.08) / 2} geometry={useMemo(() => panelBox(W - 0.12, -floor - 0.08, D - 0.12, 1.2), [W, D, floor])}>
+      <mesh position-y={(floor - TABLE_T) / 2} geometry={useMemo(() => panelBox(W - 0.12, -floor - TABLE_T, D - 0.12, 1.2), [W, D, floor])}>
         <meshToonMaterial color="#ffffff" map={COOK_MARBLE} />
       </mesh>
       {/* (as high as the steps in the recesses (STEP_H), so none of it shows over their backs: at 0.1 a band of it stood over them, a dark
