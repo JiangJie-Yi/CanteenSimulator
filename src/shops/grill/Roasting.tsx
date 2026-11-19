@@ -890,9 +890,10 @@ function BarImpl() {
       <EditBlock>
         <StaticBatch plain>
           {GRILL_COUNTERS.map((c, i) => <BarCounter key={i} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)}
-            trim={i === 0 && GRILL_COUNTERS.length > 1 ? 0.62 : 0} butt={i > 0}
-            gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} />)}
+            trim={i === 0 && GRILL_COUNTERS.length > 1 ? LIP_TRIM : 0} butt={i > 0}
+            gate={BAR_GATES[i]} noTop={GRILL_COUNTERS.length > 1} noLip={!!lipCorner()} />)}
           {GRILL_COUNTERS.length > 1 && <BarTop />}
+          {lipCorner() && <BarLip />}
         </StaticBatch>
         {GRILL_COUNTERS.map((c, i) => <BarDrawers key={`drawers-${i}`} c={c} first={GRILL_COUNTERS.slice(0, i).reduce((s, x) => s + x.seats, 0)} />)}
       </EditBlock>
@@ -1835,6 +1836,12 @@ function roundedShape(pts: [number, number][], radii: number[]) {
     const [px, py] = pts[(k + pts.length - 1) % pts.length], [nx, ny] = pts[(k + 1) % pts.length]
     const dp = Math.hypot(px - x, py - y), dn = Math.hypot(nx - x, ny - y)
     const r = Math.min(radii[k], dp / 2, dn / 2)
+    // (a corner left square: the point itself, no arc of nothing (its bevel's way out would be no way at all))
+    if (r < 1e-6) {
+      if (k) sh.lineTo(x, y)
+      else sh.moveTo(x, y)
+      return
+    }
     const a: [number, number] = [x + (px - x) / dp * r, y + (py - y) / dp * r]
     const b: [number, number] = [x + (nx - x) / dn * r, y + (ny - y) / dn * r]
     if (k) sh.lineTo(a[0], a[1])
@@ -2494,18 +2501,19 @@ function barTopShape(grow: number) {
   }
   const a = box(GRILL_COUNTERS[0]), b = box(GRILL_COUNTERS[1])
   // (the side counter stands off the first's cook's side, at its start: its outer edge flush with the first's end)
-  const i = 0.025 - grow
+  const i = BAR_TOP_OUT - grow
   const x0 = Math.min(a.x0, b.x0) + i
   // (short of each gate's flap, which is a piece of its own: at the first counter's far end, the side counter's near
   // one, which is its high-lay end here)
   const ax1 = a.x1 - gateCut(BAR_GATES[0]), by1 = b.y1 - gateCut(BAR_GATES[1])
   const pts: [number, number][] = [[x0, a.y0 + i], [ax1 - i, a.y0 + i], [ax1 - i, a.y1 - i], [b.x1 - i, a.y1 - i], [b.x1 - i, by1 - i],
     [x0, by1 - i]]
-  const sh = new THREE.Shape()
-  pts.forEach(([x, y], k) => (k ? sh.lineTo(x, y) : sh.moveTo(x, y)))
-  const thick = 0.012 + grow * 0.6
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.06 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: 0.025 + grow * 0.6,
-    bevelSegments: 3, curveSegments: 4 })
+  // (item 379: the outer corner, where the two rows of places meet, rounded off (BAR_CORNER_R); the inside corner on the kitchen's side a
+  // little; the ends at the gates square, the gates' flaps running on from them)
+  const sh = roundedShape(pts, [BAR_CORNER_R + grow, 0, 0, 0.04 + grow, 0, 0])
+  const thick = BAR_TOP_ROUND + grow * 0.6
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.06 - 2 * thick, bevelEnabled: true, bevelThickness: thick, bevelSize: BAR_TOP_OUT + grow * 0.6,
+    bevelSegments: 4, curveSegments: 4 })
   // (the boards on the top run along each arm of the L: along the first counter, and along the side counter, at one scale
   // over both: the faces' texture coordinates laid from where they are, not stretched over the shape)
   const pos = g.attributes.position, uv = g.attributes.uv
@@ -2522,6 +2530,11 @@ function barTopShape(grow: number) {
   g.translate(0, BAR_TOP - thick, 0)
   return g
 }
+/** the bar top's edges rounded over this far, up and down (of its 6 cm) and in from its faces, and its outer corner's round (item 379,
+ * docs/MODELING.md's 造型感: its edges had been eased 1.2 cm, its corners square) */
+const BAR_TOP_ROUND = 0.02
+const BAR_TOP_OUT = 0.028
+const BAR_CORNER_R = 0.12
 const BAR_WOOD = (() => {
   if (!TRAY_WOOD) return null
   const t = TRAY_WOOD.clone()
@@ -2638,6 +2651,116 @@ const EDO_KOSHI = (() => {
 const EDO_LATTICE_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_LATTICE, alphaTest: 0.5, side: THREE.DoubleSide })
 const EDO_KOSHI_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_KOSHI })
 const LIP_INK = new THREE.MeshBasicMaterial({ color: '#3b2a20', side: THREE.BackSide })
+/** how far in from the first counter's start its lip begins (with two counters: where the side counter's stands) */
+const LIP_TRIM = 0.62
+/** the raised lip's run along its counter (from, to: its own frame): stopping short of where the other counter butts on, and of the gate's
+ * flap; the first counter's starts where the side counter's now stands, drawn in from the wall by SIDE_PULL */
+function lipSpanOf(c: Counter, trim: number, butt: boolean, gate?: Gate): [number, number] {
+  const L = c.length, G = gate ? gateCut(gate) : 0, end = gate?.end ?? 1
+  let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0) + (trim ? SIDE_PULL - LIP_JOIN : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
+  if (gate) {
+    if (end > 0) x1 -= G
+    else x0 += G
+  }
+  return [x0, x1]
+}
+/** the lip's faces across its counter (its own frame): the customers', the cook's */
+const LIP_FACES = [0.25, 0.31] as const
+type LipRect = { a0: number; a1: number; l0: number; l1: number }
+let lipRects: [LipRect, LipRect] | null | undefined
+/**
+ * The two counters' lips in the bar's frame (along, lay): the first counter's, and the side counter's; null unless they meet at a corner the
+ * side counter's on the low-along side of and the first counter's on the low-lay side of (as laid out: GRILL_COUNTERS)
+ */
+function lipCorner() {
+  if (lipRects !== undefined) return lipRects
+  if (GRILL_COUNTERS.length < 2) return (lipRects = null)
+  const rect = (c: Counter, [x0, x1]: [number, number]): LipRect => {
+    const pts = [[x0, LIP_FACES[0]], [x1, LIP_FACES[0]], [x1, LIP_FACES[1]], [x0, LIP_FACES[1]]]
+      .map(([x, z]) => c.at.clone().addScaledVector(c.along, x).addScaledVector(c.lay, z))
+    const as = pts.map((p) => p.dot(ALONG)), ls = pts.map((p) => p.dot(LAY))
+    return { a0: Math.min(...as), a1: Math.max(...as), l0: Math.min(...ls), l1: Math.max(...ls) }
+  }
+  const [c0, c1] = GRILL_COUNTERS
+  const r0 = rect(c0, lipSpanOf(c0, LIP_TRIM, false, BAR_GATES[0])), r1 = rect(c1, lipSpanOf(c1, 0, true, BAR_GATES[1]))
+  const ok = r1.a0 < r0.a0 + 0.001 && r0.l0 < r1.l0 + 0.001 && r1.a1 > r0.a0 && r0.l1 > r1.l0
+  return (lipRects = ok ? [r0, r1] : null)
+}
+/** the lip's plan as one L, grown `g` all round: the first counter's run on to the side counter's outer face, the side counter's to the
+ * first's, their outer corner square to both */
+function lipOutline(g: number): [number, number][] {
+  const [r0, r1] = lipCorner()!
+  return [[r1.a0 - g, r0.l0 - g], [r0.a1 + g, r0.l0 - g], [r0.a1 + g, r0.l1 + g], [r1.a1 + g, r0.l1 + g], [r1.a1 + g, r1.l1 + g],
+    [r1.a0 - g, r1.l1 + g]]
+}
+/** a picture laid on an L's extrusion (before it's stood up: x along, y lay, z down it) at its true size: the caps' grain along each arm (the
+ * side counter's arm turned), the sides along their run (u, `tile` a picture) and down them (v, `v(z)`) */
+function layAlongL(g: THREE.BufferGeometry, tile: number, v: (z: number) => number) {
+  const [r0, r1] = lipCorner()!
+  const pos = g.attributes.position, uv = g.attributes.uv
+  for (let t = 0; t < pos.count; t += 3) {
+    const flat = pos.getZ(t) === pos.getZ(t + 1) && pos.getZ(t) === pos.getZ(t + 2)
+    const cx = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3, cy = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3
+    const sideArm = cx < r1.a1 + 0.02 && cy > r0.l1
+    let dx = 0, dy = 0
+    for (let k = 1; k < 3; k++) { dx += Math.abs(pos.getX(t + k) - pos.getX(t)); dy += Math.abs(pos.getY(t + k) - pos.getY(t)) }
+    for (let k = 0; k < 3; k++) {
+      const x = pos.getX(t + k), y = pos.getY(t + k), z = pos.getZ(t + k)
+      if (flat) uv.setXY(t + k, (sideArm ? y : x) / tile, (sideArm ? x : y) / tile)
+      else uv.setXY(t + k, (dx >= dy ? x : y) / tile, v(z))
+    }
+  }
+  uv.needsUpdate = true
+}
+/** the rail's rounds over its top edges (and under), up and down (of its 3 cm) and in from its faces */
+const RAIL_ROUND = 0.012, RAIL_ROUND_IN = 0.013
+/** the rail round the L, grown `grow` all round (its ink): its top and bottom edges rounded right over */
+function lipRailGeometry(grow: number) {
+  const sh = new THREE.Shape(lipOutline(grow - RAIL_ROUND_IN).map(([x, y]) => new THREE.Vector2(x, y)))
+  const t = RAIL_ROUND + grow * 0.5
+  const g = new THREE.ExtrudeGeometry(sh, { depth: RAIL_H + 2 * grow - 2 * t, bevelEnabled: true, bevelThickness: t, bevelSize: RAIL_ROUND_IN,
+    bevelSegments: 3, curveSegments: 1 })
+  layAlongL(g, 1.6, (z) => z * 4)
+  g.rotateX(Math.PI / 2)
+  g.translate(0, BAR_TOP + LIP_H + grow - t, 0)
+  return g
+}
+/** the carved panel round the L, grown `grow` all round and `up` up and down (its ink) */
+function lipKoshiGeometry(grow: number, up: number) {
+  const sh = new THREE.Shape(lipOutline(grow).map(([x, y]) => new THREE.Vector2(x, y)))
+  const g = new THREE.ExtrudeGeometry(sh, { depth: KOSHI_H + 2 * up, bevelEnabled: false, curveSegments: 1 })
+  layAlongL(g, LIP_TILE, (z) => 1 - (z - up) / KOSHI_H)
+  g.rotateX(Math.PI / 2)
+  g.translate(0, BAR_TOP + KOSHI_H + up, 0)
+  return g
+}
+/**
+ * The lip over both counters as one L (item 379, docs/MODELING.md's 造型感): its carved panel and its rail each one piece round the corner, the
+ * rail's edges rounded right over; the bamboo lattice's two sheets meeting at the corner. Each counter's had stopped short of the other's face
+ * at the corner (a 2 cm notch at its outer corner), and their rails ran through each other there, one's end standing out past the other's
+ * side. In the bar's frame, as the top is; in the bar's batch.
+ */
+function BarLip() {
+  const [r0, r1] = lipCorner()!
+  const rail = useMemo(() => lipRailGeometry(0), [])
+  const railInk = useMemo(() => lipRailGeometry(0.004), [])
+  const koshi = useMemo(() => lipKoshiGeometry(0, 0), [])
+  const koshiInk = useMemo(() => lipKoshiGeometry(0.004, 0.0025), [])
+  // (the lattice just behind the customers' faces (3 mm in), each sheet on to the other's at the corner)
+  const LAT = LIP_H - KOSHI_H - RAIL_H, y = BAR_TOP + KOSHI_H + LAT / 2
+  const inA = r1.a0 + 0.003, inL = r0.l0 + 0.003
+  const len0 = r0.a1 - 0.005 - inA, len1 = r1.l1 - 0.005 - inL
+  return (
+    <group rotation-y={Math.atan2(-ALONG.z, ALONG.x)}>
+      <mesh geometry={koshi} castShadow material={EDO_KOSHI_MAT!} />
+      <mesh geometry={koshiInk} material={LIP_INK} />
+      <mesh geometry={lipSheet(len0, LAT + 0.004)} position={[inA + len0 / 2, y, inL]} material={EDO_LATTICE_MAT!} castShadow />
+      <mesh geometry={lipSheet(len1, LAT + 0.004)} position={[inA, y, inL + len1 / 2]} rotation-y={Math.PI / 2} material={EDO_LATTICE_MAT!} castShadow />
+      <mesh geometry={rail} castShadow receiveShadow><meshToonMaterial color="#ffffff" map={BAR_WOOD} /></mesh>
+      <mesh geometry={railInk} material={LIP_INK} />
+    </group>
+  )
+}
 /** the carved panel: a slab `len` long whose picture repeats every LIP_TILE along its two long faces, at one height up them (made once a
  * length; a rounded slab's faces each take the whole picture, and along the bar it was drawn out into streaks) */
 const KOSHI_GEO = new Map<string, THREE.BoxGeometry>()
@@ -2749,11 +2872,13 @@ function SeatTag({ k, onLip }: { k: number; onLip: boolean }) {
     </group>
   )
 }
-function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = false }: { c: Counter; first?: number; trim?: number; gate?: Gate
+function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, noLip = false, butt = false }: { c: Counter; first?: number; trim?: number; gate?: Gate
   /** its far end runs into the first counter's side (its lip runs on into the first one's, so they meet with no gap) */
   butt?: boolean
   /** its top drawn with the others' as one piece (BarTop), not its own */
-  noTop?: boolean }) {
+  noTop?: boolean
+  /** its lip drawn with the other's as one L (BarLip), not its own */
+  noLip?: boolean }) {
   const yaw = Math.atan2(-c.along.z, c.along.x)
   const L = c.length
   const G = gate ? gateCut(gate) : 0
@@ -2764,16 +2889,7 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
   // (a counter butting into another runs its base on into the other's, so no slot opens between them at the corner (the owner saw the
   // floor through one: the side counter's base stopped 8 cm short of the long one's back))
   const run = butt ? 0.12 : 0
-  // (the raised lip's run along the counter: stopping short of where the other counter butts on, and of the gate's flap; the first counter's
-  // starts where the side counter's now stands, drawn in from the wall by SIDE_PULL, the two running a little into each other at the corner)
-  const lipSpan = (() => {
-    let x0 = -(L + 0.3) / 2 + trim - (trim ? 0.02 : 0) + (trim ? SIDE_PULL - LIP_JOIN : 0), x1 = (L + 0.3) / 2 + (butt ? 0.05 : 0)
-    if (gate) {
-      if (end > 0) x1 -= G
-      else x0 += G
-    }
-    return [x0, x1]
-  })()
+  const lipSpan = lipSpanOf(c, trim, butt, gate)
   // (where the top starts, on the near end: short of a gate there)
   return (
     <group position={c.at} rotation-y={yaw}>
@@ -2812,7 +2928,7 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, butt = fa
       </mesh>
       {/* the raised lip on the cook's side, the step the food is handed over */}
       {/* (stopping short of where the other counter butts on, and of the gate's flap) */}
-      {(() => {
+      {!noLip && (() => {
         // (where the two counters' lips meet at the corner, each runs a little into the other: no notch between their
         // rounded ends)
         // (the first counter's lip starts where the side counter's now stands, drawn in from the wall by SIDE_PULL)
