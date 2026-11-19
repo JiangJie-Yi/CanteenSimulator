@@ -29,14 +29,20 @@ await ctx.addInitScript(() => {
     }
   }
   const W = window.__why = { on: false, commits: new Map(), comps: new Map(), err: null }
-  const nameOf = (f) => {
-    const t = f.type
+  const typeName = (t) => {
     if (typeof t === 'function') return t.displayName || t.name || 'anon'
     if (t && typeof t === 'object') {
       const inner = t.type || t.render
       return t.displayName || inner?.displayName || inner?.name || 'anon'
     }
     return null
+  }
+  // (one with no name of its own named by the nearest named one above it: "anon in Movable")
+  const nameOf = (f) => {
+    const own = typeName(f.type)
+    if (own !== 'anon') return own
+    for (let q = f.return; q; q = q.return) { const nm = typeName(q.type); if (nm && nm !== 'anon') return `anon in ${nm}` }
+    return 'anon'
   }
   const FN = new Set([0, 11, 15])
   const site = (stack) => {

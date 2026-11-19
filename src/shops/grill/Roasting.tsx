@@ -40,6 +40,7 @@ import { LINES } from '@/data/lines'
 import type { Lang } from '@/data/i18n'
 import { Steam } from '@/scene/Steam'
 import { sameProps } from '@/scene/sameProps'
+import { steady } from '@/scene/steadyProps'
 import { StaffFigure, StaffWarm, TRAY_AT } from '@/scene/StaffFigure'
 import { commuteOf, delayOf, paceOf } from '@/game/commute'
 import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
@@ -4667,7 +4668,11 @@ const OPENINGS = { n: 0 }
 /** a session of trade, on the shop's clock (runGuests counts 0.8 a beat): what the day's pattern is laid over */
 const SESSION_LEN = 420
 
-export function Roasting({ url, roast, itemIds, quantities, active, instant = false, fire, heat, onOffFire, onEat,
+/** (item 374) drawn again only when what it's given has really changed: the page drew it about three times a second while the shop's open,
+ * handing it its callbacks made afresh and its servings, crew and names as new objects of the same values, and everything under it that
+ * isn't memoised with it (scene/steadyProps: each callback a steady one calling the latest, each value kept while it's alike) */
+export const Roasting = steady(RoastingImpl)
+function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false, fire, heat, onOffFire, onEat,
   onNotice, smoke, blackSmoke, ai = false, research = false, onOrder, onAddCharcoal, onSay, chef = CHEFS[1], onGuests, space = 'closed',
   locked = false, notes = {}, crowd = 1, blessed = false, onDrink, onWalkOut, onVisit, lang = 'zh', names = {}, crew = [], bar = true,
   entries, onOrderEntry }: RoastingProps) {

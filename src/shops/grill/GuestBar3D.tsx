@@ -3526,6 +3526,16 @@ const ServerWalking = memo(ServerWalkingImpl)
 function ServerWalkingImpl({ i, id, look }: { i: number; id: string; look: StaffLook }) {
   return <StaffFigure id={id} role="server" look={look} moving={useWaiterMoving(i)} />
 }
+/** the kitchen's plater on their way to the racks and back (the third cook, or the second; none, the owner), walking or not: their own flag
+ * as the servers', so only their figure is drawn again as they start or stop (item 374: it was the bar's state, and the whole bar was
+ * drawn again each time, about once a second while the shop's open) */
+const PLATER_I = 62
+const PlaterWalking = memo(function PlaterWalking({ id, role, look }: { id: string; role: 'chef' | 'sous'; look: StaffLook }) {
+  return <StaffFigure id={id} role={role} look={look} moving={useWaiterMoving(PLATER_I)} />
+})
+const OwnerPlating = memo(function OwnerPlating() {
+  return <OwnerWalker moving={useWaiterMoving(PLATER_I)} />
+})
 
 /**
  * A server at the plating place for a plate (item 317, the owner's): they take the tongs up, and what's for it on the tray by the fire is
@@ -4196,7 +4206,6 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     return pick!
   }
   const platerObj = useRef<THREE.Group | null>(null)
-  const [platerMoving, setPlaterMoving] = useState(false)
   const platerStack = useRef<THREE.Group>(null)
   /** the bowl of rice in the plater's hands (washing it, carrying it to the pot, and the cooked rice to the tub) */
   const platerBowl = useRef<THREE.Group>(null)
@@ -6595,7 +6604,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder' || pl.phase === 'toTillBack'
         || pl.phase === 'toCrate' || pl.phase === 'toBucket' || pl.phase === 'toHearth' || pl.phase === 'toSoup' || pl.phase === 'toCoalSack' || pl.phase === 'toFill'
         || pl.phase === 'toShape'
-      if (mv !== platerMoving) setPlaterMoving(mv)
+      setWaiterMoving(PLATER_I, mv)
       // (the way they face turned to the way they're to face, by time (commuteWalk's turnEase): set at once, they snapped round, over a
       // hundred times a minute at double speed (item 242))
       if (pl.yawTo !== undefined) pl.yaw = pl.phase === 'idle' ? pl.yawTo : turnToward(pl.yaw, pl.yawTo, step)
@@ -8640,7 +8649,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, !plater ? 'owner' : plater.role === 'sous' ? 'sous' : 'other') }
         }} name="plater-walker" scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.17} />
-          {plater ? <StaffFigure id={plater.id} role={plater.role} look={plater.look} moving={platerMoving} /> : <OwnerWalker moving={platerMoving} />}
+          {plater ? <PlaterWalking id={plater.id} role={plater.role} look={plater.look} /> : <OwnerPlating />}
         </group>
       )}
       {carryKit}
