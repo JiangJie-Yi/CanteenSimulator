@@ -188,6 +188,56 @@ def bevel(obj, width, segments=3, angle=True):
     return b
 
 
+def chunky_box(name, x0, x1, y0, y1, z0, z1, bw, segs, top_mat, side_mat, bottom=False, uv_scale=0.16):
+    """(docs/MODELING.md's 造型感, item 379) a box with its edges well rounded (`bw` wide, `segs` steps; its bottom's left square unless
+    `bottom`) and its normals hardened: the flat faces shade flat, the rounds smooth, as a chunky made thing reads. Its top in `top_mat`, its
+    sides and rounds in `side_mat`; pictures laid on each face by which way it faces (`uv_scale` metres a picture: u along the side, v up
+    it; the top along x and y). Returns the object (linked, the bevel applied); the caller keeps it with its parts."""
+    import bmesh
+    from mathutils import Matrix
+    bm_ = bmesh.new()
+    bmesh.ops.create_cube(bm_, size=1.0)
+    bmesh.ops.transform(bm_, matrix=Matrix.Translation(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)) @ Matrix.Diagonal((x1 - x0, y1 - y0, z1 - z0, 1)),
+                        verts=bm_.verts)
+    for f in bm_.faces:
+        f.material_index = 0 if f.normal.z > 0.5 else 1
+    wl = bm_.edges.layers.float.get("bevel_weight_edge") or bm_.edges.layers.float.new("bevel_weight_edge")
+    for e in bm_.edges:
+        e[wl] = 0.0 if (not bottom and all(v.co.z < z0 + 1e-6 for v in e.verts)) else 1.0
+    me = bpy.data.meshes.new(name)
+    bm_.to_mesh(me)
+    bm_.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(top_mat)
+    o.data.materials.append(side_mat)
+    for pg in o.data.polygons:
+        pg.use_smooth = True
+    mod = o.modifiers.new("Bevel", "BEVEL")
+    mod.width = bw
+    mod.segments = segs
+    mod.limit_method = "WEIGHT"
+    mod.harden_normals = True
+    mod.material = 1
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    me = o.data
+    uvl_ = me.uv_layers.new(name="UVMap") if not me.uv_layers else me.uv_layers[0]
+    for pg in me.polygons:
+        n = pg.normal
+        for li in pg.loop_indices:
+            c = me.vertices[me.loops[li].vertex_index].co
+            if abs(n.z) > 0.7:
+                uvl_.data[li].uv = (c.x / uv_scale, c.y / uv_scale)
+            elif abs(n.y) >= abs(n.x):
+                uvl_.data[li].uv = ((c.x if n.y < 0 else -c.x) / uv_scale, c.z / uv_scale)
+            else:
+                uvl_.data[li].uv = ((-c.y if n.x < 0 else c.y) / uv_scale, c.z / uv_scale)
+    return o
+
+
 def apply_scale(obj):
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
