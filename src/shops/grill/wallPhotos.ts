@@ -535,17 +535,48 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
 
 /**
  * The guests' signatures in marker straight on the plaster round the signed boards, as the regulars and the visitors leave them on an
- * eatery's wall (item 384, the owner's, 2026-11-20: 「牆壁可以有一些用簽字筆的簽名」): a name scrawled big with its flourish, a date, a line
- * of thanks, a fish or a face or a heart drawn by it; black, blue, red and green, each a little askew, in the wall's bare places between the
- * boards (clear of the cards, the cork board, the photographs and the light switches). All made up. A sheet the size of MARKER_WALL laid on
- * the plaster just under the boards; transparent where nothing's written.
+ * eatery's wall (item 384, the owner's, 2026-11-20: 「牆壁可以有一些用簽字筆的簽名」; item 390, again: 「牆壁簽名也太隨意了吧!」: the names were
+ * strokes that read as nothing, every character turned and sized its own way, in the system's plain letters (drawn before the hand's were
+ * in), dotted about wherever there was room). Each one now as it's really left: who it's to, the name written big and signed off with its
+ * flourish under it, a line, the day, a little drawing by it; written in one go, so the whole of it at one slant and none of its characters
+ * askew; laid out in the wall's bare places as they are (clear of the cards, the cork board, the photographs, the light switches and the exit
+ * sign: MARKER_SPOTS), the biggest where there's most room, one written down the narrow gap by the photographs as Japanese is. Black, blue,
+ * red and green. All made up. A sheet the size of MARKER_WALL laid on the plaster just under the boards; transparent where nothing's
+ * written; painted again once the hand's letters are in (MARKER_CHARS: DiningRoom asks for them).
  */
 export const MARKER_WALL = {
   /** its span along the wall from the wall's end (z0..z1, metres) and up it (y0..y1), and its pixels a metre */
   z0: -1.4, z1: -0.28, y0: 1.05, y1: 2.0, px: 1000,
 }
 const HAND = '"LXGW WenKai TC", "Segoe Print", "Comic Sans MS", cursive'
+/** (a name in Latin letters: a felt pen's running hand, as an autograph's signed (index.html asks for just its letters)) */
+const SCRIPT = `"Caveat", ${HAND}`
 const PENS = { black: '#1c1c22', blue: '#1f3c9e', red: '#c3282d', green: '#1d6a3c' }
+type Pen = keyof typeof PENS
+/** one signature: where its middle is on the wall (MARKER_WALL's z along it, y up it) and its slant (rad, + as the writing climbs to the
+ * right); who it's to (small, over the name), the name and its size (m), whether it's in Latin letters (signed as an autograph is, in
+ * a felt pen's running hand), a line under it, the day, a drawing by the line; or (`down`) the line written down the wall, a character under the next, its signing-off
+ * (`name`) under it smaller */
+type MarkerSign = { z: number; y: number; tilt: number; pen: Pen; to?: string; name: string; size: number; latin?: boolean
+  line?: string; lineSize?: number; date?: string; doodle?: 'fish' | 'smile' | 'heart' | 'star'; down?: boolean }
+/** the signatures and where each goes (the wall's bare places, measured: tests/e2e/_wallmap390.mjs; the boards and switches 3 cm clear) */
+export const MARKER_SPOTS: MarkerSign[] = [
+  // (over the photographs, under the exit sign: the most room, a visitor's, in Japanese, signed big in Latin letters)
+  { z: -0.56, y: 1.745, tilt: 0.035, pen: 'black', to: '聞野さんへ', name: 'Sakura', size: 0.085, latin: true, line: '炭火の香り、最高でした！', lineSize: 0.026, date: '2026.10.5', doodle: 'fish' },
+  // (under the photographs: a food writer's, and a couple's)
+  { z: -0.72, y: 1.2, tilt: -0.04, pen: 'blue', to: '給聞野', name: '林小雨', size: 0.06, line: '鹽烤鯖魚一級棒！', lineSize: 0.024, date: '2026.11.2', doodle: 'smile' },
+  { z: -0.44, y: 1.21, tilt: 0.045, pen: 'red', name: 'Ken & Yui', size: 0.046, latin: true, line: '結婚一週年', lineSize: 0.026, date: '2026.11.8', doodle: 'heart' },
+  // (under the cork board, right of the switches: a regular's)
+  { z: -1.035, y: 1.14, tilt: -0.03, pen: 'green', name: '阿翔', size: 0.048, line: '老闆加油！', lineSize: 0.022, date: '2026.11.15', doodle: 'star' },
+  // (over the cards: a class's reunion)
+  { z: -1.16, y: 1.925, tilt: -0.015, pen: 'black', name: '大學同學會', size: 0.032, line: '阿德　美玲　志明　小林', lineSize: 0.022, date: '2026.11.1' },
+  // (down the gap past the photographs, as Japanese is written: see you again, from Osaka)
+  { z: -0.322, y: 1.465, tilt: 0, pen: 'blue', name: '大阪より', size: 0.022, line: 'また来ます', lineSize: 0.031, down: true },
+]
+/** every character the signatures are written in, for the hand's letters to be asked for */
+export const MARKER_CHARS = [...new Set(MARKER_SPOTS.flatMap((m) => [m.to ?? '', m.latin ? '' : m.name, m.line ?? '', m.date ?? '']).join(''))].join('')
+/** and the names in Latin letters, in their own hand (SCRIPT) */
+export const MARKER_LATIN = [...new Set(MARKER_SPOTS.filter((m) => m.latin).map((m) => m.name).join(''))].join('')
 /** (a marker's ink: a soft bleed into the plaster round its strokes) */
 function ink(g: CanvasRenderingContext2D, col: string, draw: () => void) {
   g.save()
@@ -556,91 +587,102 @@ function ink(g: CanvasRenderingContext2D, col: string, draw: () => void) {
   draw()
   g.restore()
 }
-/** a line written by hand: each character its own a little up or down, turned a little, a little bigger or smaller, the line on a slant */
-function said(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, col: string, rot = 0, weight = 700) {
-  let r = 7 + text.length * 131 + Math.round(x)
-  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
-  ink(g, col, () => {
-    g.translate(x, y); g.rotate(rot)
-    g.textAlign = 'left'; g.textBaseline = 'alphabetic'
-    let at = 0
-    for (const ch of text) {
-      const k = 0.9 + rnd() * 0.22
-      g.font = `${weight} ${Math.round(size * k)}px ${HAND}`
-      g.save()
-      g.translate(at, (rnd() - 0.5) * size * 0.12)
-      g.rotate((rnd() - 0.5) * 0.16)
-      g.fillText(ch, 0, 0)
-      g.restore()
-      at += g.measureText(ch).width * (0.94 + rnd() * 0.08)
+/** words in marker: the hand's letters, gone over once more at their edge (a marker's stroke is fuller than a pen's) */
+function written(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, weight: number, align: CanvasTextAlign = 'left', hand = HAND) {
+  g.font = `${weight} ${size}px ${hand}`
+  g.textAlign = align; g.textBaseline = 'alphabetic'
+  g.lineWidth = Math.max(1, size * 0.03)
+  g.fillText(text, x, y)
+  g.strokeText(text, x, y)
+}
+/** the drawings, `s` across, centred on (x, y), in the pen's one line */
+function doodle(g: CanvasRenderingContext2D, kind: NonNullable<MarkerSign['doodle']>, x: number, y: number, s: number) {
+  g.lineWidth = Math.max(2, s * 0.075)
+  g.beginPath()
+  if (kind === 'fish') {
+    // (a fish grilled on its skewer: its body, tail, eye, the grill's two marks across it, the skewer out of its mouth)
+    const r = s * 0.36
+    g.ellipse(x - s * 0.05, y, r, r * 0.46, 0, 0, Math.PI * 2)
+    g.moveTo(x + r * 0.9, y); g.lineTo(x + r * 1.45, y - r * 0.42); g.lineTo(x + r * 1.45, y + r * 0.42); g.closePath()
+    g.moveTo(x - r * 0.25, y - r * 0.3); g.lineTo(x - r * 0.05, y + r * 0.3)
+    g.moveTo(x + r * 0.1, y - r * 0.3); g.lineTo(x + r * 0.3, y + r * 0.3)
+    g.moveTo(x - r * 1.5, y); g.lineTo(x - r * 1.05, y)
+    g.stroke()
+    g.beginPath(); g.arc(x - r * 0.62, y - r * 0.08, s * 0.035, 0, Math.PI * 2); g.fill()
+  } else if (kind === 'smile') {
+    const r = s * 0.42
+    g.arc(x, y, r, 0, Math.PI * 2)
+    // (its eyes shut with smiling, its mouth wide)
+    g.moveTo(x - r * 0.55, y - r * 0.12); g.quadraticCurveTo(x - r * 0.35, y - r * 0.42, x - r * 0.15, y - r * 0.12)
+    g.moveTo(x + r * 0.15, y - r * 0.12); g.quadraticCurveTo(x + r * 0.35, y - r * 0.42, x + r * 0.55, y - r * 0.12)
+    g.moveTo(x - r * 0.5, y + r * 0.2); g.quadraticCurveTo(x, y + r * 0.75, x + r * 0.5, y + r * 0.2)
+    g.stroke()
+  } else if (kind === 'heart') {
+    const r = s * 0.42
+    g.moveTo(x, y + r * 0.95)
+    g.bezierCurveTo(x - r * 1.35, y + r * 0.05, x - r * 0.75, y - r * 1.0, x, y - r * 0.38)
+    g.bezierCurveTo(x + r * 0.75, y - r * 1.0, x + r * 1.35, y + r * 0.05, x, y + r * 0.95)
+    g.stroke()
+  } else {
+    const r = s * 0.46
+    for (let i = 0; i <= 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5, k = i % 2 ? 0.42 : 1
+      if (i) g.lineTo(x + Math.cos(a) * r * k, y + Math.sin(a) * r * k)
+      else g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r)
     }
-  })
+    g.stroke()
+  }
 }
-/** a signature scrawled as a hand runs one off: a big initial, a tall loop up and back down through itself; then the rest of the name in a
- * run of small strokes, each its own height and width, a tall one or two among them (an l, a k); a stroke crossing it and a dot; its tail
- * swept out and back under the whole of it. Leaning a little forward */
-function scrawl(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string, seed: number, lw = 4) {
-  let r = seed
-  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
-  const base = y + h * 0.78
-  ink(g, col, () => {
-    g.lineWidth = lw
-    g.translate(x, 0)
-    g.transform(1, 0, -0.18, 1, 0.18 * base, 0)
-    g.translate(-x, 0)
-    g.beginPath()
-    // (the initial: up from under the line, a big loop over, down through its own stem)
-    g.moveTo(x + w * 0.02, base + h * 0.1)
-    g.bezierCurveTo(x + w * 0.02, y - h * 0.1, x + w * 0.2, y - h * 0.05, x + w * 0.12, base - h * 0.35)
-    g.bezierCurveTo(x + w * 0.06, base - h * 0.1, x + w * 0.0, base, x + w * 0.1, base)
-    // (the rest: a run of strokes, each its own height and width)
-    let px = x + w * 0.1
-    const end = x + w * 0.82
-    while (px < end) {
-      const tall = rnd() < 0.2, step = w * (0.04 + rnd() * 0.06), up = tall ? h * (0.75 + rnd() * 0.2) : h * (0.18 + rnd() * 0.32)
-      const nx = Math.min(end, px + step)
-      g.bezierCurveTo(px + step * 0.15, base - up, nx - step * (tall ? 0.6 : 0.1), base - up * 1.05, nx - step * 0.25, base - h * 0.02)
-      g.quadraticCurveTo(nx - step * 0.1, base + h * 0.05, nx, base - h * 0.04)
-      px = nx
+/** one signature, laid out round its middle and written at its slant */
+function sign(g: CanvasRenderingContext2D, m: MarkerSign, X: (z: number) => number, Y: (y: number) => number, px: number) {
+  const S = m.size * px, L = (m.lineSize ?? m.size * 0.45) * px
+  ink(g, PENS[m.pen], () => {
+    g.translate(X(m.z), Y(m.y))
+    g.rotate(-m.tilt)
+    if (m.down) {
+      // (down the wall: its line a character under the next, the signing-off under it, smaller; all of it on one middle)
+      const chars = [...(m.line ?? '')], tail = [...m.name]
+      const tall = chars.length * L * 1.04 + S * 0.6 + tail.length * S * 1.04
+      let at = -tall / 2
+      for (const ch of chars) { written(g, ch, 0, at + L * 0.88, L, 700, 'center'); at += L * 1.04 }
+      at += S * 0.6
+      for (const ch of tail) { written(g, ch, 0, at + S * 0.88, S, 400, 'center'); at += S * 1.04 }
+      return
     }
-    // (the tail: out past the last stroke and swept back under the whole name)
-    g.bezierCurveTo(px + w * 0.12, base - h * 0.3, px + w * 0.2, base + h * 0.25, px - w * 0.15, base + h * 0.3)
-    g.quadraticCurveTo(x + w * 0.4, base + h * 0.42, x - w * 0.04, base + h * 0.18)
-    g.stroke()
-    // (a stroke across it, and a dot)
+    // (its parts' sizes: who it's to, the name, its flourish, the line and the drawing by it, the day under them)
+    // (a running hand's letters are smaller for their size: written that much bigger)
+    const NS = m.latin ? S * 1.3 : S
+    g.font = `700 ${NS}px ${m.latin ? SCRIPT : HAND}`
+    const nameW = g.measureText(m.name).width
+    const toS = S * 0.42, dateS = Math.max(L * 0.78, S * 0.3)
+    g.font = `700 ${L}px ${HAND}`
+    const lineW = m.line ? g.measureText(m.line).width : 0
+    const dw = m.doodle ? L * 1.9 : 0
+    const W = Math.max(nameW + S * 0.35, lineW + (dw ? dw + L * 0.3 : 0))
+    const H = (m.to ? toS * 1.25 : 0) + S * 1.05 + (m.line ? S * 0.32 + L * 1.15 : 0) + (m.date ? dateS * 1.3 : 0)
+    const left = -W / 2
+    let y = -H / 2
+    if (m.to) { y += toS; written(g, m.to, left, y, toS, 400); y += toS * 0.25 }
+    // (the name, big)
+    y += S * 0.86
+    const nx = left + (m.to ? toS * 0.8 : 0)
+    written(g, m.name, nx, y, NS, 700, 'left', m.latin ? SCRIPT : HAND)
+    // (its flourish: in under its first letter, along under it and up past its end, curled back over itself)
+    const x0 = nx, x1 = nx + nameW, b = y
+    g.lineWidth = Math.max(2, S * 0.06)
     g.beginPath()
-    const cx = x + w * (0.35 + rnd() * 0.25)
-    g.moveTo(cx - w * 0.08, base - h * (0.5 + rnd() * 0.15)); g.lineTo(cx + w * 0.1, base - h * (0.55 + rnd() * 0.1))
+    g.moveTo(x0 - S * 0.08, b + S * 0.2)
+    g.bezierCurveTo(x0 + (x1 - x0) * 0.35, b + S * 0.34, x1 - (x1 - x0) * 0.15, b + S * 0.12, x1 + S * 0.26, b - S * 0.14)
+    g.quadraticCurveTo(x1 + S * 0.38, b - S * 0.32, x1 + S * 0.16, b - S * 0.22)
     g.stroke()
-    g.beginPath(); g.arc(x + w * (0.6 + rnd() * 0.2), base - h * 0.75, lw * 0.8, 0, Math.PI * 2); g.fill()
-  })
-}
-function fish(g: CanvasRenderingContext2D, x: number, y: number, s: number, col: string, lw = 3) {
-  ink(g, col, () => {
-    g.lineWidth = lw
-    g.beginPath(); g.ellipse(x, y, s, s * 0.45, 0, 0, Math.PI * 2); g.stroke()
-    g.beginPath(); g.moveTo(x + s * 0.95, y); g.lineTo(x + s * 1.5, y - s * 0.4); g.lineTo(x + s * 1.5, y + s * 0.4); g.closePath(); g.stroke()
-    g.beginPath(); g.arc(x - s * 0.55, y - s * 0.08, s * 0.08, 0, Math.PI * 2); g.fill()
-    g.beginPath(); g.moveTo(x - s * 0.2, y - s * 0.35); g.quadraticCurveTo(x - s * 0.05, y, x - s * 0.2, y + s * 0.35); g.stroke()
-  })
-}
-function face(g: CanvasRenderingContext2D, x: number, y: number, s: number, col: string, lw = 3) {
-  ink(g, col, () => {
-    g.lineWidth = lw
-    g.beginPath(); g.arc(x, y, s, 0, Math.PI * 2); g.stroke()
-    g.beginPath(); g.arc(x - s * 0.35, y - s * 0.2, s * 0.1, 0, Math.PI * 2); g.fill()
-    g.beginPath(); g.arc(x + s * 0.35, y - s * 0.2, s * 0.1, 0, Math.PI * 2); g.fill()
-    g.beginPath(); g.arc(x, y + s * 0.05, s * 0.55, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke()
-  })
-}
-function heart(g: CanvasRenderingContext2D, x: number, y: number, s: number, col: string, lw = 3) {
-  ink(g, col, () => {
-    g.lineWidth = lw
-    g.beginPath()
-    g.moveTo(x, y + s * 0.9)
-    g.bezierCurveTo(x - s * 1.4, y - s * 0.1, x - s * 0.6, y - s * 1.0, x, y - s * 0.35)
-    g.bezierCurveTo(x + s * 0.6, y - s * 1.0, x + s * 1.4, y - s * 0.1, x, y + s * 0.9)
-    g.stroke()
+    y += S * 0.19
+    if (m.line) {
+      y += S * 0.32 + L * 0.9
+      written(g, m.line, left + S * 0.1, y, L, 700)
+      if (m.doodle) doodle(g, m.doodle, left + S * 0.1 + lineW + L * 0.3 + dw / 2, y - L * 0.35, dw)
+      y += L * 0.25
+    } else if (m.doodle) doodle(g, m.doodle, x1 + S * 0.55, b - S * 0.45, S * 0.8)
+    if (m.date) { y += dateS * 1.1; written(g, m.date, left + W, y, dateS, 400, 'right') }
   })
 }
 export function paintMarkerSigns(g: CanvasRenderingContext2D, w: number, h: number) {
@@ -648,31 +690,5 @@ export function paintMarkerSigns(g: CanvasRenderingContext2D, w: number, h: numb
   const { z0, y1, px } = MARKER_WALL
   // (a place on the wall: along it from its end, up it)
   const X = (z: number) => (z - z0) * px, Y = (y: number) => (y1 - y) * px
-  // (over the photographs: a big black name, its date and a fish)
-  scrawl(g, X(-0.79), Y(1.92), 170, 60, PENS.black, 11, 5)
-  said(g, '2026.10.05', X(-0.77), Y(1.76), 22, PENS.black, -0.05, 400)
-  said(g, '炭火香到不行！', X(-0.79), Y(1.71), 26, PENS.black, -0.04)
-  fish(g, X(-0.6), Y(1.75), 26, PENS.black)
-  // (beside it, blue, in Japanese: a name, a line, a face)
-  said(g, 'さくら', X(-0.5), Y(1.86), 44, PENS.blue, 0.06)
-  said(g, 'また来ます！', X(-0.51), Y(1.79), 28, PENS.blue, 0.05)
-  scrawl(g, X(-0.5), Y(1.74), 120, 34, PENS.blue, 29, 3)
-  face(g, X(-0.34), Y(1.69), 20, PENS.blue)
-  // (under the photographs: red, a regular's, a heart by it)
-  said(g, '阿翔', X(-0.84), Y(1.27), 48, PENS.red, -0.08)
-  said(g, '鹽烤鯖魚讚！', X(-0.84), Y(1.2), 26, PENS.red, -0.06)
-  heart(g, X(-0.64), Y(1.25), 18, PENS.red)
-  // (and black, two names together and their day)
-  scrawl(g, X(-0.55), Y(1.31), 150, 48, PENS.black, 47, 4)
-  said(g, 'Ken & Yui', X(-0.54), Y(1.19), 30, PENS.black, 0.04)
-  said(g, '2026.11.08', X(-0.53), Y(1.14), 20, PENS.black, 0.04, 400)
-  // (over the cards, green, a class's reunion and its names round it)
-  said(g, '大學同學會 2026.11', X(-1.3), Y(1.92), 30, PENS.green, -0.02)
-  for (const [k, nx] of [[61, -1.3], [73, -1.18], [89, -1.06], [97, -0.96]] as const) scrawl(g, X(nx), Y(1.9), 70, 22, PENS.green, k, 2.5)
-  // (between the cards and the cork board: blue, a little line and a fish)
-  said(g, '老闆加油！', X(-1.28), Y(1.58), 24, PENS.blue, 0.03)
-  fish(g, X(-1.06), Y(1.6), 16, PENS.blue, 2.5)
-  // (under the cork board, clear of the switches: black, a traveller's)
-  scrawl(g, X(-1.16), Y(1.2), 140, 44, PENS.black, 83, 4)
-  said(g, 'From Osaka', X(-1.15), Y(1.1), 24, PENS.black, -0.03)
+  for (const m of MARKER_SPOTS) sign(g, m, X, Y, px)
 }

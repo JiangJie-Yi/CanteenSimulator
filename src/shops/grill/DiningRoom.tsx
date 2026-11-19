@@ -18,7 +18,7 @@ import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts }
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { toChineseNumber } from '@/data/menu'
-import { MARKER_WALL, paintMarkerSigns, paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
+import { MARKER_CHARS, MARKER_LATIN, MARKER_WALL, paintMarkerSigns, paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -1638,6 +1638,16 @@ function WallSigns({ end }: { end: number }) {
     const c = SIGNS_TEX.image as HTMLCanvasElement
     const repaint = () => { paintWallSigns(c.getContext('2d')!, SIGNS_ZH); SIGNS_TEX.needsUpdate = true }
     repaint()
+    // (and the signatures in marker on the plaster round them, once their hand's letters are in, both its weights (item 390: painted before
+    // they were, they were in the system's plain letters))
+    const mc = MARKER_TEX?.image as HTMLCanvasElement | undefined
+    if (mc && MARKER_TEX) {
+      void Promise.all([...['700', '400'].map((w) => document.fonts?.load(`${w} 40px "LXGW WenKai TC"`, MARKER_CHARS)),
+        document.fonts?.load('700 40px "Caveat"', MARKER_LATIN)]).then(() => {
+        paintMarkerSigns(mc.getContext('2d')!, mc.width, mc.height)
+        MARKER_TEX.needsUpdate = true
+      }).catch(() => {})
+    }
     void document.fonts?.load('700 40px "LXGW WenKai TC"', '炭火の香り最高食い倒れ山野好吃到想哭美食家林小雨魚が主役の店料理評論黒川謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念二〇六年九月冬').then(repaint).catch(() => {})
   })
   return <primitive object={obj} {...nameOver('【簽名牆】美食家的簽名與留言', '來過的美食家留下的簽名色紙、客人的留言板與合照')} />
