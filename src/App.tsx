@@ -67,6 +67,7 @@ import { Bgm } from '@/ui/Bgm'
 import { HoverTip } from '@/ui/HoverTip'
 import { DustPuffs } from '@/scene/DustPuffs'
 import { RegisterManual } from '@/ui/RegisterManual'
+import { GameGuide } from '@/ui/GameGuide'
 import { TillPanel, type TillDay } from '@/ui/TillPanel'
 import { OutfitPanel } from '@/ui/OutfitPanel'
 import { OUTFIT_KEY, readOutfit, setOutfit } from '@/game/bossOutfit'
@@ -1429,6 +1430,11 @@ export default function App() {
   const guideDone = useCallback(() => {
     setGuide(false)
     try { localStorage.setItem(GUIDE_KEY, 'done') } catch { /* (not kept) */ }
+  }, [])
+  // (and up again from the game's guide (item 388): as for a new game, till it's finished or skipped once more)
+  const replayGuide = useCallback(() => {
+    try { localStorage.removeItem(GUIDE_KEY) } catch { /* (not kept) */ }
+    setGuide(true)
   }, [])
   const guideHours = useClock((c) => inHours(c.minute))
   // edit mode is for the scene alone: no game action goes through (a click on the 3D view is swallowed before it reaches what's clicked; the menu and buttons are shut by CSS)
@@ -3984,6 +3990,8 @@ export default function App() {
           aria-label={UI[lang].resetView} title={UI[lang].resetView} aria-expanded={viewMenu}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
         </button>
+        {/* the game's guide (item 388): the fish beside the eye, its booklet; the first day's guide shown again from it */}
+        <GameGuide lang={lang} onReplay={replayGuide} />
         {/* the view's name a moment at the foot of the screen as the camera's changed to it */}
         <ViewToast view={view} lang={lang} quiet={editOn} />
         {/* the views: the grill's own, the whole shop, and each part of it (data/views); the one chosen again glides back to it */}

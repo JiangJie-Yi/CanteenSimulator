@@ -94,8 +94,9 @@ export function RegisterManual({ lang }: { lang: Lang }) {
   )
 }
 
-/** a step's keys or words with each " → " (one key, then the next) drawn as the game's own arrow, not a character */
-function withArrows(text: string) {
+/** a step's keys or words with each " → " (one key, then the next) drawn as the game's own arrow, not a character (the game's guide too,
+ * item 388) */
+export function withArrows(text: string) {
   const parts = text.split(/\s*→\s*/)
   return parts.flatMap((p, i) => (i ? [<Glyph key={i} id="arrowR" size="0.9em" className="manual-arrow" />, p] : [p]))
 }

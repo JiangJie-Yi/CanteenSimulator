@@ -1059,6 +1059,30 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   background: color-mix(in srgb, var(--washi) 75%, transparent);
 }
 
+/* the game's guide (item 388): a fish on a round button beside the views' eye, the same glass; a little wag as it's pointed at */
+.guide-fish {
+  position: absolute;
+  left: 74px;
+  bottom: 24px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--washi) 45%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+.guide-fish:hover, .guide-fish.is-open {
+  transform: rotate(-12deg) scale(1.06);
+  background: color-mix(in srgb, var(--washi) 75%, transparent);
+}
+
 /* switching language mustn't shuffle the layout: labels keep a fixed box, lines don't wrap */
 .heat-label {
   min-height: 3.3em;
@@ -5399,6 +5423,135 @@ body.be-tool .axis-widget { left: calc(var(--bt-left) + 12px); bottom: calc(var(
 .reg-manual > footer button:disabled {
   opacity: 0.3;
   cursor: default;
+}
+
+/* the game's guide opened (item 388): a booklet as the register's manual is, its six tabs along its top (never two lines), each page a few
+   lines, a picture by each: the staff's stickers as over their heads, the game's glyphs */
+.game-guide-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgb(20 12 6 / 0.35);
+}
+.game-guide {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: rgb(251 246 234 / 0.97);
+  border: 3px solid #5a3d28;
+  border-radius: 10px;
+  color: #2a1a10;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+}
+.game-guide > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 8px 14px;
+  background: var(--wood-bar);
+  color: #f6e8cc;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.game-guide > header span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.game-guide .gg-x {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.gg-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 0;
+  border-bottom: 2px solid #c79a5a;
+}
+.gg-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 1px solid #c9a978;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: #f1e2c2;
+  color: #6b4423;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.gg-tabs button.is-on {
+  background: #fffaf0;
+  color: #2a1a10;
+  box-shadow: 0 2px 0 #fffaf0;
+}
+.game-guide .gg-title {
+  margin: 12px 18px 2px;
+  font: 700 16px/1.4 var(--brush);
+  color: #3b2a20;
+}
+.gg-lines {
+  margin: 0;
+  padding: 2px 18px 12px;
+  list-style: none;
+}
+.gg-lines li {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgb(59 42 32 / 0.18);
+}
+.gg-lines li:last-child { border-bottom: 0; }
+.gg-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1e2c2;
+  color: #5a3d28;
+}
+.gg-icon.is-sticker { background: transparent; }
+.gg-sticker { width: 36px; height: 36px; }
+.gg-lines b {
+  display: block;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: #2a1a10;
+}
+.gg-lines p {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #3b2a20;
+}
+.gg-lines .manual-arrow { margin: 0 3px; vertical-align: -0.1em; opacity: 0.7; }
+.game-guide > footer { padding: 0 18px 14px; }
+.gg-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #8a6a44;
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: #5a3d28;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
 }
 @media (max-width: 600px) {
   .reg-manual dl > div { grid-template-columns: 1fr; gap: 2px; }

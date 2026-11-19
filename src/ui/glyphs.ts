@@ -9,6 +9,7 @@ export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
   | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb' | 'towel' | 'soap' | 'check' | 'calendar' | 'list' | 'people'
+  | 'fish' | 'steam' | 'crossFace' | 'gladFace'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -75,6 +76,15 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
   eye: [{ d: 'M1.4 8S3.8 3.6 8 3.6 14.6 8 14.6 8 12.2 12.4 8 12.4 1.4 8 1.4 8Z', stroke: 1.3 }, { d: 'M8 5.9a2.1 2.1 0 1 1 0 4.2A2.1 2.1 0 1 1 8 5.9Z' }],
   // (a review found useful: a thumb up, its cuff beside it)
   thumb: [{ d: 'M1.6 7.2h2.8v6.6H1.6Z' }, { d: 'M5.4 7.2 8.2 2.3c.5-.9 2-.6 2 .6v3.3h3.1c.9 0 1.6.8 1.4 1.7l-1.1 5.1c-.2.7-.8 1.2-1.5 1.2H5.4Z' }],
+  // (the game's guide (item 388): a fish, head to the left, its eye and gill cut out of it, its tail forked)
+  fish: [{ d: 'M1.2 8C2.8 4.7 5.9 3.6 8.4 3.9c2 .2 3.3 1.5 4.2 2.6L15.2 4.4v7.2l-2.6-2.1c-.9 1.1-2.2 2.4-4.2 2.6C5.9 12.4 2.8 11.3 1.2 8Z' },
+    { d: 'M5.5 7.2a.95.95 0 1 1-1.9 0a.95.95 0 1 1 1.9 0Z', cut: true }, { d: 'M7.4 5.4Q8.7 8 7.4 10.6', stroke: 1.1, cut: true }],
+  // (a customer's steam: three wisps rising; their cross face: brows down, a frown; their delight: eyes shut with smiling, mouth wide)
+  steam: [{ d: 'M4 14c-1.6-2 1.6-3 0-5s1.6-3 0-5M8 13c-1.6-2 1.6-3 0-5s1.6-3 0-5M12 14c-1.6-2 1.6-3 0-5s1.6-3 0-5', stroke: 1.4 }],
+  crossFace: [{ d: 'M8 1.9a6.1 6.1 0 1 1 0 12.2A6.1 6.1 0 1 1 8 1.9Z', stroke: 1.3 }, { d: 'M4.6 5.4l2.2 1.2M11.4 5.4l-2.2 1.2', stroke: 1.3 },
+    { d: 'M6 8.4h.1M10 8.4h.1', stroke: 1.9 }, { d: 'M5.6 11.9q2.4-1.9 4.8 0', stroke: 1.3 }],
+  gladFace: [{ d: 'M8 1.9a6.1 6.1 0 1 1 0 12.2A6.1 6.1 0 1 1 8 1.9Z', stroke: 1.3 }, { d: 'M4.7 7.4q1.1-1.5 2.2 0M9.1 7.4q1.1-1.5 2.2 0', stroke: 1.3 },
+    { d: 'M4.8 9.4h6.4a3.2 3 0 0 1-6.4 0Z' }],
 }
 
 /** the icon as SVG markup, for the DOM the developer panel builds by hand */

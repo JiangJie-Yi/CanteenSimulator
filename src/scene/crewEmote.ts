@@ -112,6 +112,13 @@ const pop = (s: number) => (s >= 0.32 ? 1 : s <= 0 ? 0 : 1 + 2.4 * Math.pow(s / 
 
 export type Emote = { g: THREE.Group; update: (t: number, e: CrewEmote, level: number) => void }
 
+/** (item 388) an emote's sticker as a picture for a page (the game's guide shows each by what it means, as it is over their heads): its
+ * data URL; none drawn (no page), '' */
+export function emotePicture(kind: Exclude<CrewEmote, 'none'>): string {
+  const c = TEX[kind]?.image as HTMLCanvasElement | undefined
+  try { return c?.toDataURL() ?? '' } catch { return '' }
+}
+
 /**
  * One figure's emotes, over a head whose top is `top` up in its own frame (and `side` out to its side for those beside the head): the one
  * showing now and its little bits (the sweat flying off, the sparkles round, the steam). `update` each frame: what shows (game/crewMood's
