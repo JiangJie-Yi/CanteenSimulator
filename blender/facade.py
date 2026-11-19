@@ -357,6 +357,14 @@ def lantern_picture(W=256, H=128):
     return np.clip(rgb, 0, 1).astype(np.float32)
 
 
+def glow_picture(N=64):
+    """(item 385, the owner's 「燈籠要有些黃光」) the warm light a lantern throws on the dark board behind it: a soft halo, yellow at its
+    middle going amber, gone by its edge (the game lays it on as light, added to what's under it)"""
+    yy, xx = (np.mgrid[0:N, 0:N].astype(np.float32) + 0.5) / N
+    k = np.clip(1 - np.hypot((xx - 0.5) * 2, (yy - 0.5) * 2), 0, 1) ** 1.5
+    return np.stack([k, k * (0.62 + 0.2 * k), k * (0.22 + 0.25 * k)], -1).astype(np.float32)
+
+
 def lattice_picture(N=128):
     """the lattice behind the big lantern: thin square slats standing close (the gaps between cut out), two rails across"""
     rgb = np.zeros((N, N, 3), np.float32)
@@ -390,6 +398,7 @@ M = {
     "roundend": pbr("FacadeRoundEnds", (1, 1, 1), tex=image("facaderoundends", tomoe_picture()), rough=0.45),
     "lanternpaper": pbr("FacadeLanternPaper", (1, 1, 1), tex=image("facadelanternpaper", lantern_picture()), rough=0.8),
     "lanterncap": pbr("FacadeLanternCap", (0.06, 0.05, 0.05), rough=0.4),
+    "lanternglow": pbr("FacadeLanternGlow", (1, 1, 1), tex=image("facadelanternglow", glow_picture()), rough=1.0),
     "trim": pbr("FacadeTrim", (0.86, 0.8, 0.66), rough=0.6),
     "gold": pbr("FacadeGegyo", (0.62, 0.48, 0.22), rough=0.4, metal=0.5),
     "back": pbr("FacadeBack", (0.11, 0.075, 0.05), rough=0.9),
@@ -484,6 +493,19 @@ bmesh.ops.recalc_face_normals(bm_p, faces=bm_p.faces)
 bmesh.ops.recalc_face_normals(bm_c, faces=bm_c.faces)
 keep(mesh_obj("FacadeLanternPapers", bm_p, smooth_shade=True), M["lanternpaper"])
 keep(mesh_obj("FacadeLanternCaps", bm_c), M["lanterncap"])
+# (item 385, the owner's 「燈籠要有些黃光」: the warm light each throws on the dark board behind it, a soft yellow halo, taller than wide,
+# reaching its neighbours': a square on the board behind each (2 mm off it), facing out, its picture the halo; the game lays it on as light,
+# as strong as they're lit, no light of its own)
+bm_g = bmesh.new()
+uvg = bm_g.loops.layers.uv.new()
+GZ = BACK_Z[1] + 0.002
+for ry, y0 in LANT_ROWS:
+    for x in lant_x:
+        yc = y0 + 0.075
+        f = bm_g.faces.new([bm_g.verts.new(P(x + dx, yc + dy, GZ)) for dx, dy in ((-0.085, -0.12), (0.085, -0.12), (0.085, 0.12), (-0.085, 0.12))])
+        for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+            lp[uvg].uv = uv
+keep(mesh_obj("FacadeLanternGlow", bm_g), M["lanternglow"])
 
 # the lattice: the band's middle bay (over the big lantern), a little in front of the wall; and the strip along the wall between the beam and
 # the eave (its slats' picture laid along it at the same size: u by length)

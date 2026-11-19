@@ -821,6 +821,10 @@ useGLTF.preload(FACADE_URL)
 /** the band's little lanterns' paper (item 349, the owner's 「牌子換成一排排的燈籠」: the menu's boards gone for two rows of them): lit with
  * the door lanterns (their switch, their breath), no light of its own (rule 6); made at load, its colour all that changes */
 const LANTERN_PAPER = new THREE.MeshBasicMaterial({ toneMapped: false })
+/** (item 385, the owner's 「燈籠要有些黃光」) the warm light the band's lanterns throw on the dark board behind them: a soft yellow halo round
+ * each (blender/facade.py's FacadeLanternGlow), laid on as light (added, not painted over), as strong as they're lit */
+const LANTERN_GLOW = new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, opacity: 0,
+  side: THREE.DoubleSide })
 function FacadeModel() {
   const gltf = useGLTF(FACADE_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -836,6 +840,10 @@ function FacadeModel() {
           LANTERN_PAPER.map = src.map ?? null
           LANTERN_PAPER.needsUpdate = true
           t = LANTERN_PAPER
+        } else if (/LanternGlow/.test(src.name)) {
+          LANTERN_GLOW.map = src.map ?? null
+          LANTERN_GLOW.needsUpdate = true
+          t = LANTERN_GLOW
         } else t = /Lattice/.test(src.name) ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, alphaTest: 0.5, side: THREE.DoubleSide })
           : new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color.clone(), map: src.map ?? null, normalMap: src.normalMap ?? null })
         t.name = src.name
@@ -849,9 +857,9 @@ function FacadeModel() {
       m.material = Array.isArray(m.material) ? m.material.map(toon) : toon(m.material)
       // (the eave throws its shadow down on the step; the rest, under it, none)
       m.castShadow = /Roof/.test(m.name)
-      m.receiveShadow = !/Roof|EaveTiles/.test(m.name)
+      m.receiveShadow = !/Roof|EaveTiles|Glow/.test(m.name)
     })
-    inkModel(r, (m) => !/Lattice|EaveTiles|Roof/.test(m.name), { width: 0.002, weld: true })
+    inkModel(r, (m) => !/Lattice|EaveTiles|Roof|Glow/.test(m.name), { width: 0.002, weld: true })
     return r
   }, [gltf])
   return <primitive object={obj} />
@@ -860,8 +868,12 @@ function ShopFrontImpl() {
   const lit = useRef(getLights().door ? 1 : 0)
   useFrame(({ clock }, dt) => {
     // (the band's lanterns lit with the door lanterns, their switch's way over some 0.4 s; their light breathing a little as theirs does)
+    // (item 385, the owner's 「燈籠要有些黃光」: lit, their paper a warm candle yellow (it was white, '#fff3dc': red and white, nothing of a
+    // flame in it), and their halos on the board behind them as bright as they're lit)
     lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
-    paperColour(LANTERN_PAPER, lit.current, 0.95 + 0.03 * Math.sin(clock.elapsedTime * 1.9), '#fff3dc')
+    const flame = 0.95 + 0.03 * Math.sin(clock.elapsedTime * 1.9)
+    paperColour(LANTERN_PAPER, lit.current, flame, '#ffd88a')
+    LANTERN_GLOW.opacity = 0.95 * lit.current * flame
   })
   return <StaticBatch><FacadeModel /></StaticBatch>
 }
