@@ -80,6 +80,12 @@ export const moodFor = (id: string, face: 'shy' | 'happy' | 'mad' | 'proud' | 's
 /** when a customer last complained of the wait (performance.now(), shops/grill/bar's gripe): the owner and the staff look alarmed a moment
  * (the owner's: Overcooked's panic as the orders pile up) */
 export const RUSH = keep(import.meta.hot, 'RUSH', { at: -1e9 })
+/** how hard pressed the shop is just now (0..1, game/crewMood's loadOf: the customers waiting for their food and how near the end of their
+ * patience; Roasting keeps it with FUMING): the staff sweat and hurry as it's up (item 381) */
+export const CREW_LOAD = keep(import.meta.hot, 'CREW_LOAD', { value: 0 })
+/** each of the staff's bond with the owner (0..100, game/affinity's bondOf; App keeps it with STAFF_BOND): getting on well they hum now and
+ * then, cold they sigh (item 381) */
+export const CREW_BONDS = keep(import.meta.hot, 'CREW_BONDS', new Map<string, number>())
 /** what the shop's name brings in today (game/reputation's flowOf, taken as the day's business opens: App): how many more customers come
  * (the gap between them divided by it), how patient they are */
 export const RATING_FLOW = keep(import.meta.hot, 'RATING_FLOW', { more: 1, patience: 1 })

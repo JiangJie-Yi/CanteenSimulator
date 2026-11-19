@@ -14,7 +14,10 @@ import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
 import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
-import { CREW_MOOD, RUSH, SPEAKERS, STAFF_IDLE, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { ATMOS, CREW_BONDS, CREW_LOAD, CREW_MOOD, RUSH, SPEAKERS, STAFF_IDLE, STAFF_SAY, STAFF_TALK, STAFF_TIRED, URGED } from '@/game/shopState'
+import { crewMood, newCrewMood, type CrewEmote, type CrewMoodState } from '@/game/crewMood'
+import { CREW_BUSY, CREW_TIRED } from '@/data/crewMoodLines'
+import { makeEmote, type Emote } from './crewEmote'
 import { activityOf } from '@/data/staff'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { FigureHit } from './FigureHit'
@@ -213,6 +216,8 @@ function poseBroom(broom: THREE.Object3D, sweep: number | undefined, carried: bo
 export const TRAY_AT: [number, number, number] = [0, 0.4, 0.36]
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
 const REACH_A = new THREE.Vector3(), REACH_B = new THREE.Vector3()
+/** (a scratch vector: the figure's scale, for its emotes' height in its own frame, item 381) */
+const EMOTE_SCALE = new THREE.Vector3()
 /** the hand wiping the bar down: up on the cloth, out in front (GuestBar3D lays the cloth under it, from the same reach) */
 export const WIPE_HAND = { y: 0.83, z: 0.44 }
 /** where the hand (and the cloth under it) is `p` (0..1) into a wipe of the bar, in the figure's own frame (x across, z out in front): three
@@ -382,6 +387,12 @@ function build(scene: THREE.Group, v: Variant): Built {
  * plate, the stock keeper a case). Faces +z, stands on y 0.
  */
 // (drawn again only when its own props change: the staff stand in parents that redraw several times a second, and they move by their own frames)
+/** when one of the staff last said they were swamped, or worn out (performance.now): one at a time, not a chorus as the shop gets busy (item
+ * 381); and each one's own last word of it */
+const MOOD_SAID = { busy: -1e9, tired: -1e9, by: new Map<string, number>() }
+/** (in development, `__crewFeel`: each one's mood as last reckoned, for the checks) */
+const CREW_FEEL = new Map<string, unknown>()
+if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __crewFeel: CREW_FEEL })
 export const StaffFigure = memo(StaffFigureImpl)
 function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, face: faceAsked }: { id: string; role: Role; look: StaffLook; moving?: boolean
   /** a face to make, whatever they're doing (the character viewer's buttons) */
@@ -473,6 +484,15 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   const life = useRef<FaceLife | null>(null)
   const yawWas = useRef(0)
   const reachAt = useRef({ L: new THREE.Vector3(), R: new THREE.Vector3() })
+  // (item 381, game/crewMood: how they feel, over their head (scene/crewEmote, made once their height's known), in their bearing (shoulders
+  // down worn out, a spring in the step glad, leaning in pressed: eased in and out) and their step's own beat)
+  const moodS = useRef<CrewMoodState | null>(null)
+  const emoteRef = useRef<Emote | null>(null)
+  const bearing = useRef({ slump: 0, bounce: 0, hurry: 0 })
+  const stepPh = useRef(0)
+  const emoteWas = useRef<CrewEmote>('none')
+  const pressedWas = useRef(false)
+  useEffect(() => () => { emoteRef.current?.g.removeFromParent(); emoteRef.current = null }, [fig])
   const broom = useMemo(() => makeHandBroom(), [])
   const pan = useMemo(() => makeDustpan(), [])
   useEffect(() => { fig.root.add(broom, pan); return () => { fig.root.remove(broom, pan) } }, [fig, broom, pan])
@@ -490,6 +510,42 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     if (!tall.current) { const b = new THREE.Box3().setFromObject(fig.root); if (!b.isEmpty()) tall.current = b.max.y - b.min.y }
     // (not on the character viewer's turntable: its own little canvas, the puffs are the room's)
     if (tall.current && o.visible && !id.startsWith('viewer-')) footDust(steps.current, at, walk, tall.current, dt, 'staff')
+    // (how they feel (item 381): not the character viewer's turntable, nor while they come and go through the door (faded))
+    const nowMs = performance.now()
+    const viewer = id.startsWith('viewer-')
+    const feeling = viewer ? null : crewMood((moodS.current ??= newCrewMood(nowMs, seed)), { now: nowMs, tired: STAFF_TIRED.has(id), load: CREW_LOAD.value,
+      bond: CREW_BONDS.get(id) ?? 50, atmos: ATMOS.value, rushAt: RUSH.at, urgedAt: URGED.get(id), feel: CREW_MOOD.get(id) }, seed)
+    const B = bearing.current, ease = Math.min(1, dt * 4)
+    B.slump += ((feeling?.slump ?? 0) - B.slump) * ease
+    B.bounce += ((feeling?.bounce ?? 0) - B.bounce) * ease
+    B.hurry += ((feeling?.hurry ?? 0) - B.hurry) * ease
+    if (!emoteRef.current && tall.current && !viewer) {
+      // (their head's top in their own frame: their height over the scale they're drawn at)
+      const sy = fig.root.getWorldScale(EMOTE_SCALE).y || 1
+      const top = tall.current / sy
+      emoteRef.current = makeEmote(top, top * 0.36)
+      fig.root.add(emoteRef.current.g)
+    }
+    const shows: CrewEmote = feeling && ((o.parent?.userData as { fade?: number } | undefined)?.fade ?? 1) > 0.5 && o.visible ? feeling.emote : 'none'
+    if (import.meta.env.DEV && feeling) CREW_FEEL.set(id, { ...feeling, shows, state: moodS.current })
+    emoteRef.current?.update(t, shows, feeling?.level ?? 0)
+    // (and now and then a word of it: swamped as the shop gets on top of them, worn out as it comes over them; one of the staff at a time, each
+    // not again for a good while)
+    if (feeling && moodS.current) {
+      const said = MOOD_SAID.by.get(id) ?? -1e9
+      if (moodS.current.pressed && !pressedWas.current && nowMs - MOOD_SAID.busy > 30000 && nowMs - said > 90000 && Math.random() < 0.35) {
+        MOOD_SAID.busy = nowMs
+        MOOD_SAID.by.set(id, nowMs)
+        STAFF_SAY.say(id, CREW_BUSY)
+      }
+      if (shows === 'gloom' && feeling.level >= 1 && emoteWas.current !== 'gloom' && nowMs - MOOD_SAID.tired > 45000 && nowMs - said > 120000 && Math.random() < 0.4) {
+        MOOD_SAID.tired = nowMs
+        MOOD_SAID.by.set(id, nowMs)
+        STAFF_SAY.say(id, CREW_TIRED)
+      }
+      pressedWas.current = moodS.current.pressed
+      emoteWas.current = shows
+    }
     // (what their walk says they're doing just now: the chef carrying food back in both hands, preparing it on the board, fanning the coals
     // for something on the fire (Roasting's CrewWalk); anyone finishing up for the day with a stretch, nodding back in at the door, fading
     // through it (commuteWalk))
@@ -533,12 +589,17 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       if (f !== fanning) setFanning(f)
     }
     // (a waddle as they walk, as Overcooked's cooks do: bobbing at each step, rocking side to side; standing, breathing)
-    const ph = t * 9
-    fig.body.position.y = walk * Math.abs(Math.sin(ph)) * 0.035
+    // (their step's beat: quicker pressed, slower worn out (its own phase, so a change of pace never jumps it))
+    stepPh.current += dt * 9 * (1 + 0.25 * B.hurry - 0.22 * B.slump)
+    const ph = stepPh.current
+    // (the bob of each step bigger glad, flatter worn out; and glad standing, a little bounce on their toes)
+    fig.body.position.y = walk * Math.abs(Math.sin(ph)) * 0.035 * (1 + 0.9 * B.bounce - 0.45 * B.slump) + (1 - walk) * B.bounce * Math.max(0, Math.sin(t * 7.5)) * 0.016
     // (and standing, never quite still (item 183, the owner's: "the staff are far too stiff"): their weight shifted from foot to foot, slowly)
     fig.body.rotation.z = walk * Math.sin(ph) * 0.07 + (1 - walk) * Math.sin(t * 0.8 + seed * 2.1) * 0.022
     // (a bow of the head and shoulders at the door)
     fig.body.rotation.x = walk * 0.08 + (seated ? 0.07 : 0) + (job?.nod ?? 0) * 0.28 + (job?.lean ?? 0) + (!id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' ? 0.1 : 0)
+      // (worn out, their head and shoulders down; pressed, leaning into their stride)
+      + 0.13 * B.slump + 0.07 * B.hurry * walk
     // ---- their face: focused at the board, the fan or the till's keys; glad carrying a dish out; alarmed as a customer complains of the
     // wait (RUSH); talking while a word of theirs is up (STAFF_TALK); a blink every few seconds; the viewer's face over all of it
     const now = performance.now()
@@ -554,6 +615,8 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const mood = CREW_MOOD.get(id)
     if (!faceAsked && mood && mood.until > now && face !== 'panic') face = mood.face
     else if (!faceAsked && face === 'idle' && STAFF_TIRED.has(id)) face = 'tired'
+    // (and their mood's face over their idle one (item 381): set to it pressed, glad humming, a sigh, cross with it)
+    else if (!faceAsked && face === 'idle' && feeling) face = feeling.emote === 'sweat' ? 'focused' : feeling.emote === 'note' ? 'happy' : feeling.emote === 'gloom' ? 'tired' : feeling.emote === 'anger' ? 'mad' : face
     // (and the face's life over it (game/faceLife): a blink at no fixed beat that closes and opens, a new face through a blink, the mouth in
     // syllables while a word's up, a glance aside now and then while they're free, the eyes first where the head's turning)
     const fl = (life.current ??= newFaceLife(seed * 7.31 + 1, face, t))

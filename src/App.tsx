@@ -48,7 +48,7 @@ import { getLights, setLightSwitch, useLights } from '@/scene/lightsStore'
 import { keyLightFrom, lampGlow, lanternsLit, roomDim, shadowDepth, shadowSoft, studioLight } from '@/game/roomLights'
 import { setStudioLight } from '@/scene/studio'
 import { FramePacer, holdPacer, usePacedDpr } from '@/scene/FramePacer'
-import { ATMOS, CREW_ROLES, dutyDay, moodFor, URGED, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
+import { ATMOS, CREW_BONDS, CREW_ROLES, dutyDay, moodFor, URGED, idleTick, LAST_CALL, LATE, LODGERS, ON_DUTY, RATING_FLOW, SHOP, STAFF_BOND, STAFF_IDLE, SPEAKERS, STAFF_SAY, STAFF_SKILLS, STAFF_TALK, STAFF_TIRED } from '@/game/shopState'
 import { commuteOf, delayOf, lineOf, talkersOf } from '@/game/commute'
 import { CLOSE_DORM, CLOSE_HOME, LAST_ORDER, OPEN_DORM, OPEN_HOME } from '@/data/commuteLines'
 import { GAME_SPEED, paused } from '@/scene/speed'
@@ -1648,7 +1648,8 @@ export default function App() {
   }, [hired, pairs, ai])
   useEffect(() => {
     STAFF_BOND.clear()
-    for (const ws of Object.values(hired)) for (const [id, r] of Object.entries(ws)) STAFF_BOND.set(id, bondPace(r.bond))
+    CREW_BONDS.clear()
+    for (const ws of Object.values(hired)) for (const [id, r] of Object.entries(ws)) { STAFF_BOND.set(id, bondPace(r.bond)); CREW_BONDS.set(id, bondOf(r.bond)) }
     ATMOS.value = atmosNow
     ATMOS.pace = moodPace(atmosNow)
   }, [hired, atmosNow])
