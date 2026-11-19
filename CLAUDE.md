@@ -98,7 +98,7 @@ data  ←  game  ←  scene  ←  ui  ←  shops/*  ←  App.tsx
 | `node tests/e2e/perf.mjs [free\|grill]` | 效能量測：用這台電腦的真顯示卡（headless Chrome＋ANGLE D3D11，不是軟體 GL）量每秒畫面數、慢的那幾格、每格的繪製次數與三角面、renderer 每格花的時間；`OPEN=<毫秒>` 先開店讓客人進來、`BY=1` 每件擺設各畫幾次、`SUBS=1` 每個 useFrame 的時間、`PROF=1` CPU 剖析、`WHO=1` 誰在呼叫 renderer（多出來的整場重畫會在這裡出現）。頁面加 `?pace=0`，量的時候不會自動降畫質 |
 | `node tests/e2e/alloc.mjs` | 開店時誰在製造垃圾（記憶體配置取樣）：開店、全員到齊、×2，跑 `WARM`（預設 60 秒）後取樣 `SPAN`（預設 30 秒），列出每秒配置幾 MB 與配置最多的函式（含呼叫者）。`BASE=http://localhost:4173`（`npx vite preview`）量正式版：dev 模式光 JSX 就多好幾倍 |
 | `node tests/e2e/soak.mjs` | 長時間營業會不會越來越卡：開店後每 `SAMPLE`（預設 60 秒）記一行 JSON：回收後的 JS heap、array buffer、FPS、最差的一格、繪製次數、三角面、GPU 的幾何／貼圖／程式數（`MINUTES` 預設 20）；每個數字都應該持平。`BASE=` 同上量正式版 |
-| `node tests/e2e/redraws.mjs` | 開店時誰在重畫、為什麼：開店、全員到齊、×2，`WARM`（預設 45 秒）後量 `SPAN`（預設 30 秒）的每一次 React 提交，列出每個元件每秒重畫幾次，以及原因：哪幾個 props 變了（「a new object, same values」＝父層重畫時順便被帶著，自己什麼都沒變，該 memo），或自己的哪個 state 變了（以宣告它的那一行標出）。用 dev server（名稱才看得到） |
+| `node tests/e2e/redraws.mjs` | 開店時誰在重畫、為什麼：開店、全員到齊、×2，`WARM`（預設 45 秒）後量 `SPAN`（預設 30 秒）的每一次 React 提交，列出每個元件每秒重畫幾次，以及原因：哪幾個 props 變了（「a new object, same values」＝父層重畫時順便被帶著，自己什麼都沒變，該 memo），或自己的哪個 state 變了（以宣告它的那一行標出）。用 dev server（名稱才看得到）；`SRC=1` 沒名字的元件附上原始碼的開頭，分得出是哪一個（例如 drei 的 `Html`） |
 | `__triTop(n, 'piece'\|'mesh')`（dev console） | 三角面排行：照擺設（最近的 Movable id，沒有就最近的具名群組）列出畫出來的三角面最多的前 n 名（模型與描線分開、網格數、實例數）與全場總數、繪製數（不含陰影；`scene/triProfiler.ts`） |
 | `npm run bench` | 性能測試（`tests/e2e/bench.mjs`，需先開 dev server；真顯示卡、1920×1080）：總覽穩定後的繪製次數、三角面、幾何、貼圖、著色程式、回收後的 JS heap；接著依序切 1～9、0 號視角（每個停 `HOLD`，預設 1 秒）、關燈再開燈、進出開發者模式，記錄平均 FPS、1% Low、最差一格（另算不含開發者模式的）、巡航前後 heap 差，與最慢的幾格發生在哪一步；寫成 Markdown 表格（`OUT`，預設 `bench.md`）與同名 .json，`BEFORE=<舊的 .json>` 並排比較 |
 | `npm run build` | 型別檢查＋建置 |

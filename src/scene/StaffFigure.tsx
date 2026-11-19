@@ -385,7 +385,8 @@ function build(scene: THREE.Group, v: Variant): Built {
 
 /**
  * Someone working in the shop at their place: a cook at the fire (fanning the coals now and then), a server holding a tray out on both
- * hands, the cashier with their hands together, the stock keeper with his clipboard; `moving`: walking somewhere (a server carrying a
+ * hands, the cashier with their hands together, the stock keeper with his clipboard; `moving` (or `walking` on their parent's userData,
+ * set as it goes, item 374): walking somewhere (a server carrying a
  * plate, the stock keeper a case). Faces +z, stands on y 0.
  */
 // (drawn again only when its own props change: the staff stand in parents that redraw several times a second, and they move by their own frames)
@@ -394,6 +395,8 @@ function build(scene: THREE.Group, v: Variant): Built {
 const MOOD_SAID = { busy: -1e9, tired: -1e9, by: new Map<string, number>() }
 /** (in development, `__crewFeel`: each one's mood as last reckoned, for the checks) */
 const CREW_FEEL = new Map<string, unknown>()
+/** (scratch for each frame: where a figure is, its hand held out, the fan off its hand; none made anew each frame, item 374) */
+const AT_NOW = new THREE.Vector3(), HAND_OUT = new THREE.Vector3(), FAN_OFF = new THREE.Vector3(0, 0.03, 0.02)
 if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __crewFeel: CREW_FEEL })
 export const StaffFigure = memo(StaffFigureImpl)
 function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, face: faceAsked }: { id: string; role: Role; look: StaffLook; moving?: boolean
@@ -452,8 +455,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
   }, [])
   // (their face (setExpression): what they're doing says it; a squash and stretch as it changes, or as they start to say something)
   const faceWas = useRef<{ face: CrewFace; at: number; said: number; saidAt: number; carry: boolean; wipe: boolean }>({ face: 'idle', at: -1e9, said: 0, saidAt: -1e9, carry: false, wipe: false })
-  // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times)
-  const [fanning, setFanning] = useState(false)
+  // (a cook fans the fire only now and then: a spell of it, the fan in hand, then put down; each to their own times. Kept by the frame,
+  // not in their state (item 374: the figure was drawn again each time a cook took the fan up or put it down))
+  const fanning = useRef(false)
   const clock = useRef(0)
   const outer = useRef<THREE.Group>(null)
   const last = useRef<THREE.Vector3 | null>(null)
@@ -504,9 +508,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const o = outer.current
     if (!o) return
     // (walking or not: by how far they've gone since the last frame)
-    const at = o.getWorldPosition(new THREE.Vector3())
+    const at = o.getWorldPosition(AT_NOW)
     const step = last.current ? Math.hypot(at.x - last.current.x, at.z - last.current.z) / Math.max(dt, 1e-3) : 0
-    last.current = at
+    ;(last.current ??= new THREE.Vector3()).copy(at)
     pace.current += (Math.min(1, step / 0.6) - pace.current) * Math.min(1, dt * 8)
     const walk = pace.current
     if (!tall.current) { const b = new THREE.Box3().setFromObject(fig.root); if (!b.isEmpty()) tall.current = b.max.y - b.min.y }
@@ -558,7 +562,10 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       /** both hands where a job wants them, in the world (item 177: on the open sake bottle as it's poured, a tokkuri, a cup) */
       handsAt?: { left: THREE.Vector3; right: THREE.Vector3 }
       /** (a server on an errand: their tray put down, item 249) */
-      trayDown?: boolean } | undefined
+      trayDown?: boolean
+      /** (on their way somewhere, as whoever moves them has it (the stock keeper's chores, item 374): their clipboard put by) */
+      walking?: boolean } | undefined
+    const going = moving || !!job?.walking
     // (how much of them shows: their own copies of the materials while they're fading, the shared ones back after; their ink line thinned
     // with them to nothing (as the customers' is: put away at once, it went in a blink before the rest of them))
     const fade = job?.fade ?? 1
@@ -587,8 +594,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       }
     }
     if (cook) {
-      const f = job?.fetcher ? !!job.fanNow : (t + seed * 3.7) % 17 < 6 && !moving
-      if (f !== fanning) setFanning(f)
+      fanning.current = job?.fetcher ? !!job.fanNow : (t + seed * 3.7) % 17 < 6 && !going
     }
     // (a waddle as they walk, as Overcooked's cooks do: bobbing at each step, rocking side to side; standing, breathing)
     // (their step's beat: quicker pressed, slower worn out (its own phase, so a change of pace never jumps it))
@@ -620,7 +626,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
     const slack = !id.startsWith('viewer-') && walk < 0.2 && activityOf(STAFF_IDLE.get(id)) === 'slack' && job?.sweep === undefined && !job?.broom
     const word = STAFF_TALK.find((w) => w.id === id)
     const tapping = seated && (t + seed) % 7 < 2.2
-    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning) || tapping || job?.wipe !== undefined || job?.sweep !== undefined || job?.floorWipe !== undefined || slack ? 'focused'
+    let face: CrewFace = faceAsked ?? (now - RUSH.at < 2500 ? 'panic' : job?.prep || job?.fanNow || (cook && fanning.current) || tapping || job?.wipe !== undefined || job?.sweep !== undefined || job?.floorWipe !== undefined || slack ? 'focused'
       : job?.carry || job?.stretch || (job?.nod ?? 0) > 0.2 ? 'happy' : 'idle')
     // (item 368: the shop's mood on them a while (praise, a raise, a cut, a word with a colleague: CREW_MOOD) over their idle or their work's
     // face but a fright; worn out, a tired face for their idle one)
@@ -705,8 +711,9 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       }
       // (held out in front (a tray, a clipboard), together at the front (the cashier), swinging as they walk, or the fan waved)
       const swing = walk * Math.sin(ph + (sd > 0 ? Math.PI : 0)) * 0.07
-      const out = new THREE.Vector3(sd * (hold === 1 ? 0.13 : 0.12), hold === 1 ? TRAY_AT[1] - 0.04 : 0.22, hold === 1 ? TRAY_AT[2] - 0.02 : 0.26)
-      hand.position.lerpVectors(rest, out, hold).add(new THREE.Vector3(0, 0, hold === 1 ? 0 : swing))
+      const out = HAND_OUT.set(sd * (hold === 1 ? 0.13 : 0.12), hold === 1 ? TRAY_AT[1] - 0.04 : 0.22, hold === 1 ? TRAY_AT[2] - 0.02 : 0.26)
+      hand.position.lerpVectors(rest, out, hold)
+      if (hold !== 1) hand.position.z += swing
       hand.rotation.x = hold === 1 ? -1.1 : 0
       if (job?.stretch) {
         // (finishing up: both arms up over the head in a long stretch, swaying a little)
@@ -749,7 +756,7 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
         hand.position.set(wx, WIPE_HAND.y, wz)
         hand.rotation.x = -1.3
       }
-      if (cook && fanning && sd > 0) {
+      if (cook && fanning.current && sd > 0) {
         hand.position.set(0.3, 0.42 + Math.sin(t * 7) * 0.03, 0.18)
         hand.rotation.z = Math.sin(t * 7) * 0.4
       } else hand.rotation.z = 0
@@ -763,12 +770,12 @@ function StaffFigureImpl({ id, role, look: who, moving = false, seated = false, 
       }
     }
     if (fig.fan && fig.handR) {
-      const shown = cook && fanning
+      const shown = cook && fanning.current
       fig.fan.scale.setScalar(shown ? 1 : 0)
-      if (shown) { fig.fan.position.copy(fig.handR.position).add(new THREE.Vector3(0, 0.03, 0.02)); fig.fan.rotation.z = fig.handR.rotation.z }
+      if (shown) { fig.fan.position.copy(fig.handR.position).add(FAN_OFF); fig.fan.rotation.z = fig.handR.rotation.z }
     }
     // (the stock keeper's clipboard, held up while they stand)
-    fig.clip?.scale.setScalar(role === 'stock' && !moving && !slack ? 1 : 0)
+    fig.clip?.scale.setScalar(role === 'stock' && !going && !slack ? 1 : 0)
     // (a server's broom: swept, or carried at their side in their right hand, there and back; their tray put by meanwhile)
     // (stooped over it while they sweep, upright after: the whole figure tipped about its feet, the broom and pan in its frame with it)
     bend.current += ((stooped ? OWNER_BEND : 0) - bend.current) * Math.min(1, dt * 8)

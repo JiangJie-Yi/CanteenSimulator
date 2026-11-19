@@ -594,6 +594,20 @@ const FIXED_ON_TOP = new Set(['bin'])
 /** how many of the floating 美味 words can be up at once, and where an unused place waits */
 const POP_SLOTS = 8
 const POP_AWAY: [number, number, number] = [0, -50, 0]
+/** a word in one of the little floating words' places (Roasting's `pops`) */
+type Pop = { id: number; at: [number, number, number]; text: string; good: boolean }
+/**
+ * One of the little floating words' places: drawn again only as its own word changes (item 374: all eight were drawn again with every
+ * redraw of the kitchen, about 12 times a second at the shop's busiest, most of them empty, each a drei Html working its place out again)
+ */
+const PopWord = memo(function PopWord({ x }: { x: Pop | null }) {
+  return (
+    <Html position={x?.at ?? POP_AWAY} center zIndexRange={zr(36, 26)} style={NO_POINTER}>
+      {/* (the word's own key: a new one starts its rise again) */}
+      {x && <span key={x.id} className={`taste-pop${x.good ? '' : ' is-bad'}`}>{x.text}</span>}
+    </Html>
+  )
+})
 /** how much bigger the fire pit (its ground and stones) is drawn than modelled */
 const PIT_SCALE = 1.3
 /**
@@ -7328,7 +7342,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
   // little floating words: how a seasoning changed a piece's 美味
   // (shown in a few places kept mounted, each word taking the next free one: one mounted for each word, a React root and its page element
   // made and thrown away two or three times a second while the chef seasoned, kept in development (the heap rose with them))
-  const [pops, setPops] = useState<({ id: number; at: [number, number, number]; text: string; good: boolean } | null)[]>(() => Array(POP_SLOTS).fill(null))
+  const [pops, setPops] = useState<(Pop | null)[]>(() => Array(POP_SLOTS).fill(null))
   const popId = useRef(0)
   const pop = (at: THREE.Vector3, delta: number) => {
     if (!delta) return
@@ -9358,12 +9372,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
           <span className="taste-tip">美味 <b>{tasteTip.taste}</b></span>
         </Html>
       )}
-      {pops.map((x, k) => (
-        <Html key={k} position={x?.at ?? POP_AWAY} center zIndexRange={zr(36, 26)} style={NO_POINTER}>
-          {/* (the word's own key: a new one starts its rise again) */}
-          {x && <span key={x.id} className={`taste-pop${x.good ? '' : ' is-bad'}`}>{x.text}</span>}
-        </Html>
-      ))}
+      {pops.map((x, k) => <PopWord key={k} x={x} />)}
       {active && toolLabel && (
         <Html position={toolLabel.at} center zIndexRange={zr(30, 10)} style={NO_POINTER}>
           <span className="tool-tag">{tipIn(toolLabel.kind === 'water' ? '水（退火用）' : TOOL_NAMES[toolLabel.kind], lang)}<small>{tipIn(toolLabel.kind === 'water' ? '拖至炭火／爐心' : '拖到食物上', lang)}</small></span>

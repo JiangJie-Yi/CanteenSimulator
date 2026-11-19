@@ -1,4 +1,4 @@
-import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes, washUrgent } from '@/game/skewers'
 import { rattleSound } from './skewerSound'
 import { useSaid } from '@/ui/speechStore'
@@ -311,19 +311,34 @@ const OWNER_BONE = new THREE.Vector3()
 /** the owner's tray: a server's rimmed lacquered one (scene/trayGeometry, item 249: a flat black disc, it read as "a black plate") */
 const OWNER_TRAY_GEO = rimmedTray(0.15, 0.024, 0.008)
 /** the owner out serving (no server hired): his figure with a rock and a bob as he walks, and a lacquered tray held in front */
-// (item 374: drawn again only when he starts or stops walking, not each time the bar's drawn)
+// (item 374: never drawn again with the bar. His rock and bob by how far he's gone since the last frame, eased in and out as he sets off
+// and stops: a walking flag the bar kept for him (and each server, and the plater), set as they set off and stopped, had his figure drawn
+// again each time, and the rock came and went at once)
+const OWNER_AT = new THREE.Vector3()
 const OwnerWalker = memo(OwnerWalkerImpl)
-function OwnerWalkerImpl({ moving }: { moving: boolean }) {
+function OwnerWalkerImpl() {
   const g = useRef<THREE.Group>(null)
+  const last = useRef<THREE.Vector3 | null>(null)
+  const pace = useRef(0)
   const tray = useRef<THREE.Mesh>(null)
   /** his hands (the model's own nodes) and where they rest, found once he's drawn */
   const hands = useRef<{ node: THREE.Object3D; at: THREE.Vector3; q: THREE.Quaternion; upper: boolean }[] | null>(null)
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const o = g.current
     if (!o) return
-    const t = clock.elapsedTime
-    o.rotation.z = moving ? Math.sin(t * 9) * 0.05 : 0
-    o.position.y = moving ? Math.abs(Math.sin(t * 9)) * 0.014 : 0
+    const t = clock.elapsedTime, dt = Math.min(0.1, delta)
+    // (how fast he's going, 0 to 1 at a walk (as the staff's figures have it); from nothing while he's out of sight, not from where he was
+    // put away)
+    if (o.parent && !o.parent.visible) { last.current = null; pace.current = 0 }
+    else {
+      const at = o.getWorldPosition(OWNER_AT)
+      const sp = last.current ? Math.hypot(at.x - last.current.x, at.z - last.current.z) / Math.max(dt, 1e-3) : 0
+      ;(last.current ??= new THREE.Vector3()).copy(at)
+      pace.current += (Math.min(1, sp / 0.6) - pace.current) * Math.min(1, dt * 8)
+    }
+    const k = pace.current
+    o.rotation.z = Math.sin(t * 9) * 0.05 * k
+    o.position.y = Math.abs(Math.sin(t * 9)) * 0.014 * k
     // (sweeping up broken glass, or the broom carried: the tray put by)
     // (nor while he's down sweeping or wiping the floor (item 116: the tray showed in his hands as he wiped, a black disc on the floor))
     // (nor on an errand, the till, the skewers, the sink or sweeping up, there and back (trayDown, item 249: back from sweeping up broken glass
@@ -553,7 +568,6 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     const sk = (mouth as THREE.Object3D).getWorldScale(new THREE.Vector3()).x, gs = o.getWorldScale(new THREE.Vector3()).x
     return { toBin, toDoor, door: at(0), mouths: { rubbish: local(mouth), recycle: local(recMouth) }, scale: gs > 0 ? sk / gs : 1 }
   }
-  const [moving, setMoving] = useState(false)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __stocker?: typeof st }).__stocker = st
   // (his walk in as the shop opens and home as it shuts (commuteWalk): out along the side counter's aisle, round the corner, to the front door)
   const cm = useRef<{ trip: Trip | null; arrived: boolean }>({ trip: null, arrived: false })
@@ -673,7 +687,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
             set([home.clone(), homeAisle.clone(), ...(seat.counter === 1 ? [] : [aisleCornerOf(counters, c1)]), seat.aisle.clone(), beside])
           }
           // (the drinks: first bent to the cartons for a case, then off with it)
-          if (next.kind === 'drinks') { s.phase = 'take'; s.t = 0 } else { s.phase = 'go'; setMoving(true) }
+          if (next.kind === 'drinks') { s.phase = 'take'; s.t = 0 } else { s.phase = 'go' }
         }
       }
     } else if (s.phase === 'take') {
@@ -681,9 +695,9 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       const face = Math.atan2(c1.lay.x, c1.lay.z)
       s.yaw += Math.atan2(Math.sin(face - s.yaw), Math.cos(face - s.yaw)) * Math.min(1, dt * 6)
       if (g.current) g.current.userData.lean = 0.4 * Math.sin(Math.min(1, s.t / 0.9) * Math.PI)
-      if (s.t > 0.9) { if (g.current) g.current.userData.lean = 0; s.phase = 'go'; s.t = 0; setMoving(true) }
+      if (s.t > 0.9) { if (g.current) g.current.userData.lean = 0; s.phase = 'go'; s.t = 0 }
     } else if (s.phase === 'go') {
-      if (walk()) { s.phase = 'work'; s.t = 0; setMoving(false) }
+      if (walk()) { s.phase = 'work'; s.t = 0 }
     } else if (s.phase === 'work' && c) {
       s.t += dt
       if (c.kind === 'drinks') {
@@ -736,7 +750,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           // stowed in it and a new one taken out; with none, out by the staff door as before)
           if (s.leg === 0 && s.t > 1.4) {
             if (bagGoes(!SHOP.leaving) === 'underSink') { s.leg = 4; s.t = 0 }
-            else { s.leg = 1; set(w.toDoor); s.phase = 'go'; setMoving(true) }
+            else { s.leg = 1; set(w.toDoor); s.phase = 'go' }
           }
           if (s.leg === 3 && s.t > 0.7 && s.bag) { s.bag = null; SINK_BIN.out = null }
           if (s.leg === 3 && s.t > 1.3) { if (g.current) g.current.userData.lean = 0; set(w.toBin); s.phase = 'back' }
@@ -758,7 +772,6 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
           s.leg = 3
           set([...w.toDoor].reverse())
           s.phase = 'go'
-          setMoving(true)
         }
       } else {
         // (the drawer out, the box in it changed for a spare, the drawer back in)
@@ -772,7 +785,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         }
         if (s.t > 2.0) { DRAWER_HELD.delete(c.seat); s.phase = 'back' }
       }
-      if (s.phase === 'back') { s.d = 0; setMoving(true) }
+      if (s.phase === 'back') { s.d = 0 }
     } else if (s.phase === 'back') {
       if (walk()) {
         s.phase = 'idle'
@@ -781,9 +794,11 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         if (c?.kind === 'roll') STOCKER_WC.who = null
         if (c?.kind === 'bin') { s.ways = null; s.leg = 0 }
         s.chore = null
-        setMoving(false)
       }
     }
+    // (on his way to a chore or back from it, for his figure: his clipboard put by as he goes (item 374: it was his state, and all of him was
+    // drawn again each time he set off or stopped))
+    if (g.current) g.current.userData.walking = s.phase === 'go' || s.phase === 'back'
     // (at a toilet's door: near enough to have it open; in, past it)
     if (c?.kind === 'roll' && wcs) {
       const w = wcs[c.who]
@@ -852,7 +867,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   return (
     <group ref={(o) => { g.current = o; STOCKER_FIG.o = o; if (o) FIGURES.set(o, 'other') }} position={home} scale={STAFF_SCALE} userData={{ staffId: who.id, role: 'stock' }}>
       <BlobShadow r={0.17} />
-      <StaffFigure id={who.id} role="stock" look={who.look} moving={moving} />
+      <StaffFigure id={who.id} role="stock" look={who.look} />
       <Html position={[0, 1.95, 0]} center zIndexRange={zr(19, 9)} style={NO_POINTER}>
         <span ref={statusEl} className="staff-status" />
       </Html>
@@ -3627,46 +3642,6 @@ const smearsOf = (g: THREE.Object3D | null | undefined): THREE.Mesh[] => {
 }
 
 /**
- * Whether each waiter (by their place in the line, 0 the first) is walking, for their figure's stride: kept here, each figure listening for
- * its own, not in GuestBar3D's state (a waiter setting off or stopping redrew the whole bar, three times a second while they cleared up at
- * closing, 30-40 ms each in the dev build: item 24)
- */
-const WAITER_MOVING: boolean[] = []
-const movingSubs = new Set<() => void>()
-const setWaiterMoving = (i: number, on: boolean) => { if (!!WAITER_MOVING[i] === on) return; WAITER_MOVING[i] = on; movingSubs.forEach((f) => f()) }
-const subMoving = (f: () => void) => { movingSubs.add(f); return () => { movingSubs.delete(f) } }
-const useWaiterMoving = (i: number) => useSyncExternalStore(subMoving, () => !!WAITER_MOVING[i])
-/** the owner serving, walking or not, as his figure has it */
-// (item 374: drawn again only when his walking flag changes)
-const OwnerWalking = memo(OwnerWalkingImpl)
-function OwnerWalkingImpl() {
-  return <OwnerWalker moving={useWaiterMoving(0)} />
-}
-/** the owner gone to wash the stack on the sink's counter (item 103): his figure as he walks there and back, his own walking flag */
-const BOSS_WASH_I = 63
-// (item 374: likewise)
-const BossWashWalking = memo(BossWashWalkingImpl)
-function BossWashWalkingImpl() {
-  return <OwnerWalker moving={useWaiterMoving(BOSS_WASH_I)} />
-}
-/** a server's figure, walking or not */
-// (item 374: likewise)
-const ServerWalking = memo(ServerWalkingImpl)
-function ServerWalkingImpl({ i, id, look }: { i: number; id: string; look: StaffLook }) {
-  return <StaffFigure id={id} role="server" look={look} moving={useWaiterMoving(i)} />
-}
-/** the kitchen's plater on their way to the racks and back (the third cook, or the second; none, the owner), walking or not: their own flag
- * as the servers', so only their figure is drawn again as they start or stop (item 374: it was the bar's state, and the whole bar was
- * drawn again each time, about once a second while the shop's open) */
-const PLATER_I = 62
-const PlaterWalking = memo(function PlaterWalking({ id, role, look }: { id: string; role: 'chef' | 'sous'; look: StaffLook }) {
-  return <StaffFigure id={id} role={role} look={look} moving={useWaiterMoving(PLATER_I)} />
-})
-const OwnerPlating = memo(function OwnerPlating() {
-  return <OwnerWalker moving={useWaiterMoving(PLATER_I)} />
-})
-
-/**
  * A server at the plating place for a plate (item 317, the owner's): they take the tongs up, and what's for it on the tray by the fire is
  * lifted onto it a piece at a time (Roasting); they take the plate up once it's all on it and nothing's in the air on its way (and a moment
  * after they're there, as before)
@@ -4364,8 +4339,6 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   /** how long each of the plating place's slots has been ready to go */
   const readyFor = useRef<number[]>(Array.from({ length: READY_SLOTS }, () => 0))
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
-  // (no one walking as the bar's set up afresh (the waiters' flags kept outside it: WAITER_MOVING))
-  useEffect(() => () => { WAITER_MOVING.length = 0; movingSubs.forEach((f) => f()) }, [])
   /** the money just paid, rising over the one who paid it (the owner's: +NT$ in green) */
   const [payFloats, setPayFloats] = useState<{ key: number; id: number; text: string }[]>([])
   useEffect(() => {
@@ -5229,14 +5202,13 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     }
     const b = bossWash.current, o = bossObj.current
     if (o) o.visible = !!b
-    if (!b) { setWaiterMoving(BOSS_WASH_I, false); if (HAND_WASH.spongeHeld) washDone(); return }
+    if (!b) { if (HAND_WASH.spongeHeld) washDone(); return }
     b.t += step
     if (b.phase === 'go' || b.phase === 'back') {
       const d = Math.min(b.len, b.t * SERVER_SPEED)
       const { p, dir } = alongPath(b.path, d)
       b.pos.copy(p)
       if (dir.x || dir.z) { const want = Math.atan2(dir.x, dir.z); b.yaw += Math.atan2(Math.sin(want - b.yaw), Math.cos(want - b.yaw)) * Math.min(1, step * 12) }
-      setWaiterMoving(BOSS_WASH_I, d < b.len)
       if (d >= b.len) {
         if (b.phase === 'go') {
           // (at the sink, facing the basin: the sponge taken up first (item 174))
@@ -5244,7 +5216,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           const at = inBar('SinkWaterTop', endOf(1)).sub(b.pos)
           b.yaw = b.base = Math.atan2(at.x, at.z)
           spongeHome()
-        } else { bossWash.current = null; ownerAway('wash', false); setWaiterMoving(BOSS_WASH_I, false); if (o) o.visible = false; washDone(); return }
+        } else { bossWash.current = null; ownerAway('wash', false); if (o) o.visible = false; washDone(); return }
       }
     } else {
       washTick(b)
@@ -6764,11 +6736,6 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         if (open && !SHOP.leaving && trayWants(ONIGIRI_TRAY.n, RICE.rice, RICE.kama) && !(FIRE_TEND.want && !FIRE_TEND.done) && !SAKE.want.length) pl.t = 0
         else setOff(home(), 'home')
       }
-      const mv = pl.phase === 'toRack' || pl.phase === 'toPass' || pl.phase === 'toRackLow' || pl.phase === 'toLow' || pl.phase === 'home' || pl.phase === 'toSack' || pl.phase === 'toSink' || pl.phase === 'toKama'
-        || pl.phase === 'toSkTray' || pl.phase === 'toSkSink' || pl.phase === 'toHolder' || pl.phase === 'toTillBack'
-        || pl.phase === 'toCrate' || pl.phase === 'toBucket' || pl.phase === 'toHearth' || pl.phase === 'toSoup' || pl.phase === 'toCoalSack' || pl.phase === 'toFill'
-        || pl.phase === 'toShape' || pl.phase === 'toGrate'
-      setWaiterMoving(PLATER_I, mv)
       // (the way they face turned to the way they're to face, by time (commuteWalk's turnEase): set at once, they snapped round, over a
       // hundred times a minute at double speed (item 242))
       if (pl.yawTo !== undefined) pl.yaw = pl.phase === 'idle' ? pl.yawTo : turnToward(pl.yaw, pl.yawTo, step)
@@ -7283,7 +7250,6 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       const trayAt = () => w.pos.clone().add(new THREE.Vector3(...HELD_AT).setY(HELD_AT[1] + 0.02).multiplyScalar(STAFF_SCALE)
         .applyAxisAngle(UP_Y, w.look ?? w.yaw)).add(new THREE.Vector3(0, onDais() ? 0 : -rise, 0))
       const run = () => runs.current.find((x) => x.key === w.run)
-      const setMove = (on: boolean) => setWaiterMoving(wi, on)
       // (their way bent in past what stands out from the first counter's wall (item 387: aisleSqueeze); the way back's walked from its end,
       // where they are: bent from there)
       const go = (path: THREE.Vector3[], phase: WaiterPhase) => {
@@ -7291,7 +7257,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         const zones = stoolLine && wallKeep.current.boxes.length ? aisleSqueeze(wallKeep.current.boxes, line, stoolLine.back, SERVER_HALF) : []
         const back = phase === 'back'
         const bent = squeezePath(back ? [...path].reverse() : path, c0, line, zones)
-        w.path = back && bent !== path ? bent.reverse() : bent; w.len = pathLength(w.path); w.phase = phase; w.t = 0; setMove(true)
+        w.path = back && bent !== path ? bent.reverse() : bent; w.len = pathLength(w.path); w.phase = phase; w.t = 0
       }
       const walk = (then: () => void) => {
         // (from a standstill they pick up their pace over the first fifth of a second, not off at full speed at once (item 183, the owner's:
@@ -7300,7 +7266,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         const { p, dir } = alongPath(w.path, d)
         w.pos.copy(p)
         if (dir.x || dir.z) w.yaw = Math.atan2(dir.x, dir.z)
-        if (d >= w.len) { w.t = 0; setMove(false); then() }
+        if (d >= w.len) { w.t = 0; then() }
       }
       const face = (at: THREE.Vector3) => { w.yaw = Math.atan2(at.x - w.pos.x, at.z - w.pos.z) }
       w.t += step * paceOfStaff(servers[wi]?.id)
@@ -7811,7 +7777,6 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           w.t = 0
           w.seat = -1
           w.broom = false
-          setMove(false)
         }
       } else if (w.phase === 'clearGo' || w.phase === 'clearBack') walk(() => {
         if (w.phase === 'clearGo') {
@@ -8746,6 +8711,51 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   // its stage's wrappers drawn again each time (item 374))
   const shopPropsLater = useMemo(() => <Later stage={2}><ShopProps counters={counters} /></Later>, [counters])
   const fridgesLater = useMemo(() => (fridges ? <Later stage={2}><Fridges fridges={fridges} /></Later> : null), [fridges])
+  // (the serving counter, the takeaway stand and the benches, made once for what they're made with (item 374): drawn in the bar's own
+  // render, they and all in them were drawn again with every redraw of the bar, 3.4 times a second (Movable 13.5 a second))
+  const servePiece = useMemo(() => servePlace && (
+    <Movable id="servecounter" label="備餐檯" ground={0}>
+      <group name="look-servecounter" position={servePlace.at.toArray()} rotation-y={servePlace.yaw}><ServeCounter /><SakeStation /></group>
+    </Movable>
+  ), [servePlace])
+  const standPiece = useMemo(() => given && (
+    <Movable id="takeoutstand" label="外帶桌">
+      <group position={[STAND_AT.x, 0, STAND_AT.z]} rotation-y={STAND_AT.yaw}>
+        <TakeoutStandModel />
+        <group ref={standTop} name="takeout-stand-top" position-y={STAND_TOP} userData={{ marker: true }} />
+        {STAND_SLOTS.map(([x, z, a], k) => (
+          <group key={k} ref={(o) => { standBags.current[k] = o }} position={[x, STAND_TOP, z]} rotation-y={a} visible={false}><KraftBag /></group>
+        ))}
+        {/* (the old rice tub on its back half, as the warming tub (the owner's, 2026-11-11)) */}
+        <group position={[0, STAND_TOP, WARM_TUB_Z]}><WarmTub /></group>
+      </group>
+    </Movable>
+  ), [given])
+  const benchPieces = useMemo(() => given && takeoutWay && (
+    <>
+      <Movable id="bench" label="候位長凳">
+        <group position={[takeoutWay.bench.x, BENCH_PLACE.y, takeoutWay.bench.z]} rotation-y={takeoutWay.benchYaw}>
+          {/* (drawn at the customers' size, as the stools are, the same every way (it was squashed along and across to fit, its
+              proportions off: the owner's, 2026-11-11)) */}
+          <group scale={PEOPLE_SCALE}><WaitingBench /></group>
+        </group>
+        {/* (its places, where those waiting sit: they go with it, moved by hand) */}
+        {takeoutWay.benchSpots.slice(0, BENCH_EACH).map((p, k) => (
+          <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
+        ))}
+      </Movable>
+      {/* (the second bench, along the wall toward the cat stand, under the shrine: the same bench, its own three places (the owner's, 2026-11-12)) */}
+      <Movable id="bench2" label="候位長凳（二）">
+        <group position={[takeoutWay.bench2.x, BENCH_PLACE.y, takeoutWay.bench2.z]} rotation-y={takeoutWay.benchYaw}>
+          <group scale={PEOPLE_SCALE}><WaitingBench /></group>
+        </group>
+        {takeoutWay.benchSpots.slice(BENCH_EACH).map((p, j) => {
+          const k = BENCH_EACH + j
+          return <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
+        })}
+      </Movable>
+    </>
+  ), [given, takeoutWay])
   return (
     <group ref={frame} name="bar-frame" scale={scale} position={offset}>
       {/* (the walking paths' map, in edit mode when asked for (item 168)) */}
@@ -8756,11 +8766,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       <PathZones home={zoneHome} />
       <PathVias home={viaHome} />
       {/* (the serving counter, in the corridor between the cook table and the freezer (item 167)) */}
-      {servePlace && (
-        <Movable id="servecounter" label="備餐檯" ground={0}>
-          <group name="look-servecounter" position={servePlace.at.toArray()} rotation-y={servePlace.yaw}><ServeCounter /><SakeStation /></group>
-        </Movable>
-      )}
+      {servePiece}
       {/* (one customer made with the page, never shown: their program linked while it loads) */}
       {people && <Suspense fallback={null}><FolkWarm /></Suspense>}
       {drawCounter && <group position={at}><Counter length={length} /></group>}
@@ -8860,7 +8866,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, !plater ? 'owner' : plater.role === 'sous' ? 'sous' : 'other') }
         }} name="plater-walker" scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.17} />
-          {plater ? <PlaterWalking id={plater.id} role={plater.role} look={plater.look} /> : <OwnerPlating />}
+          {plater ? <StaffFigure id={plater.id} role={plater.role} look={plater.look} /> : <OwnerWalker />}
         </group>
       )}
       {carryKit}
@@ -8913,7 +8919,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, 'owner') }
         }} scale={STAFF_SCALE} visible={false} userData={{ broom: false }}>
           <BlobShadow r={0.2} />
-          <BossWashWalking />
+          <OwnerWalker />
         </group>
       )}
       {ownerServes && (
@@ -8924,7 +8930,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, 'owner') }
         }} position={ownerAt()} rotation-y={OWNER_YAW} scale={STAFF_SCALE} visible={false}>
           <BlobShadow r={0.2} />
-          <OwnerWalking />
+          <OwnerWalker />
         </group>
       )}
       {!ownerServes && servers.slice(0, homes.length).map((w, i) => (
@@ -8935,7 +8941,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           if (o) { KITCHEN_FOLK.add(o); FIGURES.set(o, 'other') }
         }} position={homes[i].at} rotation-y={homes[i].yaw} scale={STAFF_SCALE} userData={{ staffId: w.id }}>
           <BlobShadow r={0.17} />
-          <ServerWalking i={i} id={w.id} look={w.look} />
+          <StaffFigure id={w.id} role="server" look={w.look} />
         </group>
       ))}
       {people && shown.map((s) => {
@@ -8959,45 +8965,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         )
       })}
       {/* the takeaway stand behind the cashier's chair (bar.ts's TAKEOUT_STAND): its bags on its top, set there by the servers */}
-      {given && (
-        <Movable id="takeoutstand" label="外帶桌">
-          <group position={[STAND_AT.x, 0, STAND_AT.z]} rotation-y={STAND_AT.yaw}>
-            <TakeoutStandModel />
-            <group ref={standTop} name="takeout-stand-top" position-y={STAND_TOP} userData={{ marker: true }} />
-            {STAND_SLOTS.map(([x, z, a], k) => (
-              <group key={k} ref={(o) => { standBags.current[k] = o }} position={[x, STAND_TOP, z]} rotation-y={a} visible={false}><KraftBag /></group>
-            ))}
-            {/* (the old rice tub on its back half, as the warming tub (the owner's, 2026-11-11)) */}
-            <group position={[0, STAND_TOP, WARM_TUB_Z]}><WarmTub /></group>
-          </group>
-        </Movable>
-      )}
+      {standPiece}
       {/* the waiting bench in the genkan, and those sat on it waiting for a stool */}
-      {given && takeoutWay && (
-        <Movable id="bench" label="候位長凳">
-          <group position={[takeoutWay.bench.x, BENCH_PLACE.y, takeoutWay.bench.z]} rotation-y={takeoutWay.benchYaw}>
-            {/* (drawn at the customers' size, as the stools are, the same every way (it was squashed along and across to fit, its
-                proportions off: the owner's, 2026-11-11)) */}
-            <group scale={PEOPLE_SCALE}><WaitingBench /></group>
-          </group>
-          {/* (its places, where those waiting sit: they go with it, moved by hand) */}
-          {takeoutWay.benchSpots.slice(0, BENCH_EACH).map((p, k) => (
-            <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
-          ))}
-        </Movable>
-      )}
-      {/* (the second bench, along the wall toward the cat stand, under the shrine: the same bench, its own three places (the owner's, 2026-11-12)) */}
-      {given && takeoutWay && (
-        <Movable id="bench2" label="候位長凳（二）">
-          <group position={[takeoutWay.bench2.x, BENCH_PLACE.y, takeoutWay.bench2.z]} rotation-y={takeoutWay.benchYaw}>
-            <group scale={PEOPLE_SCALE}><WaitingBench /></group>
-          </group>
-          {takeoutWay.benchSpots.slice(BENCH_EACH).map((p, j) => {
-            const k = BENCH_EACH + j
-            return <group key={k} name={`bench-place-${k}`} position={p} userData={{ marker: true }} ref={(o) => { if (o) BENCH_MARKS.set(k, o); else BENCH_MARKS.delete(k) }} />
-          })}
-        </Movable>
-      )}
+      {benchPieces}
       {/* (gone from the bench's list, faded out: drawn so until React takes them away, never back at full (it was ?? 1: a blink of them whole in the
           doorway as they went, the last frame)) */}
       {people && sitterList.map((v) => (

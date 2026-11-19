@@ -2,7 +2,8 @@
 // for SPAN ms is walked (through a stand-in for the devtools' hook), and each function component that rendered in it is put down to what
 // changed: its props (which ones; "a new object, same values" is a parent's redraw carrying it along, nothing of its own changed: a memo
 // would spare it) or one of its own state hooks (named by the line that declares it, read from the module as the dev server serves it).
-//   node tests/e2e/redraws.mjs     (WARM=<ms> default 45000, SPAN=<ms> default 30000, TOP=<n> default 30; needs the dev server, for names)
+//   node tests/e2e/redraws.mjs     (WARM=<ms> default 45000, SPAN=<ms> default 30000, TOP=<n> default 30; needs the dev server, for names;
+//   SRC=1: one with no name of its own told apart by the start of its source, "anon in Roasting [({ holds, children }) => …]")
 import { chromium } from 'playwright-core'
 import { toOpeningHours } from './hours.mjs'
 
@@ -16,7 +17,7 @@ await ctx.route(/\/node_modules\/\.vite\/deps\/react\.js/, async (route) => {
     'const __R = require_react(); (globalThis.__whyPatch || (() => {}))(__R); export default __R;')
   await route.fulfill({ response: res, body })
 })
-await ctx.addInitScript(() => {
+await ctx.addInitScript((srcHint) => {
   const DECL = new WeakMap()
   window.__whyPatch = (R) => {
     for (const k of ['useState', 'useReducer']) {
@@ -41,8 +42,10 @@ await ctx.addInitScript(() => {
   const nameOf = (f) => {
     const own = typeName(f.type)
     if (own !== 'anon') return own
-    for (let q = f.return; q; q = q.return) { const nm = typeName(q.type); if (nm && nm !== 'anon') return `anon in ${nm}` }
-    return 'anon'
+    const fn = typeof f.type === 'function' ? f.type : (f.type?.render ?? f.type?.type)
+    const hint = srcHint && fn ? ` [${String(fn).replace(/\s+/g, ' ').slice(0, 90)}]` : ''
+    for (let q = f.return; q; q = q.return) { const nm = typeName(q.type); if (nm && nm !== 'anon') return `anon in ${nm}${hint}` }
+    return `anon${hint}`
   }
   const FN = new Set([0, 11, 15])
   const site = (stack) => {
@@ -95,7 +98,7 @@ await ctx.addInitScript(() => {
       try { walk(root) } catch (e) { W.err = String(e) }
     },
   })
-})
+}, !!process.env.SRC)
 const p = await ctx.newPage()
 p.setDefaultTimeout(8000)
 p.on('pageerror', (e) => console.log('ERR', e.message))
