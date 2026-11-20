@@ -17,7 +17,7 @@ import { BASE_MATERIAL } from '@/scene/baseMaterial'
 import { SOFT_DOT } from '@/scene/softDot'
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { keepOut, type HearthZones } from '@/game/hearthGuard'
+import { keepOut, nearTable, type HearthRole, type HearthZones } from '@/game/hearthGuard'
 import * as THREE from 'three'
 import { flatOf } from '@/scene/flatBake'
 import { normalFromHeight } from '@/scene/normalFromHeight'
@@ -1618,41 +1618,47 @@ function HearthGuard() {
   const scene = useThree((st) => st.scene)
   useEffect(() => {
     const was = scene.onBeforeRender
+    // (each figure in turn, by the map's own forEach: its for-of made a pair for each one, every frame (item 374))
+    let frame: THREE.Object3D | null | undefined = null
+    const guard = (role: HearthRole, o: THREE.Object3D) => {
+      if (!o.parent) { FIGURES.delete(o); return }
+      // (one not drawn this frame left where it is: the plater's walker waits hidden at the bar's middle, the hearth's, till his first
+      // errand, and was pushed out of it, his whole figure posed afresh, every frame of the opening (item 411: 340 times a day))
+      if (!o.visible || !frame) return
+      o.getWorldPosition(GUARD_AT)
+      GUARD_LOCAL.copy(GUARD_AT).applyMatrix4(GUARD_INV)
+      const al = GUARD_LOCAL.dot(ALONG), la = GUARD_LOCAL.dot(LAY)
+      // (only those near the table asked about: the rest are as they are)
+      if (!nearTable(al, la, HEARTH_ZONES)) return
+      const [a2, l2] = keepOut(al, la, role, HEARTH_ZONES)
+      if (a2 === al && l2 === la) return
+      if (import.meta.env.DEV) {
+        GUARD_LOG.push({ who: o.name || String(o.userData.staffId ?? o.userData.guest ?? '?'), role, from: [al, la], to: [a2, l2] })
+        if (GUARD_LOG.length > 400) GUARD_LOG.splice(0, 100)
+      }
+      // (moved along the table's own axes only, in its frame; back into the world, and into its own parent's frame)
+      GUARD_LOCAL.addScaledVector(ALONG, a2 - al).addScaledVector(LAY, l2 - la).applyMatrix4(frame.matrixWorld)
+      GUARD_SHIFT.subVectors(GUARD_LOCAL, GUARD_AT)
+      o.parent.worldToLocal(GUARD_LOCAL)
+      o.position.copy(GUARD_LOCAL)
+      o.updateMatrixWorld(true)
+      // (and what they've in hand, as far (bar's CARRIED))
+      const held = CARRIED.get(o)
+      if (held) for (const c of held) {
+        if (!c.parent || !c.visible) continue
+        c.getWorldPosition(GUARD_HELD).add(GUARD_SHIFT)
+        c.parent.worldToLocal(GUARD_HELD)
+        c.position.copy(GUARD_HELD)
+        c.updateMatrixWorld(true)
+      }
+    }
     scene.onBeforeRender = function (...args) {
       was.apply(this, args)
-      const frame = mark.current?.parent
+      frame = mark.current?.parent
       if (!frame) return
       frame.updateWorldMatrix(true, false)
       GUARD_INV.copy(frame.matrixWorld).invert()
-      for (const [o, role] of FIGURES) {
-        if (!o.parent) { FIGURES.delete(o); continue }
-        // (one not drawn this frame left where it is: the plater's walker waits hidden at the bar's middle, the hearth's, till his first
-        // errand, and was pushed out of it, his whole figure posed afresh, every frame of the opening (item 411: 340 times a day))
-        if (!o.visible) continue
-        o.getWorldPosition(GUARD_AT)
-        GUARD_LOCAL.copy(GUARD_AT).applyMatrix4(GUARD_INV)
-        const al = GUARD_LOCAL.dot(ALONG), la = GUARD_LOCAL.dot(LAY)
-        const [a2, l2] = keepOut(al, la, role, HEARTH_ZONES)
-        if (a2 === al && l2 === la) continue
-        if (import.meta.env.DEV) {
-          GUARD_LOG.push({ who: o.name || String(o.userData.staffId ?? o.userData.guest ?? '?'), role, from: [al, la], to: [a2, l2] })
-          if (GUARD_LOG.length > 400) GUARD_LOG.splice(0, 100)
-        }
-        // (moved along the table's own axes only, in its frame; back into the world, and into its own parent's frame)
-        GUARD_LOCAL.addScaledVector(ALONG, a2 - al).addScaledVector(LAY, l2 - la).applyMatrix4(frame.matrixWorld)
-        GUARD_SHIFT.subVectors(GUARD_LOCAL, GUARD_AT)
-        o.parent.worldToLocal(GUARD_LOCAL)
-        o.position.copy(GUARD_LOCAL)
-        o.updateMatrixWorld(true)
-        // (and what they've in hand, as far (bar's CARRIED))
-        for (const c of CARRIED.get(o) ?? []) {
-          if (!c.parent || !c.visible) continue
-          c.getWorldPosition(GUARD_HELD).add(GUARD_SHIFT)
-          c.parent.worldToLocal(GUARD_HELD)
-          c.position.copy(GUARD_HELD)
-          c.updateMatrixWorld(true)
-        }
-      }
+      FIGURES.forEach(guard)
     }
     return () => { scene.onBeforeRender = was }
   }, [scene])

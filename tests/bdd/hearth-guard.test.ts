@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
-import { BODY, keepOut, PIT_ROOM, type HearthZones } from '@/game/hearthGuard'
+import { BODY, keepOut, nearTable, PIT_ROOM, type HearthZones } from '@/game/hearthGuard'
 
 // (the shop's own: the cook table, its hearth's frame, the owner's notch and the third cook's bay, in the table's frame (Roasting))
 const Z: HearthZones = {
@@ -56,5 +56,21 @@ feature('灶台與圍爐裏是禁區', () => {
     given('一位外場站在桌子前的走道上', (w) => { w.at = [0.2, 3.0] })
     when('這一格畫出來之前', (w) => { w.now = keepOut(w.at[0], w.at[1], 'other', Z) })
     then('他還在原地', (w) => { expect(w.now).toEqual([0.2, 3.0]) })
+  })
+
+  scenario('離灶台遠的人不用一個一個算，近的才算', ({ given, then, and }) => {
+    given('整間店的地上每隔 5 公分一個點（灶台的座標裡）', (w) => {
+      w.pts = [] as [number, number][]
+      for (let al = -4; al <= 5.5; al += 0.05) for (let la = -4.5; la <= 4.5; la += 0.05) w.pts.push([al, la])
+    })
+    then('說「不近」的每一點，照禁區的規則都留在原地', (w) => {
+      for (const [al, la] of w.pts) if (!nearTable(al, la, Z)) expect(keepOut(al, la, 'other', Z)).toEqual([al, la])
+    })
+    and('會被移開的每一點，都說「近」（三種人都是）', (w) => {
+      for (const role of ['other', 'owner', 'sous'] as const) for (const [al, la] of w.pts) {
+        const [a2, l2] = keepOut(al, la, role, Z)
+        if (a2 !== al || l2 !== la) expect(nearTable(al, la, Z)).toBe(true)
+      }
+    })
   })
 })

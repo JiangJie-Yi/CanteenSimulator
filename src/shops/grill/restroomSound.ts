@@ -159,12 +159,14 @@ export function slideDoorSound(opening: boolean, near = 1, seconds = 0.55) {
   if (!a || near < 0.02 || !gate(`slide${opening}${near.toFixed(2)}`)) return
   const t = a.currentTime
   // (the runners: low noise through a low band, swelling and fading with the door's pace)
-  const run = noise(a, seconds, (x) => Math.sin(Math.PI * Math.min(1, x * 1.15)) ** 0.8, 0.86)
+  // (both noises made four ways for each length the first times, then one of those picked (noise's pool): the genkan's door runs as each
+  // customer comes and goes, and each time two new buffers were worked out on the page's thread, the most garbage the shop made (item 374))
+  const run = noise(a, seconds, (x) => Math.sin(Math.PI * Math.min(1, x * 1.15)) ** 0.8, 0.86, { key: `slide-run-${seconds}`, ways: 4 })
   const lo = a.createBiquadFilter(); lo.type = 'bandpass'; lo.frequency.value = 230; lo.Q.value = 0.9
   run.connect(lo).connect(out(a, 0.55 * near))
   run.start(t)
   // (the wood on wood over it, a little higher and rough)
-  const chat = noise(a, seconds, (x) => 0.5 * Math.sin(Math.PI * x) * (0.6 + 0.4 * Math.sin(x * 60)), 0.5)
+  const chat = noise(a, seconds, (x) => 0.5 * Math.sin(Math.PI * x) * (0.6 + 0.4 * Math.sin(x * 60)), 0.5, { key: `slide-chat-${seconds}`, ways: 4 })
   const hi = a.createBiquadFilter(); hi.type = 'bandpass'; hi.frequency.value = 1300; hi.Q.value = 1.2
   chat.connect(hi).connect(out(a, 0.12 * near))
   chat.start(t)

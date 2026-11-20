@@ -4,6 +4,9 @@ import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { GAZE, LATE } from '@/game/shopState'
 /** (where one's looking at a thing in the room, worked out) */
 const GZ_P = new THREE.Vector3()
+/** how tall each shape stands in its own units, its copies sharing its position data (the key); and a vector for the world's scale on one */
+const TALL_OF = new WeakMap<object, number>()
+const TALL_SCALE = new THREE.Vector3()
 import { useFrame, useLoader } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -654,9 +657,17 @@ function FolkFigureImpl({ id, eating, walking, still, clock, talk = 0, mood = nu
     const going = walking && !still?.()
     pace.current += ((going ? Math.min(1, Math.max(0.6, moved / 0.5)) : 0) - pace.current) * follow(dt, 8)
     const walk = pace.current
-    if (!tall.current) { const bx = new THREE.Box3().setFromObject(fig.root); if (!bx.isEmpty()) tall.current = bx.max.y - bx.min.y }
+    // (how tall they stand, for the dust a running child kicks up (DustPuffs' footDust: a grown-up customer never does, and it's never
+    // asked of them): a child's measured once for each shape, its copies sharing it (item 374: every customer's skinned mesh was posed vertex
+    // by vertex for it as they came in, three's bone sums for each vertex garbage, the most the shop made after the door's sound)
+    const kid = spec.kind === 'kid'
+    if (kid && !tall.current) {
+      const key = fig.mesh?.geometry?.attributes.position, sc = fig.root.getWorldScale(TALL_SCALE).y, known = key ? TALL_OF.get(key) : undefined
+      if (known !== undefined) tall.current = known * sc
+      else { const bx = new THREE.Box3().setFromObject(fig.root); if (!bx.isEmpty()) { tall.current = bx.max.y - bx.min.y; if (key && sc > 0) TALL_OF.set(key, tall.current / sc) } }
+    }
     // (not on the character viewer's turntable (`ground`): its own little canvas, the puffs are the room's)
-    if (tall.current && going && !ground) footDust(steps.current, v3, walk, tall.current, dt, spec.kind === 'kid' ? 'kid' : 'guest')
+    if ((tall.current || !kid) && going && !ground) footDust(steps.current, v3, walk, tall.current, dt, kid ? 'kid' : 'guest')
     // (the food's come: a crouch, a hop up stretched tall and down again squashed, half a second; their eyes shut happy a moment)
     if (eating !== served.current.was) { served.current.was = eating; if (eating && !walking) { served.current.at = t; fig.root.userData.served = (fig.root.userData.served ?? 0) + 1 } }
     const since = t - served.current.at

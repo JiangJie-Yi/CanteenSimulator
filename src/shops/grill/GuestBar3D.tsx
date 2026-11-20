@@ -1063,50 +1063,55 @@ function GenkanDoorImpl() {
   const walkers = useMemo(() => ({ list: [] as DoorWalker[], pool: [] as DoorWalker[] }), [])
   useEffect(() => {
     const was = scene.onBeforeRender
+    // (each figure in turn by the map's own forEach, and the same function each frame: its for-of made a pair for each one (item 374))
+    let g: THREE.Group | null = null, now = 0
+    const ws = walkers.list
+    const pass = (_role: unknown, o: THREE.Object3D) => {
+      if (!o.parent || !o.visible || !g) return
+      o.getWorldPosition(DOOR_W)
+      DOOR_P.copy(DOOR_W).applyMatrix4(DOOR_INV)
+      let was1 = seen.get(o)
+      if (!was1) { was1 = { z: DOOR_P.z, t: now, since: now }; seen.set(o, was1) }
+      const dz = now > was1.t ? (DOOR_P.z - was1.z) / (now - was1.t) : 0
+      const age = now - was1.since
+      if (now > was1.t) { was1.z = DOOR_P.z; was1.t = now }
+      const wk = walkers.pool[ws.length] ?? (walkers.pool[ws.length] = { x: 0, z: 0, dz: 0, age: 0 })
+      wk.x = DOOR_P.x; wk.z = DOOR_P.z; wk.dz = dz; wk.age = age
+      ws.push(wk)
+      // (going through: kept to its open way, eased in and out of it either side of the leaves' line; only where they're drawn)
+      const z0 = DOOR_WAY.z[0], z1 = DOOR_WAY.z[1]
+      if (DOOR_P.z <= z0 || DOOR_P.z >= z1 || DOOR_P.x < -0.75 || DOOR_P.x > 0.6) return
+      const w = Math.min(1, (DOOR_P.z - z0) / DOOR_WAY.ease, (z1 - DOOR_P.z) / DOOR_WAY.ease)
+      const to = Math.min(DOOR_WAY.x[1], Math.max(DOOR_WAY.x[0], DOOR_P.x))
+      const nx = DOOR_P.x + (to - DOOR_P.x) * w
+      if (Math.abs(nx - DOOR_P.x) < 1e-4) return
+      DOOR_P.x = nx
+      DOOR_P.applyMatrix4(g.matrixWorld)
+      DOOR_SHIFT.subVectors(DOOR_P, DOOR_W)
+      o.parent.worldToLocal(DOOR_P)
+      o.position.copy(DOOR_P)
+      o.updateMatrixWorld(true)
+      const held = CARRIED.get(o)
+      if (held) for (const c of held) {
+        if (!c.parent || !c.visible) continue
+        c.getWorldPosition(DOOR_HELD).add(DOOR_SHIFT)
+        c.parent.worldToLocal(DOOR_HELD)
+        c.position.copy(DOOR_HELD)
+        c.updateMatrixWorld(true)
+      }
+    }
+    // (those gone: forgotten, so one put in again is new)
+    const forget = (_v: unknown, o: THREE.Object3D) => { if (!FIGURES.has(o) || !o.visible) seen.delete(o) }
     scene.onBeforeRender = function (...args) {
       was.apply(this, args)
-      const g = ref.current
+      g = ref.current
       if (!g) return
       g.updateWorldMatrix(true, false)
       DOOR_INV.copy(g.matrixWorld).invert()
-      const now = clock.current
-      const ws = walkers.list
+      now = clock.current
       ws.length = 0
-      for (const [o] of FIGURES) {
-        if (!o.parent || !o.visible) continue
-        o.getWorldPosition(DOOR_W)
-        DOOR_P.copy(DOOR_W).applyMatrix4(DOOR_INV)
-        let was1 = seen.get(o)
-        if (!was1) { was1 = { z: DOOR_P.z, t: now, since: now }; seen.set(o, was1) }
-        const dz = now > was1.t ? (DOOR_P.z - was1.z) / (now - was1.t) : 0
-        const age = now - was1.since
-        if (now > was1.t) { was1.z = DOOR_P.z; was1.t = now }
-        const wk = walkers.pool[ws.length] ?? (walkers.pool[ws.length] = { x: 0, z: 0, dz: 0, age: 0 })
-        wk.x = DOOR_P.x; wk.z = DOOR_P.z; wk.dz = dz; wk.age = age
-        ws.push(wk)
-        // (going through: kept to its open way, eased in and out of it either side of the leaves' line; only where they're drawn)
-        const [z0, z1] = DOOR_WAY.z
-        if (DOOR_P.z <= z0 || DOOR_P.z >= z1 || DOOR_P.x < -0.75 || DOOR_P.x > 0.6) continue
-        const w = Math.min(1, (DOOR_P.z - z0) / DOOR_WAY.ease, (z1 - DOOR_P.z) / DOOR_WAY.ease)
-        const to = Math.min(DOOR_WAY.x[1], Math.max(DOOR_WAY.x[0], DOOR_P.x))
-        const nx = DOOR_P.x + (to - DOOR_P.x) * w
-        if (Math.abs(nx - DOOR_P.x) < 1e-4) continue
-        DOOR_P.x = nx
-        DOOR_P.applyMatrix4(g.matrixWorld)
-        DOOR_SHIFT.subVectors(DOOR_P, DOOR_W)
-        o.parent.worldToLocal(DOOR_P)
-        o.position.copy(DOOR_P)
-        o.updateMatrixWorld(true)
-        for (const c of CARRIED.get(o) ?? []) {
-          if (!c.parent || !c.visible) continue
-          c.getWorldPosition(DOOR_HELD).add(DOOR_SHIFT)
-          c.parent.worldToLocal(DOOR_HELD)
-          c.position.copy(DOOR_HELD)
-          c.updateMatrixWorld(true)
-        }
-      }
-      // (those gone: forgotten, so one put in again is new)
-      for (const o of seen.keys()) if (!FIGURES.has(o) || !o.visible) seen.delete(o)
+      FIGURES.forEach(pass)
+      seen.forEach(forget)
       wanted.current = doorWanted(ws)
     }
     return () => { scene.onBeforeRender = was }

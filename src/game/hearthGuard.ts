@@ -40,6 +40,13 @@ function sousSlot(z: HearthZones): Oblong {
 /** (along, lay) brought into an oblong (the nearest point of it) */
 const into = (al: number, la: number, o: Oblong): [number, number] => [Math.min(o.along[1], Math.max(o.along[0], al)), Math.min(o.lay[1], Math.max(o.lay[0], la))]
 
+/** whether (along, lay) is near enough the table for keepOut to put them anywhere else (in it, or within half a body of its edge): those
+ * further off are as they are, and the guard needn't ask for each of them every frame (item 374: a new pair made for each one, thirty-odd a
+ * frame) */
+export function nearTable(al: number, la: number, z: HearthZones) {
+  return al > z.table.along[0] - BODY && al < z.table.along[1] + BODY && la > z.table.lay[0] - BODY && la < z.table.lay[1] + BODY
+}
+
 /**
  * Where someone standing at (along, lay) is put, out of where they mayn't stand: off the table altogether (its edge half a body off), but
  * the owner in his notch and the third cook in his bay, each kept a little in from its sides and clear of the hearth's frame; the nearest way
