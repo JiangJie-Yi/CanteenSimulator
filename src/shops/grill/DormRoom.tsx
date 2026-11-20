@@ -13,6 +13,8 @@ import { setTip } from '@/scene/hoverTip'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { getClock } from '@/ui/clockStore'
 import { DORM_LIFE } from './bar'
+import { slideDoorSound } from './restroomSound'
+import { doorAlong } from './ServeCounter'
 import { getEdit } from './edit'
 import { drawStreetView, type Sky } from '@/scene/streetView'
 
@@ -55,6 +57,12 @@ export const DORM_AT = new THREE.Vector3(60, -1.16, -1.69)
 const DORM_SCALE = 2
 /** the stair's well in the room's frame (blender/dorm.py: the board strip's front, 0.84 by 1.45), to be clicked */
 const STAIR = { x: 1.35, z: 0.625, w: 0.8, d: 1.4 }
+/** the bathroom's door (item 427, blender/dorm.py's DormBathDoor): the doorway's middle and size (the room's metres), how far the door
+ * slides left into the wall's pocket, and how long it takes */
+const BATH = { x: 1.36, y: 1.01, z: -1.4, w: 0.72, h: 1.68, slide: 0.7, s: 0.5 }
+const BATH_TIP = (open: boolean) => ({ title: '浴室', hint: `住在樓上的員工用的浴室與廁所｜點一下${open ? '拉上' : '拉開'}` })
+/** (dev) the bathroom's door worked by hand */
+const BATH_STATE = { open: false, t0: -1, from: 0, cur: 0 }
 /** where the owner's clothes are kept, in the room's frame (blender/dorm.py): the closet's sliding doors (its front at the left wall,
  * x = -1.8, from z -0.6 to 1.2, 1.8 high) and the chest of drawers in the back left corner (x -1.78 to -1.22, z -1.33 to -0.91, 0.95
  * high), each a box a little round it; pointed at, named; clicked, his clothes to choose (item 376) */
@@ -230,11 +238,20 @@ const Resident = memo(function Resident({ m, k, marks, open, quilt, off }: { m: 
   )
 })
 
+/** the bathroom's door slid the other way from wherever it is along its track (item 427), heard as it goes */
+function bathToggle() {
+  // (from where it is along its track now, if it was still sliding)
+  BATH_STATE.from = BATH_STATE.cur
+  BATH_STATE.open = !BATH_STATE.open
+  BATH_STATE.t0 = performance.now() / 1000
+  slideDoorSound(BATH_STATE.open, 0.6, BATH.s)
+}
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bathDoor: bathToggle })
 export function DormRoom({ crew = [], open = false, fallback, working }: { crew?: readonly Living[]; open?: boolean; fallback?: Living
   /** the ids of those on today's shift (the rest of those living in are off: up here all day); none given, all of them are */
   working?: readonly string[] }) {
   const gltf = useGLTF(DORM_URL) as unknown as { scene: THREE.Group }
-  const { root, look, marks, pieces, quilts, leftCut, leftX } = useMemo(() => {
+  const { root, look, marks, pieces, quilts, leftCut, leftX, bathDoor, bathX, bathCut, bathCutX } = useMemo(() => {
     const r = (gltf.scene.getObjectByName('DormRoot') ?? gltf.scene).clone(true)
     r.position.set(0, 0, 0)
     const made = new Map<THREE.Material, THREE.Material>()
@@ -257,7 +274,8 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       m.receiveShadow = true
     })
     // (the room's line, in its own metres: the dining room's 0.0016 a metre; none round the glow, the night, the screen)
-    inkModel(r, (m) => /DormLampShade|DormNightView|DormScreen/.test((m.material as THREE.Material).name), { width: 0.0016, weld: true })
+    // (nor round the bathroom's water, its mirror, its frosted pane (item 427))
+    inkModel(r, (m) => /DormLampShade|DormNightView|DormScreen|DormBathWater|DormMirror|DormFrosted/.test((m.material as THREE.Material).name), { width: 0.0016, weld: true })
     // (the window's picture laid on its pane: the street's upper half (its sky and the houses' upper floors) across the pane's own UVs)
     r.traverse((o) => {
       const m = o as THREE.Mesh
@@ -277,7 +295,13 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     // wall's inner face's x (the piece's furthest in less its trims' 2.2 cm))
     const leftCut = r.getObjectByName('DormLeftCut') ?? new THREE.Group()
     const leftX = new THREE.Box3().setFromObject(leftCut).max.x - 0.022
-    mergeByMaterial(r, (o) => PIECES.test(o.name) || o === leftCut)
+    // (and the bathroom's door, which slides (item 427); and the bathroom's right wall, its panels, its cap and what hangs on it (its
+    // DormBathCut), taken away as the left wall is while the view's turned round past it: the bathroom looked into from that side, not a
+    // blank wall as tall as the room; the wall's inner face's x (the piece's furthest out less the wall's 10 cm and its cap's 4 mm over))
+    const bathDoor = r.getObjectByName('DormBathDoor') ?? null
+    const bathCut = r.getObjectByName('DormBathCut') ?? new THREE.Group()
+    const bathCutX = new THREE.Box3().setFromObject(bathCut).max.x - 0.104
+    mergeByMaterial(r, (o) => PIECES.test(o.name) || o === leftCut || o === bathDoor || o === bathCut)
     const at = (n: string, d: THREE.Vector3) => r.getObjectByName(n)?.position.clone() ?? d
     const mk: Marks = {
       seats: [0, 1, 2].map((k) => at(`DormSeat${k}`, new THREE.Vector3(-0.9 + k * 0.6, 0.125, 0))),
@@ -291,7 +315,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     const byName = (n: string) => [...made.values()].find((x) => x.name === n) ?? null
     const lk = r.getObjectByName('DormLook')
     return { root: r, look: lk ? lk.position.clone() : new THREE.Vector3(0.15, 0.6, 0.1), marks: mk, pieces: ps, quilts: [byName('DormFutonBlue'), byName('DormFutonPink')],
-      leftCut, leftX }
+      leftCut, leftX, bathDoor, bathX: bathDoor?.position.x ?? 0, bathCut, bathCutX }
   }, [gltf])
   // (those living in: the cooks hired (the shop's own second cook when none is), two at most, the futons' and the cushions' number)
   // (the same list while it's the same people: a new array each time the scene's drawn)
@@ -316,6 +340,17 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     root.worldToLocal(CAM_IN)
     const out = CAM_IN.x < leftX - 0.05
     if (leftCut.visible === out) leftCut.visible = !out
+    // (and the bathroom's right wall while it's out past that (item 427))
+    const outR = CAM_IN.x > bathCutX + 0.05
+    if (bathCut.visible === outR) bathCut.visible = !outR
+    // (the bathroom's door sliding (item 427): a little pull the other way first, along into the wall's pocket, a few millimetres past and
+    // back as it stops)
+    if (bathDoor && BATH_STATE.t0 >= 0) {
+      const p = Math.min(1, (performance.now() / 1000 - BATH_STATE.t0) / BATH.s)
+      BATH_STATE.cur = doorAlong(p, BATH_STATE.from, BATH_STATE.open ? BATH.slide : 0)
+      bathDoor.position.x = bathX - BATH_STATE.cur
+      if (p >= 1) BATH_STATE.t0 = -1
+    }
     dormViewTo()
     const asleep = dormDoing(getClock().minute) === 'sleep'
     let anyone = false
@@ -341,6 +376,13 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
         onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; setTip({ title: '樓梯', hint: '點一下下樓，回到店裡' }) }}
         onPointerOut={() => { document.body.style.cursor = ''; setTip(null) }}>
         <boxGeometry args={[STAIR.w, 0.16, STAIR.d]} />
+      </mesh>
+      {/* (the bathroom's door (item 427): pointed at, what's behind it; clicked, slid open or shut) */}
+      <mesh position={[BATH.x, BATH.y, BATH.z + 0.06]} visible={false}
+        onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; bathToggle(); setTip(BATH_TIP(BATH_STATE.open)) }}
+        onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; setTip(BATH_TIP(BATH_STATE.open)) }}
+        onPointerOut={() => { document.body.style.cursor = ''; setTip(null) }}>
+        <boxGeometry args={[BATH.w, BATH.h, 0.04]} />
       </mesh>
       {/* (the closet's doors and the chest: pointed at, named; clicked, the owner's clothes to choose (App's panel, as a click on him opens)) */}
       {WARDROBE.map((w) => (
