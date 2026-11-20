@@ -1604,8 +1604,10 @@ const paperColour = (m: THREE.MeshBasicMaterial, k: number, flame: number, tint:
 }
 /** how far apart the two lanterns by the doorway hang, the red and the grill's beside it (middle to middle) */
 const CHOCHIN_PAIR = 0.32  // (0.3: their paper just touched, clips.mjs)
-/** how much further from the doorway the pair hangs than at first (item 415: the sliding door's two leaves reach right to the post) */
-const CHOCHIN_OFF = 0.05
+/** how much further from the doorway the pair hangs than at first (item 415: the sliding door's two leaves reach right to the post; item 420:
+ * 0.05, the red one's paper a centimetre over the leaves' south edge, into the south leaf's stile as it swayed toward the door, 51 frames of
+ * 541 and 17 mm deep; tests/e2e/_chochin420.mjs) */
+const CHOCHIN_OFF = 0.08
 const chochinGlow = (inner: string, mid: string, outer: string) => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')
