@@ -30,7 +30,7 @@ const URL = import.meta.env.BASE_URL + 'models/sink.glb'
 /** the brass, the copper and the dryer's stainless: real metal, reflecting the studio (it only reads as metal by what it reflects) */
 const METAL = /^Sink(Brass|Copper|Steel|SteelTap|DryerLiner)$/
 /** too fine for an ink line, or cloth: the tap's arms and knobs, its bag and string, the rods, rims and pegs, the plates' rims, the slats */
-const FINE = /^Sink(Tap(Arm|Knob|String|Bag|Cap|Stem|Screen|Mouth)|Basket(Rim|Foot|Slat|Rail|Post)|Plug|Drain(Bar|Pipe|Ring)|Overflow|Water|NorenRod|Noren\d|Towel|Pull|RackPlateRim|DrainHole|Slat|PailWater|Dryer(Button|Lamp|Rail|Handle|Cavity|Glass)|Bin(Liner|Floor|Rim|Label|Rec(Liner|Label|Mark|Heap)|Heap)|RackWire|Detergent(Soap|Collar|Pump|Head|Spout))/
+const FINE = /^Sink(Tap(Arm|Knob|String|Bag|Cap|Stem|Screen|Mouth)|Basket(Rim|Foot|Slat|Rail|Post)|Plug|Drain(Bar|Pipe|Ring)|Overflow|Water|NorenRod|Noren\d|Towel|Pull|RackPlateRim|DrainHole|Slat|PailWater|Dryer(Button|Lamp|Rail|Handle|Cavity|Glass)|Bin(Liner|Floor|Rim|Label|Cord|Rec(Liner|Label|Mark|Heap|Cord)|Heap)|RackWire|Detergent(Soap|Collar|Pump|Head|Spout))/
 /** cloth, seen from either side (and the bin's liner, seen from inside it) */
 const CLOTH = /^Sink(Noren|Cloth|BinLiner)$/
 
@@ -500,7 +500,9 @@ export const basinHint = () => {
   return `${basinSays(SINK.water, SINK.plug)}｜${st === 'none' ? handWashSays(SINK.dirty, DRAIN) : `${HAND_STEP_SAYS[st]}（髒盤 ${SINK.dirty}）`}${tips.map((t) => `｜${t}`).join('')}`
 }
 /** how far a bin's lid lifts (rad); how far it stands open with the bin heaped over full (it won't shut on it) */
-const BIN_LID_OPEN = 1.75
+// (up past upright till it rests on the wall behind (item 434): its hinge 1.6 cm off the wall, the round lid 25.6 cm across leans back 3.6
+// degrees to touch it; at 1.75 it went 3 cm into the wall)
+const BIN_LID_OPEN = 1.63
 const BIN_LID_AJAR = 0.16
 /** each bin's own parts (item 208): its lid on its hinge, its bag and what's in it (raised as it fills, taken out with the bag), and the bags
  * carried out and the new one brought back (copies for the stock keeper's hands, GuestBar3D: hidden here) */
@@ -522,17 +524,20 @@ export function useBinBags() {
     return { rubbish: one('SinkBinBag'), recycle: one('SinkBinRecBag'), fresh: one('SinkBinNewBag') }
   }, [gltf])
 }
-/** what a bin says pointed at: how full each is and with what, whose bag is out (item 208) */
+/** what a bin says pointed at: how full it is and with what, whether its bag is out (item 208); each its own (item 434, the owner's 「怎兩個一起
+ *亮?」: pointed at either, both lit and the one tip spoke of both) */
 const pctOf = (k: number) => Math.min(100, Math.round(k * 100))
-function binSays() {
-  const b = SINK_BIN.b
-  const r = b.rubbish <= 0 ? '一般垃圾：空的' : b.rubbish >= EMPTY_AT ? `一般垃圾滿了 ${pctOf(b.rubbish)}%，等倉儲來倒` : `一般垃圾 ${pctOf(b.rubbish)}%（竹籤、魚骨、衛生紙）`
-  const c = b.recycle <= 0 ? '資源回收：空的' : b.recycle >= EMPTY_AT ? `資源回收滿了 ${pctOf(b.recycle)}%，等倉儲來倒` : `資源回收 ${pctOf(b.recycle)}%（空罐 ${b.cans}、空瓶 ${b.bottles}）`
-  const out = SINK_BIN.out === 'rubbish' ? '｜倉儲正在換一般垃圾的袋子' : SINK_BIN.out === 'recycle' ? '｜倉儲正在換資源回收的袋子' : ''
+type BinKind = 'rubbish' | 'recycle'
+const BIN_NAME: Record<BinKind, string> = { rubbish: '一般垃圾桶', recycle: '資源回收桶' }
+function binSays(kind: BinKind) {
+  const b = SINK_BIN.b, k = b[kind]
+  const what = kind === 'rubbish' ? '竹籤、魚骨、衛生紙' : `空罐 ${b.cans}、空瓶 ${b.bottles}`
+  const level = k <= 0 ? '空的' : k >= EMPTY_AT ? `滿了 ${pctOf(k)}%，等倉儲來倒` : `${pctOf(k)}%（${what}）`
+  const out = SINK_BIN.out === kind ? '｜倉儲正在換袋子' : ''
   // (the full bags stowed under the sink while customers are about, put out after closing (item 318))
-  const n = SINK_BIN.stowed.rubbish + SINK_BIN.stowed.recycle
+  const n = SINK_BIN.stowed[kind]
   const stowed = n ? `｜綁好的 ${n} 袋收在水槽下，打烊後拿出去` : ''
-  return `${r}｜${c}${out}${stowed}｜${SINK_BIN.lids.rubbish.open || SINK_BIN.lids.recycle.open ? '點一下蓋上' : '點一下掀開蓋子'}`
+  return `${level}${out}${stowed}｜${SINK_BIN.lids[kind].open ? '點一下蓋上' : '點一下掀開蓋子'}`
 }
 /** the sponge taken up: lifted off its dish this far */
 const SPONGE_UP = 0.05
@@ -554,7 +559,15 @@ export function SinkPart({ node }: { node: string }) {
     plainColours(r)
     // (the bins' lids left whole, each on its hinge, to be lifted (items 136, 208); their bags and what's in them their own, to be raised as
     // they fill and taken out; the bags for carrying hidden (item 208))
-    mergeByMaterial(r, (o) => BIN_OWN.has(o.name))
+    // (and each bin a group of its own, merged by itself (item 434): pointed at, only it lights)
+    if (node === 'SinkBinSet') {
+      const sides = { rubbish: new THREE.Group(), recycle: new THREE.Group() }
+      sides.rubbish.name = 'SinkBinRubbish'
+      sides.recycle.name = 'SinkBinRecycle'
+      for (const c of [...r.children]) (c.name.startsWith('SinkBinRec') ? sides.recycle : sides.rubbish).add(c)
+      for (const g of [sides.rubbish, sides.recycle]) { r.add(g); mergeByMaterial(g, (o) => BIN_OWN.has(o.name)) }
+      r.userData.sides = sides
+    } else mergeByMaterial(r, (o) => BIN_OWN.has(o.name))
     for (const nm of ['SinkBinBag', 'SinkBinRecBag', 'SinkBinNewBag']) { const o = r.getObjectByName(nm); if (o) o.visible = false }
     return r
   }, [gltf, node])
@@ -569,7 +582,8 @@ export function SinkPart({ node }: { node: string }) {
   // its mouth as it fills, none of it there while its bag's out (item 208))
   const bins = useMemo(() => {
     if (node !== 'SinkBinSet') return null
-    const get = (n: string) => obj.getObjectByName(n) ?? null
+    const sides = obj.userData.sides as Record<BinKind, THREE.Group>
+    const get = (n: string) => sides.rubbish.getObjectByName(n) ?? sides.recycle.getObjectByName(n) ?? null
     const floor = get('SinkBinFloor'), top = get('SinkBinTop')
     const one = (lid: string, liner: string, heap: string) => {
       const h = get(heap)
@@ -643,23 +657,28 @@ export function SinkPart({ node }: { node: string }) {
       <mesh visible={false} position={hit.at}><boxGeometry args={hit.size} /></mesh>
     </group>
   )
-  if (node === 'SinkBinSet') return (
-    // (the bins: pointed at, what's in them; clicked, the lid of the one clicked lifted or shut (items 136, 208))
-    <group onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver(name, partSays(node)).onPointerOver(e) }}
-      onPointerOut={(e) => { tipOver(name, '').onPointerOut(e) }}
-      onClick={(e) => {
-        e.stopPropagation(); if (getEdit().on) return
-        // (which of the two: the nearer of their mouths to where it was clicked)
-        const a = obj.getObjectByName('SinkBinTop'), b = obj.getObjectByName('SinkBinRecTop')
-        const kind = a && b && e.point.distanceTo(b.getWorldPosition(new THREE.Vector3())) < e.point.distanceTo(a.getWorldPosition(new THREE.Vector3())) ? 'recycle' : 'rubbish'
-        const L = SINK_BIN.lids[kind]
-        L.open = !L.open
-        tapTurnSound(L.open, 0.3)
-        window.setTimeout(() => setTip({ title: name, hint: partSays(node) }), 60)
-      }}>
-      <primitive object={obj} />
-    </group>
-  )
+  if (node === 'SinkBinSet') {
+    // (the bins: pointed at, what's in it; clicked, its lid lifted or shut (items 136, 208)); each its own (item 434: pointed at either, both
+    // lit and one tip spoke of both)
+    const sides = obj.userData.sides as Record<BinKind, THREE.Group>
+    return (
+      <>
+        {(['rubbish', 'recycle'] as const).map((kind) => (
+          <group key={kind} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver(BIN_NAME[kind], binSays(kind)).onPointerOver(e) }}
+            onPointerOut={(e) => { tipOver(BIN_NAME[kind], '').onPointerOut(e) }}
+            onClick={(e) => {
+              e.stopPropagation(); if (getEdit().on) return
+              const L = SINK_BIN.lids[kind]
+              L.open = !L.open
+              tapTurnSound(L.open, 0.3)
+              window.setTimeout(() => setTip({ title: BIN_NAME[kind], hint: binSays(kind) }), 60)
+            }}>
+            <primitive object={sides[kind]} />
+          </group>
+        ))}
+      </>
+    )
+  }
   if (node !== 'SinkBasketSet') return (
     // (the rest name themselves pointed at (the owner's, 2026-11-11: every one of them), the bin with how many sticks are in it)
     <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: name, hint: partSays(node) }) }}
@@ -698,7 +717,7 @@ function partSays(node: string) {
     case 'SinkSoapSet': return '洗手用的肥皂'
     case 'SinkTowelSet': return '擦乾碗盤的布巾'
     // (each its own short line: run together it broke onto two)
-    case 'SinkBinSet': return binSays()
+    case 'SinkBinSet': return `${BIN_NAME.rubbish} ${binSays('rubbish')}｜${BIN_NAME.recycle} ${binSays('recycle')}`
     // (the name's the tip's title already: not said again at the head of its hint)
     case 'SinkDetergentSet': return IN_USE.soap <= 0 && SUPPLIES.has(DISH_SOAP) === 0 ? '用完了，庫存也沒有：到庫存的耗材訂洗碗精'
       : `點一下擠一點${SINK.water >= WASH_WET ? '到水裡' : '在菜瓜布上'}（夠洗 ${SINK.soap} 個；這瓶還能擠 ${IN_USE.soap} 次）`

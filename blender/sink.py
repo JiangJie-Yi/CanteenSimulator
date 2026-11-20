@@ -957,46 +957,157 @@ def join_into(first, rest):
     return first
 
 
-def wood_bin(pre, cx, liner_mat):
-    """one of the pair, its middle at (cx, BZ): its carcass and front (joined, one piece of the set), its bag, its lid (hinged, its own)"""
-    x0, x1, z0, z1 = cx - BW / 2, cx + BW / 2, BZ - BW / 2, BZ + BW / 2
-    top = BH - TOPF
-    bits = []
-    # (the plinth, set back at the front and the sides (none at the back: against the wall))
-    bits.append(box(pre + "Plinth", x0 + 0.012, x1 - 0.012, 0.0, PLINTH, z0 + 0.004, z1 - 0.014, "kick"))
-    # (the carcass: pale hinoki sides and back, its front well back (the lattice stands before it); open at the top, the bag inside it to be
-    # seen down the bin's mouth, not a lid of wood over it all)
-    bits.append(open_box(pre + "Carcass", x0 + 0.004, x1 - 0.004, PLINTH - 0.004, top + 0.004, z0 + 0.004, z1 - 0.014, "hinoki"))
-    # (the four corner posts of dark sugi, standing a few millimetres proud of the sides and the front)
-    for sx in (0, 1):
-        for sz in (0, 1):
-            px0 = x0 if sx == 0 else x1 - POST
-            pz0 = z0 if sz == 0 else z1 - POST
-            bits.append(box(pre + "Post%d%d" % (sx, sz), px0, px0 + POST, PLINTH - 0.002, top + 0.002, pz0, pz0 + POST, "sugi", bev=0.002, seg=1))
-    # (the front between the posts: a dark ground, sugi rails over and under, and the hinoki lattice before the ground)
-    fx0, fx1 = x0 + POST, x1 - POST
-    bits.append(box(pre + "Ground", fx0, fx1, PLINTH + 0.02, top - 0.03, z1 - 0.012, z1 - 0.008, "bin_ground"))
-    bits.append(box(pre + "RailLo", fx0, fx1, PLINTH - 0.002, PLINTH + 0.03, z1 - 0.013, z1 - 0.002, "sugi"))
-    bits.append(box(pre + "RailHi", fx0, fx1, top - 0.04, top + 0.002, z1 - 0.013, z1 - 0.002, "sugi"))
-    n_sl, sl_w = 5, 0.014
-    for k in range(n_sl):
-        mx = fx0 + (fx1 - fx0) * (k + 0.5) / n_sl
-        bits.append(box(pre + "Slat%d" % k, mx - sl_w / 2, mx + sl_w / 2, PLINTH + 0.026, top - 0.036, z1 - 0.010, z1 - 0.004, "hinoki", tile=0.6))
-    # (the top frame of sugi the lid sits on, its inner edge the bin's mouth)
-    bits.append(frame_ring(pre + "TopFrame", cx, BZ, top, BH - 0.0005, BW, BW - 0.06, "sugi"))
+# (made over as a pair of hinoki tubs, 桶 (item 434, the owner's, 2026-11-21: 「垃圾桶有點太隨便」: two square boxes of slats over a dark ground,
+# read as crates): each a round tub of twenty staves, a little wider at its mouth, two copper hoops round it (たが), its foot standing a few
+# centimetres under its floor as a tub's staves do; a round lid of boards with a cleat across it (桟), hinged along its back (its origin there,
+# for the game to lift), the recycling one with its brass-ringed hole; a wooden tag (木札) hung on a red cord from the upper hoop at its front,
+# its name burnt in. The grain and the staves' joints in their picture; inside, the same staves in the shade)
+TUB_SEG = 20
+TUB_R0, TUB_R1 = 0.112, 0.124       # its outside's radius at its foot and at its mouth
+TUB_T = 0.012                       # the staves' thickness
+LID_R = TUB_R1 + 0.004
+LID_Y = BH + 0.002                  # the lid's foot, on the bag's fold over the rim
+HOOPS = ((0.06, 0.085), (0.43, 0.455))
+HOOP_OUT = 0.0025
+
+
+def tub_r(y):
+    return TUB_R0 + (TUB_R1 - TUB_R0) * y / BH
+
+
+SN = 512
+su, sv = grid01(SN)
+# (twenty staves round, each its own shade of hinoki, the grain up it wavering, a dark joint between each two, a little darker toward the foot
+# where it's wetted)
+stave = np.floor(su * TUB_SEG).astype(int)
+tone = (0.9 + 0.12 * np.sin(stave * 2.399))[..., None]
+grain = np.sin((su * TUB_SEG * 7 + (fbm(SN, 3, 12, 4) - 0.5) * 2.5) * 2 * math.pi) * 0.5 + 0.5
+stv = mix((0.86, 0.7, 0.48), (0.74, 0.57, 0.36), smooth(0.55, 1.0, grain) * 0.6) * tone
+joint = np.abs(((su * TUB_SEG) % 1) - 0.5)
+stv = mix(stv, (0.28, 0.18, 0.1), smooth(0.47, 0.5, joint) * 0.85)
+stv = stv * (0.86 + 0.14 * smooth(0.0, 0.35, sv))[..., None]
+stv = stv * (0.94 + 0.08 * fbm(SN, 16, 16, 3))[..., None]
+M["staves"] = pbr("SinkBinStaves", (1, 1, 1), tex=image("sink_bin_staves", np.clip(stv, 0, 1).astype(np.float32)), rough=0.55)
+M["staves_in"] = pbr("SinkBinStavesIn", (1, 1, 1), tex=image("sink_bin_staves_in", np.clip(stv * 0.62, 0, 1).astype(np.float32)), rough=0.6)
+M["cord"] = pbr("SinkBinCord", lin("#b8261c"), rough=0.7)
+
+
+def ring_verts(bm_, cx, cz, r, y, seg=TUB_SEG):
+    return [bm_.verts.new(P(cx + r * math.cos(k / seg * 2 * math.pi), y, cz + r * math.sin(k / seg * 2 * math.pi))) for k in range(seg)]
+
+
+def band(bm_, lo, hi, mat_i, uvl, v0, v1, seg=TUB_SEG):
+    """quads between two rings of verts, its picture's u round it (0 to 1, its seam's loops given 1), v from v0 at `lo` to v1 at `hi`"""
+    for k in range(seg):
+        k2 = (k + 1) % seg
+        f = bm_.faces.new((lo[k], lo[k2], hi[k2], hi[k]))
+        f.material_index = mat_i
+        for lp, (uu, vv) in zip(f.loops, ((k / seg, v0), ((k + 1) / seg, v0), ((k + 1) / seg, v1), (k / seg, v1))):
+            lp[uvl].uv = (uu, vv)
+
+
+def mesh_of_bm(name, bm_, mats, smooth_shade=True):
+    bmesh.ops.recalc_face_normals(bm_, faces=bm_.faces)
+    me = bpy.data.meshes.new(name)
+    bm_.to_mesh(me)
+    bm_.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    for m in mats:
+        o.data.materials.append(M[m])
+    for poly in o.data.polygons:
+        poly.use_smooth = smooth_shade
+    parts.append(o)
+    return o
+
+
+def cord(name, a, b, r=0.0016):
+    """a thin cord, four-sided, from point a to point b (the game's frame)"""
+    a, b = P(*a), P(*b)
+    d = (b - a).normalized()
+    sd = d.cross(Vector((0, 0, 1)))
+    if sd.length < 1e-6:
+        sd = d.cross(Vector((1, 0, 0)))
+    sd.normalize()
+    up = sd.cross(d).normalized()
+    bm_ = bmesh.new()
+    ends = []
+    for c in (a, b):
+        ends.append([bm_.verts.new(c + (sd * math.cos(q) + up * math.sin(q)) * r) for q in (0.0, math.pi / 2, math.pi, 1.5 * math.pi)])
+    for k in range(4):
+        k2 = (k + 1) % 4
+        bm_.faces.new((ends[0][k], ends[0][k2], ends[1][k2], ends[1][k]))
+    bm_.faces.new(ends[0][::-1])
+    bm_.faces.new(ends[1])
+    return mesh_of_bm(name, bm_, ["cord"], smooth_shade=False)
+
+
+def wood_bin(pre, cx, liner_mat, cleat_z):
+    """one of the pair, its middle at (cx, BZ): its tub and hoops (joined, one piece of the set), its bag, its lid (hinged, its own)"""
+    bm_ = bmesh.new()
+    uvl = bm_.loops.layers.uv.new("UVMap")
+    a_ = ring_verts(bm_, cx, BZ, TUB_R0, 0.0)
+    b_ = ring_verts(bm_, cx, BZ, TUB_R1, BH)
+    c_ = ring_verts(bm_, cx, BZ, TUB_R1 - TUB_T, BH)
+    d_ = ring_verts(bm_, cx, BZ, tub_r(PLINTH) - TUB_T, PLINTH)
+    band(bm_, a_, b_, 0, uvl, 0.0, 1.0)                 # (its outside, the staves up it)
+    band(bm_, b_, c_, 0, uvl, 1.0, 1.02)                # (the rim: the staves' ends)
+    band(bm_, c_, d_, 1, uvl, 1.0, 0.1)                 # (inside, in the shade)
+    for f in ladder_fill(bm_, d_):                      # (its floor)
+        f.material_index = 1
+        for lp in f.loops:
+            co = lp.vert.co
+            lp[uvl].uv = (0.5 + (co.x - cx) * 2, 0.5 + (-co.y - BZ) * 2)
+    for f in ladder_fill(bm_, a_[::-1]):                # (under its foot)
+        f.material_index = 2
+    tub = mesh_of_bm(pre + "Tub", bm_, ["staves", "staves_in", "kick"])
+    bits = [tub]
+    # (its hoops: copper bands a little proud of the staves, their ledges into them)
+    for i, (y0, y1) in enumerate(HOOPS):
+        hb = bmesh.new()
+        huv = hb.loops.layers.uv.new("UVMap")
+        i0 = ring_verts(hb, cx, BZ, tub_r(y0) - 0.001, y0)
+        o0 = ring_verts(hb, cx, BZ, tub_r(y0) + HOOP_OUT, y0)
+        o1 = ring_verts(hb, cx, BZ, tub_r(y1) + HOOP_OUT, y1)
+        i1 = ring_verts(hb, cx, BZ, tub_r(y1) - 0.001, y1)
+        band(hb, i0, o0, 0, huv, 0.0, 0.1)
+        band(hb, o0, o1, 0, huv, 0.1, 0.9)
+        band(hb, o1, i1, 0, huv, 0.9, 1.0)
+        bits.append(mesh_of_bm(pre + "Hoop%d" % i, hb, ["copper"]))
     body = join_into(bits[0], bits[1:])
     body.name = pre + "Body"
-    # (the bag: down inside the carcass, over the frame's inner edge, a hair inside it)
-    lb = shell(pre + "Liner", cx, BZ, PLINTH + 0.01, BH - 0.004, BW / 2 - 0.032, liner_mat, inward=True)
-    fold = frame_ring(pre + "LinerFold", cx, BZ, BH - 0.03, BH + 0.0002, BW - 0.058, BW - 0.066, liner_mat)
-    liner = join_into(lb, [fold])
-    liner.name = pre + "Liner"
-    # (the lid: hinoki, its edges eased, a sugi pull under its front edge; its origin on its hinge along the back)
-    lid = box(pre + "Lid", x0 - 0.002, x1 + 0.002, BH, BH + LID_T, z0 + 0.002, z1 + 0.004, "hinoki", bev=0.004, seg=1, tile=0.6)
-    pull = box(pre + "LidPull", cx - 0.045, cx + 0.045, BH - 0.012, BH + 0.006, z1 + 0.002, z1 + 0.016, "sugi", bev=0.003, seg=1)
-    lid = join_into(lid, [pull])
+    # (the bag: down inside the tub, over its rim and down its outside a little, a hair off the staves all the way)
+    lb = bmesh.new()
+    luv = lb.loops.layers.uv.new("UVMap")
+    l0 = ring_verts(lb, cx, BZ, tub_r(PLINTH + 0.01) - TUB_T - 0.004, PLINTH + 0.01)
+    l1 = ring_verts(lb, cx, BZ, TUB_R1 - TUB_T - 0.003, BH - 0.004)
+    l2 = ring_verts(lb, cx, BZ, TUB_R1 - TUB_T * 0.5, BH + 0.0015)
+    l3 = ring_verts(lb, cx, BZ, TUB_R1 + 0.0015, BH + 0.0015)
+    l4 = ring_verts(lb, cx, BZ, tub_r(BH - 0.03) + 0.0025, BH - 0.03)
+    band(lb, l1, l0, 0, luv, 1.0, 0.0)
+    band(lb, l2, l1, 0, luv, 1.0, 1.0)
+    band(lb, l3, l2, 0, luv, 1.0, 1.0)
+    band(lb, l4, l3, 0, luv, 0.9, 1.0)
+    mesh_of_bm(pre + "Liner", lb, [liner_mat])
+    # (the lid: hinoki boards, its top edge eased by a ring a little in, a cleat of sugi across it; its origin on its hinge)
+    db = bmesh.new()
+    duv = db.loops.layers.uv.new("UVMap")
+    t0 = ring_verts(db, cx, BZ, LID_R, LID_Y)
+    t1 = ring_verts(db, cx, BZ, LID_R, LID_Y + LID_T - 0.004)
+    t2 = ring_verts(db, cx, BZ, LID_R - 0.004, LID_Y + LID_T)
+    band(db, t0, t1, 0, duv, 0.0, 0.05)
+    band(db, t1, t2, 0, duv, 0.05, 0.07)
+    for ring_, flip in ((t2, False), (t0, True)):
+        for f in ladder_fill(db, ring_[::-1] if flip else ring_):
+            for lp in f.loops:
+                co = lp.vert.co
+                lp[duv].uv = ((co.x - cx) / 0.5 + 0.5, (-co.y - BZ) / 0.5 + 0.5)
+    lid = mesh_of_bm(pre + "Lid", db, ["hinoki"])
+    cleat = box(pre + "LidCleat", cx - 0.07, cx + 0.07, LID_Y + LID_T - 0.001, LID_Y + LID_T + 0.016, BZ + cleat_z - 0.011, BZ + cleat_z + 0.011, "sugi",
+                bev=0.004, seg=1)
+    lid = join_into(lid, [cleat])
     lid.name = pre + "Lid"
-    bpy.context.scene.cursor.location = P(cx, BH, z0 + 0.002)
+    bpy.context.scene.cursor.location = P(cx, LID_Y, BZ - LID_R)
     bpy.ops.object.select_all(action="DESELECT"); lid.select_set(True); bpy.context.view_layer.objects.active = lid
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
     empty(pre + "Top", cx, BH - 0.05, BZ)
@@ -1004,15 +1115,16 @@ def wood_bin(pre, cx, liner_mat):
     return body, lid
 
 
-wood_bin("SinkBin", BX, "liner")
-wood_bin("SinkBinRec", RX, "liner_rec")
+wood_bin("SinkBin", BX, "liner", 0.0)
+wood_bin("SinkBinRec", RX, "liner_rec", -0.062)
+
 # (where whoever empties them stands: before the pair, facing them)
 empty("SinkBinFront", (BX + RX) / 2, 0.0, BZ + BW / 2 + 0.42)
 
 # ---- what's in them, to be seen filling them (item 208): each bin's heap, its origin at its foot's middle (the game raises it with how full
 # the bin is, from its floor toward its mouth, and hides it while it's empty); the bags taken out (tied, carried off by the stock keeper) and
 # the new one brought back folded, each its own, hidden in the bins till the game wants them
-HEAP_HALF = BW / 2 - 0.034
+HEAP_HALF = tub_r(PLINTH) - TUB_T - 0.007   # (the round heap's radius, inside the bag inside the tub (item 434))
 NP = 256
 hu, hv = grid01(NP)
 # (the rubbish: a black bag's inside, its folds catching the light; crumpled tissues, a fish's bones, a few bamboo sticks across it)
@@ -1050,7 +1162,8 @@ M["bottle_green"] = pbr("SinkBinBottleGreen", lin("#2f6b3c"), rough=0.15)
 
 
 def heap(name, x, mat, rise, seed_):
-    """a heap filling a bag's square: a grid of 4 by 4 quads, its middle higher, every inner point a little up or down; its origin at its foot"""
+    """a heap filling a bag's round: a grid of 4 by 4 quads drawn into a round, its middle higher, every inner point a little up or down; its
+    origin at its foot"""
     rnd = __import__("random").Random(seed_)
     bm_ = bmesh.new()
     n = 4
@@ -1060,7 +1173,9 @@ def heap(name, x, mat, rise, seed_):
             a, b = i / n * 2 - 1, j / n * 2 - 1
             edge = i in (0, n) or j in (0, n)
             y = 0.0 if edge else rise * (1 - 0.5 * (a * a + b * b)) + rnd.uniform(-0.008, 0.008)
-            vs[i, j] = bm_.verts.new(P(x + a * HEAP_HALF, y, BZ + b * HEAP_HALF))
+            # (the square's grid drawn into a round, the tub's (item 434): its corners on the circle)
+            ra, rb = a * math.sqrt(1 - b * b / 2), b * math.sqrt(1 - a * a / 2)
+            vs[i, j] = bm_.verts.new(P(x + ra * HEAP_HALF, y, BZ + rb * HEAP_HALF))
     for i in range(n):
         for j in range(n):
             bm_.faces.new((vs[i, j], vs[i + 1, j], vs[i + 1, j + 1], vs[i, j + 1]))
@@ -1131,13 +1246,14 @@ rec_heap = heap("SinkBinRecHeap", RX, "recheap", 0.024, 11)
 # (a few lying on the bottles and cans' heap, sunk a little into it, one across the others; each well inside the bag (measured: along its
 # length and across it, at its angle, inside the bag's half less a centimetre))
 items = []
-for k, (prof, mat, dx, dz, ang, up) in enumerate(((BOTTLE, "bottle_brown", -0.035, 0.0, 1.87, 0.0), (CAN, "can_silver", 0.03, -0.02, 1.9, 0.0),
-                                                 (CAN, "can_red", -0.02, 0.045, 0.15, 0.034))):
+# (item 434: the heap round now, 9 cm in radius: the bottle across its middle, the red can lying across it on top of it, the other cans in its
+# picture)
+for k, (prof, mat, dx, dz, ang, up) in enumerate(((BOTTLE, "bottle_brown", 0.0, 0.0, 0.6, 0.0), (CAN, "can_red", 0.0, 0.0, 2.2, 0.062))):
     r0 = max(r for r, _ in prof)
     length = prof[-1][1]
     ca, sa = math.cos(ang), math.sin(ang)
-    ext_x, ext_z = abs(ca) * length / 2 + abs(sa) * r0, abs(sa) * length / 2 + abs(ca) * r0
-    assert abs(dx) + ext_x <= HEAP_HALF - 0.004 and abs(dz) + ext_z <= HEAP_HALF - 0.004, ("bin item out of its bag", k)
+    far = max(math.hypot(dx + s1 * ca * length / 2 - s2 * sa * r0, dz + s1 * sa * length / 2 + s2 * ca * r0) for s1 in (-1, 1) for s2 in (-1, 1))
+    assert far <= HEAP_HALF - 0.004, ("bin item out of its bag", k, far)
     # (its middle on the spot: its foot back half its length along its lying way)
     items.append(lathe("SinkBinRecItem%d" % k, RX + dx - ca * length / 2, 0.012 + r0 * 0.85 + up, BZ + dz + sa * length / 2, prof, 8, mat, lying=ang))
 # (each its own mesh under the heap (hung on it once the sets are made, below), not joined into it: a heap of over a hundred triangles is
@@ -1244,11 +1360,17 @@ def bag_roll(name, x0, y0, z0):
 nb = bag_roll("SinkBinNewBag", BX, PLINTH + 0.02 + ROLL_R + 0.06, BZ)
 assert len(nb.data.polygons) <= 100, ("the roll's over a small piece's faces", len(nb.data.polygons))
 print("NEW_BAG_ROLL", len(nb.data.polygons), "faces")
-# (each one's plaque on its front, high up over the lattice: pale hinoki, a sugi edge to it)
-PLQ_W, PLQ_H, PLQ_Y = 0.17, 0.085, BH - TOPF - 0.11
-PLQ_Z = BZ + BW / 2 + 0.006   # its face
+# (each one's tag (木札) hung at its front on a red cord from the upper hoop (item 434): pale hinoki, its name burnt in; its back 4 mm off the
+# staves' front where they come furthest out)
+PLQ_W, PLQ_H, PLQ_Y = 0.15, 0.075, 0.3675
+TAG_T = 0.008
+PLQ_Z = BZ + tub_r(PLQ_Y + PLQ_H / 2) + 0.004 + TAG_T   # its face
 for pre, cx in (("SinkBin", BX), ("SinkBinRec", RX)):
-    box(pre + "Plaque", cx - PLQ_W / 2, cx + PLQ_W / 2, PLQ_Y - PLQ_H / 2, PLQ_Y + PLQ_H / 2, PLQ_Z - 0.009, PLQ_Z, "hinoki", bev=0.003, seg=1, tile=0.4)
+    box(pre + "Plaque", cx - PLQ_W / 2, cx + PLQ_W / 2, PLQ_Y - PLQ_H / 2, PLQ_Y + PLQ_H / 2, PLQ_Z - TAG_T, PLQ_Z, "hinoki", bev=0.003, seg=1, tile=0.4)
+    hy = (HOOPS[1][0] + HOOPS[1][1]) / 2
+    hz = BZ + tub_r(hy) + HOOP_OUT
+    for k, sx in enumerate((-1, 1)):
+        cord(pre + "Cord%d" % k, (cx + sx * (PLQ_W / 2 - 0.02), PLQ_Y + PLQ_H / 2 - 0.004, PLQ_Z - TAG_T / 2), (cx + sx * 0.012, hy, hz + 0.0016))
 
 # ---- their names, burnt into the plaques, a hair proud of them; the recycling lid's hole
 # (at a finer pitch than the plaques' size asks, and in the regular weight, not the bold: drawn smaller than they're made, the bold strokes ran
@@ -1286,14 +1408,14 @@ def print_on(name, body, size, x, y, font, mat="bin_ink", width=PLQ_W * 0.86):
     return q
 
 
-print_on("SinkBinLabelZh", "一般垃圾", 0.036, BX, PLQ_Y + 0.013, ZH)
-print_on("SinkBinLabelJa", "燃えるゴミ", 0.023, BX, PLQ_Y - 0.023, JA)
-print_on("SinkBinRecLabelZh", "資源回收", 0.036, RX + 0.014, PLQ_Y + 0.013, ZH, width=PLQ_W * 0.66)
-print_on("SinkBinRecLabelJa", "びん・かん", 0.023, RX + 0.014, PLQ_Y - 0.023, JA, width=PLQ_W * 0.66)
-print_on("SinkBinRecMark", "\u267b", 0.05, RX - PLQ_W / 2 + 0.03, PLQ_Y - 0.002, SYM, mat="bin_white", width=0.05)
+print_on("SinkBinLabelZh", "一般垃圾", 0.03, BX, PLQ_Y + 0.011, ZH)
+print_on("SinkBinLabelJa", "燃えるゴミ", 0.019, BX, PLQ_Y - 0.019, JA)
+print_on("SinkBinRecLabelZh", "資源回收", 0.03, RX + 0.013, PLQ_Y + 0.011, ZH, width=PLQ_W * 0.64)
+print_on("SinkBinRecLabelJa", "びん・かん", 0.019, RX + 0.013, PLQ_Y - 0.019, JA, width=PLQ_W * 0.64)
+print_on("SinkBinRecMark", "\u267b", 0.042, RX - PLQ_W / 2 + 0.026, PLQ_Y - 0.002, SYM, mat="bin_white", width=0.042)
 # (the lid's hole: a brass ring and a dark disc in it, a hair over the lid's top toward its front; drawn into the picture with the words)
 for nm, r_, mat in (("SinkBinRecRing", 0.05, "bin_ring"), ("SinkBinRecHole", 0.041, "bin_hole")):
-    bpy.ops.mesh.primitive_circle_add(vertices=24, radius=r_, fill_type="NGON", location=P(RX, BH + LID_T + (0.0012 if mat == "bin_ring" else 0.0018), BZ + 0.035))
+    bpy.ops.mesh.primitive_circle_add(vertices=24, radius=r_, fill_type="NGON", location=P(RX, LID_Y + LID_T + (0.0012 if mat == "bin_ring" else 0.0018), BZ + 0.045))
     c_ = active()
     c_.name = nm
     c_.data.materials.append(M[mat])
