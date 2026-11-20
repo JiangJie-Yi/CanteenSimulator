@@ -1771,7 +1771,7 @@ function CorkNoteView({ n, k, end }: { n: (typeof CORK_NOTES)[number]; k: number
   useEffect(() => () => obj.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !PIN_GEOS.includes(m.geometry)) m.geometry.dispose() }), [obj])
   return (
     <Movable id={n.id} label={n.label}>
-      <primitive object={obj} position={[-0.004 - cork.t - 0.0006, cork.up + n.dy, end - cork.back + n.dz]} rotation-x={n.rot} {...nameOver(...SIGN_TIP)} />
+      <primitive object={obj} position={[-0.004 - cork.t - 0.0006 - (n.layer ?? 0) * 0.0012, cork.up + n.dy, end - cork.back + n.dz]} rotation-x={n.rot} {...nameOver(...SIGN_TIP)} />
     </Movable>
   )
 }
@@ -1788,7 +1788,8 @@ function WallSigns({ end }: { end: number }) {
     const repaint = () => { paintWallSigns(c.getContext('2d')!, SIGNS_ZH); SIGNS_TEX.needsUpdate = true }
     repaint()
     void Promise.all(['700', '400'].map((w) => document.fonts?.load(`${w} 40px "LXGW WenKai TC"`,
-      '謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念秋夜の隔壁桌となりの席小美みき必點食' + CARD_CHARS))).then(repaint).catch(() => {})
+      '謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念秋夜の隔壁桌となりの席小美みき必點食'
+      + '客人的話お様声同事聚餐会社飲み加油晴歲翔收據集滿送飯糰燒焼スタンプカードレシートかっこいいたいしょうがんばってはるなさいおめでとうしょう個おにぎりBestgrilledfishintown!TomLondonNT$0123456789' + CARD_CHARS))).then(repaint).catch(() => {})
   })
   return (
     <group name="wall-signs" userData={{ end }}>

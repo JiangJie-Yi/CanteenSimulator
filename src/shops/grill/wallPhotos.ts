@@ -269,11 +269,14 @@ type Rect = [number, number, number, number]
 /** the wall signs' canvas over WALL_SIGNS.size (its pixels per place) */
 export const SIGNS_PX = 2
 export const WALL_SIGNS = {
-  /** the cork board: its frame and its cork (its notes are pieces of their own) */
-  board: [0, 0, 420, 300] as Rect,
+  /** the cork board: its frame and its cork (its notes are pieces of their own); 60 by 33 (item 413, the owner's 「這有點看不懂，可以豐富一點」:
+   * 42 by 30 held seven), in the canvas's free corner by the tanzaku */
+  board: [64, 690, 600, 330] as Rect,
   photos: [[430, 0, 200, 150], [640, 0, 200, 150]] as Rect[],
-  /** the notes on the cork board, each its own picture, upright in its place (as cut: torn and curled edges see-through) */
-  notes: [[0, 310, 100, 86], [105, 310, 90, 78], [200, 310, 96, 112], [300, 310, 104, 88], [410, 310, 94, 82], [510, 310, 68, 72], [585, 310, 132, 96]] as Rect[],
+  /** the notes on the cork board (CORK_NOTES' order), each its own picture, upright in its place (as cut: torn and curled edges see-through):
+   * the yellow note and the pink one where they were, the rest where the board was */
+  notes: [[0, 310, 100, 86], [105, 310, 90, 80], [276, 0, 96, 116], [0, 0, 132, 104], [140, 0, 128, 96], [0, 120, 128, 96], [136, 120, 112, 72],
+    [252, 120, 92, 92], [346, 120, 72, 86], [0, 224, 100, 60], [108, 224, 230, 44]] as Rect[],
   /** the seven signed pieces, SIGN_PIECES' order: the shikishi, the round one, the black card, the polaroid, the wooden board, the little
    * gold shikishi, the tanzaku */
   signs: [[0, 430, 220, 245], [225, 430, 180, 180], [410, 430, 170, 120], [585, 430, 92, 110], [682, 430, 190, 120], [877, 430, 136, 150],
@@ -317,16 +320,25 @@ export const WALL_PIECES: WallPiece[] = [
 ]
 /** the notes pinned on the cork board (item 402: each a piece of its own): about the board's middle (along it, + toward the door; up) (its
  * size its picture's place's, WALL_SIGNS.notes), its slant (radians, as the picture turns: + clockwise to the eye), its pins about its middle (along, up, which colour), the
- * yellow one's corner curling up off the board */
+ * yellow one's corner curling up off the board; `layer` how many papers' thickness over the cork (one lying a little over another).
+ * Item 413 (the owner's 「這有點看不懂，可以豐富一點」, over the seven: a crude fish, a cake a box, a night photo a dark blur, the till slip cut
+ * off at the frame, nothing saying what the board was): the board 60 by 33, its heading at the top (客人的話), eleven cards none over another's
+ * words: three photographs plain to read (the grilled fish on its plate, a table of colleagues raising their beers, the shop at night, its
+ * lantern lit), the guests' notes (thanks with the fish drawn properly, the boss is handsome, a birthday with its cake, a child's crayon
+ * drawing of the boss with a fish, a note in English, the saba circled on a till slip) and a stamp card */
 export const CORK_NOTES = [
-  { id: 'sign-note1', label: '便利貼（黃）', dz: -0.136, dy: 0.084, rot: -0.06, pins: [[0, 0.036, 0]], curl: true },
-  { id: 'sign-note2', label: '便利貼（粉紅）', dz: -0.038, dy: 0.088, rot: 0.05, pins: [[0, 0.034, 1]] },
-  { id: 'sign-note3', label: '烤魚的照片', dz: 0.056, dy: 0.072, rot: -0.04, pins: [[0, 0.05, 2]] },
-  { id: 'sign-note4', label: '撕下的筆記紙', dz: -0.124, dy: -0.016, rot: 0.04, pins: [[0, 0.036, 3]] },
-  { id: 'sign-note5', label: '牛皮紙卡片', dz: -0.018, dy: -0.018, rot: -0.05, pins: [[0, 0.035, 0]] },
-  { id: 'sign-note6', label: '收銀小票', dz: -0.158, dy: -0.098, rot: 0.07, pins: [[0, 0.03, 1]] },
-  { id: 'sign-note7', label: '店面夜景的照片', dz: 0.106, dy: -0.064, rot: 0.035, pins: [[-0.058, 0.044, 2], [0.058, 0.04, 0]] },
-] as { id: string; label: string; dz: number; dy: number; rot: number; pins: [number, number, number][]; curl?: boolean }[]
+  { id: 'cork-thanks', label: '便利貼（黃）', dz: -0.085, dy: 0.032, rot: -0.05, pins: [[-0.039, 0.035, 0]], curl: true },
+  { id: 'cork-boss', label: '便利貼（粉紅）', dz: -0.095, dy: -0.075, rot: 0.05, pins: [[0.035, 0.031, 1]] },
+  { id: 'cork-fish', label: '烤魚的照片', dz: 0.05, dy: 0.028, rot: -0.035, pins: [[0, 0.05, 2]] },
+  { id: 'cork-toast', label: '合照（乾杯）', dz: -0.215, dy: 0.083, rot: -0.04, pins: [[0, 0.044, 3]] },
+  { id: 'cork-night', label: '店面夜景的照片', dz: 0.212, dy: 0.088, rot: 0.03, pins: [[-0.054, 0.04, 2], [0.054, 0.04, 0]] },
+  { id: 'cork-crayon', label: '小朋友的畫', dz: -0.214, dy: -0.088, rot: 0.03, pins: [[-0.055, 0.04, 1], [0.055, 0.04, 3]] },
+  { id: 'cork-english', label: '英文留言卡', dz: 0.152, dy: -0.045, rot: 0.03, pins: [[-0.047, 0.029, 1]], layer: 1 },
+  { id: 'cork-bday', label: '牛皮紙卡片', dz: 0, dy: -0.09, rot: -0.04, pins: [[0.038, 0.04, 0]] },
+  { id: 'cork-saba', label: '收銀小票', dz: 0.247, dy: -0.078, rot: 0.06, pins: [[-0.027, 0.036, 1]] },
+  { id: 'cork-stamps', label: '集點卡', dz: 0.12, dy: -0.118, rot: -0.03, pins: [[-0.043, 0.023, 2]] },
+  { id: 'cork-title', label: '留言板標題', dz: -0.02, dy: 0.125, rot: -0.015, pins: [] },
+] as { id: string; label: string; dz: number; dy: number; rot: number; pins: [number, number, number][]; curl?: boolean; layer?: number }[]
 const BRUSH = '"LXGW WenKai TC", "Noto Serif TC", serif'
 /** a little photograph's own frame and print, `draw` drawing what's in it into its print */
 function snapshot(g: CanvasRenderingContext2D, [x, y, w, h]: number[], draw: (fr: { x: number; y: number; w: number; h: number }) => void) {
@@ -393,13 +405,13 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     cg.addColorStop(0, '#c99c66'); cg.addColorStop(1, '#a97c4a')
     g.fillStyle = cg; g.fillRect(cx0, cy0, cw, ch)
     const cols = ['138,90,48', '216,176,124', '168,116,66', '232,200,148', '110,70,38']
-    for (let k = 0; k < 5200; k++) {
+    for (let k = 0, n = Math.round((5200 * cw * ch) / (396 * 276)); k < n; k++) {
       const sz = rnd() < 0.82 ? 1 : rnd() < 0.8 ? 2 : 3
       g.fillStyle = `rgba(${cols[Math.floor(rnd() * cols.length)]},${0.35 + rnd() * 0.45})`
       g.fillRect(cx0 + rnd() * cw, cy0 + rnd() * ch, sz, sz * (0.7 + rnd() * 0.6))
     }
     g.fillStyle = 'rgba(60,36,16,0.55)'
-    for (let k = 0; k < 14; k++) { g.beginPath(); g.arc(cx0 + 8 + rnd() * (cw - 16), cy0 + 8 + rnd() * (ch - 16), 0.9, 0, Math.PI * 2); g.fill() }
+    for (let k = 0; k < 22; k++) { g.beginPath(); g.arc(cx0 + 8 + rnd() * (cw - 16), cy0 + 8 + rnd() * (ch - 16), 0.9, 0, Math.PI * 2); g.fill() }
   }
   // (handwriting: a line of it, as big as fits, a touch uneven)
   const hand = (text: string, cx: number, cy: number, size: number, maxW: number, col = '#23284a') => {
@@ -416,91 +428,280 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     g.save(); g.translate(x + w / 2, y + h / 2); draw(); g.restore()
   }
   g.textAlign = 'center'; g.textBaseline = 'middle'
-  // 1 (a yellow sticky note, its lower right corner curling up off the cork (the piece's corner itself turns up); a little fish drawn under
-  // the words)
+  // (pen and crayon: a five-pointed star, a heart, a fish drawn in pen, a polaroid's white frame (its foot wider))
+  const star = (cx: number, cy: number, r: number, col: string) => {
+    g.fillStyle = col; g.beginPath()
+    for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5, rr = k % 2 ? r * 0.45 : r; g.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)) }
+    g.closePath(); g.fill()
+  }
+  const heart = (cx: number, cy: number, r: number, col: string) => {
+    g.fillStyle = col; g.beginPath(); g.moveTo(cx, cy + r * 0.9)
+    g.bezierCurveTo(cx - r * 1.6, cy - r * 0.2, cx - r * 0.7, cy - r * 1.4, cx, cy - r * 0.45)
+    g.bezierCurveTo(cx + r * 0.7, cy - r * 1.4, cx + r * 1.6, cy - r * 0.2, cx, cy + r * 0.9)
+    g.fill()
+  }
+  /** a fish in pen, its head to the left: `L` long; its body filled `fill`, grill marks on it if `grilled` */
+  const penFish = (cx: number, cy: number, L: number, fill: string, grilled: boolean, ink = INK) => {
+    const x0 = cx - L / 2, x1 = cx + L * 0.3, hh = L * 0.2
+    g.lineWidth = Math.max(1.1, L * 0.045); g.lineJoin = 'round'; g.lineCap = 'round'
+    g.beginPath(); g.moveTo(x0, cy)
+    g.bezierCurveTo(x0 + L * 0.18, cy - hh * 1.25, x1 - L * 0.2, cy - hh * 1.1, x1, cy - hh * 0.25)
+    g.lineTo(cx + L / 2, cy - hh * 0.95); g.lineTo(cx + L * 0.43, cy); g.lineTo(cx + L / 2, cy + hh * 0.95); g.lineTo(x1, cy + hh * 0.25)
+    g.bezierCurveTo(x1 - L * 0.2, cy + hh * 1.1, x0 + L * 0.18, cy + hh * 1.2, x0, cy)
+    g.closePath(); g.fillStyle = fill; g.fill(); g.strokeStyle = ink; g.stroke()
+    // (its dorsal fin, its gill, its eye)
+    g.beginPath(); g.moveTo(cx - L * 0.08, cy - hh * 1.02); g.quadraticCurveTo(cx + L * 0.02, cy - hh * 1.6, cx + L * 0.14, cy - hh * 0.9); g.stroke()
+    g.beginPath(); g.arc(x0 + L * 0.2, cy, hh * 0.75, -Math.PI * 0.4, Math.PI * 0.4); g.stroke()
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x0 + L * 0.1, cy - hh * 0.25, L * 0.05, 0, Math.PI * 2); g.fill(); g.stroke()
+    g.fillStyle = ink; g.beginPath(); g.arc(x0 + L * 0.1, cy - hh * 0.25, L * 0.022, 0, Math.PI * 2); g.fill()
+    if (grilled) {
+      g.strokeStyle = 'rgba(70,30,10,0.75)'
+      for (const k of [0, 1, 2]) { const x = cx - L * 0.05 + k * L * 0.12; g.beginPath(); g.moveTo(x - L * 0.04, cy - hh * 0.75); g.lineTo(x + L * 0.04, cy + hh * 0.75); g.stroke() }
+    }
+  }
+  const polaroid = (w: number, h: number, foot: number) => {
+    g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(-w / 2 + 1.5, -h / 2 + 1.5, w, h)
+    g.fillStyle = '#fbfaf6'; g.fillRect(-w / 2, -h / 2, w, h)
+    return { x: -w / 2 + 5, y: -h / 2 + 5, w: w - 10, h: h - 10 - foot }
+  }
+  // 1 (a yellow sticky note, its lower right corner curling up off the cork (the piece's corner itself turns up)): thanks, the fish drawn
+  // properly in pen, five stars
   note(0, () => {
     const yg = g.createLinearGradient(0, -41, 0, 41); yg.addColorStop(0, '#fff6a6'); yg.addColorStop(1, '#f6e47c')
     g.fillStyle = yg; g.beginPath(); g.moveTo(-48, -41); g.lineTo(48, -41); g.lineTo(48, 25); g.lineTo(32, 41); g.lineTo(-48, 41); g.closePath(); g.fill()
     g.fillStyle = '#e8d266'; g.beginPath(); g.moveTo(48, 25); g.lineTo(32, 41); g.lineTo(36, 27); g.closePath(); g.fill()
-    hand(zh ? '謝謝招待！' : 'ごちそうさま！', 0, -12, 20, 84)
-    g.strokeStyle = '#23284a'; g.lineWidth = 1.6
-    g.beginPath(); g.ellipse(-6, 16, 14, 6, 0, 0, Math.PI * 2); g.stroke()
-    g.beginPath(); g.moveTo(8, 16); g.lineTo(18, 10); g.lineTo(18, 22); g.closePath(); g.stroke()
-    g.fillStyle = '#23284a'; g.beginPath(); g.arc(-14, 15, 1.4, 0, Math.PI * 2); g.fill()
+    hand(zh ? '謝謝招待！' : 'ごちそうさま！', 0, -25, 19, 86)
+    penFish(-4, 5, 46, '#f4b46c', true, '#23284a')
+    for (let k = 0; k < 5; k++) star(-26 + k * 11, 29, 4.3, '#e0951a')
   })
-  // 2 (a pink sticky note)
+  // 2 (a pink sticky note): the boss is handsome, from the next table, two hearts
   note(1, () => {
-    const pg = g.createLinearGradient(0, -37, 0, 37); pg.addColorStop(0, '#ffd9e4'); pg.addColorStop(1, '#f9c2d2')
-    g.fillStyle = pg; g.fillRect(-43, -37, 86, 74)
-    hand(zh ? '下次再來～' : 'また来ます～', 0, -6, 19, 76)
-    hand(zh ? '小美' : 'みき', 22, 22, 12, 40, '#7a3a50')
+    const pg = g.createLinearGradient(0, -38, 0, 38); pg.addColorStop(0, '#ffd9e4'); pg.addColorStop(1, '#f9c2d2')
+    g.fillStyle = pg; g.fillRect(-43, -38, 86, 76)
+    hand(zh ? '老闆好帥！' : '大将かっこいい！', 0, -14, 20, 80)
+    hand(zh ? '— 隔壁桌' : '— となりの席', 12, 12, 12, 58, '#7a3a50')
+    heart(-26, 22, 6.5, '#e0506e'); heart(-14, 27, 4, '#ea7a92')
   })
-  // 3 (a print of the grilled fish on its plate, a white border, words written under it)
+  // 3 (a polaroid of the grilled fish: on a long plate on the dark wood, a lemon's wedge and grated daikon by it, steam over it)
   note(2, () => {
-    g.fillStyle = '#fbfaf6'; g.fillRect(-46, -54, 92, 108)
-    g.fillStyle = '#3a2a22'; g.fillRect(-40, -48, 80, 70)
-    const pl = g.createRadialGradient(0, -12, 4, 0, -12, 36); pl.addColorStop(0, '#f4f0e8'); pl.addColorStop(1, '#cfc7b8')
-    g.fillStyle = pl; g.beginPath(); g.ellipse(0, -13, 34, 22, 0, 0, Math.PI * 2); g.fill()
-    g.fillStyle = '#b7712f'; g.beginPath(); g.ellipse(-3, -14, 22, 8, -0.08, 0, Math.PI * 2); g.fill()
-    g.beginPath(); g.moveTo(17, -15); g.lineTo(28, -22); g.lineTo(28, -7); g.closePath(); g.fill()
-    g.strokeStyle = '#5a3216'; g.lineWidth = 1.6
-    for (const k of [-12, -4, 4]) { g.beginPath(); g.moveTo(-3 + k - 3, -20); g.lineTo(-3 + k + 3, -8); g.stroke() }
-    g.fillStyle = '#e8e2c8'; g.beginPath(); g.ellipse(14, 0, 6, 3, 0, 0, Math.PI * 2); g.fill()
-    g.fillStyle = '#f2d23a'; g.beginPath(); g.ellipse(-24, -2, 5, 3, 0.3, 0, Math.PI * 2); g.fill()
-    hand(zh ? '烤魚超讚' : '焼き魚最高', 0, 38, 17, 80)
+    const f = polaroid(96, 116, 22)
+    g.save(); g.beginPath(); g.rect(f.x, f.y, f.w, f.h); g.clip()
+    const tg = g.createLinearGradient(0, f.y, 0, f.y + f.h); tg.addColorStop(0, '#5a3a24'); tg.addColorStop(1, '#2e1c12')
+    g.fillStyle = tg; g.fillRect(f.x, f.y, f.w, f.h)
+    g.strokeStyle = 'rgba(20,10,4,0.35)'; g.lineWidth = 1
+    for (let k = 0; k < 7; k++) { const y = f.y + 6 + k * 12; g.beginPath(); g.moveTo(f.x, y); g.bezierCurveTo(f.x + 30, y - 2, f.x + 55, y + 2, f.x + f.w, y); g.stroke() }
+    // (the long plate, its shadow)
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.roundRect(-35, -24, 72, 38, 7); g.fill()
+    const pg = g.createLinearGradient(0, -28, 0, 10); pg.addColorStop(0, '#fbf8f0'); pg.addColorStop(1, '#ddd5c4')
+    g.fillStyle = pg; g.beginPath(); g.roundRect(-37, -28, 72, 38, 7); g.fill()
+    // (the fish: browned, its grill marks, salt on its tail)
+    penFish(-3, -10, 50, '#c98a42', true)
+    g.fillStyle = 'rgba(255,255,255,0.85)'; for (const [x, y] of [[20, -16], [23, -6], [18, -11], [21, -2]]) { g.beginPath(); g.arc(x, y, 0.9, 0, Math.PI * 2); g.fill() }
+    // (a lemon's wedge, the grated daikon with its drop of soy)
+    g.fillStyle = '#f5d43a'; g.beginPath(); g.moveTo(16, 6); g.lineTo(31, 2); g.quadraticCurveTo(30, 9, 22, 9); g.closePath(); g.fill()
+    g.strokeStyle = '#fbf3c0'; g.lineWidth = 1; g.beginPath(); g.moveTo(18, 6); g.quadraticCurveTo(26, 5.5, 30, 3); g.stroke()
+    g.fillStyle = '#f4f1e8'; g.beginPath(); g.ellipse(-24, 4, 8, 4.5, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#6a3a1a'; g.beginPath(); g.ellipse(-23, 3, 2.5, 1.4, 0, 0, Math.PI * 2); g.fill()
+    // (its steam)
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.6
+    for (const x of [-12, 0, 12]) { g.beginPath(); g.moveTo(x, -30); g.bezierCurveTo(x - 4, -36, x + 4, -40, x, -46); g.stroke() }
+    g.restore()
+    hand(zh ? '烤魚超讚！' : '焼き魚最高！', 0, 45, 15, 82)
   })
-  // 4 (a page torn off a lined pad: its blue lines, its torn top edge)
+  // 4 (a polaroid of a table of colleagues, a warm night in the shop: three of them, two raising their beers, one making a peace sign)
   note(3, () => {
-    let r = 9
-    const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
-    g.fillStyle = '#fdfdf8'
-    g.beginPath(); g.moveTo(-50, -34)
-    for (let i = 0; i <= 20; i++) g.lineTo(-50 + i * 5, -40 + (i % 2 ? 3 : 0) + (rnd() - 0.5) * 2)
-    g.lineTo(50, 40); g.lineTo(-50, 40); g.closePath(); g.fill()
-    g.strokeStyle = 'rgba(80,120,200,0.45)'; g.lineWidth = 1
-    for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(-46, -18 + k * 16); g.lineTo(46, -18 + k * 16); g.stroke() }
-    g.strokeStyle = 'rgba(210,70,70,0.4)'; g.beginPath(); g.moveTo(-34, -36); g.lineTo(-34, 40); g.stroke()
-    hand(zh ? '老闆好帥' : '大将かっこいい', 6, -4, 21, 80)
-    hand(zh ? '— 隔壁桌' : '— となりの席', 18, 22, 11, 60, '#4a4a60')
+    const f = polaroid(132, 104, 22)
+    g.save(); g.beginPath(); g.rect(f.x, f.y, f.w, f.h); g.clip()
+    const bg = g.createLinearGradient(0, f.y, 0, f.y + f.h); bg.addColorStop(0, '#8a5634'); bg.addColorStop(1, '#3e2618')
+    g.fillStyle = bg; g.fillRect(f.x, f.y, f.w, f.h)
+    // (a red lantern behind them, its glow; a shelf of bottles)
+    const lg = g.createRadialGradient(-44, -32, 2, -44, -32, 26); lg.addColorStop(0, 'rgba(255,150,80,0.75)'); lg.addColorStop(1, 'rgba(255,150,80,0)')
+    g.fillStyle = lg; g.fillRect(f.x, f.y, f.w, f.h)
+    g.fillStyle = '#d8402a'; g.beginPath(); g.ellipse(-44, -32, 6.5, 9, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#2a1a10'; g.fillRect(-48, -42, 8, 2.5); g.fillRect(-48, -23.5, 8, 2.5)
+    g.fillStyle = '#2a1a10'; g.fillRect(-10, -34, 70, 3)
+    ;['#3a6a3a', '#7a2a2a', '#d8c070', '#2a3a6a', '#6a4a2a'].forEach((c, k) => { g.fillStyle = c; g.fillRect(-4 + k * 12, -47, 6, 13) })
+    // (the table in front of them)
+    g.fillStyle = '#6a4024'; g.fillRect(f.x, f.y + f.h - 12, f.w, 12)
+    const who = [
+      { x: -34, w: { id: 'cork-salaryman', role: 'server', look: { age: 'middle', female: false }, dress: { coat: '#2e3444', collar: '#f2f2f2', neck: '#b8323a' } } },
+      { x: 0, w: { id: 'cork-ol', role: 'server', look: { age: 'young', female: true }, peace: true, dress: { coat: '#d89aa8', collar: '#f6f0f0', neck: '#b85a70' } } },
+      { x: 34, w: { id: 'cork-junior', role: 'server', look: { age: 'young', female: false }, dress: { coat: '#4a6a8a', collar: '#e8eef4', neck: '#2a3a5a' } } },
+    ]
+    for (const { x, w } of who) drawFolk(g, x, f.y + f.h + 4, 11.5, w as unknown as Who)
+    // (their mugs of beer, raised: foam over gold, a handle)
+    for (const x of [-34, 34]) {
+      const mx = x + (x < 0 ? 9 : -9), my = f.y + f.h - 28
+      g.fillStyle = '#f2b836'; g.fillRect(mx - 4.5, my - 6, 9, 12)
+      g.fillStyle = '#fff8e6'; g.beginPath(); g.ellipse(mx, my - 6.5, 5.5, 2.6, 0, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = '#d8d0c0'; g.lineWidth = 1.4; g.beginPath(); g.arc(mx + (x < 0 ? 5 : -5), my, 3, x < 0 ? -1.2 : 1.9, x < 0 ? 1.2 : 4.3); g.stroke()
+    }
+    g.restore()
+    hand(zh ? '同事聚餐 11/03' : '会社の飲み会 11/03', 0, 40, 13, 118)
   })
-  // 5 (a kraft card with a little cake drawn on it)
+  // 5 (a print of the shop at night (item 413: it was a dark blur): the night sky and the moon, the front's dark wood under its eave, the
+  // sliding door's two leaves lit warm from inside, the indigo noren over it, the red lantern by it lit, 燒 on it, its glow, the light
+  // spilt on the street; written under it, the night it was taken)
   note(4, () => {
-    g.fillStyle = '#d6b88a'; g.fillRect(-45, -39, 90, 78)
-    g.strokeStyle = 'rgba(120,80,40,0.25)'; g.lineWidth = 1
-    for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(-45, -30 + k * 13); g.lineTo(45, -28 + k * 13); g.stroke() }
-    hand(zh ? '生日快樂' : 'お誕生日', 0, -16, 19, 80, '#5a2a18')
-    g.fillStyle = '#f6e6d0'; g.fillRect(-14, 6, 28, 14)
-    g.fillStyle = '#e05a6a'; g.fillRect(-14, 6, 28, 4)
-    g.fillStyle = '#f0f0f0'; g.fillRect(-1.5, -4, 3, 10)
-    g.fillStyle = '#ffb030'; g.beginPath(); g.ellipse(0, -6, 2.4, 4, 0, 0, Math.PI * 2); g.fill()
-    hand('2026.10', 0, 30, 10, 60, '#5a2a18')
+    g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(-62.5, -46.5, 128, 96)
+    g.fillStyle = '#fbfaf6'; g.fillRect(-64, -48, 128, 96)
+    const f = { x: -59, y: -43, w: 118, h: 70 }
+    g.save(); g.beginPath(); g.rect(f.x, f.y, f.w, f.h); g.clip()
+    const sky = g.createLinearGradient(0, f.y, 0, f.y + 30); sky.addColorStop(0, '#0c1430'); sky.addColorStop(1, '#22284a')
+    g.fillStyle = sky; g.fillRect(f.x, f.y, f.w, f.h)
+    g.fillStyle = 'rgba(255,255,255,0.8)'; for (const [x, y] of [[-48, -38], [-30, -33], [-12, -39], [26, -37], [50, -31], [8, -35]]) g.fillRect(x, y, 1, 1)
+    g.fillStyle = '#f4edd2'; g.beginPath(); g.arc(44, -34, 5, 0, Math.PI * 2); g.fill()
+    // (the front and its eave)
+    g.fillStyle = '#2c1c12'; g.fillRect(f.x, -22, f.w, 50)
+    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; for (let x = f.x + 6; x < f.x + f.w; x += 8) { g.beginPath(); g.moveTo(x, -22); g.lineTo(x, 28); g.stroke() }
+    g.fillStyle = '#120a06'; g.beginPath(); g.moveTo(f.x, -22); g.lineTo(f.x + f.w, -22); g.lineTo(f.x + f.w, -27); g.lineTo(f.x, -30); g.closePath(); g.fill()
+    // (the door's two leaves lit from inside, their lattice)
+    const dg = g.createLinearGradient(0, -14, 0, 26); dg.addColorStop(0, '#ffd590'); dg.addColorStop(1, '#ffb862')
+    g.fillStyle = dg; g.fillRect(-14, -14, 36, 40)
+    g.strokeStyle = '#3a2416'; g.lineWidth = 1.2
+    for (let x = -11; x < 22; x += 4) { g.beginPath(); g.moveTo(x, -14); g.lineTo(x, 13); g.stroke() }
+    g.lineWidth = 2; g.strokeRect(-14, -14, 36, 40); g.beginPath(); g.moveTo(4, -14); g.lineTo(4, 26); g.stroke()
+    g.fillStyle = '#4a2c1a'; g.fillRect(-14, 13, 36, 13)
+    // (the noren over it: indigo, split in three, a white ring on the middle one)
+    g.fillStyle = '#26345a'; g.fillRect(-17, -21, 42, 13)
+    g.fillStyle = '#16203a'; g.fillRect(-3.5, -15, 1, 7); g.fillRect(10.5, -15, 1, 7)
+    g.strokeStyle = '#f2ead8'; g.lineWidth = 1; g.beginPath(); g.arc(4, -15, 3, 0, Math.PI * 2); g.stroke()
+    // (the red lantern by the door, its glow, 燒 on it)
+    const gl = g.createRadialGradient(-33, -2, 2, -33, -2, 24); gl.addColorStop(0, 'rgba(255,120,60,0.85)'); gl.addColorStop(1, 'rgba(255,120,60,0)')
+    g.fillStyle = gl; g.fillRect(f.x, f.y, f.w, f.h)
+    const lp = g.createRadialGradient(-35, -6, 1, -33, -2, 12); lp.addColorStop(0, '#ff8a5a'); lp.addColorStop(1, '#c8281a')
+    g.fillStyle = lp; g.beginPath(); g.ellipse(-33, -2, 9, 13, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#140c08'; g.fillRect(-38, -16, 10, 3); g.fillRect(-38, 10, 10, 3)
+    hand(zh ? '燒' : '焼', -33, -1, 13, 14, '#fff4e4')
+    // (the light spilt on the street before the door)
+    const sp = g.createLinearGradient(0, 26, 0, f.y + f.h); sp.addColorStop(0, 'rgba(255,190,110,0.55)'); sp.addColorStop(1, 'rgba(255,190,110,0)')
+    g.fillStyle = '#1a1612'; g.fillRect(f.x, 26, f.w, f.y + f.h - 26)
+    g.fillStyle = sp; g.beginPath(); g.moveTo(-14, 26); g.lineTo(22, 26); g.lineTo(34, f.y + f.h); g.lineTo(-26, f.y + f.h); g.closePath(); g.fill()
+    g.restore()
+    hand(zh ? '秋夜' : '秋の夜', 0, 38, 13, 60)
   })
-  // 6 (a till slip, its torn foot zigzag, a dish written on it and circled)
+  // 6 (a child's crayon drawing: the sun, the boss in his headband holding up a big fish, the grass; written in crayon, wobbly)
   note(5, () => {
-    g.fillStyle = '#fbf9f2'
-    g.beginPath(); g.moveTo(-32, -32); g.lineTo(32, -32); g.lineTo(32, 28)
-    for (let i = 0; i <= 8; i++) g.lineTo(32 - i * 8, 28 + (i % 2 ? 4 : 0))
-    g.closePath(); g.fill()
-    g.strokeStyle = 'rgba(60,60,60,0.35)'; g.setLineDash([3, 3]); g.lineWidth = 1
-    g.beginPath(); g.moveTo(-26, -18); g.lineTo(26, -18); g.stroke(); g.setLineDash([])
-    hand(zh ? '鹽烤鯖魚' : '鯖の塩焼き', 0, -2, 14, 56, '#2a2a2a')
-    hand(zh ? '必點！' : '必食！', 0, 16, 13, 50, '#c0281c')
-    g.strokeStyle = '#c0281c'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, 6, 30, 20, 0.05, 0, Math.PI * 2); g.stroke()
+    g.fillStyle = 'rgba(0,0,0,0.1)'; g.fillRect(-62.5, -46.5, 128, 96)
+    g.fillStyle = '#fffdf4'; g.fillRect(-64, -48, 128, 96)
+    let r = 23
+    const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+    // (a crayon's stroke: the same line laid down three times a little apart, half there each time)
+    const crayon = (col: string, w: number, path: () => void, fill = false) => {
+      g.save(); g.strokeStyle = col; g.fillStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'
+      for (let k = 0; k < 3; k++) {
+        g.globalAlpha = fill ? 0.35 : 0.55
+        g.translate((rnd() - 0.5) * 1.2, (rnd() - 0.5) * 1.2)
+        g.beginPath(); path(); if (fill) g.fill(); else g.stroke()
+      }
+      g.restore()
+    }
+    // (the sun and its rays)
+    crayon('#f2b51a', 2.4, () => g.arc(-46, -30, 9, 0, Math.PI * 2), true)
+    crayon('#f29a1a', 1.6, () => { for (let k = 0; k < 8; k++) { const a = (k * Math.PI) / 4; g.moveTo(-46 + 12 * Math.cos(a), -30 + 12 * Math.sin(a)); g.lineTo(-46 + 17 * Math.cos(a), -30 + 17 * Math.sin(a)) } })
+    // (the grass)
+    crayon('#4aa040', 2.4, () => { g.moveTo(-60, 40); for (let x = -60; x <= 60; x += 6) g.lineTo(x, 38 + (Math.round(x / 6) % 2 ? -3 : 1)) })
+    // (the boss: his round face, his white headband, his white coat, his arms up holding the fish)
+    crayon('#f1c79a', 1.5, () => g.arc(22, -10, 11, 0, Math.PI * 2), true)
+    crayon('#3a2a20', 1.4, () => g.arc(22, -10, 11, 0, Math.PI * 2))
+    crayon('#d83a2a', 2.6, () => { g.moveTo(11.5, -15); g.lineTo(32.5, -15) })
+    crayon('#3a2a20', 1.5, () => { g.moveTo(18, -9); g.lineTo(18.5, -8); g.moveTo(26, -9); g.lineTo(26.5, -8); g.moveTo(18, -4); g.quadraticCurveTo(22, 0, 26, -4) })
+    crayon('#9ab4d8', 1.5, () => { g.moveTo(12, 2); g.lineTo(32, 2); g.lineTo(36, 34); g.lineTo(8, 34); g.closePath() }, true)
+    crayon('#3a2a20', 1.4, () => { g.moveTo(12, 2); g.lineTo(32, 2); g.lineTo(36, 34); g.lineTo(8, 34); g.closePath() })
+    crayon('#3a2a20', 1.6, () => { g.moveTo(10, 8); g.lineTo(-4, -4); g.moveTo(34, 8); g.lineTo(44, -6) })
+    // (the big fish he holds up, smiling)
+    crayon('#f07a2a', 1.8, () => { g.ellipse(-16, -8, 15, 8, -0.15, 0, Math.PI * 2); g.moveTo(-30, -6); g.lineTo(-38, -13); g.lineTo(-38, 1); g.closePath() }, true)
+    crayon('#b84a10', 1.4, () => { g.ellipse(-16, -8, 15, 8, -0.15, 0, Math.PI * 2) })
+    crayon('#3a2a20', 1.6, () => { g.moveTo(-6, -11); g.lineTo(-5.5, -10.5); g.moveTo(-9, -5); g.quadraticCurveTo(-6, -2, -3, -5) })
+    // (written in red crayon, wobbly; her name and age)
+    g.save(); g.rotate(-0.06); hand(zh ? '老闆加油！' : 'たいしょう がんばって！', -12, 24, 15, 76, '#d23a2a'); g.restore()
+    hand(zh ? '小晴 5歲' : 'はるな 5さい', 44, 42, 9, 34, '#3a5ac8')
   })
-  // 7 (a print of the shop at night: its front, the red lantern lit, the noren; pinned at both top corners; written under: the night it
-  // was taken, not the shop's name (item 399: 聞野 not on everything))
+  // 7 (a pale blue card in English)
   note(6, () => {
-    g.fillStyle = '#fbfaf6'; g.fillRect(-64, -46, 128, 92)
-    const ng = g.createLinearGradient(0, -40, 0, 40); ng.addColorStop(0, '#141a30'); ng.addColorStop(1, '#2a2430')
-    g.fillStyle = ng; g.fillRect(-58, -40, 116, 80)
-    g.fillStyle = '#2a1a12'; g.fillRect(-50, -22, 100, 8)
-    g.fillStyle = '#3a2a20'; g.fillRect(-42, -14, 84, 52)
-    g.fillStyle = 'rgba(255,190,110,0.85)'; g.fillRect(-20, -6, 40, 44)
-    g.fillStyle = '#26345a'; for (const k of [0, 1, 2]) g.fillRect(-20 + k * 13.6, -6, 12.6, 16)
-    const lg = g.createRadialGradient(-30, 4, 1, -30, 4, 18); lg.addColorStop(0, 'rgba(255,120,60,0.9)'); lg.addColorStop(1, 'rgba(255,120,60,0)')
-    g.fillStyle = lg; g.fillRect(-48, -14, 36, 36)
-    g.fillStyle = '#e8402a'; g.beginPath(); g.ellipse(-30, 4, 7, 11, 0, 0, Math.PI * 2); g.fill()
-    hand(zh ? '秋夜' : '秋の夜', 40, -32, 10, 30, '#f2ead8')
+    g.fillStyle = 'rgba(0,0,0,0.1)'; g.fillRect(-54.5, -34.5, 112, 72)
+    g.fillStyle = '#dde9f6'; g.fillRect(-56, -36, 112, 72)
+    g.strokeStyle = '#8aa6cc'; g.lineWidth = 1; g.strokeRect(-52, -32, 104, 64)
+    hand('Best grilled fish', 0, -15, 15, 98, '#1e3a6a')
+    hand('in town!', 0, 3, 15, 98, '#1e3a6a')
+    hand('— Tom, London', 16, 22, 10.5, 70, '#3a4a6a')
+    // (a fish's bones drawn by it)
+    g.strokeStyle = '#3a4a6a'; g.lineWidth = 1.1; g.lineCap = 'round'
+    g.beginPath(); g.moveTo(-46, 22); g.lineTo(-24, 22); g.stroke()
+    for (let k = 0; k < 4; k++) { const x = -42 + k * 5; g.beginPath(); g.moveTo(x, 18); g.lineTo(x + 2, 22); g.lineTo(x, 26); g.stroke() }
+    g.beginPath(); g.moveTo(-24, 22); g.lineTo(-19, 18); g.lineTo(-19, 26); g.closePath(); g.stroke()
+    g.beginPath(); g.arc(-48, 22, 2.6, 0, Math.PI * 2); g.stroke()
+  })
+  // 8 (a kraft card for a birthday: the cake in two tiers, cream dripping, strawberries, three candles lit; who and when)
+  note(7, () => {
+    g.fillStyle = '#d6b88a'; g.fillRect(-46, -46, 92, 92)
+    g.strokeStyle = 'rgba(120,80,40,0.22)'; g.lineWidth = 1
+    for (let k = 0; k < 7; k++) { g.beginPath(); g.moveTo(-46, -38 + k * 13); g.lineTo(46, -36 + k * 13); g.stroke() }
+    hand(zh ? '生日快樂' : 'お誕生日おめでとう', 0, -33, 17, 84, '#5a2a18')
+    // (the plate, the tiers)
+    g.fillStyle = '#efe6d6'; g.beginPath(); g.ellipse(0, 22, 30, 3.5, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#f8eedd'; g.fillRect(-24, 4, 48, 18)
+    g.fillStyle = '#f2a2b2'; g.fillRect(-24, 13, 48, 3)
+    g.fillStyle = '#f8eedd'; g.fillRect(-15, -8, 30, 13)
+    // (the cream run down over their edges)
+    g.fillStyle = '#ffffff'
+    for (const [x0, w, y] of [[-24, 48, 4], [-15, 30, -8]] as const) {
+      g.beginPath(); g.moveTo(x0, y)
+      for (let k = 0; k <= 6; k++) { const x = x0 + (w * k) / 6; g.quadraticCurveTo(x - w / 12, y + (k % 2 ? 5 : 2.5), x, y) }
+      g.closePath(); g.fill()
+    }
+    // (strawberries on top, three candles lit)
+    for (const x of [-10, 0, 10]) { g.fillStyle = '#d8283a'; g.beginPath(); g.arc(x, -9, 2.6, 0, Math.PI * 2); g.fill(); g.fillStyle = '#3a8a2a'; g.fillRect(x - 1.5, -12.5, 3, 1.5) }
+    for (const x of [-7, 0, 7]) {
+      g.fillStyle = '#8ab0e8'; g.fillRect(x - 1, -20, 2, 9)
+      g.fillStyle = '#ffb030'; g.beginPath(); g.ellipse(x, -23, 1.8, 3, 0, 0, Math.PI * 2); g.fill()
+    }
+    hand(zh ? '小翔 6歲' : 'しょう 6さい', 0, 31, 11, 60, '#5a2a18')
+    hand('2026.10', 0, 41, 8.5, 40, '#7a4a28')
+  })
+  // 9 (a till slip, its foot torn zigzag: the saba circled, a must)
+  note(8, () => {
+    g.fillStyle = 'rgba(0,0,0,0.1)'; g.fillRect(-32.5, -39.5, 68, 76)
+    g.fillStyle = '#fbf9f2'
+    g.beginPath(); g.moveTo(-34, -41); g.lineTo(34, -41); g.lineTo(34, 35)
+    for (let i = 0; i <= 8; i++) g.lineTo(34 - i * 8.5, 35 + (i % 2 ? 5 : 0))
+    g.closePath(); g.fill()
+    hand(zh ? '收據' : 'レシート', 0, -32, 9, 40, '#555555')
+    g.strokeStyle = 'rgba(60,60,60,0.35)'; g.setLineDash([3, 3]); g.lineWidth = 1
+    g.beginPath(); g.moveTo(-28, -24); g.lineTo(28, -24); g.stroke(); g.setLineDash([])
+    hand(zh ? '鹽烤鯖魚' : '鯖の塩焼き', 0, -10, 14, 58, '#2a2a2a')
+    hand('NT$ 280', 0, 4, 10, 50, '#444444')
+    g.strokeStyle = '#c0281c'; g.lineWidth = 1.6; g.beginPath(); g.ellipse(0, -4, 31, 16, 0.04, 0, Math.PI * 2); g.stroke()
+    hand(zh ? '必點！' : '必食！', 0, 24, 17, 56, '#c0281c')
+  })
+  // 10 (a stamp card: ten places, seven stamped with a red fish; ten get a grilled rice ball)
+  note(9, () => {
+    g.fillStyle = 'rgba(0,0,0,0.1)'; g.fillRect(-48.5, -28.5, 100, 60)
+    g.fillStyle = '#fffaf0'; g.fillRect(-50, -30, 100, 60)
+    g.strokeStyle = '#c0382a'; g.lineWidth = 1.4; g.strokeRect(-47, -27, 94, 54)
+    hand(zh ? '集點卡' : 'スタンプカード', 0, -19, 11, 70, '#c0382a')
+    for (let k = 0; k < 10; k++) {
+      const x = -32 + (k % 5) * 16, y = -4 + Math.floor(k / 5) * 14
+      g.strokeStyle = 'rgba(192,56,42,0.55)'; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.stroke()
+      if (k < 7) {
+        g.fillStyle = 'rgba(200,40,30,0.85)'; g.beginPath(); g.arc(x, y, 5.2, 0, Math.PI * 2); g.fill()
+        g.fillStyle = '#fff6ee'; g.beginPath(); g.ellipse(x - 0.8, y, 3, 1.6, 0, 0, Math.PI * 2); g.fill()
+        g.beginPath(); g.moveTo(x + 1.8, y); g.lineTo(x + 3.6, y - 1.6); g.lineTo(x + 3.6, y + 1.6); g.closePath(); g.fill()
+      }
+    }
+    hand(zh ? '集滿 10 點送烤飯糰' : '10個で焼きおにぎり', 0, 22, 8.5, 90, '#8a2a20')
+  })
+  // 11 (the board's heading: a strip of cream paper taped up across its top, written large; two hearts)
+  note(10, () => {
+    g.fillStyle = 'rgba(0,0,0,0.1)'; g.fillRect(-111.5, -18.5, 226, 40)
+    g.fillStyle = '#fbf3df'; g.fillRect(-113, -20, 226, 40)
+    // (washi tape over its two ends)
+    g.save(); g.translate(-104, -14); g.rotate(-0.5); g.fillStyle = 'rgba(244,191,205,0.92)'; g.fillRect(-12, -5, 24, 10)
+    g.fillStyle = '#fff2f6'; for (let i = 0; i < 4; i++) { g.beginPath(); g.arc(-9 + i * 6, 0, 1.4, 0, Math.PI * 2); g.fill() }
+    g.restore()
+    g.save(); g.translate(104, -14); g.rotate(0.5); g.fillStyle = 'rgba(184,226,208,0.92)'; g.fillRect(-12, -5, 24, 10); g.restore()
+    hand(zh ? '客人的話' : 'お客様の声', 0, 1, 26, 150, '#5a2a18')
+    heart(-88, 2, 7, '#e0506e'); heart(88, 2, 7, '#e0506e')
   })
   // (the owner with a famous guest before the noren, signed across in silver pen)
   snapshot(g, WALL_SIGNS.photos[0], (fr) => {

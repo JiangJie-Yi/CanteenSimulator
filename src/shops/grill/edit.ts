@@ -82,7 +82,8 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   // (the signed wall by the way in, every piece of it its own (items 402 and 406, the owner's 「物件要拆細、拆散 然後再group」): the cork board, its
   // notes, the photographs, the signed pieces and the plaster's writing (wallPhotos' WALL_PIECES, CORK_NOTES))
   'grp-signwall': { zh: '簽名留言牆', ja: 'サインと伝言の壁', members: ['sign-cork', 'sign-photo0', 'sign-photo1', 'sign-card1', 'sign-card2', 'sign-card3',
-    'sign-card4', 'sign-card5', 'sign-card6', 'sign-note1', 'sign-note2', 'sign-note3', 'sign-note4', 'sign-note5', 'sign-note6', 'sign-note7', 'sign-card7', 'sign-ledge'] },
+    'sign-card4', 'sign-card5', 'sign-card6', 'cork-thanks', 'cork-boss', 'cork-fish', 'cork-toast', 'cork-night', 'cork-crayon', 'cork-english',
+    'cork-bday', 'cork-saba', 'cork-stamps', 'cork-title', 'sign-card7', 'sign-ledge'] },
   // (the sink and all that's on it and by it)
   'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge', 'stepstool'] },
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
@@ -172,10 +173,13 @@ const loadGroups = (): Record<string, Group> => {
   }
   // (the signed wall's group a browser kept (item 409): the plaster's writing gone from it, the ledge and the tanzaku put in it; on every
   // load, as the cat's above)
+  // (and the cork board's notes made afresh (item 413): the seven old ones out of it, the eleven new ones in)
   {
     const k = g['grp-signwall']
-    const add = k ? ['sign-card7', 'sign-ledge'].filter((m) => !k.members.includes(m)) : []
-    if (k && (add.length || k.members.includes('sign-freehand'))) g['grp-signwall'] = { ...k, members: [...k.members.filter((m) => m !== 'sign-freehand'), ...add] }
+    const gone = (m: string) => m === 'sign-freehand' || /^sign-note\d$/.test(m)
+    const add = k ? ['sign-card7', 'sign-ledge', 'cork-thanks', 'cork-boss', 'cork-fish', 'cork-toast', 'cork-night', 'cork-crayon', 'cork-english', 'cork-bday',
+      'cork-saba', 'cork-stamps', 'cork-title'].filter((m) => !k.members.includes(m)) : []
+    if (k && (add.length || k.members.some(gone))) g['grp-signwall'] = { ...k, members: [...k.members.filter((m) => !gone(m)), ...add] }
   }
   // (groups a browser kept from before their default place was moved: moved on by as much, once (its key marks it done))
   for (const [key, id] of GENKAN_SHIFT) {
