@@ -10,7 +10,8 @@ and its print all painted round it in one picture, a row of it a barrel (KomoStr
 the top and the foot, pairs of thick ones up its sides, none across the print), with a normal map from the same heights; its lid a low
 dome painted with the straw folded in under a rope ring and its knot (KomoLid); the mat's straw ends frayed over the rim and the cord's two
 ends hanging at its side, pictures on cards cut out by their alpha (KomoCards: drawn double-sided, alpha-tested, no ink line). About
-1,000 triangles the stack. The brands are made up (聞野 the shop's own; 福壽, 玉泉 plain words), none a real brewer's.
+1,000 triangles the stack. The brands are made up (霧ノ松, 瑞雲錦, 八雲泉), none a real brewer's, and none the shop's own
+name (item 399, the owner's 「別甚麼都聞野」).
 
 Run:
     blender -b --factory-startup --python blender/komodaru.py -- <project path> [preview.png]

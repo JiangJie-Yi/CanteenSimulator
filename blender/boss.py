@@ -5,7 +5,7 @@ off underneath (no legs, no feet), no arms, floating mitten hands (a plump paddl
 (ui/Avatar.tsx, role 'owner'); dressed as a Japanese cook: his head wrapped in an indigo tenugui, a white fish pressed on its front, knotted at the back,
 its front edge rolled, a little brown hair at the sides and the nape; round-cornered glasses over small dark eyes, short thick brows, a round
 button nose, a moustache and a smile, ears, a pencil behind his right one; a white kappōgi crossed at the front over an indigo under-collar,
-a little gold fish pinned to his chest, indigo trousers and a navy apron (前掛け) with 聞野 on it in white, its cream cord tied in a bow at
+a little gold fish pinned to his chest, indigo trousers and a navy apron (前掛け) with 日式烤魚 on it in white, its cream cord tied in a bow at
 his left, a blue-striped hand towel tucked in at his right. Kept light in geometry, the cloth and hair given their look by painted
 textures (the tenugui's fish, the cotton's weave, the indigo's dye, the hair's strands).
 - his hands are separate nodes (BossHandL, BossHandR) so the game can move them, and so are the tongs and the fan he picks up
@@ -16,7 +16,7 @@ Run:
 
 The staff are made by the same script, the boss's figure dressed for their job: CREW=<variant> writes crew_<variant>.glb (the same node
 names, so the game moves them as it moves him), no moustache, pencil or gold pin:
-- chef: a cook in the white kappōgi and a white tenugui cap, the navy apron with 聞野 and a towel at the cord
+- chef: a cook in the white kappōgi and a white tenugui cap, the navy apron with 日式烤魚 and a towel at the cord
 - chefF: the same for a woman, her hair in a bun at the back
 - server: an indigo samue, a white hachimaki round the head (its knot and ends at the back), the hair over the crown, a short dark apron
 - serverF: a kimono of deep plum with a gold obi, the hair put up in a bun with a red comb, no apron
@@ -652,21 +652,21 @@ if CREW == "serverF":
     bv = o.modifiers.new("b", "BEVEL"); bv.width = 0.022; bv.segments = 1
     bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier="b")
     fin(o, "BossObiKnot", M["obi"])
-# (the apron (前掛け): navy, from the cord down over his front nearly to the ground, a little proud of him; 聞野 on it in white)
+# (the apron (前掛け): navy, from the cord down over his front nearly to the ground, a little proud of him; 日式烤魚 on it in white)
 AP = [(y, rb(y) + 0.015) for y in (0.04, HEM, BELT - 0.004)]
 if CREW == "server":
     # (shorter: to the knee, as a server's is)
     AP = [(y, rb(y) + 0.015) for y in (0.09, HEM, BELT - 0.004)]
 AP_A = math.radians(68)
 ap = lathe("BossApron", AP, M["apron"], seg=6, a0=-AP_A, a1=AP_A)
-# (its picture over the whole of it: across its width, up its height (a pixel as wide as it's tall), so the 聞野 written into it is sharp)
+# (its picture over the whole of it: across its width, up its height (a pixel as wide as it's tall), so the letters written into it are sharp)
 AP_W, AP_H = 2 * AP_A * (rb(0.15) + 0.015), AP[-1][0] - AP[0][0]
 for lp in ap.data.uv_layers.active.data:
     lp.uv = (lp.uv.x, (lp.uv.y * 1.64 - AP[0][0]) / AP_H)
 for poly in ap.data.polygons:
     if poly.normal.dot(Vector((poly.center.x, poly.center.y, 0))) < 0:
         poly.flip()
-# (聞野 in white on it, as the letters were (the font's at the size they stood, a little above its middle): the letters made as a mesh once,
+# (the letters in white on it, as they were (the font's at the size they stood, a little above its middle): the letters made as a mesh once,
 # each of its triangles filled into the picture, the mesh let go: two letters were five hundred triangles)
 _aw, _ah = 512, max(64, round(512 * AP_H / AP_W))
 _ap = _weave_at(APRON, _aw, _ah, 0.12, 128)
@@ -866,7 +866,7 @@ for o in [x for x in parts if (x.name.startswith(_drop) or x.name == "BossObi") 
     parts.remove(o)
     bpy.data.objects.remove(o)
 
-# ---- the body: one turned shape, 16 round; the trousers, the coat (its creases), the apron with 聞野 on it, the cord round the waist and
+# ---- the body: one turned shape, 16 round; the trousers, the coat (its creases), the apron with its letters on it, the cord round the waist and
 # its bow, the crossed collar and (the owner's) the gold fish pin all one picture on it
 BODY_TOP = 0.6
 _TW, _TH = 1024, 512

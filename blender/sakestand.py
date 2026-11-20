@@ -619,7 +619,7 @@ stand_col = wood.astype(np.float32)
 
 # ---- (item 383) the stand's woods and pictures: keyaki (欅) for its feet, plinth, posts and beams (the hinoki's own grain stained a warm
 # mid brown); a figured burl (玉杢) for the plinth's long faces, as the screen's lower panel; the risers' shoji (格子): keyaki bars over warm
-# paper, a cell across a picture and the riser's height up it; the plaque's two faces, pale wood in a keyaki edge, brushed in sumi
+# paper, a cell across a picture and the riser's height up it (the frame's transom the same)
 keyaki_col = (stand_col * np.array([0.7, 0.5, 0.33], np.float32)).astype(np.float32)
 
 
@@ -661,29 +661,6 @@ def shoji_pic(w=128, h=128):
     return img.astype(np.float32)
 
 
-def plaque_pic(w=128, h=168):
-    """the plaque's two faces side by side: the customers' (銘酒) left, the owner's (聞野) right; pale hinoki in a keyaki edge, the two
-    characters brushed down it in sumi"""
-    out = np.zeros((h, 2 * w, 3), np.float32)
-    ink = np.array([0.05, 0.04, 0.04], np.float32)
-    edge = np.array([0.42, 0.25, 0.12], np.float32)
-    for col, chars in ((0, "銘酒"), (1, "聞野")):
-        x0 = col * w
-        cell = np.array(stand_col[:h, x0 * 3:x0 * 3 + w], np.float32)
-        m = np.zeros((h * SS, w * SS), bool)
-        size = w * 0.7
-        for n_, ch in enumerate(chars):
-            # (down the board: the first character above)
-            fill_tris(m, glyph(ch, True), (w / 2) * SS, (h / 2 + (0.5 - n_) * size * 1.06) * SS, size * SS, size * SS)
-        cov = m.reshape(h, SS, w, SS).mean(axis=(1, 3))
-        cell = cell * (1 - cov[..., None]) + ink * cov[..., None]
-        yy, xx = np.mgrid[0:h, 0:w]
-        e = 7
-        cell[(xx < e) | (xx >= w - e) | (yy < e) | (yy >= h - e)] = edge
-        out[:, x0:x0 + w] = cell
-    return out
-
-
 M = {
     "glass": pbr("SakeBottles", (1, 1, 1), tex=image("sake_bottles", atlas), rough=0.18),
     # (the same picture: the game draws this one see-through, the light through it (item 88))
@@ -692,12 +669,11 @@ M = {
     # (the cloudy sake (にごり, item 285): white, near opaque, the game its own see-through for it)
     "nigori": pbr("SakeLiquidNigori", (0.95, 0.94, 0.9), rough=0.25),
     # (the stand's woods (item 383): its hinoki, its keyaki, the burl of the plinth's faces, the risers' shoji (the game lights its paper
-    # softly), the plaque)
+    # softly, the frame's transom with them))
     "wood": pbr("SakeStandWood", (1, 1, 1), tex=image("sake_stand_wood", stand_col), rough=0.6),
     "keyaki": pbr("SakeWoodKeyaki", (1, 1, 1), tex=image("sake_keyaki", keyaki_col), rough=0.5),
     "burl": pbr("SakeWoodBurl", (1, 1, 1), tex=image("sake_burl", burl()), rough=0.45),
     "shoji": pbr("SakeShoji", (1, 1, 1), tex=image("sake_shoji", shoji_pic()), rough=0.7),
-    "plaque": pbr("SakeWoodPlaque", (1, 1, 1), tex=image("sake_plaque", plaque_pic()), rough=0.5),
 }
 parts = []
 
@@ -898,9 +874,9 @@ def bottle(k, prof, at, turn):
 # lacquer, gold and vermilion didn't go with the shop's Edo wood (the bar's lip, item 313, after a 衝立 too)). All of it wood now, joined
 # as a joiner joins it: a keyaki plinth up on two bracket feet (脚), its long faces figured burl (玉杢) as the screen's lower panel; two
 # steps on it, their tops pale hinoki, their risers a shoji lattice (格子) of keyaki bars over paper, lit softly from within; each bottle
-# on a hinoki coaster, the best one up on a white-wood dais; behind them a gate of keyaki at the back corners: two posts standing on the
-# feet, the top rail (笠木) over them, its ends run on past them and cut slanting, the tie beam (貫) under it through the posts, and at
-# the middle between the two the plaque (額束) brushed in sumi, 銘酒 to the customers and 聞野 to the owner. Bold rounded shapes (item
+# on a hinoki coaster, the best one up on a white-wood dais; behind them the screen's frame, square (item 399: it had been a gate, a
+# torii's top rail run on past the posts, its tie beam through them and a plaque between): two keyaki posts at the back corners standing
+# on the feet, a top rail on them ending flush with them, a middle rail under it, a shoji transom between the two. Bold rounded shapes (item
 # 379's 造型感: bevels with their normals hardened). The steps' heights and the bottles' places as they were (the pour, the tasting)
 # =====================================================================
 L, D = 0.93, 0.25
@@ -911,11 +887,11 @@ T2 = T1 + 0.06       # (the back step's top)
 CO = 0.006           # (a coaster's height)
 DAI = 0.045          # (the best bottle's dais)
 PX = L / 2 + 0.046   # (the plinth's half length)
-PY0, PY1 = -D / 2 - 0.02, D / 2 + 0.035     # (its depth: deeper behind, the gate's posts on it behind the steps)
+PY0, PY1 = -D / 2 - 0.02, D / 2 + 0.035     # (its depth: deeper behind, the frame's posts on it behind the steps)
 FOOT_H = 0.022       # (the feet: the plinth stands up on them, the table seen under it between them)
 POST_X, POST_Y, POST_W = L / 2 + 0.018, D / 2 + 0.017, 0.032
-NUKI_Z, KASA_Z = 0.515, 0.6      # (the tie beam's top; the top rail's foot)
-KASA_H, KASA_D, KASA_RUN = 0.028, 0.048, 0.055
+TOP_Z, TOP_H = 0.6, 0.026        # (the frame's top rail: its foot, its height)
+MID_Z, MID_H = 0.5, 0.012        # (its middle rail: its top, its height; the shoji transom between the two rails)
 CELL = 0.05          # (the risers' lattice: a cell across)
 
 
@@ -1060,39 +1036,27 @@ for k_, j_ in ((3, -2.5), (6, -1.5), (7, -0.5), (4, 0.5), (11, 1.5)):
     bottle(k_, YONGO, Vector((j_ * SPAN, ys_front, T1 + CO + 0.0003)), 0.0)
 coaster("SakeStandCoasterJug", 2.5 * SPAN, ys_front, T1, 0.045)
 
-# ---- the gate behind them: two keyaki posts at the back corners standing on the feet through the plinth; the top rail (笠木) over them,
-# its ends run on past them and cut slanting (its top longer than its foot); the tie beam (貫) under it through the posts, its ends just out
-# past them; between the two at the middle the plaque (額束)
+# ---- the frame behind them (item 399, the owner's 「你設計的風格很像鳥居，不OK」: a top rail run on past the posts and cut slanting, a tie
+# beam through them, a plaque between, were a torii's): a screen's (衝立) frame, square, as the woodblock print's (item 383): two keyaki
+# posts at the back corners standing on the feet through the plinth; a top rail on them, its ends flush with their outer faces (the posts
+# up a millimetre into it, below its eased edge: no two faces in one plane); a middle rail between them under it; between the two rails a
+# shoji transom (欄間), the risers' lattice and paper (lit softly as they are), its edges in the posts and the rails; open under it, the
+# bottles seen through. Nothing written on it (the owner's 「別甚麼都聞野」)
 for sx in (-1, 1):
     x = sx * POST_X
-    post = rounded_box(f"SakeStandPost{sx}", x - POST_W / 2, x + POST_W / 2, POST_Y - POST_W / 2, POST_Y + POST_W / 2, FOOT_H - 0.001, KASA_Z + 0.004,
+    post = rounded_box(f"SakeStandPost{sx}", x - POST_W / 2, x + POST_W / 2, POST_Y - POST_W / 2, POST_Y + POST_W / 2, FOOT_H - 0.001, TOP_Z + 0.001,
                        0.005, 2, M["keyaki"], M["keyaki"])
     relay_uv(post, upright_uv(0.16))
-XK = POST_X + POST_W / 2 + KASA_RUN
-profile("SakeStandKasagi", [(-XK + 0.016, KASA_Z), (XK - 0.016, KASA_Z), (XK, KASA_Z + KASA_H), (-XK, KASA_Z + KASA_H)], "y",
-        POST_Y - KASA_D / 2, POST_Y + KASA_D / 2, M["keyaki"], 0.006, 3)
-XN = POST_X + POST_W / 2 + 0.018
-nuki = rounded_box("SakeStandNuki", -XN, XN, POST_Y - 0.011, POST_Y + 0.011, NUKI_Z - 0.018, NUKI_Z, 0.004, 2, M["keyaki"], M["keyaki"], bottom=True)
-relay_uv(nuki, along_uv(0.16))
-# (the plaque: a board from the tie beam up into the top rail, its faces the picture's two halves, each read the right way round from its
-# side; its edges the picture's keyaki edge)
-GW, GT = 0.034, 0.012
-z0g, z1g = NUKI_Z - 0.002, KASA_Z + 0.002
-bm_ = bmesh.new()
-uv_ = bm_.loops.layers.uv.new()
-bmesh.ops.create_cube(bm_, size=1.0)
-bmesh.ops.transform(bm_, matrix=Matrix.Translation((0, POST_Y, (z0g + z1g) / 2)) @ Matrix.Diagonal((2 * GW, GT, z1g - z0g, 1)), verts=bm_.verts)
-for f in bm_.faces:
-    for l in f.loops:
-        c = l.vert.co
-        v = (c.z - z0g) / (z1g - z0g)
-        if f.normal.y < -0.5:
-            l[uv_].uv = ((c.x + GW) / (2 * GW) * 0.5, v)
-        elif f.normal.y > 0.5:
-            l[uv_].uv = (0.5 + (GW - c.x) / (2 * GW) * 0.5, v)
-        else:
-            l[uv_].uv = (0.01, 0.5)
-mesh_obj("SakeStandGakuzuka", bm_, M["plaque"], smooth_=False)
+XO, XI = POST_X + POST_W / 2, POST_X - POST_W / 2     # (the posts' outer faces, their inner)
+top = rounded_box("SakeStandTopRail", -XO, XO, POST_Y - POST_W / 2, POST_Y + POST_W / 2, TOP_Z, TOP_Z + TOP_H, 0.005, 2, M["keyaki"], M["keyaki"],
+                  bottom=True)
+relay_uv(top, along_uv(0.16))
+mid = rounded_box("SakeStandMidRail", -XI - 0.002, XI + 0.002, POST_Y - 0.01, POST_Y + 0.01, MID_Z - MID_H, MID_Z, 0.003, 2, M["keyaki"], M["keyaki"],
+                  bottom=True)
+relay_uv(mid, along_uv(0.16))
+pane = rounded_box("SakeStandTransom", -XI - 0.002, XI + 0.002, POST_Y - 0.004, POST_Y + 0.004, MID_Z - 0.002, TOP_Z + 0.002, 0.001, 1,
+                   M["shoji"], M["shoji"])
+relay_uv(pane, shoji_uv(MID_Z, TOP_Z))
 
 # (joined by material)
 by = {}
