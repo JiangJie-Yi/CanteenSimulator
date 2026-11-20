@@ -64,6 +64,9 @@ PULL = (0.012, 0.07, 0.86)           # a pull's width, height and its middle's h
 STILE, TOP_RAIL, BOTTOM_RAIL, MID_RAIL = 0.03, 0.045, 0.11, 0.035
 MID_Y = 0.56                         # the middle rail's foot, over the leaf's foot
 SLAT_W, SLAT_GAP = 0.009, 0.036      # the lattice's slats: their width, their pitch (fine: at 12 mm and 46 they read as bars)
+# the north jamb's pieces, foot to top: from, to, how far north (item 419: the wall's face 0.498, its chair rail's 0.453, its nageshi's 0.473,
+# the plaster's over that 0.494; half a millimetre to one short of each)
+JAMB = [(TRACK_Y[0], 0.824, 0.4975), (0.824, 0.876, 0.4525), (0.876, 1.976, 0.4975), (1.976, 2.004, 0.4725), (2.004, 2.199, 0.4935)]
 
 
 # --- pictures -----------------------------------------------------------------------------------------------------
@@ -73,7 +76,8 @@ def wood_picture(n=256):
     streak = fbm(n, 24, 2, 4)
     fine = 0.5 + 0.5 * np.sin(2 * np.pi * (u * 38 + 0.8 * fbm(n, 3, 2)))
     k = 0.82 + 0.14 * streak + 0.06 * fine
-    base = np.array((0.3, 0.19, 0.11), np.float32)
+    # (a medium brown now (item 419, the owner's 「顏色要亮一些」): 0.3, 0.19, 0.11 before, near black in the genkan's shade)
+    base = np.array((0.42, 0.28, 0.17), np.float32)
     return (base[None, None, :] * k[..., None]).clip(0, 1).astype(np.float32)
 
 
@@ -186,7 +190,7 @@ leaves = [leaf("GenkanDoorS", *LEAF_X[0], *TRACK_Z[0], 1), leaf("GenkanDoorN", *
 print("GENKANDOOR_LEAVES", W_LEAF, LEAF_X, "open way", LEAF_X[0][1], X_WALL - 0.001)
 
 
-# --- the frame: the track, the jamb strip, the lintel, the transom and its head rail ------------------------------
+# --- the frame: the track, the lintel, the transom and its head rail, the north jamb -------------------------------
 def frame_wood(bm, uvl):
     box(bm, uvl, X_POST, X_WALL - 0.001, TRACK_Y[0], TRACK_Y[1], FRAME_Z[0], FRAME_Z[1], "x")
     box(bm, uvl, X_S, X_WALL - 0.001, LINTEL_Y[0], LINTEL_Y[1], FRAME_Z[0], FRAME_Z[1], "x")
@@ -201,6 +205,13 @@ def frame_wood(bm, uvl):
         box(bm, uvl, cx - SLAT_W / 2, cx + SLAT_W / 2, TRANSOM_Y[0] - 0.001, TRANSOM_Y[1] + 0.001, 0.4095, 0.424, "y")
     # (its head rail, from the transom back into the beam's front (z 0.34), under the beam's foot)
     box(bm, uvl, X_S, X_WALL - 0.001, HEAD_Y[0], HEAD_Y[1], 0.338, 0.43, "x")
+    # (the jamb (縦枠) at the north end, the north leaf shut against it, out to the room's wall: item 419, the owner's 「這個門沒密合」, a slot
+    # 7 cm wide from the sill to the head between the shut leaf (x 0.429) and the wall's face (0.498), the shoe cupboard seen through it at
+    # its foot. Measured in the game (tests/e2e/_doorbox419.mjs): notched round the wall's chair rail (y 0.825 to 0.875, out to x 0.453) and
+    # its nageshi (1.977 to 2.003, out to 0.473), which run out to the door's line; over the nageshi the plaster's face is 4 mm nearer (0.494);
+    # up to the wall's band over the door (from y 2.2))
+    for y0, y1, x1 in JAMB:
+        box(bm, uvl, X_WALL, x1, y0, y1, FRAME_Z[0], FRAME_Z[1], "y")
 
 
 def frame_glass(bm, uvl):
