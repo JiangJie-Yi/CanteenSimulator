@@ -57,7 +57,8 @@ function mergeable(o: THREE.Object3D): o is THREE.Mesh {
   // (a hand-written shader only the ink lines' kind: drawn from inside out, its look all in its uniforms)
   if ((mat as THREE.ShaderMaterial).isShaderMaterial && mat.side !== THREE.BackSide) return false
   // (only the ink lines, asked so: drawn from inside out, a hand-written shader or a plain one)
-  if (INK_ONLY && !(mat.side === THREE.BackSide && ((mat as THREE.ShaderMaterial).isShaderMaterial || (mat as THREE.MeshBasicMaterial).isMeshBasicMaterial))) return false
+  // (or what asks for it (userData.worldMerge: the signed wall's pieces, item 402: many small still pieces of one picture))
+  if (INK_ONLY && !m.userData.worldMerge && !(mat.side === THREE.BackSide && ((mat as THREE.ShaderMaterial).isShaderMaterial || (mat as THREE.MeshBasicMaterial).isMeshBasicMaterial))) return false
   // (nor what fades as it comes between the camera and what's looked at (scene/OccluderFade: a lamp, the noren): its material's swapped for a
   // see-through copy then, and it was taken out of the merge each time, twice and left out; now never put in)
   for (let q = m.parent; q; q = q.parent) if (q.userData.fadeOccluder) return false

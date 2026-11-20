@@ -18,7 +18,7 @@ import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts }
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { toChineseNumber } from '@/data/menu'
-import { CARD_CHARS, paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
+import { CARD_CHARS, CORK_NOTES, FREEHAND, paintFreehand, paintOuting, paintWallSigns, SIGNS_PX, WALL_PIECES, WALL_SIGNS, type WallPiece } from './wallPhotos'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -1559,44 +1559,34 @@ function MenuTags({ z0, z1 }: { z0: number; z1: number }) {
 }
 /**
  * The corner by the way in where the visitors have left their mark (item 295, the owner's, 2026-11-17: 「靠近玄關的門處牆壁會有些美食家的簽名及
- * 留言板+照片」): on the plaster over the shoe cupboard, past the shrine's shelf, short of the doorway: three signed boards in a row, the cork
- * board of notes under them, the two photographs beside it under the exit sign (wallPhotos' paintWallSigns, all made up). Each a thin board
- * hung just off the wall, its face its part of the one canvas, its edges the frame's wood or the boards' gold; all one mesh, one line.
- * `end` the wall's end by the way in: each placed back from it (the switches 1.2 to 1.4 back, under the cork board; the exit sign 0.42 to
- * 0.82 back, over the photographs; the shrine's shelf ends 1.48 back, the doorway's front starts 0.26 back)
+ * 留言板+照片」): on the plaster over the shoe cupboard, past the shrine's shelf, short of the doorway. A collage (items 402, 405 and 406, the
+ * owner's 「留言牆細節要有，物件要拆細、拆散 然後再group」, 「簽名牆要有一些是隨筆簽，英日中都有」「各種顏色也會有塗鴉」, 「這太固定了，而且放太高，
+ * 要有點設計感」: it was one mesh of six cards alike in a grid high up, the cork board and its notes one picture): every piece its own, movable
+ * on its own in the editor and all one group (edit.ts's grp-signwall): the cork board, each note pinned on it with its own pushpins (the
+ * yellow one's corner curling off it), the two framed photographs, the six signed pieces taped up round them at their slants (wallPhotos'
+ * WALL_PIECES, CORK_NOTES), and the plaster written all over round them (paintFreehand). `end` the wall's end by the way in: each placed back
+ * from it (the switches 1.2 to 1.4 back, under the cork board; the exit sign 0.42 to 0.82 back, over the photographs; the shrine's shelf ends
+ * 1.27 back, from 1.46 up; the doorway's front starts 0.26 back). Their pictures one canvas, one material (seen through where a paper's cut);
+ * the still ones merged into one draw by the room's merge (userData.worldMerge), one taken out as it's moved.
  */
-type WallBoard = { z: number; y: number; w: number; h: number; t: number; rect: number[]; edge: number[] }
-const SIGN_BOARDS = (end: number): WallBoard[] => [
-  // (the six signature cards in a grid, two rows of three where the three signed boards hung (item 400, the owner's photograph of a wall of
-  // them): the cork board 11 cm under them, the photographs 4.7 cm past them, the shrine's shelf 10 cm short of them)
-  ...[0, 1, 2, 3, 4, 5].map((k) => ({ z: end - 1.3 + (k % 3) * 0.175, y: k < 3 ? 1.88 : 1.73, w: 0.165, h: 0.14, t: 0.005, rect: WALL_SIGNS.cards[k], edge: WALL_SIGNS.card })),
-  { z: end - 1.12, y: 1.4, w: 0.42, h: 0.3, t: 0.02, rect: WALL_SIGNS.board, edge: WALL_SIGNS.wood },
-  { z: end - 0.72, y: 1.475, w: 0.2, h: 0.15, t: 0.012, rect: WALL_SIGNS.photos[0], edge: WALL_SIGNS.wood },
-  { z: end - 0.48, y: 1.43, w: 0.2, h: 0.15, t: 0.012, rect: WALL_SIGNS.photos[1], edge: WALL_SIGNS.wood },
-]
 let SIGNS_ZH = true
 const SIGNS_TEX = signTexture(WALL_SIGNS.size[0] * SIGNS_PX, WALL_SIGNS.size[1] * SIGNS_PX, (g) => paintWallSigns(g, SIGNS_ZH))
-const SIGNS_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: SIGNS_TEX })
-function signsGeometry(boards: WallBoard[]) {
-  const [W, H] = WALL_SIGNS.size
+// (fine handwriting: kept at up to twice the machine's cap (scene/textureCap))
+if (SIGNS_TEX) SIGNS_TEX.userData.capScale = 2
+const SIGNS_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: SIGNS_TEX, alphaTest: 0.5 })
+/** the plaster's writing: a sheet a hair off the wall, lit as the wall is, see-through where nothing's written, drawn over the wall's face */
+const FREE_TEX = signTexture(Math.round((FREEHAND.back1 - FREEHAND.back0) * FREEHAND.px), Math.round((FREEHAND.up1 - FREEHAND.up0) * FREEHAND.px),
+  (g, w, h) => paintFreehand(g, w, h))
+if (FREE_TEX) FREE_TEX.userData.capScale = 2
+const FREE_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: FREE_TEX, transparent: true, depthWrite: false, polygonOffset: true,
+  polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
+const signUV = ([x, y, w, h]: number[]) => { const [W, H] = WALL_SIGNS.size; return [x / W, 1 - (y + h) / H, (x + w) / W, 1 - y / H] }
+/** a geometry of the given faces (four corners each, counter-clockwise seen from the side it faces, with their picture's corners) and
+ * triangles (three) */
+function facesGeometry(quads: { p: number[][]; uv: number[][] }[], tris: { p: number[][]; uv: number[][] }[] = []) {
   const pos: number[] = [], uv: number[] = [], idx: number[] = []
-  const face = (pts: number[][], uvs: number[][]) => {
-    const b = pos.length / 3
-    for (const p of pts) pos.push(...p)
-    for (const q of uvs) uv.push(...q)
-    idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
-  }
-  const rectUV = ([x, y, w, h]: number[]) => [x / W, 1 - (y + h) / H, (x + w) / W, 1 - y / H]
-  for (const b of boards) {
-    const [u0, v0, u1, v1] = rectUV(b.rect), [e0, f0, e1, f1] = rectUV(b.edge)
-    const xb = -0.004, xf = xb - b.t, za = b.z - b.w / 2, zb = b.z + b.w / 2, ya = b.y - b.h / 2, yb = b.y + b.h / 2
-    const E = [[e0, f0], [e1, f0], [e1, f1], [e0, f1]]
-    face([[xf, ya, za], [xf, ya, zb], [xf, yb, zb], [xf, yb, za]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]])
-    face([[xb, ya, za], [xf, ya, za], [xf, yb, za], [xb, yb, za]], E)
-    face([[xf, ya, zb], [xb, ya, zb], [xb, yb, zb], [xf, yb, zb]], E)
-    face([[xf, yb, za], [xf, yb, zb], [xb, yb, zb], [xb, yb, za]], E)
-    face([[xb, ya, za], [xb, ya, zb], [xf, ya, zb], [xf, ya, za]], E)
-  }
+  for (const f of quads) { const b = pos.length / 3; f.p.forEach((q) => pos.push(...q)); f.uv.forEach((q) => uv.push(...q)); idx.push(b, b + 1, b + 2, b, b + 2, b + 3) }
+  for (const f of tris) { const b = pos.length / 3; f.p.forEach((q) => pos.push(...q)); f.uv.forEach((q) => uv.push(...q)); idx.push(b, b + 1, b + 2) }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
@@ -1604,19 +1594,137 @@ function signsGeometry(boards: WallBoard[]) {
   g.computeVertexNormals()
   return g
 }
-function WallSigns({ end }: { end: number }) {
+/** a board off the wall about its middle: its back at the wall's face, its front `t` out into the room (-x), its picture's size (a millimetre
+ * a unit) along the wall (z: its left toward the wall's far end) and up; its face its picture, its edges their swatch */
+function plaqueGeometry(rect: number[], edge: number[], t: number) {
+  const w = rect[2] / 1000, h = rect[3] / 1000
+  const [u0, v0, u1, v1] = signUV(rect), [e0, f0, e1, f1] = signUV(edge)
+  const xb = 0, xf = -t, za = -w / 2, zb = w / 2, ya = -h / 2, yb = h / 2
+  const E = [[e0, f0], [e1, f0], [e1, f1], [e0, f1]]
+  return facesGeometry([
+    { p: [[xf, ya, za], [xf, ya, zb], [xf, yb, zb], [xf, yb, za]], uv: [[u0, v0], [u1, v0], [u1, v1], [u0, v1]] },
+    { p: [[xb, ya, za], [xf, ya, za], [xf, yb, za], [xb, yb, za]], uv: E },
+    { p: [[xf, ya, zb], [xb, ya, zb], [xb, yb, zb], [xf, yb, zb]], uv: E },
+    { p: [[xf, yb, za], [xf, yb, zb], [xb, yb, zb], [xb, yb, za]], uv: E },
+    { p: [[xb, ya, za], [xb, ya, zb], [xf, ya, zb], [xf, ya, za]], uv: E },
+  ])
+}
+/** a paper about its middle, flat on what it's pinned to (its picture as cut: see-through round it); the yellow note's corner (its picture's
+ * (48, 25)-(32, 41) fold, from its middle in millimetres) turned up off the board, its tip 6 mm out */
+function paperGeometry(rect: number[], curl = false) {
+  const w = rect[2] / 1000, h = rect[3] / 1000
+  const [u0, v0, u1, v1] = signUV(rect)
+  // (a point on the paper from its middle in its picture's millimetres (y down) to its place and its picture's)
+  const P = (mx: number, my: number, out = 0) => [-out, -my / 1000, mx / 1000]
+  const U = (mx: number, my: number) => [u0 + (mx / 1000 / w + 0.5) * (u1 - u0), v1 - (my / 1000 / h + 0.5) * (v1 - v0)]
+  const hw = rect[2] / 2, hh = rect[3] / 2
+  if (!curl) return facesGeometry([{ p: [P(-hw, hh), P(hw, hh), P(hw, -hh), P(-hw, -hh)], uv: [U(-hw, hh), U(hw, hh), U(hw, -hh), U(-hw, -hh)] }])
+  // (the note with its lower right corner cut along the fold, and the flap folded back over it, its tip lifted)
+  const outline = [[-hw, -hh], [hw, -hh], [hw, 25], [32, hh], [-hw, hh]]
+  const tris: { p: number[][]; uv: number[][] }[] = []
+  // (its outline in a ladder of triangles from its first corner, its own picture laid on each)
+  for (let i = 1; i < outline.length - 1; i++) {
+    const q = [outline[0], outline[i + 1], outline[i]]
+    tris.push({ p: q.map(([x, y]) => P(x, y)), uv: q.map(([x, y]) => U(x, y)) })
+  }
+  tris.push({ p: [P(48, 25), P(36, 27, 0.006), P(32, 41)], uv: [U(48, 25), U(36, 27), U(32, 41)] })
+  return facesGeometry([], tris)
+}
+/** a pushpin's head: an octagon 11 mm across standing 6 mm out, its top the shine of its colour (WALL_SIGNS.pins[k]), its sides its rim;
+ * its top closed across in a ladder (no fan into a middle) */
+const PIN_GEOS: THREE.BufferGeometry[] = []
+function pinGeometry(k: number) {
+  if (PIN_GEOS[k]) return PIN_GEOS[k]
+  const [x, y, w, h] = WALL_SIGNS.pins[k], [W, H] = WALL_SIGNS.size
+  const R = 0.0056, out = 0.006
+  const ring = (xx: number) => Array.from({ length: 8 }, (_, i) => [xx, Math.sin((i * Math.PI) / 4) * R, Math.cos((i * Math.PI) / 4) * R])
+  const top = ring(-out), foot = ring(0)
+  const tuv = Array.from({ length: 8 }, (_, i) => [(x + w / 2 + Math.cos((i * Math.PI) / 4) * w * 0.48) / W, 1 - (y + h / 2 - Math.sin((i * Math.PI) / 4) * h * 0.48) / H])
+  const rim = [(x + w * 0.94) / W, 1 - (y + h / 2) / H]
+  const quads = Array.from({ length: 8 }, (_, i) => { const j = (i + 1) % 8; return { p: [foot[i], foot[j], top[j], top[i]], uv: [rim, rim, rim, rim] } })
+  const L = [[0, 1, 7], [1, 2, 6], [1, 6, 7], [2, 3, 5], [2, 5, 6], [3, 4, 5]]
+  PIN_GEOS[k] = facesGeometry(quads, L.map((t) => ({ p: t.map((i) => top[i]), uv: t.map((i) => tuv[i]) })))
+  return PIN_GEOS[k]
+}
+/** a strip of washi tape `len` long, 18 mm wide, its picture one of the tapes */
+function tapeGeometry(k: number, len: number) {
+  const [u0, v0, u1, v1] = signUV(WALL_SIGNS.tapes[k]), w = 0.018
+  return facesGeometry([{ p: [[0, -w / 2, -len / 2], [0, -w / 2, len / 2], [0, w / 2, len / 2], [0, w / 2, -len / 2]], uv: [[u0, v0], [u1, v0], [u1, v1], [u0, v1]] }])
+}
+const DEG2 = Math.PI / 180
+/** what the pointer says over any of it */
+const SIGN_TIP = ['【簽名牆】美食家的簽名與留言', '來過的客人留下的簽名卡、留言板與合照'] as const
+/** a mesh of the wall's: its own geometry, the wall's picture, in the room's merge while it stands still */
+function signMesh(geo: THREE.BufferGeometry, mat: THREE.Material = SIGNS_MAT, ink = false) {
+  const m = new THREE.Mesh(geo, mat)
+  m.receiveShadow = true
+  m.userData.worldMerge = true
+  const g = new THREE.Group()
+  g.add(m)
+  if (ink) { const k = inkTogether([m], { width: 0.0012, weld: true }); if (k) g.add(k) }
+  return g
+}
+/** one piece on the wall: its board (and its ink), its tape */
+function WallPieceView({ p, end }: { p: WallPiece; end: number }) {
   const obj = useMemo(() => {
     const g = new THREE.Group()
-    g.name = 'wall-signs'
-    const m = new THREE.Mesh(signsGeometry(SIGN_BOARDS(end)), SIGNS_MAT)
-    m.receiveShadow = true
-    g.add(m)
-    const ink = inkTogether([m], { width: 0.0012, weld: true })
-    if (ink) g.add(ink)
+    g.add(signMesh(plaqueGeometry(p.rect, p.edge, p.t), SIGNS_MAT, true))
+    // (its tape: over its two top corners, at a slant across each, or one strip across its top's middle)
+    const w = p.rect[2] / 1000, h = p.rect[3] / 1000, x = -p.t - 0.0004
+    if (p.hold === 'tape') {
+      for (const sd of [-1, 1]) {
+        const t = signMesh(tapeGeometry(p.tape ?? 0, 0.05))
+        t.position.set(x, h / 2 - 0.004, sd * (w / 2 - 0.008))
+        t.rotation.x = sd * 38 * DEG2
+        g.add(t)
+      }
+    } else if (p.hold === 'tape1') {
+      const t = signMesh(tapeGeometry(p.tape ?? 0, 0.045))
+      t.position.set(x, h / 2, 0)
+      t.rotation.x = 4 * DEG2
+      g.add(t)
+    }
     return g
-  }, [end])
-  useEffect(() => () => { obj.traverse((o) => (o as THREE.Mesh).geometry?.dispose()) }, [obj])
-  // (its notes in the page's language, painted again as that changes; once more as the brush hand's letters are in)
+  }, [p])
+  useEffect(() => () => obj.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !PIN_GEOS.includes(m.geometry)) m.geometry.dispose() }), [obj])
+  return (
+    <Movable id={p.id} label={p.label}>
+      <primitive object={obj} position={[-0.004 - p.layer * 0.003, p.up, end - p.back]} rotation-x={p.tilt * DEG2} {...nameOver(...SIGN_TIP)} />
+    </Movable>
+  )
+}
+/** one note pinned on the cork board: the paper a hair off the cork, its pins through it */
+function CorkNoteView({ n, k, end }: { n: (typeof CORK_NOTES)[number]; k: number; end: number }) {
+  const cork = WALL_PIECES[0]
+  const obj = useMemo(() => {
+    const g = new THREE.Group()
+    g.add(signMesh(paperGeometry(WALL_SIGNS.notes[k], !!n.curl)))
+    for (const [dz, dy, c] of n.pins) {
+      const pin = signMesh(pinGeometry(c))
+      pin.position.set(-0.0004, dy, dz)
+      g.add(pin)
+    }
+    return g
+  }, [n, k])
+  useEffect(() => () => obj.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !PIN_GEOS.includes(m.geometry)) m.geometry.dispose() }), [obj])
+  return (
+    <Movable id={n.id} label={n.label}>
+      <primitive object={obj} position={[-0.004 - cork.t - 0.0006, cork.up + n.dy, end - cork.back + n.dz]} rotation-x={n.rot} {...nameOver(...SIGN_TIP)} />
+    </Movable>
+  )
+}
+function WallSigns({ end }: { end: number }) {
+  // (the plaster's writing: facing into the room (-x), its picture's left toward the wall's far end)
+  const free = useMemo(() => {
+    const { back0, back1, up0, up1 } = FREEHAND
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(back1 - back0, up1 - up0).rotateY(-Math.PI / 2), FREE_MAT)
+    m.receiveShadow = true
+    m.name = 'wall-freehand'
+    return m
+  }, [])
+  useEffect(() => () => free.geometry.dispose(), [free])
+  // (their words in the page's language, painted again as that changes; once more as the hand's letters are in, both its weights (item 390:
+  // painted before they were, they were in the system's plain letters))
   const lang = useRef('')
   useFrame(() => {
     const l = document.documentElement.lang
@@ -1624,13 +1732,24 @@ function WallSigns({ end }: { end: number }) {
     lang.current = l
     SIGNS_ZH = l !== 'ja' && l !== 'en'
     const c = SIGNS_TEX.image as HTMLCanvasElement
-    const repaint = () => { paintWallSigns(c.getContext('2d')!, SIGNS_ZH); SIGNS_TEX.needsUpdate = true }
+    const repaint = () => {
+      paintWallSigns(c.getContext('2d')!, SIGNS_ZH); SIGNS_TEX.needsUpdate = true
+      const fc = FREE_TEX?.image as HTMLCanvasElement | undefined
+      if (fc && FREE_TEX) { paintFreehand(fc.getContext('2d')!, fc.width, fc.height); FREE_TEX.needsUpdate = true }
+    }
     repaint()
-    // (the cards' words in both the hand's weights (item 390: painted before its letters were in, they were the system's plain ones))
     void Promise.all(['700', '400'].map((w) => document.fonts?.load(`${w} 40px "LXGW WenKai TC"`,
-      '謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念' + CARD_CHARS))).then(repaint).catch(() => {})
+      '謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念秋夜の隔壁桌となりの席小美みき必點食' + CARD_CHARS))).then(repaint).catch(() => {})
   })
-  return <primitive object={obj} {...nameOver('【簽名牆】美食家的簽名與留言', '來過的客人留下的簽名卡、留言板與合照')} />
+  return (
+    <group name="wall-signs">
+      {WALL_PIECES.map((p) => <WallPieceView key={p.id} p={p} end={end} />)}
+      {CORK_NOTES.map((n, k) => <CorkNoteView key={n.id} n={n} k={k} end={end} />)}
+      <Movable id="sign-freehand" label="牆上的隨手簽">
+        <primitive object={free} position={[-0.0015, (FREEHAND.up0 + FREEHAND.up1) / 2, end - (FREEHAND.back0 + FREEHAND.back1) / 2]} {...nameOver(...SIGN_TIP)} />
+      </Movable>
+    </group>
+  )
 }
 /** the round window's frame's tint over its keyaki: a deep walnut */
 const ROUND_WOOD_TINT = new THREE.Color('#7a5136')
@@ -5306,7 +5425,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           {/* (half as long down the wall as they were (the owner's, 2026-11-11), from the shelf's underside) */}
           {[-0.35, 0.35].map((z) => <group key={z} position={[ALTAR_D / 2, -0.034, z]} scale-y={0.5}><KamiCopy part="bracket" /></group>)}</group></StaticBatch></Movable>}
         {/* (the visitors' signed boards, notes and photographs on the plaster over the shoe cupboard, by the way in (item 295)) */}
-        {altar && <Movable id="wallsigns" label="簽名留言牆"><WallSigns end={to} /></Movable>}
+        {altar && <WallSigns end={to} />}
         {/* (the menu's wooden tags on the plaster between the round window and the shrine's shelf (item 293)) */}
         {altar && tagSpan && <Movable id="menutags" label="菜單木札"><MenuTags z0={tagSpan[0]} z1={tagSpan[1]} /></Movable>}
         {/* (the omiki poured, the motes rising over the shrine: not merged) */}

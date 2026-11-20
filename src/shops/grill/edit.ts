@@ -79,6 +79,10 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   // (each part of the shop kept together, as the owner asked (2026-11-11: every piece in its area's group, the warmer and the rice ball
   // counter as one): the warmer with its miso pot and the rice ball counter with its cooker, side by side between the cook table and the till)
   'grp-ricestation': { zh: '料理台組', ja: '調理台一式', members: ['warmer', 'misopot', 'prepcounter', 'denkinabe'] },
+  // (the signed wall by the way in, every piece of it its own (items 402 and 406, the owner's 「物件要拆細、拆散 然後再group」): the cork board, its
+  // notes, the photographs, the signed pieces and the plaster's writing (wallPhotos' WALL_PIECES, CORK_NOTES))
+  'grp-signwall': { zh: '簽名留言牆', ja: 'サインと伝言の壁', members: ['sign-cork', 'sign-photo0', 'sign-photo1', 'sign-card1', 'sign-card2', 'sign-card3',
+    'sign-card4', 'sign-card5', 'sign-card6', 'sign-note1', 'sign-note2', 'sign-note3', 'sign-note4', 'sign-note5', 'sign-note6', 'sign-note7', 'sign-freehand'] },
   // (the sink and all that's on it and by it)
   'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge', 'stepstool'] },
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
@@ -559,7 +563,7 @@ export const pivotOf = (id: string): V3 => state.pivots[id] ?? [0, 0, 0]
  * sat half way up each piece; a chair's, a counter's, a fridge's, a vase's, a sack's at the middle of its base, as Maya's are set): turned
  * about it, it turns where it stands; sized about it, it grows up from where it stands and doesn't sink into it. A new piece that hangs goes on here.
  */
-export const HANGS = /^(barlamp|sidelamp|chochin|fishlantern|noren$|facade$|menutags$|outingphoto$|wallsigns$|speaker$|exitsign$|lightswitch|wcswitch$|art-|knives$|altar$|viewcam-)|^wc2-[mf]-(lamp|noren|dryer|towelbox|remote|paper|oto|pads)/
+export const HANGS = /^(barlamp|sidelamp|chochin|fishlantern|noren$|facade$|menutags$|outingphoto$|wallsigns$|speaker$|exitsign$|lightswitch|wcswitch$|art-|knives$|altar$|viewcam-|sign-)|^wc2-[mf]-(lamp|noren|dryer|towelbox|remote|paper|oto|pads)/
 // (each piece and each group whose pivot has been brought down to its foot, once: what was saved for it made up for then, so nothing moved)
 const KEY_FOOT = 'jgs-edit-foot-1'
 const KEY_GFOOT = 'jgs-edit-group-foot-2'

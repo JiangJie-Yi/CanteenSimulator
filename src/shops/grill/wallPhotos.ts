@@ -255,24 +255,64 @@ export function paintOuting(g: CanvasRenderingContext2D, W: number, H: number, z
 
 /**
  * The corner by the way in where the shop's visitors have left their mark (item 295, the owner's, 2026-11-17: 「靠近玄關的門處牆壁會有些美食家
- * 的簽名及留言板+照片」), all made up: six signature cards in a grid (item 400: SIGN_CARDS, signCard; they were three signed boards, 色紙 with a
- * line brushed down them), a cork board pinned with the customers' notes and a postcard, and two photographs: the owner with a famous guest before the
- * noren, signed across in pen, and the shop on its first day in sepia. All one canvas (WALL_SIGNS' places on it), for the boards that carry
- * them.
+ * 的簽名及留言板+照片」), all made up. Laid out as a collage (items 402 and 406, the owner's 「留言牆細節要有，物件要拆細、拆散 然後再group」,
+ * 「這太固定了，而且放太高，要有點設計感」: six cards alike in a two-by-three grid, high up the wall, the rest one board): the cork board with its
+ * notes pinned on it, each note a piece of its own; two framed photographs; six signed pieces round them, each its own kind and size (two
+ * shikishi with their gold edges, three cards, a polaroid), each taped up at its own slant, the lot about eye height; and the plaster round
+ * them written all over (paintFreehand). Every piece's picture on one canvas (WALL_SIGNS' places on it), for the pieces that carry them
+ * (DiningRoom's WallSigns, each piece movable on its own, all one group). Its millimetres a unit.
  */
+type Rect = [number, number, number, number]
 /** the wall signs' canvas over WALL_SIGNS.size (its pixels per place) */
 export const SIGNS_PX = 2
 export const WALL_SIGNS = {
-  /** each piece's place on the canvas (x, y, w, h, its pixels) */
-  /** the six signature cards (item 400), in a row along the canvas's foot */
-  cards: [0, 1, 2, 3, 4, 5].map((k) => [k * 171, 352, 165, 140]) as [number, number, number, number][],
-  board: [508, 0, 420, 300] as [number, number, number, number],
-  photos: [[0, 192, 200, 150], [212, 192, 200, 150]] as [number, number, number, number][],
-  /** a swatch of the frames' dark wood, and of the cards' white edge */
-  wood: [940, 0, 20, 20] as [number, number, number, number],
-  card: [970, 0, 20, 20] as [number, number, number, number],
-  size: [1024, 512] as [number, number],
+  /** the cork board: its frame and its cork (its notes are pieces of their own) */
+  board: [0, 0, 420, 300] as Rect,
+  photos: [[430, 0, 200, 150], [640, 0, 200, 150]] as Rect[],
+  /** the notes on the cork board, each its own picture, upright in its place (as cut: torn and curled edges see-through) */
+  notes: [[0, 310, 100, 86], [105, 310, 90, 78], [200, 310, 96, 112], [300, 310, 104, 88], [410, 310, 94, 82], [510, 310, 68, 72], [585, 310, 132, 96]] as Rect[],
+  /** the six signed pieces, SIGN_PIECES' order */
+  signs: [[0, 430, 220, 245], [225, 430, 180, 150], [410, 430, 165, 140], [580, 430, 92, 110], [680, 430, 160, 135], [845, 430, 150, 165]] as Rect[],
+  /** swatches: the frames' dark wood, the cards' white edge, the shikishi's gold; the pins' heads (red, blue, green, yellow), each with its
+   * shine; washi tapes (pink with dots, mint with stripes, yellow, blue checks) */
+  wood: [850, 0, 20, 20] as Rect, card: [875, 0, 20, 20] as Rect, gold: [900, 0, 20, 20] as Rect,
+  pins: [[850, 50, 36, 36], [890, 50, 36, 36], [930, 50, 36, 36], [970, 50, 36, 36]] as Rect[],
+  tapes: [[850, 100, 60, 20], [915, 100, 60, 20], [850, 125, 60, 20], [915, 125, 60, 20]] as Rect[],
+  size: [1024, 1024] as [number, number],
 }
+/** how a piece is held up: washi tape over its two top corners (`tape`), one strip over its top (`tape1`), or nothing seen (it hangs) */
+export type Hold = 'tape' | 'tape1'
+/** a piece on the wall: where its middle is (back from the wall's end at the door, up from the floor; metres), how thick, its slant (degrees,
+ * + turning its top toward the door), how far over what's under it (layer: 3 mm each), its picture (its size: a millimetre a unit), its edges'
+ * picture, how it's held and which tape */
+export type WallPiece = { id: string; label: string; back: number; up: number; t: number; tilt: number; layer: number
+  rect: Rect; edge: Rect; hold?: Hold; tape?: number }
+/** the collage (item 406): the cork board and the photographs at eye height, the signed pieces round them above and below, each at a slant,
+ * a few overlapping; clear of the light switches (back 1.20 to 1.41, up 1.05 to 1.19), the shrine's shelf (back 1.27 on, up 1.46 on) and the
+ * exit sign over the photographs (back 0.42 to 0.82, up 1.8 on) */
+export const WALL_PIECES: WallPiece[] = [
+  { id: 'sign-cork', label: '軟木留言板', back: 1.05, up: 1.38, t: 0.02, tilt: 0, layer: 0, rect: WALL_SIGNS.board, edge: WALL_SIGNS.wood },
+  { id: 'sign-photo0', label: '合照（名人來店）', back: 0.66, up: 1.47, t: 0.012, tilt: -2, layer: 0, rect: WALL_SIGNS.photos[0], edge: WALL_SIGNS.wood },
+  { id: 'sign-photo1', label: '合照（開店紀念）', back: 0.43, up: 1.38, t: 0.012, tilt: 3, layer: 0, rect: WALL_SIGNS.photos[1], edge: WALL_SIGNS.wood },
+  { id: 'sign-card1', label: '簽名色紙（黒川）', back: 1.13, up: 1.7, t: 0.004, tilt: -4, layer: 1, rect: WALL_SIGNS.signs[0], edge: WALL_SIGNS.gold, hold: 'tape', tape: 2 },
+  { id: 'sign-card2', label: '簽名卡（さくら）', back: 0.93, up: 1.665, t: 0.002, tilt: 3, layer: 2, rect: WALL_SIGNS.signs[1], edge: WALL_SIGNS.card, hold: 'tape', tape: 0 },
+  { id: 'sign-card3', label: '簽名卡（Ken & Yui）', back: 0.7, up: 1.68, t: 0.002, tilt: -3, layer: 1, rect: WALL_SIGNS.signs[2], edge: WALL_SIGNS.card, hold: 'tape', tape: 1 },
+  { id: 'sign-card4', label: '拍立得（林小雨）', back: 0.5, up: 1.62, t: 0.002, tilt: 6, layer: 1, rect: WALL_SIGNS.signs[3], edge: WALL_SIGNS.card, hold: 'tape1', tape: 3 },
+  { id: 'sign-card5', label: '簽名卡（阿翔）', back: 0.4, up: 1.17, t: 0.002, tilt: 4, layer: 1, rect: WALL_SIGNS.signs[4], edge: WALL_SIGNS.card, hold: 'tape', tape: 2 },
+  { id: 'sign-card6', label: '簽名色紙（美咲）', back: 0.66, up: 1.22, t: 0.004, tilt: -5, layer: 1, rect: WALL_SIGNS.signs[5], edge: WALL_SIGNS.gold, hold: 'tape', tape: 0 },
+]
+/** the notes pinned on the cork board (item 402: each a piece of its own): about the board's middle (along it, + toward the door; up) (its
+ * size its picture's place's, WALL_SIGNS.notes), its slant (radians, as the picture turns: + clockwise to the eye), its pins about its middle (along, up, which colour), the
+ * yellow one's corner curling up off the board */
+export const CORK_NOTES = [
+  { id: 'sign-note1', label: '便利貼（黃）', dz: -0.136, dy: 0.084, rot: -0.06, pins: [[0, 0.036, 0]], curl: true },
+  { id: 'sign-note2', label: '便利貼（粉紅）', dz: -0.038, dy: 0.088, rot: 0.05, pins: [[0, 0.034, 1]] },
+  { id: 'sign-note3', label: '烤魚的照片', dz: 0.056, dy: 0.072, rot: -0.04, pins: [[0, 0.05, 2]] },
+  { id: 'sign-note4', label: '撕下的筆記紙', dz: -0.124, dy: -0.016, rot: 0.04, pins: [[0, 0.036, 3]] },
+  { id: 'sign-note5', label: '牛皮紙卡片', dz: -0.018, dy: -0.018, rot: -0.05, pins: [[0, 0.035, 0]] },
+  { id: 'sign-note6', label: '收銀小票', dz: -0.158, dy: -0.098, rot: 0.07, pins: [[0, 0.03, 1]] },
+  { id: 'sign-note7', label: '店面夜景的照片', dz: 0.106, dy: -0.064, rot: 0.035, pins: [[-0.058, 0.044, 2], [0.058, 0.04, 0]] },
+] as { id: string; label: string; dz: number; dy: number; rot: number; pins: [number, number, number][]; curl?: boolean }[]
 const BRUSH = '"LXGW WenKai TC", "Noto Serif TC", serif'
 /** a little photograph's own frame and print, `draw` drawing what's in it into its print */
 function snapshot(g: CanvasRenderingContext2D, [x, y, w, h]: number[], draw: (fr: { x: number; y: number; w: number; h: number }) => void) {
@@ -292,13 +332,35 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
   g.clearRect(0, 0, W, H)
   g.fillStyle = '#3a2416'; g.fillRect(...WALL_SIGNS.wood)
   g.fillStyle = '#e4e2dc'; g.fillRect(...WALL_SIGNS.card)
-  // (the signature cards: their visitors' autographs, words and names, made up (item 400))
-  SIGN_CARDS.forEach((c, k) => signCard(g, WALL_SIGNS.cards[k], c))
+  g.fillStyle = '#c9a24a'; g.fillRect(...WALL_SIGNS.gold)
+  // (a pushpin's head as the eye meets it: its colour, a shine up to the left, darker to its edge; laid over each pin's top)
+  ;['#d23a2a', '#2a5ad2', '#2aa04a', '#e0a020'].forEach((col, k) => {
+    const [x, y, w, h] = WALL_SIGNS.pins[k], cx = x + w / 2, cy = y + h / 2, r = w / 2
+    const hg = g.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.06, cx, cy, r)
+    hg.addColorStop(0, '#ffffff'); hg.addColorStop(0.28, col); hg.addColorStop(1, shade(col, -0.45))
+    g.fillStyle = hg; g.fillRect(x, y, w, h)
+  })
+  // (washi tape: the paper's colour and its pattern)
+  const tape = ([x, y, w, h]: Rect, base: string, draw: (x: number, y: number, w: number, h: number) => void) => {
+    g.fillStyle = base; g.fillRect(x, y, w, h)
+    g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); draw(x, y, w, h); g.restore()
+  }
+  tape(WALL_SIGNS.tapes[0], '#f4bfcd', (x, y) => {
+    g.fillStyle = '#fff2f6'
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) { g.beginPath(); g.arc(x + 3 + i * 7 + (j % 2) * 3.5, y + 4 + j * 6, 1.5, 0, Math.PI * 2); g.fill() }
+  })
+  tape(WALL_SIGNS.tapes[1], '#b8e2d0', (x, y, _w, h) => {
+    g.fillStyle = '#e6f6ef'
+    for (let i = -4; i < 14; i++) { g.beginPath(); g.moveTo(x + i * 6, y + h); g.lineTo(x + i * 6 + 3, y + h); g.lineTo(x + i * 6 + 3 + h, y); g.lineTo(x + i * 6 + h, y); g.fill() }
+  })
+  tape(WALL_SIGNS.tapes[2], '#f3dc84', (x, y, w, h) => { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x, y + h * 0.36, w, h * 0.28) })
+  tape(WALL_SIGNS.tapes[3], '#b6cdee', (x, y, w, h) => {
+    g.fillStyle = '#dce8f8'
+    for (let i = 0; i < w; i += 5) for (let j = 0; j < h; j += 5) if ((i / 5 + j / 5) % 2 === 0) g.fillRect(x + i, y + j, 5, 5)
+  })
   // (the cork board (item 356, the owner's 「不OK」 over it: flat coloured squares each with a line and a squiggle, dots for pins, a lighthouse
-  // postcard that had nothing to do with the shop): its frame's wood eased at the edge, the cork's grains of every size and shade, and pinned
-  // on it what a shop's regulars leave: sticky notes with a corner curling up, a page torn off a lined pad, a till slip, a kraft card with a
-  // little cake drawn on, a print of the grilled fish and one of the shop at night; each casting its shadow on the cork, held by a pin with a
-  // shine on its head and its own shadow)
+  // postcard that had nothing to do with the shop): its frame's wood eased at the edge, the cork's grains of every size and shade; what's
+  // pinned on it is pieces of its own now (item 402), each casting its own shadow)
   {
     const [x, y, w, h] = WALL_SIGNS.board
     let r = 5
@@ -309,7 +371,7 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     for (let k = 0; k < 24; k++) { const yy = y + 2 + k * 12.3; g.beginPath(); g.moveTo(x, yy); g.bezierCurveTo(x + w * 0.3, yy - 2, x + w * 0.6, yy + 3, x + w, yy); g.stroke() }
     g.fillStyle = '#7a5232'; g.fillRect(x + 9, y + 9, w - 18, h - 18)
     g.fillStyle = '#2a180c'; g.fillRect(x + 11, y + 11, w - 22, h - 22)
-    // (the cork: a warm ground, darker toward the frame, its grains, a few darker crumbs and pale chips)
+    // (the cork: a warm ground, darker toward the frame, its grains, a few darker crumbs and pale chips; the holes of pins long gone)
     const cx0 = x + 12, cy0 = y + 12, cw = w - 24, ch = h - 24
     const cg = g.createRadialGradient(cx0 + cw / 2, cy0 + ch / 2, 20, cx0 + cw / 2, cy0 + ch / 2, cw * 0.7)
     cg.addColorStop(0, '#c99c66'); cg.addColorStop(1, '#a97c4a')
@@ -320,55 +382,45 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
       g.fillStyle = `rgba(${cols[Math.floor(rnd() * cols.length)]},${0.35 + rnd() * 0.45})`
       g.fillRect(cx0 + rnd() * cw, cy0 + rnd() * ch, sz, sz * (0.7 + rnd() * 0.6))
     }
-    // (a pushpin at (px, py): its shadow, its body, its head with a shine)
-    const pin = (px: number, py: number, col: string) => {
-      g.fillStyle = 'rgba(30,18,8,0.35)'; g.beginPath(); g.ellipse(px + 4, py + 5, 6, 4, 0.4, 0, Math.PI * 2); g.fill()
-      const hg = g.createRadialGradient(px - 2, py - 2, 0.5, px, py, 6)
-      hg.addColorStop(0, '#ffffff'); hg.addColorStop(0.25, col); hg.addColorStop(1, shade(col, -0.45))
-      g.fillStyle = hg; g.beginPath(); g.arc(px, py, 5.6, 0, Math.PI * 2); g.fill()
-      g.strokeStyle = shade(col, -0.6); g.lineWidth = 0.8; g.stroke()
-    }
-    // (a paper's shadow on the cork, offset down and to the right, soft)
-    const shadow = (nw: number, nh: number) => {
-      g.fillStyle = 'rgba(40,24,10,0.14)'; g.fillRect(-nw / 2 + 2, -nh / 2 + 3, nw + 3, nh + 3)
-      g.fillStyle = 'rgba(40,24,10,0.18)'; g.fillRect(-nw / 2 + 3, -nh / 2 + 4, nw, nh)
-    }
-    // (handwriting: a line of it, as big as fits, a touch uneven)
-    const hand = (text: string, cx: number, cy: number, size: number, maxW: number, col = '#23284a') => {
-      g.fillStyle = col
-      g.font = `700 ${size}px ${BRUSH}`
-      const fit = Math.min(1, maxW / Math.max(1, g.measureText(text).width))
-      g.font = `700 ${Math.floor(size * fit)}px ${BRUSH}`
-      g.textAlign = 'center'; g.textBaseline = 'middle'
-      g.fillText(text, cx, cy)
-    }
+    g.fillStyle = 'rgba(60,36,16,0.55)'
+    for (let k = 0; k < 14; k++) { g.beginPath(); g.arc(cx0 + 8 + rnd() * (cw - 16), cy0 + 8 + rnd() * (ch - 16), 0.9, 0, Math.PI * 2); g.fill() }
+  }
+  // (handwriting: a line of it, as big as fits, a touch uneven)
+  const hand = (text: string, cx: number, cy: number, size: number, maxW: number, col = '#23284a') => {
+    g.fillStyle = col
+    g.font = `700 ${size}px ${BRUSH}`
+    const fit = Math.min(1, maxW / Math.max(1, g.measureText(text).width))
+    g.font = `700 ${Math.floor(size * fit)}px ${BRUSH}`
     g.textAlign = 'center'; g.textBaseline = 'middle'
-    // 1 (a yellow sticky note, its lower right corner curling up off the cork; a little fish drawn under the words)
-    g.save(); g.translate(x + 74, y + 66); g.rotate(-0.06)
-    shadow(96, 82)
+    g.fillText(text, cx, cy)
+  }
+  // (each note in the middle of its own place, upright: the piece carrying it is turned and pinned on the board in the room)
+  const note = (k: number, draw: () => void) => {
+    const [x, y, w, h] = WALL_SIGNS.notes[k]
+    g.save(); g.translate(x + w / 2, y + h / 2); draw(); g.restore()
+  }
+  g.textAlign = 'center'; g.textBaseline = 'middle'
+  // 1 (a yellow sticky note, its lower right corner curling up off the cork (the piece's corner itself turns up); a little fish drawn under
+  // the words)
+  note(0, () => {
     const yg = g.createLinearGradient(0, -41, 0, 41); yg.addColorStop(0, '#fff6a6'); yg.addColorStop(1, '#f6e47c')
     g.fillStyle = yg; g.beginPath(); g.moveTo(-48, -41); g.lineTo(48, -41); g.lineTo(48, 25); g.lineTo(32, 41); g.lineTo(-48, 41); g.closePath(); g.fill()
     g.fillStyle = '#e8d266'; g.beginPath(); g.moveTo(48, 25); g.lineTo(32, 41); g.lineTo(36, 27); g.closePath(); g.fill()
-    g.fillStyle = 'rgba(40,24,10,0.2)'; g.beginPath(); g.moveTo(48, 25); g.lineTo(52, 30); g.lineTo(34, 44); g.lineTo(32, 41); g.closePath(); g.fill()
     hand(zh ? '謝謝招待！' : 'ごちそうさま！', 0, -12, 20, 84)
     g.strokeStyle = '#23284a'; g.lineWidth = 1.6
     g.beginPath(); g.ellipse(-6, 16, 14, 6, 0, 0, Math.PI * 2); g.stroke()
     g.beginPath(); g.moveTo(8, 16); g.lineTo(18, 10); g.lineTo(18, 22); g.closePath(); g.stroke()
     g.fillStyle = '#23284a'; g.beginPath(); g.arc(-14, 15, 1.4, 0, Math.PI * 2); g.fill()
-    g.restore()
-    pin(x + 74, y + 30, '#d23a2a')
-    // 2 (a pink sticky note)
-    g.save(); g.translate(x + 172, y + 62); g.rotate(0.05)
-    shadow(86, 74)
+  })
+  // 2 (a pink sticky note)
+  note(1, () => {
     const pg = g.createLinearGradient(0, -37, 0, 37); pg.addColorStop(0, '#ffd9e4'); pg.addColorStop(1, '#f9c2d2')
     g.fillStyle = pg; g.fillRect(-43, -37, 86, 74)
     hand(zh ? '下次再來～' : 'また来ます～', 0, -6, 19, 76)
     hand(zh ? '小美' : 'みき', 22, 22, 12, 40, '#7a3a50')
-    g.restore()
-    pin(x + 172, y + 28, '#2a5ad2')
-    // 3 (a print of the grilled fish on its plate, a white border, words written under it)
-    g.save(); g.translate(x + 266, y + 78); g.rotate(-0.04)
-    shadow(92, 108)
+  })
+  // 3 (a print of the grilled fish on its plate, a white border, words written under it)
+  note(2, () => {
     g.fillStyle = '#fbfaf6'; g.fillRect(-46, -54, 92, 108)
     g.fillStyle = '#3a2a22'; g.fillRect(-40, -48, 80, 70)
     const pl = g.createRadialGradient(0, -12, 4, 0, -12, 36); pl.addColorStop(0, '#f4f0e8'); pl.addColorStop(1, '#cfc7b8')
@@ -380,11 +432,11 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     g.fillStyle = '#e8e2c8'; g.beginPath(); g.ellipse(14, 0, 6, 3, 0, 0, Math.PI * 2); g.fill()
     g.fillStyle = '#f2d23a'; g.beginPath(); g.ellipse(-24, -2, 5, 3, 0.3, 0, Math.PI * 2); g.fill()
     hand(zh ? '烤魚超讚' : '焼き魚最高', 0, 38, 17, 80)
-    g.restore()
-    pin(x + 266, y + 28, '#2aa04a')
-    // 4 (a page torn off a lined pad: its blue lines, its torn top edge)
-    g.save(); g.translate(x + 86, y + 166); g.rotate(0.04)
-    shadow(100, 80)
+  })
+  // 4 (a page torn off a lined pad: its blue lines, its torn top edge)
+  note(3, () => {
+    let r = 9
+    const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
     g.fillStyle = '#fdfdf8'
     g.beginPath(); g.moveTo(-50, -34)
     for (let i = 0; i <= 20; i++) g.lineTo(-50 + i * 5, -40 + (i % 2 ? 3 : 0) + (rnd() - 0.5) * 2)
@@ -394,11 +446,9 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     g.strokeStyle = 'rgba(210,70,70,0.4)'; g.beginPath(); g.moveTo(-34, -36); g.lineTo(-34, 40); g.stroke()
     hand(zh ? '老闆好帥' : '大将かっこいい', 6, -4, 21, 80)
     hand(zh ? '— 隔壁桌' : '— となりの席', 18, 22, 11, 60, '#4a4a60')
-    g.restore()
-    pin(x + 86, y + 130, '#e0a020')
-    // 5 (a kraft card with a little cake drawn on it)
-    g.save(); g.translate(x + 192, y + 168); g.rotate(-0.05)
-    shadow(90, 78)
+  })
+  // 5 (a kraft card with a little cake drawn on it)
+  note(4, () => {
     g.fillStyle = '#d6b88a'; g.fillRect(-45, -39, 90, 78)
     g.strokeStyle = 'rgba(120,80,40,0.25)'; g.lineWidth = 1
     for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(-45, -30 + k * 13); g.lineTo(45, -28 + k * 13); g.stroke() }
@@ -408,11 +458,9 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     g.fillStyle = '#f0f0f0'; g.fillRect(-1.5, -4, 3, 10)
     g.fillStyle = '#ffb030'; g.beginPath(); g.ellipse(0, -6, 2.4, 4, 0, 0, Math.PI * 2); g.fill()
     hand('2026.10', 0, 30, 10, 60, '#5a2a18')
-    g.restore()
-    pin(x + 192, y + 133, '#d23a2a')
-    // 6 (a till slip, its torn foot zigzag, a dish written on it and circled)
-    g.save(); g.translate(x + 52, y + 248); g.rotate(0.07)
-    shadow(64, 64)
+  })
+  // 6 (a till slip, its torn foot zigzag, a dish written on it and circled)
+  note(5, () => {
     g.fillStyle = '#fbf9f2'
     g.beginPath(); g.moveTo(-32, -32); g.lineTo(32, -32); g.lineTo(32, 28)
     for (let i = 0; i <= 8; i++) g.lineTo(32 - i * 8, 28 + (i % 2 ? 4 : 0))
@@ -422,11 +470,10 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     hand(zh ? '鹽烤鯖魚' : '鯖の塩焼き', 0, -2, 14, 56, '#2a2a2a')
     hand(zh ? '必點！' : '必食！', 0, 16, 13, 50, '#c0281c')
     g.strokeStyle = '#c0281c'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, 6, 30, 20, 0.05, 0, Math.PI * 2); g.stroke()
-    g.restore()
-    pin(x + 52, y + 218, '#2a5ad2')
-    // 7 (a print of the shop at night: its front, the red lantern lit, the noren; pinned at both top corners)
-    g.save(); g.translate(x + 316, y + 214); g.rotate(0.035)
-    shadow(128, 92)
+  })
+  // 7 (a print of the shop at night: its front, the red lantern lit, the noren; pinned at both top corners; written under: the night it
+  // was taken, not the shop's name (item 399: 聞野 not on everything))
+  note(6, () => {
     g.fillStyle = '#fbfaf6'; g.fillRect(-64, -46, 128, 92)
     const ng = g.createLinearGradient(0, -40, 0, 40); ng.addColorStop(0, '#141a30'); ng.addColorStop(1, '#2a2430')
     g.fillStyle = ng; g.fillRect(-58, -40, 116, 80)
@@ -437,11 +484,8 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     const lg = g.createRadialGradient(-30, 4, 1, -30, 4, 18); lg.addColorStop(0, 'rgba(255,120,60,0.9)'); lg.addColorStop(1, 'rgba(255,120,60,0)')
     g.fillStyle = lg; g.fillRect(-48, -14, 36, 36)
     g.fillStyle = '#e8402a'; g.beginPath(); g.ellipse(-30, 4, 7, 11, 0, 0, Math.PI * 2); g.fill()
-    g.fillStyle = 'rgba(255,240,220,0.9)'; g.font = `700 8px ${BRUSH}`; g.fillText('聞', -30, 4)
-    hand(zh ? '聞野・夜' : '聞野・夜', 34, -32, 10, 40, '#f2ead8')
-    g.restore()
-    pin(x + 316 - 58, y + 214 - 44, '#2aa04a'); pin(x + 316 + 58, y + 214 - 40, '#d23a2a')
-  }
+    hand(zh ? '秋夜' : '秋の夜', 40, -32, 10, 30, '#f2ead8')
+  })
   // (the owner with a famous guest before the noren, signed across in silver pen)
   snapshot(g, WALL_SIGNS.photos[0], (fr) => {
     g.fillStyle = '#e9dcc0'; g.fillRect(fr.x, fr.y, fr.w, fr.h)
@@ -503,36 +547,37 @@ export function paintWallSigns(g: CanvasRenderingContext2D, zh: boolean) {
     g.textAlign = 'left'; g.textBaseline = 'alphabetic'
     g.fillText(zh ? '開店紀念 2024' : '開店記念 2024', fr.x + 6, fr.y + 16)
   })
+  // (the signed pieces, each of its kind)
+  SIGN_PIECES.forEach((c, k) => (c.kind === 'shikishi' ? signShikishi : c.kind === 'polaroid' ? signPolaroid : signCard)(g, WALL_SIGNS.signs[k], c))
 }
 
 /**
- * The visitors' signature cards (item 400, the owner's, 2026-11-20: a photograph of a wall of them, 「先給你看一下，簽名的樣子」; after items
- * 384 and 390, the signatures in marker on the plaster: their names were set in a handwriting typeface (Caveat, the WenKai), neat letters
- * that read as typing, not as anyone's signature, and they were dotted about the wall): six white cards in a grid, each signed as an
- * autograph is, in one run of the pen: a big capital, the rest of the name run together fast into humps and loops, smaller as it goes, a
- * flourish swung back under it or up off its end, the line thinner where the pen ran fast; who it's to small over it, a line or two and
- * the day by it, the name printed small in its corner. The autographs drawn stroke by stroke (no typeface), each from its own name's
- * letters and its own seed; all made up. Only one to the shop by its name (item 399: not 聞野 on everything).
+ * The visitors' signed pieces (item 400, the owner's, 2026-11-20: a photograph of a wall of them, 「先給你看一下，簽名的樣子」; after items 384
+ * and 390, the signatures in marker on the plaster: their names set in a handwriting typeface, neat letters that read as typing): each
+ * signed as an autograph is, in one run of the pen: a big capital, the rest of the name run together fast into humps and loops, smaller as it
+ * goes, a flourish swung back under it or up off its end, the line thinner where the pen ran fast; who it's to small over it, a line or two
+ * and the day by it, the name printed small in its corner. Of three kinds (item 406: six cards alike were too set): a white card, a shikishi
+ * with its gold edge, a polaroid with the guest and the owner in it. The autographs drawn stroke by stroke (no typeface); all made up; one
+ * only to the shop by its name (item 399).
  */
 const HAND = '"LXGW WenKai TC", "Segoe Print", "Comic Sans MS", cursive'
-const PENS = { black: '#1c1c22', blue: '#1f3c9e', red: '#c3282d' }
+const PENS = { black: '#1c1c22', blue: '#1f3c9e', red: '#c3282d', green: '#1d6a3c', purple: '#6a2c8c', orange: '#e0731f', pink: '#d6457a', brown: '#6b3e1e' }
 type Pen = keyof typeof PENS
 type Flourish = 'under' | 'rise' | 'loop'
-/** one card: who it's to, the name it's signed with (its letters shape the autograph), the name printed under it, its line or two, the
- * day, the pen, the autograph's seed, its capital (0: a loop on a tall stem, 1: a big oval, 2: a stroke up, a loop and a leg) and its
- * flourish, and a little drawing after the line */
-type SignCard = { to: string; sign: string; name: string; lines: string[]; date: string; pen: Pen; seed: number; cap: 0 | 1 | 2; end: Flourish
-  doodle?: 'fish' | 'smile' | 'heart' | 'star' }
-export const SIGN_CARDS: SignCard[] = [
-  { to: 'To 老闆', sign: 'Sakura', name: 'さくら', lines: ['炭火の香り、', '最高でした！'], date: '2026.10.5', pen: 'black', seed: 11, cap: 1, end: 'under', doodle: 'fish' },
-  { to: 'To 聞野', sign: 'Xiaoyu', name: '美食家 林小雨', lines: ['好吃到想哭！'], date: '2026.6.12', pen: 'black', seed: 23, cap: 2, end: 'rise' },
-  { to: 'To Chef', sign: 'Kenyui', name: 'Ken & Yui', lines: ['結婚一週年', 'ありがとう！'], date: '2026.11.8', pen: 'red', seed: 37, cap: 2, end: 'loop', doodle: 'heart' },
-  { to: '給老闆', sign: 'Ahsiang', name: '阿翔', lines: ['老闆加油！'], date: '2026.11.15', pen: 'black', seed: 41, cap: 0, end: 'under', doodle: 'star' },
-  { to: '店長さんへ', sign: 'Misaki', name: '大阪より 美咲', lines: ['また来ます！'], date: '2026.10.21', pen: 'blue', seed: 53, cap: 1, end: 'rise', doodle: 'smile' },
-  { to: 'To 大家', sign: 'Kurokawa', name: '料理評論 黒川', lines: ['魚が主役の店'], date: '2025.12.3', pen: 'black', seed: 67, cap: 0, end: 'loop' },
+type Doodle = 'fish' | 'smile' | 'heart' | 'star' | 'arrow' | 'flower' | 'cat' | 'note' | 'sun' | 'onigiri'
+/** one signed piece: its kind, who it's to, the name it's signed with (its letters shape the autograph), the name printed under it, its line
+ * or two, the day, the pen, the autograph's seed, its capital (0: a loop on a tall stem, 1: a big oval, 2: a stroke up, a loop and a leg) and
+ * its flourish, and a little drawing after the line */
+type SignPiece = { kind: 'card' | 'shikishi' | 'polaroid'; to: string; sign: string; name: string; lines: string[]; date: string; pen: Pen; seed: number
+  cap: 0 | 1 | 2; end: Flourish; doodle?: Doodle }
+export const SIGN_PIECES: SignPiece[] = [
+  { kind: 'shikishi', to: '大将へ', sign: 'Kurokawa', name: '料理評論 黒川', lines: ['魚が主役の店'], date: '2025.12.3', pen: 'black', seed: 67, cap: 0, end: 'loop' },
+  { kind: 'card', to: 'To 老闆', sign: 'Sakura', name: 'さくら', lines: ['炭火の香り、', '最高でした！'], date: '2026.10.5', pen: 'black', seed: 11, cap: 1, end: 'under', doodle: 'fish' },
+  { kind: 'card', to: 'To Chef', sign: 'Kenyui', name: 'Ken & Yui', lines: ['結婚一週年', 'ありがとう！'], date: '2026.11.8', pen: 'red', seed: 37, cap: 2, end: 'loop', doodle: 'heart' },
+  { kind: 'polaroid', to: 'To 聞野', sign: 'Xiaoyu', name: '林小雨', lines: ['好吃到想哭！'], date: '2026.6.12', pen: 'blue', seed: 23, cap: 2, end: 'rise' },
+  { kind: 'card', to: '給老闆', sign: 'Ahsiang', name: '阿翔', lines: ['老闆加油！'], date: '2026.11.15', pen: 'black', seed: 41, cap: 0, end: 'under', doodle: 'star' },
+  { kind: 'shikishi', to: '店長さんへ', sign: 'Misaki', name: '大阪より 美咲', lines: ['また来ます！'], date: '2026.10.21', pen: 'blue', seed: 53, cap: 1, end: 'rise', doodle: 'smile' },
 ]
-/** every character the cards' words are written in, for the hand's letters to be asked for */
-export const CARD_CHARS = [...new Set(SIGN_CARDS.flatMap((c) => [c.to, c.name, ...c.lines, c.date]).join(''))].join('')
 /** a point of an autograph in its own frame: x along it, y up it, its capital about a unit tall */
 type P2 = [number, number]
 /** a cubic's points on from the stroke's last one, n of them */
@@ -647,7 +692,7 @@ function signInto(g: CanvasRenderingContext2D, strokes: P2[][], [x, y, w, h]: nu
   }
 }
 /** a little drawing in the pen's line, `s` across, centred on (x, y) */
-function doodle(g: CanvasRenderingContext2D, kind: NonNullable<SignCard['doodle']>, x: number, y: number, s: number) {
+function doodle(g: CanvasRenderingContext2D, kind: Doodle, x: number, y: number, s: number) {
   g.lineWidth = Math.max(0.7, s * 0.08)
   g.beginPath()
   if (kind === 'fish') {
@@ -674,6 +719,55 @@ function doodle(g: CanvasRenderingContext2D, kind: NonNullable<SignCard['doodle'
     g.bezierCurveTo(x - r * 1.35, y + r * 0.05, x - r * 0.75, y - r * 1.0, x, y - r * 0.38)
     g.bezierCurveTo(x + r * 0.75, y - r * 1.0, x + r * 1.35, y + r * 0.05, x, y + r * 0.95)
     g.stroke()
+  } else if (kind === 'arrow') {
+    // (a curving arrow, as one points at their own name)
+    const r = s * 0.5
+    g.moveTo(x - r, y + r * 0.3); g.quadraticCurveTo(x - r * 0.1, y - r * 0.6, x + r * 0.8, y - r * 0.1)
+    g.moveTo(x + r * 0.8, y - r * 0.1); g.lineTo(x + r * 0.42, y - r * 0.36)
+    g.moveTo(x + r * 0.8, y - r * 0.1); g.lineTo(x + r * 0.5, y + r * 0.18)
+    g.stroke()
+  } else if (kind === 'flower') {
+    // (five petals round a middle)
+    const r = s * 0.17
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 - Math.PI / 2, px = x + Math.cos(a) * r * 1.9, py = y + Math.sin(a) * r * 1.9
+      g.moveTo(px + r, py); g.arc(px, py, r, 0, Math.PI * 2)
+    }
+    g.moveTo(x + r * 0.7, y); g.arc(x, y, r * 0.7, 0, Math.PI * 2)
+    g.stroke()
+  } else if (kind === 'cat') {
+    // (a cat's face: round, its ears up, its eyes, its whiskers)
+    const r = s * 0.36
+    g.moveTo(x - r * 0.95, y - r * 0.2); g.lineTo(x - r * 0.72, y - r * 1.15); g.lineTo(x - r * 0.25, y - r * 0.88)
+    g.moveTo(x + r * 0.95, y - r * 0.2); g.lineTo(x + r * 0.72, y - r * 1.15); g.lineTo(x + r * 0.25, y - r * 0.88)
+    g.moveTo(x + r, y); g.ellipse(x, y, r, r * 0.88, 0, 0, Math.PI * 2)
+    for (const sd of [-1, 1]) {
+      g.moveTo(x + sd * r * 0.45, y + r * 0.28); g.lineTo(x + sd * r * 1.4, y + r * 0.14)
+      g.moveTo(x + sd * r * 0.45, y + r * 0.42); g.lineTo(x + sd * r * 1.4, y + r * 0.56)
+    }
+    g.stroke()
+    g.beginPath(); g.arc(x - r * 0.35, y - r * 0.06, s * 0.035, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.arc(x + r * 0.35, y - r * 0.06, s * 0.035, 0, Math.PI * 2); g.fill()
+  } else if (kind === 'note') {
+    // (two notes on a beam)
+    const r = s * 0.42
+    g.moveTo(x - r * 0.5, y + r * 0.5); g.lineTo(x - r * 0.5, y - r * 0.6); g.lineTo(x + r * 0.6, y - r * 0.8); g.lineTo(x + r * 0.6, y + r * 0.3)
+    g.stroke()
+    g.beginPath(); g.ellipse(x - r * 0.72, y + r * 0.55, r * 0.26, r * 0.18, -0.4, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.ellipse(x + r * 0.38, y + r * 0.35, r * 0.26, r * 0.18, -0.4, 0, Math.PI * 2); g.fill()
+  } else if (kind === 'sun') {
+    const r = s * 0.21
+    g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2)
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; g.moveTo(x + Math.cos(a) * r * 1.5, y + Math.sin(a) * r * 1.5); g.lineTo(x + Math.cos(a) * r * 2.2, y + Math.sin(a) * r * 2.2) }
+    g.stroke()
+  } else if (kind === 'onigiri') {
+    // (a rice ball: its rounded triangle, its band of nori)
+    const r = s * 0.45
+    g.moveTo(x, y - r)
+    g.quadraticCurveTo(x + r * 0.2, y - r * 1.02, x + r * 0.95, y + r * 0.55); g.quadraticCurveTo(x + r, y + r * 0.85, x, y + r * 0.85)
+    g.quadraticCurveTo(x - r, y + r * 0.85, x - r * 0.95, y + r * 0.55); g.quadraticCurveTo(x - r * 0.2, y - r * 1.02, x, y - r)
+    g.stroke()
+    g.beginPath(); g.rect(x - r * 0.3, y + r * 0.2, r * 0.6, r * 0.65); g.fill()
   } else {
     const r = s * 0.46
     for (let i = 0; i <= 10; i++) {
@@ -684,7 +778,7 @@ function doodle(g: CanvasRenderingContext2D, kind: NonNullable<SignCard['doodle'
     g.stroke()
   }
 }
-/** words written small in the card's pen (gone over once at their edge, a marker's stroke fuller than a pen's), or printed (`print`) */
+/** words written small in the pen (gone over once at their edge, a marker's stroke fuller than a pen's), or printed (`print`) */
 function words(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, align: CanvasTextAlign, print = false) {
   g.font = `${print ? 400 : 700} ${size}px ${HAND}`
   g.textAlign = align; g.textBaseline = 'alphabetic'
@@ -692,8 +786,26 @@ function words(g: CanvasRenderingContext2D, text: string, x: number, y: number, 
   if (!print) { g.lineWidth = size * 0.04; g.strokeText(text, x, y) }
   return g.measureText(text).width
 }
-/** one signature card: white with a faint sheen, its edge a shade darker; signed */
-function signCard(g: CanvasRenderingContext2D, [x, y, w, h]: number[], c: SignCard) {
+/** what's written on a signed piece within (x, y, w, h): who it's to, small at its top left a little aslant; the autograph big across the
+ * middle, climbing; its line or two at the left under it, the drawing after the last; the day and the name printed small at the right foot */
+function signFace(g: CanvasRenderingContext2D, [x, y, w, h]: number[], c: SignPiece) {
+  const col = PENS[c.pen]
+  g.fillStyle = col; g.strokeStyle = col
+  g.lineCap = 'round'; g.lineJoin = 'round'
+  // (a marker on gloss: barely any bleed)
+  g.shadowColor = col; g.shadowBlur = 0.6
+  g.save(); g.translate(x + w * 0.07, y + h * 0.15); g.rotate(-0.05); words(g, c.to, 0, 0, h * 0.085, 'left'); g.restore()
+  signInto(g, autograph(c.sign, c.seed, c.cap, c.end), [x + w * 0.07, y + h * 0.19, w * 0.86, h * 0.54], 0.1 + (c.seed % 7) * 0.025, h * 0.026)
+  c.lines.forEach((l, i) => {
+    const ly = y + h * (c.lines.length > 1 ? 0.8 + i * 0.095 : 0.85)
+    const lw = words(g, l, x + w * 0.07, ly, h * 0.07, 'left')
+    if (c.doodle && i === c.lines.length - 1) doodle(g, c.doodle, x + w * 0.07 + lw + h * 0.075, ly - h * 0.025, h * 0.1)
+  })
+  words(g, c.date, x + w * 0.93, y + h * 0.8, h * 0.058, 'right')
+  words(g, c.name, x + w * 0.93, y + h * 0.915, h * 0.062, 'right', true)
+}
+/** a signature card: white with a faint sheen, its edge a shade darker; signed */
+function signCard(g: CanvasRenderingContext2D, [x, y, w, h]: number[], c: SignPiece) {
   g.save()
   g.fillStyle = '#f7f6f1'; g.fillRect(x, y, w, h)
   const sh = g.createLinearGradient(x, y, x + w, y + h)
@@ -701,23 +813,127 @@ function signCard(g: CanvasRenderingContext2D, [x, y, w, h]: number[], c: SignCa
   sh.addColorStop(0.44, 'rgba(255,255,255,0.65)'); sh.addColorStop(0.52, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(255,255,255,0)')
   g.fillStyle = sh; g.fillRect(x, y, w, h)
   g.strokeStyle = 'rgba(120,118,110,0.35)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
+  signFace(g, [x, y, w, h], c)
+  g.restore()
+}
+/** a shikishi: its edge gold, flecked; its face cream; signed as a card is, the autograph the bigger for it */
+function signShikishi(g: CanvasRenderingContext2D, [x, y, w, h]: number[], c: SignPiece) {
+  g.save()
+  g.fillStyle = '#c9a24a'; g.fillRect(x, y, w, h)
+  let r = c.seed
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  for (let k = 0; k < 160; k++) { g.fillStyle = `rgba(255,236,170,${0.4 + rnd() * 0.5})`; g.fillRect(x + rnd() * w, y + rnd() * h, 2, 2) }
+  g.fillStyle = '#f6f0e0'; g.fillRect(x + 7, y + 7, w - 14, h - 14)
+  // (a faint mottle in its paper, as a shikishi's has)
+  for (let k = 0; k < 90; k++) { g.fillStyle = `rgba(214,196,160,${0.08 + rnd() * 0.1})`; g.beginPath(); g.arc(x + 10 + rnd() * (w - 20), y + 10 + rnd() * (h - 20), 2 + rnd() * 6, 0, Math.PI * 2); g.fill() }
+  signFace(g, [x + 7, y + 7, w - 14, h - 14], c)
+  g.restore()
+}
+/** a polaroid: its white frame, wider at its foot; a square print of the guest and the owner at the counter by night; signed across the print
+ * in silver, who it's to and the day in the margin in the pen */
+function signPolaroid(g: CanvasRenderingContext2D, [x, y, w, h]: number[], c: SignPiece) {
+  g.save()
+  g.fillStyle = '#f5f3ee'; g.fillRect(x, y, w, h)
+  g.strokeStyle = 'rgba(120,118,110,0.3)'; g.lineWidth = 0.8; g.strokeRect(x + 0.4, y + 0.4, w - 0.8, h - 0.8)
+  const fr = { x: x + 6, y: y + 6, w: w - 12, h: w - 12 }
+  g.save(); g.beginPath(); g.rect(fr.x, fr.y, fr.w, fr.h); g.clip()
+  const bg = g.createLinearGradient(0, fr.y, 0, fr.y + fr.h); bg.addColorStop(0, '#5a3a24'); bg.addColorStop(1, '#2a1a10')
+  g.fillStyle = bg; g.fillRect(fr.x, fr.y, fr.w, fr.h)
+  const lg = g.createRadialGradient(fr.x + fr.w * 0.8, fr.y + fr.h * 0.18, 1, fr.x + fr.w * 0.8, fr.y + fr.h * 0.18, fr.w * 0.5)
+  lg.addColorStop(0, 'rgba(255,200,120,0.85)'); lg.addColorStop(1, 'rgba(255,200,120,0)')
+  g.fillStyle = lg; g.fillRect(fr.x, fr.y, fr.w, fr.h)
+  g.fillStyle = '#7a5232'; g.fillRect(fr.x, fr.y + fr.h * 0.84, fr.w, fr.h * 0.16)
+  drawFolk(g, fr.x + fr.w * 0.32, fr.y + fr.h * 1.02, fr.h * 0.3, { id: 'photo-writer', role: 'server', look: { age: 'young', female: true }, peace: true,
+    dress: { coat: '#c86a7a', collar: '#f4e8e0', neck: '#e8b0b8' } })
+  drawFolk(g, fr.x + fr.w * 0.7, fr.y + fr.h * 1.02, fr.h * 0.3, { id: 'photo-owner', role: 'owner', look: { age: 'middle', female: false } })
+  g.restore()
+  g.strokeStyle = '#eef0f6'; g.fillStyle = '#eef0f6'; g.lineCap = 'round'; g.lineJoin = 'round'
+  signInto(g, autograph(c.sign, c.seed, c.cap, c.end), [fr.x + fr.w * 0.08, fr.y + fr.h * 0.1, fr.w * 0.84, fr.h * 0.42], 0.18, fr.h * 0.03)
   const col = PENS[c.pen]
   g.fillStyle = col; g.strokeStyle = col
-  g.lineCap = 'round'; g.lineJoin = 'round'
-  // (a marker on gloss: barely any bleed)
-  g.shadowColor = col; g.shadowBlur = 0.6
-  // (who it's to, small, at the top left, a little aslant)
-  g.save(); g.translate(x + w * 0.07, y + h * 0.15); g.rotate(-0.05); words(g, c.to, 0, 0, h * 0.085, 'left'); g.restore()
-  // (the autograph, big, climbing across the middle)
-  signInto(g, autograph(c.sign, c.seed, c.cap, c.end), [x + w * 0.07, y + h * 0.19, w * 0.86, h * 0.54], 0.1 + (c.seed % 7) * 0.025, h * 0.026)
-  // (its line or two at the left under it, the drawing after the last)
-  c.lines.forEach((l, i) => {
-    const ly = y + h * (c.lines.length > 1 ? 0.8 + i * 0.095 : 0.85)
-    const lw = words(g, l, x + w * 0.07, ly, h * 0.07, 'left')
-    if (c.doodle && i === c.lines.length - 1) doodle(g, c.doodle, x + w * 0.07 + lw + h * 0.075, ly - h * 0.025, h * 0.1)
-  })
-  // (the day, and the name printed small, at the right foot)
-  words(g, c.date, x + w * 0.93, y + h * 0.8, h * 0.058, 'right')
-  words(g, c.name, x + w * 0.93, y + h * 0.915, h * 0.062, 'right', true)
+  words(g, `${c.to}　${c.lines[0] ?? ''}`, x + w / 2, y + h - 11, 6.8, 'center')
+  words(g, `${c.name}　${c.date}`, x + w / 2, y + h - 3.2, 5, 'center', true)
   g.restore()
+}
+
+/**
+ * The plaster round the pieces written all over by the visitors themselves (item 405, the owner's, 2026-11-20: 「簽名牆要有一些是隨筆簽，
+ * 英日中都有」「各種顏色也會有塗鴉」, after photographs of a theatre's and a shop's signature walls): autographs (autograph, as the pieces')
+ * with a line by them in English, Japanese or Chinese and often the day; big words on their own; drawings; in every colour of marker, each at
+ * its own slant, crowded round the pieces, a little under them, none over the shrine's shelf. A sheet just off the plaster (DiningRoom's
+ * WallSigns), see-through where nothing's written; its picture's left toward the wall's far end. All made up.
+ */
+export const FREEHAND = { back0: 0.28, back1: 1.4, up0: 0.92, up1: 1.98, px: 1150 }
+const FREE_NAMES = ['Haruka', 'Kenji', 'Lily', 'Tom', 'Yuki', 'Wei', 'Minami', 'Chen', 'Marco', 'Aya', 'Jun', 'Sophie', 'Ryo', 'Hana', 'Leo', 'Mei',
+  'Daisuke', 'Ting', 'Nina', 'Kai', 'Emma', 'Shota']
+const FREE_LINES = ['Thanks for the amazing dinner!', 'Best mackerel in town', 'We will be back!', 'Loved it!!', 'So yummy', 'Cheers from Sydney',
+  'Keep it up, Chef!', 'Unforgettable', 'Love this place', 'ごちそうさまでした！', 'また来ます', '最高でした', '美味しかった！', '大将ありがとう',
+  '鯖の塩焼き最高', '東京より', 'また絶対来る！', 'お腹いっぱい', '謝謝招待！', '太好吃了', '下次還要來', '老闆加油', '鹽烤鯖魚一級棒', '台中來的',
+  '烤魚超讚', '吃飽飽', '必點！']
+const FREE_BIG = ['THANK YOU!', 'ごちそうさま', '好吃！', 'LOVE IT', '最高！', '讚啦！']
+const FREE_DOODLES: Doodle[] = ['heart', 'star', 'smile', 'fish', 'arrow', 'flower', 'cat', 'note', 'sun', 'onigiri']
+const FREE_PENS: Pen[] = ['black', 'blue', 'red', 'green', 'purple', 'orange', 'pink', 'brown', 'black', 'blue']
+/** every character the pieces and the plaster are written in, for the hand's letters to be asked for */
+export const CARD_CHARS = [...new Set([...SIGN_PIECES.flatMap((c) => [c.to, c.name, ...c.lines, c.date]), ...FREE_LINES, ...FREE_BIG, '0123456789.'].join(''))].join('')
+export function paintFreehand(g: CanvasRenderingContext2D, w: number, h: number) {
+  const { back0, back1, up0, up1, px } = FREEHAND
+  g.clearRect(0, 0, w, h)
+  let r = 405
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)]
+  // (each name and each line once, in an order of its own: no two the same on the wall)
+  const deal = <T,>(a: T[]) => { const d = [...a]; for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [d[i], d[j]] = [d[j], d[i]] } let k = 0; return () => d[k++ % d.length] }
+  const nextName = deal(FREE_NAMES), nextLine = deal(FREE_LINES)
+  const X = (back: number) => (back1 - back) * px, Y = (up: number) => (up1 - up) * px
+  // (under a piece a little shows; nothing over the shrine's shelf's end (back 1.25 on, from 1.43 up))
+  const under = (b: number, u: number, pad: number) => WALL_PIECES.some((p) => Math.abs(b - p.back) < p.rect[2] / 2000 - pad && Math.abs(u - p.up) < p.rect[3] / 2000 - pad)
+  const placed: { b: number; u: number; r: number }[] = []
+  /** somewhere for a thing `rad` round on the plaster: not deep under a piece, not over the shrine's shelf, not on what's written already (a
+   * little overlap, as walls have) */
+  const spot = (rad: number) => {
+    for (let k = 0; k < 90; k++) {
+      const b = back0 + rad + rnd() * (back1 - back0 - 2 * rad), u = up0 + rad * 0.6 + rnd() * (up1 - up0 - 1.2 * rad)
+      if (under(b, u, -rad * 0.2) || (b > 1.25 - rad * 0.5 && u > 1.43 - rad * 0.5)) continue
+      if (placed.some((q) => Math.hypot(q.b - b, q.u - u) < (q.r + rad) * 0.7)) continue
+      placed.push({ b, u, r: rad })
+      return [X(b), Y(u)] as [number, number]
+    }
+    return null
+  }
+  g.lineCap = 'round'; g.lineJoin = 'round'
+  // (a marker on plaster: its ink a little soft at its edge)
+  const ink = (col: string) => { g.fillStyle = col; g.strokeStyle = col; g.shadowColor = col; g.shadowBlur = 1.2 }
+  // (autographs, a line by each and often the day, now and then a drawing)
+  for (let i = 0; i < 24; i++) {
+    const at = spot(0.07 + rnd() * 0.03)
+    if (!at) continue
+    const aw = (0.11 + rnd() * 0.07) * px, ah = aw * (0.42 + rnd() * 0.12)
+    ink(PENS[pick(FREE_PENS)])
+    g.save(); g.translate(at[0], at[1]); g.rotate((rnd() - 0.5) * 0.55)
+    signInto(g, autograph(nextName(), 100 + i * 7, Math.floor(rnd() * 3) as 0 | 1 | 2, pick(['under', 'rise', 'loop'] as Flourish[])),
+      [-aw / 2, -ah / 2, aw, ah], 0.08 + rnd() * 0.15, ah * 0.045)
+    if (rnd() < 0.85) words(g, nextLine(), -aw / 2 + rnd() * aw * 0.15, ah / 2 + ah * 0.32, ah * (0.2 + rnd() * 0.08), 'left')
+    if (rnd() < 0.5) words(g, `${2025 + Math.floor(rnd() * 2)}.${1 + Math.floor(rnd() * 12)}.${1 + Math.floor(rnd() * 28)}`, aw / 2, ah / 2 + ah * 0.62, ah * 0.17, 'right')
+    if (rnd() < 0.35) doodle(g, pick(FREE_DOODLES), aw / 2 + ah * 0.35, -ah * 0.2, ah * 0.5)
+    g.restore()
+  }
+  // (big words on their own, underlined now and then)
+  for (let i = 0; i < FREE_BIG.length; i++) {
+    const at = spot(0.06)
+    if (!at) continue
+    ink(PENS[pick(FREE_PENS)])
+    g.save(); g.translate(at[0], at[1]); g.rotate((rnd() - 0.5) * 0.5)
+    words(g, FREE_BIG[i], 0, 0, (0.036 + rnd() * 0.016) * px, 'center')
+    if (rnd() < 0.6) { g.lineWidth = 0.003 * px; g.beginPath(); g.moveTo(-0.055 * px, 0.012 * px); g.quadraticCurveTo(0, 0.022 * px, 0.06 * px, 0.008 * px); g.stroke() }
+    g.restore()
+  }
+  // (drawings on their own, in every colour)
+  for (let i = 0; i < 18; i++) {
+    const at = spot(0.025 + rnd() * 0.02)
+    if (!at) continue
+    ink(PENS[pick(FREE_PENS)])
+    g.save(); g.translate(at[0], at[1]); g.rotate((rnd() - 0.5) * 0.6)
+    doodle(g, FREE_DOODLES[i % FREE_DOODLES.length], 0, 0, (0.035 + rnd() * 0.03) * px)
+    g.restore()
+  }
 }
