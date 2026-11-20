@@ -44,7 +44,7 @@ import { sameProps } from '@/scene/sameProps'
 import { steady } from '@/scene/steadyProps'
 import { StaffFigure, StaffWarm, TRAY_AT } from '@/scene/StaffFigure'
 import { commuteOf, delayOf, paceOf } from '@/game/commute'
-import { COMMUTERS, makeTrip, through, tripStep, turnToward, type Trip } from './commuteWalk'
+import { COMMUTERS, makeTrip, tripStep, turnToward, type Trip } from './commuteWalk'
 import { fireCall, fireLow, HOT_AT, roastRate } from '@/game/fireTend'
 import { afterPhase, CHEF_PACE, nextTrip, PREP_S, TAKE_S, TEND_AT, tendOf, type ChefPhase, type Store } from '@/game/chefFlow'
 import { BOARD_SLOTS, RING_AZ, boardRoom, freeRingSlot } from '@/game/fireSlots'
@@ -99,7 +99,7 @@ import { CREW_LOAD, GAZE, SHOP, STAFF_SAY, clockIn, idleTick, paceOfStaff, LATE,
 import { loadOf } from '@/game/crewMood'
 /** (where a customer's looking, worked out) */
 const GAZE_AT = new THREE.Vector3()
-import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
+import { aisleCornerOf, aisleOf, FIGURES, CARRIED, FED, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, SAY_SEATED, BOWLS, RICE_SEATS, SIDE_SALE, FIRE_TEND, SKEWERS, SEAT_MOVE, STAFF_DOOR_HOLD, CUBBY_KICK, seatLabel, CHOPS_UP, GRIPES, gripe, CUBBY_OPEN, meterWater, KITCHEN_ROUTE, askPantry, shutPantry, SUPPLIES, PLACE, sharedAlong, SICK, LIP_H, PLATING, READY_SLOTS, readyAlong, PLATES_OUT, PLATER_OUT, OWNER_GRILL, FETCHER, SEAT_STICKS, SEAT_BONES, WHOLE_FISH, RICE, seatAlong, tipOver, ALONG, handOver, genkanY, ONIGIRI_TRAY, FLOOR_NEAR, staffWayOut, doorOutOf, inKitchen, alongPath, pathLength, drinkFor, type DrinkId, sauceSide, POINTER_HINT, PLATES_SET, SEATS_TAKEN, SERVICE, PANTRY, KITCHEN_FOLK, platingOf, BAR_GATES, gateCut, gateOf, type Gate, TILL, GRILL_BAR_TOP, GRILL_COUNTERS, GRILL_OFFSET, GRILL_SCALE, GRILL_SEATS, SIDE_PULL, FIRE_SHIFT, KITCHEN_DROP, LAY, toGrillScene, CUBBY, CUBBY2, CUBBY_FLOOR_Y, CUBBY_SHELF_Y, COOK_NOTCH, SOUS_NOTCH, nameOver, BAR_BASE_Z, SOY_DISH_AT, seatTurn, type Counter } from './bar'
 import { freshFactor, sickChance } from '@/game/freshness'
 import { warmLater } from '@/scene/Prewarm'
 import { NO_POINTER, zr } from '@/scene/htmlProps'
@@ -1333,7 +1333,8 @@ function CrewWalk({ id, role, at, yaw, way, seat, round, fetcher, children }: { 
         here(dW.clone()), here(dW.clone().addScaledVector(room, -0.6))]
     }
     const w = (toGate ? [...toGate, ...out.slice(1).map(fromBar)] : [from, ...way.slice(1)]).map((v, i) => (i ? floor(v) : v))
-    return [...w, floor(through(w[w.length - 2], w[w.length - 1], 0.55))]
+    // (on out through the sliding door's open way and down its steps (item 410: a step past the door, through its shut middle))
+    return [...w, ...doorOutOf(GRILL_COUNTERS).map((v) => floor(fromBar(v)))]
   }
   /** a step along their walk: where they stand and face, how much of them shows, their stretch and nod; the stair's door slid open
    * for them as they near it; whether it's done */

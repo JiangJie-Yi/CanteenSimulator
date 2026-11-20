@@ -5,6 +5,7 @@ import { useSaid } from '@/ui/speechStore'
 import { getClock, minutesNow } from '@/ui/clockStore'
 import { crewCall, crewThanks, crewWelcome } from './crewTalk'
 import { NO_RAY } from '@/scene/pickable'
+import { heard } from '@/scene/sfx'
 import { nextClean, sweeps, SWEEP_S, WIPE_S as FLOOR_WIPE_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { CALM, calmLeft, canCalm, type CalmKind } from '@/game/calm'
@@ -29,7 +30,8 @@ import { joySound, usePanelSound } from '@/ui/uiSound'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
-import { makeTrip, through, tripStep, turnSmooth, turnToward, type Trip } from './commuteWalk'
+import { DOOR_OPEN_S, DOOR_SHUT_S, doorShown, doorShut, doorStep, doorWanted, type DoorState, type DoorWalker } from '@/game/slideDoor'
+import { makeTrip, tripStep, turnSmooth, turnToward, type Trip } from './commuteWalk'
 import { latheSolid, rimmedTray } from '@/scene/trayGeometry'
 import { StaffWords, TiredBadges } from './StaffWords'
 import { STAFF_IDLE, STAFF_SAY, STAFF_TALK, idleTick, paceOfStaff } from '@/game/shopState'
@@ -93,7 +95,7 @@ import { WARM_TUB_HOLDS, keptWarm } from '@/game/takeout'
 import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soupGoes, soupReady, takeBowl, topUpGoes } from '@/game/soup'
 import { RICE_BEATS, SOUP_BEATS, beatsLength } from '@/game/sides'
 import { SeatBowls, fillRice, fillSoup, ladleRest, leftOf, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
-import { bottleClink, lightSwitchSound, plateClink, plateDownSound, scrubSound, stoolSound, tapTurnSound, washSplash } from './restroomSound'
+import { bottleClink, lightSwitchSound, plateClink, plateDownSound, scrubSound, slideDoorSound, stoolSound, tapTurnSound, washSplash } from './restroomSound'
 import { LAST_CALL, SHOP, clockIn } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
@@ -102,7 +104,7 @@ import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
 import { plateGoes } from '@/game/tray'
-import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, GRATING, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
+import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, GRATING, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, doorAt, doorOutOf, DOOR_LANE, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -581,8 +583,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       // (his status put away while he walks in or home: shown again below once he's at work)
       if ((!c.arrived || SHOP.leaving) && statusEl.current) statusEl.current.style.visibility = 'hidden'
       const wayFrom = (from: THREE.Vector3) => {
-        const w = [from.clone(), homeAisle.clone(), aisleCornerOf(counters, c1), doorOf(counters)]
-        return [...w, through(w[w.length - 2], w[w.length - 1], 0.5)]
+        // (on out through the sliding door's open way and down its steps (item 410: a step past the door, through its shut middle))
+        return [from.clone(), homeAisle.clone(), aisleCornerOf(counters, c1), doorOf(counters), ...doorOutOf(counters)]
       }
       const apply = (tr: Trip) => {
         const pose = tripStep(tr, dt, 1.0, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
@@ -1009,6 +1011,122 @@ function doorLight() {
 }
 
 /**
+ * The sliding door at the way in (item 410, the owner's 「玄關試著做和式拉門」「客人進來的時候會先開拉門再脫鞋」): blender/genkandoor.py's three
+ * leaves of dark wood and frosted glass on the stone sill, in the doorway's own frame (this group's); the middle and the north ones slid south
+ * over the south one when someone wants through (game/slideDoor: one out on the step, one walking out toward it, one just put in at it),
+ * shut once no one does. Whoever's going through is kept to its open way where they're drawn (as the hearth's guard keeps them off the fire,
+ * after every walk's frame and before it's drawn), so none walks through a leaf's edge. The glass seen through a little, from either side;
+ * a wooden rumble as it runs, a knock as it shuts.
+ */
+const DOOR_URL = import.meta.env.BASE_URL + 'models/genkandoor.glb'
+useGLTF.preload(DOOR_URL)
+/** frosted glass: a pale grey-blue, seen through a little (the noren and the night behind it), from either side; no transmission (rule 5) */
+const DOOR_GLASS = new THREE.MeshToonMaterial({ color: '#e4e9ec', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+/** how far each moving leaf runs open (x): the middle one over the south one, the north one over both, stopped short of the red lantern */
+const DOOR_RUN: Record<string, number> = { GenkanDoorM: -0.34, GenkanDoorN: -0.675 }
+/** the open way's sides (x) for the middle of one going through: their half-width (0.28, a head's: 0.56 across) clear of the stacked
+ * leaves' edge (-0.26) and the wall's end (0.43); and how far in and out of the leaves' line they're kept to it, full within its middle (two
+ * come together, stood side by side out on the step (the crowd's stepping aside), go through it one after the other) */
+const DOOR_WAY = { x: [-0.26 + 0.28, 0.43 - 0.28] as const, z: [0.08, 0.78] as const, ease: 0.2 }
+const DOOR_INV = new THREE.Matrix4(), DOOR_P = new THREE.Vector3(), DOOR_W = new THREE.Vector3(), DOOR_SHIFT = new THREE.Vector3(), DOOR_HELD = new THREE.Vector3()
+function GenkanDoorImpl() {
+  const gltf = useGLTF(DOOR_URL) as unknown as { scene: THREE.Group }
+  const ref = useRef<THREE.Group>(null)
+  const scene = useThree((s) => s.scene)
+  const { obj, moving } = useMemo(() => {
+    const r = gltf.scene.clone(true)
+    const wood = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      if (/Glass/.test(src.name)) { m.material = DOOR_GLASS; m.renderOrder = 2 }
+      else {
+        let t = wood.get(src)
+        if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null }); t.name = src.name; wood.set(src, t) }
+        m.material = t
+      }
+      m.castShadow = false
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => m.material === DOOR_GLASS, { width: 0.0015, weld: true })
+    const moving = Object.entries(DOOR_RUN).flatMap(([n, run]) => { const o = r.getObjectByName(n); return o ? [{ o, run, x0: o.position.x }] : [] })
+    return { obj: r, moving }
+  }, [gltf])
+  const st = useRef<DoorState>(doorShut())
+  const wanted = useRef(false)
+  /** the game's own time (its frames' deltas, at the game's pace: x2, paused), for how long each one's been seen */
+  const clock = useRef(0)
+  /** each one about, where they were last (the doorway's frame), when, and since when they've been seen; and each frame's list of them for
+   * game/slideDoor, its entries kept from frame to frame (nothing made each frame: it runs before every frame's drawing) */
+  const seen = useMemo(() => new Map<THREE.Object3D, { z: number; t: number; since: number }>(), [])
+  const walkers = useMemo(() => ({ list: [] as DoorWalker[], pool: [] as DoorWalker[] }), [])
+  useEffect(() => {
+    const was = scene.onBeforeRender
+    scene.onBeforeRender = function (...args) {
+      was.apply(this, args)
+      const g = ref.current
+      if (!g) return
+      g.updateWorldMatrix(true, false)
+      DOOR_INV.copy(g.matrixWorld).invert()
+      const now = clock.current
+      const ws = walkers.list
+      ws.length = 0
+      for (const [o] of FIGURES) {
+        if (!o.parent || !o.visible) continue
+        o.getWorldPosition(DOOR_W)
+        DOOR_P.copy(DOOR_W).applyMatrix4(DOOR_INV)
+        let was1 = seen.get(o)
+        if (!was1) { was1 = { z: DOOR_P.z, t: now, since: now }; seen.set(o, was1) }
+        const dz = now > was1.t ? (DOOR_P.z - was1.z) / (now - was1.t) : 0
+        const age = now - was1.since
+        if (now > was1.t) { was1.z = DOOR_P.z; was1.t = now }
+        const wk = walkers.pool[ws.length] ?? (walkers.pool[ws.length] = { x: 0, z: 0, dz: 0, age: 0 })
+        wk.x = DOOR_P.x; wk.z = DOOR_P.z; wk.dz = dz; wk.age = age
+        ws.push(wk)
+        // (going through: kept to its open way, eased in and out of it either side of the leaves' line; only where they're drawn)
+        const [z0, z1] = DOOR_WAY.z
+        if (DOOR_P.z <= z0 || DOOR_P.z >= z1 || DOOR_P.x < -0.75 || DOOR_P.x > 0.6) continue
+        const w = Math.min(1, (DOOR_P.z - z0) / DOOR_WAY.ease, (z1 - DOOR_P.z) / DOOR_WAY.ease)
+        const to = Math.min(DOOR_WAY.x[1], Math.max(DOOR_WAY.x[0], DOOR_P.x))
+        const nx = DOOR_P.x + (to - DOOR_P.x) * w
+        if (Math.abs(nx - DOOR_P.x) < 1e-4) continue
+        DOOR_P.x = nx
+        DOOR_P.applyMatrix4(g.matrixWorld)
+        DOOR_SHIFT.subVectors(DOOR_P, DOOR_W)
+        o.parent.worldToLocal(DOOR_P)
+        o.position.copy(DOOR_P)
+        o.updateMatrixWorld(true)
+        for (const c of CARRIED.get(o) ?? []) {
+          if (!c.parent || !c.visible) continue
+          c.getWorldPosition(DOOR_HELD).add(DOOR_SHIFT)
+          c.parent.worldToLocal(DOOR_HELD)
+          c.position.copy(DOOR_HELD)
+          c.updateMatrixWorld(true)
+        }
+      }
+      // (those gone: forgotten, so one put in again is new)
+      for (const o of seen.keys()) if (!FIGURES.has(o) || !o.visible) seen.delete(o)
+      wanted.current = doorWanted(ws)
+    }
+    return () => { scene.onBeforeRender = was }
+  }, [scene, seen, walkers])
+  const soundAt = useMemo(() => new THREE.Vector3(), [])
+  useFrame((_, dt0) => {
+    clock.current += Math.min(dt0, 0.1)
+    const was = st.current, now = doorStep(was, wanted.current, Math.min(dt0, 0.1))
+    st.current = now
+    const k = doorShown(now.k, now.opening)
+    for (const m of moving) m.o.position.x = m.x0 + m.run * k
+    // (a rumble as it starts to run either way, its knock home at the end of it shutting)
+    // (the shop's sliding doors' own sound (restroomSound's), as loud as it's near, as long as it runs)
+    if (now.opening !== was.opening && ref.current) slideDoorSound(now.opening, heard(ref.current.localToWorld(soundAt.set(DOOR_LANE.x, 1.0, DOOR_LANE.line))).near, now.opening ? DOOR_OPEN_S : DOOR_SHUT_S)
+  })
+  return <group ref={ref}><primitive object={obj} /></group>
+}
+const GenkanDoor = memo(GenkanDoorImpl)
+
+/**
  * The way in: a noren hanging just past the end of the bar, three panels that sway a little.
  */
 // (drawn again only if the door's place or the shop's mark changes: the bar above it redraws several times a second while the shop's open, and
@@ -1052,13 +1170,16 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       // (pushed the way they're going, the hem swung away from them: quickly as they come, slowly falling back)
       const want = side.current[i] * NOREN_PUSH * near
       swing.current[i] += (want - swing.current[i]) * Math.min(1, dt * (Math.abs(want) > Math.abs(swing.current[i]) ? 9 : 2.5))
-      m.rotation.x = Math.sin(t * 1.3 + i * 0.9) * 0.05 + swing.current[i]
+      // (its hem kept in from the sliding door's leaves, 8 cm out past it (item 410): swung out no more than 0.07)
+      m.rotation.x = Math.max(-0.07, Math.sin(t * 1.3 + i * 0.9) * 0.05 + swing.current[i])
     })
   })
   return (
     <group name="look-door" position={at} rotation-y={yaw}>
       {/* the shop's front over the way in: its eave, the beam and post, the band of the menu's lit boards, the lanterns' bar (item 300) */}
       <Movable id="facade" label="門面"><ShopFront /></Movable>
+      {/* the sliding door in the doorway (item 410) */}
+      <Movable id="genkandoor" label="玄關拉門"><GenkanDoor /></Movable>
       {/* (in edit mode the cats' stand, the shoe cupboard and the like can each be moved: each its own batch inside its own Movable) */}
       <Movable id="doorcats" label="門口招財貓台"><StaticBatch plain>
       {/* just inside, against the wall: a two-tier stand of dark wood, the beckoning cats on it facing those coming in */}
@@ -3021,9 +3142,16 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   /** going out of the door: how long (s) they've been fading */
   fadeT?: number
   /** in the house's slippers (inside, past the genkan's step), or their own shoes */
-  slippers?: boolean }
+  slippers?: boolean
+  /** the height they were last shown at (item 410: eased up and down the sliding door's steps) */
+  shownY?: number }
 /** how long they stand at the genkan's step changing their shoes */
 const SHOES_S = 1.2
+/** (item 410) how long one coming stands on the step at the sliding door while it's slid open (game/slideDoor: it's wanted open DOOR_SEEN_S
+ * after they show out there, and open in DOOR_OPEN_S; a beat more); one going, just in from it as they slide it */
+const DOOR_WAIT_S = 0.9, DOOR_SLIDE_S = 0.35
+/** how fast a customer's height may change (a second, the bar's units): a step's 0.13 in a little over a tenth of a second (item 410) */
+const STEP_Y_RATE = 1.2
 /** (their shoes go into the cupboard now: none left out on the genkan's stones) */
 const NO_SHOES: { at: THREE.Vector3; turn: number; colour: string }[] = []
 /** the money a customer's just paid, over their head: rising a hand's width and fading in 1.6 s, following them */
@@ -3334,7 +3462,9 @@ const TILL_WAIT_MAX = 45
 const TILL_BY_PLATER = 99
 /** where a takeaway waits in the genkan, off the line those paying walk out along (item 203): this far to its side, toward the till, and a
  * second this much further (the genkan's stone reaches 0.6 that way: tests/e2e/_genkan203.mjs) */
-const TAKEOUT_ASIDE = -0.25, TAKEOUT_NEXT = -0.3
+// (item 410: in a little from the sliding door, its leaves on the sill (-0.25 stood one's head in the shut south leaf); a second along the
+// line toward the till rather than out beside the first, where the door is)
+const TAKEOUT_ASIDE = -0.22, TAKEOUT_NEXT = 0.25
 /** those waiting for a stool, at the genkan's step: how long they stop there to step out of their shoes (or into them going), and how far
  * the pair's left on the stone back from where they stepped up, toes out (item 203: the bench is on the room's boards, and they walked up
  * onto them in their shoes) */
@@ -3705,18 +3835,27 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
    * frame: tests/e2e/paths.mjs saw it, and one called off the bench was drawn there for a frame, put in after the walk's frame was done:
    * dayaudit.mjs RUSH=1, 13 of them, from the door to the bench when it was the door) */
   const wayIn = useMemo(() => wayInOf(counters), [counters])
+  /** in from outside (item 410, the owner's 「客人進來的時候會先開拉門再脫鞋」): shown out on the step past the sliding door, where they stand while
+   * it's slid open (game/slideDoor: a moment after they show), then just in through its open way; put before the way in from the door's place
+   * (doorOf), walked back going out. `len` its length (going out, they slide it open just in from it) */
+  const doorLead = useMemo(() => {
+    const pts = given ? [doorAt(counters, DOOR_LANE.x, DOOR_LANE.wait), doorAt(counters, DOOR_LANE.x, DOOR_LANE.in)] : []
+    // (where they're first put: there, at its step's height (item 410: put at the floor's, they dropped onto the step the next frame))
+    const start = pts[0]?.clone().setY(genkanY(counters, pts[0]))
+    return { pts, len: pathLength(pts), start }
+  }, [counters, given])
   const paths = useMemo(() => seats.map((st) => {
-    const path = pathTo(counters, st)
+    const path = [...doorLead.pts.map((v) => v.clone()), ...pathTo(counters, st)]
     return { path, len: pathLength(path) }
-  }), [counters, seats])
+  }), [counters, seats, doorLead])
   // the way out: the same way back, but by the till, where they stop to pay (door first, like the way in)
   const leavePaths = useMemo(() => seats.map((st) => {
     const base = pathTo(counters, st)
     if (!given) return { path: base, len: pathLength(base), payD: 0 }
     const { spot, lane, aisle } = payOf(counters)
-    const path = [base[0], spot, lane, aisle, ...base.slice(1)]
-    return { path, len: pathLength(path), payD: base[0].distanceTo(spot) }
-  }), [counters, seats, given])
+    const path = [...doorLead.pts.map((v) => v.clone()), base[0], spot, lane, aisle, ...base.slice(1)]
+    return { path, len: pathLength(path), payD: pathLength([...doorLead.pts, base[0], spot]) }
+  }), [counters, seats, given, doorLead])
   const plateAt = (n: number) => seats[n].plate.clone().setY(top)
   /** how far along a way in (from the door) the genkan's step up into the room is (found once for each way: it was walked out in a hundred
    * steps for every walker twice a frame) */
@@ -3725,8 +3864,12 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     if (!given) return 0
     const known = stepMemo.get(path)
     if (known !== undefined) return known
-    let at = 0
-    for (let d = 0; d < 2; d += 0.02) if (!inGenkan(counters, alongPath(path, d).p)) { at = d; break }
+    // (from out past the sliding door now (item 410): where it leaves the genkan having come into it)
+    let at = 0, seen = false
+    for (let d = 0; d < 3; d += 0.02) {
+      if (inGenkan(counters, alongPath(path, d).p)) seen = true
+      else if (seen) { at = d; break }
+    }
     stepMemo.set(path, at)
     return at
   }
@@ -3815,7 +3958,8 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     const bench2 = bench.clone().addScaledVector(u, BENCH2_ALONG)
     const benchSpots = Array.from({ length: BENCH_SEATS }, (_, k) => (k < BENCH_EACH ? bench : bench2).clone()
       .addScaledVector(u, ((k % BENCH_EACH) - (BENCH_EACH - 1) / 2) * BENCH_PLACE.pitch))
-    return { door: door.clone(), wait, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()], bench, bench2, benchYaw: BENCH_PLACE.yaw, benchSpots }
+    const next = wait.clone().addScaledVector(spot.clone().sub(door).setY(0).normalize(), TAKEOUT_NEXT)
+    return { door: door.clone(), wait, next, hand, side, out: [aisle.clone(), lane.clone(), spot.clone(), hand.clone()], bench, bench2, benchYaw: BENCH_PLACE.yaw, benchSpots }
   }, [counters, seats, given])
   /** the cashier's chair (its seat's mark, Register's: it may be moved) in the bar's frame: where their hands are, turned round `turn` of the
    * way to the takeaway stand behind them (0: facing the till) */
@@ -5489,7 +5633,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       // the first bench went through the second and those sat on it (item 193, tests/e2e/_clash193.mjs))
       if (s.from && !s.fromWay) {
         const c0 = counters[0], back = s.from.clone().sub(c0.at).dot(c0.lay) + aisleOf(c0)
-        const p = [s.from.clone(), ...(back < -0.02 ? [s.from.clone().addScaledVector(c0.lay, -back)] : []), ...paths[s.seat].path.slice(1)]
+        const p = [s.from.clone(), ...(back < -0.02 ? [s.from.clone().addScaledVector(c0.lay, -back)] : []), ...paths[s.seat].path.slice(1 + doorLead.pts.length)]
         s.fromWay = { path: p, len: pathLength(p) }
       }
       const { path, len } = s.phase === 'enter' && s.fromWay ? s.fromWay : paths[s.seat]
@@ -5497,7 +5641,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         // in through the noren, along the aisle behind the stools (round the corner, for the other counter), and
         // in to their own stool
         // (stopping at the genkan's step a moment, to step out of their shoes and up into slippers)
-        const v = SPEED * walkSpeedOf(kindOf(s.id).kind), raw = s.t * v
+        const v = SPEED * walkSpeedOf(kindOf(s.id).kind), raw0 = s.t * v
+        // (stood out on the step at the sliding door while it's slid open (item 410), then in; one off the bench is in already)
+        const raw = s.from || !doorLead.len ? raw0 : withPause(raw0, 0, DOOR_WAIT_S * v)
         // (behind their stool they stop, pull it out, step up onto it (the owner's), then sit and slide in with it)
         const stand = len - STOOL_STAND
         const d = Math.min(stand, withPause(raw, stepAt(path), SHOES_S * v))
@@ -5786,7 +5932,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         // (getting up: their stool pushed back with them first, then pushed home by them, stood behind it, before they walk off (item 203: it
         // slid home by itself, 0.3 s after they'd gone, their back to it 0.6 off down the aisle))
         const back = STOOL_LEAVE * Math.min(1, s.t / STOOL_PULL_S)
-        const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(raw, payAt, payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v))))
+        // (and last, just in from the sliding door, a moment as they slide it open (item 410))
+        const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(withPause(raw, payAt, payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v),
+          lp.len - doorLead.len, doorLead.len ? DOOR_SLIDE_S * v : 0))))
         const { p, dir } = alongPath(lp.path, lp.len - d)
         const home = Math.max(0, s.t - STOOL_HOME_AT)
         // (pushed home in under the counter, done as they turn to go at 0.8)
@@ -5829,10 +5977,12 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         }
         // (out of the door they fade away, the last stretch, and no quicker than FADE_S: through it, they stand on there till they're gone
         // (let go at its end, a long stride at ×2 left them a third seen, a blink out of sight))
-        if (lp.len - d < 0.9) s.fadeT = (s.fadeT ?? 0) + dt
-        s.fade = Math.max(0, Math.min(1, Math.max((lp.len - d) / 0.9, 1 - (s.fadeT ?? 0) / FADE_S)))
+        // (past the sliding door they fade, down its step (item 410): over the last 0.3, not the last 0.9, which began in front of it)
+        const leaveFade = doorLead.len ? 0.3 : 0.9
+        if (lp.len - d < leaveFade) s.fadeT = (s.fadeT ?? 0) + dt
+        s.fade = Math.max(0, Math.min(1, Math.max((lp.len - d) / leaveFade, 1 - (s.fadeT ?? 0) / FADE_S)))
         // (and if they've somehow not got out in all the time it can take, they're gone all the same)
-        if ((d >= lp.len && s.fade <= 0) || raw > lp.len + (PAY_S + SHOES_S + 8) * v) done.push(s.id)
+        if ((d >= lp.len && s.fade <= 0) || raw > lp.len + (PAY_S + SHOES_S + DOOR_SLIDE_S + 8) * v) done.push(s.id)
       }
       // (their stool where it's been moved to by hand: sat on it there, and stepped up to it and away from it there)
       const mk = SEAT_MARKS.get(s.seat), fr = frame.current
@@ -5871,7 +6021,15 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       }
       // (down a step, standing in the genkan)
       // (sat on a toilet: lowered so the seat they're lifted onto is its seat's height (FolkFigure's SEAT, a stool's))
-      if (g && given) g.position.y = s.wcSit ? WC_SIT_LIFT : genkanY(counters, g.position)
+      // (going up or down the sliding door's steps (item 410) no faster than STEP_Y_RATE: a slow frame at x2 took two steps at once, a drop
+      // of 0.24 in a frame; put in the scene, where they're shown, at once)
+      if (g && given) {
+        // (from the height they were shown at last: their walk puts them back on the floor's each frame)
+        const ty = s.wcSit ? WC_SIT_LIFT : genkanY(counters, g.position)
+        const most = STEP_Y_RATE * Math.min(dt, 0.1), was = s.shownY
+        s.shownY = was === undefined || s.t <= Math.min(dt, 0.1) * 1.5 ? ty : was + Math.max(-most, Math.min(most, ty - was))
+        g.position.y = s.shownY
+      }
     }
     // (the register and the money follow what's being paid: each dish rung up in turn, the total, the note laid on the tray, the drawer out and
     // the note put in it, the change worked out and set on the tray, the drawer shut, the change taken)
@@ -6927,8 +7085,8 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         if (visitors.current.has(o.id) || o.handed) continue
         if (!way || !open) { if (o.ready) { o.taken = true; o.handed = true; o.gone = true } continue }
         const taken = new Set([...visitors.current.values()].filter((v) => v.phase !== 'out').map((v) => v.wait.distanceTo(way.wait) > 0.1 ? 1 : 0))
-        // (a second one beside the first, on the side away from the bench)
-        const wait = way.wait.clone().addScaledVector(way.side, taken.has(0) ? TAKEOUT_NEXT : 0)
+        // (a second one by the first, along toward the till (item 410: beside it, out toward the door, they stood in the sliding door))
+        const wait = (taken.has(0) ? way.next : way.wait).clone()
         visitors.current.set(o.id, { id: o.id, rider: o.rider, order: o, phase: 'in', t: 0, fade: 0, fadeT: 0, pos: way.door.clone(), yaw: 0, wait })
         changed = true
       }
@@ -7205,7 +7363,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         if (!w.in) {
           if (o && performance.now() - SHOP.openedAt < 4000) {
             const way = [home.at.clone(), ...home.way.slice(1).map((v) => v.clone()), ...(home.counter ? [aisleCorner(counters[home.counter])] : []), doorOf(counters)]
-            way.push(through(way[way.length - 2], way[way.length - 1], 0.5))
+            way.push(...doorOutOf(counters))
             w.in = makeTrip(id, 'in', way.reverse(), delayOf(id, SHOP.day + 0.5) * 0.8 + 0.8, paceOf(id))
           } else { w.arrived = true; clockIn(id, minutesNow()) }
         }
@@ -8023,7 +8181,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         if (!w.out) {
           const h = homeOf(wi)
           const way = [w.pos.clone(), ...h.way.slice(1).map((v) => v.clone()), ...(h.counter ? [aisleCorner(counters[h.counter])] : []), doorOf(counters)]
-          way.push(through(way[way.length - 2], way[way.length - 1], 0.5))
+          way.push(...doorOutOf(counters))
           w.out = makeTrip(id, 'out', way, delayOf(id, SHOP.day), paceOf(id))
           SHOP.walking.add(id)
         }
@@ -8929,7 +9087,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         const g = guests.find((x) => x.id === s.id)
         const walking = s.phase !== 'sit'
         return (
-          <group key={s.id} position={s.from ?? wayIn} userData={{ guest: s.id }} ref={(o) => { if (o) { groups.current.set(s.id, o); FIGURES.set(o, 'other') } else groups.current.delete(s.id) }}>
+          <group key={s.id} position={s.from ?? doorLead.start ?? wayIn} userData={{ guest: s.id }} ref={(o) => { if (o) { groups.current.set(s.id, o); FIGURES.set(o, 'other') } else groups.current.delete(s.id) }}>
             {/* (a soft shadow under them, sat or walking) */}
             <BlobShadow r={0.17 * PEOPLE_SCALE} />
             <group scale={PEOPLE_SCALE}>

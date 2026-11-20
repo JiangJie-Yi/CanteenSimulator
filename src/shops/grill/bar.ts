@@ -1226,9 +1226,18 @@ export const GENKAN = { depth: 0.1, along: [0.15, 1.45] as [number, number], lay
 // (pushed up against the step's beam (item 294, the owner's 「貼緊」): along 0.6 to 1.32 before)
 // (and filled out side to side (item 312): lay -1.25 to -0.55 before)
 export const GENKAN_RUG = { along: [0.175, 0.895] as [number, number], lay: [-1.38, -0.445] as [number, number], top: 0.014 }
-/** how high someone stands at a point (the bar's frame): the room's floor, down in the genkan, or up on its rug there */
+/** the stone steps down out of the sliding door (item 410, blender/stonesteps.py's StoneStep1, StoneStep2): how far out past the genkan's
+ * front each reaches (along), its top's height; past them the street's */
+const DOOR_STEPS: readonly (readonly [number, number])[] = [[0.17, -0.228], [0.34, -0.341], [0.9, -0.45]]
+/** how high someone stands at a point (the bar's frame): the room's floor, down in the genkan, or up on its rug there; out of the door, on
+ * its steps (item 410: one going out stood on the air over them) */
 export function genkanY(cs: Counter[], p: THREE.Vector3) {
-  if (!inGenkan(cs, p)) return 0
+  if (!inGenkan(cs, p)) {
+    const c0 = cs[0], d = p.clone().sub(c0.at)
+    const out = d.dot(c0.along) - c0.length / 2 - GENKAN.along[1], l = d.dot(c0.lay)
+    if (out > 0.01 && l > GENKAN.lay[0] - 0.01 && l < GENKAN.lay[1]) for (const [to, y] of DOOR_STEPS) if (out <= to) return y
+    return 0
+  }
   const c0 = cs[0], d = p.clone().sub(c0.at)
   const a = d.dot(c0.along) - c0.length / 2, l = d.dot(c0.lay)
   const on = a > GENKAN_RUG.along[0] && a < GENKAN_RUG.along[1] && l > GENKAN_RUG.lay[0] && l < GENKAN_RUG.lay[1]
@@ -1251,6 +1260,23 @@ export const doorOf = (cs: Counter[]) => cs[0].at.clone().addScaledVector(cs[0].
   .addScaledVector(cs[0].lay, -AISLE)
 /** where the customers come in at the door and go out: the doorway's place, on their line along the first counter's aisle */
 export const wayInOf = (cs: Counter[]) => doorOf(cs).addScaledVector(cs[0].lay, AISLE - aisleOf(cs[0]))
+/**
+ * The sliding door at the way in (item 410, the owner's 「玄關試著做和式拉門」「客人進來的時候會先開拉門再脫鞋」: blender/genkandoor.py, three
+ * leaves on the stone sill, the middle and the north ones sliding south over the south one, game/slideDoor its run): the way through it as
+ * it opens, in the doorway's own frame (GuestBar3D's look-door group, at doorOf: x along the front, + toward the north wall; z out to the
+ * street): its middle (`x`), just in from it (`in`), the leaves' line, where one coming stands while it's slid open for them (`wait`: on the
+ * second step down, their head clear of the shut leaves) and where one going is gone (`far`, past the steps)
+ */
+export const DOOR_LANE = { x: 0.085, in: 0.3, line: 0.39, wait: 0.72, far: 0.95 }
+/** a point in the doorway's own frame (x along the front, z out to the street, as DOOR_LANE's) in the bar's frame: at doorOf, turned as the
+ * look-door group is (its z the first counter's along, ALONG) */
+export function doorAt(cs: Counter[], x: number, z: number, y = 0) {
+  const a = ALONG.clone().normalize()
+  return doorOf(cs).add(new THREE.Vector3(a.z * x + a.x * z, y, -a.x * x + a.z * z))
+}
+/** out of the door from its place inside (doorOf): to its open way just in from it, and straight out through it, down its steps, gone (the
+ * crew home: their walks end at the door; item 410: a step past it, they'd gone through the shut door's middle) */
+export const doorOutOf = (cs: Counter[]) => [doorAt(cs, DOOR_LANE.x, DOOR_LANE.in), doorAt(cs, DOOR_LANE.x, DOOR_LANE.far)]
 
 /**
  * From the door to a stool: along the first counter's aisle, round the corner into another counter's aisle if
