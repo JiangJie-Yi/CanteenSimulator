@@ -9,7 +9,7 @@ import { heard } from '@/scene/sfx'
 import { nextClean, sweeps, SWEEP_S, WIPE_S as FLOOR_WIPE_S } from '@/game/spills'
 import { FigureHit, GRABBING } from '@/scene/FigureHit'
 import { CALM, calmLeft, canCalm, type CalmKind } from '@/game/calm'
-import { glowOff } from '@/scene/hoverGlow'
+import { glowLeave, glowOff, glowOnly } from '@/scene/hoverGlow'
 import { BOX_SHEETS, sheetsFor, takeSheets, TISSUE } from '@/game/tissues'
 import { drinksToOrder, ROLL_LOW, stockerChore, type StockChore } from '@/game/stocker'
 import { bagGoes, bagOut, binToEmpty, toss, type BinKind, type Waste } from '@/game/bins'
@@ -30,7 +30,7 @@ import { joySound, usePanelSound } from '@/ui/uiSound'
 import { guestLabel, kindOf } from '@/data/guests'
 import { FOLK_HEIGHT, FolkFigure, FolkWarm, SEAT as FOLK_SEAT, folkSpec } from '@/scene/FolkFigure'
 import { delayOf, FADE_S, paceOf } from '@/game/commute'
-import { DOOR_OPEN_S, DOOR_SHUT_S, doorShown, doorShut, doorStep, doorWanted, type DoorState, type DoorWalker } from '@/game/slideDoor'
+import { DOOR_OPEN_S, DOOR_SHUT_S, doorClicked, doorShown, doorShut, doorStep, doorWantOpen, type DoorState, type DoorWalker } from '@/game/slideDoor'
 import { makeTrip, tripStep, turnSmooth, turnToward, type Trip } from './commuteWalk'
 import { latheSolid, rimmedTray } from '@/scene/trayGeometry'
 import { StaffWords, TiredBadges } from './StaffWords'
@@ -58,7 +58,7 @@ import { brushText, followSign, signTexture } from '@/scene/signFont'
 import { activityOf, type Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel, inkTogether } from '@/scene/inkHull'
-import { setTip, shownOver } from '@/scene/hoverTip'
+import { aimTip, setTip, shownOver } from '@/scene/hoverTip'
 import { shrineDoor } from './shrineSound'
 import { getLights, setLightSwitch } from '@/scene/lightsStore'
 import { Later } from '@/scene/Later'
@@ -1022,18 +1022,23 @@ const DOOR_URL = import.meta.env.BASE_URL + 'models/genkandoor.glb'
 useGLTF.preload(DOOR_URL)
 /** frosted glass: a pale grey-blue, seen through a little (the noren and the night behind it), from either side; no transmission (rule 5) */
 const DOOR_GLASS = new THREE.MeshToonMaterial({ color: '#e4e9ec', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
-/** how far each moving leaf runs open (x): the middle one over the south one, the north one over both, stopped short of the red lantern */
-const DOOR_RUN: Record<string, number> = { GenkanDoorM: -0.34, GenkanDoorN: -0.675 }
-/** the open way's sides (x) for the middle of one going through: their half-width (0.28, a head's: 0.56 across) clear of the stacked
- * leaves' edge (-0.26) and the wall's end (0.43); and how far in and out of the leaves' line they're kept to it, full within its middle (two
- * come together, stood side by side out on the step (the crowd's stepping aside), go through it one after the other) */
-const DOOR_WAY = { x: [-0.26 + 0.28, 0.43 - 0.28] as const, z: [0.08, 0.78] as const, ease: 0.2 }
+/** how far the moving leaf runs open (x): the north one over the south one, to the post (item 415: two leaves, the owner's 「拉門我要兩節」;
+ * item 410's three ran -0.34 and -0.675) */
+const DOOR_RUN: Record<string, number> = { GenkanDoorN: -0.56 }
+/** the open way's sides (x) for the middle of one going through: the way's 0.56 open (the stacked leaves' edge -0.131 to the wall's end
+ * 0.429), a customer about 0.6 across at the leaves' line (0.3 either side, tests/e2e/_doorwidth415.mjs): kept to its middle, as they were
+ * kept 2 cm off the wall before; and how far in and out of the leaves' line they're kept to it, full within its middle (two come together,
+ * stood side by side out on the step (the crowd's stepping aside), go through it one after the other) */
+const DOOR_WAY = { x: [0.144, 0.154] as const, z: [0.08, 0.78] as const, ease: 0.2 }
+/** what the door's called by the pointer, and what a click does now */
+const DOOR_TIP = '玄關拉門'
+const doorHint = (open: boolean) => (open ? '點一下關上（客人進出時照樣自己開關）' : '點一下拉開，一直開著')
 const DOOR_INV = new THREE.Matrix4(), DOOR_P = new THREE.Vector3(), DOOR_W = new THREE.Vector3(), DOOR_SHIFT = new THREE.Vector3(), DOOR_HELD = new THREE.Vector3()
 function GenkanDoorImpl() {
   const gltf = useGLTF(DOOR_URL) as unknown as { scene: THREE.Group }
   const ref = useRef<THREE.Group>(null)
   const scene = useThree((s) => s.scene)
-  const { obj, moving } = useMemo(() => {
+  const { obj, moving, leaves } = useMemo(() => {
     const r = gltf.scene.clone(true)
     const wood = new Map<THREE.Material, THREE.Material>()
     r.traverse((o) => {
@@ -1043,18 +1048,27 @@ function GenkanDoorImpl() {
       if (/Glass/.test(src.name)) { m.material = DOOR_GLASS; m.renderOrder = 2 }
       else {
         let t = wood.get(src)
-        if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null }); t.name = src.name; wood.set(src, t) }
+        // (the wood its picture; the pulls their own dark bronze, no picture)
+        if (!t) { t = new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color, map: src.map ?? null }); t.name = src.name; wood.set(src, t) }
         m.material = t
       }
       m.castShadow = false
       m.receiveShadow = true
     })
     inkModel(r, (m) => m.material === DOOR_GLASS, { width: 0.0015, weld: true })
+    // (the two leaves together under one group of their own, to light up under the pointer, the frame over them not)
+    const leaves = new THREE.Group()
+    leaves.name = 'GenkanDoorLeaves'
+    const s0 = r.getObjectByName('GenkanDoorS')
+    s0?.parent?.add(leaves)
+    for (const n of ['GenkanDoorS', 'GenkanDoorN']) { const o = r.getObjectByName(n); if (o) leaves.add(o) }
     const moving = Object.entries(DOOR_RUN).flatMap(([n, run]) => { const o = r.getObjectByName(n); return o ? [{ o, run, x0: o.position.x }] : [] })
-    return { obj: r, moving }
+    return { obj: r, moving, leaves }
   }, [gltf])
   const st = useRef<DoorState>(doorShut())
   const wanted = useRef(false)
+  /** held open by the player (clicked open: it stays open till it's clicked again; item 415, the owner's 「我也可以互動」) */
+  const held = useRef(false)
   /** the game's own time (its frames' deltas, at the game's pace: x2, paused), for how long each one's been seen */
   const clock = useRef(0)
   /** each one about, where they were last (the doorway's frame), when, and since when they've been seen; and each frame's list of them for
@@ -1112,7 +1126,7 @@ function GenkanDoorImpl() {
       ws.length = 0
       FIGURES.forEach(pass)
       seen.forEach(forget)
-      wanted.current = doorWanted(ws)
+      wanted.current = doorWantOpen(ws, held.current)
     }
     return () => { scene.onBeforeRender = was }
   }, [scene, seen, walkers])
@@ -1127,7 +1141,28 @@ function GenkanDoorImpl() {
     // (the shop's sliding doors' own sound (restroomSound's), as loud as it's near, as long as it runs)
     if (now.opening !== was.opening && ref.current) slideDoorSound(now.opening, heard(ref.current.localToWorld(soundAt.set(DOOR_LANE.x, 1.0, DOOR_LANE.line))).near, now.opening ? DOOR_OPEN_S : DOOR_SHUT_S)
   })
-  return <group ref={ref}><primitive object={obj} /></group>
+  // (the player's: pointed at, its leaves light up and the pointer's a hand, its tag says what a click does; clicked, it's slid open and kept
+  // open, or let go (doorClicked); in edit mode nothing: the piece is picked as any other)
+  return (
+    <group ref={ref}>
+      <primitive object={obj}
+        onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+          if (getEdit().on) return
+          e.stopPropagation()
+          document.body.style.cursor = 'pointer'
+          glowOnly(leaves)
+          aimTip(e)
+          setTip({ title: DOOR_TIP, hint: doorHint(st.current.opening) })
+        }}
+        onPointerOut={() => { glowLeave(leaves); document.body.style.cursor = ''; setTip(null) }}
+        onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (getEdit().on) return
+          e.stopPropagation()
+          held.current = doorClicked(st.current)
+          setTip({ title: DOOR_TIP, hint: doorHint(held.current) })
+        }} />
+    </group>
+  )
 }
 const GenkanDoor = memo(GenkanDoorImpl)
 
@@ -1246,10 +1281,12 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (the red lantern, its own piece: hung by its own cord) */}
       {/* (the lanterns at the door don't fade when they're in the way, as the room's hangings do: they're outside, and it left them a ghost
           from inside (the owner's)) */}
-      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
+      {/* (the pair 5 cm further from the doorway than they were, for the sliding door's two leaves (item 415): the red one's paper bulged into the
+          doorway, and the leaves had to stop short of it, the way left open narrower than a customer) */}
+      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_OFF, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
       {/* (and the grill's own, cream, 炭火 on it, hung right beside the red one, on its far side from the doorway (the owner's: it hung on the
           doorway's other side)) */}
-      <Movable id="chochin2" label="燒烤燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
+      <Movable id="chochin2" label="燒烤燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_OFF - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
       {/* (and under the eave in the doorway's middle the big one, the shop's name 聞野 on it (item 300)) */}
       <Movable id="chochin-big" label="大紅燈籠"><group position={[0.26, BIG_HANG[0] - 2.25, BIG_HANG[1]]}><Chochin mark={mark} big /></group></Movable>
       {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
@@ -1551,6 +1588,8 @@ const paperColour = (m: THREE.MeshBasicMaterial, k: number, flame: number, tint:
 }
 /** how far apart the two lanterns by the doorway hang, the red and the grill's beside it (middle to middle) */
 const CHOCHIN_PAIR = 0.32  // (0.3: their paper just touched, clips.mjs)
+/** how much further from the doorway the pair hangs than at first (item 415: the sliding door's two leaves reach right to the post) */
+const CHOCHIN_OFF = 0.05
 const chochinGlow = (inner: string, mid: string, outer: string) => {
   if (typeof document === 'undefined') return null
   const c = document.createElement('canvas')

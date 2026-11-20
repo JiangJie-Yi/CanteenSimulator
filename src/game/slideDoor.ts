@@ -8,7 +8,8 @@ export type DoorWalker = { x: number; z: number; dz: number; age: number }
 
 /** where it matters (the doorway's frame): across the way through it (x from..to); the leaves' line; out to the step's end (`out`); in to
  * where one walking out toward it is seen coming (`inside`); just in from it where one put in at the door shows (`near`) */
-export const DOOR_ZONE = { x: [-0.36, 0.5] as [number, number], line: 0.39, out: 1.05, inside: -0.9, near: -0.15 }
+// (the leaves' line between the two leaves' tracks, item 415: the two on the threshold stone, z 0.388 to 0.427)
+export const DOOR_ZONE = { x: [-0.36, 0.5] as [number, number], line: 0.407, out: 1.05, inside: -0.9, near: -0.15 }
 /** how long one just put in at the door counts as come in through it (s); how long one out at it stands there before it's slid open for
  * them (s: shown there, they stand a moment, then it opens; one walking in from out past it has it open at once) */
 export const DOOR_NEW_S = 0.6, DOOR_SEEN_S = 0.3
@@ -24,6 +25,14 @@ export function doorWanted(ws: readonly DoorWalker[]): boolean {
     || (w.dz > 0.05 && w.z > inside && w.z < out)
     || (w.age < DOOR_NEW_S && w.z > near && w.z <= line)))
 }
+
+/** wanted open: held open by the player's hand (clicked open: it stays open whoever's about), or by anyone about it (doorWanted) (item 415,
+ * the owner's 「我也可以互動」) */
+export const doorWantOpen = (ws: readonly DoorWalker[], held: boolean) => held || doorWanted(ws)
+
+/** what a click on it does, as it's seen: shut or shutting, it's taken and slid open, and held open; open (or opening for someone), it's let
+ * go, and shuts once no one wants it (someone in the way, it waits for them: never shut on anyone) */
+export const doorClicked = (st: DoorState): boolean => !st.opening
 
 /** the door's run: `k` how far along it is (0 shut, 1 open), `opening` which way it's going, `idle` how long it's been unwanted (s) */
 export type DoorState = { k: number; opening: boolean; idle: number }

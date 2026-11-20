@@ -1267,7 +1267,8 @@ export const wayInOf = (cs: Counter[]) => doorOf(cs).addScaledVector(cs[0].lay, 
  * street): its middle (`x`), just in from it (`in`), the leaves' line, where one coming stands while it's slid open for them (`wait`: on the
  * second step down, their head clear of the shut leaves) and where one going is gone (`far`, past the steps)
  */
-export const DOOR_LANE = { x: 0.085, in: 0.3, line: 0.39, wait: 0.72, far: 0.95 }
+// (item 415: through the two leaves' open way, x -0.131 to 0.429, its middle; the leaves' line between their tracks)
+export const DOOR_LANE = { x: 0.149, in: 0.3, line: 0.407, wait: 0.72, far: 0.95 }
 /** a point in the doorway's own frame (x along the front, z out to the street, as DOOR_LANE's) in the bar's frame: at doorOf, turned as the
  * look-door group is (its z the first counter's along, ALONG) */
 export function doorAt(cs: Counter[], x: number, z: number, y = 0) {
