@@ -2660,8 +2660,11 @@ const LIP_TILE = 0.3
 /** the lip's pictures drawn at twice their first size (512 x 128 a repeat), their drawing as it was, scaled: a normal map's slopes want
  * the room (item 394) */
 const LIP_PX = 2
-/** the rails across the lattice, their middles down its picture (of 64) */
-const LATTICE_RAILS = [14, 48]
+/** the lattice's picture's height (its width 256 a repeat of LIP_TILE): as tall as the lattice is at the picture's scale (64 for its first
+ * 0.07: item 416 made the lip twice as tall, and a 64 stretched over it drew its rails and cords three times as thick); the rails across it,
+ * their middles down it: two on a low one, three on a tall one (item 416) */
+const LATTICE_H = Math.round((64 * (LIP_H - KOSHI_H - RAIL_H)) / 0.07)
+const LATTICE_RAILS = LATTICE_H > 120 ? [0.2, 0.5, 0.8].map((f) => Math.round(f * LATTICE_H)) : [14, 48]
 /**
  * The lattice's picture and its relief (item 394, the owner's, 2026-11-20: 「毫無立體感，有辦法增加幾何面嗎?在不增加模型面數的情況下」: it was
  * a flat picture on a flat sheet): a normal map worked out for each part as it's shaped, not from a height picture (a half-round's
@@ -2671,7 +2674,7 @@ const LATTICE_RAILS = [14, 48]
  */
 const EDO_LATTICE = (() => {
   if (typeof document === 'undefined') return null
-  const W = 256, H = 64, cell = W / 12
+  const W = 256, H = LATTICE_H, cell = W / 12
   const c = document.createElement('canvas')
   c.width = W * LIP_PX; c.height = H * LIP_PX
   const g = c.getContext('2d')!
@@ -2679,7 +2682,7 @@ const EDO_LATTICE = (() => {
   g.clearRect(0, 0, W, H)
   let seed = 5
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const nodes: number[] = []
+  const nodes: number[][] = []
   // (split bamboo stood side by side, a gap between each: each its own straw green-gold, lighter down its middle, a node at its own height)
   for (let k = 0; k < 12; k++) {
     const x = k * cell + 3, w = cell - 6
@@ -2691,11 +2694,13 @@ const EDO_LATTICE = (() => {
     const at = (f: number, r: number, gg: number, b: number) => gr.addColorStop(f, `rgb(${Math.round(r * tone)},${Math.round(gg * tone)},${Math.round(b * tone)})`)
     at(0, 104, 78, 40); at(0.1, 168, 138, 84); at(0.3, 228, 204, 146); at(0.38, 214, 186, 122); at(0.66, 170, 138, 82); at(0.86, 112, 84, 42); at(1, 136, 106, 60)
     g.fillStyle = gr; g.fillRect(x, 0, w, H)
-    const ny = 10 + rnd() * 44
-    nodes.push(ny)
-    // (the node a low ring round it: lit along its top, its underside dark)
-    g.fillStyle = 'rgba(255,236,190,0.4)'; g.fillRect(x, ny - 0.5, w, 1)
-    g.fillStyle = 'rgba(70,48,22,0.6)'; g.fillRect(x, ny + 0.5, w, 1.6)
+    // (its node, a ring round it lit along its top, its underside dark; two on a tall one, each in its own half (item 416))
+    const own = H > 120 ? [H * (0.08 + rnd() * 0.32), H * (0.58 + rnd() * 0.32)] : [10 + rnd() * 44]
+    nodes.push(own)
+    for (const ny of own) {
+      g.fillStyle = 'rgba(255,236,190,0.4)'; g.fillRect(x, ny - 0.5, w, 1)
+      g.fillStyle = 'rgba(70,48,22,0.6)'; g.fillRect(x, ny + 0.5, w, 1.6)
+    }
   }
   // (the rails' shadows on the culms: a band under each rail, fading down, and a fainter one over it; on the culms only)
   g.globalCompositeOperation = 'source-atop'
@@ -2751,8 +2756,7 @@ const EDO_LATTICE = (() => {
       const x0 = k * cell + 3, w = cell - 6
       if (u >= x0 && u <= x0 + w) {
         nx = ((u - (x0 + w / 2)) / (w / 2)) * 0.85
-        const dn = v - (nodes[k] + 1)
-        if (Math.abs(dn) < 2) ny = -(dn / 2) * 0.5
+        for (const nk of nodes[k]) { const dn = v - (nk + 1); if (Math.abs(dn) < 2) ny = -(dn / 2) * 0.5 }
       }
     }
     const l = Math.hypot(nx, ny)

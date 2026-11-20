@@ -875,8 +875,9 @@ export function payOf(cs: Counter[]) {
   return { spot: at(TILL.along, TILL.lay - TILL.D / 2 - 0.46), lane: at(0.4, TILL.lay - TILL.D / 2 - 0.46), aisle: at(0.4, -aisleOf(c0)) }
 }
 
-/** how tall the raised lip along the counters' cook's side stands over their tops */
-export const LIP_H = 0.15
+/** how tall the raised lip along the counters' cook's side stands over their tops (item 416, the owner's 「客人區與老闆的圍牆架高一些，最少兩倍」:
+ * twice the 0.15 it was, the screen between the customers and the boss at the fire) */
+export const LIP_H = 0.3
 /**
  * The chef's plating place (盛り付け), on the cook table right beside him (the owner's: no pass on the bar any more; the chef plates what's
  * grilled where he stands, sets it down ready (ORDER_READY) on the table's front edge, and a server comes into the kitchen to him for it).
