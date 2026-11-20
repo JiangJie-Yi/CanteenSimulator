@@ -8721,6 +8721,173 @@ function WillowModel() {
   return <group {...WILLOW_SAYS}><primitive object={obj} /></group>
 }
 const WILLOW_SAYS = nameOver('【觀賞盆栽】垂柳', '墨色粗陶盆裡的垂柳，枝條隨意垂下，盆面鋪著青苔')
+/**
+ * The premium liquor's hanging cabinet over the kitchen's far side (item 443, the owner's, 2026-11-21: 「上面新增系統櫃壩台，專門放高級酒」,
+ * the dark space over the kitchen from the left to the drinks fridges, seen from the customers' side): blender/liquorshelf.py, a long built-in
+ * cabinet of dark walnut hung on four rods over the plate racks, the freezer and the sink, three bays and two levels of the shop's better
+ * bottles, a warm LED strip under each level (its own light: no lamp added). The room's open side, where the camera looks in from: hidden,
+ * as a wall is, while the camera's out there behind it (it'd stand between the camera and the kitchen), seen from the room.
+ */
+const LIQUOR_URL = import.meta.env.BASE_URL + 'models/liquorshelf.glb'
+useGLTF.preload(LIQUOR_URL)
+/** where it hangs, in the side wall's frame (x into the room minus, z along that wall): its back's foot's middle, over the plate racks'
+ * backs, the freezer's and the sink's, clear of the side counter's lamps; its foot over the plate racks' tops (1.02), the walls' top 2.3 */
+const LIQUOR_AT = { x: -2.425, y: 1.3, z: -2.66 }
+type LabelStyle = { bg: string; ink: string; edge: string; seal?: string }
+/** the labels' cells, in blender/liquorshelf.py's order (bay by bay: the floor's four isshobin, the shelf's five): each its kind, its name
+ * (made up, not any brewer's), what it is, and its colours */
+const LIQUOR_LABELS: { kind: 'sake' | 'shochu' | 'whisky' | 'umeshu'; name: string; sub: string; st: LabelStyle }[] = (() => {
+  const W: LabelStyle = { bg: '#f3ecdc', ink: '#1b1713', edge: '#8c1c16', seal: '#b3261e' }
+  const K: LabelStyle = { bg: '#141210', ink: '#d9b25a', edge: '#d9b25a' }
+  const B: LabelStyle = { bg: '#203457', ink: '#f2ede2', edge: '#f2ede2', seal: '#b3261e' }
+  const R: LabelStyle = { bg: '#9c241c', ink: '#f6efe2', edge: '#f6efe2' }
+  const S: LabelStyle = { bg: '#e9eef2', ink: '#1d3a6b', edge: '#1d3a6b', seal: '#b3261e' }
+  const D: LabelStyle = { bg: '#3a2414', ink: '#efe2c6', edge: '#c9a44c' }
+  const P: LabelStyle = { bg: '#f4d9d6', ink: '#8c1c2a', edge: '#8c1c2a' }
+  const G: LabelStyle = { bg: '#efe4c8', ink: '#2a1a0e', edge: '#7a5420' }
+  const sake = (name: string, sub: string, st: LabelStyle) => ({ kind: 'sake' as const, name, sub, st })
+  const sho = (name: string) => ({ kind: 'shochu' as const, name, sub: '焼酎', st: D })
+  const wh = (name: string, sub: string) => ({ kind: 'whisky' as const, name, sub, st: G })
+  const ume = () => ({ kind: 'umeshu' as const, name: '梅酒', sub: '', st: P })
+  return [
+    sake('雪月', '大吟醸', W), sake('凪', '純米', K), sake('鶴', '吟醸', W), sake('山廃', '純米', B),
+    sake('月', '吟醸', S), sho('芋'), wh('12', 'SINGLE MALT'), ume(), sake('雪', '純米', S),
+    sake('蔵', '大吟醸', K), sake('龍', '純米', W), sake('古酒', '', K), sake('原酒', '', R),
+    sho('麦'), sake('凪', '吟醸', S), ume(), wh('17', 'PURE MALT'), sho('芋'),
+    sake('雪', '大吟醸', W), sake('鶴', '純米', B), sake('月', '吟醸', K), sake('山廃', '', R),
+    sake('蔵', '吟醸', S), wh('21', 'BLENDED'), sake('龍', '純米', S), sho('麦'), ume(),
+  ]
+})()
+/** the labels' picture: eight cells across, four down, each 128 x 192, every label drawn as a small brewer's would (a washi or a coloured
+ * ground, a fine border, its name brushed big down the middle, what it is small beside it, a red seal), the whiskies' printed across */
+const LIQUOR_LABEL_TEX = (() => {
+  const t = signTexture(1024, 768, (g) => {
+    LIQUOR_LABELS.forEach((l, k) => {
+      const x = (k % 8) * 128, y = Math.floor(k / 8) * 192
+      g.save()
+      g.translate(x, y)
+      g.fillStyle = l.st.bg; g.fillRect(0, 0, 128, 192)
+      g.strokeStyle = l.st.edge; g.lineWidth = 3; g.strokeRect(7, 7, 114, 178)
+      if (l.kind === 'whisky') {
+        g.fillStyle = l.st.ink; g.textAlign = 'center'; g.textBaseline = 'middle'
+        g.font = '700 15px Georgia, "Times New Roman", serif'
+        g.fillText(l.sub, 64, 46)
+        g.font = '700 70px Georgia, "Times New Roman", serif'
+        g.fillText(l.name, 64, 104)
+        g.font = '700 14px Georgia, "Times New Roman", serif'
+        g.fillText('YEARS OLD', 64, 150)
+        g.fillStyle = l.st.edge; g.fillRect(30, 68, 68, 2); g.fillRect(30, 166, 68, 2)
+      } else {
+        // (its name down the middle, a character at a time; what it is small, down its left)
+        const chars = [...l.name], size = chars.length > 1 ? 50 : 76
+        chars.forEach((ch, i) => brushText(g, ch, l.sub ? 72 : 64, 96 + (i - (chars.length - 1) / 2) * (size * 1.02), size, { fill: l.st.ink }))
+        if (l.sub) [...l.sub].forEach((ch, i) => brushText(g, ch, 26, 44 + i * 24, 20, { fill: l.st.ink }))
+        if (l.st.seal) { g.fillStyle = l.st.seal; g.fillRect(96, 152, 18, 18); g.fillStyle = l.st.bg; g.fillRect(100, 156, 10, 10); g.fillStyle = l.st.seal; g.fillRect(102, 158, 6, 6) }
+      }
+      g.restore()
+    })
+  })
+  if (t) { t.flipY = false; t.anisotropy = 4 }
+  return t
+})()
+let liquorMats: Record<string, THREE.Material> | null = null
+const liquorMatOf = (src: THREE.MeshStandardMaterial) => {
+  if (!liquorMats) {
+    const glass = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.1, metalness: 0, envMapIntensity: 1.1 })
+    reflectStudio(glass)
+    liquorMats = {
+      LiquorGlass: glass,
+      LiquorLED: new THREE.MeshBasicMaterial({ color: '#ffe2b4' }),
+      LiquorRod: new THREE.MeshToonMaterial({ color: '#1c1c1f' }),
+      LiquorLabel: new THREE.MeshToonMaterial({ color: '#ffffff', map: LIQUOR_LABEL_TEX }),
+    }
+  }
+  let m = liquorMats[src.name]
+  if (!m) {
+    // (the walnut, and the back washed warm under the strips: its own picture lifting it a little in the dark)
+    m = src.name === 'LiquorBack'
+      ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, emissive: '#ffffff', emissiveMap: src.map ?? null, emissiveIntensity: 0.45 })
+      : new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, normalMap: src.normalMap ?? null })
+    m.name = src.name
+    liquorMats[src.name] = m
+  }
+  return m
+}
+const LIQUOR_N = new THREE.Vector3(), LIQUOR_P = new THREE.Vector3(), LIQUOR_C = new THREE.Vector3()
+function LiquorShelf() {
+  const gltf = useGLTF(LIQUOR_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('LiquorShelf') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      m.material = Array.isArray(m.material) ? m.material.map((x) => liquorMatOf(x as THREE.MeshStandardMaterial)) : liquorMatOf(m.material as THREE.MeshStandardMaterial)
+      m.castShadow = false
+      m.receiveShadow = false
+    })
+    // (an ink line round its boards and rods, not its strips, its back, its glass or its labels)
+    inkModel(r, (m) => !/LiquorWood|LiquorRod/.test((m.material as THREE.Material).name))
+    return mergeByMaterial(r)
+  }, [gltf])
+  const g = useRef<THREE.Group>(null)
+  useFrame(({ camera }) => {
+    const o = g.current
+    if (!o) return
+    // (seen only from the room's side of its open front: behind it, out past the room's open side, it's put away as a wall is)
+    o.getWorldPosition(LIQUOR_P)
+    LIQUOR_N.set(0, 0, 1).transformDirection(o.matrixWorld)
+    o.visible = LIQUOR_C.copy(camera.position).sub(LIQUOR_P).dot(LIQUOR_N) > 0
+  })
+  return <group ref={g} name="look-liquor"><primitive object={obj} /></group>
+}
+/**
+ * The milk crates of cold drinks (item 437, the owner's, 2026-11-21: 「新整另一種籃子風格，裡面也是用來裝冷飲類」, after a pink milk crate):
+ * blender/milkcrate.py, faded magenta moulded plastic, ribs round its top, a hand-hold in each end, its sides a lattice of diamonds (a
+ * picture's holes, not cut), a solid band round its foot, scuffed; bottled tea, a sports drink and cans standing in it. In the stock room
+ * against its back wall behind the doorway, seen through it from the room. The plastic glossy as the beer crates' is (the studio in it, a
+ * little), the lattice cut by its picture's holes (no mipmaps: shrunk, the holes' edges went grey and speckled), the drinks toon-lit.
+ */
+const MILK_URL = import.meta.env.BASE_URL + 'models/milkcrate.glb'
+useGLTF.preload(MILK_URL)
+let milkMats: Record<string, THREE.Material> | null = null
+const milkMatOf = (src: THREE.MeshStandardMaterial) => {
+  if (!milkMats) milkMats = {}
+  let m = milkMats[src.name]
+  if (!m) {
+    if (src.name === 'MilkCrateLattice') {
+      if (src.map) { src.map.generateMipmaps = false; src.map.minFilter = THREE.LinearFilter; src.map.needsUpdate = true }
+      m = new THREE.MeshStandardMaterial({ color: '#ffffff', map: src.map ?? null, normalMap: src.normalMap ?? null, roughness: 0.45, metalness: 0,
+        alphaTest: 0.5, side: THREE.DoubleSide, envMapIntensity: 0.35 })
+      reflectStudio(m as THREE.MeshStandardMaterial)
+    } else if (src.name === 'MilkCratePlastic') {
+      m = new THREE.MeshStandardMaterial({ color: '#ffffff', map: src.map ?? null, normalMap: src.normalMap ?? null, roughness: 0.45, metalness: 0, envMapIntensity: 0.35 })
+      reflectStudio(m as THREE.MeshStandardMaterial)
+    } else m = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null })
+    m.name = src.name
+    milkMats[src.name] = m
+  }
+  return m
+}
+/** a milk crate as made (its foot's middle at its origin, its front +z, 0.37 x 0.25 x 0.30 at its lip): one copy, its parts shared */
+function MilkCrate() {
+  const gltf = useGLTF(MILK_URL) as unknown as { scene: THREE.Group }
+  const obj = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('MilkCrateRoot') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      m.material = milkMatOf(m.material as THREE.MeshStandardMaterial)
+      m.castShadow = true
+      m.receiveShadow = true
+    })
+    // (an ink line round its plastic, not its lattice (the whole panel would be outlined) or its drinks)
+    inkModel(r, (m) => !/MilkCratePlastic/.test((m.material as THREE.Material).name))
+    return r
+  }, [gltf])
+  return <primitive object={obj} />
+}
 /** plastic crates of bottles (P箱), stacked by the fridges, where the stock's seen to (blender/bottlecrate.py: the owner's, their hand-holds
  * cut through and plastic to look at; they were boxes with a black slot painted on) */
 const CRATE_URL = import.meta.env.BASE_URL + 'models/bottlecrate.glb'
@@ -9528,6 +9695,17 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   // fridge, the cartons behind the far one, the milk crates behind the doorway, seen through it (item 437); each against the back wall)
   const st = useMemo(() => storeOf(counters), [counters])
   const crateAt = useMemo(() => (fr && st ? st.at(fr[0].z - 0.21, STORE.deep - 0.16) : new THREE.Vector3()), [fr, st])
+  // (the premium liquor's cabinet (item 443): its place in the side wall's frame (LIQUOR_AT) in the room's, its open front to the room)
+  const c1Liquor = useMemo(() => {
+    const c1 = counters[1]
+    if (!c1) return null
+    const p = c1.at.clone().addScaledVector(c1.along, LIQUOR_AT.z).addScaledVector(c1.lay, farOf(c1) - LIQUOR_AT.x)
+    p.y += LIQUOR_AT.y
+    return { p, yaw: Math.atan2(c1.along.x, c1.along.z) }
+  }, [counters])
+  // (the milk crates of cold drinks (item 437): behind the doorway against the back wall, two stacked by the room's end, one beside them,
+  // seen through the doorway; clear of the room's end (2.5 cm) and of the cartons (1.7 cm), their backs a centimetre off the wall)
+  const milkAt = useMemo(() => (st ? [st.at(st.mid - 0.133, STORE.deep - 0.16), st.at(st.mid + 0.217, STORE.deep - 0.16)] : null), [st])
   // (the cartons' stack 0.44 deep: its back a centimetre off the back wall, not in its face)
   const cartonAt = useMemo(() => (fr && st ? st.at(fr[fr.length - 1].z, STORE.deep - 0.23) : new THREE.Vector3()), [fr, st])
   return (
@@ -9561,11 +9739,21 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
         {/* (only to look at (the owner's): named when pointed at, the cursor left an arrow, a click does nothing) */}
         <group position={cornerAt} rotation-y={0.4}><BambooHit {...BAMBOO_SAYS} /></group>
       </Movable>
+      {/* (the premium liquor's cabinet, hung over the kitchen's far side (item 443)) */}
+      {c1Liquor && <Movable id="liquorshelf" label="高級酒吊櫃"><group position={c1Liquor.p} rotation-y={c1Liquor.yaw}><Suspense fallback={null}><LiquorShelf /></Suspense></group></Movable>}
       {/* (the crates of red bottles and the cartons of cans, in the stock room behind the side wall now, along its back wall (item 430)) */}
       {fr && <Movable id="crates" label="酒箱"><group><StaticBatch plain>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <CrateBoxes />
         </group>
+        {/* (the milk crates of cold drinks behind the doorway (item 437): standing still, in the batch with the beer crates) */}
+        {milkAt && <>
+          <group name="look-milkcrates" position={milkAt[0]} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
+            <MilkCrate />
+            <group position={[0.004, 0.25, -0.003]} rotation-y={0.035}><MilkCrate /></group>
+          </group>
+          <group position={milkAt[1]} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z) - 0.05}><MilkCrate /></group>
+        </>}
       </StaticBatch>
         {/* (the bottles in the crates, out of the batch, as many as the back stock has; and beside them the cartons of canned drinks, as many as
             the back has cans for, laid out again as that changes (item 199): out of the batch too, which merges only what's there as it's
@@ -9574,6 +9762,7 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
           <CrateBottles />
         </group>
         <group name="look-crates" position={cartonAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z) + 0.02}><DrinkCartons /></group>
+
       </group>
         {/* (the back stock's pointed at by the stock room's doorway now: what's running low, a click opens the drinks' stock) */}
       </Movable>}

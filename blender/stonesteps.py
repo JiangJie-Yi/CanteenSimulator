@@ -566,7 +566,13 @@ def cushion(bm, L, p0, p1, nf, nw, r, tone):
 
 
 def tint_of():
-    return TINTS[int(RS.integers(0, len(TINTS) - 1))] if RS.random() > 0.2 else TINTS[-1]
+    """a stone's tint: one of the floor's paler four only, a shade each way (the genkan's floor inside is seen untinted: its points' colours
+    never reached the game (item 443's find); the steps kept close to it, their stones a little varied, the dark slates left out)"""
+    return STEP_TINTS[int(RS.integers(0, len(STEP_TINTS)))]
+
+
+# (the pale four, as the points' colours take them (written as they're seen, the exporter making them linear): a hair warmer or cooler)
+STEP_TINTS = [(1.0, 1.0, 1.0), (1.0, 0.97, 0.92), (0.93, 0.95, 0.98), (0.96, 0.95, 0.94)]
 
 
 def build_step(name):

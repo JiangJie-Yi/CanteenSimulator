@@ -455,6 +455,24 @@ def export_dish(root, parts, glb_path, blend_path, preview=None, ladder=True):
         n = sum(ladder_ngons(o) for o in parts if getattr(o, "type", None) == "MESH")
         if n:
             print("LADDERED_NGONS", n)
+    # (a part's own colours in its points (a bmesh's "Col" layer) made its mesh's active and default colour, so they go out as COLOR_0, the
+    # set the game reads: left as they were, the exporter wrote a white COLOR_0 of its own and the colours as COLOR_1, which nothing reads
+    # (item 443: the stone steps' tints and moss, the liquor's glass, all white))
+    for o in parts:
+        me = getattr(o, "data", None) if getattr(o, "type", None) == "MESH" else None
+        if me is None or not len(me.color_attributes):
+            continue
+        name = "Col" if "Col" in me.color_attributes else me.color_attributes[0].name
+        try:
+            me.color_attributes.active_color = me.color_attributes[name]
+            me.color_attributes.render_color_index = list(me.color_attributes).index(me.color_attributes[name])
+        except (AttributeError, TypeError):
+            pass
+        try:
+            me.attributes.active_color_name = name
+            me.attributes.default_color_name = name
+        except (AttributeError, TypeError):
+            pass
     scene = bpy.context.scene
     if preview:
         for engine in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):
