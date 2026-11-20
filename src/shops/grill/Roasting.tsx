@@ -2982,79 +2982,191 @@ function lipSheet(len: number, h: number) {
  * and that end of the top too: the staff's way between the kitchen and the floor, shut by a little swing door (BarGate).
  */
 /**
- * Each place's number (the owner's: the bar's places numbered; round, and fixed on the wooden screen behind the place): a disc of black
- * lacquer on the screen's face toward the customer, half way up it, its number in gold inside a gold ring. A place with no screen behind it
- * has it standing on a little foot instead, its number on both faces. One picture for all the places, a cell each (the disc's round edge
- * its cut-out: a square of two triangles, no fan of them round a middle), its rim a short tube; batched with the bar.
+ * Each place's number (the owner's: the bar's places numbered, fixed on the wooden screen behind the place), made over as a grilled fish's
+ * (item 445, the owner's 「號碼牌要有設計感，感覺得出是烤魚店」: a black lacquer disc, gold number and ring): a little board cut as a fish, its head
+ * to the left as a grilled fish is served (頭は左), on a bamboo skewer (串) through it from nose to tail as a salt-grilled fish is; charred
+ * cedar (焼杉), near black as the disc's lacquer was (in a grilled fish's own gold-brown it was lost on the bamboo behind it), the fish drawn
+ * on it in fine gold (its scales, gill, fins, eye; a gold line round its edge), a few grains of salt on its tail; the place's number large on
+ * its belly in cream. Its outline the shape's own (no fan: its faces cut by earcut), its edge dark; on the screen's face toward the
+ * customer half way up it. A place with no screen behind it has two back to back on
+ * a little foot, each its fish head-left and its number the right way round from its own side. One picture for all the places, a cell each.
  */
-const SEAT_TAG = { r: 0.032, d: 0.008, foot: 0.012 }
-/** the screen's (the raised lip's) face toward the customer, across the counter, and how far in from its ends a disc keeps */
+const SEAT_TAG = { L: 0.122, H: 0.061, d: 0.006, foot: 0.012 }
+/** the screen's (the raised lip's) face toward the customer, across the counter, and how far in from its ends a board keeps */
 const LIP_FACE = 0.28 - 0.03
+/** the fish's outline across its picture's cell (ox: -0.5 its nose, 0.5 its tail's end; oy up), its head to the left */
+const FISH_TAG_OUTLINE: [number, number][] = [
+  [-0.5, 0.02], [-0.46, 0.13], [-0.36, 0.25], [-0.2, 0.33], [0.0, 0.35], [0.16, 0.29], [0.27, 0.17], [0.33, 0.08],
+  [0.41, 0.22], [0.49, 0.36], [0.45, 0.02], [0.49, -0.34], [0.41, -0.2], [0.33, -0.07],
+  [0.24, -0.18], [0.1, -0.27], [-0.08, -0.31], [-0.26, -0.27], [-0.4, -0.17], [-0.48, -0.07],
+]
 const SEAT_TAG_TEX = (() => {
   if (typeof document === 'undefined') return null
-  const n = GRILL_SEATS.length, c = 128
+  const n = GRILL_SEATS.length, cw = 256, ch = 128
   const cv = document.createElement('canvas')
-  cv.width = c * n; cv.height = c
+  cv.width = cw * n; cv.height = ch
   const g = cv.getContext('2d')
   if (!g) return null
+  let seed = 445
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
   for (let k = 0; k < n; k++) {
-    const cx = k * c + c / 2, cy = c / 2, R = c / 2 - 1
-    const gr = g.createLinearGradient(cx - R, cy - R, cx + R, cy + R)
-    gr.addColorStop(0, '#2c2523'); gr.addColorStop(0.5, '#161213'); gr.addColorStop(1, '#0d0b0b')
-    g.fillStyle = gr
-    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill()
-    g.strokeStyle = '#c9a24e'
+    const x0 = k * cw
+    const X = (ox: number) => x0 + (0.5 + ox) * cw, Y = (oy: number) => (0.5 - oy) * ch
+    const outline = () => { g.beginPath(); FISH_TAG_OUTLINE.forEach(([ox, oy], i) => (i ? g.lineTo(X(ox), Y(oy)) : g.moveTo(X(ox), Y(oy)))); g.closePath() }
+    g.save()
+    outline()
+    g.clip()
+    // (charred cedar (焼杉), as the old disc's black lacquer stood out on the bamboo: near black, its grain along the fish in finer dark lines,
+    // a little warmth in it where the char's thinnest)
+    const wood = g.createLinearGradient(0, Y(0.35), 0, Y(-0.31))
+    wood.addColorStop(0, '#120b07'); wood.addColorStop(0.5, '#24160d'); wood.addColorStop(1, '#2e1d11')
+    g.fillStyle = wood
+    g.fillRect(x0, 0, cw, ch)
+    for (let i = 0; i < 26; i++) {
+      const yy = rnd() * ch
+      g.strokeStyle = `rgba(${rnd() > 0.5 ? '70,42,22' : '8,5,3'},${0.35 + rnd() * 0.3})`
+      g.lineWidth = 0.8 + rnd() * 1.4
+      g.beginPath(); g.moveTo(x0, yy); g.bezierCurveTo(x0 + cw * 0.3, yy + (rnd() - 0.5) * 8, x0 + cw * 0.7, yy + (rnd() - 0.5) * 8, x0 + cw, yy + (rnd() - 0.5) * 6); g.stroke()
+    }
+    // (the fish drawn on it in fine gold: its scales in rows of little arcs, its gill, its fins' rays, its tail's)
+    const GOLD = '#d4ab55'
+    g.strokeStyle = 'rgba(212,171,85,0.55)'
+    g.lineWidth = 1.3
+    for (let row = -2; row <= 2; row++) {
+      for (let c = 0; c < 6; c++) {
+        const cx = X(-0.12 + c * 0.075 + (row % 2 ? 0.037 : 0)), cy = Y(row * 0.085)
+        g.beginPath(); g.arc(cx, cy, 7, Math.PI * 0.55, Math.PI * 1.45); g.stroke()
+      }
+    }
+    g.strokeStyle = GOLD
+    g.lineWidth = 2.4
+    g.beginPath(); g.moveTo(X(-0.27), Y(0.27)); g.quadraticCurveTo(X(-0.19), Y(0.0), X(-0.27), Y(-0.25)); g.stroke()
+    g.lineWidth = 1.5
+    for (let rr = 0; rr < 5; rr++) {
+      g.beginPath(); g.moveTo(X(0.36), Y(0.07 - rr * 0.035)); g.lineTo(X(0.47), Y(0.31 - rr * 0.155)); g.stroke()
+    }
+    for (let rr = 0; rr < 4; rr++) {
+      g.beginPath(); g.moveTo(X(-0.12 + rr * 0.07), Y(0.31)); g.lineTo(X(-0.06 + rr * 0.07), Y(0.355)); g.stroke()
+    }
+    // (its eye: a gold ring, its pupil dark, a glint)
+    g.fillStyle = GOLD; g.beginPath(); g.arc(X(-0.37), Y(0.09), 8, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#120b07'; g.beginPath(); g.arc(X(-0.372), Y(0.09), 5, 0, Math.PI * 2); g.fill()
+    g.fillStyle = 'rgba(255,240,200,0.9)'; g.beginPath(); g.arc(X(-0.382), Y(0.104), 1.5, 0, Math.PI * 2); g.fill()
+    // (a few grains of salt caught on it, as on a salt-grilled fish: its fins and tail)
+    for (let i = 0; i < 40; i++) {
+      const ox = 0.3 + rnd() * 0.2, oy = (rnd() - 0.5) * 0.6
+      g.fillStyle = `rgba(255,250,235,${0.5 + rnd() * 0.4})`
+      g.beginPath(); g.arc(X(ox), Y(oy), 0.6 + rnd() * 1.0, 0, Math.PI * 2); g.fill()
+    }
+    g.restore()
+    // (a gold line round it, just in from its edge)
+    outline()
+    g.strokeStyle = GOLD
     g.lineWidth = 3
-    g.beginPath(); g.arc(cx, cy, R - 9, 0, Math.PI * 2); g.stroke()
-    g.lineWidth = 1
-    g.beginPath(); g.arc(cx, cy, R - 15, 0, Math.PI * 2); g.stroke()
-    g.font = 'bold 66px Georgia, "Times New Roman", serif'
+    g.stroke()
+    // (the number on its belly: cream, outlined dark, large)
+    const label = String(seatLabel(k))
+    g.font = `900 ${label.length > 1 ? 60 : 68}px Georgia, "Times New Roman", serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
-    g.fillStyle = 'rgba(0,0,0,0.6)'
-    g.fillText(String(seatLabel(k)), cx + 2, cy + 6)
-    g.fillStyle = '#e6c26e'
-    g.fillText(String(seatLabel(k)), cx, cy + 4)
+    g.lineJoin = 'round'
+    g.lineWidth = 7
+    g.strokeStyle = '#120b07'
+    g.strokeText(label, X(0.04), Y(-0.02))
+    g.fillStyle = '#f6e7c4'
+    g.fillText(label, X(0.04), Y(-0.02))
   }
   const t = new THREE.CanvasTexture(cv)
   t.colorSpace = THREE.SRGBColorSpace
   t.anisotropy = 4
   return t
 })()
-/** a disc's face, its picture the k-th cell (cut round by the picture's clear corners) */
-const seatTagFace = (k: number) => {
-  const g = new THREE.PlaneGeometry(2 * SEAT_TAG.r, 2 * SEAT_TAG.r)
-  const uv = g.attributes.uv as THREE.BufferAttribute
-  const n = GRILL_SEATS.length
-  for (let i = 0; i < uv.count; i++) uv.setX(i, (k + uv.getX(i)) / n)
-  return g
+/** a fish board for the k-th place, `d` thick: its face toward -z (its picture's cell on it, its head to the viewer's left, its number the
+ * right way round) and its back and edge plain, two geometries; `facing` +1 turns it to face +z instead (a standing one's kitchen side) */
+function fishTagGeometry(k: number, d: number, facing: 1 | -1) {
+  const n = GRILL_SEATS.length, { L, H } = SEAT_TAG
+  // (viewed from -z its left is +x: the head (ox -0.5) at +x; viewed from +z, at -x)
+  const pts = FISH_TAG_OUTLINE.map(([ox, oy]) => new THREE.Vector2(facing * ox * L, oy * H))
+  const shape = new THREE.Shape(pts)
+  const face = new THREE.ShapeGeometry(shape, 1)
+  const back = new THREE.ShapeGeometry(shape, 1)
+  // (the face: at the side it faces, wound to face it; its picture's cell by ox: the head at the cell's left)
+  const fz = facing < 0 ? -d / 2 : d / 2
+  face.translate(0, 0, fz)
+  const fuv = face.attributes.uv as THREE.BufferAttribute, fpos = face.attributes.position as THREE.BufferAttribute
+  for (let i = 0; i < fuv.count; i++) {
+    const ox = facing * fpos.getX(i) / L, oy = fpos.getY(i) / H
+    fuv.setXY(i, (k + 0.5 + ox) / n, 0.5 + oy)
+  }
+  back.translate(0, 0, -fz)
+  // (ShapeGeometry faces +z: the side toward -z turned by flipping its winding)
+  const flip = (g: THREE.BufferGeometry) => {
+    const ix = g.index!
+    for (let i = 0; i < ix.count; i += 3) { const a = ix.getX(i + 1); ix.setX(i + 1, ix.getX(i + 2)); ix.setX(i + 2, a) }
+    const nm = g.attributes.normal as THREE.BufferAttribute
+    for (let i = 0; i < nm.count; i++) nm.setZ(i, -nm.getZ(i))
+  }
+  if (facing < 0) flip(face); else flip(back)
+  // (its edge: a quad between each two points, round)
+  const side: number[] = []
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length]
+    side.push(a.x, a.y, -d / 2, b.x, b.y, -d / 2, b.x, b.y, d / 2, a.x, a.y, -d / 2, b.x, b.y, d / 2, a.x, a.y, d / 2)
+  }
+  const edge = new THREE.BufferGeometry()
+  edge.setAttribute('position', new THREE.Float32BufferAttribute(side, 3))
+  edge.setAttribute('uv', new THREE.Float32BufferAttribute(new Array((side.length / 3) * 2).fill(0), 2))
+  edge.computeVertexNormals()
+  // (its winding outward whichever way round the outline runs)
+  const area = pts.reduce((s, p, i) => s + p.x * pts[(i + 1) % pts.length].y - pts[(i + 1) % pts.length].x * p.y, 0)
+  if (area < 0) {
+    const pa = edge.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < pa.count; i += 3) {
+      const x = pa.getX(i + 1), y = pa.getY(i + 1), z = pa.getZ(i + 1)
+      pa.setXYZ(i + 1, pa.getX(i + 2), pa.getY(i + 2), pa.getZ(i + 2)); pa.setXYZ(i + 2, x, y, z)
+    }
+    edge.computeVertexNormals()
+  }
+  // (two meshes, not one with two groups: the bar's batch folds meshes together by material)
+  const front = face.toNonIndexed(), b2 = back.toNonIndexed()
+  const plain = mergeGeometries([b2, edge])!
+  face.dispose(); back.dispose(); edge.dispose(); b2.dispose()
+  return { face: front, plain }
 }
-const SEAT_TAG_FACES = GRILL_SEATS.map((_, k) => seatTagFace(k))
-/** the disc's rim: a short open tube, its axis across the counter */
-const SEAT_TAG_RIM = new THREE.CylinderGeometry(SEAT_TAG.r * 0.985, SEAT_TAG.r * 0.985, SEAT_TAG.d, 20, 1, true).rotateX(Math.PI / 2)
-const SEAT_TAG_FACE_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ map: SEAT_TAG_TEX, alphaTest: 0.5, emissive: '#ffffff', emissiveMap: SEAT_TAG_TEX, emissiveIntensity: 0.18 })
-const SEAT_TAG_RIM_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#151112' })
+const SEAT_TAG_GEOS = GRILL_SEATS.map((_, k) => fishTagGeometry(k, SEAT_TAG.d, -1))
+/** the standing ones' halves: each its own face, back to back */
+const SEAT_TAG_GEOS_HALF = GRILL_SEATS.map((_, k) => [fishTagGeometry(k, SEAT_TAG.d / 2, -1), fishTagGeometry(k, SEAT_TAG.d / 2, 1)] as const)
+/** the skewer through it, nose to tail, out a little past each: a split of bamboo, six sides */
+const SEAT_TAG_SKEWER = new THREE.CylinderGeometry(0.0016, 0.0016, SEAT_TAG.L + 0.04, 6).rotateZ(Math.PI / 2)
+const SEAT_TAG_FACE_MAT = typeof document === 'undefined' ? null
+  : new THREE.MeshToonMaterial({ map: SEAT_TAG_TEX, emissive: '#ffffff', emissiveMap: SEAT_TAG_TEX, emissiveIntensity: 0.18 })
+const SEAT_TAG_EDGE_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#1a100a' })
+const SEAT_TAG_SKEWER_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#d2b27a' })
 /** the place's number: on the screen's face behind it (`onLip`), or standing on a foot there's no screen */
 function SeatTag({ k, onLip }: { k: number; onLip: boolean }) {
   if (onLip) {
     const y = LIP_H / 2
     return (
       <group position={[0, y, LIP_FACE - SEAT_TAG.d / 2 - 0.001]}>
-        <mesh geometry={SEAT_TAG_RIM} material={SEAT_TAG_RIM_MAT!} />
-        {/* (its face toward the customer, -z) */}
-        <mesh geometry={SEAT_TAG_FACES[k]} material={SEAT_TAG_FACE_MAT!} position-z={-SEAT_TAG.d / 2 - 0.0006} rotation-y={Math.PI} />
+        <mesh geometry={SEAT_TAG_GEOS[k].face} material={SEAT_TAG_FACE_MAT!} />
+        <mesh geometry={SEAT_TAG_GEOS[k].plain} material={SEAT_TAG_EDGE_MAT!} />
+        <mesh geometry={SEAT_TAG_SKEWER} material={SEAT_TAG_SKEWER_MAT!} position-y={-0.003} />
       </group>
     )
   }
-  const y = SEAT_TAG.foot + SEAT_TAG.r
+  const y = SEAT_TAG.foot + SEAT_TAG.H / 2 + 0.004
   return (
     <group position={[0, 0, LIP_FACE - 0.035]}>
-      <mesh position={[0, SEAT_TAG.foot / 2, 0]}><boxGeometry args={[2 * SEAT_TAG.r * 0.8, SEAT_TAG.foot, 0.026]} /><meshToonMaterial color="#d6b88c" /></mesh>
+      <mesh position={[0, SEAT_TAG.foot / 2, 0]}><boxGeometry args={[SEAT_TAG.L * 0.5, SEAT_TAG.foot, 0.026]} /><meshToonMaterial color="#d6b88c" /></mesh>
       <group position-y={y}>
-        <mesh geometry={SEAT_TAG_RIM} material={SEAT_TAG_RIM_MAT!} />
-        {/* (the customer's face toward -z, the kitchen's toward +z, each reading the right way round from its side) */}
-        <mesh geometry={SEAT_TAG_FACES[k]} material={SEAT_TAG_FACE_MAT!} position-z={-SEAT_TAG.d / 2 - 0.0006} rotation-y={Math.PI} />
-        <mesh geometry={SEAT_TAG_FACES[k]} material={SEAT_TAG_FACE_MAT!} position-z={SEAT_TAG.d / 2 + 0.0006} />
+        {/* (the customer's toward -z, the kitchen's toward +z, each head-left and reading the right way round from its side) */}
+        {SEAT_TAG_GEOS_HALF[k].map((h, i) => (
+          <group key={i} position-z={(i ? 1 : -1) * SEAT_TAG.d / 4}>
+            <mesh geometry={h.face} material={SEAT_TAG_FACE_MAT!} />
+            <mesh geometry={h.plain} material={SEAT_TAG_EDGE_MAT!} />
+          </group>
+        ))}
+        <mesh geometry={SEAT_TAG_SKEWER} material={SEAT_TAG_SKEWER_MAT!} position-y={-0.003} />
       </group>
     </group>
   )
@@ -3143,7 +3255,8 @@ function BarCounterImpl({ c, first = 0, trim = 0, gate, noTop = false, noLip = f
                 them; behind on the left the little soy dish (on the right instead at a seat where it'd be off the top, by the gate) */}
             {/* (the chopsticks and their rest, the soy dish, the soy pot and wasabi: pieces of their own now, BarTableware) */}
             {/* (the place's number, on the screen behind it; standing, where there's none) */}
-            <SeatTag k={first + n} onLip={x - SEAT_TAG.r - 0.03 > lipSpan[0] && x + SEAT_TAG.r + 0.03 < lipSpan[1]} />
+            {/* (on the screen if the board and its skewer's ends (2 cm past it) keep a centimetre in from the screen's ends) */}
+            <SeatTag k={first + n} onLip={x - SEAT_TAG.L / 2 - 0.03 > lipSpan[0] && x + SEAT_TAG.L / 2 + 0.03 < lipSpan[1]} />
           </group>
         )
       })}
