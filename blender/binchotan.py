@@ -12,7 +12,7 @@ Writes public/models/binchotan.glb and blender/binchotan.blend.
 
 Frame: each piece along +y (the game's up; Blender's +z), its middle at the origin: a stick 0.3 long and about 0.032 round (the game scales
 it to each stick's length and thickness), a piece 0.05 to 0.1 long. Nodes: BinStick0..5, BinChunk0..5, and BinAsh0..5 (clumps of ash about
-0.04 across, flat underneath at y = 0).
+0.04 across, open underneath at y = 0: their flattened undersides left out, as they lie in the salt).
 """
 import math
 import os
@@ -217,6 +217,14 @@ def ash_clump(name, rng):
     apply_scale(o)
     bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT"); bpy.ops.mesh.remove_doubles(threshold=1e-5)
     bpy.ops.uv.sphere_project(); bpy.ops.object.mode_set(mode="OBJECT")
+    # (its underside left out (item 25): the lower half pressed flat onto y = 0 faced down into the salt, a hair under it, never seen from
+    # above and never casting (the bed only takes shadows): half the clump's faces, 80 to 40, the top as it was)
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if all(v.co.z <= 1e-6 for v in f.verts)], context="FACES")
+    bm.to_mesh(o.data)
+    bm.free()
     return finish(o, name, ASH, smooth_shade=False)
 
 

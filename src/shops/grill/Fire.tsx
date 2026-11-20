@@ -93,7 +93,9 @@ type FireProps = ThreeElements['group'] & {
 // (item 374: drawn again only as its own props change (the same numbers and the same fire's level each time the scene was drawn, three times a second))
 export const Fire = memo(function Fire({ layers = 4, width = 0.9, height = 0.75, embers = 90, baseIntensity = 7, level, ...props }: FireProps) {
   const flameGeometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(width, height, 16, 48)
+    // (one step across (item 25): the flames' vertex shader moves each row by an amount of its height alone, so a row stays a straight
+    // line and the strip between two rows a flat parallelogram, the same with one step across as with sixteen: 1,536 triangles a sheet to 96)
+    const g = new THREE.PlaneGeometry(width, height, 1, 48)
     g.translate(0, height / 2, 0)
     return g
   }, [width, height])
