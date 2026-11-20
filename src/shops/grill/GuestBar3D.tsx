@@ -2702,41 +2702,51 @@ const RISER = '#3a2416'
  */
 /** how far out each of the doorway's stone steps reaches (the bar's units: a tread a third of a metre deep, the dining room's metres) */
 const STEP_GO = 0.17
-/** the steps themselves (item 352, the owner's 「石階梯太假了吧」: they were boxes in the base's masonry picture, bricks stacked): a slab of
- * granite each, its edges eased and its tread's front worn (blender/stonesteps.py); made at the doorway's measure as it stood, each scaled
- * to it as it stands (within a percent) */
+/** the steps themselves (item 352, the owner's 「石階梯太假了吧」: they were boxes in the base's masonry picture, bricks stacked); now each
+ * (and the band over them) stones of their own on each face that shows, as the genkan's floor is made, in a recessed pebble-wash, moss in
+ * their shaded corners (item 424, the owner's 「這石階跟裡面比，不夠精緻，其次是可以加點青苔感。」: they were slabs with a picture of stones on
+ * them): blender/stonesteps.py; made at the doorway's measure as it stood, each scaled to it as it stands (within a percent) */
 const STEPS_URL = import.meta.env.BASE_URL + 'models/stonesteps.glb'
 useGLTF.preload(STEPS_URL)
 /** each part's size as made (blender/stonesteps.py's SLABS): the footing's band over the upper step (item 404: a riser of its own, laid on the
  * footing's face), the upper step, the lower; the genkan's side by the wall, the footing */
 const STONE_MADE: Record<string, [number, number, number]> = { StoneStep0: [1.2369, 0.1123, 0.012], StoneStep1: [1.2329, 0.2247, 0.168],
   StoneStep2: [1.2289, 0.1123, 0.168], StoneSide: [0.02, 0.112, 1.3155], StoneFoot: [1.2369, 0.337, 1.3155] }
-/** the way in's stone in the room's toon light, made once for the model's material and shared by all its parts */
+/** the way in's stone in the room's toon light, made once for each of the model's materials and shared by all its parts (the stones' tints
+ * in their points' colour, item 424) */
 const PAVING = new Map<THREE.Material, THREE.MeshToonMaterial>()
-function pavingOf(sm: THREE.MeshStandardMaterial) {
+function pavingOf(sm: THREE.MeshStandardMaterial, tinted: boolean) {
   let t = PAVING.get(sm)
-  if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: sm.map ?? null, normalMap: sm.normalMap ?? null }); PAVING.set(sm, t) }
+  if (!t) {
+    t = new THREE.MeshToonMaterial({ color: '#ffffff', map: sm.map ?? null, normalMap: sm.normalMap ?? null, vertexColors: tinted })
+    t.name = sm.name
+    PAVING.set(sm, t)
+  }
   return t
 }
-/** the way in's stone parts by name, each a copy of its own in the room's light (each piece of the scene its own object) */
+/** the way in's stone parts by name, each a copy of its own in the room's light (each piece of the scene its own object; a step its three
+ * materials' meshes under it, item 424) */
 function useStoneParts(names: string[]) {
   const gltf = useGLTF(STEPS_URL) as unknown as { scene: THREE.Group }
   const key = names.join()
   return useMemo(() => {
-    const out: Record<string, THREE.Mesh> = {}
+    const out: Record<string, THREE.Object3D> = {}
     for (const n of key.split(',')) {
-      const src = gltf.scene.getObjectByName(n) as THREE.Mesh
-      const m = src.clone()
-      m.material = pavingOf(src.material as THREE.MeshStandardMaterial)
+      const m = gltf.scene.getObjectByName(n)!.clone(true)
       m.position.set(0, 0, 0)
-      m.receiveShadow = true
+      m.traverse((o) => {
+        const me = o as THREE.Mesh
+        if (!me.isMesh) return
+        me.material = pavingOf(me.material as THREE.MeshStandardMaterial, !!me.geometry.attributes.color)
+        me.receiveShadow = true
+      })
       out[n] = m
     }
     return out
   }, [gltf, key])
 }
 /** a part laid in the box from (x0, y0, z0) to (x1, y1, z1) of its parent's frame: its middle there, scaled from its made size to fit */
-function laid(part: THREE.Mesh, made: [number, number, number], [x0, y0, z0]: number[], [x1, y1, z1]: number[]) {
+function laid(part: THREE.Object3D, made: [number, number, number], [x0, y0, z0]: number[], [x1, y1, z1]: number[]) {
   return { object: part, position: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2] as [number, number, number],
     scale: [Math.abs(x1 - x0) / made[0], Math.abs(y1 - y0) / made[1], Math.abs(z1 - z0) / made[2]] as [number, number, number] }
 }
@@ -2768,19 +2778,43 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   // same granite down from the genkan's stone toward the street, each a third of the way down and STEP_GO further out, the doorway's width)
   const rise = (gTop - gFoot) / 3
   const stone = useStoneParts(['StoneStep0', 'StoneStep1', 'StoneStep2', 'StoneFoot'])
+  // (the two steps and the band over them, each laid where it stands, then folded together by material (item 424: each is its stones, its
+  // pebble-wash and its moss now, three draws for all of them, not nine); copies of the parts, so it can be done again if the room's changed)
+  const [ga1, gy0, gy1] = [gal[1], gly[0], gly[1]]
+  const steps = useMemo(() => {
+    const g = new THREE.Group()
+    const add = (o: THREE.Object3D, made: [number, number, number], lo: number[], hi: number[]) => {
+      const { position, scale } = laid(o, made, lo, hi)
+      const c = o.clone(true)
+      c.position.set(...position)
+      c.scale.set(...scale)
+      g.add(c)
+    }
+    for (const k of [1, 2]) {
+      const yTop = gTop - rise * k, z0 = ga1 + STEP_GO * (k - 1) + 0.002, z1 = ga1 + STEP_GO * k, xc = -(gy0 + gy1) / 2
+      const w = (gy1 - gy0 - 0.004 * k) / 2
+      add(stone[`StoneStep${k}`], STONE_MADE[`StoneStep${k}`], [xc - w, gFoot, z0], [xc + w, yTop, z1])
+    }
+    // (the footing's face over the upper step, one course of whole stones laid on it (item 404, the owner's 「切得很怪」: the paving's one
+    // picture went on over it and the steps, its stones cut off wherever a face ended): from the upper step's tread up to the genkan's stone,
+    // 1.5 mm proud of the footing's face, its foot a hair over the tread)
+    add(stone.StoneStep0, STONE_MADE.StoneStep0, [-gy1, gTop - rise + 0.0005, ga1 + 0.0015], [-gy0, gTop, ga1 + 0.0135])
+    const shared = new Set<THREE.BufferGeometry>()
+    g.traverse((o) => { if ((o as THREE.Mesh).isMesh) shared.add((o as THREE.Mesh).geometry) })
+    mergeByMaterial(g)
+    g.userData.shared = shared
+    return g
+  }, [stone, gTop, rise, gFoot, ga1, gy0, gy1])
+  // (the folded meshes are its own: let them go when it's done again or goes)
+  useEffect(() => () => {
+    const shared = steps.userData.shared as Set<THREE.BufferGeometry>
+    steps.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !shared.has(m.geometry)) m.geometry.dispose() })
+  }, [steps])
   return (
     <>
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
       <primitive {...laid(stone.StoneFoot, STONE_MADE.StoneFoot, [-gly[1], gFoot, gal[0]], [-gly[0], gTop, gal[1]])} />
-      {[1, 2].map((k) => {
-        const yTop = gTop - rise * k, z0 = gal[1] + STEP_GO * (k - 1) + 0.002, z1 = gal[1] + STEP_GO * k, xc = -(gly[0] + gly[1]) / 2
-        const w = (gly[1] - gly[0] - 0.004 * k) / 2
-        return <primitive key={`step${k}`} {...laid(stone[`StoneStep${k}`], STONE_MADE[`StoneStep${k}`], [xc - w, gFoot, z0], [xc + w, yTop, z1])} />
-      })}
-      {/* (the footing's face over the upper step, one course of whole stones laid on it (item 404, the owner's 「切得很怪」: the paving's one
-          picture went on over it and the steps, its stones cut off wherever a face ended): from the upper step's tread up to the genkan's stone,
-          1.5 mm proud of the footing's face, its foot a hair over the tread) */}
-      <primitive {...laid(stone.StoneStep0, STONE_MADE.StoneStep0, [-gly[1], gTop - rise + 0.0005, gal[1] + 0.0015], [-gly[0], gTop, gal[1] + 0.0135])} />
+      <primitive object={steps} />
     </>
   )
 }
