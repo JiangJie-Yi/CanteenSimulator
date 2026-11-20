@@ -1064,14 +1064,23 @@ function GenkanDoorImpl() {
       if (/Glass/.test(src.name)) { m.material = DOOR_GLASS; m.renderOrder = 2 }
       else {
         let t = wood.get(src)
-        // (the wood its picture; the pulls their own dark bronze, no picture)
-        if (!t) { t = new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color, map: src.map ?? null }); t.name = src.name; wood.set(src, t) }
+        // (the wood its picture; the pulls their own dark bronze, no picture; the carvings (item 421) their relief in their normal maps, the
+        // transom's lattice and the corners' brass cut out by their pictures, seen from both sides)
+        if (!t) {
+          const cut = /Kumiko|Brass/.test(src.name)
+          const toon = new THREE.MeshToonMaterial({ color: src.map ? '#ffffff' : src.color, map: src.map ?? null, normalMap: src.normalMap ?? null,
+            ...(cut ? { alphaTest: 0.5, side: THREE.DoubleSide } : {}) })
+          if (src.normalMap) toon.normalScale.copy(src.normalScale)
+          toon.name = src.name
+          wood.set(src, (t = toon))
+        }
         m.material = t
       }
       m.castShadow = false
       m.receiveShadow = true
     })
-    inkModel(r, (m) => m.material === DOOR_GLASS, { width: 0.0015, weld: true })
+    // (no ink line round the glass, nor round the flat faces of the lattice, the brass and the lintel's band: round their squares, not their shapes)
+    inkModel(r, (m) => m.material === DOOR_GLASS || /Kumiko|Brass|Band/.test((m.material as THREE.Material).name), { width: 0.0015, weld: true })
     // (the two leaves together under one group of their own, to light up under the pointer, the frame over them not)
     const leaves = new THREE.Group()
     leaves.name = 'GenkanDoorLeaves'

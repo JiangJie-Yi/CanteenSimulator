@@ -64,6 +64,7 @@ PULL = (0.012, 0.07, 0.86)           # a pull's width, height and its middle's h
 STILE, TOP_RAIL, BOTTOM_RAIL, MID_RAIL = 0.03, 0.045, 0.11, 0.035
 MID_Y = 0.56                         # the middle rail's foot, over the leaf's foot
 SLAT_W, SLAT_GAP = 0.009, 0.036      # the lattice's slats: their width, their pitch (fine: at 12 mm and 46 they read as bars)
+BRASS_S = 0.07                       # a corner's brass fitting, its side (item 421)
 # the north jamb's pieces, foot to top: from, to, how far north (item 419: the wall's face 0.498, its chair rail's 0.453, its nageshi's 0.473,
 # the plaster's over that 0.494; half a millimetre to one short of each)
 JAMB = [(TRACK_Y[0], 0.824, 0.4975), (0.824, 0.876, 0.4525), (0.876, 1.976, 0.4975), (1.976, 2.004, 0.4725), (2.004, 2.199, 0.4935)]
@@ -81,8 +82,147 @@ def wood_picture(n=256):
     return (base[None, None, :] * k[..., None]).clip(0, 1).astype(np.float32)
 
 
+def carve_pictures(n=512):
+    """the leaves' lower panels (腰板), carved as a main door's are (item 421, the owner's 「畢竟是大門，會有些華麗的刻文」): a bead and a groove
+    round the edge; the field cut in blue-sea waves (青海波), rings of circles each row over the one above it; in the middle a round crest, its
+    rim raised and a cut round it, a sea bream (鯛, the shop's grilled fish) raised in it, its eye and its gill cut. The wood's colour darker
+    down in the cuts, lighter on what stands up. Returns (colour, normal)"""
+    u, v = grid01(n)
+    h = np.full((n, n), 0.5, np.float32)
+    d = np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v))
+    h += 0.22 * np.sqrt(np.clip(1 - np.abs(d - 0.022) / 0.010, 0, 1))
+    h -= 0.18 * np.clip(1 - np.abs(d - 0.038) / 0.005, 0, 1)
+    field = d > 0.044
+    # (the waves: circles R across, rows half R apart and every other one half a circle along; a point is the lowest row's that reaches it)
+    R = 0.09
+    found = np.zeros((n, n), bool)
+    dist = np.zeros((n, n), np.float32)
+    jlo = np.floor((v - R) / (0.5 * R)).astype(int) + 1
+    for k in range(5):
+        j = jlo + k
+        cy = j * 0.5 * R
+        off = np.mod(j, 2) * R
+        cx = np.round((u - off) / (2 * R)) * 2 * R + off
+        dd = np.hypot(u - cx, v - cy)
+        take = (~found) & (dd < R)
+        dist[take] = dd[take]
+        found |= take
+    rr = dist / R
+    g = np.zeros_like(h)
+    # (three rings to a fan, cut wide and deep enough to read from the street: four thin ones were lost there)
+    for k in (0.4, 0.7, 0.99):
+        g = np.maximum(g, np.clip(1 - np.abs(rr - k) / 0.08, 0, 1))
+    h -= np.where(field & found, 0.22 * g, 0)
+    # (the crest: cleared of the waves, its rim raised, a cut round it)
+    CR = 0.2
+    rc = np.hypot(u - 0.5, v - 0.5)
+    inside = rc < CR
+    h = np.where(inside, 0.52, h)
+    h += 0.2 * np.clip(1 - np.abs(rc - (CR - 0.012)) / 0.01, 0, 1)
+    h -= 0.14 * np.clip(1 - np.abs(rc - (CR + 0.008)) / 0.005, 0, 1)
+    # (the bream, its head to the right: a domed body, a low ridge of a back fin, a forked tail off a narrow root)
+    body = np.sqrt(np.clip(1 - ((u - 0.515) / 0.105) ** 2 - ((v - 0.5) / 0.06) ** 2, 0, 1))
+    fin = np.sqrt(np.clip(1 - ((u - 0.5) / 0.07) ** 2 - ((v - 0.565) / 0.022) ** 2, 0, 1))
+    tx = (0.415 - u) / 0.055
+    spread = 0.012 + 0.048 * tx
+    tail = np.where((tx >= 0) & (tx <= 1), np.clip(1 - np.abs(v - 0.5) / spread, 0, 1), 0)
+    tail = np.where((tx > 0.7) & (np.abs(v - 0.5) < (tx - 0.7) * 0.09), 0, tail)
+    relief = np.maximum(np.maximum(body, 0.55 * fin), 0.55 * tail)
+    h = np.where(inside, h + 0.32 * relief, h)
+    h -= 0.25 * np.clip(1 - np.hypot(u - 0.585, v - 0.512) / 0.009, 0, 1)
+    gill = np.clip(1 - np.abs(np.hypot(u - 0.62, v - 0.5) - 0.07) / 0.004, 0, 1) * (np.abs(v - 0.5) < 0.045) * (u < 0.57) * (relief > 0.3)
+    h -= 0.12 * gill
+    k = 0.84 + 0.12 * fbm(n, 24, 2, 4)
+    base = np.array((0.42, 0.28, 0.17), np.float32)
+    # (the flat of it the door's own wood; only the cuts darker and what stands up lighter: at 0.72 the whole panel read darker than the door)
+    ao = np.clip(1.0 + 1.25 * (h - 0.5), 0.55, 1.35)
+    col = base[None, None, :] * (k * ao)[..., None]
+    return col.clip(0, 1).astype(np.float32), to_normal(h, 9.0).astype(np.float32)
+
+
+def kumiko_picture(w=1024, h=256, W=1.082, H=0.25, s=0.06, t=0.0035):
+    """the transom's lattice (欄間の組子, item 421), hemp-leaf (麻の葉): a grid of triangles, each one's three corners joined to its middle, in
+    thin strips of pale wood with a strip along its top and foot; the rest clear (W by H metres, a triangle's side s, a strip t wide).
+    Returns (colour, alpha)"""
+    X, Y = np.meshgrid((np.arange(w) + 0.5) / w * W, (np.arange(h) + 0.5) / h * H)
+    ht = s * np.sqrt(3) / 2
+    r = Y / ht
+    q = X / s - r / 2
+    fq, fr = q - np.floor(q), r - np.floor(r)
+    low = fq + fr < 1
+    la = np.where(low, 1 - fq - fr, fq + fr - 1)
+    lb = np.where(low, fq, 1 - fr)
+    lc = np.where(low, fr, 1 - fq)
+    dist = np.minimum(np.minimum(la, lb), lc) * ht
+    for a, b, c in ((la, lb, lc), (lb, lc, la), (lc, la, lb)):
+        dist = np.minimum(dist, np.where(a >= 1 / 3 - t / s, np.abs(b - c) * s / 2, np.inf))
+    dist = np.minimum(dist, np.maximum(np.minimum(Y, H - Y) - t, 0))
+    alpha = np.clip((t / 2 - dist) / (W / w) + 0.5, 0, 1)
+    k = 0.86 + 0.1 * np.sin(2 * np.pi * (X * 23 + Y * 3))
+    col = np.array((0.6, 0.45, 0.3), np.float32)[None, None, :] * k[..., None]
+    return col.clip(0, 1).astype(np.float32), alpha.astype(np.float32)
+
+
+def brass_pictures(n=128, S=0.07, wa=0.022, lobe=0.013):
+    """a corner's brass fitting (飾り金具, item 421), in the picture's lower left: two arms along the edges, each ending in a round knob, an
+    engraved line round inside its edge, three rivets; the rest clear (S metres across). Returns (colour, alpha, normal)"""
+    u, v = grid01(n)
+    X, Y = u * S, v * S
+
+    def box_sdf(cx, cy, hx, hy):
+        qx, qy = np.abs(X - cx) - hx, np.abs(Y - cy) - hy
+        return np.hypot(np.maximum(qx, 0), np.maximum(qy, 0)) + np.minimum(np.maximum(qx, qy), 0)
+
+    sdf = np.minimum.reduce([
+        box_sdf(wa / 2, (S - lobe) / 2, wa / 2, (S - lobe) / 2), box_sdf((S - lobe) / 2, wa / 2, (S - lobe) / 2, wa / 2),
+        np.hypot(X - wa / 2, Y - (S - lobe)) - lobe, np.hypot(X - (S - lobe), Y - wa / 2) - lobe])
+    alpha = np.clip(0.5 - sdf / (S / n), 0, 1)
+    hgt = 0.5 + 0.15 * np.clip(-sdf / 0.002, 0, 1)
+    hgt -= 0.2 * np.clip(1 - np.abs(sdf + 0.0028) / 0.0007, 0, 1)
+    dome = np.zeros_like(hgt)
+    for cx, cy in ((wa / 2, S - lobe), (S - lobe, wa / 2), (wa / 2, wa / 2)):
+        dome = np.maximum(dome, np.sqrt(np.clip(1 - (np.hypot(X - cx, Y - cy) / 0.0035) ** 2, 0, 1)))
+    hgt += 0.3 * dome
+    ao = np.clip(0.75 + 1.2 * (hgt - 0.5), 0.45, 1.3)
+    col = np.array((0.8, 0.62, 0.3), np.float32)[None, None, :] * ao[..., None]
+    return col.clip(0, 1).astype(np.float32), alpha.astype(np.float32), to_normal(hgt, 4.0).astype(np.float32)
+
+
+def band_pictures(w=1024, h=64, W=1.14, H=0.053):
+    """the lintel's face (item 421), carved in a running seven-treasures (七宝つなぎ): circles each overlapping the next, cut in, a line along
+    its top and foot. Returns (colour, normal)"""
+    X, Y = np.meshgrid((np.arange(w) + 0.5) / w * W, (np.arange(h) + 0.5) / h * H)
+    rho = H * 0.36
+    step = rho * np.sqrt(2)
+    hgt = np.full(X.shape, 0.5, np.float32)
+    g = np.zeros_like(hgt)
+    i0 = np.round(X / step)
+    for di in (-1, 0, 1):
+        cx = (i0 + di) * step
+        g = np.maximum(g, np.clip(1 - np.abs(np.hypot(X - cx, Y - H / 2) - rho) / 0.0012, 0, 1))
+    for yl in (0.004, H - 0.004):
+        g = np.maximum(g, np.clip(1 - np.abs(Y - yl) / 0.0008, 0, 1))
+    hgt -= 0.24 * g
+    k = 0.84 + 0.12 * np.sin(2 * np.pi * (X * 7 + 0.3 * np.sin(Y * 90)))
+    # (the flat of it the wood's own colour, the cuts darker: at 0.72 it read as a dark band under the eave's shade)
+    ao = np.clip(1.0 + 1.4 * (hgt - 0.5), 0.5, 1.3)
+    col = np.array((0.42, 0.28, 0.17), np.float32)[None, None, :] * (k * ao)[..., None]
+    return col.clip(0, 1).astype(np.float32), to_normal(hgt, 5.0).astype(np.float32)
+
+
+CARVE_COL, CARVE_NRM = carve_pictures()
+KUMIKO_COL, KUMIKO_A = kumiko_picture()
+BRASS_COL, BRASS_A, BRASS_NRM = brass_pictures()
+BAND_COL, BAND_NRM = band_pictures()
+
 M = {
     "wood": pbr("GenkanDoorWood", (1, 1, 1), tex=image("genkan_door_wood", wood_picture()), rough=0.6),
+    # (item 421: the carved panels, the transom's lattice (cut out), the corners' brass (cut out), the lintel's carved band)
+    "carve": pbr("GenkanDoorCarve", (1, 1, 1), tex=image("genkan_door_carve", CARVE_COL), nrm=image("genkan_door_carve_n", CARVE_NRM, data=True), rough=0.6),
+    "kumiko": pbr("GenkanDoorKumiko", (1, 1, 1), tex=image("genkan_door_kumiko", KUMIKO_COL, alpha=KUMIKO_A), rough=0.6, blend=True),
+    "brass": pbr("GenkanDoorBrass", (1, 1, 1), tex=image("genkan_door_brass", BRASS_COL, alpha=BRASS_A), nrm=image("genkan_door_brass_n", BRASS_NRM, data=True),
+                 rough=0.35, metal=0.8, blend=True),
+    "band": pbr("GenkanDoorBand", (1, 1, 1), tex=image("genkan_door_band", BAND_COL), nrm=image("genkan_door_band_n", BAND_NRM, data=True), rough=0.6),
     # (the pulls: dark bronze)
     "pull": pbr("GenkanDoorPull", (0.08, 0.06, 0.045), rough=0.45),
     # (frosted glass: the game draws it its own way, see-through a little, from both sides)
@@ -121,29 +261,67 @@ def glass_quad(bm, uvl, x0, x1, y0, y1, z):
         lp[uvl].uv = (a, b)
 
 
-def mesh_of(name, build_wood, build_glass=None, build_pull=None):
-    """an object of its wood (and its glass, its pulls), each its own material"""
+FLAT = ("glass", "kumiko", "brass", "band")
+
+
+def quad_uv(bm, uvl, corners, uvs, out):
+    """one face through four points (the game's frame), each its uv, turned to face `out` (a direction in the game's frame)"""
+    vs = [bm.verts.new(P(*c)) for c in corners]
+    f = bm.faces.new(vs)
+    f.normal_update()
+    if f.normal.dot(P(*out)) < 0:
+        f.normal_flip()
+    uv = dict(zip(vs, uvs))
+    for lp in f.loops:
+        lp[uvl].uv = uv[lp.vert]
+    return f
+
+
+def carved_box(bm, uvl, x0, x1, y0, y1, z0, z1):
+    """a lower panel's box (item 421): its two broad faces the carving's picture whole across them (the street one as drawn, the shop's one
+    turned about so it reads the same from in there), its narrow sides a corner of it (the bead's plain wood)"""
+    vs = [bm.verts.new(P(x, y, z)) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
+    idx = lambda i, j, k: vs[i * 4 + j * 2 + k]
+    faces = [
+        ((0, 0, 0), (0, 0, 1), (0, 1, 1), (0, 1, 0)), ((1, 0, 0), (1, 1, 0), (1, 1, 1), (1, 0, 1)),
+        ((0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)), ((0, 1, 0), (0, 1, 1), (1, 1, 1), (1, 1, 0)),
+        ((0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)), ((0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)),
+    ]
+    for f in faces:
+        face = bm.faces.new([idx(*c) for c in f])
+        broad = all(c[2] == f[0][2] for c in f)
+        for lp, c in zip(face.loops, f):
+            if broad:
+                uu = c[0] if f[0][2] == 1 else 1 - c[0]
+                lp[uvl].uv = (float(uu), float(c[1]))
+            else:
+                lp[uvl].uv = (0.015, 0.015)
+
+
+def mesh_of(name, builds):
+    """an object of its parts, each its own material: `builds` a list of (the material's key, its builder); the boxes' normals put right,
+    the flat faces (glass, the lattice, the brass, the band) as they're made"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    build_wood(bm, uvl)
-    nw = len(bm.faces)
-    if build_glass:
-        build_glass(bm, uvl)
-    ng = len(bm.faces)
-    if build_pull:
-        build_pull(bm, uvl)
-    for i, f in enumerate(bm.faces):
-        f.material_index = 0 if i < nw else 1 if i < ng else 2
-    bmesh.ops.recalc_face_normals(bm, faces=[f for f in bm.faces if f.material_index != 1])
+    keys = []
+    for key, build in builds:
+        n0 = len(bm.faces)
+        build(bm, uvl)
+        bm.faces.ensure_lookup_table()
+        if len(bm.faces) == n0:
+            continue
+        if key not in keys:
+            keys.append(key)
+        for i in range(n0, len(bm.faces)):
+            bm.faces[i].material_index = keys.index(key)
+    bmesh.ops.recalc_face_normals(bm, faces=[f for f in bm.faces if keys[f.material_index] not in FLAT])
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
-    o.data.materials.append(M["wood"])
-    o.data.materials.append(M["glass"])
-    if build_pull:
-        o.data.materials.append(M["pull"])
+    for key in keys:
+        o.data.materials.append(M[key])
     parts.append(o)
     return o
 
@@ -160,8 +338,6 @@ def leaf(name, xa, xb, za, zb, meet):
         box(bm, uvl, xa + STILE, xb - STILE, y1 - TOP_RAIL, y1, za, zb, "x")
         box(bm, uvl, xa + STILE, xb - STILE, y0, y0 + BOTTOM_RAIL, za, zb, "x")
         box(bm, uvl, xa + STILE, xb - STILE, MID_Y, MID_Y + MID_RAIL, za, zb, "x")
-        # (the panel under the middle rail, set in from both faces)
-        box(bm, uvl, xa + STILE - 0.002, xb - STILE + 0.002, y0 + BOTTOM_RAIL - 0.002, MID_Y + 0.002, zm - 0.004, zm + 0.004, "y")
         # (the slats over the glass, on its street side: evenly across between the stiles)
         inner = (xb - STILE) - (xa + STILE)
         n = max(1, int(round(inner / SLAT_GAP)) - 1)
@@ -172,8 +348,22 @@ def leaf(name, xa, xb, za, zb, meet):
         cy = MID_Y + MID_RAIL + (y1 - TOP_RAIL - MID_Y - MID_RAIL) * CROSS_K
         box(bm, uvl, xa + STILE - 0.002, xb - STILE + 0.002, cy - CROSS_H / 2, cy + CROSS_H / 2, zm + 0.001, zb - 0.0005, "x")
 
+    def carve(bm, uvl):
+        # (the panel under the middle rail, set in from both faces: carved, item 421)
+        carved_box(bm, uvl, xa + STILE - 0.002, xb - STILE + 0.002, y0 + BOTTOM_RAIL - 0.002, MID_Y + 0.002, zm - 0.004, zm + 0.004)
+
     def glass(bm, uvl):
         glass_quad(bm, uvl, xa + STILE - 0.002, xb - STILE + 0.002, MID_Y + MID_RAIL - 0.002, y1 - TOP_RAIL + 0.002, zm)
+
+    def brass(bm, uvl):
+        # (a brass fitting on each corner, both faces, a little proud: from just over the track to just under the lintel, their arms along the
+        # stile and the rail; the picture's L turned to each corner)
+        S, yb, yt = BRASS_S, TRACK_Y[1] + 0.006, LINTEL_Y[0] - 0.006
+        for (cx0, cy0, fu, fv) in ((xa, yb, 0, 0), (xb - S, yb, 1, 0), (xa, yt - S, 0, 1), (xb - S, yt - S, 1, 1)):
+            for z, out in ((zb + 0.0012, (0, 0, 1)), (za - 0.0012, (0, 0, -1))):
+                pts = [(cx0, cy0, z), (cx0 + S, cy0, z), (cx0 + S, cy0 + S, z), (cx0, cy0 + S, z)]
+                uvs = [(abs(fu - a), abs(fv - b)) for a, b in ((0, 0), (1, 0), (1, 1), (0, 1))]
+                quad_uv(bm, uvl, pts, uvs, out)
 
     def pull(bm, uvl):
         # (on the meeting stile's middle, both faces, a millimetre proud of the wood)
@@ -182,7 +372,7 @@ def leaf(name, xa, xb, za, zb, meet):
         box(bm, uvl, cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2, zb - 0.001, zb + 0.001, "y")
         box(bm, uvl, cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2, za - 0.001, za + 0.001, "y")
 
-    return mesh_of(name, wood, glass, pull)
+    return mesh_of(name, [("wood", wood), ("carve", carve), ("glass", glass), ("pull", pull), ("brass", brass)])
 
 
 # --- the leaves --------------------------------------------------------------------------------------------------
@@ -194,15 +384,10 @@ print("GENKANDOOR_LEAVES", W_LEAF, LEAF_X, "open way", LEAF_X[0][1], X_WALL - 0.
 def frame_wood(bm, uvl):
     box(bm, uvl, X_POST, X_WALL - 0.001, TRACK_Y[0], TRACK_Y[1], FRAME_Z[0], FRAME_Z[1], "x")
     box(bm, uvl, X_S, X_WALL - 0.001, LINTEL_Y[0], LINTEL_Y[1], FRAME_Z[0], FRAME_Z[1], "x")
-    # (the transom's frame: its two ends; its slats on the glass's street side)
+    # (the transom's frame: its two ends; its lattice (組子) over the glass's street side, kumiko below (item 421: plain slats before))
     tz = (0.392, 0.425)
     box(bm, uvl, X_S, X_S + STILE, TRANSOM_Y[0] - 0.001, TRANSOM_Y[1] + 0.001, *tz, "y")
     box(bm, uvl, X_WALL - 0.001 - STILE, X_WALL - 0.001, TRANSOM_Y[0] - 0.001, TRANSOM_Y[1] + 0.001, *tz, "y")
-    inner = (X_WALL - 0.001 - STILE) - (X_S + STILE)
-    n = int(round(inner / (SLAT_GAP * 1.5))) - 1
-    for k in range(n):
-        cx = X_S + STILE + inner * (k + 1) / (n + 1)
-        box(bm, uvl, cx - SLAT_W / 2, cx + SLAT_W / 2, TRANSOM_Y[0] - 0.001, TRANSOM_Y[1] + 0.001, 0.4095, 0.424, "y")
     # (its head rail, from the transom back into the beam's front (z 0.34), under the beam's foot)
     box(bm, uvl, X_S, X_WALL - 0.001, HEAD_Y[0], HEAD_Y[1], 0.338, 0.43, "x")
     # (the jamb (縦枠) at the north end, the north leaf shut against it, out to the room's wall: item 419, the owner's 「這個門沒密合」, a slot
@@ -218,7 +403,19 @@ def frame_glass(bm, uvl):
     glass_quad(bm, uvl, X_S + STILE - 0.002, X_WALL - 0.001 - STILE + 0.002, TRANSOM_Y[0], TRANSOM_Y[1], 0.408)
 
 
-frame = mesh_of("GenkanDoorFrame", frame_wood, frame_glass)
+def frame_kumiko(bm, uvl):
+    """the transom's hemp-leaf lattice (item 421): one face, cut out by its picture, between the glass and the frame's street face"""
+    x0, x1, y0, y1, z = X_S + STILE - 0.001, X_WALL - 0.001 - STILE + 0.001, TRANSOM_Y[0], TRANSOM_Y[1], 0.4168
+    quad_uv(bm, uvl, [(x0, y0, z), (x1, y0, z), (x1, y1, z), (x0, y1, z)], [(0, 0), (1, 0), (1, 1), (0, 1)], (0, 0, 1))
+
+
+def frame_band(bm, uvl):
+    """the lintel's street face carved (item 421): one face of its picture, a hair proud, over the leaves' tops to the transom"""
+    x0, x1, y0, y1, z = X_S, X_WALL - 0.001, 1.976, LINTEL_Y[1] - 0.001, FRAME_Z[1] + 0.0012
+    quad_uv(bm, uvl, [(x0, y0, z), (x1, y0, z), (x1, y1, z), (x0, y1, z)], [(0, 0), (1, 0), (1, 1), (0, 1)], (0, 0, 1))
+
+
+frame = mesh_of("GenkanDoorFrame", [("wood", frame_wood), ("band", frame_band), ("kumiko", frame_kumiko), ("glass", frame_glass)])
 
 root = bpy.data.objects.new("GenkanDoor", None)
 bpy.context.collection.objects.link(root)
