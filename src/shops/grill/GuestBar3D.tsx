@@ -145,24 +145,39 @@ const SITTER_KEY = -1000
  * 0.42 from the stools' backs, those going by walked into it: aisleSqueeze) */
 const WALL_PIECES = ['bench', 'bench2', 'kabutostand', 'kabuto', 'doorcats', 'owncat', 'koban', 'doorcat0', 'doorcat1', 'doorcat2', 'doorcat3']
 const WALL_V = new THREE.Vector3(), WALL_INV = new THREE.Matrix4()
-type WallKeep = { at: number; boxes: { a0: number; a1: number; front: number }[]; roots: Map<string, THREE.Object3D> }
+/** (and where they stood when last measured, `sig`; when that was, `full`; when those not found were last looked for, `looked`) */
+type WallKeep = { at: number; boxes: { a0: number; a1: number; front: number }[]; roots: Map<string, THREE.Object3D>; sig: number; full: number; looked: number }
 /**
  * Each of WALL_PIECES' footprints in the first counter's frame (item 193), from its own meshes' vertices between the floor and a body's
  * shoulders: along the counter from its middle (`a0` to `a1`), and how far toward the aisle its front comes (`front`, lay). Measured now and
  * then, not laid down here, so it follows a piece moved by hand.
  */
 function measureWall(scene: THREE.Object3D, frame: THREE.Object3D, c: { at: THREE.Vector3; along: THREE.Vector3; lay: THREE.Vector3 }, keep: WallKeep) {
+  // (measured again only when one of them has moved (by hand in edit mode, the benches put back as the shop shuts), or a minute on (item 374:
+  // every 3 s it was, its sums over thousands of vertices each time, run too seldom to be made quick: a number made for each, some 23 MB of
+  // garbage every 30 s); and those not in the shop looked for at most every 10 s, a walk through the whole scene for each)
+  const now = performance.now(), look = now - keep.looked > 10000
+  if (look) keep.looked = now
+  let sig = 0
+  for (const id of WALL_PIECES) {
+    let root = keep.roots.get(id)
+    if ((!root || !root.parent) && look) {
+      let found: THREE.Object3D | undefined
+      scene.traverse((o) => { if (!found && o.userData?.editId === id) found = o })
+      if (found) keep.roots.set(id, (root = found))
+    }
+    if (!root || !root.parent) continue
+    const e = root.matrixWorld.elements
+    sig = (Math.imul(sig, 31) + id.length) | 0
+    for (let k = 0; k < 16; k++) sig = (Math.imul(sig, 31) + Math.round(e[k] * 1e4)) | 0
+  }
+  if (sig === keep.sig && now - keep.full < 60000) return
+  keep.sig = sig; keep.full = now
   keep.boxes.length = 0
   WALL_INV.copy(frame.matrixWorld).invert()
   for (const id of WALL_PIECES) {
-    let root = keep.roots.get(id)
-    if (!root || !root.parent) {
-      let found: THREE.Object3D | undefined
-      scene.traverse((o) => { if (!found && o.userData?.editId === id) found = o })
-      if (!found) continue
-      root = found
-      keep.roots.set(id, root)
-    }
+    const root = keep.roots.get(id)
+    if (!root || !root.parent) continue
     let a0 = Infinity, a1 = -Infinity, front = -Infinity
     root.traverse((o) => {
       const m = o as THREE.Mesh
@@ -3854,7 +3869,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
    * (keyed by id: a customer's, a server's -1 - i, the stock keeper's) */
   const aside = useRef(new Map<number, { x: number; z: number; f: number }>())
   /** what stands against the first counter's wall behind its aisle, that nobody stepping aside for another goes into (measureWall) */
-  const wallKeep = useRef<WallKeep>({ at: -9, boxes: [], roots: new Map() })
+  const wallKeep = useRef<WallKeep>({ at: -9, boxes: [], roots: new Map(), sig: NaN, full: 0, looked: -1e9 })
   const lastAt = useRef(new Map<number, { x: number; z: number; f: number }>())
   const asideTick = useRef(0)
   if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __guestGroups?: typeof groups }).__guestGroups = groups

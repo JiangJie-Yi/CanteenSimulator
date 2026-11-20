@@ -214,6 +214,14 @@ const REST_RAY = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -
 /** how long a piece's face is kept, nothing under it changed (a plate moved under it by hand, its spot not); the last number given a piece */
 const REST_STALE = 10000
 let REST_HID = 0
+/** a piece's spot on a server's tray, in place of where it is (item 374): it and the plate under it go with the tray, every frame somewhere
+ * else, and what it rests on (a height over its spot) doesn't change with it: measured as it's picked up, not every frame (97% of these
+ * measures, three rays each against every plate and every piece on the bar, were pieces being carried) */
+const TRAY_SPOT = -0x7fffffff
+/** (and on a tray, how often what's under its middle is felt for again, alone: the plate and the spot go along together, but not quite (a
+ * step down off the kitchen's dais, the plate set down: 3.5 cm apart a while); its roll as it was picked up, kept (felt for across the seat's
+ * way, not the tray's as it turns, its sides found the plate's rim, then nothing: it rocked from side to side as it was carried)) */
+const TRAY_REST_MS = 100
 /** how far either side of a piece's middle, across its plate, what holds it up is felt for (the scene's units: about half a fish's width) */
 const REST_SIDE = 0.018 * GRILL_SCALE
 /** (scratch) the way across the plate a piece rests on, its length's, and its roll over about it (item 271) */
@@ -4750,9 +4758,11 @@ type Piece = {
   /** (on a plate) the face it rests on, in its parent's frame: the plate's own surface (or what it lies on, on the plate) under it, found
    * where it is (`at`) by a ray, again each second (`t`); none found, null (item 258); and how far it's rolled over about its length, from
    * what holds it up either side of it (item 271) */
-  /** the face it rests on, measured (`t`, performance.now()) where it was (`x`, `z`: its spot, in thousandths, on `on`) with what was under
-   * it then (`sig`, restSig's) */
-  restFace?: { on: string | undefined; x: number; z: number; sig: number; t: number; face: number | null; roll: number }
+  /** the face it rests on, measured (`t`, performance.now()) where it was (`x`, `z`: its spot, in thousandths, on `on`; on a server's tray
+   * TRAY_SPOT instead) with what was under it then (`sig`, restSig's), and the height of its spot then (`base`: on a tray, the face is kept as a
+   * height over the spot, which moves with the tray, the plate under it with it); what was under its middle (`mid`: on a tray measured again
+   * alone every TRAY_REST_MS, the face moved as much as it did) */
+  restFace?: { on: string | undefined; x: number; z: number; sig: number; t: number; face: number | null; roll: number; base: number; mid: number | null }
   /** a number of its own, for restSig */
   hid?: number
   id: string
@@ -9014,20 +9024,28 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
             // the bar, where it is (to 2 mm), how big and how it's rolled; or after REST_STALE (item 374: three rays every second for every piece
             // on the bar, against every plate and every piece on it, whatever had changed: three's triangle tests the most garbage the shop made,
             // 100 MB the half minute in a rush))
-            const rx = Math.round(p.local.x * 1000), rz = Math.round(p.local.z * 1000)
+            const carried = SERVICE.carried.has(p.key)
+            const rx = carried ? TRAY_SPOT : Math.round(p.local.x * 1000), rz = carried ? TRAY_SPOT : Math.round(p.local.z * 1000)
             let sig = 0
             if (p.container === 'bar' && !onTray) {
               sig = PLATE_FACES.size
+              // (only those carried as it is or not: one on a tray rests on nothing on the bar, nor one on the bar on anything on a tray. On a
+              // tray only which are on it with it: what's on its plate was laid there before it was picked up and stays so till it's set down,
+              // and the pieces on a tray, each a little rolled and turned as the tray turns, measured one another again and again by where
+              // they were)
               for (const q of pieces.current) {
                 if (q === p || q.container !== p.container || q.seat !== p.seat || (q.flight ?? 0) < 1 || q.eaten || !q.node) continue
+                if (SERVICE.carried.has(q.key) !== carried) continue
                 const at = q.node.position
                 sig = (Math.imul(sig, 31) + (q.hid ??= ++REST_HID)) | 0
+                if (carried) continue
                 sig = (Math.imul(sig, 31) + Math.round(at.x * 500) * 3 + Math.round(at.y * 500) * 5 + Math.round(at.z * 500) * 7) | 0
                 sig = (Math.imul(sig, 31) + Math.round(q.node.scale.x * 200) + Math.round((q.restFace?.roll ?? 0) * 100) * 11) | 0
               }
             }
             const rf = p.restFace
-            if (p.container === 'bar' && !onTray && (!rf || rf.on !== p.container || rf.x !== rx || rf.z !== rz || rf.sig !== sig || nowMs - rf.t > REST_STALE)) {
+            const anew = !rf || rf.on !== p.container || rf.x !== rx || rf.z !== rz || rf.sig !== sig || nowMs - rf.t > REST_STALE
+            if (p.container === 'bar' && !onTray && (anew || (carried && nowMs - rf!.t > TRAY_REST_MS))) {
               const par = p.node.parent
               const under: THREE.Object3D[] = [...PLATE_FACES]
               for (const q of pieces.current) if (q !== p && q.container === p.container && (q.flight ?? 0) >= 1 && !q.eaten && q.node) under.push(q.node)
@@ -9038,11 +9056,20 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
                 const hit = REST_RAY.intersectObjects(under, true).find((h) => drawnUp(h.object))
                 return hit ? par.worldToLocal(LOW_AT.copy(hit.point)).y : null
               }
-              const mid = faceAt(0), l = faceAt(-1), r = faceAt(1)
-              const roll = l !== null && r !== null ? THREE.MathUtils.clamp(Math.atan2(r - l, 2 * REST_SIDE), -0.4, 0.4) : 0
-              // (rolled, it lies on its lower side's support: the lower of either side's, or its middle's if a side found nothing)
-              const low = Math.min(...[l, r, mid].filter((v): v is number => v !== null))
-              p.restFace = { on: p.container, x: rx, z: rz, sig, t: nowMs, face: Number.isFinite(low) ? (roll ? low : mid ?? low) : null, roll }
+              const mid = faceAt(0)
+              if (!anew && rf) {
+                // (on a tray, a while on: its middle alone, what it rests on moved as much as that did; kept from here as a height over its
+                // spot where it is now)
+                if (mid !== null && rf.mid !== null && rf.face !== null) rf.face += mid - rf.mid
+                if (mid !== null) { rf.mid = mid; rf.base = p.toP.y }
+                rf.t = nowMs
+              } else {
+                const l = faceAt(-1), r = faceAt(1)
+                const roll = l !== null && r !== null ? THREE.MathUtils.clamp(Math.atan2(r - l, 2 * REST_SIDE), -0.4, 0.4) : 0
+                // (rolled, it lies on its lower side's support: the lower of either side's, or its middle's if a side found nothing)
+                const low = Math.min(...[l, r, mid].filter((v): v is number => v !== null))
+                p.restFace = { on: p.container, x: rx, z: rz, sig, t: nowMs, face: Number.isFinite(low) ? (roll ? low : mid ?? low) : null, roll, base: p.toP.y, mid }
+              }
             }
             const roll = p.container === 'bar' && !onTray ? p.restFace?.roll ?? 0 : 0
             if (roll) p.node.quaternion.premultiply(REST_ROLL.setFromAxisAngle(REST_LONG.crossVectors(across, UP_AXIS).normalize(), roll))
@@ -9067,7 +9094,9 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
               low = p.node.parent.worldToLocal(LOW_AT.set(0, low, 0)).y
               p.restDrop = { q: p.node.quaternion.clone(), s: p.node.scale.x, drop: p.node.position.y - low, cx, cz }
             }
-            const face = (p.container === 'bar' && !onTray ? p.restFace?.face : null) ?? p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
+            // (on a tray, kept as a height over its spot as the tray moves on)
+            const kept = p.container === 'bar' && !onTray ? p.restFace : undefined
+            const face = (kept && kept.face !== null ? kept.face + (kept.x === TRAY_SPOT ? p.toP.y - kept.base : 0) : null) ?? p.toP.y - (p.container === 'takeout' ? 0.04 : 0.023)
             p.node.position.y = face + 0.003 + p.restDrop!.drop
           }
           if (p.flight >= 1 && inBasket(p)) {

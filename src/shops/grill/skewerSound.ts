@@ -2,10 +2,18 @@
 // skewers' tray, a handful dropped back into the holder
 let audio: AudioContext | null = null
 
-function noise(len: number, shape: (x: number) => number) {
+/** a stretch of shaped noise: a few of each kind (`key`) made as they're first wanted, then one of them picked at random (item 374: fresh noise
+ * made for every skewer pushed through, four buffers each time, some 14 MB of garbage every 30 s in a rush); each still sounds its own, its
+ * filter's sweep and its timing set afresh */
+const NOISES = new Map<string, AudioBuffer[]>()
+function noise(key: string, len: number, shape: (x: number) => number) {
+  let list = NOISES.get(key)
+  if (!list) NOISES.set(key, (list = []))
+  if (list.length >= 4) return list[Math.floor(Math.random() * list.length)]
   const buf = audio!.createBuffer(1, Math.max(1, Math.round(audio!.sampleRate * len)), audio!.sampleRate)
   const d = buf.getChannelData(0)
   for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * shape(i / d.length)
+  list.push(buf)
   return buf
 }
 
@@ -30,7 +38,7 @@ export function pierceSound() {
     const t0 = audio.currentTime
     {
       const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain()
-      s.buffer = noise(0.13, (x) => Math.sin(Math.PI * x) ** 0.6)
+      s.buffer = noise('shing', 0.13, (x) => Math.sin(Math.PI * x) ** 0.6)
       f.type = 'bandpass'
       f.frequency.setValueAtTime(4800, t0)
       f.frequency.linearRampToValueAtTime(7200, t0 + 0.13)
@@ -43,7 +51,7 @@ export function pierceSound() {
     const t = t0 + 0.16
     for (let k = 0; k < 3; k++) {
       const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain()
-      s.buffer = noise(0.07, (x) => Math.sin(Math.PI * x))
+      s.buffer = noise('scrape', 0.07, (x) => Math.sin(Math.PI * x))
       f.type = 'bandpass'
       f.frequency.value = 2200 + k * 500
       f.Q.value = 1.4

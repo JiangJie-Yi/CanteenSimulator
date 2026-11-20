@@ -59,15 +59,31 @@ if (typeof window !== 'undefined') {
   replaces(import.meta.hot, () => { window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go); void ac?.close() })
 }
 
+/**
+ * A burst's noise, falling away fast, for a length (to 5 ms): a few of each made as they're first wanted, then one of them picked at random
+ * (item 374: a buffer of fresh noise made for every pop and every spit, several a second with the fire up and food over it, was 14 MB of
+ * garbage every 30 s). Each still sounds its own: its pitch, its loudness and its filter are new each time.
+ */
+const BURSTS = new Map<number, AudioBuffer[]>()
+const BURST_WAYS = 3
+function burstNoise(a: AudioContext, len: number) {
+  const key = Math.max(1, Math.round(len * 200))
+  let list = BURSTS.get(key)
+  if (!list) BURSTS.set(key, (list = []))
+  if (list.length >= BURST_WAYS) return list[Math.floor(Math.random() * list.length)]
+  const n = Math.floor((a.sampleRate * key) / 200)
+  const b = a.createBuffer(1, n, a.sampleRate)
+  const d = b.getChannelData(0)
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n * 0.15))
+  list.push(b)
+  return b
+}
+
 /** a sharp little sound: a charcoal pop (low, woody) or a spit of fat (high, quick) */
 function burst(freq: number, q: number, len: number, gain: number) {
   if (!ac || !out) return
-  const n = Math.floor(ac.sampleRate * len)
-  const b = ac.createBuffer(1, n, ac.sampleRate)
-  const d = b.getChannelData(0)
-  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n * 0.15))
   const s = ac.createBufferSource()
-  s.buffer = b
+  s.buffer = burstNoise(ac, len)
   const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q
   const g = ac.createGain(); g.gain.value = gain
   s.connect(f).connect(g).connect(out)

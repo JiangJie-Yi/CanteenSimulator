@@ -388,6 +388,7 @@ const ShadowPacer = memo(function ShadowPacer() {
   const n = useRef(0)
   const seen = useRef(-1)
   useEffect(() => { gl.shadowMap.autoUpdate = false; gl.shadowMap.needsUpdate = true; return () => { gl.shadowMap.autoUpdate = true } }, [gl])
+  const onePass = (mat: THREE.Material | undefined) => { if (mat && mat.transparent && mat.side === THREE.DoubleSide && !mat.forceSinglePass) mat.forceSinglePass = true }
   useFrame(({ clock }) => {
     // (once a second and a half)
     if (clock.elapsedTime - seen.current > 1.5) {
@@ -399,9 +400,11 @@ const ShadowPacer = memo(function ShadowPacer() {
         // (and anything see-through and two-sided drawn in one pass: three otherwise draws it twice a frame, back faces then front, flagging
         // its material changed before each (its program's parameters worked out afresh twice a frame, for every banner, glow and glass);
         // they're all flat cloths, glows and panes here, which look the same either way)
-        for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
-          if (mat && mat.transparent && mat.side === THREE.DoubleSide && !mat.forceSinglePass) mat.forceSinglePass = true
-        }
+        // (one material or a list, each as it is: a list made of every mesh's one, every second and a half, was 9 MB of garbage the half
+        // minute (item 374))
+        const mats = m.material
+        if (Array.isArray(mats)) mats.forEach(onePass)
+        else onePass(mats)
         if (m.userData.sunSeen === m.geometry) return
         m.userData.sunSeen = m.geometry
         const g = m.geometry

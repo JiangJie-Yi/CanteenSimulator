@@ -10,7 +10,9 @@ import { chromium } from 'playwright-core'
 import { toOpeningHours } from './hours.mjs'
 
 const WARM = +(process.env.WARM ?? 60000), SPAN = +(process.env.SPAN ?? 30000)
-const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] })
+// (JS_FLAGS: flags for V8, e.g. "--log-deopt --logfile=<file> --no-logfile-per-isolate" (the renderer unsandboxed, so it can write it))
+const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-precise-memory-info',
+  ...(process.env.JS_FLAGS ? [`--js-flags=${process.env.JS_FLAGS}`, '--no-sandbox'] : [])] })
 const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } })
 const p = await ctx.newPage()
 p.setDefaultTimeout(8000)
@@ -53,9 +55,19 @@ const cdp = await ctx.newCDPSession(p)
 await cdp.send('HeapProfiler.enable')
 const heap = () => p.evaluate(() => Math.round(performance.memory.usedJSHeapSize / 1e6))
 console.log('heap before', await heap(), 'MB')
+// (DEOPT=1: a CPU profile over the same span too, and every function V8 gave up its optimised code for in it, with why: a function made slow
+// that way allocates every number it works out)
+if (process.env.DEOPT) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start') }
 await cdp.send('HeapProfiler.startSampling', { samplingInterval: 16384, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true })
 await p.waitForTimeout(SPAN)
 const { profile } = await cdp.send('HeapProfiler.stopSampling')
+if (process.env.DEOPT) {
+  const { profile: cpu } = await cdp.send('Profiler.stop')
+  const why = new Map()
+  for (const n of cpu.nodes) if (n.deoptReason) { const k = `${n.callFrame.functionName || '(anon)'} ${n.callFrame.url.split('/').pop()}:${n.callFrame.lineNumber + 1} -- ${n.deoptReason}`; why.set(k, (why.get(k) ?? 0) + (n.hitCount ?? 0)) }
+  console.log('deoptimised in the span (function, why; samples in it):')
+  for (const [k, v] of [...why.entries()].sort((x, y) => y[1] - x[1]).slice(0, 25)) console.log(`  ${v}  ${k}`)
+}
 console.log('heap after', await heap(), 'MB')
 const by = new Map(), deep = new Map()
 let total = 0

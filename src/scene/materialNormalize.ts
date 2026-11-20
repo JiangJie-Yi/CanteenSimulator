@@ -76,8 +76,6 @@ export function normalizeMaterial(mat: THREE.Material) {
   m.needsUpdate = true
 }
 
-const normalizeAll = (m: THREE.Material | THREE.Material[]) => { if (Array.isArray(m)) m.forEach(normalizeMaterial); else normalizeMaterial(m) }
-
 /**
  * Whether a material drawn with `side` is drawn with the two-sided program. It's the same picture: the two-sided program turns the normal of a
  * face the GL sees from behind (gl_FrontFacing false). A front-sided one is drawn with the back faces culled, so every face it draws is seen
@@ -158,7 +156,11 @@ export function normalizeRenderer(r: THREE.WebGLRenderer) {
   // (a transparent two-sided material drawn in one pass, as ShadowPacer has them all now and then: three otherwise draws, and compiles, its
   // back and its front apart, with a back-sided program of its own besides)
   const single = (m: THREE.Material) => { if (m.transparent && m.side === THREE.DoubleSide) m.forceSinglePass = true }
-  const visit = (o: THREE.Object3D) => o.traverse((c) => { const m = (c as THREE.Mesh).material; if (m) { normalizeAll(m); ([] as THREE.Material[]).concat(m).forEach(single) } })
+  // (each of a mesh's materials taken as they are, one or a list: a list made of every one, every 20 frames for the whole scene, was some
+  // 16 MB of garbage every 30 s (item 374))
+  const one = (m: THREE.Material) => { normalizeMaterial(m); single(m) }
+  const each = (c: THREE.Object3D) => { const m = (c as THREE.Mesh).material; if (!m) return; if (Array.isArray(m)) m.forEach(one); else one(m) }
+  const visit = (o: THREE.Object3D) => o.traverse(each)
   // (and the scene gone through before it's drawn, now and then: the shadows are drawn first, and the depth material three makes for a
   // shadow follows the material's features as they are then: one met first there was made a shadow program of its own, kept for good)
   const render = r.render.bind(r)
