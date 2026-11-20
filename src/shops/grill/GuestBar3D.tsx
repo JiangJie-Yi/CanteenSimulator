@@ -53,7 +53,6 @@ import { Omamori } from './Omamori'
 import { moodOf, walkSpeedOf } from '@/scene/people'
 import { BlobShadow } from '@/scene/BlobShadow'
 import { brushText, followSign, signTexture } from '@/scene/signFont'
-import { StreetOutside } from './StreetOutside'
 import { activityOf, type Look as StaffLook } from '@/data/staff'
 import type { Lang } from '@/data/i18n'
 import { inkModel, inkTogether } from '@/scene/inkHull'
@@ -980,7 +979,7 @@ const BIG_CHOCHIN: [number, number, number] = [1.8, 0.95, 1.8]
 const DOOR_LIGHT = (() => {
   if (typeof document === 'undefined') return { spill: null }
   const tex = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
-  // (the street itself out there is StreetOutside's now, with depth (item 386); it was a picture on a card here (item 360))
+  // (no street out there (item 397, the owner's 「戶外景拿掉好了」): it was StreetOutside's, with depth (item 386), a card before (item 360))
   const s = document.createElement('canvas')
   s.width = 64; s.height = 128
   const h = s.getContext('2d')!
@@ -1015,9 +1014,6 @@ function doorLight() {
 // (drawn again only if the door's place or the shop's mark changes: the bar above it redraws several times a second while the shop's open, and
 // the way in is a dozen pieces, each in edit mode's wrapper)
 export const Entrance = memo(EntranceImpl, (a, b) => a.mark === b.mark && a.at.equals(b.at))
-/** the doorway's opening in the wall (its frame: x across from the noren's middle line, y up), the street seen only through it (item 386):
- * the noren's width (1.05, its middle 0.12 toward the till) and a hair, from under the sill to the head */
-const STREET_HOLE = { x0: -0.12 - 0.545, x1: -0.12 + 0.545, y0: -0.4, y1: 2.2 }
 function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   const lantern = mark === '聞野' ? '燒' : mark
   // (the grill's noren reads 烤魚, the shop's trade, with a fish on it; the other shops' name their own)
@@ -1117,8 +1113,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       </Movable>
       <group position-x={DX}>
       {/* (the street's light out through the doorway, facing in only; and the day spilling in on the genkan's stones (item 306)) */}
-      {/* (the street out there, with depth (item 386): it was a picture on a card here, 20 cm past the door) */}
-      <StreetOutside floor={-GENKAN.depth} hole={STREET_HOLE} />
+      {/* (past the door, nothing: the street that stood out there (items 360, 386) taken away, item 397 (the owner's 「戶外景拿掉好了」): from out
+          round the shop its power pole stood up out of the night past the restrooms (item 396, 「這是甚麼? 2F嗎?」)) */}
       <mesh position={[0, -GENKAN.depth + 0.012, NZ - 0.6]} rotation-x={-Math.PI / 2} material={DOOR_SPILL} renderOrder={2} raycast={NO_RAY}><planeGeometry args={[W * 0.95, 1.2]} /></mesh>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
