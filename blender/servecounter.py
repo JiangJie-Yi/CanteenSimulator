@@ -40,8 +40,8 @@ def P(x, y, z):
     return Vector((x, -z, y))
 
 
-# (wood and bamboo, item 403: the top a hinoki board, the frame darker wood, the doors and the ends split bamboo in wooden frames; the culm's
-# skin of items 254 and 286 (the fence's kind, 「已經放一段時間的那種竹」, 「然後會有點撥離感」) kept for the split strips and the pulls)
+# (all bamboo again, item 438 (item 403 had made its top and frame wood); the culm's skin of items 254 and 286 (the fence's kind,
+# 「已經放一段時間的那種竹」, 「然後會有點撥離感」) for its culms, the split strips for its top, back, ends and doors)
 L, D, H = 1.0, 0.36, 0.496
 TT = 0.03             # the top's thickness
 LEG_W = 0.036         # the legs: square
@@ -211,46 +211,114 @@ def eased(name, lo, hi, mat, bw, segs=2, bottom=True):
     return o
 
 
-# ---- the top: one board of hinoki the whole of it, its edges eased round (under too)
-eased("ServeTop", (-L / 2, H - TT, -D / 2), (L / 2, H, D / 2), "top", 0.008, 3)
-# ---- the legs: square, darker wood, in from the corners, up into the top
+# (all bamboo (item 438, the owner's, 2026-11-21: 「這個我要全竹子的，拉門可拉」: item 403 had made it a hinoki top on a frame of darker wood,
+# the split bamboo only in its doors and ends): its legs, the rails under its top and the stretchers near the floor round culms, nodes and
+# all; its top split bamboo laid along it, its edges finished with culms; its back and ends upright split bamboo; its two sliding doors
+# each framed in thin culms round a panel of split bamboo, each its own node (the game slides them); inside, the takeaways' spare boxes and
+# a bundle of disposable chopsticks, seen with a door open)
+def lin(hexs):
+    """a #rrggbb colour into linear light, for pbr's base colour"""
+    c = [int(hexs[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    return tuple((x / 12.92) if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c)
+
+
+M["kraft"] = pbr("ServeKraft", lin("#b8915e"), rough=0.8)
+M["kraftlid"] = pbr("ServeKraftLid", lin("#cfae7c"), rough=0.8)
+M["chop"] = pbr("ServeChop", lin("#e6d3a8"), rough=0.6)
+M["band"] = pbr("ServeBand", lin("#b8261c"), rough=0.6)
+
+
+def block_along(name, lo, hi, mat, tile):
+    """a box as block() is, its top's and foot's picture turned a quarter round (split bamboo laid along it, its strips along x)"""
+    o = block(name, lo, hi, mat, tile)
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    uvl = bm.loops.layers.uv.get("UVMap")
+    for f in bm.faces:
+        if abs(f.normal.z) >= max(abs(f.normal.x), abs(f.normal.y)):
+            for loop in f.loops:
+                c = o.matrix_world @ loop.vert.co
+                loop[uvl].uv = (c.y / tile, c.x / tile)
+    bm.to_mesh(o.data)
+    bm.free()
+    return o
+
+
+LR = 0.018               # the legs' culms' radius (their 3.6 cm, the square legs' size)
+RR = 0.011               # the rails' and stretchers'
 LX, LZ = L / 2 - LEG_IN, D / 2 - LEG_IN
+# ---- the top: split bamboo laid along it, a culm along each edge
+block_along("ServeTop", (-L / 2 + 0.012, H - TT, -D / 2 + 0.012), (L / 2 - 0.012, H - 0.004, D / 2 - 0.012), "split", SPLIT_TILE)
+ER = 0.013
+for sz in (-1, 1):
+    culm(f"ServeEdge{sz}", (-L / 2, H - TT / 2 - 0.002, sz * (D / 2 - ER)), (L / 2, H - TT / 2 - 0.002, sz * (D / 2 - ER)), ER, segs=8, turn=0.4 + sz)
+for sx in (-1, 1):
+    culm(f"ServeEdgeEnd{sx}", (sx * (L / 2 - ER), H - TT / 2 - 0.002, -D / 2 + 2 * ER + 0.001), (sx * (L / 2 - ER), H - TT / 2 - 0.002, D / 2 - 2 * ER - 0.001),
+         ER, segs=8, turn=1.3 + sx)
+# ---- the legs: culms, up to the top's foot
 for sx in (-1, 1):
     for sz in (-1, 1):
-        # (a single chamfer at their edges: two rounds' steps each, four legs, were 400 triangles for what reads the same at this size)
-        eased(f"ServeLeg{sx}{sz}", (sx * LX - LEG_W / 2, 0.0, sz * LZ - LEG_W / 2), (sx * LX + LEG_W / 2, H - TT + 0.002, sz * LZ + LEG_W / 2), "frame", 0.004, 1)
-# ---- the cupboard between the legs: its floor, its back a plain board, its ends split bamboo in their frames, its doors at its front
-ix = LX - LEG_W / 2 - 0.002     # the cupboard's ends, inside the legs
-zb = -LZ + LEG_W / 2 - 0.004    # its back's front face
-zf = LZ + LEG_W / 2 - 0.004     # its front: the doors' outer track's front face, in a hair from the legs' fronts
-top_y = H - TT - 0.03           # the rail under the top: the doors' tops just under it
-block("ServeFloor", (-ix, FLOOR_Y, zb - 0.008), (ix, FLOOR_Y + FLOOR_T, zf - 0.002), "frame", WOOD_TILE)
-block("ServeBack", (-ix, FLOOR_Y + FLOOR_T + 0.001, zb - 0.01), (ix, H - TT - 0.002, zb), "frame", WOOD_TILE)
-# (the rails under the top all round, the front one the doors' top track)
-block("ServeRailFront", (-LX + LEG_W / 2 + 0.001, top_y, zf - 0.03), (LX - LEG_W / 2 - 0.001, H - TT - 0.001, zf), "frame", WOOD_TILE)
+        culm(f"ServeLeg{sx}{sz}", (sx * LX, 0.0, sz * LZ), (sx * LX, H - TT - 0.001, sz * LZ), LR, segs=8, turn=0.7 * (sx + 2 * sz))
+# ---- under the top all round, and near the floor at the back and the ends: rails of culm between the legs, a hair clear of them
+ix = LX - LR - 0.002     # the cupboard's ends, inside the legs
+zb = -LZ + LR - 0.004    # its back's front face
+zf = LZ + LR - 0.004     # its front: the doors' outer track's front face
+top_y = H - TT - 0.026   # the rail under the top's middle: the doors' tops just under it
+for sz in (-1, 1):
+    culm(f"ServeRail{sz}", (-LX + LR + 0.001, top_y, sz * LZ), (LX - LR - 0.001, top_y, sz * LZ), RR, segs=8, turn=2.1 + sz)
 for sx in (-1, 1):
-    x0, x1 = sorted((sx * (ix - 0.012), sx * (ix + 0.001)))
-    block(f"ServeRailEnd{sx}", (x0, top_y, -LZ + LEG_W / 2 + 0.001), (x1, H - TT - 0.001, LZ - LEG_W / 2 - 0.001), "frame", WOOD_TILE)
-    # (the end's split bamboo, upright between the floor and the rail, set in its frame of the legs and a bottom rail)
-    block(f"ServeEndRail{sx}", (x0, FLOOR_Y + FLOOR_T + 0.001, -LZ + LEG_W / 2 + 0.001), (x1, FLOOR_Y + FLOOR_T + 0.03, LZ - LEG_W / 2 - 0.001), "frame", WOOD_TILE)
-    xs0, xs1 = sorted((sx * (ix - 0.009), sx * (ix - 0.003)))
-    block(f"ServeEnd{sx}", (xs0, FLOOR_Y + FLOOR_T + 0.029, -LZ + LEG_W / 2 + 0.001), (xs1, top_y + 0.001, LZ - LEG_W / 2 - 0.001), "split", SPLIT_TILE)
-# (the two doors: each a little over half the opening, one in the outer track, one in the inner, overlapping in the middle; each a frame of
-# the darker wood round a panel of split bamboo set a hair back in it, a short round culm for its pull by its outer edge)
+    culm(f"ServeRailEnd{sx}", (sx * LX, top_y, -LZ + LR + 0.001), (sx * LX, top_y, LZ - LR - 0.001), RR, segs=8, turn=2.9 + sx)
+    culm(f"ServeStretch{sx}", (sx * LX, FLOOR_Y + 0.004, -LZ + LR + 0.001), (sx * LX, FLOOR_Y + 0.004, LZ - LR - 0.001), RR, segs=8, turn=3.7 + sx)
+culm("ServeStretchBack", (-LX + LR + 0.001, FLOOR_Y + 0.004, -LZ), (LX - LR - 0.001, FLOOR_Y + 0.004, -LZ), RR, segs=8, turn=4.4)
+# ---- the cupboard: its floor split bamboo along it on the stretchers; its back and its ends upright split bamboo, between the legs and the rails
+block_along("ServeFloor", (-ix, FLOOR_Y + RR, zb - 0.008), (ix, FLOOR_Y + RR + FLOOR_T, zf - 0.03), "split", SPLIT_TILE)
+block("ServeBack", (-ix, FLOOR_Y + RR + FLOOR_T + 0.001, zb - 0.01), (ix, top_y - RR - 0.001, zb), "split", SPLIT_TILE)
+for sx in (-1, 1):
+    xs0, xs1 = sorted((sx * (ix - 0.006), sx * (ix + 0.0)))
+    block(f"ServeEnd{sx}", (xs0, FLOOR_Y + RR + 0.004, -LZ + LR + 0.001), (xs1, top_y - RR - 0.001, LZ - LR - 0.001), "split", SPLIT_TILE)
+# (the doors' bottom track: a culm along the front on the floor's edge)
+culm("ServeTrack", (-LX + LR + 0.001, FLOOR_Y + RR, zf - 0.02), (LX - LR - 0.001, FLOOR_Y + RR, zf - 0.02), 0.007, segs=6, turn=5.2)
+# ---- what's kept in it: the takeaways' spare boxes in two stacks of kraft, a bundle of wari-bashi in its paper band
+fy = FLOOR_Y + RR + FLOOR_T
+for k, cx in enumerate((-0.27, -0.06)):
+    for j in range(3):
+        y0 = fy + 0.001 + j * 0.043
+        block(f"ServeBox{k}{j}", (cx - 0.09, y0, zb + 0.02), (cx + 0.09, y0 + 0.036, zb + 0.15), "kraft", 0.3)
+        block(f"ServeBoxLid{k}{j}", (cx - 0.092, y0 + 0.036, zb + 0.018), (cx + 0.092, y0 + 0.042, zb + 0.152), "kraftlid", 0.3)
+block("ServeChops", (0.12, fy + 0.001, zb + 0.03), (0.33, fy + 0.046, zb + 0.09), "chop", 0.3)
+block("ServeChopsBand", (0.205, fy + 0.0005, zb + 0.0295), (0.245, fy + 0.0465, zb + 0.0905), "band", 0.3)
+# ---- the two doors: each a little over half the opening, one in the outer track, one in the inner, overlapping in the middle; each a frame
+# of thin culms round its split bamboo panel, a short upright culm for its pull by its outer edge; each its own node, its origin its middle
 DW = ix + 0.02
-door_lo, door_hi = FLOOR_Y + FLOOR_T + 0.002, top_y - 0.001
-FB, FT = 0.022, 0.014            # the frame's bars: how wide, how thick
-for d_, (x0, x1, zz) in enumerate(((-ix, -ix + DW, zf - FT - 0.03 - 0.001), (ix - DW, ix, zf - FT * 2 - 0.03 - 0.005))):
+door_lo, door_hi = FLOOR_Y + RR + FLOOR_T + 0.002, top_y - RR - 0.002
+FR = 0.007               # the frame's culms' radius
+doors = []
+for d_, (x0, x1, zz) in enumerate(((-ix, -ix + DW, zf - 0.012), (ix - DW, ix, zf - 0.03))):
     nm = f"ServeDoor{d_}"
-    block(nm + "Top", (x0, door_hi - FB, zz), (x1, door_hi, zz + FT), "frame", WOOD_TILE)
-    block(nm + "Bot", (x0, door_lo, zz), (x1, door_lo + FB * 1.4, zz + FT), "frame", WOOD_TILE)
-    block(nm + "L", (x0, door_lo + FB * 1.4 + 0.001, zz), (x0 + FB, door_hi - FB - 0.001, zz + FT), "frame", WOOD_TILE)
-    block(nm + "R", (x1 - FB, door_lo + FB * 1.4 + 0.001, zz), (x1, door_hi - FB - 0.001, zz + FT), "frame", WOOD_TILE)
-    block(nm + "Panel", (x0 + FB - 0.002, door_lo + FB * 1.4 - 0.002, zz + 0.004), (x1 - FB + 0.002, door_hi - FB + 0.002, zz + FT - 0.004), "split", SPLIT_TILE)
-    # (its pull: a short culm upright on the frame by its outer edge, standing proud of it)
-    px = x0 + FB / 2 if d_ == 0 else x1 - FB / 2
+    first = len(parts)
+    culm(nm + "Top", (x0, door_hi - FR, zz), (x1, door_hi - FR, zz), FR, segs=6, turn=0.3 + d_)
+    culm(nm + "Bot", (x0, door_lo + FR, zz), (x1, door_lo + FR, zz), FR, segs=6, turn=0.9 + d_)
+    culm(nm + "L", (x0 + FR, door_lo + 2 * FR + 0.001, zz), (x0 + FR, door_hi - 2 * FR - 0.001, zz), FR, segs=6, turn=1.6 + d_)
+    culm(nm + "R", (x1 - FR, door_lo + 2 * FR + 0.001, zz), (x1 - FR, door_hi - 2 * FR - 0.001, zz), FR, segs=6, turn=2.2 + d_)
+    block(nm + "Panel", (x0 + FR, door_lo + FR, zz - 0.003), (x1 - FR, door_hi - FR, zz + 0.003), "split", SPLIT_TILE)
+    px = x0 + 2 * FR + 0.012 if d_ == 0 else x1 - 2 * FR - 0.012
     my = (door_lo + door_hi) / 2
-    culm(nm + "Pull", (px, my - 0.035, zz + FT + 0.006), (px, my + 0.035, zz + FT + 0.006), 0.006, segs=6, turn=0.6 * (d_ + 1))
+    culm(nm + "Pull", (px, my - 0.03, zz + 0.008), (px, my + 0.03, zz + 0.008), 0.005, segs=6, turn=0.6 * (d_ + 1))
+    mine = parts[first:]
+    del parts[first:]
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in mine:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = mine[0]
+    bpy.ops.object.join()
+    door = bpy.context.view_layer.objects.active
+    door.name = nm
+    bpy.context.scene.cursor.location = P((x0 + x1) / 2, (door_lo + door_hi) / 2, zz)
+    bpy.ops.object.select_all(action="DESELECT"); door.select_set(True); bpy.context.view_layer.objects.active = door
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    doors.append(door)
+    print("SERVE_DOOR", nm, "slides", round(DW - 0.04, 4))
+
 
 # (one node of it all, its own name; the marks)
 bpy.ops.object.select_all(action="DESELECT")
@@ -263,6 +331,8 @@ counter.name = "ServeCounter"
 root = bpy.data.objects.new("ServeCounterRoot", None)
 bpy.context.collection.objects.link(root)
 counter.parent = root
+for d_o in doors:
+    d_o.parent = root
 top = bpy.data.objects.new("ServeCounterTop", None)
 top.location = P(0, H, 0)
 front = bpy.data.objects.new("ServeCounterFront", None)
@@ -270,7 +340,7 @@ front.location = P(0, 0, D / 2 + 0.18)
 for o in (top, front):
     bpy.context.collection.objects.link(o)
     o.parent = root
-print("SERVE_TRIS", sum(len(p.vertices) - 2 for p in counter.data.polygons))
-export_dish(root, [counter, top, front, root], os.path.join(PROJECT, "public", "models", "servecounter.glb"),
+print("SERVE_TRIS", sum(len(p.vertices) - 2 for o in [counter] + doors for p in o.data.polygons))
+export_dish(root, [counter, top, front, root] + doors, os.path.join(PROJECT, "public", "models", "servecounter.glb"),
             os.path.join(PROJECT, "blender", "servecounter.blend"), PREVIEW)
 print("SERVE_DONE")
