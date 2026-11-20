@@ -61,6 +61,8 @@ await p.evaluate((JUMP) => {
   const plain = (u) => Object.fromEntries(Object.entries(u).filter(([, b]) => b === null || ['string', 'number', 'boolean'].includes(typeof b)).slice(0, 10))
   const phaseOf = (o, k) => {
     // (the plater off their place: what they're about, how far along, the way they're on (GuestBar3D's platerRun))
+    // (one on the bench: what they're about, how far, the place they're going to, where they set out from going (item 411))
+    if (k.startsWith('bench')) { const v = window.__sitters?.current?.get(+k.slice(5)); return v ? `${v.phase} t${(+v.t).toFixed(2)}${v.handed ? ' handed' : ''} at${v.at ? `${v.at.x.toFixed(2)},${v.at.z.toFixed(2)}` : '-'}${v.outFrom ? ` from${v.outFrom.x.toFixed(2)},${v.outFrom.z.toFixed(2)}` : ''}` : null }
     if (k === 'plater-walker') { const r = window.__platerRun?.current; return r ? `${r.phase} t${(+r.t).toFixed(2)} len${(+r.len).toFixed(2)} path${r.path.length}:${r.path.map((q) => q.x.toFixed(2) + ',' + q.z.toFixed(2)).join(' ')}` : null }
     if (k?.startsWith('takeout')) { const v = window.__visitors?.current?.get(+k.slice(7)); return v ? `${v.rider ? 'rider' : 'takeout'} ${v.phase} t${(+v.t).toFixed(2)}` : null }
     const id = o.userData.guest

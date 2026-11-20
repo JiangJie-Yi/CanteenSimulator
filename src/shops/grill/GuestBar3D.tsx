@@ -96,7 +96,7 @@ import { MAKE_S, SOUP_BOWLS, emptyPot, heatNow, heatRate, potTick, setSoup, soup
 import { RICE_BEATS, SOUP_BEATS, beatsLength } from '@/game/sides'
 import { SeatBowls, fillRice, fillSoup, ladleRest, leftOf, paddleRest, riceFillPose, soupFillPose, useSideProps, type FillAt, type FillPose } from './SideBowls'
 import { bottleClink, lightSwitchSound, plateClink, plateDownSound, scrubSound, slideDoorSound, stoolSound, tapTurnSound, washSplash } from './restroomSound'
-import { LAST_CALL, SHOP, clockIn } from '@/game/shopState'
+import { LAST_CALL, ON_DUTY, SHOP, clockIn } from '@/game/shopState'
 import { flowerBuffs } from '@/game/shrineFlowers'
 import { murmur } from '@/game/fireSound'
 import { crowdAmbience } from './fireAmbience'
@@ -4111,8 +4111,10 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     /** at the genkan's step (item 203): how far through stepping out of (or into) their shoes, 0..1, -1 not at it; and their pair left on the
      * stone, where and which way */
     bow?: number; shoes?: { at: THREE.Vector3; yaw: number }
-    /** how far along their way in, and their way out, the genkan's step is (found once each, not every frame) */
-    stepIn?: number; stepOut?: number }
+    /** how far along their way in, and their way out, the genkan's step is (found once each, not every frame); and how long they stop at it
+     * going out, fixed as they set off (item 411: worked out each frame from whether their shoes were still on the stone, it went to nothing
+     * halfway into the stop as they stepped into them, and they were put where the walk would have been without it: 0.75 to 1.7 on in a frame) */
+    stepIn?: number; stepOut?: number; outHold?: number }
   const sitters = useRef(new Map<number, Sitter>())
   /** where the bench's sitters leave their shoes on the genkan's stone (item 203): found from the first one's way up the step, kept */
   const shoeRow = useRef<{ at: THREE.Vector3; toes: THREE.Vector3; across: THREE.Vector3 } | null>(null)
@@ -4765,13 +4767,17 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     // (its two ends, where one's set inside a piece itself, moved out to stand up against it (game/kitchenPath's outOfPieces, item 333): no
     // way walks into or out of the middle of the warmer, the low rack or the cook table)
     const end = (v: THREE.Vector3) => { const q = flat(v), o = outOfPieces(q, blocks, PASS_ROOM); return o === q ? v : back(o) }
-    const stops = [end(from), ...viaStops(from, to), end(to)]
+    const start = end(from)
+    const stops = [start, ...viaStops(from, to), end(to)]
     let out: THREE.Vector3[] = []
     for (let i = 1; i < stops.length; i++) {
       const way = kitchenPath(flat(stops[i - 1]), flat(stops[i]), area, blocks)
       const leg = way ? way.map(back) : [stops[i - 1].clone().setY(0), stops[i].clone().setY(0)]
       out = i === 1 ? leg : [...out, ...leg.slice(1)]
     }
+    // (and from just where they stand: one at their place in a piece's reach (the third cook in his bay at the cook table) moved out to the
+    // clear floor at the way's start, they set off from there, 0.7 away, a jump each time (item 411))
+    if (start !== from && out.length && out[0].distanceTo(from.clone().setY(0)) > 0.02) out.unshift(from.clone().setY(0))
     return out
   }
   /** the paths' map (item 168, PathMap) filled: what's in the way, looked at afresh (it may have been moved in edit mode); the staff's usual
@@ -6548,7 +6554,10 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       } else if (pl.phase === 'idle') {
         // (the second cook, plating with no third cook to: not while he's fetching an order or skewering it at the board)
         // (the owner doing it, with no third cook: not while he's off on another job, the washing up (item 216: two of him at once))
-        if (pl.t > 0.5 && (!!plater || ownerFree('plate')) && platerFree(!!plater && FETCHER.id === plater.id, FETCHER.busy)) {
+        // (and not with the shop open till the third cook's in at his place (game/shopState's ON_DUTY: his walk in from the door done): sent off
+        // from his place while he was still out at the door or on his way, which was where his mark was, and home to it, he went out to the
+        // steps and jumped back (item 411))
+        if (pl.t > 0.5 && (!!plater || ownerFree('plate')) && platerFree(!!plater && FETCHER.id === plater.id, FETCHER.busy) && !(plater && open && !ON_DUTY.in.has(plater.id))) {
           pl.t = 0
           if (open && !SHOP.leaving && FIRE_TEND.want && !FIRE_TEND.done) {
             // (the fire's asked for: charcoal from the crate, or water from the bucket on the table by his bay, first of all)
@@ -7209,8 +7218,12 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       if (way) {
         for (const id of BENCH.ids) {
           if (sitters.current.has(id)) continue
-          const taken = new Set([...sitters.current.values()].map((x) => x.spot))
-          const spot = Math.max(0, Array.from({ length: BENCH_SEATS }, (_, k) => k).findIndex((k) => !taken.has(k)))
+          // (a place no one's sat in or on their way to: those going out are up off theirs, and with every place counted (the bench full, one
+          // going) the next in was sat on the first, on someone's lap (item 411); one just called away is still sat there till they're on
+          // their way to their stool (a frame or two): theirs only if there's no other)
+          const places = Array.from({ length: BENCH_SEATS }, (_, k) => k), on = [...sitters.current.values()].filter((x) => x.phase !== 'out')
+          const taken = new Set(on.map((x) => x.spot)), held = new Set(on.filter((x) => !x.handed).map((x) => x.spot))
+          const free = places.findIndex((k) => !taken.has(k)), spot = Math.max(0, free >= 0 ? free : places.findIndex((k) => !held.has(k)))
           sitters.current.set(id, { id, phase: 'in', t: 0, fade: 0, fadeT: 0, pos: way.door.clone(), yaw: 0, spot })
           benchChanged = true
         }
@@ -7309,7 +7322,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
             for (let k = 0; k < len0; k += 0.02) if (inGenkan(counters, alongPath(back, k).p)) { v.stepOut = k; break }
           }
           const on = v.stepOut
-          const hold = v.shoes ? SHOE_OFF_S * sp : 0, raw = v.t * sp, len = len0 + hold
+          const hold = (v.outHold ??= v.shoes ? SHOE_OFF_S * sp : 0), raw = v.t * sp, len = len0 + hold
           const d = Math.min(len0, withPause(raw, on, hold)), { p, dir } = alongPath(back, d)
           v.bow = hold > 0 && raw >= on && raw < on + hold ? (raw - on) / hold : -1
           if (v.shoes && raw >= on + hold * 0.55) v.shoes = undefined

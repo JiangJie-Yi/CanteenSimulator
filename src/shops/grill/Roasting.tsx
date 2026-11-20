@@ -1626,6 +1626,9 @@ function HearthGuard() {
       GUARD_INV.copy(frame.matrixWorld).invert()
       for (const [o, role] of FIGURES) {
         if (!o.parent) { FIGURES.delete(o); continue }
+        // (one not drawn this frame left where it is: the plater's walker waits hidden at the bar's middle, the hearth's, till his first
+        // errand, and was pushed out of it, his whole figure posed afresh, every frame of the opening (item 411: 340 times a day))
+        if (!o.visible) continue
         o.getWorldPosition(GUARD_AT)
         GUARD_LOCAL.copy(GUARD_AT).applyMatrix4(GUARD_INV)
         const al = GUARD_LOCAL.dot(ALONG), la = GUARD_LOCAL.dot(LAY)
