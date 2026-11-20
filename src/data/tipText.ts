@@ -45,7 +45,7 @@ export const TIP_TEXT: Record<string, [ja: string, en: string]> = {
   '【照片】員工旅遊合照': ['【写真】社員旅行の記念写真', '[Photo] Staff trip'],
   '老闆與店裡的大家一起出遊，在湖邊與富士山合影': ['大将と店のみんなで旅行、湖のほとりで富士山を背に', 'The owner and everyone from the shop on a trip, by a lake under Fuji'],
   '【簽名牆】美食家的簽名與留言': ['【サイン】食通のサインと伝言', '[Signatures] Food critics and guests'],
-  '來過的美食家留下的簽名色紙、客人的留言板與合照': ['訪れた食通のサイン色紙、お客さんの伝言板と写真', 'Boards signed by visiting food critics, the guests’ notes and photos'],
+  '來過的客人留下的簽名卡、留言板與合照': ['訪れたお客さんのサインカード、伝言板と写真', 'Cards signed by visiting guests, the guests’ notes and photos'],
   女廁電燈: ['女子トイレの照明', 'Women’s light'],
   男廁電燈: ['男子トイレの照明', 'Men’s light'],
   店內電燈: ['店内の照明', 'Room lights'],

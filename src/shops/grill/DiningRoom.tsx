@@ -18,7 +18,7 @@ import { homeCopy, plainColours, StaticBatch, mergeByMaterial, type BatchParts }
 import { glowLeave, glowOff, glowOn, glowOnly } from '@/scene/hoverGlow'
 import { inkModel, inkTogether } from '@/scene/inkHull'
 import { toChineseNumber } from '@/data/menu'
-import { MARKER_CHARS, MARKER_LATIN, MARKER_WALL, paintMarkerSigns, paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
+import { CARD_CHARS, paintOuting, paintWallSigns, SIGNS_PX, WALL_SIGNS } from './wallPhotos'
 import { reflectStudio, useStudio } from '@/scene/studio'
 import { heard } from '@/scene/sfx'
 import { ColdMist } from '@/scene/ColdMist'
@@ -1567,7 +1567,9 @@ function MenuTags({ z0, z1 }: { z0: number; z1: number }) {
  */
 type WallBoard = { z: number; y: number; w: number; h: number; t: number; rect: number[]; edge: number[] }
 const SIGN_BOARDS = (end: number): WallBoard[] => [
-  ...[0, 1, 2].map((k) => ({ z: end - 1.3 + k * 0.185, y: 1.75, w: 0.16, h: 0.18, t: 0.006, rect: WALL_SIGNS.shikishi[k], edge: WALL_SIGNS.gold })),
+  // (the six signature cards in a grid, two rows of three where the three signed boards hung (item 400, the owner's photograph of a wall of
+  // them): the cork board 11 cm under them, the photographs 4.7 cm past them, the shrine's shelf 10 cm short of them)
+  ...[0, 1, 2, 3, 4, 5].map((k) => ({ z: end - 1.3 + (k % 3) * 0.175, y: k < 3 ? 1.88 : 1.73, w: 0.165, h: 0.14, t: 0.005, rect: WALL_SIGNS.cards[k], edge: WALL_SIGNS.card })),
   { z: end - 1.12, y: 1.4, w: 0.42, h: 0.3, t: 0.02, rect: WALL_SIGNS.board, edge: WALL_SIGNS.wood },
   { z: end - 0.72, y: 1.475, w: 0.2, h: 0.15, t: 0.012, rect: WALL_SIGNS.photos[0], edge: WALL_SIGNS.wood },
   { z: end - 0.48, y: 1.43, w: 0.2, h: 0.15, t: 0.012, rect: WALL_SIGNS.photos[1], edge: WALL_SIGNS.wood },
@@ -1575,13 +1577,6 @@ const SIGN_BOARDS = (end: number): WallBoard[] => [
 let SIGNS_ZH = true
 const SIGNS_TEX = signTexture(WALL_SIGNS.size[0] * SIGNS_PX, WALL_SIGNS.size[1] * SIGNS_PX, (g) => paintWallSigns(g, SIGNS_ZH))
 const SIGNS_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: SIGNS_TEX })
-/** (item 384, the owner's 「牆壁可以有一些用簽字筆的簽名」) the guests' signatures in marker on the plaster round the boards (wallPhotos'
- * paintMarkerSigns): a sheet 1.5 mm off the wall, under the boards (theirs 4 mm off), lit as the wall is, its bare places see-through and
- * drawn over the wall's face (no two faces fighting for it) */
-const MARKER_TEX = signTexture(Math.round((MARKER_WALL.z1 - MARKER_WALL.z0) * MARKER_WALL.px), Math.round((MARKER_WALL.y1 - MARKER_WALL.y0) * MARKER_WALL.px),
-  (g, w, h) => paintMarkerSigns(g, w, h))
-const MARKER_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: MARKER_TEX, transparent: true, depthWrite: false, polygonOffset: true,
-  polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
 function signsGeometry(boards: WallBoard[]) {
   const [W, H] = WALL_SIGNS.size
   const pos: number[] = [], uv: number[] = [], idx: number[] = []
@@ -1618,13 +1613,6 @@ function WallSigns({ end }: { end: number }) {
     g.add(m)
     const ink = inkTogether([m], { width: 0.0012, weld: true })
     if (ink) g.add(ink)
-    // (the marker signatures on the plaster round them, facing into the room (-x), the picture's left toward the wall's far end)
-    const { z0, z1, y0, y1 } = MARKER_WALL
-    const mk = new THREE.Mesh(new THREE.PlaneGeometry(z1 - z0, y1 - y0).rotateY(-Math.PI / 2), MARKER_MAT)
-    mk.position.set(-0.0015, (y0 + y1) / 2, end + (z0 + z1) / 2)
-    mk.receiveShadow = true
-    mk.name = 'wall-marker-signs'
-    g.add(mk)
     return g
   }, [end])
   useEffect(() => () => { obj.traverse((o) => (o as THREE.Mesh).geometry?.dispose()) }, [obj])
@@ -1638,19 +1626,11 @@ function WallSigns({ end }: { end: number }) {
     const c = SIGNS_TEX.image as HTMLCanvasElement
     const repaint = () => { paintWallSigns(c.getContext('2d')!, SIGNS_ZH); SIGNS_TEX.needsUpdate = true }
     repaint()
-    // (and the signatures in marker on the plaster round them, once their hand's letters are in, both its weights (item 390: painted before
-    // they were, they were in the system's plain letters))
-    const mc = MARKER_TEX?.image as HTMLCanvasElement | undefined
-    if (mc && MARKER_TEX) {
-      void Promise.all([...['700', '400'].map((w) => document.fonts?.load(`${w} 40px "LXGW WenKai TC"`, MARKER_CHARS)),
-        document.fonts?.load('700 40px "Caveat"', MARKER_LATIN)]).then(() => {
-        paintMarkerSigns(mc.getContext('2d')!, mc.width, mc.height)
-        MARKER_TEX.needsUpdate = true
-      }).catch(() => {})
-    }
-    void document.fonts?.load('700 40px "LXGW WenKai TC"', '炭火の香り最高食い倒れ山野好吃到想哭美食家林小雨魚が主役の店料理評論黒川謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念二〇六年九月冬').then(repaint).catch(() => {})
+    // (the cards' words in both the hand's weights (item 390: painted before its letters were in, they were the system's plain ones))
+    void Promise.all(['700', '400'].map((w) => document.fonts?.load(`${w} 40px "LXGW WenKai TC"`,
+      '謝謝招待下次再來烤魚超讚老闆好帥生日快樂鹽烤鯖魚ごちそうさままた来ます焼き魚最高大将お誕生日鯖の塩焼き開店紀念記念' + CARD_CHARS))).then(repaint).catch(() => {})
   })
-  return <primitive object={obj} {...nameOver('【簽名牆】美食家的簽名與留言', '來過的美食家留下的簽名色紙、客人的留言板與合照')} />
+  return <primitive object={obj} {...nameOver('【簽名牆】美食家的簽名與留言', '來過的客人留下的簽名卡、留言板與合照')} />
 }
 /** the round window's frame's tint over its keyaki: a deep walnut */
 const ROUND_WOOD_TINT = new THREE.Color('#7a5136')
