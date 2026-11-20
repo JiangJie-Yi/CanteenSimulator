@@ -1,4 +1,4 @@
-import { memo, useRef } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { warmLater } from './Prewarm'
@@ -15,7 +15,11 @@ const FADED = 0.18
 /** the rays: a grid round where what's looked at is on the screen (in the screen's -1..1, about a third of it across) */
 const AIM: [number, number][] = [-0.3, -0.15, 0, 0.15, 0.3].flatMap((x) => [-0.3, -0.15, 0, 0.15, 0.3].map((y) => [x, y] as [number, number]))
 
-type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; box: THREE.Box3; drawn: THREE.Mesh[]; ink: THREE.Mesh[]; low: number; k: number; want: number; own: Map<THREE.Material, THREE.Material> }
+type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; box: THREE.Box3; drawn: THREE.Mesh[]; ink: THREE.Mesh[]; low: number; k: number; want: number; own: Map<THREE.Material, THREE.Material>
+  /** the look it was last found in (gather's), and whether its meshes are on their see-through copies now (setOpacity's) */
+  gen: number; onCopy: boolean }
+/** a material drawn on its back faces only (an ink line's) */
+const backOnly = (m: THREE.Material) => m.side === THREE.BackSide
 
 /** (scratch for the rays, none made anew each time (item 374): where the target is on the screen, a ray's point on it, what a ray hit, which
  * hangings are in the way) */
@@ -45,43 +49,56 @@ export const OccluderFade = memo(function OccluderFade({ target }: { target: () 
   const tick = useRef(0)
   const ray = useRef(new THREE.Raycaster())
 
-  // (the marked groups, looked for again now and then: pieces load and batches merge after mount)
-  const gather = () => {
-    const list: Fader[] = []
-    scene.traverse((o) => {
+  // (the marked groups, looked for again now and then: pieces load and batches merge after mount; the same Fader kept for the same group,
+  // its lists refilled in place (item 374: every look made all its lists anew, and a list of each mesh's materials twice over, 16 MB the half
+  // minute of garbage; the functions that look made once))
+  const gather = useMemo(() => {
+    const known = new Map<THREE.Object3D, Fader>()
+    let gen = 0, cur: Fader | null = null
+    const warm = (f: Fader, mesh: THREE.Mesh, mat: THREE.Material) => { if (!f.own.has(mat)) warmLater(new THREE.Mesh(mesh.geometry, ownCopy(f.own, mat))) }
+    const visitMesh = (m: THREE.Object3D) => {
+      const mesh = m as THREE.Mesh, f = cur
+      if (!f || !mesh.isMesh || mesh.userData.glow) return
+      // (its ink line, drawn on its own back faces: not faded but put away while it's faded (the owner's: a faded lamp went a dark ball,
+      // its black hull showing through its see-through shade))
+      const mat = mesh.material
+      if (mesh.name.endsWith('_outline') || (Array.isArray(mat) ? mat.every(backOnly) : backOnly(mat))) { f.ink.push(mesh); return }
+      f.drawn.push(mesh)
+      f.hit.push(mesh)
+      // (its see-through copies made now, and compiled with the rest at load (Prewarm): made the first time it faded, their programs were
+      // compiled then, a hitch of 80 to 150 ms on turning to the grill, where a lamp hangs between the camera and the fire)
+      if (mesh.userData.fadeOrig) return
+      if (Array.isArray(mat)) { for (const x of mat) warm(f, mesh, x) } else warm(f, mesh, mat)
+    }
+    const visitRoot = (o: THREE.Object3D) => {
       // (its own mark, not `fade`: that's the kitchen's people's own, how much of them shows as they come and go; read as this, every one of
       // them was tried by these rays every third frame, a skinned figure's every vertex posed for it, some 420 a second (2026-11-15))
       if (!o.userData.fadeOccluder) return
-      const hit: THREE.Mesh[] = [], drawn: THREE.Mesh[] = [], ink: THREE.Mesh[] = []
-      o.traverse((m) => {
-        const mesh = m as THREE.Mesh
-        if (!mesh.isMesh || mesh.userData.glow) return
-        // (its ink line, drawn on its own back faces: not faded but put away while it's faded (the owner's: a faded lamp went a dark ball,
-        // its black hull showing through its see-through shade))
-        const mats = ([] as THREE.Material[]).concat(mesh.material)
-        if (mesh.name.endsWith('_outline') || mats.every((x) => x.side === THREE.BackSide)) { ink.push(mesh); return }
-        drawn.push(mesh)
-        hit.push(mesh)
-      })
-      const was = faders.current.find((f) => f.root === o)
+      let f = known.get(o)
+      if (!f) { f = { root: o, hit: [], box: new THREE.Box3(), drawn: [], ink: [], low: FADED, k: 1, want: 1, own: new Map(), gen, onCopy: false }; known.set(o, f) }
       // (how far it fades: a number on the mark, or FADED; a lit lamp keeps more of itself, or it goes dark against the wall behind)
-      const low = typeof o.userData.fadeOccluder === 'number' ? o.userData.fadeOccluder : FADED
-      const own = was?.own ?? new Map<THREE.Material, THREE.Material>()
-      // (its see-through copies made now, and compiled with the rest at load (Prewarm): made the first time it faded, their programs were
-      // compiled then, a hitch of 80 to 150 ms on turning to the grill, where a lamp hangs between the camera and the fire)
-      for (const mesh of drawn) {
-        for (const mat of ([] as THREE.Material[]).concat(mesh.material)) {
-          if (own.has(mat) || mesh.userData.fadeOrig) continue
-          warmLater(new THREE.Mesh(mesh.geometry, ownCopy(own, mat)))
-        }
-      }
-      list.push({ root: o, hit, box: was?.box ?? new THREE.Box3(), drawn, ink, low, k: was?.k ?? 1, want: 1, own })
-    })
-    faders.current = list
-  }
+      f.low = typeof o.userData.fadeOccluder === 'number' ? o.userData.fadeOccluder : FADED
+      f.want = 1
+      f.gen = gen
+      f.hit.length = 0; f.drawn.length = 0; f.ink.length = 0
+      cur = f
+      o.traverse(visitMesh)
+      cur = null
+      faders.current.push(f)
+    }
+    // (those no longer found let go)
+    const stale = (f: Fader, root: THREE.Object3D) => { if (f.gen !== gen) known.delete(root) }
+    return () => {
+      gen++
+      faders.current.length = 0
+      scene.traverse(visitRoot)
+      known.forEach(stale)
+    }
+  }, [scene])
 
   const setOpacity = (f: Fader, k: number) => {
     const faded = k < 0.999
+    f.onCopy = faded
     for (const m of f.ink) m.visible = !faded
     for (const m of f.drawn) {
       const orig = m.userData.fadeOrig as THREE.Material | THREE.Material[] | undefined
@@ -145,7 +162,7 @@ export const OccluderFade = memo(function OccluderFade({ target }: { target: () 
       if (Math.abs(f.k - f.want) >= 0.002) {
         f.k += (f.want - f.k) * Math.min(1, dt * 8)
         if (Math.abs(f.k - f.want) < 0.01) f.k = f.want
-      } else if (f.k >= 0.999 && !f.drawn.some((m) => m.userData.fadeOrig)) continue
+      } else if (f.k >= 0.999 && !f.onCopy) continue
       // (faded, it's kept in step with its originals every frame: they can change under it)
       setOpacity(f, f.k)
     }

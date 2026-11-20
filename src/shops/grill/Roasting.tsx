@@ -211,6 +211,9 @@ const TURN_Q = new THREE.Quaternion()
 const LOW_AT = new THREE.Vector3()
 /** the ray that finds a plate's face under a piece set down on it (item 258), straight down */
 const REST_RAY = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 1)
+/** how long a piece's face is kept, nothing under it changed (a plate moved under it by hand, its spot not); the last number given a piece */
+const REST_STALE = 10000
+let REST_HID = 0
 /** how far either side of a piece's middle, across its plate, what holds it up is felt for (the scene's units: about half a fish's width) */
 const REST_SIDE = 0.018 * GRILL_SCALE
 /** (scratch) the way across the plate a piece rests on, its length's, and its roll over about it (item 271) */
@@ -4743,7 +4746,11 @@ type Piece = {
   /** (on a plate) the face it rests on, in its parent's frame: the plate's own surface (or what it lies on, on the plate) under it, found
    * where it is (`at`) by a ray, again each second (`t`); none found, null (item 258); and how far it's rolled over about its length, from
    * what holds it up either side of it (item 271) */
-  restFace?: { at: string; t: number; face: number | null; roll: number }
+  /** the face it rests on, measured (`t`, performance.now()) where it was (`x`, `z`: its spot, in thousandths, on `on`) with what was under
+   * it then (`sig`, restSig's) */
+  restFace?: { on: string | undefined; x: number; z: number; sig: number; t: number; face: number | null; roll: number }
+  /** a number of its own, for restSig */
+  hid?: number
   id: string
   copy: number
   loose: boolean
@@ -8992,7 +8999,6 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
             // plates as they're drawn (bar.ts's PLATE_FACES) and the other pieces lying on them, where it is, and again each second (what
             // it lay on eaten from under it); none under it (a takeaway's box, the table's top): from its spot's height as before (item
             // 258: worked out from its spot's height for the plates before item 228's, it rested 3 cm over the new ones' faces)
-            const at = `${p.container}|${p.local.x.toFixed(3)}|${p.local.z.toFixed(3)}`
             const nowMs = performance.now()
             // (and with gravity (item 271, the owner's: 「我覺得你對食物要考究一下，應該會有重力」): what holds it up either side of it, across
             // the plate (the way things lie side by side on it), measured too: one side on the plate and the other on the piece beside it, or
@@ -9000,7 +9006,24 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
             // whatever was highest under its middle)
             const across = REST_ACROSS.copy(PLATING_FRAME.across)
             if (p.readyAt === undefined && p.seat !== undefined && p.seat >= 0) across.applyAxisAngle(UP_AXIS, seatTurn(p.seat))
-            if (p.container === 'bar' && !onTray && (!p.restFace || p.restFace.at !== at || nowMs - p.restFace.t > 1000)) {
+            // (measured again only when what's under it may have changed: where it is, the plates drawn, and each piece lying at the same place at
+            // the bar, where it is (to 2 mm), how big and how it's rolled; or after REST_STALE (item 374: three rays every second for every piece
+            // on the bar, against every plate and every piece on it, whatever had changed: three's triangle tests the most garbage the shop made,
+            // 100 MB the half minute in a rush))
+            const rx = Math.round(p.local.x * 1000), rz = Math.round(p.local.z * 1000)
+            let sig = 0
+            if (p.container === 'bar' && !onTray) {
+              sig = PLATE_FACES.size
+              for (const q of pieces.current) {
+                if (q === p || q.container !== p.container || q.seat !== p.seat || (q.flight ?? 0) < 1 || q.eaten || !q.node) continue
+                const at = q.node.position
+                sig = (Math.imul(sig, 31) + (q.hid ??= ++REST_HID)) | 0
+                sig = (Math.imul(sig, 31) + Math.round(at.x * 500) * 3 + Math.round(at.y * 500) * 5 + Math.round(at.z * 500) * 7) | 0
+                sig = (Math.imul(sig, 31) + Math.round(q.node.scale.x * 200) + Math.round((q.restFace?.roll ?? 0) * 100) * 11) | 0
+              }
+            }
+            const rf = p.restFace
+            if (p.container === 'bar' && !onTray && (!rf || rf.on !== p.container || rf.x !== rx || rf.z !== rz || rf.sig !== sig || nowMs - rf.t > REST_STALE)) {
               const par = p.node.parent
               const under: THREE.Object3D[] = [...PLATE_FACES]
               for (const q of pieces.current) if (q !== p && q.container === p.container && (q.flight ?? 0) >= 1 && !q.eaten && q.node) under.push(q.node)
@@ -9015,7 +9038,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
               const roll = l !== null && r !== null ? THREE.MathUtils.clamp(Math.atan2(r - l, 2 * REST_SIDE), -0.4, 0.4) : 0
               // (rolled, it lies on its lower side's support: the lower of either side's, or its middle's if a side found nothing)
               const low = Math.min(...[l, r, mid].filter((v): v is number => v !== null))
-              p.restFace = { at, t: nowMs, face: Number.isFinite(low) ? (roll ? low : mid ?? low) : null, roll }
+              p.restFace = { on: p.container, x: rx, z: rz, sig, t: nowMs, face: Number.isFinite(low) ? (roll ? low : mid ?? low) : null, roll }
             }
             const roll = p.container === 'bar' && !onTray ? p.restFace?.roll ?? 0 : 0
             if (roll) p.node.quaternion.premultiply(REST_ROLL.setFromAxisAngle(REST_LONG.crossVectors(across, UP_AXIS).normalize(), roll))

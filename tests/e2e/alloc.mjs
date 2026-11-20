@@ -4,6 +4,8 @@
 //   node tests/e2e/alloc.mjs        (WARM=<ms> default 60000, SPAN=<ms> default 30000, TOP=<n> default 30)
 //   BASE=http://localhost:4173 node tests/e2e/alloc.mjs   (the production build, `npx vite preview`: dev mode's JSX alone makes several times
 //                                                           more; names there are minified)
+//   DEEP=<function name> node tests/e2e/alloc.mjs        (and for that function, its five biggest whole ways in, twelve callers deep: who it is
+//                                                           that has three raycast so much, say)
 import { chromium } from 'playwright-core'
 import { toOpeningHours } from './hours.mjs'
 
@@ -55,7 +57,7 @@ await cdp.send('HeapProfiler.startSampling', { samplingInterval: 16384, includeO
 await p.waitForTimeout(SPAN)
 const { profile } = await cdp.send('HeapProfiler.stopSampling')
 console.log('heap after', await heap(), 'MB')
-const by = new Map()
+const by = new Map(), deep = new Map()
 let total = 0
 const walk = (n, stack) => {
   const f = n.callFrame
@@ -68,6 +70,7 @@ const walk = (n, stack) => {
     const parent = stack.slice(-3).join(' < ')
     e.parents.set(parent, (e.parents.get(parent) ?? 0) + self)
     by.set(key, e)
+    if (process.env.DEEP && key.split(' ')[0] === process.env.DEEP) { const w = stack.slice(-12).join(' < '); deep.set(w, (deep.get(w) ?? 0) + self) }
   }
   for (const c of n.children) walk(c, [...stack, key.split(' ')[0] + '@' + key.split(':').slice(-1)[0]])
 }
@@ -78,4 +81,5 @@ for (const [k, e] of rows) {
   const top = [...e.parents.entries()].sort((a, b) => b[1] - a[1])[0]
   console.log(`${(e.self / 1e6).toFixed(1).padStart(7)} MB  ${k}\n            from ${top ? top[0] : ''}`)
 }
+if (process.env.DEEP) for (const [w, n] of [...deep.entries()].sort((x, y) => y[1] - x[1]).slice(0, 5)) console.log(`\n${process.env.DEEP} ${(n / 1e6).toFixed(1)} MB by way of:\n  ${w.split(' < ').join('\n  < ')}`)
 await b.close()
