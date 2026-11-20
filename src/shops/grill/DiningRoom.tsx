@@ -5365,11 +5365,13 @@ function PendantLight({ y }: { y: number }) {
 }
 /** a pendant lamp, an oval washi lantern, its band 鱗 or 立涌 (`band` 0 or 1; the owner's: every one the plain lantern again, the round
  * one with 日式烤魚 and the fish taken down) */
-function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: number; band?: number }) {
+function Pendant({ z, drop, pool, band = 0, hang = 0 }: { z: number; drop: number; pool: number; band?: number
+  /** how far under the room's top its cord starts (the shelf over the bar's foot, item 450: the lamps hang from it) */
+  hang?: number }) {
   return (
     <group position={[0, WALL_H, z]}>
-      <mesh position-y={-drop / 2}>
-        <cylinderGeometry args={[0.004, 0.004, drop, 4]} />
+      <mesh position-y={-(hang + drop) / 2}>
+        <cylinderGeometry args={[0.004, 0.004, drop - hang, 4]} />
         <meshBasicMaterial color={INK} />
       </mesh>
       {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord) */}
@@ -5675,7 +5677,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
       {/* pendant lamps over the bar's customer side, low: one between each two places, midway (the owner's: a lamp between one customer and
           the next; bar's lampsAlong), their bands 鱗 and 立涌 in turn */}
       {lampsAlong(c).map((z, i) => (
-        <Movable key={i} id={`${lampId}${i}`} label={`吊燈（${lampName} ${i + 1}）`} blocks><group position-x={0.05} userData={{ fadeOccluder: 0.5 }}><Pendant z={z} drop={0.25} pool={top} band={i % 2} /></group></Movable>
+        <Movable key={i} id={`${lampId}${i}`} label={`吊燈（${lampName} ${i + 1}）`} blocks><group position-x={0.05} userData={{ fadeOccluder: 0.5 }}><Pendant z={z} drop={LAMP_DROP} hang={WALL_H - BAR_SHELF.foot} pool={top} band={i % 2} /></group></Movable>
       ))}
     </group>
   )
@@ -8722,17 +8724,19 @@ function WillowModel() {
 }
 const WILLOW_SAYS = nameOver('【觀賞盆栽】垂柳', '墨色粗陶盆裡的垂柳，枝條隨意垂下，盆面鋪著青苔')
 /**
- * The premium liquor's hanging cabinet over the kitchen's far side (item 443, the owner's, 2026-11-21: 「上面新增系統櫃壩台，專門放高級酒」,
- * the dark space over the kitchen from the left to the drinks fridges, seen from the customers' side): blender/liquorshelf.py, a long built-in
- * cabinet of dark walnut hung on four rods over the plate racks, the freezer and the sink, three bays and two levels of the shop's better
- * bottles, a warm LED strip under each level (its own light: no lamp added). The room's open side, where the camera looks in from: hidden,
- * as a wall is, while the camera's out there behind it (it'd stand between the camera and the kitchen), seen from the room.
+ * The premium liquor's hanging shelf over the bar (items 443, 450, the owner's, 2026-11-21: 「上面新增系統櫃壩台，專門放高級酒」, then
+ * 「要做在燈的上面」, the cabinet over the kitchen crossed out and the L of the bar boxed): blender/liquorshelf.py, an open L of dark walnut
+ * over the two counters from their corner out past their last seats, hung from the room's top on short rods, the bar's lamps hanging from
+ * its foot; on it the shop's better bottles four to a bay, their labels to the customers, a warm LED strip under its top on their side
+ * (its own light: no lamp added). Fades as the lamps do when it's between the camera and what it's looking at (OccluderFade).
  */
 const LIQUOR_URL = import.meta.env.BASE_URL + 'models/liquorshelf.glb'
 useGLTF.preload(LIQUOR_URL)
-/** where it hangs, in the side wall's frame (x into the room minus, z along that wall): its back's foot's middle, over the plate racks'
- * backs, the freezer's and the sink's, clear of the side counter's lamps; its foot over the plate racks' tops (1.02), the walls' top 2.3 */
-const LIQUOR_AT = { x: -2.425, y: 1.3, z: -2.66 }
+/** the shelf over the bar (item 450): its foot's height over the room's floor (its top 2.25, its rods up to the room's top, 2.3); the bar's
+ * lamps hung from it, lower than they were (their cords 0.25 from the room's top, their lanterns' tops 2.06: the shelf's 0.23 and the
+ * lamps' cords between wouldn't go in over them), their lanterns' tops at 1.97 now */
+const BAR_SHELF = { foot: 2.02 }
+const LAMP_DROP = 0.36
 type LabelStyle = { bg: string; ink: string; edge: string; seal?: string }
 /** the labels' cells, in blender/liquorshelf.py's order (bay by bay: the floor's four isshobin, the shelf's five): each its kind, its name
  * (made up, not any brewer's), what it is, and its colours */
@@ -8813,7 +8817,6 @@ const liquorMatOf = (src: THREE.MeshStandardMaterial) => {
   }
   return m
 }
-const LIQUOR_N = new THREE.Vector3(), LIQUOR_P = new THREE.Vector3(), LIQUOR_C = new THREE.Vector3()
 function LiquorShelf() {
   const gltf = useGLTF(LIQUOR_URL) as unknown as { scene: THREE.Group }
   const obj = useMemo(() => {
@@ -8830,16 +8833,7 @@ function LiquorShelf() {
     inkModel(r, (m) => !/LiquorWood|LiquorRod/.test((m.material as THREE.Material).name))
     return mergeByMaterial(r)
   }, [gltf])
-  const g = useRef<THREE.Group>(null)
-  useFrame(({ camera }) => {
-    const o = g.current
-    if (!o) return
-    // (seen only from the room's side of its open front: behind it, out past the room's open side, it's put away as a wall is)
-    o.getWorldPosition(LIQUOR_P)
-    LIQUOR_N.set(0, 0, 1).transformDirection(o.matrixWorld)
-    o.visible = LIQUOR_C.copy(camera.position).sub(LIQUOR_P).dot(LIQUOR_N) > 0
-  })
-  return <group ref={g} name="look-liquor"><primitive object={obj} /></group>
+  return <group name="look-liquor" userData={{ fadeOccluder: 0.35 }}><primitive object={obj} /></group>
 }
 /**
  * The milk crates of cold drinks (item 437, the owner's, 2026-11-21: 「新整另一種籃子風格，裡面也是用來裝冷飲類」, after a pink milk crate):
@@ -9695,13 +9689,20 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   // fridge, the cartons behind the far one, the milk crates behind the doorway, seen through it (item 437); each against the back wall)
   const st = useMemo(() => storeOf(counters), [counters])
   const crateAt = useMemo(() => (fr && st ? st.at(fr[0].z - 0.21, STORE.deep - 0.16) : new THREE.Vector3()), [fr, st])
-  // (the premium liquor's cabinet (item 443): its place in the side wall's frame (LIQUOR_AT) in the room's, its open front to the room)
-  const c1Liquor = useMemo(() => {
-    const c1 = counters[1]
-    if (!c1) return null
-    const p = c1.at.clone().addScaledVector(c1.along, LIQUOR_AT.z).addScaledVector(c1.lay, farOf(c1) - LIQUOR_AT.x)
-    p.y += LIQUOR_AT.y
-    return { p, yaw: Math.atan2(c1.along.x, c1.along.z) }
+  // (the premium liquor's shelf over the bar (item 450): its corner where the two counters' lamp lines meet (each one's middle line 5 cm
+  // toward its customers, as DiningWall hangs them: its frame's x, (along.z, 0, -along.x)), its run A out along the long counter, B along
+  // the side one (the model's z, the side counter's way out from the corner); its foot at BAR_SHELF.foot)
+  const barShelf = useMemo(() => {
+    const [a, b] = counters
+    if (!a || !b) return null
+    const line = (c: Counter) => ({ p: c.at.clone().add(new THREE.Vector3(c.along.z, 0, -c.along.x).multiplyScalar(0.05)), d: c.along.clone().setY(0).normalize() })
+    const la = line(a), lb = line(b)
+    const den = la.d.x * lb.d.z - la.d.z * lb.d.x
+    if (Math.abs(den) < 1e-6) return null
+    const s = ((lb.p.x - la.p.x) * lb.d.z - (lb.p.z - la.p.z) * lb.d.x) / den
+    const p = la.p.clone().addScaledVector(la.d, s)
+    p.y = BAR_SHELF.foot
+    return { p, yaw: Math.atan2(-la.d.z, la.d.x) }
   }, [counters])
   // (the milk crates of cold drinks (item 437): behind the doorway against the back wall, two stacked by the room's end, one beside them,
   // seen through the doorway; clear of the room's end (2.5 cm) and of the cartons (1.7 cm), their backs a centimetre off the wall)
@@ -9739,8 +9740,8 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
         {/* (only to look at (the owner's): named when pointed at, the cursor left an arrow, a click does nothing) */}
         <group position={cornerAt} rotation-y={0.4}><BambooHit {...BAMBOO_SAYS} /></group>
       </Movable>
-      {/* (the premium liquor's cabinet, hung over the kitchen's far side (item 443)) */}
-      {c1Liquor && <Movable id="liquorshelf" label="高級酒吊櫃"><group position={c1Liquor.p} rotation-y={c1Liquor.yaw}><Suspense fallback={null}><LiquorShelf /></Suspense></group></Movable>}
+      {/* (the premium liquor's shelf over the bar, the lamps under it (items 443, 450)) */}
+      {barShelf && <Movable id="barshelf" label="高級酒吊棚"><group position={barShelf.p} rotation-y={barShelf.yaw}><Suspense fallback={null}><LiquorShelf /></Suspense></group></Movable>}
       {/* (the crates of red bottles and the cartons of cans, in the stock room behind the side wall now, along its back wall (item 430)) */}
       {fr && <Movable id="crates" label="酒箱"><group><StaticBatch plain>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>

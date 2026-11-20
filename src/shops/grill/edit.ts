@@ -577,7 +577,7 @@ export const pivotOf = (id: string): V3 => state.pivots[id] ?? [0, 0, 0]
  * sat half way up each piece; a chair's, a counter's, a fridge's, a vase's, a sack's at the middle of its base, as Maya's are set): turned
  * about it, it turns where it stands; sized about it, it grows up from where it stands and doesn't sink into it. A new piece that hangs goes on here.
  */
-export const HANGS = /^(barlamp|sidelamp|chochin|fishlantern|noren$|facade$|menutags$|outingphoto$|wallsigns$|speaker$|exitsign$|lightswitch|wcswitch$|art-|knives$|altar$|viewcam-|sign-)|^wc2-[mf]-(lamp|noren|dryer|towelbox|remote|paper|oto|pads)/
+export const HANGS = /^(barlamp|sidelamp|barshelf$|chochin|fishlantern|noren$|facade$|menutags$|outingphoto$|wallsigns$|speaker$|exitsign$|lightswitch|wcswitch$|art-|knives$|altar$|viewcam-|sign-)|^wc2-[mf]-(lamp|noren|dryer|towelbox|remote|paper|oto|pads)/
 // (each piece and each group whose pivot has been brought down to its foot, once: what was saved for it made up for then, so nothing moved)
 const KEY_FOOT = 'jgs-edit-foot-1'
 const KEY_GFOOT = 'jgs-edit-group-foot-2'

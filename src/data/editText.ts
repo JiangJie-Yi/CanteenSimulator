@@ -266,6 +266,7 @@ export const EDIT_TEXT = {
 
 /** each piece's name in Japanese, by its Chinese name */
 const PIECES_JA: Record<string, string> = {
+  高級酒吊棚: '高級酒の吊り棚',
   小判金幣: '小判', 頭盔木台: '兜の飾り台', 頭盔與木台: '兜と飾り台', 候位長凳: '待合ベンチ', '候位長凳（二）': '待合ベンチ（二）', 踏台: '踏み台',
   木台階: '踏み台', 三廚木台階: '三番手の踏み台',
   刀具組: '包丁セット', 切魚砧板: '魚をさばくまな板', 酒台: '酒の飾り台',
@@ -286,6 +287,7 @@ const PIECES_JA: Record<string, string> = {
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
 const PIECES_EN: Record<string, string> = {
+  高級酒吊棚: 'Premium liquor shelf',
   小判金幣: 'Koban coin', 頭盔木台: 'Helmet stand', 頭盔與木台: 'Helmet and stand (group)', 候位長凳: 'Waiting bench', '候位長凳（二）': 'Waiting bench (2)', 踏台: 'Step stool', 刀具組: 'Knife rack', 切魚砧板: 'Fish board', 酒台: 'Sake stand', 櫃檯尾閘門門板: 'Till-end gate', 水槽旁閘門門板: 'Sink-side gate',
   神龕旁花瓶與杯: 'Shrine vases and cups', 供桌上的供品: 'Offerings on the altar', 結帳牌: 'Pay sign', 逃生出口燈: 'Exit sign',
   收銀高腳凳: 'Cashier stool (high)', 備餐檯: 'Serving counter', 禁區: 'Keep-clear patch', 收銀矮凳: 'Cashier stool (low)', 餐盤堆: 'Plate stack', '攝影機 1（研製視角）': 'Camera 1 (cooking view)',
