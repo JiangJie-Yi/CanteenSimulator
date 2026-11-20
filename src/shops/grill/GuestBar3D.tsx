@@ -988,7 +988,8 @@ function ShopFrontImpl() {
 const ShopFront = memo(ShopFrontImpl)
 /** the big red lantern under the eave: hung in the doorway's middle, out in front of the noren, from the eave's boards (its cord's top: the
  * eave's underside there, blender/facade.py's `under`) */
-const BIG_HANG: [number, number] = [2.469, 0.64]
+// (7 mm lower (item 440): its top's rim, as it sways, kept under the eave's boards; tests/e2e/_bighang440.mjs)
+const BIG_HANG: [number, number] = [2.462, 0.64]
 /** the big one's size against the door lanterns': fat and round, a little shorter */
 const BIG_CHOCHIN: [number, number, number] = [1.8, 0.95, 1.8]
 
@@ -1246,7 +1247,18 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
   return (
     <group name="look-door" position={at} rotation-y={yaw}>
       {/* the shop's front over the way in: its eave, the beam and post, the band of the menu's lit boards, the lanterns' bar (item 300) */}
-      <Movable id="facade" label="門面"><ShopFront /></Movable>
+      {/* (the lanterns hung from it with it (item 441, the owner's 「上面燈籠跟燈座要連動」): the red one and the grill's from its bar, the big one from
+          its eave, each still its own piece: moved, the front takes them along, as they hang from it) */}
+      <Movable id="facade" label="門面"><ShopFront />
+        <group position-x={DX}>
+        <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_OFF, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
+        {/* (and the grill's own, cream, 炭火 on it, hung right beside the red one, on its far side from the doorway (the owner's: it hung on the
+            doorway's other side)) */}
+        <Movable id="chochin2" label="燒烤燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_OFF - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
+        {/* (and under the eave in the doorway's middle the big one, the shop's name 聞野 on it (item 300)) */}
+        <Movable id="chochin-big" label="大紅燈籠"><group position={[0.26, BIG_HANG[0] - 2.25, BIG_HANG[1]]}><Chochin mark={mark} big /></group></Movable>
+        </group>
+      </Movable>
       {/* the sliding door in the doorway (item 410) */}
       <Movable id="genkandoor" label="玄關拉門"><GenkanDoor /></Movable>
       {/* (in edit mode the cats' stand, the shoe cupboard and the like can each be moved: each its own batch inside its own Movable) */}
@@ -1312,12 +1324,6 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
           from inside (the owner's)) */}
       {/* (the pair 5 cm further from the doorway than they were, for the sliding door's two leaves (item 415): the red one's paper bulged into the
           doorway, and the leaves had to stop short of it, the way left open narrower than a customer) */}
-      <Movable id="chochin" label="紅燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_OFF, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} /></group></Movable>
-      {/* (and the grill's own, cream, 炭火 on it, hung right beside the red one, on its far side from the doorway (the owner's: it hung on the
-          doorway's other side)) */}
-      <Movable id="chochin2" label="燒烤燈籠"><group position={[-(W / 2 * NOREN_WIDE + 0.12) + 0.26 - CHOCHIN_OFF - CHOCHIN_PAIR, H - 0.08 - 2.25, 0.47]}><Chochin mark={lantern} style="cream" /></group></Movable>
-      {/* (and under the eave in the doorway's middle the big one, the shop's name 聞野 on it (item 300)) */}
-      <Movable id="chochin-big" label="大紅燈籠"><group position={[0.26, BIG_HANG[0] - 2.25, BIG_HANG[1]]}><Chochin mark={mark} big /></group></Movable>
       {/* (and beyond it the fish lantern, a round one with a fish hung under it (the owner's, after their photograph of one)) */}
       {/* (turned a quarter round, its fish's side to the street, and a little bigger: 1.15 times (the owner's: 1.3, then a little smaller)) */}
       <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]} baseScale={1.15}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
@@ -1680,7 +1686,8 @@ function Chochin({ mark, style = 'red', big = false }: { mark: string; style?: '
     // order, App), the paper as daylight or the dark finds it)
     lit.current += ((getLights().door ? 1 : 0) - lit.current) * Math.min(1, Math.min(dt, 0.1) * 7)
     const k = lit.current, flame = 0.9 + 0.06 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 7.3 + 1.1)
-    if (hang.current) hang.current.rotation.z = Math.sin(t * 0.9) * 0.04
+    // (the big one, heavy, barely (item 440: swinging as the small ones do, its top's rim rose 1.6 cm into the eave at each end))
+    if (hang.current) hang.current.rotation.z = Math.sin(t * 0.9) * (big ? 0.012 : 0.04)
     if (skin) paperColour(skin, k, flame, style === 'cream' ? '#fff1cc' : '#ffffff')
     if (halo.current) halo.current.material.opacity = k * (0.5 + (flame - 0.9) * 2)
   })

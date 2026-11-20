@@ -89,7 +89,10 @@ def under(z):
 # (the eave swept up over the big lantern (軒唐破風, item 341): its middle and half width along the front, how high its crown rises at the
 # edge; the lift dies away up the slope from KARA_FROM)
 # (raised (item 349, the owner's 「拱形的弧度不夠」): 0.16 high over 0.42 either side read as a bump, not an arch)
-KARA_X, KARA_HW, KARA_H = -0.12, 0.47, 0.27
+# (bigger and wider (item 440, the owner's 「這拱形再大一些寬一點」): 0.27 over 0.47 either side to 0.36 over 0.64, its sides drawn in a little
+# more (KARA_P) as a karahafu's are, low and long out to the eave, the crown up in the middle: so its shoulders stay under the band's lanterns
+# either side of the middle, its crown before the middle bay's)
+KARA_X, KARA_HW, KARA_H, KARA_P = -0.12, 0.64, 0.36, 1.3
 KARA_FROM = 0.5
 
 
@@ -98,7 +101,7 @@ def bell(x):
     s_ = abs(x - KARA_X) / KARA_HW
     if s_ >= 1:
         return 0.0
-    return KARA_H * ((1 + math.cos(math.pi * s_)) / 2) ** 0.85
+    return KARA_H * ((1 + math.cos(math.pi * s_)) / 2) ** KARA_P
 
 
 def lift(x, z):
@@ -442,9 +445,16 @@ while _x < XB1 - 0.07:
     if not (LATTICE_X[0] - 0.06 < _x < LATTICE_X[1] + 0.06):
         lant_x.append(_x)
     _x += 0.112
+# (and the middle bay over the big lantern, its lattice gone for lanterns as the rest (item 442, the owner's 「這邊也塞燈」): four, at the
+# others' spacing, about its middle, clear of its stiles)
+LATTICE_MID = (LATTICE_X[0] + LATTICE_X[1]) / 2
+lant_x += [LATTICE_MID + 0.112 * (k - 1.5) for k in range(4)]
+lant_x.sort()
+assert all(min(abs(x - sx) for sx in LATTICE_X) >= 0.043 + STILE_W / 2 + 0.01 for x in lant_x), "a lantern into a stile"
 rails = []
 for ry, _ in LANT_ROWS:
-    for a_, b_ in ((XB0 + 0.026, LATTICE_X[0] - STILE_W / 2), (LATTICE_X[1] + STILE_W / 2, XB1 - 0.026)):
+    for a_, b_ in ((XB0 + 0.026, LATTICE_X[0] - STILE_W / 2), (LATTICE_X[0] + STILE_W / 2, LATTICE_X[1] - STILE_W / 2),
+                   (LATTICE_X[1] + STILE_W / 2, XB1 - 0.026)):
         rails.append(((a_, ry - 0.008, LZ - 0.006), (b_, ry, LZ + 0.006)))
 keep(box_obj("FacadeLanternRails", rails), M["wood"])
 bm_p = bmesh.new()
@@ -512,8 +522,8 @@ keep(mesh_obj("FacadeLanternGlow", bm_g), M["lanternglow"])
 bm = bmesh.new()
 uvl = bm.loops.layers.uv.new()
 lx0, lx1 = LATTICE_X[0] + STILE_W / 2, LATTICE_X[1] - STILE_W / 2
-for (x0, x1, y0, y1, z, u1) in ((lx0, lx1, BAY[0], BAY[1], BACK_Z[1] + 0.03, 1.0),
-                                (XL + 0.03, XR - 0.03, LOW_LATTICE[0], LOW_LATTICE[1], BACK_Z[1] + 0.005, (XR - XL - 0.06) / 0.46)):
+# (the middle bay's own lattice gone for its lanterns (item 442): the strip under the eave alone)
+for (x0, x1, y0, y1, z, u1) in ((XL + 0.03, XR - 0.03, LOW_LATTICE[0], LOW_LATTICE[1], BACK_Z[1] + 0.005, (XR - XL - 0.06) / 0.46),):
     vs = [bm.verts.new(P(x, y, z)) for (x, y) in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
     f = bm.faces.new(vs)
     for lp, uv in zip(f.loops, ((0, 0), (u1, 0), (u1, 1), (0, 1))):
