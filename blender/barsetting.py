@@ -708,6 +708,9 @@ def condiments(name, M, ps):
 
 # (how tall the bar's raised lip stands over its top: bar.ts's LIP_H, item 416)
 LIP_H = 0.3
+# (how high the condiment shelf's top stands over the counter (item 446): its pot's lid (8.4 cm over the shelf) 4 mm under the lip's rail's
+# ink (the rail 3 cm at the lip's top, its ink 4 mm round it))
+SHELF_TOP = LIP_H - 0.03 - 0.004 - 0.004 - 0.084
 
 
 def cond_rack(name, M, ps):
@@ -717,15 +720,17 @@ def cond_rack(name, M, ps):
     in z and up to LIP_H; its ink a few millimetres round it: the hooks kept clear of both, the shelf high enough for the table bin under it"""
     out = []
     wood = []
-    # (the shelf: 16 by 7 cm, 1.2 cm thick, its top 10.4 cm over the counter; the bin's rim 8.7 cm, under its front)
-    wood.append(board(f"{name}Shelf", -0.08, 0.08, 0.092, 0.104, -0.085, -0.013, ease=0.0012))
-    wood.append(board(f"{name}Rail", -0.08, 0.08, 0.104, 0.116, -0.085, -0.079, ease=0))
+    # (the shelf: 16 by 7 cm, 1.2 cm thick, hung high on the lip (item 446, the owner's 「醬料台往上掛」: its top was 10.4 cm over the counter,
+    # low on the lip doubled in height, on long straps): its top SHELF_TOP over the counter, the pot's lid 4 mm under the lip's rail's ink;
+    # the bin's rim 8.7 cm, well under its front)
+    wood.append(board(f"{name}Shelf", -0.08, 0.08, SHELF_TOP - 0.012, SHELF_TOP, -0.085, -0.013, ease=0.0012))
+    wood.append(board(f"{name}Rail", -0.08, 0.08, SHELF_TOP, SHELF_TOP + 0.012, -0.085, -0.079, ease=0))
     # (the hooks over the lip's top as it stands (item 433, the owner's 「嗯?」 at two of them seen from above: made for the lip's 0.149 before
     # item 416 doubled it, their tops hung halfway up its see-through lattice, hooked over nothing): 5 mm over its rail's ink)
     hook = LIP_H + 0.009
     for k, hx in enumerate((-0.06, 0.06)):
         # (each hook: a strip up in front of the lip, over its top, a short way down its back)
-        wood.append(board(f"{name}HookFront{k}", hx - 0.008, hx + 0.008, 0.092, hook, -0.013, -0.008, ease=0))
+        wood.append(board(f"{name}HookFront{k}", hx - 0.008, hx + 0.008, SHELF_TOP - 0.012, hook, -0.013, -0.008, ease=0))
         wood.append(board(f"{name}HookTop{k}", hx - 0.008, hx + 0.008, hook, hook + 0.006, -0.013, 0.073, ease=0))
         wood.append(board(f"{name}HookBack{k}", hx - 0.008, hx + 0.008, hook - 0.03, hook, 0.068, 0.073, ease=0))
     out.append(fin(joined(f"{name}Wood", wood), M["rackwood"], ps))
@@ -735,7 +740,7 @@ def cond_rack(name, M, ps):
         if o.name.endswith("Tray"):
             bpy.data.objects.remove(o, do_unlink=True)
             continue
-        o.location = o.location + P(0, 0.104 - 0.012, -0.046)
+        o.location = o.location + P(0, SHELF_TOP - 0.012, -0.046)
         out.append(fin(o, o.data.materials[0], ps))
     return out
 
