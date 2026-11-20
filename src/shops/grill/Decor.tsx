@@ -1668,6 +1668,9 @@ export function dressSake(r: THREE.Object3D, made: Map<THREE.Material, THREE.Mat
     const src = m.material as THREE.MeshStandardMaterial
     let t = made.get(src)
     if (!t) {
+      // (the bottles' picture kept at up to twice the machine's cap (scene/textureCap): their columns' margins (item 398) and their labels'
+      // brush lettering want the pixels)
+      if (/SakeBottles|SakeGlass/.test(src.name) && src.map) src.map.userData.capScale = 2
       if (/SakeBottles|ShochuLabel/.test(src.name)) {
         // (the labels, the shoulder labels and the caps: paper and foil, opaque, a soft sheen)
         const g = new THREE.MeshStandardMaterial({ map: src.map ?? null, roughness: 0.42, metalness: 0.02, envMapIntensity: 0.6, side: THREE.DoubleSide })

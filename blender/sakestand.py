@@ -52,6 +52,11 @@ NB = 13               # (twelve bottles and the hang tag's picture)
 # 3,136 by 2,048, the last cell empty)
 NCOL, NROW = 7, 2
 CWID, CH = 448, 1024
+# (each column with a margin either side that carries its own picture on round the bottle (item 398, the owner's 「酒瓶背後都有一條縫線?」
+# 「幾乎每個都有」): a bottle's back is where its column's two edges meet, and they met the next columns' pictures; kept 0.6 % in from them
+# (item 197) was a pixel at full size, under one as the game draws the picture smaller (scene/textureCap), and the next bottle's colour
+# came in down every back as a line, lit by the glass's own glow; 24 pixels a side, the picture round the bottle carried on into them)
+GUT = 24
 TAG = 12              # (the hang tag's picture: the cell after the twelve bottles')
 NIGORI = {11}         # (the cloudy one: its sake white)
 # (the stoneware one's washi cap draped down its neck, tied with a gold cord, two tassels over its shoulder (item 285, the owner's picture):
@@ -135,7 +140,9 @@ class Col:
         seam = (np.abs(cdist(self.uu - 0.25)) < 0.003) | (np.abs(cdist(self.uu - 0.75)) < 0.003)
         # (just showing: brighter, it read as a scratch down the bottle's side (item 197))
         self.col[seam] *= 1.08
-        self.col *= (0.94 + 0.06 * fbm(CH // 2, 20, 40, 3)[:CH // 2, :CWID].repeat(2, 0)[:CH])[..., None]
+        # (its mottle round the bottle without a break where the column's edges meet: a noise that tiles across the column's width)
+        mottle = np.tile(fbm(CWID, 18, 36, 3).repeat(2, 0), (2, 1))[:CH]
+        self.col *= (0.94 + 0.06 * mottle)[..., None]
         self.rough = np.full((CH, CWID), 0.12, np.float32)
 
     def rect(self, x0, x1, y0, y1):
@@ -167,7 +174,7 @@ def cdist(du):
 
 def washi(col, m, base, fibre=0.06):
     """washi paper over `m`: its base colour, long fibres through it, a little uneven"""
-    n = fbm(CH // 2, 60, 120, 2)[:CH // 2, :CWID].repeat(2, 0)[:CH]
+    n = wrapnoise(60, 120, 2)
     f = np.abs(np.sin(col.x * 900 + n * 20) * np.sin(col.y * 300 + n * 9))
     c = np.asarray(base, np.float32)[None, None, :] * (1 - fibre + fibre * f)[..., None] * (0.96 + 0.06 * n)[..., None]
     col.col[m] = c[m]
@@ -192,8 +199,20 @@ cols = []
 
 
 def border(c, x0, x1, y0, y1, w, colour, rough=0.6):
-    """a ruled frame `w` wide just inside the rectangle"""
+    """a ruled frame `w` wide just inside the rectangle; round the whole bottle (a label that goes all the way round, its ends meeting at its
+    back), its top and foot only (item 398, the owner's 「酒瓶背後都有一條縫線?」: its two upright lines stood down every bottle's back)"""
+    if x0 <= -c.circ / 2 + 0.003 and x1 >= c.circ / 2 - 0.003:
+        c.paint(c.rect(-c.circ, c.circ, y0, y1) & ~c.rect(-c.circ, c.circ, y0 + w, y1 - w), colour, rough)
+        return
     c.paint(c.rect(x0, x1, y0, y1) & ~c.rect(x0 + w, x1 - w, y0 + w, y1 - w), colour, rough)
+
+
+def wrapnoise(cx, cy, octaves):
+    """noise over a bottle's column that runs on round it without a break where the column's two edges meet, at its back (item 398): as
+    fbm(CH // 2, cx, cy) was over 512 (cut to the column's 448 it broke there), over a square of the column's width, each row doubled down"""
+    k = CWID / (CH // 2)
+    n = fbm(CWID, max(1, round(cx * k)), max(1, round(cy * k)), octaves).repeat(2, 0)
+    return np.tile(n, (int(np.ceil(CH / n.shape[0])), 1))[:CH]
 
 
 def disc(c, x0, y0, r, colour, ring=0.0, rough=0.6):
@@ -203,7 +222,7 @@ def disc(c, x0, y0, r, colour, ring=0.0, rough=0.6):
 
 def worn(c, m, k=0.12):
     """the print a little worn where a hand takes the bottle"""
-    n = fbm(CH // 2, 30, 60, 3)[:CH // 2, :CWID].repeat(2, 0)[:CH]
+    n = wrapnoise(30, 60, 3)
     c.col[m] = mix(c.col, np.asarray((0.93, 0.9, 0.82), np.float32), smooth(0.62, 0.9, n) * k)[m]
 
 
@@ -342,7 +361,7 @@ c = Col(2 * math.pi * 0.052, H, (0.05, 0.13, 0.08))
 X0, X1, Y0, Y1 = -c.circ / 2, c.circ / 2, 0.05, 0.2
 lab = c.rect(X0, X1, Y0, Y1)
 c.paint(lab, (0.08, 0.08, 0.08), 0.5)
-c.col[lab] *= (0.85 + 0.15 * fbm(CH // 2, 80, 160, 2)[:CH // 2, :CWID].repeat(2, 0)[:CH])[lab][:, None]
+c.col[lab] *= (0.85 + 0.15 * wrapnoise(80, 160, 2))[lab][:, None]
 border(c, X0 + 0.002, X1 - 0.002, Y0 + 0.002, Y1 - 0.002, 0.0008, GOLD, 0.35)
 c.text("鶴汀", 0.006, 0.152, 0.05, GOLD, brush=True, gap=0.95)
 d = np.sqrt((c.x - 0.03) ** 2 + (c.y - 0.1) ** 2)
@@ -519,7 +538,7 @@ cols.append(c)
 # name brushed big, the grade and 清酒 small, a red seal; its washi cap draped down the neck in points and tied with a gold cord, two
 # tassels hanging over the shoulder (the drape and the cord are shapes: drape())
 c = Col(2 * math.pi * 0.04, H4, (0.06, 0.055, 0.05))
-nz = fbm(CH // 2, 40, 80, 3)[:CH // 2, :CWID].repeat(2, 0)[:CH]
+nz = wrapnoise(40, 80, 3)
 c.col[:] = np.asarray((0.07, 0.065, 0.06), np.float32) * (0.75 + 0.5 * nz)[..., None]
 r_ = np.random.default_rng(10)
 for _ in range(900):
@@ -577,6 +596,8 @@ disc(tag, 0.0, 0.124, 0.003, (0.3, 0.3, 0.3))
 cols.append(tag)
 
 cells = [np.clip(k.col, 0, 1) for k in cols] + [np.full((CH, CWID, 3), 0.5, np.float32)] * (NCOL * NROW - len(cols))
+# (each column's margins: its right edge's picture on the left of it, its left edge's on the right, as round the bottle they're one)
+cells = [np.concatenate([c[:, -GUT:], c, c[:, :GUT]], 1) for c in cells]
 atlas = np.concatenate([np.concatenate(cells[r * NCOL:(r + 1) * NCOL], 1) for r in range(NROW)], 0).astype(np.float32)
 # (the roughness in the picture's alpha is no use to the game's toon; the shine kept in a second small picture would be one more texture:
 # instead the label's matte and the glass's gloss come from the material's own roughness, the label's own look painted)
@@ -804,7 +825,7 @@ def bottle(k, prof, at, turn):
     # (each bottle's column kept a little in from its edges: its back, where the column's edges meet, picked up the next bottle's colour as
     # the picture was drawn smaller (item 197: a line of another bottle's colour down each one's back, the kitchen's side); in two rows
     # now (item 285), its foot and its cap's top kept in from the row above and below the same way)
-    u0, uw = (k % NCOL) / NCOL + 0.006 / NCOL, (1 - 0.012) / NCOL
+    u0, uw = ((k % NCOL) + GUT / (CWID + 2 * GUT)) / NCOL, CWID / (CWID + 2 * GUT) / NCOL
     vrow = lambda z: ((k // NCOL) + 0.004 + 0.992 * z / H_) / NROW
     for j in range(len(prof) - 1):
         for i in range(NA):
@@ -834,8 +855,8 @@ def bottle(k, prof, at, turn):
         sw = Matrix.Rotation(-0.55, 4, "Z")
         q = [sw @ p_ for p_ in q]
         f = bm.faces.new([bm.verts.new(p_) for p_ in q])
-        tu0, tv0 = (TAG % NCOL) / NCOL, (TAG // NCOL) / NROW
-        for l, uvq in zip(f.loops, ((tu0, tv0), (tu0 + 1 / NCOL, tv0), (tu0 + 1 / NCOL, tv0 + 1 / NROW), (tu0, tv0 + 1 / NROW))):
+        tu0, tv0, tw = ((TAG % NCOL) + GUT / (CWID + 2 * GUT)) / NCOL, (TAG // NCOL) / NROW, CWID / (CWID + 2 * GUT) / NCOL
+        for l, uvq in zip(f.loops, ((tu0, tv0), (tu0 + tw, tv0), (tu0 + tw, tv0 + 1 / NROW), (tu0, tv0 + 1 / NROW))):
             l[uvl].uv = uvq
     bmesh.ops.transform(bm, matrix=Matrix.Rotation(turn, 4, "Z"), verts=bm.verts)
     o = mesh_obj(f"SakeBottle{k}", bm, [M["glass"], M["clear"]], join=False)
