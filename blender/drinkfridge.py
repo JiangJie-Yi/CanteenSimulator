@@ -15,6 +15,10 @@ plain boxes and planes, about 400 triangles.
   floor's): the plinth under the floor, the liner's faces 4 mm off the walls, the shelves' tags 3 mm off their lips.
 - "FridgeDoorL", "FridgeDoorR": the pair of glass doors (the owner's: two black-framed doors a fridge, a black mullion where they meet): each
   its frame, its pane (FridgeGlass, see-through) and a long silver handle by the middle; the game swings each on its outer edge.
+- "FridgeRearL", "FridgeRearR": its back a pair of doors too (item 431, the owner's, 2026-11-21: 「飲料可以從冷飲櫃後面直接補」: the fridges
+  stand in the wall now, their backs in the stock room behind it, filled from there as a convenience store's are): each half the back, the
+  cabinet's black outside and the lit liner's half inside (the halves' liners overlapping a little at the middle, a millimetre apart, so from
+  the front the back's one lit face, no seam); the game swings each out on its outer edge into the room behind.
 - The foot: six louvre slats and a small silver maker's plate (FridgeMetal).
 
 The game's frame, in the room's units: y up, the door's face toward +z, the middle of its foot at the origin; as big as bar.ts's FRIDGE
@@ -211,7 +215,6 @@ shell_out = rounded_loop(x0, x1, 0.0, H, SHELL_R, 2, (False, False, True, True))
 shell_in = [(x0 + T, 0.0), (x0 + T, H - T), (x1 - T, H - T), (x1 - T, 0.0)]
 body = [
     slab("shell", [[shell_out[0]] + shell_in + shell_out[1:]], zb, zf, "shell", SHELL_ROUND, 1),
-    box("back", x0 + T, x1 - T, 0, H - T, zb, zb + T, "shell"),
     box("head", x0 + T, x1 - T, open_y1, H - T, zf - 0.06, zf, "shell"),
     # (under the floor, not up into it: its top and its front lay in the floor's planes and fought them)
     box("plinth", x0 + T, x1 - T, 0.0, PLINTH - 0.02, zf - 0.08, zf - 0.02, "louver"),
@@ -228,7 +231,6 @@ body.append(box("badge", -0.055, 0.055, 0.056, 0.082, zf - 0.006, zf - 0.002, "m
 ix0, ix1, iz0, iz1 = x0 + T, x1 - T, zb + T, zf - 0.06
 # (4 mm off the cabinet's walls, not 1: at 1 they flickered with them from across the room)
 LO = 0.004
-body.append(quad("liner-back", [(ix0, open_y0, iz0 + LO), (ix1, open_y0, iz0 + LO), (ix1, open_y1, iz0 + LO), (ix0, open_y1, iz0 + LO)], "backlight"))
 # (the sides' pictures from the front (u 0) to the back (u 1), up their height)
 body.append(quad("liner-l", [(ix0 + LO, open_y0, iz1), (ix0 + LO, open_y0, iz0), (ix0 + LO, open_y1, iz0), (ix0 + LO, open_y1, iz1)], "sideglow",
                  uv=((0, 0), (1, 0), (1, 1), (0, 1))))
@@ -304,11 +306,23 @@ for side, (ax, bx) in (("L", (fx0, -0.002)), ("R", (0.002, fx1))):
     ]
     doors.append(join(parts_, f"FridgeDoor{side}"))
 
+# ---- the back: a pair of doors (item 431), each half of it: its black outside (the cabinet's back as it was, from a hair over the floor
+# to under the top) and its half of the lit liner inside (the left's to 3 mm past the middle, the right's from 3 mm before it, a millimetre
+# further back: one lit face from the front, no seam); the picture's halves as the one liner's were
+rears = []
+for side, (ax, bx) in (("L", (x0 + T, -0.0005)), ("R", (0.0005, x1 - T))):
+    la, lb = (ix0, 0.003) if side == "L" else (-0.003, ix1)
+    lz = iz0 + LO + (0.0 if side == "L" else -0.001)
+    u0, u1 = (la - ix0) / (ix1 - ix0), (lb - ix0) / (ix1 - ix0)
+    rears.append(join([box(f"rear{side}", ax, bx, 0.003, H - T, zb, zb + T, "shell"),
+                       quad(f"liner-back{side}", [(la, open_y0, lz), (lb, open_y0, lz), (lb, open_y1, lz), (la, open_y1, lz)], "backlight",
+                            uv=((u0, 0), (u1, 0), (u1, 1), (u0, 1)))], f"FridgeRear{side}"))
+
 root = bpy.data.objects.new("DrinkFridge", None)
 bpy.context.collection.objects.link(root)
-for o in (fridge_body, sign, fridge_shelves, *doors):
+for o in (fridge_body, sign, fridge_shelves, *doors, *rears):
     o.parent = root
-print("FRIDGE_TRIS", sum(len(p.vertices) - 2 for o in (fridge_body, sign, fridge_shelves, *doors) for p in o.data.polygons))
+print("FRIDGE_TRIS", sum(len(p.vertices) - 2 for o in (fridge_body, sign, fridge_shelves, *doors, *rears) for p in o.data.polygons))
 if PREVIEW:
     target = P(0, 1.1, 0)
     cam = bpy.data.objects.new("PreviewCam", bpy.data.cameras.new("PreviewCam"))

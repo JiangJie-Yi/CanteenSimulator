@@ -28,7 +28,7 @@ import { BOSS_DRINK, BOSS_FX } from './Boss'
 import { CASE_SIZE, depthOf } from '@/game/drinkStock'
 import { CARTON_CASES, cartonStack } from '@/game/cartonStack'
 import { cartonMaterials } from './drinkCartons'
-import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, SHOP_MENU, type Counter, type DrinkId } from './bar'
+import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, storeOf, STORE, STORE_STATE, WALL_OUT, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, SHOP_MENU, type Counter, type DrinkId } from './bar'
 import { EditBlock, Movable } from './Movable'
 import { getEdit } from './edit'
 import { askView } from './DormRoom'
@@ -3194,6 +3194,152 @@ function WcMass({ x, y, z, cap = true }: { x: [number, number]; y: [number, numb
     </>
   )
 }
+/** the stock room's doorway's frame (items 430): its posts' width in the wall's line, its head's height over the opening */
+const STORE_POST = 0.05, STORE_HEAD = 0.07
+/** the stock room's noren (a half-noren, to the stocker's shoulders): as wide as the frame's posts' outer sides, and how long */
+const STORE_NOREN_W = STORE.doorW + 2 * STORE_POST, STORE_NOREN_L = 0.6
+/**
+ * The stock room's noren (item 430, the owner's 「這邊挖空並加上掛簾，後面是小儲藏室，倉儲員工專用」): indigo cotton, the shop's back rooms'
+ * plain kind: its top band darker where it's sewn over the rod; across its middle, where its two panels part, a white ring round 倉 (the
+ * store), and under it in small spaced capitals STAFF ONLY; a white line along its hem; the cotton's weave. One picture over both panels.
+ */
+const STORE_NOREN = (() => {
+  const PX = 1024 / STORE_NOREN_W, H = Math.round(STORE_NOREN_L * PX)
+  return canvasTex(1024, H, (g) => {
+    const cloth = '#1f2f52'
+    const band = Math.round(0.034 * PX), cy = Math.round(band + (H - band) * 0.43)
+    g.save()
+    g.fillStyle = cloth; g.fillRect(0, 0, 1024, H)
+    g.globalAlpha = 0.06
+    g.fillStyle = '#ffffff'
+    for (let x = 0; x < 1024; x += 3) g.fillRect(x, 0, 1, H)
+    g.fillStyle = '#000000'
+    for (let y = 0; y < H; y += 3) g.fillRect(0, y, 1024, 1)
+    g.globalAlpha = 1
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, 1024, band)
+    g.fillStyle = 'rgba(255,255,255,0.16)'; g.fillRect(0, band, 1024, 3)
+    // (the ring and the character in it)
+    g.strokeStyle = '#efe9dc'; g.lineWidth = 16
+    g.beginPath(); g.arc(512, cy, 150, 0, Math.PI * 2); g.stroke()
+    g.fillStyle = '#efe9dc'; g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.font = `700 200px ${SIGN_FONT}`
+    g.fillText('倉', 512, cy + 8)
+    g.font = '700 46px "Arial Black", sans-serif'
+    ;(g as unknown as { letterSpacing: string }).letterSpacing = '14px'
+    g.fillText('STAFF ONLY', 512, cy + 232)
+    g.fillRect(0, H - Math.round(0.022 * PX), 1024, 5)
+    g.restore()
+  })
+})()
+/** the noren's cloth: both sides, its picture read from the room (the side toward the stock room mirrored, as a dyed cloth is) */
+const STORE_NOREN_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: STORE_NOREN, side: THREE.DoubleSide })
+/**
+ * The stock room (items 430, 431, 437; the owner's, 2026-11-21: 「這邊挖空並加上掛簾，後面是小儲藏室，倉儲員工專用」「飲料可以從冷飲櫃後面直接
+ * 補」): a narrow room behind the side wall, from the wall's start along behind the drinks fridges to the men's toilet's room, its way in a
+ * doorway in the wall's stretch past the fridges, a noren over it; only the stocker goes in. Built as the toilets' rooms are (a wing of the
+ * house: dark cedar to the waist outside, plaster over, a dark cap along the tops, a slatted ceiling seen from above; inside, cedar to the
+ * waist and plaster, the floor's boards the toilets' hinoki), the fridges' backs in its front wall, the drinks' stock along its back wall
+ * (ShopProps: the crates and the cartons, and the milk crates). In the wall's frame (x behind its face, y up, z along it).
+ */
+function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number, number]; deep: number; fridges: [number, number][] }) {
+  const h = STORE.doorH, top = h + 0.3
+  const [z0, z1] = room
+  // (its far end the men's toilet's room's end wall (its outside, 4 mm on), as deep as that room; past it a short wall of its own on to the
+  // back)
+  const zE = z1 + 0.004
+  const mid = (z0 + zE) / 2, len = zE - z0, dx = deep - WALL_OUT
+  const noren = useRef<THREE.Group>(null)
+  useFrame((_, dt0) => {
+    // (swung aside as the stocker goes through, back into the room the way he's going, and settling back after him: a spring, a little
+    // overshoot, each panel a little behind the other)
+    const dt = Math.min(dt0, 0.05)
+    const st = STORE_STATE as typeof STORE_STATE & { v?: number; a?: number }
+    const want = st.passing > 0 ? 1 : 0
+    st.v = ((st.v ?? 0) + ((want - st.push) * 60 - (st.v ?? 0) * 9) * dt)
+    st.push += st.v * dt
+    const g = noren.current
+    if (!g) return
+    g.children.forEach((p, i) => { p.rotation.z = st.push * (0.62 - i * 0.08) })
+  })
+  const hit = useMemo(() => {
+    const hint = () => `只有倉儲員工進出｜後場最少：${lowestBack().slice(0, 3).map((id) => `${drinkLabel(id)} ${DRINK_BACK.back[id] ?? 0}`).join('、')}｜點一下打開飲料庫存`
+    return {
+      onClick: (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); if (getEdit().on) return; setDrinkPanel(true) },
+      onPointerOver: (e: ThreeEvent<PointerEvent>) => { if (getEdit().on) return; handOver.onPointerOver({ ...e, eventObject: noren.current ?? e.eventObject }); setTip({ title: '儲藏室', hint: hint() }) },
+      onPointerOut: (e: ThreeEvent<PointerEvent>) => { handOver.onPointerOut({ ...e, eventObject: noren.current ?? e.eventObject }); setTip(null) },
+    }
+  }, [])
+  return (
+    <group>
+      <EditBlock>
+      <StaticBatch plain>
+        {/* its floor, the toilets' hinoki boards, a hair over the shop's own floor run out behind the wall */}
+        <WcFloor wx={dx} wz={len} at={[(WALL_OUT + deep) / 2, 0.007, mid]} />
+        {/* inside: its back wall, its near end; its far end in front of the men's room's end wall (2 mm off it) */}
+        <WcWall len={len} at={[deep, 0, mid]} yaw={-Math.PI / 2} top={top} />
+        <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, z0]} yaw={0} top={top} />
+        <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, zE - 0.002]} yaw={Math.PI} top={top} />
+        {/* outside: the walls' bodies, from a little behind the shop's wall: its near end, its back, and the short end past the men's room */}
+        <WcMass x={[WC_IN, deep + WC_T]} y={[0, top]} z={[z0 - WC_T, z0 - 0.002]} />
+        <WcMass x={[deep + 0.002, deep + WC_T]} y={[0, top]} z={[z0 - WC_T, zE + WC_T]} />
+        <WcMass x={[WC_ROOM.D + WC_T + 0.002, deep]} y={[0, top]} z={[zE, zE + WC_T]} />
+        {/* the slatted ceiling on the caps */}
+        <WcSlats x={[WALL_OUT, deep]} z={[z0, zE]} y={top + WC_CAP + 0.011} />
+        {/* (dark posts at its two outer corners) */}
+        {[z0 - WC_T, zE + WC_T].map((z, k) => (
+          <mesh key={k} position={[deep + WC_T / 2, top / 2, z + (k ? -0.015 : 0.015)]}><boxGeometry args={[WC_T + 0.012, top, 0.034]} /><meshToonMaterial color="#2e1c10" /></mesh>
+        ))}
+        {/* the doorway's frame: two dark cedar posts in the wall's line, proud of its face, through its thickness; the head over them; the
+            jambs lined; a low sill across its foot */}
+        {[door[0] - STORE_POST / 2, door[1] + STORE_POST / 2].map((z) => (
+          <mesh key={z} position={[(WALL_OUT - 0.03) / 2, (h + STORE_HEAD) / 2, z]}><boxGeometry args={[WALL_OUT + 0.03, h + STORE_HEAD, STORE_POST]} /><meshToonMaterial color="#3d2414" /></mesh>
+        ))}
+        <mesh position={[(WALL_OUT - 0.035) / 2, h + STORE_HEAD / 2, (door[0] + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.035, STORE_HEAD, door[1] - door[0] + 2 * STORE_POST + 0.02]} /><meshToonMaterial color="#35200f" /></mesh>
+        <mesh position={[WALL_OUT / 2, 0.006, (door[0] + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.02, 0.012, door[1] - door[0]]} /><meshToonMaterial color="#4a2e1a" /></mesh>
+        {/* the noren's rod on its two brackets off the head's face */}
+        <mesh position={[-0.05, h + STORE_HEAD - 0.02, (door[0] + door[1]) / 2]} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.01, 0.01, STORE_NOREN_W + 0.04, 10]} /><meshToonMaterial color="#d9b884" />
+        </mesh>
+        {[-1, 1].map((k) => (
+          <mesh key={k} position={[-0.033, h + STORE_HEAD - 0.036, (door[0] + door[1]) / 2 + k * (STORE_NOREN_W / 2 + 0.006)]}>
+            <boxGeometry args={[0.034, 0.01, 0.014]} /><meshToonMaterial color="#3a2416" />
+          </mesh>
+        ))}
+      </StaticBatch>
+      </EditBlock>
+      {/* the noren: its two panels hung from the rod, each its half of the one picture, a slit between; swung aside as the stocker goes
+          through (not merged: it moves) */}
+      <group ref={noren} name="look-store" position={[-0.05, h + STORE_HEAD - 0.02, (door[0] + door[1]) / 2]}>
+        {[-1, 1].map((sd) => <StoreNorenPanel key={sd} sd={sd} />)}
+      </group>
+      {/* the doorway as one thing to point at: what's in there and what's lowest, a click opens the drinks' stock */}
+      <mesh position={[-0.06, (h + STORE_HEAD) / 2, (door[0] + door[1]) / 2]} rotation-y={-Math.PI / 2} {...hit}>
+        <planeGeometry args={[door[1] - door[0] + 2 * STORE_POST, h + STORE_HEAD]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  )
+}
+/** one of the stock room noren's two panels: its half of the picture, hung from the rod (its top), a slit between the two */
+function StoreNorenPanel({ sd }: { sd: number }) {
+  const geo = useMemo(() => {
+    const w = (STORE_NOREN_W - 0.008) / 2
+    const g = new THREE.PlaneGeometry(w, STORE_NOREN_L)
+    const u0 = sd < 0 ? 0 : 1 - w / STORE_NOREN_W, u1 = u0 + w / STORE_NOREN_W
+    const uv = g.attributes.uv as THREE.BufferAttribute
+    for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
+    // (hung from its top: the cloth below the rod)
+    g.translate(0, -STORE_NOREN_L / 2 + 0.012, 0)
+    return { g, z: sd * (0.008 + w) / 2 }
+  }, [sd])
+  useEffect(() => () => geo.g.dispose(), [geo])
+  // (in the doorway's plane, its face to the room: seen from the room the picture reads right)
+  return (
+    <group position-z={geo.z}>
+      <mesh geometry={geo.g} rotation-y={-Math.PI / 2} material={STORE_NOREN_MAT} />
+    </group>
+  )
+}
 /** the height of the rooms' dark cedar outside (their wainscot's), and of the dark wooden cap along their walls' tops */
 const WC_WAIST = 0.9
 const WC_CAP = 0.03
@@ -5260,7 +5406,10 @@ function Pendant({ z, drop, pool, band = 0 }: { z: number; drop: number; pool: n
  * One counter's stretch of the room: the wall behind its aisle (from/to along it, in the counter's own frame), and
  * pendant lamps over it.
  */
-function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar = false, clear = [], corner = false, hang = [], staffDoor }: { c: Counter; from: number; to: number; far: number
+function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar = false, clear = [], corner = false, hang = [], staffDoor, store }: { c: Counter; from: number; to: number; far: number
+  /** the stock room behind it (items 430, 431): its doorway (the clear opening along it), its two ends along it, how deep it is behind the
+   * wall's face, and the fridges set into the wall (each its stretch along it) */
+  store?: { door: [number, number]; room: [number, number]; deep: number; fridges: [number, number][] }
   /** prints hung here as well, where asked (along it) */
   hang?: { z: number; print: ArtKey }[]
   /** a staff-only door here (its middle, along it): nothing hung over it */
@@ -5286,10 +5435,23 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
   const mid = (from + to) / 2
   // the wall's stretches: whole, or with the toilets' doorways left open (as high as their frames' lintel)
   const spans = useMemo(() => {
-    if (door === undefined) return [[from, to, 0]]
-    const g0 = door - WC_W - 0.12, g1 = door + WC_W + 0.12
-    return [[from, g0, 0], [door - 0.06, door + 0.06, 0], [g1, to, 0], [g0, g1, WC_H + 0.07]]
-  }, [from, to, door])
+    let out: number[][]
+    if (door === undefined) out = [[from, to, 0]]
+    else {
+      const g0 = door - WC_W - 0.12, g1 = door + WC_W + 0.12
+      out = [[from, g0, 0], [door - 0.06, door + 0.06, 0], [g1, to, 0], [g0, g1, WC_H + 0.07]]
+    }
+    if (!store) return out
+    // (the stock room's doorway, its frame's posts in it, and the fridges set into the wall (items 430, 431): through it, the wall over each
+    // from its top up)
+    const holes = [[store.door[0] - STORE_POST, store.door[1] + STORE_POST, STORE.doorH + STORE_HEAD], ...store.fridges.map(([a, b]) => [a, b, FRIDGE.H + 0.012])]
+    for (const [a, b, top] of holes) {
+      out = out.flatMap(([z0, z1, y0]) => (y0 !== 0 || z1 <= a || z0 >= b ? [[z0, z1, y0]] : [[z0, a, 0], [b, z1, 0]].filter(([p, q]) => q - p > 0.001)))
+      out.push([a, b, top])
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from, to, door, store?.door[0], store?.door[1], store?.fridges.map((f) => f.join()).join()])
   // (pictures along the wall, a print then a scroll in turn, about a metre apart, leaving the shelf's stretch clear)
   // (the shelf in the far third of the wall, or the near one if the door's in the far one)
   const shelfZ0 = door !== undefined && Math.abs(door - (mid + l * 0.3)) < 1.3 ? mid - l * 0.3 : mid + l * 0.3
@@ -5373,7 +5535,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
             out at the door (scene/pickable's blocksEdit); the pieces on it are still their own) */}
         <EditBlock>
         {/* (all of it standing still: drawn merged, a few meshes for the whole wall) */}
-        <StaticBatch plain key={`${from}|${to}|${door}|${!!altar}`}>
+        <StaticBatch plain key={`${from}|${to}|${door}|${!!altar}|${spans.length}`}>
         {/* the plaster over the wainscot, open where the toilets' doors are (a strip between them, and over them) */}
         {/* (the wall's thickness: a slab behind it, the base's dark wood, full height, over the toilets' doorways only above them) */}
         {/* (down through the base's own thickness too, which stops at the room's outline, short of the wall's) */}
@@ -5496,6 +5658,8 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
       </group>
       {/* the toilets: not part of the wall that's hidden from behind, so they're still there when the camera swings round to the back */}
       <group position-x={-far}>
+        {/* (and the stock room, a wing of the house as the toilets' are (items 430, 431)) */}
+        {store && <StoreRoom {...store} />}
         {/* the toilets, the men's and the women's, side by side */}
         {/* (their doors and frames, shut, stand in edit mode's way as the wall does: not chosen through) */}
         <EditBlock>
@@ -6257,7 +6421,8 @@ const fridgeTagTex = (n: number) => {
   }
   return t
 }
-const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; doors: THREE.Group[]; home: ReturnType<typeof homeCopy> }>()
+const freezers = new Map<number, { body: THREE.Group; doorRoot: THREE.Group; doors: THREE.Group[]; home: ReturnType<typeof homeCopy>
+  rearRoot: THREE.Group; rears: THREE.Group[]; rearHome: ReturnType<typeof homeCopy> }>()
 /** the glass (cool, clear, its glare streaks; the studio's room in it), made once */
 const FRIDGE_GLASS = new THREE.MeshStandardMaterial({ color: '#ffffff', map: FRIDGE_GLASS_TEX, transparent: true, roughness: 0.05, metalness: 0.1,
   side: THREE.DoubleSide, depthWrite: false })
@@ -6350,15 +6515,33 @@ function useFreezer(n: number) {
       }
       doors.push(pivot)
     }
+    // (and its back's pair (item 431: filled from the stock room behind the wall), each on its outer edge at the back)
+    const rears: THREE.Group[] = []
+    for (const side of ['L', 'R'] as const) {
+      const rear = root.getObjectByName(`FridgeRear${side}`)
+      const pivot = new THREE.Group()
+      pivot.name = `fridge-rear-${side}`
+      if (rear) {
+        const box = new THREE.Box3().setFromObject(rear)
+        pivot.position.set(side === 'L' ? box.min.x : box.max.x, 0, box.min.z)
+        pivot.updateMatrixWorld(true)
+        pivot.attach(rear)
+      }
+      rears.push(pivot)
+    }
     // (the cabinet never moves and each door swings as one: each folded together by material)
     plainColours(root)
     mergeByMaterial(root)
     for (const d of doors) mergeByMaterial(d)
+    for (const d of rears) mergeByMaterial(d)
     const doorRoot = new THREE.Group()
     for (const d of doors) doorRoot.add(d)
     // (both shut, drawn as one: a draw a material, not four a door)
     const home = homeCopy(doorRoot, doors)
-    const out = { body, doorRoot, doors, home }
+    const rearRoot = new THREE.Group()
+    for (const d of rears) rearRoot.add(d)
+    const rearHome = homeCopy(rearRoot, rears)
+    const out = { body, doorRoot, doors, home, rearRoot, rears, rearHome }
     freezers.set(n, out)
     return out
   }, [gltf, n])
@@ -6565,13 +6748,17 @@ function DrinkFridgeImpl({ n = 0 }: { n?: number }) {
  * pours out of it in a low white mist.
  */
 export const FridgeDoor = memo(FridgeDoorImpl)
+/** how far a fridge's back doors swing open (item 431): a little short of square, clear of the stock along the room's back wall */
+const REAR_OPEN = Math.PI * 0.47
 const FRIDGE_DOOR_AT = new THREE.Vector3()
 function FridgeDoorImpl({ n = 0 }: { n?: number }) {
   const { W, D } = FRIDGE
-  const { doors, doorRoot, home } = useFreezer(n)
+  const { doors, doorRoot, home, rears, rearRoot, rearHome } = useFreezer(n)
   const door = doors[0]
   const open = useRef(0)
   const mist = useRef(0)
+  // (its back's pair (item 431): swung out into the stock room while the stocker fills it from there, a little bounce as they stop open)
+  const rear = useRef({ k: 0, sounded: false })
   // (the door's state lives outside React: leave it shut when the shop's let go, so it doesn't come back open)
   useEffect(() => () => { FRIDGE_STATE[n].open = false; FRIDGE_STATE[n].passing = 0 }, [n])
   // (heard: its seal let go as it starts to swing open, a muffled knock as it swings shut (the owner's), as loud as it's near)
@@ -6589,11 +6776,22 @@ function FridgeDoorImpl({ n = 0 }: { n?: number }) {
     doors[1].rotation.y = e * (Math.PI / 2)
     home.home(e === 0)
     mist.current = e
+    // (the back's: out on their outer edges, away from the cabinet into the room behind, a hair past square and back; heard from there)
+    const r = rear.current, wantR = FRIDGE_STATE[n].stocker ? 1 : 0
+    if (wantR && !r.sounded) { r.sounded = true; coolerDoorSound(true, near() * 0.6) }
+    else if (!wantR && r.sounded && r.k < 0.04) { r.sounded = false; coolerDoorSound(false, near() * 0.6) }
+    r.k += Math.sign(wantR - r.k) * Math.min(Math.abs(wantR - r.k), Math.min(dt, 0.1) * 2.4)
+    const q = r.k, eb = q < 1 ? q * q * (3 - 2 * q) + Math.sin(q * Math.PI) * 0.06 : 1
+    rears[0].rotation.y = eb * REAR_OPEN
+    rears[1].rotation.y = -eb * REAR_OPEN
+    rearHome.home(q === 0)
   })
   return (
     <group>
       {/* the model's own door, hung on its pivot (the glass and its frame), swung with the rest of the model's scale */}
       <group onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; FRIDGE_STATE[n].open = !FRIDGE_STATE[n].open }} {...tipOver('飲料櫃', '點一下開關門')}><primitive object={doorRoot} /></group>
+      {/* (its back's pair, in the stock room) */}
+      <primitive object={rearRoot} />
       {/* the cold, pouring out over the open door's foot and rolling out over the floor (it was drawn as rising steam: the owner saw it
           was wrong) */}
       <group position={[0, 0, D / 2 + 0.02]}>
@@ -8646,23 +8844,6 @@ function DrinkCartons() {
   return <primitive object={holder} />
 }
 useGLTF.preload(CARTONS_URL)
-/** an unseen box over the crates and cartons: they're the drinks' stock; pointed at it says what's lowest and lights them all (`lit`: the
- * crates and cartons as drawn, the box itself being unseen), a click opens the drinks' stock (DrinkStockPanel: order cases, fill the fridges) */
-function BackStockHit({ size = [0.42, 0.62, 0.34], lit }: { size?: [number, number, number]; lit: () => THREE.Object3D | null }) {
-  const hint = () => `後場最少：${lowestBack().slice(0, 3).map((id) => `${drinkLabel(id)} ${DRINK_BACK.back[id] ?? 0}`).join('、')}｜點一下打開飲料庫存`
-  const open = (e: { stopPropagation: () => void }) => {
-    e.stopPropagation()
-    if (getEdit().on) return
-    setDrinkPanel(true)
-  }
-  return (
-    <mesh position={[0, size[1] / 2, 0]} onClick={open} onPointerOver={(e) => { handOver.onPointerOver({ ...e, eventObject: lit() ?? e.eventObject }); setTip({ title: '飲料庫存區', hint: hint() }) }}
-      onPointerOut={(e) => { handOver.onPointerOut({ ...e, eventObject: lit() ?? e.eventObject }); setTip(null) }}>
-      <boxGeometry args={size} />
-      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-    </mesh>
-  )
-}
 /** an unseen box over the sake barrels: the sake's stock (kept at room temperature); pointed at, it says how much there is and lights them
  * (`lit`: the barrels as drawn), a click opens the stock on its larder's tab, at the sake (the owner's) */
 function SakeHit({ lit }: { lit: () => THREE.Object3D | null }) {
@@ -8694,11 +8875,6 @@ function SakeHit({ lit }: { lit: () => THREE.Object3D | null }) {
 }
 /** the stack's size (in the frame it's turned in): the box pointed at over it */
 const SAKE_HIT: [number, number, number] = [0.9, 0.98, 0.76]
-/** how far along from the crates the cartons stand (the crates' own frame) */
-/** where the cartons stand by the crates (the crates' own frame): turned end on, close beside them and running out from the wall, so they
- * keep to the floor (laid along the wall they ran on past the wall's end and the floor's edge) */
-/** (the stack bigger now (nine cases, 0.83 by 0.42, 1.1 high): drawn 0.08 further from the crates, which it ran 6 cm into) */
-const CARTONS_AT: [number, number, number] = [-0.44, 0, 0.173]
 /**
  * The beer bottles standing in the crates' cells: only their tops show over the crates' walls, so only the tops are made (the owner's: each
  * was a whole bottle, 12 round): the shoulder, the neck and its lip in brown glass, 8 round, open below where the cells hide it; the foil
@@ -9331,13 +9507,9 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   // (their fronts toward the room's open side, where the camera is)
   const face = Math.atan2(-c0.lay.x, -c0.lay.z)
   const fr = useMemo(() => fridgesOf(counters), [counters])
-  // (the drinks' stock as drawn, the crates and the cartons: what lights up when the unseen box over them is pointed at)
-  const stock = useRef<THREE.Group>(null)
-  const stockLit = () => stock.current
   // (and the sake barrels, as drawn: the sake's stock)
   const sake = useRef<THREE.Group>(null)
   const sakeLit = () => sake.current
-  const c1 = counters[1]
   // (the corner where the room's two walls meet: the plant stands in it, a little in from both)
   const cornerAt = useMemo(() => {
     const along = Math.min(-c0.length / 2 - 0.35, ...counters.slice(1).map((o) => o.at.clone().addScaledVector(o.lay, farOf(o)).sub(c0.at).dot(c0.along)))
@@ -9352,11 +9524,12 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
     p.y += 1.55
     return { p, yaw: Math.atan2(c0.lay.x, c0.lay.z) }
   }, [c0, counters])
-  const crateAt = useMemo(() => {
-    if (!fr || !c1) return new THREE.Vector3()
-    const last = fr[fr.length - 1]
-    return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.3).addScaledVector(c1.lay, farOf(c1) + 0.32)
-  }, [fr, c1])
+  // (the drinks' stock in the stock room now (item 430: its doorway's where they stood): along its back wall, the beer crates behind the near
+  // fridge, the cartons behind the far one, the milk crates behind the doorway, seen through it (item 437); each against the back wall)
+  const st = useMemo(() => storeOf(counters), [counters])
+  const crateAt = useMemo(() => (fr && st ? st.at(fr[0].z - 0.21, STORE.deep - 0.16) : new THREE.Vector3()), [fr, st])
+  // (the cartons' stack 0.44 deep: its back a centimetre off the back wall, not in its face)
+  const cartonAt = useMemo(() => (fr && st ? st.at(fr[fr.length - 1].z, STORE.deep - 0.23) : new THREE.Vector3()), [fr, st])
   return (
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     // (not keyed by the language any more: that was for a mat with words on it, long gone, and each switch built all four again, their
@@ -9388,8 +9561,8 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
         {/* (only to look at (the owner's): named when pointed at, the cursor left an arrow, a click does nothing) */}
         <group position={cornerAt} rotation-y={0.4}><BambooHit {...BAMBOO_SAYS} /></group>
       </Movable>
-      {/* (the crates of red bottles against the side wall just along from the fridges, clear of the men's door's slide) */}
-      {fr && <Movable id="crates" label="酒箱"><group ref={stock}><StaticBatch plain>
+      {/* (the crates of red bottles and the cartons of cans, in the stock room behind the side wall now, along its back wall (item 430)) */}
+      {fr && <Movable id="crates" label="酒箱"><group><StaticBatch plain>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <CrateBoxes />
         </group>
@@ -9399,14 +9572,10 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
             made and hides the rest) */}
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <CrateBottles />
-          <group position={CARTONS_AT} rotation-y={Math.PI / 2 + 0.04}><DrinkCartons /></group>
         </group>
+        <group name="look-crates" position={cartonAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z) + 0.02}><DrinkCartons /></group>
       </group>
-        {/* (the back stock: pointed at, what's running low; a click opens the drinks' stock) */}
-        <group name="look-crates" position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
-          <BackStockHit lit={stockLit} />
-          <group position={CARTONS_AT} rotation-y={Math.PI / 2}><BackStockHit size={[0.86, 1.16, 0.32]} lit={stockLit} /></group>
-        </group>
+        {/* (the back stock's pointed at by the stock room's doorway now: what's running low, a click opens the drinks' stock) */}
       </Movable>}
     </>
   )

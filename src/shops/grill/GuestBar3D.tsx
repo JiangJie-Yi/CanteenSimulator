@@ -105,7 +105,7 @@ import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
 import { plateGoes } from '@/game/tray'
-import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, GRATING, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, WC_ROOM, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, doorAt, doorOutOf, DOOR_LANE, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
+import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, GRATING, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, WC_ROOM, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, storeOf, STORE, STORE_STATE, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, doorAt, doorOutOf, DOOR_LANE, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -553,6 +553,10 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   }, [c1, fridges])
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => toiletsOf(counters), [counters])
+  // (the stock room's way in (items 430, 431): before its doorway in the aisle, in it, and just inside it; the drinks are fetched in there now
+  // and put in the fridges from behind, out of the customers' way)
+  const store = useMemo(() => storeOf(counters), [counters])
+  const storeWay = useMemo(() => store && { out: store.at(store.mid, -0.42), mid: store.at(store.mid, 0.1), inside: store.at(store.mid, 0.46) }, [store])
   /** his way out into the side counter's aisle, across from his place */
   const homeAisle = useMemo(() => c1.at.clone().addScaledVector(c1.along, home.clone().sub(c1.at).dot(c1.along) / c1.along.lengthSq()).addScaledVector(c1.lay, -AISLE), [home, c1])
   const st = useRef({ phase: 'idle' as 'idle' | 'take' | 'go' | 'work' | 'back', t: 0, chore: null as StockChore, path: [] as THREE.Vector3[], len: 0, d: 0,
@@ -653,6 +657,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     }
     const set = (path: THREE.Vector3[]) => { s.path = path; s.len = pathLength(path); s.d = 0 }
     const c = s.chore
+    // (the stock room's noren swung aside as he goes through its doorway, either way)
+    STORE_STATE.passing = storeWay && s.pos.distanceTo(storeWay.mid) < 0.3 ? 1 : 0
     idleTick(who.id, s.phase === 'idle' && !SHOP.leaving, dt, true)
     if (s.phase === 'idle') {
       s.check += dt
@@ -689,7 +695,12 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         if (next && !(next.kind === 'roll' && !wcs) && !(next.kind === 'bin' && !ways)) {
           s.chore = next
           s.done = false
-          if (next.kind === 'drinks') set([home.clone(), fridges.find((f) => f.n === next.unit)!.front.clone()])
+          if (next.kind === 'drinks') {
+            const f = fridges.find((x) => x.n === next.unit)!
+            // (in through the stock room's noren and along behind the fridges to this one's back (item 431); to its front, as before, if
+            // there's no stock room)
+            set(storeWay ? [home.clone(), storeWay.out.clone(), storeWay.mid.clone(), storeWay.inside.clone(), f.back.clone()] : [home.clone(), f.front.clone()])
+          }
           else if (next.kind === 'bin') {
             s.ways = ways
             s.leg = 0
@@ -707,18 +718,24 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
             const beside = seat.aisle.clone().lerp(seat.stool, 0.55).addScaledVector(seat.along, 0.3)
             set([home.clone(), homeAisle.clone(), ...(seat.counter === 1 ? [] : [aisleCornerOf(counters, c1)]), seat.aisle.clone(), beside])
           }
-          // (the drinks: first bent to the cartons for a case, then off with it)
-          if (next.kind === 'drinks') { s.phase = 'take'; s.t = 0 } else { s.phase = 'go' }
+          // (the drinks: first bent to the cartons for a case, then off with it; with the stock room, in there first, the case taken from the
+          // stock along its back wall behind him, then turned to the fridge's back)
+          if (next.kind === 'drinks' && !storeWay) { s.phase = 'take'; s.t = 0 } else { s.phase = 'go'; s.t = 0 }
         }
       }
     } else if (s.phase === 'take') {
       s.t += dt
-      const face = Math.atan2(c1.lay.x, c1.lay.z)
+      // (in the stock room, to the stock along its back wall behind him; by the crates and cartons, toward them)
+      const inStore = !!(storeWay && store && c?.kind === 'drinks')
+      const to = inStore ? store!.at(fridges.find((x) => x.n === (c as { unit: number }).unit)!.z, STORE.deep) : null
+      const face = to ? Math.atan2(to.x - s.pos.x, to.z - s.pos.z) : Math.atan2(c1.lay.x, c1.lay.z)
       s.yaw += Math.atan2(Math.sin(face - s.yaw), Math.cos(face - s.yaw)) * Math.min(1, dt * 6)
-      if (g.current) g.current.userData.lean = 0.4 * Math.sin(Math.min(1, s.t / 0.9) * Math.PI)
-      if (s.t > 0.9) { if (g.current) g.current.userData.lean = 0; s.phase = 'go'; s.t = 0 }
+      // (turned first, then bent to it: a quarter of a second to turn, the bend and back after)
+      const k = inStore ? Math.max(0, (s.t - 0.25) / 0.9) : s.t / 0.9
+      if (g.current) g.current.userData.lean = 0.4 * Math.sin(Math.min(1, k) * Math.PI)
+      if (k >= 1) { if (g.current) g.current.userData.lean = 0; s.phase = inStore ? 'work' : 'go'; s.t = 0 }
     } else if (s.phase === 'go') {
-      if (walk()) { s.phase = 'work'; s.t = 0 }
+      if (walk()) { s.phase = storeWay && c?.kind === 'drinks' ? 'take' : 'work'; s.t = 0 }
     } else if (s.phase === 'work' && c) {
       s.t += dt
       if (c.kind === 'drinks') {
@@ -727,7 +744,9 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
         // (its door open while he fills it: his own mark, as the bar counts those at it afresh each frame (a count added to here was lost to
         // that, and he filled it through the shut glass))
         FRIDGE_STATE[c.unit].stocker = true
-        if (s.t > 1.6) {
+        // (from behind (item 431): its back doors swung open first, the drinks put in row by row, a while longer, seen through the glass from
+        // the room)
+        if (s.t > (storeWay ? 2.4 : 1.6)) {
           const run = restockRun(placesOf(c.unit), FRIDGE_UNITS[c.unit].shelves.map((sh) => sh.ids), DRINK_BACK.back, STOCK_CARRY)
           run.rows.forEach((r, i) => { FRIDGE_STOCK.units[c.unit][i] = r; FRIDGE_STOCK.counts[c.unit][i] = run.counts[i] })
           DRINK_BACK.back = run.back
@@ -3113,6 +3132,16 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
     const ly: [number, number] = [open[0] || wc[0] >= l0 ? l0 : wc[0] - 0.002, open[1] || wc[1] <= l1 ? l1 : wc[1] + 0.002]
     return { al: [a0 - (WC_ROOM.D + WC_BACK_PAST + EDGE_W + 0.003), a0] as [number, number], ly, wc, open }
   }, [counters, c, a0, l0, l1])
+  // (and further out under the stock room (items 430, 431): deeper than the toilets' rooms, the base and its fill under its walls' outside;
+  // its own floor in it (DiningRoom's StoreRoom), the strip's edging broken where it stands)
+  const bump = useMemo(() => {
+    const st = storeOf(counters)
+    if (!st || !back) return null
+    const c1 = counters[1], ua = c1.along.clone().normalize(), ul = c.lay.clone().normalize()
+    const ends = [st.room[0] - 0.062, st.room[1] + 0.004 + 0.062].map((z) => c1.at.clone().addScaledVector(ua, z).sub(c.at).dot(ul))
+    const ly: [number, number] = [Math.max(back.ly[0], Math.min(...ends)), Math.min(back.ly[1], Math.max(...ends))]
+    return { al: [a0 - (STORE.deep + 0.062), back.al[0]] as [number, number], ly }
+  }, [counters, c, a0, back])
   // (the edging's run, in the floor's frame (x = -lay, z = along): from the kamachi's end at the door round to the genkan's other side; with the
   // floor run on out behind the back edge (item 423), not along that edge (item 436, the owner's 「這條線拿掉」: a dark line across the floor,
   // seen from behind with the wall there hidden): two runs, the open end and side, and the side by the door; the wall's own skirting
@@ -3125,13 +3154,28 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
     return g
   }, [gl, a1, l1, a0, l0, g0, back])
   useEffect(() => () => edging.dispose(), [edging])
-  const backEdging = useMemo(() => back && mitredRun([...(back.open[1] ? [[-back.ly[1], back.al[1]] as [number, number]] : []),
-    [-back.ly[1], back.al[0]], [-back.ly[0], back.al[0]], ...(back.open[0] ? [[-back.ly[0], back.al[1]] as [number, number]] : [])],
-    EDGE_W, EDGE_H), [back])
+  const backEdging = useMemo(() => {
+    if (!back) return null
+    const head = back.open[1] ? [[-back.ly[1], back.al[1]] as [number, number]] : [], tail = back.open[0] ? [[-back.ly[0], back.al[1]] as [number, number]] : []
+    // (broken where the stock room stands out past it (items 430, 431): up to its walls either side, not across its floor)
+    const bm = (bump?.ly ?? null) as [number, number] | null
+    const ly0 = back.ly[0], ly1 = back.ly[1], al0 = back.al[0]
+    if (!bm) return mitredRun([...head, [-ly1, al0], [-ly0, al0], ...tail], EDGE_W, EDGE_H)
+    // (a run's points that meet left as one (the stock room's from the room's side: its edge where the strip's starts), and a run with
+    // nothing left of it dropped: a nothing-long piece made the edging's corner of nothing, NaN)
+    const runs = [[...head, [-ly1, al0], [-bm[1], al0]], [[-bm[0], al0], [-ly0, al0], ...tail]]
+      .map((r) => (r as [number, number][]).filter((q, i, a) => i === 0 || Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > 0.005))
+      .filter((r) => r.length > 1)
+    const gs = runs.map((r) => mitredRun(r as [number, number][], EDGE_W, EDGE_H))
+    if (gs.length === 1) return gs[0]
+    const g = mergeGeometries(gs)!
+    gs.forEach((x) => x.dispose())
+    return g
+  }, [back, bump])
   useEffect(() => () => backEdging?.dispose(), [backEdging])
-  const A0 = back?.al[0] ?? a0, L0 = back?.ly[0] ?? l0, L1 = back?.ly[1] ?? l1
-  const bases = useMemo(() => [[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]], ...(back ? [[back.al, back.ly]] : [])] as [[number, number], [number, number]][],
-    [a0, g0, l0, l1, a1, gl, back])
+  const A0 = bump?.al[0] ?? back?.al[0] ?? a0, L0 = back?.ly[0] ?? l0, L1 = back?.ly[1] ?? l1
+  const bases = useMemo(() => [[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]], ...(back ? [[back.al, back.ly]] : []), ...(bump ? [[bump.al, bump.ly]] : [])] as [[number, number], [number, number]][],
+    [a0, g0, l0, l1, a1, gl, back, bump])
   // (the kitchen's cut out of the boards: it lies lower, KitchenPit)
   const piece = (al: [number, number], ly: [number, number], k: string) => minus(al, ly, kitchen).map(([a, l], i) => (
     <FloorPiece key={`${k}${i}`} w={l[1] - l[0]} l={a[1] - a[0]} position={[-(l[0] + l[1]) / 2, 0.004, (a[0] + a[1]) / 2]} />
@@ -3987,7 +4031,14 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   const wcs = useMemo(() => (given ? toiletsOf(counters) : null), [counters, given])
   const fridges = useMemo(() => (given ? fridgesOf(counters) : null), [counters, given])
   // (the stretches of the side wall kept clear for the fridges: one array, so the wall (memo'd) isn't drawn again with every redraw here)
-  const fridgeClear = useMemo(() => (fridges ? fridges.map((f) => [f.z - FRIDGE.W / 2 - 0.1, f.z + FRIDGE.W / 2 + 0.1] as [number, number]) : undefined), [fridges])
+  // (the stock room behind the side wall (items 430, 431): its doorway, its two ends, how deep it is, and the fridges set into the wall; one
+  // object, as the clear stretches are, so the wall isn't drawn again with every redraw here)
+  const store = useMemo(() => (given ? storeOf(counters) : null), [counters, given])
+  const storeWall = useMemo(() => (store && fridges ? { door: store.door, room: store.room, deep: store.deep,
+    fridges: fridges.map((f) => [f.z - FRIDGE.W / 2 - 0.004, f.z + FRIDGE.W / 2 + 0.004] as [number, number]) } : undefined), [store, fridges])
+  // (and nothing hung over its doorway)
+  const fridgeClear = useMemo(() => (fridges ? [...fridges.map((f) => [f.z - FRIDGE.W / 2 - 0.1, f.z + FRIDGE.W / 2 + 0.1] as [number, number]),
+    ...(store ? [[store.door[0] - 0.1, store.door[1] + 0.1] as [number, number]] : [])] : undefined), [fridges, store])
   /** a couple sat side by side turn to talk: the one at the next stool along is on the left (+1), the one before on
    * the right (-1); 0 while the other isn't sat there yet (or has gone) */
   const talkSide = (s: Shown) => {
@@ -6451,7 +6502,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     if (fridges) for (const fr of fridges) {
       FRIDGE_STATE[fr.n].passing = shown.filter((x) => x.wc?.who === 'drink' && (x.wc.unit ?? 0) === fr.n && (x.phase === 'wcIn'
         || ((x.phase === 'wcGo' || x.phase === 'wcBack') && (groups.current.get(x.id)?.position.distanceTo(fr.front) ?? 9) < 0.7))).length
-        + (FRIDGE_STATE[fr.n].stocker ? 1 : 0)
+      // (the stocker fills it from behind now, its back doors open for him (item 431): its front stays shut)
       // (a door left open by hand shuts as soon as anyone else has to go by it: the door swings out over the way, so nobody
       // walks through it)
       if (FRIDGE_STATE[fr.n].open && !FRIDGE_STATE[fr.n].passing) {
@@ -9161,7 +9212,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} wall={!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lampId="sidelamp" lampName="側吧台" top={top} door={wcs?.door ?? (meet + corner) / 2}
-              clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35, wcs?.door ?? (meet + corner) / 2, corner)} />}
+              clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35, wcs?.door ?? (meet + corner) / 2, corner)} store={storeWall} />}
           </group>
         )
       })}

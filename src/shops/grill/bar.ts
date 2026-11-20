@@ -409,6 +409,34 @@ export function toiletsOf(cs: Counter[]) {
   }
   return { door, m: one(-1), f: one(1) }
 }
+/** the side wall's outer face, behind its face (DiningRoom's wall: its slab WALL_T 0.2 thick, 1.2 cm off the plaster): where the drinks
+ * fridges' backs are, set into the wall (item 431), and where the stock room behind it begins */
+export const WALL_OUT = 0.212
+/** the men's toilet's room's end wall's thickness (DiningRoom's WC_T): the stock room runs up to its outside */
+const WC_END_T = 0.06
+/**
+ * The stock room behind the side counter's wall (items 430, 431, the owner's, 2026-11-21: 「這邊挖空並加上掛簾，後面是小儲藏室，倉儲員工專用」,
+ * 「飲料可以從冷飲櫃後面直接補」): a doorway with a noren in the wall's stretch past the drinks fridges, where the crates and the cartons stood
+ * in front of it (they're in the room now), and behind the wall a long narrow room from there along behind the fridges to the men's toilet's
+ * room: the fridges stand set into the wall, their backs in it, filled from there through their back doors, out of the customers' way. Only
+ * the stocker goes in. In the side counter's frame: `door` its doorway's clear opening along the wall, `room` the room's two ends along it,
+ * `deep` how far its back wall's inside is behind the wall's face (its inside from WALL_OUT to there), `doorH` the doorway's clear height
+ */
+export const STORE = { doorW: 0.56, doorH: 1.85, deep: 1.15, sill: 0.06 }
+export function storeOf(cs: Counter[]) {
+  const t = toiletsOf(cs), fr = fridgesOf(cs)
+  if (!t || !fr) return null
+  const c = cs[1]
+  // (the wall's own start (GuestBar3D's side wall: from -length / 2 - 0.35) and the far fridge's side, with its 3 cm)
+  const start = -c.length / 2 - 0.35, near = fr[fr.length - 1].z - FRIDGE.W / 2 - 0.03
+  const mid = (start + near) / 2
+  const door: [number, number] = [mid - STORE.doorW / 2, mid + STORE.doorW / 2]
+  // (from just in from the wall's start to just short of the men's room's end wall's outside)
+  const room: [number, number] = [start + 0.03, t.m.z - WC_W / 2 - WC_ROOM.E - WC_END_T - 0.004]
+  /** a spot in it (or by it): `along` the wall, `behind` its face (minus: out in the room) */
+  const at = (along: number, behind: number) => c.at.clone().addScaledVector(c.along, along).addScaledVector(c.lay, farOf(c) - behind)
+  return { door, room, mid, at, deep: STORE.deep }
+}
 /** the two drinks fridges against the side counter's wall, just along from the toilets, side by side: where each stands
  * (along that counter, and out from its middle line), the way it faces, and the spot before it where a customer helps themselves */
 export function fridgesOf(cs: Counter[]) {
@@ -417,7 +445,9 @@ export function fridgesOf(cs: Counter[]) {
   const c = cs[1]
   // (the first clear of where the men's door slides open, the second on along the wall from it)
   // (as close along to the men's door's slide as it allows)
-  const z0 = t.m.z - WC_W / 2 - 0.06 - WC_SLIDE - FRIDGE.W / 2 - 0.02
+  // (and clear of the men's room behind the wall now (item 431: their backs are in the stock room, which runs up to that room's end): 12 cm
+  // further along, 2 cm short of its end wall's outside)
+  const z0 = t.m.z - (WC_W / 2 + WC_ROOM.E + WC_END_T) - 0.02 - FRIDGE.W / 2
   // (the door's hinged on the fridge's own left, and swings out that side: whoever's helping themselves stands a little right of
   // its middle, clear of it; the fridge's own +x is (lay.z, -lay.x) in this frame)
   const side = new THREE.Vector3(c.lay.z, 0, -c.lay.x).multiplyScalar(0.17)
@@ -426,17 +456,24 @@ export function fridgesOf(cs: Counter[]) {
     // no wider than the cabinets), their sides not in one plane)
     const z = z0 - n * (FRIDGE.W + 0.03)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
-    return { n, z, at: at(farOf(c) + FRIDGE_GAP + FRIDGE.D / 2), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(farOf(c) + FRIDGE_GAP + FRIDGE.D + 0.33).add(side), aisle: at(-aisleOf(c)) }
+    // (set into the wall (item 431): its back flush with the wall's outside, in the stock room; `back` where the stocker stands behind it to
+    // fill it, its back doors swung open either side of him)
+    const mid = farOf(c) + FRIDGE.D / 2 - WALL_OUT
+    return { n, z, at: at(mid), yaw: Math.atan2(c.lay.x, c.lay.z), front: at(mid + FRIDGE.D / 2 + 0.33).add(side), aisle: at(-aisleOf(c)),
+      back: at(farOf(c) - WALL_OUT - 0.25) }
   })
 }
-/** how far a fridge's back stands off the wall's face: clear of the rail over the wainscot (DiningRoom's, 4.5 cm proud of the wall; at 1 cm it
- * ran through the cabinet's back and showed inside, the owner's), and a centimetre more */
+/** how far a fridge's back stood off the wall's face (clear of the rail over the wainscot, DiningRoom's, 4.5 cm proud of the wall; at 1 cm it
+ * ran through the cabinet's back and showed inside, the owner's), and a centimetre more; the fridges stand in the wall now (item 431) */
 export const FRIDGE_GAP = 0.055
 /** the fridge's size: across, up, deep */
 export const FRIDGE = { W: 0.86, H: 2.17, D: 0.75 }
-/** each fridge's door: how many are at it just now (GuestBar3D), whether the stocker's filling it (its door held open for him), and whether
- * the player's opened it (a click) */
+/** each fridge's door: how many are at it just now (GuestBar3D), whether the stocker's filling it (its back doors held open for him, from
+ * the stock room: item 431; its front door before), and whether the player's opened it (a click) */
 export const FRIDGE_STATE = [{ passing: 0, stocker: false, open: false }, { passing: 0, stocker: false, open: false }]
+/** the stock room's noren: how many are passing through it just now (the stocker), its cloth swung aside by them */
+export const STORE_STATE = { passing: 0, push: 0 }
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __storeState?: typeof STORE_STATE }).__storeState = STORE_STATE
 /** where each fridge's doors are in the world (DiningRoom keeps it): its sounds heard from there */
 export const FRIDGE_AT = [new THREE.Vector3(), new THREE.Vector3()]
 /** whether a drink's a can (its clink a can's) */
