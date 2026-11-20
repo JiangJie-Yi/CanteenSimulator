@@ -2776,8 +2776,9 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
 /** the floor's edging strip: how wide (in from the edge) and how high over the boards */
 const EDGE_W = 0.04, EDGE_H = 0.02
 /** the toilets' rooms out past the room's back edge (item 423, measured in the game, tests/e2e/_floorout423.mjs): their back wall's outer face
- * this far past WC_ROOM.D, their end walls' outer faces this far past their rooms' ends */
-const WC_BACK_PAST = 0.032, WC_SIDE_WALL = 0.102
+ * this far past WC_ROOM.D, and at the floor their end walls' outermost (the corner post, 2 mm proud of the plaster, item 425; it was the back
+ * wall's cap overhead, 0.102, as it ran 3 cm past the end) this far past their rooms' ends */
+const WC_BACK_PAST = 0.032, WC_SIDE_WALL = 0.062
 /**
  * A strip laid along a run of points (x, z) on the floor, `w` wide inward (to the left of the way it runs) and `h` high, its corners
  * mitred (each piece's inner edge cut back where it turns, so the two meet on the diagonal) and its two ends square: each piece a
@@ -3057,12 +3058,21 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
     const t = toiletsOf(counters)
     if (!t || counters.length < 2) return null
     const c1 = counters[1], half = WC_W + 0.06 + WC_ROOM.E + WC_SIDE_WALL
-    const ends = [t.door - half, t.door + half].map((z) => c1.at.clone().addScaledVector(c1.along, z).sub(c.at).dot(c.lay))
+    // (on unit directions, as the toilets stand (their wall's group on its yaw): the counters' along and lay are a shade over unit length,
+    // and reckoned with them the women's end came out 1.2 cm past where it stands)
+    const ua = c1.along.clone().normalize(), ul = c.lay.clone().normalize()
+    const ends = [t.door - half, t.door + half].map((z) => c1.at.clone().addScaledVector(ua, z).sub(c.at).dot(ul))
     const wc: [number, number] = [Math.min(...ends), Math.max(...ends)]
-    const ly: [number, number] = [Math.min(l0, wc[0] - EDGE_W - 0.005), Math.max(l1, wc[1] + EDGE_W + 0.005)]
-    return { al: [a0 - (WC_ROOM.D + WC_BACK_PAST + EDGE_W + 0.003), a0] as [number, number], ly, wc }
+    // (each side: floor open between the toilets' end and the room's side, the strip runs on to the room's side, edged along it; their end
+    // wall standing at the room's side (item 425, the owner's 「接縫修掉，要無縫接軌」: the women's, a few millimetres in from it), the strip
+    // ends flush with the room's base, unedged (run on past it to take an edging, its base stood 9 cm out from the room's, a step under the
+    // corner); their end past the room's side, just past it)
+    const open: [boolean, boolean] = [wc[0] - l0 >= EDGE_W + 0.005, l1 - wc[1] >= EDGE_W + 0.005]
+    const ly: [number, number] = [open[0] || wc[0] >= l0 ? l0 : wc[0] - 0.002, open[1] || wc[1] <= l1 ? l1 : wc[1] + 0.002]
+    return { al: [a0 - (WC_ROOM.D + WC_BACK_PAST + EDGE_W + 0.003), a0] as [number, number], ly, wc, open }
   }, [counters, c, a0, l0, l1])
-  const backEdging = useMemo(() => back && mitredRun([[-back.ly[1], back.al[1]], [-back.ly[1], back.al[0]], [-back.ly[0], back.al[0]], [-back.ly[0], back.al[1]]],
+  const backEdging = useMemo(() => back && mitredRun([...(back.open[1] ? [[-back.ly[1], back.al[1]] as [number, number]] : []),
+    [-back.ly[1], back.al[0]], [-back.ly[0], back.al[0]], ...(back.open[0] ? [[-back.ly[0], back.al[1]] as [number, number]] : [])],
     EDGE_W, EDGE_H), [back])
   useEffect(() => () => backEdging?.dispose(), [backEdging])
   const A0 = back?.al[0] ?? a0, L0 = back?.ly[0] ?? l0, L1 = back?.ly[1] ?? l1

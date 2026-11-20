@@ -3414,21 +3414,27 @@ function WcRoom({ w, h, who }: { w: number; h: number; who: 'm' | 'f' }) {
           from it, their fronts were in its face and fought it, flickering, the wainscot beside the doors showing plaster (the owner saw
           both) */}
       <WcMass x={[WC_IN, D]} y={[0, top]} z={[-s * (w / 2 + 0.002), -s * (w / 2 + WC_T)]} />
-      <WcMass x={[WC_IN, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E + WC_T)]} />
+      <WcMass x={[WC_IN, X0 - 0.002]} y={[0, top]} z={[s * (w / 2 + 0.002), s * (w / 2 + E)]} />
       <WcMass x={[X0, D]} y={[h, top]} z={[s * w / 2, s * (w / 2 + WC_T)]} />
-      <WcMass x={[X0, D]} y={[0, top]} z={[s * (w / 2 + E + 0.002), s * (w / 2 + E + WC_T)]} />
+      {/* (the toilet's room's end, one block from the shop's wall to the back (item 425, the owner's 「接縫修掉，要無縫接軌」): it began at the
+          toilet's room (X0), the short wall's block beside it taken out to its outer face too and stopping 2 mm short, and through the gap
+          between them a line ran down the end wall's face, seen from outside) */}
+      <WcMass x={[WC_IN, D]} y={[0, top]} z={[s * (w / 2 + E + 0.002), s * (w / 2 + E + WC_T)]} />
       {/* (the doorway's jambs lined inside in dark cedar, a board each side a hand deep into the room up to the lintel: the wall beside the
           post began bare, its plaster seen nearly edge on as a pale sliver and its wainscot as a dark slot down past the noren (the owner's)) */}
       {[-1, 1].map((k) => (
         <mesh key={k} position={[0.045, h / 2, k * (w / 2 - 0.006)]}><boxGeometry args={[0.09, h, 0.012]} /><meshToonMaterial color="#3d2414" /></mesh>
       ))}
       {/* (the back wall's top capped too, along the washroom and the toilet's room) */}
-      <mesh position={[D + 0.012, top + WC_CAP / 2, s * (E + WC_T) / 2]}><boxGeometry args={[0.05, WC_CAP, w + E + 2 * WC_T + 0.024]} /><meshToonMaterial color="#2e1c10" /></mesh>
+      {/* (its outer end flush with the end wall's cap (item 425): it ran 3 cm on past it, a lump over the corner) */}
+      <mesh position={[D + 0.012, top + WC_CAP / 2, s * (E + WC_T / 2) / 2]}><boxGeometry args={[0.05, WC_CAP, w + E + 1.5 * WC_T + 0.024]} /><meshToonMaterial color="#2e1c10" /></mesh>
       {/* (the slatted ceilings, over the washroom and the toilet's room, on the caps) */}
       <WcSlats x={[WC_IN, D]} z={[-s * (w / 2 + 0.01), s * (w / 2 + 0.01)]} y={top + WC_CAP + 0.011} />
       <WcSlats x={[X0, D]} z={[s * (w / 2 + WC_T - 0.01), s * (w / 2 + E + 0.01)]} y={top + WC_CAP + 0.011} />
       {/* (dark posts at the outer corners: the toilet's room's far corner, and, once for both, the corner between the two toilets) */}
-      <mesh position={[D + 0.012, (top + WC_CAP) / 2, s * (w / 2 + E + WC_T)]}><boxGeometry args={[0.07, top + WC_CAP, 0.07]} /><meshToonMaterial color="#2e1c10" /></mesh>
+      {/* (the far corner's: 2 mm proud of the end wall (item 425: centred on its face, it stood 3.5 cm out, past the shop's base under it
+          once the base was taken in flush)) */}
+      <mesh position={[D + 0.012, (top + WC_CAP) / 2, s * (w / 2 + E + WC_T - 0.0165)]}><boxGeometry args={[0.07, top + WC_CAP, 0.037]} /><meshToonMaterial color="#2e1c10" /></mesh>
       {s < 0 && <mesh position={[D + 0.012, (top + WC_CAP) / 2, -s * (w / 2 + WC_T)]}><boxGeometry args={[0.07, top + WC_CAP, 0.07]} /><meshToonMaterial color="#2e1c10" /></mesh>}
       {/* (the way through: a cedar post at the short wall's end, as deep as the wall; the noren's rod across it just under the lintel, in the
           wall's depth, from the post's face to the back wall's, each end in a little wooden socket (竿受け) fixed there: it hung on two

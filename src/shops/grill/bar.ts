@@ -376,6 +376,11 @@ export const WC_SLIDE = WC_W - 0.1
  * In the room's own frame: x from the door's wall back, z across the door from its middle.
  */
 export const WC_ROOM = { D: 0.9, E: 0.84, X0: 0.24 }
+/** how much further the toilets stand back from the corner than their doors need (item 425, measured: the women's end wall stood 2.14 cm out
+ * past the shop's floor at the corner (its plaster at 1.6783 of the room-floor's x, the floor's edge at 1.6569), and the end of the shop's back
+ * wall, inside it, at 1.6500: 2.6 cm takes its corner post (2 mm proud) 2.6 mm inside the floor's edge, its base flush with the shop's, its
+ * plaster still 2.3 mm over the back wall's end (at 3 cm that end stood out of it, a dark stripe down the corner)) */
+const WC_SET_BACK = 0.026
 /**
  * The two toilets, the men's and the women's, side by side in the side counter's wall where it runs into the corner:
  * each one's door along that counter (from its middle), the spot on the floor before it, and inside: just in at the door, at the
@@ -386,8 +391,10 @@ export function toiletsOf(cs: Counter[]) {
   const c0 = cs[0], c = cs[1]
   const meet = c0.at.clone().addScaledVector(c0.lay, FLOOR_NEAR).sub(c.at).dot(c.along)
   const corner = (FLOOR_FAR - c.at.clone().sub(c0.at).dot(c0.lay)) / c.along.dot(c0.lay)
-  // (set back from the corner far enough that the women's door, sliding open toward it, stays on the wall)
-  const door = Math.min((meet + corner) / 2, corner - (WC_W + 0.12 + WC_SLIDE + 0.08))
+  // (set back from the corner far enough that the women's door, sliding open toward it, stays on the wall; and WC_SET_BACK more (item 425,
+  // the owner's 「接縫修掉，要無縫接軌」): the women's end wall stood 2 cm out past the shop's floor at the corner, the base under it stepping
+  // out from the shop's)
+  const door = Math.min((meet + corner) / 2, corner - (WC_W + 0.12 + WC_SLIDE + 0.08)) - WC_SET_BACK
   const one = (k: number) => {
     const z = door + k * (WC_W / 2 + 0.06)
     const at = (lay: number) => c.at.clone().addScaledVector(c.along, z).addScaledVector(c.lay, lay)
