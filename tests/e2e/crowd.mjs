@@ -4,7 +4,8 @@
 //   - frames a customer moved quicker than FAST (bar units a second, default 2.6: the quickest walk is 1.32 x 1.35 = 1.8), and the quickest;
 //   - frames one moved more than JUMP (default 0.2) in a frame (LIST=1 prints each with everyone near it, the frame before and this one);
 //   - frames two stood in each other (nearer than IN, default 0.22; one of them a customer on their feet, the other a customer, a server
-//     or the stock keeper), and who with whom; two customers in each other by what each was doing and where (the bar's frame);
+//     or the stock keeper), and who with whom; two customers in each other by what each was doing and where (the bar's frame); those on
+//     the genkan's bench and on their way to it or from it count as customers (`bench-in`, `bench-out`: item 414);
 //   - a customer's time in a phase going back (their entry swapped for an older copy).
 // Before item 45, 200 s of it: 225 frames too quick (7.55 a second at most), 15 over 0.2, 942 in each other, 18 times back; after it: 40
 // (3.28), 3, 253, 0.
@@ -43,8 +44,16 @@ await p.evaluate(([JUMP, FAST, IN]) => {
         now.set('g' + u.guest, { x: o.position.x, z: o.position.z, o, up: !!s && s.phase !== 'sit' && o.visible, ph: s ? `${s.phase} t${s.t.toFixed(2)}${s.wc ? ' ' + s.wc.who : ''}` : '?' })
       }
     })
+    // (and those waiting on the genkan's bench, on their way to it, sat there or on their way out (item 414): customers too, changing their
+    // shoes in the genkan as the rest do; keyed 'b' and their id)
+    const sitters = window.__sitters?.current
     if (floor) for (const o of floor.children) {
       const u = o.userData
+      if (sitters && o.visible && o.name.startsWith('bench-sitter-')) {
+        const v = sitters.get(+o.name.slice(13))
+        if (v && !v.handed) now.set('b' + v.id, { x: o.position.x, z: o.position.z, o, up: v.phase !== 'sit', ph: `bench-${v.phase} t${(+v.t).toFixed(2)}` })
+        continue
+      }
       if (u?.staffId === undefined || !o.visible) continue
       const w = waiters.find((x) => Math.hypot(x.pos.x - o.position.x, x.pos.z - o.position.z) < 1e-3)
       now.set('s:' + u.staffId, { x: o.position.x, z: o.position.z, o, up: false, ph: w ? `${w.phase} t${(+w.t).toFixed(2)}` : u.role ?? 'staff' })
@@ -56,9 +65,10 @@ await p.evaluate(([JUMP, FAST, IN]) => {
       if (Math.hypot(a.x - b.x, a.z - b.z) < IN) {
         A.inside++
         const kind = `${ka[0] === 'g' ? 'guest' : a.ph}-${kb[0] === 'g' ? 'guest' : b.ph}`.replace(/ t[0-9.]+/g, '')
+        const cust = (k) => k[0] === 'g' || k[0] === 'b'
         A.insideBy[kind] = (A.insideBy[kind] ?? 0) + 1
         // (two customers: what each was doing, and where (the bar's frame, to a tenth))
-        if (ka[0] === 'g' && kb[0] === 'g') { const w = [a.ph, b.ph].map((x) => x.replace(/ t[0-9.]+/g, '')).sort().join(' + ') + ` @${((a.x + b.x) / 2).toFixed(1)},${((a.z + b.z) / 2).toFixed(1)}`; A.guestPairs[w] = (A.guestPairs[w] ?? 0) + 1 }
+        if (cust(ka) && cust(kb)) { const w = [a.ph, b.ph].map((x) => x.replace(/ t[0-9.]+/g, '')).sort().join(' + ') + ` @${((a.x + b.x) / 2).toFixed(1)},${((a.z + b.z) / 2).toFixed(1)}`; A.guestPairs[w] = (A.guestPairs[w] ?? 0) + 1 }
       }
     }
     for (const [k, v] of now) {

@@ -1,5 +1,6 @@
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { SKEWER_WASH_S, WASH_LOW, pickUpDirty, putBackClean, washAll, washGoes, washUrgent } from '@/game/skewers'
+import { newStepTurn, stepFrame, waitsForStep } from '@/game/genkanStep'
 import { rattleSound } from './skewerSound'
 import { useSaid } from '@/ui/speechStore'
 import { getClock, minutesNow } from '@/ui/clockStore'
@@ -3169,8 +3170,11 @@ type Shown = { id: number; seat: number; phase: 'enter' | 'sit' | 'leave' | 'wcG
   fromWay?: { path: THREE.Vector3[]; len: number }
   /** their shoes in a cubby of the cupboard; welcomed in */
   shoesIn?: boolean; welcomed?: boolean
-  /** (leaving) how long they've stood in the queue for the till; what's been said on the way out (getting up, paying, thanks) */
+  /** (leaving) how long they've stood in the queue for the till, or for the genkan's step; what's been said on the way out (getting up,
+   * paying, thanks) */
   hold?: number; said?: number
+  /** (coming in) how long they've waited for the genkan's step, someone else on it (item 414) */
+  stepHold?: number
   /** how far along their way they'd come last frame, and whether they've stood still since (a pause: shoes, paying, getting up) */
   lastD?: number; still?: boolean
   /** (off to the toilet, or to the fridge for a drink) where, and the way there from their stool; told to go home
@@ -3220,6 +3224,9 @@ function PayFloat({ text, follow, done }: { text: string; follow: () => THREE.Ob
 const PAY_S = 5.6
 /** how far back the next one waits while someone's paying */
 const QUEUE_GAP = 0.6
+/** the genkan's step, one at a time changing their shoes, the next a body's length (QUEUE_GAP) back till they've stepped on (item 414:
+ * game/genkanStep) */
+const STEP_TURN = newStepTurn()
 /** what one paying at the till is rung up for, a line a dish and then their drink (item 182: at the menu's prices, as App's books have it;
  * the old flat price only for one whose bill isn't known; item 195: as their bill stands, less what was given back for what they didn't
  * get, and the drink on it) */
@@ -5694,6 +5701,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       crowdAmbience(murmur(sat), THREE.MathUtils.clamp(1.4 - d / 12, 0.2, 1), Math.min(dt, 0.1))
     }
     let done: number[] = []
+    stepFrame(STEP_TURN)
     let paying: { s: Shown; k: number } | null = null
     let queue = 0
     for (const s of shown) {
@@ -5715,12 +5723,16 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         // in through the noren, along the aisle behind the stools (round the corner, for the other counter), and
         // in to their own stool
         // (stopping at the genkan's step a moment, to step out of their shoes and up into slippers)
-        const v = SPEED * walkSpeedOf(kindOf(s.id).kind), raw0 = s.t * v
+        const v = SPEED * walkSpeedOf(kindOf(s.id).kind), raw0 = Math.max(0, (s.t - (s.stepHold ?? 0)) * v)
         // (stood out on the step at the sliding door while it's slid open (item 410), then in; one off the bench is in already)
         const raw = s.from || !doorLead.len ? raw0 : withPause(raw0, 0, DOOR_WAIT_S * v)
         // (behind their stool they stop, pull it out, step up onto it (the owner's), then sit and slide in with it)
         const stand = len - STOOL_STAND
-        const d = Math.min(stand, withPause(raw, stepAt(path), SHOES_S * v))
+        // (the genkan's step one at a time (item 414): someone else on it changing their shoes, they wait a body's length back, that time
+        // out of their walk)
+        const stepD = stepAt(path)
+        if (!s.from && waitsForStep(STEP_TURN, s.id, raw, stepD, stepD + SHOES_S * v, QUEUE_GAP)) s.stepHold = (s.stepHold ?? 0) + Math.min(dt, 0.1)
+        const d = Math.min(stand, withPause(raw, stepD, SHOES_S * v))
         const { p, dir } = alongPath(path, d)
         if (d >= stand) {
           s.pullT = (s.pullT ?? 0) + dt
@@ -5984,19 +5996,28 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         // (one with nothing to pay (gone before anything came, and nothing drunk) goes by the till without stopping (item 195: they paid the
         // whole bill, given back to them, into the drawer)); the money taken as the cash key's pressed, once
         const payD = lp.payD && paysAtTill(GUEST_BILLS.of(s.id)) ? lp.payD : 0
+        // (the stops on the way out taken in the order they come along it (item 414): since the genkan's step was drawn back toward the bar
+        // (item 410) it's the step first, their shoes on, then the till down in the genkan, then the sliding door; the till's stop was taken
+        // first, as it had come first, and they paid stood at the step, 1.5 from the till, 6.8 s on it. Where each begins in the walk's own
+        // terms (`raw`, the time stood at the stops in it): its place along it, and the stops before it)
+        const shoeAt = lp.len - stepAt(lp.path), shoeHold = SHOES_S * v, payHold = payD ? PAY_S * v : 0
+        const payFirst = payAt <= shoeAt
+        const payRaw = payAt + (payFirst ? 0 : shoeHold), shoeRaw = shoeAt + (payFirst ? payHold : 0)
         // (no cashier sat at the till: they wait at it, a server called round to ring them up (item 203: the register took their money by itself),
         // and pay once one's behind it; at most TILL_WAIT_MAX, then as before)
         {
           const tc = tillCall.current
-          if (payD && raw >= payAt && raw < payAt + PAY_S * v && !cashierIn()) {
+          if (payD && raw >= payRaw && raw < payRaw + payHold && !cashierIn()) {
             if (tc.who < 0) { tc.who = s.id; tc.since = clock.current; tc.there = false }
             if (tc.who === s.id && !tc.there && clock.current - tc.since < TILL_WAIT_MAX) s.hold = (s.hold ?? 0) + dt
           } else if (tc.who === s.id) { tc.who = -1; tc.there = false }
         }
-        if (payD && raw >= payAt + 0.44 * PAY_S * v && !TILL_CASH.paid.has(s.id)) payIn(s.id, billFor(s).bill, paysByCard(s.id), tenderOf(billFor(s).bill, s.id))
+        if (payD && raw >= payRaw + 0.44 * payHold && !TILL_CASH.paid.has(s.id)) payIn(s.id, billFor(s).bill, paysByCard(s.id), tenderOf(billFor(s).bill, s.id))
         // (in the queue for the till (the owner's): someone else at it paying, they wait a body's length back till it's free)
         // (or the cashier handing a takeaway's bag over it, item 203)
-        if (lp.payD && ((TILL_STATE.k >= 0 && TILL_STATE.payer !== s.id) || TAKEOUT_STAND.handing) && raw >= payAt - QUEUE_GAP && raw < payAt) s.hold = (s.hold ?? 0) + dt
+        if (lp.payD && ((TILL_STATE.k >= 0 && TILL_STATE.payer !== s.id) || TAKEOUT_STAND.handing) && raw >= payRaw - QUEUE_GAP && raw < payRaw) s.hold = (s.hold ?? 0) + dt
+        // (and for the genkan's step, one at a time (item 414): someone else on it changing their shoes, they wait a body's length back)
+        else if (waitsForStep(STEP_TURN, s.id, payFirst ? withPause(raw, payAt, payHold) : raw, shoeAt, shoeAt + shoeHold, QUEUE_GAP)) s.hold = (s.hold ?? 0) + Math.min(dt, 0.1)
         // (a word getting up, if they ate; at the till, the cashier's thanks and the bill; the money handed over, theirs)
         const said = s.said ?? 0
         if (said < 1 && s.t > 0.3) {
@@ -6007,28 +6028,26 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         // slid home by itself, 0.3 s after they'd gone, their back to it 0.6 off down the aisle))
         const back = STOOL_LEAVE * Math.min(1, s.t / STOOL_PULL_S)
         // (and last, just in from the sliding door, a moment as they slide it open (item 410))
-        const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(withPause(withPause(raw, payAt, payD ? PAY_S * v : 0), lp.len - stepAt(lp.path), SHOES_S * v),
-          lp.len - doorLead.len, doorLead.len ? DOOR_SLIDE_S * v : 0))))
+        const toDoor = payFirst ? withPause(withPause(raw, payAt, payHold), shoeAt, shoeHold) : withPause(withPause(raw, shoeAt, shoeHold), payAt, payHold)
+        const d = Math.max(0, Math.min(lp.len, Math.max(back, withPause(toDoor, lp.len - doorLead.len, doorLead.len ? DOOR_SLIDE_S * v : 0))))
         const { p, dir } = alongPath(lp.path, lp.len - d)
         const home = Math.max(0, s.t - STOOL_HOME_AT)
         // (pushed home in under the counter, done as they turn to go at 0.8)
         if (home < STOOL_SLIDE_S) SEAT_PULL.set(s.seat, s.t < STOOL_HOME_AT ? back : STOOL_LEAVE - (STOOL_LEAVE + STOOL_TUCK) * (home / STOOL_SLIDE_S))
         else SEAT_PULL.delete(s.seat)
         s.still = s.lastD !== undefined && Math.abs(d - s.lastD) < 1e-6 && d < lp.len
-        // (at the step on the way out: their shoes out of their cubby and on)
-        const shoeFrom = lp.len - stepAt(lp.path)
-        const paid = withPause(raw, payAt, payD ? PAY_S * v : 0)
         s.lastD = d
         s.slippers = lp.len - d > stepAt(lp.path)
         g?.position.copy(p)
         if (g) g.rotation.y = s.t < 0.8 ? st.yaw : turnToward(g.rotation.y, Math.atan2(-dir.x, -dir.z), dt * 1.5)
-        shoeStep(s, g, (paid - shoeFrom) / (SHOES_S * v), false)
+        // (at the step on the way out: their shoes out of their cubby and on)
+        shoeStep(s, g, (raw - shoeRaw) / shoeHold, false)
         // (at the till, facing it: the register's reading follows what they owe)
         // (waiting to pay: on the way out and not yet past the till)
-        if (payD && raw < payAt + PAY_S * v) queue++
-        if (payD && raw >= payAt && raw < payAt + PAY_S * v) {
+        if (payD && raw < payRaw + payHold) queue++
+        if (payD && raw >= payRaw && raw < payRaw + payHold) {
           if (g) g.rotation.y = Math.atan2(counters[0].lay.x, counters[0].lay.z)
-          paying = { s, k: (raw - payAt) / (PAY_S * v) }
+          paying = { s, k: (raw - payRaw) / payHold }
           const k = paying.k
           // (once the register's on their bill: the frame they step up it's still the last one's)
           if ((s.said ?? 0) < 2 && k > 0.12 && TILL_STATE.payer === s.id) {
@@ -6188,7 +6207,9 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
       if (STOCKER_FIG.o?.visible) add(STOCKER_FIG.o.position, false, STOCKER_KEY)
       // (and those waiting on the bench, on their way to it, sat there or on their way out: they keep to their way, the rest step round them
       // (item 193: going by in the aisle, customers walked through one stood before their place on it))
-      sitters.current.forEach((v) => { const o = sitterObjs.current.get(v.id); if (o && !v.handed) add(o.position, false, SITTER_KEY - v.id) })
+      // (on their way in or out they step aside as everyone walking does (item 414: one on their way in to the bench and one on their way out
+      // of it walked through each other at the genkan's step, neither giving way); sat, they keep to their place)
+      sitters.current.forEach((v) => { const o = sitterObjs.current.get(v.id); if (o && !v.handed) add(o.position, v.phase !== 'sit', SITTER_KEY - v.id) })
       // (a body's width, the round bodies' shoulders and all, so no two ever overlap)
       const R = 0.38
       // (what stands against the first counter's wall, measured every few seconds)
@@ -7402,6 +7423,10 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         const g = sitterObjs.current.get(v.id)
         if (g) {
           g.position.copy(v.pos)
+          // (and as far aside as they've stepped for whoever they're passing (the crowd's, above, from where they were drawn last frame); sat
+          // down, what's left of it eases back to nothing there, not snapped away)
+          const off = aside.current.get(SITTER_KEY - v.id)
+          if (off) { g.position.x += off.x; g.position.z += off.z }
           g.position.y = genkanY(counters, v.pos)
           // (shown once they're where they are: put in the scene between this and the frame's drawing, they were drawn a frame at the
           // bar's middle first, a flash there as each came (item 242))
