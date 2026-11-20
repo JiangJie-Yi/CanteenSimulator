@@ -9,7 +9,7 @@ export type GlyphId =
   | 'fast' | 'menu' | 'close' | 'minus' | 'chevL' | 'chevR' | 'caretR' | 'caretD' | 'refresh' | 'undo'
   | 'note' | 'notes' | 'heart' | 'coin' | 'bolt' | 'drop' | 'receipt' | 'tissue' | 'globe' | 'box'
   | 'tools' | 'person' | 'group' | 'search' | 'arrowR' | 'arrowU' | 'ban' | 'plus' | 'eye' | 'gamepad' | 'thumb' | 'towel' | 'soap' | 'check' | 'calendar' | 'list' | 'people'
-  | 'fish' | 'steam' | 'crossFace' | 'gladFace'
+  | 'fish' | 'steam' | 'crossFace' | 'gladFace' | 'climb'
 
 const S = 1.6
 export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
@@ -85,6 +85,11 @@ export const GLYPHS: Record<GlyphId, GlyphPart[]> = {
     { d: 'M6 8.4h.1M10 8.4h.1', stroke: 1.9 }, { d: 'M5.6 11.9q2.4-1.9 4.8 0', stroke: 1.3 }],
   gladFace: [{ d: 'M8 1.9a6.1 6.1 0 1 1 0 12.2A6.1 6.1 0 1 1 8 1.9Z', stroke: 1.3 }, { d: 'M4.7 7.4q1.1-1.5 2.2 0M9.1 7.4q1.1-1.5 2.2 0', stroke: 1.3 },
     { d: 'M4.8 9.4h6.4a3.2 3 0 0 1-6.4 0Z' }],
+  // (one going up a stair (item 428, the owner's 「cursor 需克制化，一個人走樓梯的樣子」): four treads rising to the right, filled; on them one
+  // climbing, leaning into it, the back foot on the first tread, the front on the second, the arms swinging)
+  climb: [{ d: 'M1 15v-2.6h3.5V9.9H8V7.4h3.5V4.9H15V15Z' },
+    { d: 'M6.6 1.3a1.45 1.45 0 1 1 0 2.9a1.45 1.45 0 1 1 0-2.9Z' },
+    { d: 'M6.3 4.9 5.3 8.2M5.3 8.2 4.4 10.3 3.6 12.2M5.3 8.2 7.4 8.7 7.7 9.7M6.1 5.6 4.3 7.1M6.1 5.6 8.1 6.3', stroke: 1.25 }],
 }
 
 /** the icon as SVG markup, for the DOM the developer panel builds by hand */
@@ -95,6 +100,21 @@ export function glyphSvg(id: GlyphId, size = 12) {
       : `<path d="${p.d}" fill="${col}"/>`
   }).join('')
   return `<svg class="game-icon" viewBox="0 0 16 16" width="${size}" height="${size}" aria-hidden="true">${parts}</svg>`
+}
+
+/** the icon as the mouse's pointer (a CSS cursor): `size` across, dark with a pale halo round it so it reads on any ground, its point at
+ * `hot` (its own 16 units); the hand after it where a picture's not taken */
+export function glyphCursor(id: GlyphId, hot: [number, number] = [2, 2], size = 32) {
+  const INK = '#24160c', HALO = '#fff6e6'
+  const halo = GLYPHS[id].filter((p) => !p.cut).map((p) => (p.stroke
+    ? `<path d="${p.d}" fill="none" stroke="${HALO}" stroke-width="${p.stroke + 1.5}" stroke-linecap="round" stroke-linejoin="round"/>`
+    : `<path d="${p.d}" fill="${HALO}" stroke="${HALO}" stroke-width="1.5" stroke-linejoin="round"/>`)).join('')
+  const ink = GLYPHS[id].map((p) => (p.stroke
+    ? `<path d="${p.d}" fill="none" stroke="${p.cut ? HALO : INK}" stroke-width="${p.stroke}" stroke-linecap="round" stroke-linejoin="round"/>`
+    : `<path d="${p.d}" fill="${p.cut ? HALO : INK}"/>`)).join('')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 18 18" width="${size}" height="${size}">${halo}${ink}</svg>`
+  const k = size / 18
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round((hot[0] + 1) * k)} ${Math.round((hot[1] + 1) * k)}, pointer`
 }
 
 /** the icon painted on a canvas: its top left at (x, y), `size` across, in `ink` (cut parts in `cut`, the background's colour) */

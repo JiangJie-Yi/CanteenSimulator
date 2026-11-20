@@ -36,7 +36,7 @@ import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { getBgmOff, setBgmOff, useBgmOff } from '@/ui/bgmStore'
 import { useSfxMuted } from '@/scene/sfx'
-import { drawGlyph } from '@/ui/glyphs'
+import { drawGlyph, glyphCursor } from '@/ui/glyphs'
 import { getLights, onLights, pressLightSwitch, useLights } from '@/scene/lightsStore'
 import { AnchoredLight } from '@/scene/AnchoredLight'
 import { QUALITY } from '@/scene/quality'
@@ -3929,6 +3929,8 @@ function CornerSupplies() {
 }
 /** the staff's door, its width along the wall (the toilets' own: the owner found it too narrow at 0.66) */
 const STAFF_W = 0.82
+/** the pointer over the stair up (item 428, the owner's 「cursor 需克制化，一個人走樓梯的樣子」): one going up a stair, drawn (ui/glyphs' climb) */
+const STAIR_CURSOR = glyphCursor('climb', [3, 2])
 /**
  * Behind the staff's door, inside its frame: the stair up to the floor above (the owner's: as the round window's view is, a picture in depth
  * on one flat pane, costing nothing; a stair painted flat on it once was only right from straight in front). The pane's two triangles find,
@@ -4426,7 +4428,7 @@ function StaffDoor() {
         <planeGeometry args={[STAFF_W * 2.4, WC_H * 1.4]} />
       </mesh>
       <mesh ref={stairs} position={[-0.004, (WC_H + 0.03) / 2, 0]} rotation-y={-Math.PI / 2} material={STAFF_STAIRS}
-        onPointerOver={(ev) => { ev.stopPropagation(); if (getEdit().on) return; stairsHot.current = true; document.body.style.cursor = 'not-allowed'; setTip({ title: '2F 員工休息室／倉庫', hint: '閒人勿進・禁止進入', warn: true }) }}
+        onPointerOver={(ev) => { ev.stopPropagation(); if (getEdit().on) return; stairsHot.current = true; document.body.style.cursor = STAIR_CURSOR; setTip({ title: '2F 員工休息室／倉庫', hint: '閒人勿進・禁止進入', warn: true }) }}
         onPointerOut={() => { stairsHot.current = false; document.body.style.cursor = ''; setTip(null) }}
         onClick={(ev) => { ev.stopPropagation(); if (getEdit().on) return; setTip(null); askView('upstairs') }}>
         <planeGeometry args={[STAFF_W + 0.06, WC_H + 0.03]} />
