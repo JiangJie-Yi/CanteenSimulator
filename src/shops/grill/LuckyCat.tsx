@@ -4,6 +4,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { BAKE_COATS, coatPicture, SUZU_MAT, suzuAt, thicken, type Coat } from './catCoat'
 
 /**
  * A beckoning cat (招き猫), about 0.2 tall, facing +z, from the model "Lucky cat with animation cute maneki neko" by Noth+
@@ -13,11 +14,15 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
  * costs more to draw); `still` shows one pose, the default plays the wave by stepping through them there and back.
  */
 /** the three models (the first waves, the others are still ones), how much taller each comes out than asked for, and the turn that brings its face to +z (measured) */
-const MODELS = [
-  { url: import.meta.env.BASE_URL + 'models/luckycat1.glb', fudge: 0.5 },
-  { url: import.meta.env.BASE_URL + 'models/luckycat2.glb', fudge: 0.5 },
-  { url: import.meta.env.BASE_URL + 'models/luckycat3.glb', fudge: 0.5, yaw: -Math.PI / 2 },
+/** (items 429, 432) each its own coat (catCoat's); the third's bell is part of its one mesh: where it is as made (its gold's middle and its
+ * radius, measured on its picture's colour) */
+const MODELS: { url: string; fudge: number; yaw?: number; coat: Coat; bell?: { at: [number, number, number]; r: number } }[] = [
+  { url: import.meta.env.BASE_URL + 'models/luckycat1.glb', fudge: 0.5, coat: 'ginger' },
+  { url: import.meta.env.BASE_URL + 'models/luckycat2.glb', fudge: 0.5, coat: 'saddle' },
+  { url: import.meta.env.BASE_URL + 'models/luckycat3.glb', fudge: 0.5, yaw: -Math.PI / 2, coat: 'tux', bell: { at: [0.454, 0.554, -0.035], r: 0.09 } },
 ]
+/** (item 429) how much thicker the coins they hold are made */
+const COIN_THICK = 1.6
 /** how tall each stands in the shop, unless said otherwise */
 const HEIGHT = 0.2
 /** the poses: the wave's lift, from its start up to the paw's highest, at these moments of the clip (seconds) */
@@ -51,6 +56,7 @@ function clean(tex: THREE.Texture): THREE.Texture {
   out.wrapS = tex.wrapS
   out.wrapT = tex.wrapT
   out.anisotropy = tex.anisotropy
+  out.userData.cleanOf = tex
   cleaned.set(tex, out)
   return out
 }
@@ -85,6 +91,7 @@ function bake(gltf: Pick<GLTF, 'scene' | 'animations'>, at: number, tint: THREE.
     g.computeBoundingSphere()
     const src = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial
     const mat = new THREE.MeshToonMaterial({ color: src.color?.clone() ?? new THREE.Color('#ffffff'), map: src.map ? (tidy ? clean(src.map) : src.map) : null, side: THREE.DoubleSide })
+    mat.name = src.name ?? ''
     // (a differently coloured cat: the body's own material takes the tint)
     if (tint && src.map && !/coin|ring|red/i.test(src.name)) mat.color.lerp(tint, 0.85)
     out.push({ g, mat })
@@ -112,13 +119,43 @@ export function LuckyCat({ kind = 1, height = HEIGHT, still = false }: { kind?: 
     const place = new THREE.Matrix4().makeRotationY((model as { yaw?: number }).yaw ?? 0).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -box.min.y, -centre.z))
     // (and its bounds measured again where it now stands: carried through the placing they came out a speck (1 cm across), and the cat was
     // culled away whenever that speck's place went off the edge of the picture, so it vanished now and then)
-    return baked.map((parts) => parts.map(({ g, mat }) => {
+    const placed = baked.map((parts) => parts.map(({ g, mat }) => {
       g.applyMatrix4(place)
       g.boundingBox = null
       g.boundingSphere = null
       g.computeBoundingSphere()
       return { g, mat }
     }))
+    // (items 429, 432: each one's bell (theirs a plain gold ball) put away and the made one set where it was, a little bigger round it; their
+    // coins made thicker; their coats worked on their pictures)
+    const isBell = (m: THREE.Material) => /^(Bell|Ring)$/.test(m.name)
+    const isCoin = (m: THREE.Material) => /coin/i.test(m.name)
+    const first = placed[0]
+    const bells: { at: THREE.Vector3; r: number }[] = []
+    for (const { g, mat } of first) if (isBell(mat)) {
+      g.computeBoundingBox()
+      const bb = g.boundingBox!, sz = bb.getSize(new THREE.Vector3())
+      bells.push({ at: bb.getCenter(new THREE.Vector3()), r: Math.max(sz.x, sz.y, sz.z) / 2 * 1.08 })
+    }
+    if (model.bell) bells.push({ at: new THREE.Vector3(...model.bell.at).applyMatrix4(place), r: model.bell.r * 1.1 * k })
+    const box0 = new THREE.Box3()
+    for (const { g, mat } of first) if (!isBell(mat) && !isCoin(mat) && mat.name !== 'RedMat') { g.computeBoundingBox(); box0.union(g.boundingBox!) }
+    // (their coats are in their models' pictures (scripts/bake-cat-coats.mjs); worked out here only for that script)
+    const coats = new Map<THREE.Texture, THREE.Texture>()
+    if (BAKE_COATS) for (const { mat } of first) {
+      const map = (mat as THREE.MeshToonMaterial).map
+      if (!map || coats.has(map) || isBell(mat) || isCoin(mat) || mat.name === 'RedMat') continue
+      coats.set(map, coatPicture(map, first.filter((q) => (q.mat as THREE.MeshToonMaterial).map === map).map((q) => q.g), box0, model.coat))
+    }
+    return placed.map((parts) => [
+      ...parts.filter(({ mat }) => !isBell(mat)).map(({ g, mat }) => {
+        if (isCoin(mat)) thicken(g, COIN_THICK)
+        const tm = mat as THREE.MeshToonMaterial
+        if (tm.map && coats.has(tm.map)) tm.map = coats.get(tm.map)!
+        return { g, mat }
+      }),
+      ...bells.map((b) => ({ g: suzuAt(b.at, b.r), mat: SUZU_MAT as THREE.Material })),
+    ])
   }, [gltf, kind, height, model, still])
   const group = useRef<THREE.Group>(null)
   const t = useRef(Math.random() * 10)

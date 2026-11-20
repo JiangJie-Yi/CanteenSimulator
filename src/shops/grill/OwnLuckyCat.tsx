@@ -3,6 +3,7 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { mergeByMaterial } from '@/scene/StaticBatch'
 import { inkModel } from '@/scene/inkHull'
+import { BAKE_COATS, coatPicture, SUZU_MAT, suzuAt, thicken } from './catCoat'
 
 /**
  * The shop's own beckoning cat (blender/ownluckycat.py, item 97, the owner's, 2026-11-14: "a lucky cat of your own"): 0.30 tall as made,
@@ -36,6 +37,40 @@ export function OwnLuckyCat() {
       m.castShadow = true
       m.receiveShadow = true
     })
+    // (items 429, 432, the owner's 「鈴鐺須做好，增加一些米克斯斑紋，硬幣加厚」「這招財貓的金幣背後有點怪」: its bell (a ball, its band and slit only
+    // drawn) put away for the made one, a little bigger round where it was; its koban half as thick again, both its sides drawn (a face of its
+    // back came out turned in, and seen from the side the dark through it); its coat a grey tabby's over its back and crown)
+    r.updateMatrixWorld(true)
+    const inv = new THREE.Matrix4().copy(r.matrixWorld).invert()
+    const local = (m: THREE.Mesh) => m.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld))
+    const bell = r.getObjectByName('OwnCatBell') as THREE.Mesh | undefined
+    if (bell?.isMesh) {
+      const g = local(bell)
+      g.computeBoundingBox()
+      const bb = g.boundingBox!, sz = bb.getSize(new THREE.Vector3())
+      g.dispose()
+      bell.removeFromParent()
+      const made = new THREE.Mesh(suzuAt(bb.getCenter(new THREE.Vector3()), (Math.max(sz.x, sz.y, sz.z) / 2) * 1.12), SUZU_MAT)
+      made.name = 'OwnCatSuzu'
+      made.castShadow = true
+      r.add(made)
+    }
+    const koban = r.getObjectByName('OwnCatKoban') as THREE.Mesh | undefined
+    if (koban?.isMesh) {
+      koban.geometry = thicken(koban.geometry.clone(), 1.5)
+      const km = (koban.material as THREE.MeshToonMaterial).clone()
+      km.side = THREE.DoubleSide
+      koban.material = km
+    }
+    const body = r.getObjectByName('OwnCatBody') as THREE.Mesh | undefined
+    const bm = body?.material as THREE.MeshToonMaterial | undefined
+    // (its coat in its model's picture (scripts/bake-cat-coats.mjs); worked out here only for that script)
+    if (BAKE_COATS && body?.isMesh && bm?.map) {
+      const g = local(body)
+      g.computeBoundingBox()
+      bm.map = coatPicture(bm.map, [g], g.boundingBox!, 'grey')
+      g.dispose()
+    }
     inkModel(r, () => false, { width: 0.0016, weld: true })
     mergeByMaterial(r)
     return r
