@@ -5467,7 +5467,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
             <group position={[-WC_POST_FACE - 0.002, 1.12, door]}><DoubleSwitch circuits={['wcM', 'wcF']} /></group>
           </Movable>
         )}
-        {altar && <Movable id="altar" label="供桌"><StaticBatch plain><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
+        {altar && <Movable id="altar" label="供桌" blocks><StaticBatch plain><group position={[(-ALTAR_D / 2) * ALTAR_SCALE, ALTAR_Y, shelfZ]} scale={ALTAR_SCALE}><AltarTable />
           {/* hung on the wall on two cloud brackets (雲形の棚受け, blender/kamidana.py's KamiBracket, the owner's after their photo): an arm under
               the shelf ending in a cloud's head, the cloud stepping back down to the plate on the wall, which runs on below to a rounded end */}
           {/* (half as long down the wall as they were (the owner's, 2026-11-11), from the shelf's underside) */}
@@ -5497,7 +5497,7 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
       {/* pendant lamps over the bar's customer side, low: one between each two places, midway (the owner's: a lamp between one customer and
           the next; bar's lampsAlong), their bands 鱗 and 立涌 in turn */}
       {lampsAlong(c).map((z, i) => (
-        <Movable key={i} id={`${lampId}${i}`} label={`吊燈（${lampName} ${i + 1}）`}><group position-x={0.05} userData={{ fadeOccluder: 0.5 }}><Pendant z={z} drop={0.25} pool={top} band={i % 2} /></group></Movable>
+        <Movable key={i} id={`${lampId}${i}`} label={`吊燈（${lampName} ${i + 1}）`} blocks><group position-x={0.05} userData={{ fadeOccluder: 0.5 }}><Pendant z={z} drop={0.25} pool={top} band={i % 2} /></group></Movable>
       ))}
     </group>
   )

@@ -1293,7 +1293,7 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (turned a quarter round, its fish's side to the street, and a little bigger: 1.15 times (the owner's: 1.3, then a little smaller)) */}
       <Movable id="fishlantern" label="魚燈" baseTurn={[0, -90, 0]} baseScale={1.15}><group position={[(W / 2 * NOREN_WIDE + 0.12) + FISH_LANTERN_OUT, H - 0.08, 0.47]} scale={0.85}><FishLantern /></group></Movable>
       {/* the noren: three panels side by side, hung from a bamboo rod under the lintel, the rod by a cord at each end from the beam above */}
-      <Movable id="noren" label="門簾">
+      <Movable id="noren" label="門簾" blocks>
         {/* (fades when it stands between the camera and what's looked at, as the other hangings do: see OccluderFade) */}
         <group userData={{ fadeOccluder: true }}>
           {/* (the pole laid on the lintel's brackets, no cords; the cloth longer than it was, as wide as the doorway so it stays clear of the walls) */}
@@ -1949,7 +1949,7 @@ function RegisterImpl({ at, yaw, top, lang }: { at: THREE.Vector3; yaw: number; 
       <Movable id="till-stool-lo" label="收銀矮凳"><StaticBatch plain>
         <group position={at} rotation-y={yaw}><group position={[-0.44, 0, 0.68]} rotation-y={-0.28} scale={PEOPLE_SCALE}><TillStoolModel which="Low" /></group></group>
       </StaticBatch></Movable>
-      <Movable id="till-counter" label="收銀櫃檯"><StaticBatch plain>
+      <Movable id="till-counter" label="收銀櫃檯" blocks><StaticBatch plain>
       <group position={at} rotation-y={yaw}>
       {/* (local x along the bar, +z toward the cashier, behind it) */}
       {/* the counter itself, from blender/tillcounter.py: its dark body with the lit bamboo and the lantern window, the marble top, the walnut partition */}
@@ -8933,7 +8933,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
   // (the serving counter, the takeaway stand and the benches, made once for what they're made with (item 374): drawn in the bar's own
   // render, they and all in them were drawn again with every redraw of the bar, 3.4 times a second (Movable 13.5 a second))
   const servePiece = useMemo(() => servePlace && (
-    <Movable id="servecounter" label="備餐檯" ground={0}>
+    <Movable id="servecounter" label="備餐檯" ground={0} blocks>
       <group name="look-servecounter" position={servePlace.at.toArray()} rotation-y={servePlace.yaw}><ServeCounter /><SakeStation /></group>
     </Movable>
   ), [servePlace])

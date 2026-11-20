@@ -15,7 +15,7 @@ import { holdVeil } from '@/scene/Later'
 import { isInk } from '@/scene/inkHull'
 import { TOOL_PAGE } from '@/scene/toolPage'
 import { warmLater } from '@/scene/Prewarm'
-import { blockedBefore, blocksEdit, solidHit, pieceOf } from '@/scene/pickable'
+import { answersBelow, blockedBefore, blocksEdit, opaqueHit, solidHit, pieceOf } from '@/scene/pickable'
 import { beginChange, chooseNext, clickPick, groupFrame, commitOffsets, FIXED_SIZE, footSettled, footXzSettled, getEdit, GIZMO, HANGS, setStats, groupTransformOf, isPicked, moveTo, offsetOf, outerTransformOf, pivotOf, positionOf, registerMovable, registerPivotReset, rotationOf, scaleOf, scaleTo, select, setFrame, setPivot, settleFoot, settleFootXz, settleRoomTurn, turnTo, useEditSel, groupSigOf, useListHot, type Group, type V3 } from './edit'
 
 type Controls = { enabled: boolean; target?: THREE.Vector3; update?: () => void } | null
@@ -762,13 +762,20 @@ const ParentPiece = createContext<string | null>(null)
  * onto it (item 162, the owner's, 2026-11-15: "the cursor still finds what's behind": come onto the bar through its ink line first, which isn't
  * solid, the bar let every move after it through, and the produce and the coal sack behind it lit up). `whole` false: only what's marked
  * `editBlock` inside it stands in the way (the hearth's frame and stones in the grill's model), the rest of it is only looked at. Out of edit
- * mode it has no handlers, so it's no part of the game's pointing.
+ * mode the same (item 418, the owner's 「要避免掉會穿牆 hover 到物件的情況」: the game's pointing went on through a wall, and the shoe cupboard in
+ * the genkan named itself and lit up through the wall and the door): what's behind a wall or a counter isn't pointed at, lit up or clicked
+ * through it; and a click on it is still a click on nothing in the game (the panels docked at the right fold away, as a click that lands on
+ * nothing does: r3f no longer calls that a miss, the wall having handlers now).
  */
 export function EditBlock({ children, whole = true }: { children: ReactNode; whole?: boolean }) {
   const on = useEditSel((s) => s.on)
   const stop = (e: { stopPropagation: () => void; object: THREE.Object3D }) => { if (solidHit(e.object) && blocksEdit(e.object)) e.stopPropagation() }
-  const h = on ? stop : undefined
-  return <group userData={whole ? { editBlock: true } : {}} onPointerDown={h} onPointerOver={h} onPointerMove={h}>{children}</group>
+  const click = (e: { stopPropagation: () => void; object: THREE.Object3D; eventObject: THREE.Object3D; delta: number }) => {
+    if (!solidHit(e.object) || !blocksEdit(e.object)) return
+    e.stopPropagation()
+    if (!on && e.delta <= 2 && !answersBelow(e)) window.dispatchEvent(new Event('scene-blank-click'))
+  }
+  return <group userData={whole ? { editBlock: true } : {}} onPointerDown={stop} onPointerOver={stop} onPointerMove={stop} onClick={click}>{children}</group>
 }
 
 /** each piece's group by its id (item 213: what's chosen found to be drawn over the veil) */
@@ -818,11 +825,15 @@ export function SelectionDim() {
   return <mesh ref={veil} geometry={VEIL_GEO} material={VEIL_MAT} renderOrder={VEIL_ORDER} frustumCulled={false} visible={false} raycast={() => {}} />
 }
 
-export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0], ground }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3
+export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 0], ground, blocks }: { id: string; label: string; children: ReactNode; baseScale?: number; baseTurn?: V3
   /** it stands on the floor, this high in its own frame: sized about the middle of its foot there, not about its own middle, so made bigger
    * it grows up from the floor and doesn't sink into it (the dish cabinet's and the freezer's feet went down through the kitchen's dais and
    * out past its edge) */
-  ground?: number }) {
+  ground?: number
+  /** it stands in the game's pointing (item 418, the owner's 「要避免掉會穿牆 hover 到物件的情況」): a big solid piece that's no wall (the till's
+   * counter, a hanging lamp, the noren) hides what's behind it from the pointer as it does from the eye; lit up and named things in it,
+   * pieces of their own or not, answer first as ever. Out of edit mode only (there the piece is picked) */
+  blocks?: boolean }) {
   const g = useRef<THREE.Group>(null)
   /** the group this piece is in lays its transform here, outside the piece's own place */
   const gw = useRef<THREE.Group>(null)
@@ -1332,6 +1343,14 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
     PIECE_GROUPS.set(id, set)
     return () => { set.delete(o); if (!set.size) PIECE_GROUPS.delete(id) }
   }, [id])
+  // (in the game, a solid piece that `blocks`: the pointer stops at its drawn, opaque faces, nothing behind it lit or clicked through it; and a
+  // click on them that nothing in it answers is a click on nothing, as one on a wall is: the panels docked at the right fold away)
+  const gameBlock = blocks ? (e: { stopPropagation: () => void; object: THREE.Object3D }) => { if (opaqueHit(e.object)) e.stopPropagation() } : undefined
+  const gameClick = blocks ? (e: { stopPropagation: () => void; object: THREE.Object3D; eventObject: THREE.Object3D; delta: number }) => {
+    if (!opaqueHit(e.object)) return
+    e.stopPropagation()
+    if (e.delta <= 2 && !answersBelow(e)) window.dispatchEvent(new Event('scene-blank-click'))
+  } : undefined
   return (
     <group ref={gw} matrixAutoUpdate={false} visible={!hiddenHere}>
     <group ref={g} position={o} userData={{ editId: id }}>
@@ -1339,11 +1358,13 @@ export function Movable({ id, label, children, baseScale = 1, baseTurn = [0, 0, 
       {/* (the turn and the scale are about the room's axes, the same ones the arrows and rings show: the piece stood in the room's frame, turned and
           scaled there, and stood back) */}
       <group ref={pg} position={piv} rotation-y={thetaW} visible={ready || !pivoted}
-        onPointerDown={on ? down : undefined}
+        onPointerDown={on ? down : gameBlock}
+        onPointerMove={on ? undefined : gameBlock}
+        onClick={on ? undefined : gameClick}
         onPointerOver={on ? (e: { stopPropagation: () => void; object: THREE.Object3D; index?: number; instanceId?: number; distance: number; intersections?: { object: THREE.Object3D; distance: number }[] }) => {
           if (!solidHit(e.object) || blockedBefore(e)) return
           e.stopPropagation(); over.current.add(overKey(e)); setHover(true)
-        } : undefined}
+        } : gameBlock}
         onPointerOut={on ? (e: { object: THREE.Object3D; index?: number; instanceId?: number }) => {
           over.current.delete(overKey(e)); if (!over.current.size) setHover(false)
         } : undefined}>

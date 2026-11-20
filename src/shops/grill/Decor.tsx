@@ -2111,7 +2111,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="prepcounter" label="料理台（飯糰）"><PrepCounter /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="denkinabe" label="電鍋"><DenkiNabe /></Movable>
-      <Movable id="knives" label="刀具組"><KnifeSet /></Movable>
+      <Movable id="knives" label="刀具組" blocks><KnifeSet /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><VegAt /><CharcoalSackAt /></group>
     </>
   )

@@ -25,6 +25,27 @@ export function solidHit(o: THREE.Object3D) {
 }
 
 /**
+ * Whether what a ray hit stands in the game's pointing as solid (item 418): solid (solidHit) and drawn opaque as it is now, not a hanging's
+ * see-through copy as it's faded out of the camera's way (OccluderFade's `fadeCopy`), nor see-through
+ */
+export function opaqueHit(o: THREE.Object3D) {
+  if (!solidHit(o) || o.userData.proxy) return false
+  const m = o as THREE.Mesh
+  const mats = Array.isArray(m.material) ? m.material : [m.material]
+  return !mats.some((x) => x.userData?.fadeCopy || (x.transparent && x.opacity < 0.9))
+}
+
+/**
+ * Whether anything from what a ray hit up to the group whose handler has the event now (not that group) has handlers of its own (r3f's), so
+ * answers the pointer itself: a click there is a click on it, not on nothing (item 418: a click on a wall or a counter's bare face is one on
+ * nothing, as it was when they took no rays, and folds the docked panels away; one on a door in the wall is the door's)
+ */
+export function answersBelow(e: { object: THREE.Object3D; eventObject: THREE.Object3D }) {
+  for (let q: THREE.Object3D | null = e.object; q && q !== e.eventObject; q = q.parent) if ((q as { __r3f?: { eventCount?: number } }).__r3f?.eventCount) return true
+  return false
+}
+
+/**
  * Whether what a ray hit stands in the edit mode's way though it's no piece: a counter, a wall (a group of it marked `editBlock`). A press or a
  * point that lands on it, solid, goes no further: what's behind it is hidden by it, not to be chosen through it (the owner, 2026-11-15: a press
  * on the bar top beside a pair of chopsticks, or a second press on the pair, chose the charcoal sack on the kitchen floor behind the bar). A
