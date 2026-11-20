@@ -1016,7 +1016,10 @@ const BIG_CHOCHIN: [number, number, number] = [1.8, 0.95, 1.8]
  * What's seen out through the doorway (item 306, the owner's: 「光照跟陰影感還不行，尤其是白天，不太真實」: the open doorway showed the dark
  * behind the shop, black under the noren at noon): the street's light out there, a card past the doorway facing in (from outside it isn't
  * there), pale sky over it and the street's warm stone under; and the day spilling in on the genkan's stones, brightest at the sill. Both
- * by the part of the day: bright by day, amber at dusk, rose at dawn, the night's dark blue (the street's own lanterns are the door's)
+ * by the part of the day: bright by day, amber at dusk, rose at dawn, the night's dark blue (the street's own lanterns are the door's).
+ * The spill reaches out over the sill and comes in softly at its edge (item 448, the owner's 「還是有一些奇怪的陰影要處理」: it stopped 10 cm
+ * short of the door at its brightest, the stones along the door left out of it, a dark band there like a shadow), and it's as the door
+ * is: faint through the frosted glass shut, all of it once the doorway's open
  */
 const DOOR_LIGHT = (() => {
   if (typeof document === 'undefined') return { spill: null }
@@ -1025,9 +1028,10 @@ const DOOR_LIGHT = (() => {
   const s = document.createElement('canvas')
   s.width = 64; s.height = 128
   const h = s.getContext('2d')!
-  // (brightest at the sill (the picture's foot: laid flat it's toward the doorway), fading in over the stones; soft at either side)
+  // (brightest at the sill (the picture's foot: laid flat it's toward the doorway), fading in over the stones; soft at either side; its
+  // very edge (the last few rows, out past the sill's outer edge) easing in, not a cut)
   for (let y = 0; y < 128; y++) {
-    const k = Math.pow(y / 127, 1.6)
+    const k = Math.pow(y / 127, 1.6) * Math.min(1, 0.55 + 0.45 * (127 - y) / 6)
     const row = h.createLinearGradient(0, 0, 64, 0)
     row.addColorStop(0, 'rgba(255,255,255,0)'); row.addColorStop(0.18, `rgba(255,255,255,${k})`); row.addColorStop(0.82, `rgba(255,255,255,${k})`)
     row.addColorStop(1, 'rgba(255,255,255,0)')
@@ -1036,6 +1040,14 @@ const DOOR_LIGHT = (() => {
   return { spill: tex(s) }
 })()
 const DOOR_SPILL = new THREE.MeshBasicMaterial({ map: DOOR_LIGHT.spill, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
+/** the day's spill on the stones: how far in from the noren's line it reaches, and how far out past it (to the sill's outer edge, measured:
+ * the stones run to 0.371 past it in the doorway's frame, the sill 0.384..0.459, the line 0.27) */
+const SPILL_IN = 1.2, SPILL_OUT = 0.19
+/** how open the way in is (0 shut, 1 its leaves run open: GenkanDoor's), for the day's spill through it */
+const DOOR_OPEN = { k: 0 }
+/** the spill's strength for the part of the day, the door shut letting through this much of it (its frosted glass) */
+let doorSpillBase = 0
+const DOOR_SHUT_LIGHT = 0.45
 /** the street's light and the spill on the stones, by the part of the day (the page's data-sky): colour, and the spill's strength */
 const DOOR_LOOKS: Record<string, [string, string, number]> = {
   day: ['#ffffff', '#fff0d6', 0.34], dawn: ['#ffffff', '#ffd6c8', 0.16], dusk: ['#ffffff', '#ffb46e', 0.3], night: ['#ffffff', '#8fa6d8', 0.07],
@@ -1043,11 +1055,13 @@ const DOOR_LOOKS: Record<string, [string, string, number]> = {
 let doorSky = ''
 function doorLight() {
   const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
-  if (s === doorSky) return
-  doorSky = s
-  const [, sc, so] = DOOR_LOOKS[s] ?? DOOR_LOOKS.day
-  DOOR_SPILL.color.set(sc)
-  DOOR_SPILL.opacity = so
+  if (s !== doorSky) {
+    doorSky = s
+    const [, sc, so] = DOOR_LOOKS[s] ?? DOOR_LOOKS.day
+    DOOR_SPILL.color.set(sc)
+    doorSpillBase = so
+  }
+  DOOR_SPILL.opacity = doorSpillBase * (DOOR_SHUT_LIGHT + (1 - DOOR_SHUT_LIGHT) * DOOR_OPEN.k)
 }
 
 /**
@@ -1185,6 +1199,7 @@ function GenkanDoorImpl() {
     const was = st.current, now = doorStep(was, wanted.current, Math.min(dt0, 0.1))
     st.current = now
     const k = doorShown(now.k, now.opening)
+    DOOR_OPEN.k = k
     for (const m of moving) m.o.position.x = m.x0 + m.run * k
     // (a rumble as it starts to run either way, its knock home at the end of it shutting)
     // (the shop's sliding doors' own sound (restroomSound's), as loud as it's near, as long as it runs)
@@ -1336,7 +1351,8 @@ function EntranceImpl({ at, mark }: { at: THREE.Vector3; mark: string }) {
       {/* (the street's light out through the doorway, facing in only; and the day spilling in on the genkan's stones (item 306)) */}
       {/* (past the door, nothing: the street that stood out there (items 360, 386) taken away, item 397 (the owner's 「戶外景拿掉好了」): from out
           round the shop its power pole stood up out of the night past the restrooms (item 396, 「這是甚麼? 2F嗎?」)) */}
-      <mesh position={[0, -GENKAN.depth + 0.012, NZ - 0.6]} rotation-x={-Math.PI / 2} material={DOOR_SPILL} renderOrder={2} raycast={NO_RAY}><planeGeometry args={[W * 0.95, 1.2]} /></mesh>
+      {/* (from as far in as it was out to the sill's outer edge, under the leaves (item 448): SPILL_IN, SPILL_OUT past the noren's line) */}
+      <mesh position={[0, -GENKAN.depth + 0.012, NZ + (SPILL_OUT - SPILL_IN) / 2]} rotation-x={-Math.PI / 2} material={DOOR_SPILL} renderOrder={2} raycast={NO_RAY}><planeGeometry args={[W * 0.95, SPILL_OUT + SPILL_IN]} /></mesh>
       {/* the doorway: the noren's rod, and the red lantern hung by the doorway on the bar's side */}
       {/* (the red lantern, its own piece: hung by its own cord) */}
       {/* (the lanterns at the door don't fade when they're in the way, as the room's hangings do: they're outside, and it left them a ghost

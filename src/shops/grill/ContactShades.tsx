@@ -37,6 +37,8 @@ const MAT = new THREE.MeshBasicMaterial({ color: '#000000', map: SHADE, transpar
   polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
 /** the nine-slice's picture coordinates: its band from the edge in to where the middle starts */
 const UV = [0, 0.4, 0.6, 1]
+/** the doors (item 448): they run in their tracks, not standing on the floor, and slid open the shade would be left on the threshold */
+const NO_SHADE = /^(genkandoor|staffdoor)$/
 
 /** one piece's shade: its foot's four corners (the box's bottom: c00, c01 along its depth, c10 along its width), how tall it is */
 function shadeQuad(c00: THREE.Vector3, c01: THREE.Vector3, c10: THREE.Vector3, tall: number, pos: number[], uv: number[], idx: number[]) {
@@ -67,7 +69,7 @@ function shadeQuad(c00: THREE.Vector3, c01: THREE.Vector3, c10: THREE.Vector3, t
 function build(): THREE.BufferGeometry | null {
   const pos: number[] = [], uv: number[] = [], idx: number[] = []
   for (const [id, e] of registryEntries()) {
-    if (HANGS.test(id) || !e.corners) continue
+    if (HANGS.test(id) || NO_SHADE.test(id) || !e.corners) continue
     const cs = e.corners()
     if (!cs || cs.length < 8) continue
     const v = cs.map((c) => new THREE.Vector3(...c))
