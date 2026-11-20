@@ -4114,10 +4114,34 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
     /** how far along their way in, and their way out, the genkan's step is (found once each, not every frame); and how long they stop at it
      * going out, fixed as they set off (item 411: worked out each frame from whether their shoes were still on the stone, it went to nothing
      * halfway into the stop as they stepped into them, and they were put where the walk would have been without it: 0.75 to 1.7 on in a frame) */
-    stepIn?: number; stepOut?: number; outHold?: number }
+    stepIn?: number; stepOut?: number; outHold?: number
+    /** where their pair's to stand on the stone (their place's in the row), found as they come in: they stop on it both ways, out of their
+     * shoes there coming in and back into them going (item 412: they stopped at the step's edge and the pair came and went in the row 0.16 to
+     * 0.41 from them, a stride off, never stood in); going out, the place they stop at (null: no pair down there, not stopping) */
+    shoeAt?: THREE.Vector3; outShoe?: THREE.Vector3 | null }
   const sitters = useRef(new Map<number, Sitter>())
   /** where the bench's sitters leave their shoes on the genkan's stone (item 203): found from the first one's way up the step, kept */
   const shoeRow = useRef<{ at: THREE.Vector3; toes: THREE.Vector3; across: THREE.Vector3 } | null>(null)
+  /** the k-th place's pair's place in the row (shoeRow), the row found the first time from `walk`, a way in from the door: SHOES_BACK back
+   * toward the door from where it steps up out of the genkan, toes that way, its pairs off to the side away from the shoe cupboard (kept
+   * only once the cupboard's there to keep away from); null with no step on the way to find it from */
+  const shoeSpotOf = (k: number, walk: THREE.Vector3[]) => {
+    let r = shoeRow.current
+    if (!r) {
+      const at0 = stepAt(walk)
+      if (!(at0 > 0)) return null
+      const back = alongPath(walk, Math.max(0, at0 - SHOES_BACK)), toes = back.dir.clone().negate().setY(0).normalize()
+      const across = new THREE.Vector3(-toes.z, 0, toes.x), fr = frame.current
+      const cab = fr && SHOE_CELLS.ready ? fr.worldToLocal(SHOE_CELLS.at.clone()) : null
+      if (cab && across.dot(cab.setY(0).sub(back.p.clone().setY(0))) > 0) across.negate()
+      r = { at: back.p.clone().setY(0), toes, across }
+      if (cab) shoeRow.current = r
+    }
+    // (a neat row of them, not each pair where the last was (three at one spot, one in another): two side by side along the step's edge, two
+    // more behind them toward the door, the fifth and sixth squeezed between; all on the stone and away from the shoe cupboard (its front a
+    // step from where they cross: tests/e2e/_shoerow203.mjs))
+    return r.at.clone().addScaledVector(r.across, 0.1 + 0.17 * (k % 2) + (k >= 4 ? 0.085 : 0)).addScaledVector(r.toes, 0.18 * (Math.floor(k / 2) % 2) + (k >= 4 ? 0.09 : 0))
+  }
   /** those called off the bench whose shoes have been put in their place's cubby (item 203), for their seated self to take out going */
   const benchShoesIn = useRef(new Set<number>())
   const [sitterList, setSitterList] = useState<{ id: number; sat: boolean }[]>([])
@@ -7250,7 +7274,10 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         } else if (v.face) BENCH_B.copy(v.face)
         // (never found yet: across the bench as it's laid, its yaw turned a quarter)
         else BENCH_B.set(Math.sin(BENCH_PLACE.yaw), 0, Math.cos(BENCH_PLACE.yaw))
-        const before = at.clone().addScaledVector(BENCH_B, 0.42), walk = [way.door, before, at]
+        const before = at.clone().addScaledVector(BENCH_B, 0.42)
+        // (in by way of where their pair's to stand: stopped on it, out of their shoes, and up the step (item 412))
+        if (v.phase === 'in' && !v.shoeAt) v.shoeAt = shoeSpotOf(v.spot, [way.door, before, at]) ?? undefined
+        const walk = v.shoeAt ? [way.door, v.shoeAt, before, at] : [way.door, before, at]
         if (BENCH.up.has(v.id)) {
           // (called: up off the bench and on in to their stool from here (setShown's way in starts where they sat))
           BENCH.up.delete(v.id)
@@ -7280,29 +7307,24 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         // 2.22 across in a frame at 04:01, the shop shutting, back to their place on the bench and out from there))
         if (BENCH.gone.has(v.id) && v.phase !== 'out') {
           // (back the way they came: round the corner in front of the bench again if they'd passed it)
-          if (v.phase === 'in') { v.outFrom = v.pos.clone(); v.outVia = Math.min(pathLength(walk), v.t * sp) > way.door.distanceTo(before) }
+          // (how far in they'd got, the stop at their pair as it went; past the corner in front of the bench or not)
+          if (v.phase === 'in') {
+            v.outFrom = v.pos.clone()
+            const got = Math.min(pathLength(walk), withPause(v.t * sp, v.stepIn ?? 0, SHOE_OFF_S * sp))
+            v.outVia = got > pathLength(walk.slice(0, walk.length - 1))
+          }
           v.phase = 'out'; v.t = 0; v.fadeT = 0
         }
         if (v.phase === 'in') {
           // (stopped at the genkan's step a moment, out of their shoes and up onto the boards in their socks, the pair left on the stone toes out
           // (item 203: the bench is on the room's boards))
-          const len = pathLength(walk), hold = SHOE_OFF_S * sp, at0 = (v.stepIn ??= stepAt(walk)), raw = v.t * sp
+          const len = pathLength(walk), hold = SHOE_OFF_S * sp, at0 = (v.stepIn ??= v.shoeAt ? way.door.distanceTo(v.shoeAt) : stepAt(walk)), raw = v.t * sp
           const d = Math.min(len, withPause(raw, at0, hold)), { p, dir } = alongPath(walk, d)
           v.bow = at0 > 0 && raw >= at0 && raw < at0 + hold ? (raw - at0) / hold : -1
           if (at0 > 0 && raw >= at0 + hold * 0.55 && !v.shoes) {
-            // (a neat row of them, not each pair where the last was (three at one spot, one in another): two side by side along the step's edge,
-            // two more behind them toward the door, the fifth and sixth squeezed between; all on the stone and away from the shoe cupboard
-            // (its front a step from where they cross: tests/e2e/_shoerow203.mjs))
-            if (!shoeRow.current) {
-              const back = alongPath(walk, Math.max(0, at0 - SHOES_BACK)), toes = back.dir.clone().negate().setY(0).normalize()
-              const across = new THREE.Vector3(-toes.z, 0, toes.x), fr = frame.current
-              const cab = fr && SHOE_CELLS.ready ? fr.worldToLocal(SHOE_CELLS.at.clone()) : null
-              if (cab && across.dot(cab.setY(0).sub(back.p.clone().setY(0))) > 0) across.negate()
-              shoeRow.current = { at: back.p.clone().setY(0), toes, across }
-            }
-            const r = shoeRow.current, k = v.spot
-            v.shoes = { at: r.at.clone().addScaledVector(r.across, 0.1 + 0.17 * (k % 2) + (k >= 4 ? 0.085 : 0))
-              .addScaledVector(r.toes, 0.18 * (Math.floor(k / 2) % 2) + (k >= 4 ? 0.09 : 0)), yaw: Math.atan2(r.toes.x, r.toes.z) }
+            // (the pair left where they stood, toes out, in their place in the row)
+            const spot = v.shoeAt ?? shoeSpotOf(v.spot, walk), r = shoeRow.current
+            if (spot) v.shoes = { at: spot.clone().setY(0), yaw: r ? Math.atan2(r.toes.x, r.toes.z) : v.yaw + Math.PI }
           }
           v.pos.copy(p)
           v.yaw = turnSmooth(v.yaw, Math.atan2(dir.x, dir.z), Math.min(step, 0.1))
@@ -7315,14 +7337,15 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
           const yaw = Math.atan2(BENCH_B.x, BENCH_B.z)
           v.yaw += Math.atan2(Math.sin(yaw - v.yaw), Math.cos(yaw - v.yaw)) * Math.min(1, step * 6)
         } else {
-          // (going: at the step a moment, back into their shoes off the stone)
-          const back = v.outFrom ? (v.outVia ? [v.outFrom, before, way.door] : [v.outFrom, way.door]) : [at, before, way.door], len0 = pathLength(back)
-          if (v.stepOut === undefined) {
-            v.stepOut = len0
-            for (let k = 0; k < len0; k += 0.02) if (inGenkan(counters, alongPath(back, k).p)) { v.stepOut = k; break }
-          }
+          // (going: down onto the stone to their own pair, a moment there stepping back into them, and out of the door (item 412: they stopped
+          // at the step's edge, the pair a stride off going from the row); with none down there (never got out of them), straight out)
+          if (v.outShoe === undefined) v.outShoe = v.shoes ? v.shoes.at.clone().setY(0) : null
+          const sh = v.outShoe
+          const back = v.outFrom ? [v.outFrom, ...(v.outVia ? [before] : []), ...(sh ? [sh] : []), way.door] : [at, before, ...(sh ? [sh] : []), way.door]
+          const len0 = pathLength(back)
+          v.stepOut ??= sh ? pathLength(back.slice(0, back.length - 1)) : len0
           const on = v.stepOut
-          const hold = (v.outHold ??= v.shoes ? SHOE_OFF_S * sp : 0), raw = v.t * sp, len = len0 + hold
+          const hold = (v.outHold ??= sh ? SHOE_OFF_S * sp : 0), raw = v.t * sp, len = len0 + hold
           const d = Math.min(len0, withPause(raw, on, hold)), { p, dir } = alongPath(back, d)
           v.bow = hold > 0 && raw >= on && raw < on + hold ? (raw - on) / hold : -1
           if (v.shoes && raw >= on + hold * 0.55) v.shoes = undefined
