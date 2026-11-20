@@ -67,10 +67,10 @@ WEAVE = weave_of()
 WEAVE_N = image("produce_weave_n", to_normal(WEAVE["relief"], 1.4), data=True)
 
 
-def burlap(name, band=None, base=("#7e5f3a", "#d2b07c"), stripes=False, creases=True, nrm=None):
+def burlap(name, band=None, base=("#7e5f3a", "#d2b07c"), stripes=False, creases=True, nrm=None, shade=None, half=False):
     """burlap: the weave (WEAVE) flecked, a little hairy; grimier toward the foot, and (`creases`) in the creases round its upper part (where
     v is 0.55, 0.7, 0.83 up it); `band` a colour woven round it near the top; `stripes` three black bands printed round it and a red stamp
-    (the charcoal's); `nrm` its relief"""
+    (the charcoal's); `nrm` its relief; `shade` (u, v -> how light) laid over it last; `half` its picture at half its size"""
     S, u, v, f = WEAVE["S"], WEAVE["u"], WEAVE["v"], WEAVE["f"]
     wx, wy, over, tone, gaps = WEAVE["wx"], WEAVE["wy"], WEAVE["over"], WEAVE["tone"], WEAVE["gaps"]
     # (jute as it's woven (the owner's, 2026-11-11: the sacks nothing like sacks, a checkerboard in olive): each thread round, lighter along
@@ -106,7 +106,27 @@ def burlap(name, band=None, base=("#7e5f3a", "#d2b07c"), stripes=False, creases=
         ring = smooth(0.05, 0.0, np.abs(np.sqrt(sx * sx + sy * sy) - 0.32)) + smooth(0.32, 0.26, np.sqrt(sx * sx + sy * sy)) * smooth(0.06, 0.0, np.abs(sx))
         col = mix(col, lin("#141210"), np.clip(ink, 0, 1) * (0.55 + 0.45 * thread) * 0.9)
         col = mix(col, lin("#b3261e"), np.clip(ring, 0, 1) * (0.5 + 0.5 * thread) * 0.85)
-    return pbr(name, (1, 1, 1), tex=image(name, col), nrm=nrm, rough=0.95)
+    if shade is not None:
+        col = col * shade(u, v)[..., None]
+    if half:
+        col = col.reshape(S // 2, 2, S // 2, 2, 3).mean(axis=(1, 3))
+    return pbr(name, (1, 1, 1), tex=image(name, col.astype(np.float32)), nrm=nrm, rough=0.95)
+
+
+LINER_V = (0.68, 0.9)   # (the lining's picture: its bottom, the mouth's edge; the weave as tall as the body's (0.9 of v its height h))
+
+
+def liner_shade(u, v):
+    """(item 401) the sacks' lining, the cloth's inside (u round the sack twice, v up it from LINER_V[0] at its bottom to LINER_V[1] at the
+    mouth's edge, as the body's own picture runs; its bottom laid flat under LINER_V[0]): a little darker than its outside, gathered into fine
+    soft folds down it, wandering a little, and falling off going down, as the light into a sack's mouth does (not toward black: an empty
+    sack slumps, its lining shallow)"""
+    S = u.shape[0]
+    d = np.clip((v - LINER_V[0]) / (LINER_V[1] - LINER_V[0]), 0, 1)
+    # (long folds of their own widths down it, not evenly spaced: a regular ripple read as a basket's ribs)
+    fine = smooth(0.25, 0.8, 0.65 * vnoise(S, 26, 2) + 0.35 * vnoise(S, 57, 3))
+    deep = 0.62 + 0.3 * d ** 0.8
+    return (deep * (0.86 + 0.14 * fine)).astype(np.float32)
 
 
 # (the potatoes' and sweet potatoes' own skins, as dug: blender/tubers.py)
@@ -123,6 +143,8 @@ M = {
     "tie": pbr("ProduceTwine", tuple(lin("#b58f52")), rough=0.95),
     "sackC": burlap("CharcoalSackCloth", base=("#4a3c2a", "#9a8460"), stripes=True),
     "inside": pbr("ProduceSackInside", tuple(lin("#2e2416")), rough=1.0),
+    # (the open sacks' lining (item 401): their burlap seen from inside, a little darker, its fine folds and its fall into the dark painted on)
+    "liner": burlap("ProduceSackLiner", base=("#6e5232", "#c4a26e"), creases=False, shade=liner_shade, half=True),
     # (binchotan has a dull metallic sheen, near black)
     "coal": pbr("CharcoalSackStick", tuple(lin("#2a2a2e")), rough=0.45, metal=0.35),
 }
@@ -334,15 +356,45 @@ def open_sack(name, cx, cz, h, r, mat, lean=(0.0, 0.0), seg=24, front=math.pi / 
                 loop[uv].uv = (jj / seg * 2, vv)
     ladder_fill(bm, rows[0][0])
     o = mesh_object(name, bm, mat)
-    # ---- the dark floor just inside the mouth, under what's heaped there
+    # ---- the lining (item 401, the owner's 「裡面都空空的怎就一種顏色，應該會有內襯皺褶」: it was a flat disc of one dark brown just inside the
+    # mouth): the cloth's inside going down into the sack from just in from the mouth's edge, drawn in and gathered into a few big soft folds
+    # that wander round as they go down (the fine ones, and its fall into the dark, in its picture: M["liner"]); its bottom a ladder across
+    # (no fan), a quarter of the sack down; facing in and up; its back kept off the counter's face the sack's back is pressed flat on.
+    # (Under what's heaped in the mouth while there's any; seen when the sack's empty and slumped)
+    LINER = ((0.0, 0.985, 0.0), (0.06, 0.92, 0.025), (0.14, 0.76, 0.05), (0.22, 0.4, 0.0))   # (down: of h; in: of the mouth; its folds' depth)
     bm = bmesh.new()
-    ring = [bm.verts.new(at(top[j] * 0.93, (2 * math.pi * j / seg + A0), h - 0.006)) for j in range(seg)]
-    bm.faces.new(ring)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    for fc in bm.faces:
-        if fc.normal.z < 0:
-            fc.normal_flip()
-    mesh_object(name + "Inside", bm, "inside")
+    luv = bm.loops.layers.uv.new()
+    lrows = []
+    for dn, k_in, fd in LINER:
+        y = h - 0.002 - dn * h
+        row = []
+        for j in range(seg):
+            a = 2 * math.pi * j / seg + A0
+            tw = a + 0.35 * dn / LINER[-1][0]
+            rr = top[j] * (k_in + fd * (0.6 * math.sin(5 * tw + ph[7]) + 0.4 * math.sin(8 * tw + ph[8])))
+            row.append(bm.verts.new(P(cx + rr * math.cos(a) + dx * y, y, max(WALL_Z + 0.012, cz + rr * math.sin(a) + dz * y))))
+        lrows.append(row)
+    for k in range(len(lrows) - 1):
+        for j in range(seg):
+            j2 = (j + 1) % seg
+            f = bm.faces.new((lrows[k][j], lrows[k][j2], lrows[k + 1][j2], lrows[k + 1][j]))
+            for loop, (jj, kk) in zip(f.loops, ((j, k), (j + 1, k), (j + 1, k + 1), (j, k + 1))):
+                # (down it as far as the body's picture goes for so much of its height: the weave not squashed)
+                loop[luv].uv = (jj / seg * 2, LINER_V[1] - LINER[kk][0] * 0.9 * (LINER_V[1] - LINER_V[0]) / (LINER[-1][0] * 0.9))
+    # (its bottom laid flat on the picture, the weave's own size, under the lining's fall: a ladder's rungs from side to side swept the picture's
+    # whole way round across each, in a zigzag)
+    circ = 2 * math.pi * sum(top) / len(top)
+    for f in ladder_fill(bm, lrows[-1]):
+        for loop in f.loops:
+            q = loop.vert.co
+            loop[luv].uv = ((q.x - cx) / circ * 2, 0.4 + (q.y + cz) / (h / 0.9))
+    axis = Vector(P(cx + dx * h, h, cz + dz * h))
+    bm.normal_update()
+    for f in bm.faces:
+        c = f.calc_center_median()
+        if f.normal.dot(Vector((axis.x - c.x, axis.y - c.y, 0.05))) < 0:
+            f.normal_flip()
+    mesh_object(name + "Inside", bm, "liner")
     # ---- the seam, below the cuff
     # (down its side, toward the back, as a sack's is sewn: its front left for what's printed on it (the owner's, 2026-11-11))
     seam_of(name, cx, cz, h, r, mat, lean, front + math.pi * 0.62, [t for t in ts if t <= 0.92], radius, ph, o)

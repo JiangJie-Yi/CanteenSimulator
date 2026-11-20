@@ -29,7 +29,7 @@ const BAKED = /^ProduceTuber/
 const WOVEN = /^ProduceSack(Potato|Sweet|Onion)$/
 /** how much brighter each sack's burlap is drawn than it's woven */
 // (the produce sacks' a little too, to an old sack's light tan (the owner's, 2026-11-11))
-const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18, ProduceSackPotato: 1.15, ProduceSackSweet: 1.15, ProduceSackOnion: 1.22 }
+const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18, ProduceSackPotato: 1.15, ProduceSackSweet: 1.15, ProduceSackOnion: 1.22, ProduceSackLiner: 1.15 }
 /** the produce sacks' cloth dyed another colour: none now (the owner's, 2026-11-11: the white was too white, an old burlap sack's tan as it's
  * woven, grime and all; they'd been dyed a bleached cotton-hemp, 2026-11-09); kept for a sack that wants one */
 const BURLAP_DYE: Record<string, string> = {}
@@ -136,7 +136,7 @@ function printSack(map: THREE.Texture, p: (typeof SACK_PRINT)[string]) {
   return t
 }
 /** too small or too fine for an ink line (the skewers, their ties, the labels and the marks on things) */
-const UNINKED = /Skewer|Label|Mark|Spice\d|SpiceCap|FoilRoll|Lemon\d/
+const UNINKED = /Skewer|Label|Mark|Spice\d|SpiceCap|FoilRoll|Lemon\d|ProduceSack\dInside/
 
 /** a loaded model's part (its node by name), in the room's toon light, inked once and folded together by material (it never moves; but what
  * `keep` names, left as it is to be shown or hidden) */
@@ -284,92 +284,6 @@ const CHILLED_FOODS = DISHES.flatMap((d) => d.items.map((x) => x.id)).filter((id
 const CHILLED_SAUCES = SEASON_GOODS.map((g) => g.id).filter((id) => storageOf(id) === 'chilled')
 
 /**
- * The little wooden tags on the room-temperature stores (item 355, the owner's 「?」 over them: three open sacks with a flat brown mouth, two
- * empty crates, an empty basket, nothing to say what any of them was): each container's name brushed on a pale hinoki tag hung on its front
- * by a twine through its hole; a red 空 stamped over it while there's none of it in stock. One picture for all six (repainted only as one
- * empties or fills), one material.
- */
-const TAG_FONT = '"LXGW WenKai TC", "Noto Serif TC", serif'
-const TAG_W = 256, TAG_H = 160
-const TAG_NAMES = ['馬鈴薯', '地瓜', '洋蔥', '番茄・茄子', '根菜', '青菜'] as const
-/** which tag each container's: the sacks 0..2 (PILES' order), the crates and the basket */
-const TAG_OF: Record<string, number> = { VegCrate: 3, VegCrate2: 4, VegBasket: 5 }
-const TAG_EMPTY: (boolean | null)[] = TAG_NAMES.map(() => null)
-const TAG_TEX = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = TAG_W * 2; c.height = TAG_H * 3
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
-function paintTag(k: number, empty: boolean) {
-  const c = TAG_TEX?.image as HTMLCanvasElement | undefined
-  if (!c || !TAG_TEX) return
-  const g = c.getContext('2d')!
-  const x = (k % 2) * TAG_W, y = Math.floor(k / 2) * TAG_H
-  g.save()
-  g.beginPath(); g.rect(x, y, TAG_W, TAG_H); g.clip()
-  // (pale hinoki, its grain, a darker edge where it's handled)
-  const gr = g.createLinearGradient(x, y, x, y + TAG_H)
-  gr.addColorStop(0, '#ecd9b4'); gr.addColorStop(1, '#dcc49a')
-  g.fillStyle = gr; g.fillRect(x, y, TAG_W, TAG_H)
-  g.strokeStyle = 'rgba(150,110,60,0.25)'; g.lineWidth = 1.5
-  for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(x, y + 14 + i * 16 + (i % 3) * 2); g.bezierCurveTo(x + 80, y + 10 + i * 16, x + 170, y + 20 + i * 16, x + TAG_W, y + 12 + i * 16); g.stroke() }
-  g.strokeStyle = 'rgba(90,60,30,0.6)'; g.lineWidth = 6; g.strokeRect(x + 3, y + 3, TAG_W - 6, TAG_H - 6)
-  // (its hole, and the twine through it)
-  g.fillStyle = '#5a3d22'; g.beginPath(); g.arc(x + TAG_W / 2, y + 22, 7, 0, Math.PI * 2); g.fill()
-  // (its name, brushed)
-  const name = TAG_NAMES[k]
-  g.fillStyle = '#1e140c'
-  const size = Math.min(64, Math.floor((TAG_W - 36) / [...name].length))
-  g.font = `700 ${size}px ${TAG_FONT}`
-  g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText(name, x + TAG_W / 2, y + TAG_H / 2 + 12)
-  // (none in stock: a red 空 stamped across its corner)
-  if (empty) {
-    g.translate(x + TAG_W - 52, y + TAG_H - 50)
-    g.rotate(-0.25)
-    g.strokeStyle = '#c0281c'; g.lineWidth = 6
-    g.beginPath(); g.arc(0, 0, 38, 0, Math.PI * 2); g.stroke()
-    g.fillStyle = '#c0281c'; g.font = `700 48px ${TAG_FONT}`
-    g.fillText('空', 0, 2)
-  }
-  g.restore()
-  TAG_TEX.needsUpdate = true
-}
-/** a tag's stock state painted when it changes (the first time, and once more when the brush font's in) */
-function tagState(k: number, empty: boolean) {
-  if (TAG_EMPTY[k] === empty) return
-  TAG_EMPTY[k] = empty
-  paintTag(k, empty)
-  void document.fonts?.load(`700 40px "LXGW WenKai TC"`, TAG_NAMES.join('') + '空').then(() => paintTag(k, !!TAG_EMPTY[k])).catch(() => {})
-}
-const TAG_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: TAG_TEX })
-/** tag k's square: `w` wide (its picture's shape), facing +z, its foot at its origin's height less half */
-function tagGeo(k: number, w: number) {
-  const g = new THREE.PlaneGeometry(w, w * (TAG_H / TAG_W))
-  const uv = g.attributes.uv as THREE.BufferAttribute
-  const u0 = (k % 2) / 2, v0 = 1 - (Math.floor(k / 2) + 1) / 3
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) / 2, v0 + uv.getY(i) / 3)
-  return g
-}
-/** a tag hung on the front of what's in `box` (its parent's frame): a little over halfway up its front, a hair out from it, and its twine */
-function hangTag(k: number, box: THREE.Box3, w: number, up = 0.58) {
-  const g = new THREE.Group()
-  const m = new THREE.Mesh(tagGeo(k, w), TAG_MAT)
-  m.name = `store-tag-${k}`
-  m.rotation.x = -0.12
-  g.add(m)
-  const twine = new THREE.Mesh(new THREE.CylinderGeometry(0.0012, 0.0012, w * 0.35, 4), TWINE_MAT)
-  twine.position.set(0, w * (TAG_H / TAG_W) / 2 + w * 0.15, -0.004)
-  g.add(twine)
-  g.position.set((box.min.x + box.max.x) / 2, box.min.y + (box.max.y - box.min.y) * up, box.max.z + 0.006)
-  return g
-}
-const TWINE_MAT = new THREE.MeshToonMaterial({ color: '#8a6a40' })
-
-/**
  * The sacks of potatoes and sweet potatoes, their backs to the bar, along it: what's kept at room temperature, so pointed at they light and
  * say how many there are, and clicked the stock opens on its larder's tab (the owner's).
  */
@@ -392,10 +306,9 @@ const pileRank = (name: string) => (/Heap(_\d+)?$/.test(name) ? 4 : /Loose/.test
  * while there's any; all of them with no shop running */
 const pileShown = (have: number, all: number) => (have < 0 ? all : have <= 0 ? 0 : Math.max(1, Math.min(all, Math.round((all * have) / PAR))))
 /** an empty sack slumped down on its foot (item 222, the owner's 「這也超怪」: emptied, each stood as full as ever, its mouth a black hole, the
- * dark floor set just inside it under what's heaped there): how tall it's left, how much wider it slumps, and how quickly it goes (per s) */
+ * dark floor set just inside it under what's heaped there): how tall it's left, how much wider it slumps, and how quickly it goes (per s).
+ * Its mouth shows its lining then (blender/produce.py's ProduceSack*Inside, item 401: the cloth's inside going down into it, its folds) */
 const SLUMP_H = 0.3, SLUMP_W = 1.08, SLUMP_RATE = 3
-/** the dark floor inside a sack's mouth, and the cloth it turns to as the sack slumps empty (its mouth folded in over nothing: no hole) */
-const SACK_FLOOR = new THREE.Color('#2e2416'), SACK_FOLD = new THREE.Color('#9a7a50')
 export function ProduceSacks() {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
   const { obj, piles, sacks } = useMemo(() => {
@@ -446,19 +359,8 @@ export function ProduceSacks() {
       r.add(g)
       g.updateMatrixWorld(true)
       for (const o of own) g.attach(o)
-      // (its floor a material of its own (the shop's plain colours had it in with the twine), to turn to cloth as it slumps)
-      let floor: THREE.MeshToonMaterial | null = null
-      for (const o of own) {
-        if (!/Inside$/.test(o.name)) continue
-        floor ??= new THREE.MeshToonMaterial({ color: SACK_FLOOR.clone() })
-        ;(o as THREE.Mesh).material = floor
-      }
       mergeByMaterial(g)
-      // (its tag (item 355), on its front, in the sack's own frame: unsquashed as it slumps)
-      const inG = box.clone().translate(g.position.clone().negate())
-      const tag = hangTag(i, inG, 0.17)
-      g.add(tag)
-      return { g, k: 0, floor, tag }
+      return { g, k: 0 }
     })
     return { obj: r, piles, sacks }
   }, [gltf])
@@ -473,14 +375,11 @@ export function ProduceSacks() {
       // (empty: the sack slumps down on its foot, a little wider; filled again, it stands up as it was)
       const sk = sacks[i]
       if (!sk) return
-      tagState(i, SUPPLIES.has(p.id) === 0)
       const want = n === 0 ? 1 : 0
       if (sk.k === want) return
       sk.k = want > sk.k ? Math.min(want, sk.k + dt * SLUMP_RATE) : Math.max(want, sk.k - dt * SLUMP_RATE)
       const e = sk.k * sk.k * (3 - 2 * sk.k)
       sk.g.scale.set(1 + (SLUMP_W - 1) * e, 1 - (1 - SLUMP_H) * e, 1 + (SLUMP_W - 1) * e)
-      sk.tag.scale.set(1 / sk.g.scale.x, 1 / sk.g.scale.y, 1 / sk.g.scale.z)
-      sk.floor?.color.copy(SACK_FLOOR).lerp(SACK_FOLD, e)
     })
   })
   // (the sacks of potatoes, sweet potatoes and onions, and the baskets of the summer vegetables and the burdock beside them: how many of each
@@ -545,10 +444,6 @@ export function VegBasket({ node }: { node: VegNode }) {
       const all = Math.max(...lists.flatMap((l) => l.map((x) => x.i))) + 1
       return { stock: VEG_STOCK[kind] ?? null, all, shown: -1, batches: lists.map((l) => ({ at: l.map((x) => x.i), b: countedBatch(r, l.map((x) => x.m)) })) }
     })
-    // (its tag (item 355), on its front)
-    r.updateMatrixWorld(true)
-    const box = new THREE.Box3().setFromObject(r)
-    r.add(hangTag(TAG_OF[node], box, node === 'VegBasket' ? 0.17 : 0.2, node === 'VegBasket' ? 0.55 : 0.6))
     return { obj: r, kinds }
   }, [gltf, node])
   useFrame(() => {
@@ -560,9 +455,6 @@ export function VegBasket({ node }: { node: VegNode }) {
       k.shown = n
       for (const bt of k.batches) bt.b.show(bt.at.filter((i) => i < n).length)
     }
-    // (its tag stamped 空 while none of what's counted in it is in (a shop running))
-    const counted = kinds.filter((k) => k.stock)
-    tagState(TAG_OF[node], counted.length > 0 && counted.every((k) => SUPPLIES.has(k.stock!) === 0))
   })
   const [title, hint] = VEG_SAYS[node]
   return (
