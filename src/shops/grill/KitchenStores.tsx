@@ -26,10 +26,11 @@ const OPEN = /^(ProduceSack|CharcoalSack)/
  * it as if it were round */
 const BAKED = /^ProduceTuber/
 /** the produce sacks' cloth: its cross-weave pressed in (a normal map, blender/produce.py's WEAVE_N), kept as the tubers' are */
-const WOVEN = /^ProduceSack(Potato|Sweet|Onion)$/
+const WOVEN = /^ProduceSack(Potato|Sweet|Onion|Empty)$/
 /** how much brighter each sack's burlap is drawn than it's woven */
 // (the produce sacks' a little too, to an old sack's light tan (the owner's, 2026-11-11))
-const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18, ProduceSackPotato: 1.15, ProduceSackSweet: 1.15, ProduceSackOnion: 1.22, ProduceSackLiner: 1.15 }
+const BURLAP_LIFT: Record<string, number> = { CharcoalSackCloth: 1.18, ProduceSackPotato: 1.15, ProduceSackSweet: 1.15, ProduceSackOnion: 1.22, ProduceSackLiner: 1.15,
+  ProduceSackEmpty: 1.15 }
 /** the produce sacks' cloth dyed another colour: none now (the owner's, 2026-11-11: the white was too white, an old burlap sack's tan as it's
  * woven, grime and all; they'd been dyed a bleached cotton-hemp, 2026-11-09); kept for a sack that wants one */
 const BURLAP_DYE: Record<string, string> = {}
@@ -307,8 +308,12 @@ const pileRank = (name: string) => (/Heap(_\d+)?$/.test(name) ? 4 : /Loose/.test
 const pileShown = (have: number, all: number) => (have < 0 ? all : have <= 0 ? 0 : Math.max(1, Math.min(all, Math.round((all * have) / PAR))))
 /** an empty sack slumped down on its foot (item 222, the owner's 「這也超怪」: emptied, each stood as full as ever, its mouth a black hole, the
  * dark floor set just inside it under what's heaped there): how tall it's left, how much wider it slumps, and how quickly it goes (per s).
- * Its mouth shows its lining then (blender/produce.py's ProduceSack*Inside, item 401: the cloth's inside going down into it, its folds) */
+ * Slumped right down, it's rolled down: the full sack put away and the emptied one (blender/produce.py's ProduceSackEmpty0 to 2: its sides
+ * rolled down to the floor, its bottom inside in the light) in its place, settling (item 417, the owner's 「有點怪，不真實」: left squashed to a
+ * third of its height, it read as a wooden bowl, its weave pressed into a grain, its lining a dark hollow); how tall it drops from, and how
+ * quickly it settles (per s) */
 const SLUMP_H = 0.3, SLUMP_W = 1.08, SLUMP_RATE = 3
+const ROLL_FROM = 1.35, ROLL_RATE = 4
 export function ProduceSacks() {
   const gltf = useGLTF(PRODUCE_URL) as unknown as { scene: THREE.Group }
   const { obj, piles, sacks } = useMemo(() => {
@@ -324,7 +329,8 @@ export function ProduceSacks() {
     const piled = (o: THREE.Object3D) => PILES.some((k) => k.re.test(o.name))
     // (each open sack's own pieces (its cloth, the dark floor inside it, its twine) kept out of the shop's merging, to be gathered and slumped
     // as one when it's empty (item 222))
-    const ownSack = (o: THREE.Object3D) => /^ProduceSack\d/.test(o.name)
+    // (and each emptied one, shown in its place when it's empty (item 417))
+    const ownSack = (o: THREE.Object3D) => /^ProduceSack(\d|Empty\d)/.test(o.name)
     // (a finer ink line (item 314): at 4 mm every tuber in the heaps had a thick black ring round it, a cartoon's blobs, the sweet potatoes red
     // leaves, as the basket's vegetables were before item 153)
     const r = partOf(holder, 'ProduceSacks', 0.0022, (o) => piled(o) || ownSack(o))
@@ -360,7 +366,10 @@ export function ProduceSacks() {
       g.updateMatrixWorld(true)
       for (const o of own) g.attach(o)
       mergeByMaterial(g)
-      return { g, k: 0 }
+      // (its emptied one: hidden till it's empty)
+      const e = r.getObjectByName(`ProduceSackEmpty${i}`) ?? null
+      if (e) e.visible = false
+      return { g, k: 0, e, ek: 0 }
     })
     return { obj: r, piles, sacks }
   }, [gltf])
@@ -372,10 +381,18 @@ export function ProduceSacks() {
         p.body.show(n)
         p.roots?.show(p.rootsOf(n))
       }
-      // (empty: the sack slumps down on its foot, a little wider; filled again, it stands up as it was)
+      // (empty: the sack slumps down on its foot, a little wider, and right down it's rolled down: the emptied one in its place, dropping the
+      // last bit and settling; filled again, that's put away and the full one stands up as it was)
       const sk = sacks[i]
       if (!sk) return
       const want = n === 0 ? 1 : 0
+      const rolled = want === 1 && sk.k >= 1 && !!sk.e
+      if (sk.e && rolled !== sk.e.visible) { sk.e.visible = rolled; sk.g.visible = !rolled; sk.ek = 0 }
+      if (rolled && sk.e && sk.ek < 1) {
+        sk.ek = Math.min(1, sk.ek + dt * ROLL_RATE)
+        const u = 1 - (1 - sk.ek) ** 3
+        sk.e.scale.y = ROLL_FROM + (1 - ROLL_FROM) * u
+      }
       if (sk.k === want) return
       sk.k = want > sk.k ? Math.min(want, sk.k + dt * SLUMP_RATE) : Math.max(want, sk.k - dt * SLUMP_RATE)
       const e = sk.k * sk.k * (3 - 2 * sk.k)

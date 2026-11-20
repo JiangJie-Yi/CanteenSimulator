@@ -145,6 +145,8 @@ M = {
     "inside": pbr("ProduceSackInside", tuple(lin("#2e2416")), rough=1.0),
     # (the open sacks' lining (item 401): their burlap seen from inside, a little darker, its fine folds and its fall into the dark painted on)
     "liner": burlap("ProduceSackLiner", base=("#6e5232", "#c4a26e"), creases=False, shade=liner_shade, half=True),
+    # (an emptied sack rolled down (item 417): the same burlap, nothing printed on it)
+    "sackE": burlap("ProduceSackEmpty", creases=False, nrm=WEAVE_N),
     # (binchotan has a dull metallic sheen, near black)
     "coal": pbr("CharcoalSackStick", tuple(lin("#2a2a2e")), rough=0.45, metal=0.35),
 }
@@ -875,6 +877,95 @@ def heap_of(kind, tx, tz, h, top, A0, cloth=None):
     return heap
 
 
+# ---- an emptied sack (item 417, the owner's 「有點怪，不真實」 over the emptied sacks: item 222 squashed the full sack to a third of its height,
+# and it read as a wooden bowl, its cuff a thick ring, its weave pressed into a grain, its lining a dark hollow): its sides rolled down to the
+# floor, as a shopkeeper rolls an emptied sack, a fat soft roll of the cloth all round, thick here and thin there, bunched tall and narrow
+# where it's pinched; inside it the sack's bottom lying flat in the light, a few creases running in from the roll. The game shows it in the
+# full sack's place when there's none of what it holds ("ProduceSackEmpty0" to 2) ----
+EMPTY_SEG, EMPTY_TUBE = 24, 8
+FLOOR_E = 0.006         # (the floor under the sacks in the game, over their foot: measured, tests/e2e/_sackfloor417.mjs: 0.0057)
+
+
+def empty_sack(name, cx, cz, r, mat="sackE", salt=0):
+    """an emptied sack rolled down: its roll round (cx, cz) about as wide as the sack stood (r), its bottom inside it on the floor"""
+    rnd = __import__("random").Random(salt * 6007 + 31)
+    ph = [rnd.uniform(0, 6.3) for _ in range(8)]
+    pinches = [(rnd.uniform(0, 2 * math.pi), rnd.uniform(0.12, 0.34)) for _ in range(6)]
+    # (the folds across the roll where the cloth's creased as it went round: narrow, here and there)
+    folds = [(rnd.uniform(0, 2 * math.pi), rnd.uniform(0.07, 0.14)) for _ in range(9)]
+
+    def wrap(d):
+        return math.atan2(math.sin(d), math.cos(d))
+
+    def pinch(a):
+        return min(0.5, sum(k * math.exp(-(wrap(a - pa) / 0.17) ** 2) for pa, k in pinches))
+
+    def ring_r(a):
+        # (out of round, as cloth lies: wider one way, a lobe or two)
+        return r * (0.96 + 0.06 * math.sin(2 * a + ph[0]) + 0.04 * math.sin(3 * a + ph[1]) + 0.02 * math.sin(5 * a + ph[7]))
+
+    def fold(a):
+        return sum(k * math.exp(-(wrap(a - fa) / 0.045) ** 2) for fa, k in folds)
+
+    def tube(a):
+        # (rolled unevenly: fatter here, thinner there; bunched where it's pinched, narrower and taller)
+        t = 0.034 * (1 + 0.3 * math.sin(3 * a + ph[2]) + 0.12 * math.sin(7 * a + ph[3]) + 0.06 * math.sin(13 * a + ph[4])) * (1 - fold(a))
+        k = pinch(a)
+        return t * (1 - 0.55 * k), t * (1 + 0.5 * k)
+
+    def at(x, y, z):
+        return P(x, y, max(WALL_Z + 0.004, z))
+
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new()
+    A = [2 * math.pi * j / EMPTY_SEG + ph[5] for j in range(EMPTY_SEG)]
+    # ---- the roll: a soft tube round, twisting a little as it goes (a rolled sock's), resting on the floor
+    rows = []
+    for k in range(EMPTY_TUBE):
+        row = []
+        for a in A:
+            R = ring_r(a)
+            th, tv = tube(a)
+            phi = 2 * math.pi * k / EMPTY_TUBE + 0.45 * math.sin(5 * a + ph[6])
+            ox, oy = math.cos(phi) * th, math.sin(phi) * tv
+            # (on the floor, its top up and down a little round as it lies)
+            row.append(bm.verts.new(at(cx + (R + ox) * math.cos(a), FLOOR_E + 0.001 + tv * (1 + 0.12 * math.sin(2 * a + ph[1])) + oy, cz + (R + ox) * math.sin(a))))
+        rows.append(row)
+    for k in range(EMPTY_TUBE):
+        k2 = (k + 1) % EMPTY_TUBE
+        for j in range(EMPTY_SEG):
+            j2 = (j + 1) % EMPTY_SEG
+            f = bm.faces.new((rows[k][j], rows[k][j2], rows[k2][j2], rows[k2][j]))
+            # (the weave as the standing sack's: twice round it; across the roll a strip of the picture's clean middle)
+            for loop, (jj, kk) in zip(f.loops, ((j, k), (j + 1, k), (j + 1, k + 1), (j, k + 1))):
+                loop[uv].uv = (jj / EMPTY_SEG * 2, 0.5 + kk / EMPTY_TUBE * 0.3)
+    # ---- the bottom: the sack's floor lying flat inside the roll, its edge tucked under the roll's inside, a few soft creases running in
+    bottom = []
+    for q, rho in enumerate((1.0, 0.62)):
+        ring_ = []
+        for a in A:
+            R = ring_r(a)
+            th, tv = tube(a)
+            rr = (R - 0.35 * th) * rho
+            y = FLOOR_E + 0.006 + 0.003 * rho * math.cos(6 * a + ph[7]) * (1 if q == 0 else 0.6)
+            ring_.append(bm.verts.new(at(cx + rr * math.cos(a), y, cz + rr * math.sin(a))))
+        bottom.append(ring_)
+    floor_ = []
+    for j in range(EMPTY_SEG):
+        j2 = (j + 1) % EMPTY_SEG
+        floor_.append(bm.faces.new((bottom[0][j], bottom[0][j2], bottom[1][j2], bottom[1][j])))
+    floor_ += ladder_fill(bm, bottom[1])
+    # (the bottom's picture laid flat across it, the cloth's clean middle)
+    for f in floor_:
+        for loop in f.loops:
+            q = loop.vert.co
+            loop[uv].uv = ((q.x - cx) / 0.54 + 0.5, 0.45 + (q.y + cz) / 0.68)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    o = mesh_object(name, bm, mat)
+    print("EMPTY_SACK", name, len(o.data.polygons), "faces")
+    return o
+
+
 # ---- the three sacks, standing close together, a little apart at their cuffs; the middle one a step back ----
 # (the counter's face behind them, in this frame (Decor's SACKS_AT puts it here): every sack's back pressed flat this side of it)
 WALL_Z = -0.255
@@ -939,6 +1030,8 @@ for i, (x, z, h, r, mat, lean, kind) in enumerate(SACKS):
     print("SETTLED", i, {k_: v for k_, v in lifts.items() if v})
     # (and what's under them: the heap filling the mouth, so there's no flat dark disc to look down onto)
     heap_of(kind, tx, tz, h, top, (front + math.pi / 2) % (2 * math.pi / 24), cloth)
+    # (and the sack emptied, rolled down where it stands (item 417): the game's to show in its place when there's none of it)
+    empty_sack(f"ProduceSackEmpty{i}", x, z, r * 1.02, salt=i)
 
 
 def sealed_sack(name, cx, cz, L, W, T, yaw, mat, salt=0, seg=16, NU=14, stand=False):
