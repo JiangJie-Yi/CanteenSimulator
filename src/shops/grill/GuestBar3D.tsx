@@ -2492,11 +2492,11 @@ function minus(al: [number, number], ly: [number, number], h: { along: [number, 
 const RISER = '#3a2416'
 /**
  * The genkan's footing in stone (item 287, the owner's, 2026-11-17: 「門口的厚度要改成石造」: seen from above, the edge of the genkan was a
- * dark board), in the genkan floor's crazy paving (item 395, the owner's, 2026-11-20: 「石階很怪，目前這樣看有三種風格，應該是由裡面第一種為主」:
- * the floor's stones inside, the footing's face in courses of blocks, the steps plain granite): the steps' picture (blender/stonesteps.py's
- * crazy_paving) laid at its scale, a repeat every STONE_TILE (the script's TILE), on every face of it as on the steps'
+ * dark board), in the genkan floor's crazy paving (item 395); every face of the way in's stone its own course of whole stones (item 404, the
+ * owner's 「切得很怪」: one picture of the paving laid over them all at one scale, its stones cut off wherever a face ended): the steps, the
+ * footing's band over them, the footing's sides and the genkan's side by the wall, each a part of blender/stonesteps.py's
+ * made to its measure (STONE_MADE), scaled to it as it stands
  */
-const STONE_TILE = { along: 0.8, across: 0.8 }
 /** how far out each of the doorway's stone steps reaches (the bar's units: a tread a third of a metre deep, the dining room's metres) */
 const STEP_GO = 0.17
 /** the steps themselves (item 352, the owner's 「石階梯太假了吧」: they were boxes in the base's masonry picture, bricks stacked): a slab of
@@ -2504,31 +2504,38 @@ const STEP_GO = 0.17
  * to it as it stands (within a percent) */
 const STEPS_URL = import.meta.env.BASE_URL + 'models/stonesteps.glb'
 useGLTF.preload(STEPS_URL)
-const STEP_MADE: [number, number, number][] = [[1.2329, 0.2247, 0.168], [1.2289, 0.1123, 0.168]]
-/** the steps' crazy paving in the room's toon light, made once for the model's material and shared by the steps, the footing and the
- * genkan's sides (item 395: one style of stone at the way in) */
+/** each part's size as made (blender/stonesteps.py's SLABS): the footing's band over the upper step (item 404: a riser of its own, laid on the
+ * footing's face), the upper step, the lower; the genkan's side by the wall, the footing */
+const STONE_MADE: Record<string, [number, number, number]> = { StoneStep0: [1.2369, 0.1123, 0.012], StoneStep1: [1.2329, 0.2247, 0.168],
+  StoneStep2: [1.2289, 0.1123, 0.168], StoneSide: [0.02, 0.112, 1.3155], StoneFoot: [1.2369, 0.337, 1.3155] }
+/** the way in's stone in the room's toon light, made once for the model's material and shared by all its parts */
 const PAVING = new Map<THREE.Material, THREE.MeshToonMaterial>()
 function pavingOf(sm: THREE.MeshStandardMaterial) {
   let t = PAVING.get(sm)
   if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: sm.map ?? null, normalMap: sm.normalMap ?? null }); PAVING.set(sm, t) }
   return t
 }
-function usePaving() {
+/** the way in's stone parts by name, each a copy of its own in the room's light (each piece of the scene its own object) */
+function useStoneParts(names: string[]) {
   const gltf = useGLTF(STEPS_URL) as unknown as { scene: THREE.Group }
-  return useMemo(() => pavingOf((gltf.scene.getObjectByName('StoneStep1') as THREE.Mesh).material as THREE.MeshStandardMaterial), [gltf])
-}
-function useStepSlabs() {
-  const gltf = useGLTF(STEPS_URL) as unknown as { scene: THREE.Group }
+  const key = names.join()
   return useMemo(() => {
-    return [1, 2].map((k) => {
-      const src = gltf.scene.getObjectByName(`StoneStep${k}`) as THREE.Mesh
+    const out: Record<string, THREE.Mesh> = {}
+    for (const n of key.split(',')) {
+      const src = gltf.scene.getObjectByName(n) as THREE.Mesh
       const m = src.clone()
       m.material = pavingOf(src.material as THREE.MeshStandardMaterial)
       m.position.set(0, 0, 0)
       m.receiveShadow = true
-      return m
-    })
-  }, [gltf])
+      out[n] = m
+    }
+    return out
+  }, [gltf, key])
+}
+/** a part laid in the box from (x0, y0, z0) to (x1, y1, z1) of its parent's frame: its middle there, scaled from its made size to fit */
+function laid(part: THREE.Mesh, made: [number, number, number], [x0, y0, z0]: number[], [x1, y1, z1]: number[]) {
+  return { object: part, position: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2] as [number, number, number],
+    scale: [Math.abs(x1 - x0) / made[0], Math.abs(y1 - y0) / made[1], Math.abs(z1 - z0) / made[2]] as [number, number, number] }
 }
 /**
  * The shop's base: a thick plinth of wood under the whole room (the customers' floor on a solid fill, the kitchen's lower
@@ -2557,19 +2564,20 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   // (its street side in steps (item 342, the owner's: 「這邊做成石階」: it stood a sheer wall of three courses at the door): two treads of the
   // same granite down from the genkan's stone toward the street, each a third of the way down and STEP_GO further out, the doorway's width)
   const rise = (gTop - gFoot) / 3
-  const slabs = useStepSlabs()
-  const paving = usePaving()
+  const stone = useStoneParts(['StoneStep0', 'StoneStep1', 'StoneStep2', 'StoneFoot'])
   return (
     <>
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
-      <mesh position={[-(gly[0] + gly[1]) / 2, (gTop + gFoot) / 2, (gal[0] + gal[1]) / 2]}
-        geometry={timberBox(gly[1] - gly[0], gTop - gFoot, gal[1] - gal[0], STONE_TILE.along, STONE_TILE.across)} material={paving} />
+      <primitive {...laid(stone.StoneFoot, STONE_MADE.StoneFoot, [-gly[1], gFoot, gal[0]], [-gly[0], gTop, gal[1]])} />
       {[1, 2].map((k) => {
-        const yTop = gTop - rise * k, z0 = gal[1] + STEP_GO * (k - 1) + 0.002, z1 = gal[1] + STEP_GO * k
-        const [w0, h0, d0] = STEP_MADE[k - 1]
-        return <primitive key={`step${k}`} object={slabs[k - 1]} position={[-(gly[0] + gly[1]) / 2, (yTop + gFoot) / 2, (z0 + z1) / 2]}
-          scale={[(gly[1] - gly[0] - 0.004 * k) / w0, (yTop - gFoot) / h0, (z1 - z0) / d0]} />
+        const yTop = gTop - rise * k, z0 = gal[1] + STEP_GO * (k - 1) + 0.002, z1 = gal[1] + STEP_GO * k, xc = -(gly[0] + gly[1]) / 2
+        const w = (gly[1] - gly[0] - 0.004 * k) / 2
+        return <primitive key={`step${k}`} {...laid(stone[`StoneStep${k}`], STONE_MADE[`StoneStep${k}`], [xc - w, gFoot, z0], [xc + w, yTop, z1])} />
       })}
+      {/* (the footing's face over the upper step, one course of whole stones laid on it (item 404, the owner's 「切得很怪」: the paving's one
+          picture went on over it and the steps, its stones cut off wherever a face ended): from the upper step's tread up to the genkan's stone,
+          1.5 mm proud of the footing's face, its foot a hair over the tread) */}
+      <primitive {...laid(stone.StoneStep0, STONE_MADE.StoneStep0, [-gly[1], gTop - rise + 0.0005, gal[1] + 0.0015], [-gly[0], gTop, gal[1] + 0.0135])} />
     </>
   )
 }
@@ -2835,7 +2843,7 @@ const GROUND_SHADOW = (() => {
   return t
 })()
 function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }) {
-  const paving = usePaving()
+  const stone = useStoneParts(['StoneSide'])
   const c = counters[0]
   const { along: [a0, a1], lay: [l0, l1] } = useMemo(() => roomOf(counters), [counters])
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
@@ -2877,8 +2885,9 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
       {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
       {/* (the wall's foot, and the room's open end, down to the genkan's pebble-wash (its stones, step and threshold: GenkanFloor, below)) */}
       {/* (in the genkan's stone, as its footing is (item 287): they were dark boards, the doorway's edge read as wood from above) */}
-      <mesh position={[-l0, -(D + GENKAN_SUNK) / 2, (g0 + a1) / 2]} geometry={timberBox(0.02, D + GENKAN_SUNK, a1 - g0, STONE_TILE.along, STONE_TILE.across)} material={paving} />
-      <mesh position={[-(l0 + gl) / 2, -(D + GENKAN_SUNK) / 2, a1]} geometry={timberBox(gl - l0, D + GENKAN_SUNK, 0.012, STONE_TILE.along, STONE_TILE.across)} material={paving} />
+      <primitive {...laid(stone.StoneSide, STONE_MADE.StoneSide, [-l0 - 0.01, -(D + GENKAN_SUNK), g0], [-l0 + 0.01, 0, a1])} />
+      {/* (the room's open end at the door, from the boards down to the footing, is gone (item 407, the owner's 「這片到底是甚麼? 拿掉」): the
+          genkan's stone lies 10 cm under the boards, and at the door it stood up over the genkan's stone like a low wall) */}
       </StaticBatch>
       {/* the genkan: its stones laid crazy-paving in pebble-wash, the shoe-off stone at the step, the threshold, the polished keyaki step
           (item 185: one flat picture of stones and two thin boards before) */}
