@@ -768,11 +768,13 @@ def washstand():
     fin(tube("WashPumpNozzle", [(sx - 0.014, T + 0.121, sz), (sx - 0.034, T + 0.118, sz)], 0.003, caps=True, res=1, ru=2), "WashPumpNozzle", M["brass"], parts)
     # ---- the mirror over it all: round, a slim black-lacquered frame, a fine brass ring at the glass's edge
     MY = T + 0.66
+    # (the frame and the glass 64 round: at 48 the frame's edge showed its corners close to; the ring between them 48 round and its tube four
+    # (item 25): 64 by six it was 768 triangles, a ring 6 mm thick; at 48 it's 0.4 mm off the circle at most, between the two)
     bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.205, depth=0.022, location=P(-0.011, MY, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "WashMirrorFrame", M["frame"], parts)
     bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.188, depth=0.004, location=P(-0.0235, MY, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "WashMirror", M["mirror"], parts)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.19, minor_radius=0.0032, major_segments=64, minor_segments=6, location=P(-0.024, MY, 0), rotation=(0, math.pi / 2, 0))
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.19, minor_radius=0.0032, major_segments=48, minor_segments=4, location=P(-0.024, MY, 0), rotation=(0, math.pi / 2, 0))
     fin(active(), "WashMirrorRing", M["brass"], parts)
     # (the marks the game reads: the spout's mouth, the drain)
     marks = []
