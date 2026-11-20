@@ -82,7 +82,7 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   // (the signed wall by the way in, every piece of it its own (items 402 and 406, the owner's 「物件要拆細、拆散 然後再group」): the cork board, its
   // notes, the photographs, the signed pieces and the plaster's writing (wallPhotos' WALL_PIECES, CORK_NOTES))
   'grp-signwall': { zh: '簽名留言牆', ja: 'サインと伝言の壁', members: ['sign-cork', 'sign-photo0', 'sign-photo1', 'sign-card1', 'sign-card2', 'sign-card3',
-    'sign-card4', 'sign-card5', 'sign-card6', 'sign-note1', 'sign-note2', 'sign-note3', 'sign-note4', 'sign-note5', 'sign-note6', 'sign-note7', 'sign-freehand'] },
+    'sign-card4', 'sign-card5', 'sign-card6', 'sign-note1', 'sign-note2', 'sign-note3', 'sign-note4', 'sign-note5', 'sign-note6', 'sign-note7', 'sign-card7', 'sign-ledge'] },
   // (the sink and all that's on it and by it)
   'grp-sink': { zh: '流理台組', ja: '流し一式', members: ['sink', 'sink-basket', 'sink-scrub', 'sink-soap', 'sink-towel', 'sink-bin', 'sink-detergent', 'sink-sponge', 'stepstool'] },
   'grp-racks': { zh: '碗盤架組', ja: '食器棚', members: ['platerack', 'platerack2'] },
@@ -169,6 +169,13 @@ const loadGroups = (): Record<string, Group> => {
       for (const [n, x] of Object.entries(g)) if (n !== 'grp-doorcats' && x.members.includes('owncat')) g[n] = { ...x, members: x.members.filter((m) => m !== 'owncat') }
       g['grp-doorcats'] = { ...g['grp-doorcats'], members: [...k.members, 'owncat'] }
     }
+  }
+  // (the signed wall's group a browser kept (item 409): the plaster's writing gone from it, the ledge and the tanzaku put in it; on every
+  // load, as the cat's above)
+  {
+    const k = g['grp-signwall']
+    const add = k ? ['sign-card7', 'sign-ledge'].filter((m) => !k.members.includes(m)) : []
+    if (k && (add.length || k.members.includes('sign-freehand'))) g['grp-signwall'] = { ...k, members: [...k.members.filter((m) => m !== 'sign-freehand'), ...add] }
   }
   // (groups a browser kept from before their default place was moved: moved on by as much, once (its key marks it done))
   for (const [key, id] of GENKAN_SHIFT) {
