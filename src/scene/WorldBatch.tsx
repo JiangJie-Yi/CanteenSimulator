@@ -12,12 +12,18 @@ const LOOK_MS = 1200
  * whole by itself: what's taken out is drawn by itself, as before the merge; made again whole only as the editor's shut) */
 const ADD_MIN = 24
 const ADD_MS = 3000
-/** off unless asked for (`?world=1` on the page's address) while what's left of it is worked through (item 367: the close views' triangles
- * (the merge isn't culled by piece), the heap, made again as the walls hide for the camera); `?world=0` off */
-const OFF = typeof location === 'undefined' || new URLSearchParams(location.search).get('world') !== '1'
+/** the whole room merged only when asked for (`?world=1` on the page's address) while what's left of it is worked through (item 367: the
+ * close views' triangles (the merge isn't culled by piece), the heap, made again as the walls hide for the camera); `?world=0` none of it */
+const WORLD_ASK = typeof location === 'undefined' ? '0' : new URLSearchParams(location.search).get('world')
+/** (item 374) by itself, only the ink lines merged, by stretches of the room (CELL 3): a fifth of a frame's draws were ink lines, each piece
+ * its own, most of them still; merged, the overview 1,484 draws to about 1,350 (the close views 24 to 71 fewer), their triangles as they were
+ * (by stretches, a close view still leaves out what's off it), the frame rate the same, each view's picture the same as unmerged within
+ * the moving people's own difference (`?world=ink` the same) */
+const INK_ONLY = WORLD_ASK === null || WORLD_ASK === 'ink'
+const OFF = !INK_ONLY && WORLD_ASK !== '1'
 /** the room's merge split by stretches of the room this many units across (x and z), a look's mesh a stretch (`?wcell=<units>`, item 374:
  * tried against a look's one mesh for all the room); 0: not split */
-const CELL = typeof location === 'undefined' ? 0 : Number(new URLSearchParams(location.search).get('wcell')) || 0
+const CELL = typeof location === 'undefined' ? 0 : Number(new URLSearchParams(location.search).get('wcell')) || (INK_ONLY ? 3 : 0)
 const CENTRE = new THREE.Vector3()
 
 /** what of a material's look keyOf doesn't say, that two merged must share */
@@ -50,6 +56,8 @@ function mergeable(o: THREE.Object3D): o is THREE.Mesh {
   if (m.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender || mat.onBeforeRender !== THREE.Material.prototype.onBeforeRender) return false
   // (a hand-written shader only the ink lines' kind: drawn from inside out, its look all in its uniforms)
   if ((mat as THREE.ShaderMaterial).isShaderMaterial && mat.side !== THREE.BackSide) return false
+  // (only the ink lines, asked so: drawn from inside out, a hand-written shader or a plain one)
+  if (INK_ONLY && !(mat.side === THREE.BackSide && ((mat as THREE.ShaderMaterial).isShaderMaterial || (mat as THREE.MeshBasicMaterial).isMeshBasicMaterial))) return false
   // (nor what fades as it comes between the camera and what's looked at (scene/OccluderFade: a lamp, the noren): its material's swapped for a
   // see-through copy then, and it was taken out of the merge each time, twice and left out; now never put in)
   for (let q = m.parent; q; q = q.parent) if (q.userData.fadeOccluder) return false
