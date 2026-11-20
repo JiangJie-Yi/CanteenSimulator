@@ -20,6 +20,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { keepOut, type HearthZones } from '@/game/hearthGuard'
 import * as THREE from 'three'
 import { flatOf } from '@/scene/flatBake'
+import { normalFromHeight } from '@/scene/normalFromHeight'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { OUTLINE_WIDTH } from '@/scene/Dish'
 import { bakeable, colourVertices, homeCopy, StaticBatch, type BatchParts } from '@/scene/StaticBatch'
@@ -2643,50 +2644,121 @@ const ROUNDED_SLAB = new RoundedBoxGeometry(1, 1, 1, 3, 0.08)
  */
 const KOSHI_H = 0.05, RAIL_H = 0.03
 const LIP_TILE = 0.3
+/** the lip's pictures drawn at twice their first size (512 x 128 a repeat), their drawing as it was, scaled: a normal map's slopes want
+ * the room (item 394) */
+const LIP_PX = 2
+/** the rails across the lattice, their middles down its picture (of 64) */
+const LATTICE_RAILS = [14, 48]
+/**
+ * The lattice's picture and its relief (item 394, the owner's, 2026-11-20: 「毫無立體感，有辦法增加幾何面嗎?在不增加模型面數的情況下」: it was
+ * a flat picture on a flat sheet): a normal map worked out for each part as it's shaped, not from a height picture (a half-round's
+ * slope runs steep at its edges, which a height picture's steps lose): each split culm round across its width, its node a low ridge, the
+ * two rails round over and standing in front of the culms, the palm cord bound round each crossing in turns; and the shadows painted in,
+ * the rails' and the cord's on the culms under them (the light from above). The sheet's faces as they were.
+ */
 const EDO_LATTICE = (() => {
   if (typeof document === 'undefined') return null
+  const W = 256, H = 64, cell = W / 12
   const c = document.createElement('canvas')
-  c.width = 256; c.height = 64
+  c.width = W * LIP_PX; c.height = H * LIP_PX
   const g = c.getContext('2d')!
-  g.clearRect(0, 0, 256, 64)
+  g.scale(LIP_PX, LIP_PX)
+  g.clearRect(0, 0, W, H)
   let seed = 5
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const nodes: number[] = []
   // (split bamboo stood side by side, a gap between each: each its own straw green-gold, lighter down its middle, a node at its own height)
   for (let k = 0; k < 12; k++) {
-    const x = k * (256 / 12) + 3, w = 256 / 12 - 6
+    const x = k * cell + 3, w = cell - 6
     const tone = 0.86 + 0.14 * rnd()
+    // (round as a toon cylinder's drawn (the room's toon light has two steps, and a front lit from above stays in the lighter one however its
+    // normals lean, so the roundness is painted in too): a dark edge, the lit side, a highlight left of the middle, the turn into shadow,
+    // the shadow, and the light thrown back at its far edge)
     const gr = g.createLinearGradient(x, 0, x + w, 0)
-    gr.addColorStop(0, `rgb(${Math.round(150 * tone)},${Math.round(118 * tone)},${Math.round(66 * tone)})`)
-    gr.addColorStop(0.45, `rgb(${Math.round(214 * tone)},${Math.round(186 * tone)},${Math.round(122 * tone)})`)
-    gr.addColorStop(1, `rgb(${Math.round(132 * tone)},${Math.round(102 * tone)},${Math.round(56 * tone)})`)
-    g.fillStyle = gr; g.fillRect(x, 0, w, 64)
+    const at = (f: number, r: number, gg: number, b: number) => gr.addColorStop(f, `rgb(${Math.round(r * tone)},${Math.round(gg * tone)},${Math.round(b * tone)})`)
+    at(0, 104, 78, 40); at(0.1, 168, 138, 84); at(0.3, 228, 204, 146); at(0.38, 214, 186, 122); at(0.66, 170, 138, 82); at(0.86, 112, 84, 42); at(1, 136, 106, 60)
+    g.fillStyle = gr; g.fillRect(x, 0, w, H)
     const ny = 10 + rnd() * 44
-    g.fillStyle = 'rgba(70,48,22,0.55)'; g.fillRect(x, ny, w, 2)
+    nodes.push(ny)
+    // (the node a low ring round it: lit along its top, its underside dark)
+    g.fillStyle = 'rgba(255,236,190,0.4)'; g.fillRect(x, ny - 0.5, w, 1)
+    g.fillStyle = 'rgba(70,48,22,0.6)'; g.fillRect(x, ny + 0.5, w, 1.6)
   }
-  // (a pair of bamboo rails across, tied to each upright with dark palm cord)
-  for (const y of [14, 48]) {
-    g.fillStyle = '#7a5a30'; g.fillRect(0, y - 3, 256, 6)
-    g.fillStyle = 'rgba(255,240,200,0.35)'; g.fillRect(0, y - 2, 256, 1)
-    for (let k = 0; k < 12; k++) { g.fillStyle = '#2a1a10'; g.fillRect(k * (256 / 12) + 256 / 24 - 3, y - 4, 6, 8) }
+  // (the rails' shadows on the culms: a band under each rail, fading down, and a fainter one over it; on the culms only)
+  g.globalCompositeOperation = 'source-atop'
+  for (const y of LATTICE_RAILS) {
+    const under = g.createLinearGradient(0, y + 3, 0, y + 9)
+    under.addColorStop(0, 'rgba(38,22,8,0.6)'); under.addColorStop(1, 'rgba(38,22,8,0)')
+    g.fillStyle = under; g.fillRect(0, y + 3, W, 6)
+    const over = g.createLinearGradient(0, y - 3, 0, y - 6)
+    over.addColorStop(0, 'rgba(38,22,8,0.3)'); over.addColorStop(1, 'rgba(38,22,8,0)')
+    g.fillStyle = over; g.fillRect(0, y - 6, W, 3)
+  }
+  g.globalCompositeOperation = 'source-over'
+  // (a pair of bamboo rails across, tied to each upright with dark palm cord, wound round in turns, its shadow under it)
+  for (const y of LATTICE_RAILS) {
+    // (the rail round: lit along its top, darkening under)
+    const rg = g.createLinearGradient(0, y - 3, 0, y + 3)
+    rg.addColorStop(0, '#a07a44'); rg.addColorStop(0.3, '#c49a5a'); rg.addColorStop(0.55, '#7a5a30'); rg.addColorStop(1, '#3e2a14')
+    g.fillStyle = rg; g.fillRect(0, y - 3, W, 6)
+    g.fillStyle = 'rgba(255,240,200,0.45)'; g.fillRect(0, y - 2, W, 0.8)
+    for (let k = 0; k < 12; k++) {
+      const cx = k * cell + cell / 2
+      g.fillStyle = 'rgba(24,12,4,0.45)'; g.fillRect(cx - 2.2, y - 3, 6, 8)
+      g.fillStyle = '#2a1a10'; g.fillRect(cx - 3, y - 4, 6, 8)
+      g.save(); g.beginPath(); g.rect(cx - 3, y - 4, 6, 8); g.clip()
+      g.strokeStyle = 'rgba(150,112,72,0.55)'; g.lineWidth = 0.7
+      for (let d = -8; d <= 8; d += 1.7) { g.beginPath(); g.moveTo(cx - 3, y - 4 + d); g.lineTo(cx + 3, y - 4 + d + 6); g.stroke() }
+      g.restore()
+    }
   }
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = THREE.RepeatWrapping
-  return t
+  t.anisotropy = 4
+  // (the relief, each pixel's slope as its part is shaped (x along the picture, y up it): a cord over a rail over a culm)
+  const nc = document.createElement('canvas')
+  nc.width = W * LIP_PX; nc.height = H * LIP_PX
+  const ng = nc.getContext('2d')!
+  const img = ng.createImageData(nc.width, nc.height), d = img.data
+  for (let py = 0; py < nc.height; py++) for (let px = 0; px < nc.width; px++) {
+    const u = (px + 0.5) / LIP_PX, v = (py + 0.5) / LIP_PX
+    const k = Math.min(11, Math.floor(u / cell)), cx = k * cell + cell / 2
+    let nx = 0, ny = 0
+    const tie = LATTICE_RAILS.find((y) => Math.abs(v - y) <= 4 && Math.abs(u - cx) <= 3)
+    const rail = LATTICE_RAILS.find((y) => Math.abs(v - y) <= 3)
+    if (tie !== undefined) {
+      // (the cord: a knot domed over the crossing, its turns ridged across it)
+      const wrap = 0.32 * Math.cos((u - cx - (v - tie)) * 3.7)
+      nx = ((u - cx) / 3) * 0.6 + wrap
+      ny = -((v - tie) / 4) * 0.6 - wrap
+    } else if (rail !== undefined) {
+      ny = -((v - rail) / 3) * 0.85
+    } else {
+      const x0 = k * cell + 3, w = cell - 6
+      if (u >= x0 && u <= x0 + w) {
+        nx = ((u - (x0 + w / 2)) / (w / 2)) * 0.85
+        const dn = v - (nodes[k] + 1)
+        if (Math.abs(dn) < 2) ny = -(dn / 2) * 0.5
+      }
+    }
+    const l = Math.hypot(nx, ny)
+    if (l > 0.95) { nx *= 0.95 / l; ny *= 0.95 / l }
+    const nz = Math.sqrt(1 - nx * nx - ny * ny), i = (py * nc.width + px) * 4
+    d[i] = (nx * 0.5 + 0.5) * 255; d[i + 1] = (ny * 0.5 + 0.5) * 255; d[i + 2] = (nz * 0.5 + 0.5) * 255; d[i + 3] = 255
+  }
+  ng.putImageData(img, 0, 0)
+  const n = new THREE.CanvasTexture(nc)
+  n.wrapS = THREE.RepeatWrapping
+  n.anisotropy = 4
+  return { map: t, normal: n }
 })()
-const EDO_KOSHI = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 256; c.height = 64
-  const g = c.getContext('2d')!
-  g.fillStyle = '#5a3520'; g.fillRect(0, 0, 256, 64)
-  // (its grain, faint)
-  for (let y = 0; y < 64; y += 3) { g.fillStyle = `rgba(${y % 2 ? '30,16,8' : '110,72,40'},0.18)`; g.fillRect(0, y, 256, 1) }
-  // (the hemp-leaf carved in fine pale lines: a six-pointed star of lines in each cell of a triangular grid)
-  g.strokeStyle = 'rgba(232,192,130,0.9)'; g.lineWidth = 1.7
+/** the hemp-leaf (麻の葉) traced on a picture of the carved panel's (of 256 by 64): a six-pointed star of lines in each cell of a
+ * triangular grid, and the hexagon round it */
+function asanoha(g: CanvasRenderingContext2D, dx = 0, dy = 0) {
   const s = 32, h = s * Math.sqrt(3) / 2
   for (let row = -1; row < 4; row++) for (let col = -1; col < 10; col++) {
-    const cx = col * s + (row % 2 ? s / 2 : 0), cy = row * h + 8
+    const cx = col * s + (row % 2 ? s / 2 : 0) + dx, cy = row * h + 8 + dy
     for (let k = 0; k < 6; k++) {
       const a = (k * Math.PI) / 3 + Math.PI / 6
       g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * s * 0.58, cy + Math.sin(a) * s * 0.58); g.stroke()
@@ -2695,15 +2767,51 @@ const EDO_KOSHI = (() => {
     for (let k = 0; k <= 6; k++) { const a = (k * Math.PI) / 3; const x = cx + Math.cos(a) * s * 0.5, y = cy + Math.sin(a) * s * 0.5; if (k) g.lineTo(x, y); else g.moveTo(x, y) }
     g.stroke()
   }
+}
+/**
+ * The carved panel's picture and its relief (item 394): the hemp-leaf's pale strips standing proud of a sunk dark ground as a kumiko's
+ * do, rounded over, and the beads along its top and foot sunk; its normal map from a height picture of them (scene/normalFromHeight),
+ * the strips' shadows on the ground painted in, down and a little across (the light from above).
+ */
+const EDO_KOSHI = (() => {
+  if (typeof document === 'undefined') return null
+  const W = 256, H = 64
+  const c = document.createElement('canvas')
+  c.width = W * LIP_PX; c.height = H * LIP_PX
+  const g = c.getContext('2d')!
+  g.scale(LIP_PX, LIP_PX)
+  g.fillStyle = '#5a3520'; g.fillRect(0, 0, W, H)
+  // (its grain, faint)
+  for (let y = 0; y < H; y += 3) { g.fillStyle = `rgba(${y % 2 ? '30,16,8' : '110,72,40'},0.18)`; g.fillRect(0, y, W, 1) }
+  // (the strips' shadows on the ground, then the strips, pale, a lighter line along each's upper edge)
+  g.lineCap = 'round'
+  g.strokeStyle = 'rgba(16,7,2,0.7)'; g.lineWidth = 3; asanoha(g, 0.8, 1.3)
+  g.strokeStyle = 'rgba(214,170,108,1)'; g.lineWidth = 1.9; asanoha(g)
+  // (each strip's edges: the upper caught by the light, the lower turned away)
+  g.strokeStyle = 'rgba(255,238,200,0.75)'; g.lineWidth = 0.7; asanoha(g, -0.4, -0.5)
+  g.strokeStyle = 'rgba(70,40,16,0.5)'; g.lineWidth = 0.6; asanoha(g, 0.45, 0.55)
   // (a fine bead along its top and foot)
-  g.fillStyle = 'rgba(20,10,4,0.7)'; g.fillRect(0, 0, 256, 3); g.fillRect(0, 61, 256, 3)
+  g.fillStyle = 'rgba(20,10,4,0.7)'; g.fillRect(0, 0, W, 3); g.fillRect(0, H - 3, W, 3)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = THREE.RepeatWrapping
-  return t
+  t.anisotropy = 4
+  // (its height: the ground a little down, the strips up in three steps (rounded over), the beads sunk)
+  const hc = document.createElement('canvas')
+  hc.width = W * LIP_PX; hc.height = H * LIP_PX
+  const h = hc.getContext('2d')!
+  h.scale(LIP_PX, LIP_PX)
+  h.fillStyle = 'rgb(70,70,70)'; h.fillRect(0, 0, W, H)
+  h.lineCap = 'round'
+  for (const [lw, grey] of [[3.2, 140], [2.3, 200], [1.3, 255]] as const) { h.strokeStyle = `rgb(${grey},${grey},${grey})`; h.lineWidth = lw; asanoha(h) }
+  h.fillStyle = 'rgb(18,18,18)'; h.fillRect(0, 0, W, 3); h.fillRect(0, H - 3, W, 3)
+  const n = new THREE.CanvasTexture(normalFromHeight(hc, 2.2))
+  n.wrapS = THREE.RepeatWrapping
+  n.anisotropy = 4
+  return { map: t, normal: n }
 })()
-const EDO_LATTICE_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_LATTICE, alphaTest: 0.5, side: THREE.DoubleSide })
-const EDO_KOSHI_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_KOSHI })
+const EDO_LATTICE_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_LATTICE!.map, normalMap: EDO_LATTICE!.normal, alphaTest: 0.5, side: THREE.DoubleSide })
+const EDO_KOSHI_MAT = typeof document === 'undefined' ? null : new THREE.MeshToonMaterial({ color: '#ffffff', map: EDO_KOSHI!.map, normalMap: EDO_KOSHI!.normal })
 const LIP_INK = new THREE.MeshBasicMaterial({ color: '#3b2a20', side: THREE.BackSide })
 /** how far in from the first counter's start its lip begins (with two counters: where the side counter's stands) */
 const LIP_TRIM = 0.62
