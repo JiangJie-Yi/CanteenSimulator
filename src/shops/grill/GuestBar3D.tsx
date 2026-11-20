@@ -105,7 +105,7 @@ import { LINES } from '@/data/lines'
 import { looksOf, newRoll, openRoom, penaltyOf, visitRoom } from '@/game/restroom'
 import { platerFree } from '@/game/kitchenCrew'
 import { plateGoes } from '@/game/tray'
-import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, GRATING, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, doorAt, doorOutOf, DOOR_LANE, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
+import { CALM_ASK, FUMING, DRAIN_KINDS, EAT_PHASE, PLATE_FACES, SEATS_SAT, DRAWER_KICK, TISSUE_REACH_MS, seatTurn, GRATING, ONIGIRI_TRAY, HAND_WASH, FIGURES, CARRIED, SOY_DISH_AT, FETCHER, FIRE_TEND, SKEWERS, SEAT_MOVE, SEAT_PULL, STOOL_TUCK, SHOE_CELLS, aisleCornerOf, aisleOf, DRAWER_HELD, SHOP_PURSE, STOCKER_WC, SUPPLIES, CHOPS_UP, FED, BENCH, BENCH_SEATS, BENCH_EACH, BENCH_PLACE, BENCH2_ALONG, TAKEOUT_STAND, STAND_AT, cashierIn, nameOver, gripe, setTissues, tissuesAt, meterWater, OWNER_OUT, OWNER_SPOT, OWNER_YAW, FIRE_SHIFT, KITCHEN_ROUTE, PATH_MAP, type PathRoute, SERVE_COUNTER, PLACE, SICK, SHRINE_FLOWERS, PLATING, READY_SLOTS, PLATE_STACK_ALONG, PLATE_STACK_ACROSS, readyAlong, PLATES_OUT, PLATER_OUT, DRYER, DRAIN, PLATE_COUNT, SINK_BIN, SEAT_STICKS, SEAT_BONES, WC_W, WC_ROOM, RICE, SOUP, SOUP_SEATS, SAKE, SAKE_SEATS, LOW_RACK, takeDrink, KITCHEN_DROP, kitchenOf, kitchenGatesOf, AISLE, FLOOR_FAR, FLOOR_NEAR, PLATES_SET, SINK, PILE, KITCHEN_FOLK, GENKAN, inGenkan, sauceSide, SEATS_TAKEN, SERVICE, BAR_GATES, TILL, TILL_CASH, anyInStock, batchOf, payIn, TILL_STATE, PLATE_RACK, billOf, GUEST_BILLS, DRINKS, yen, payOf, TAKEOUT, takeoutOf, POINTER_HINT, tipOver, TOILETS, WC_GRUMBLE, DRINK_BACK, FRIDGE, FRIDGE_AT, FRIDGE_STATE, isCan, FRIDGE_STOCK, placesOf, FRIDGE_UNITS, drinkFor, farOf, fridgesOf, fridgeUnitOf, gateOf, toiletsOf, type DrinkId, platingOf, roomOf, alongPath, doorOf, wayInOf, doorAt, doorOutOf, DOOR_LANE, pathLength, pathTo, seatsOf, singleCounter, type Counter, SPILLS, IRONS, type Spill, genkanY, soapPlate, scrubDose, SAY_SEATED, BOWLS, RICE_SEATS, STAFF_DOOR_HOLD, sakeLeft, ownerAway, ownerFree, ownerBack, DRINK_COMING } from './bar'
 import { BONES_GEO, HEAD_GEO } from './fishBones'
 import { arrivals, buyCase, caseCost, emptyFillable, orderCase, restockRun } from '@/game/drinkStock'
 import { tl } from '@/data/i18n'
@@ -2766,6 +2766,9 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
 }
 /** the floor's edging strip: how wide (in from the edge) and how high over the boards */
 const EDGE_W = 0.04, EDGE_H = 0.02
+/** the toilets' rooms out past the room's back edge (item 423, measured in the game, tests/e2e/_floorout423.mjs): their back wall's outer face
+ * this far past WC_ROOM.D, their end walls' outer faces this far past their rooms' ends */
+const WC_BACK_PAST = 0.032, WC_SIDE_WALL = 0.102
 /**
  * A strip laid along a run of points (x, z) on the floor, `w` wide inward (to the left of the way it runs) and `h` high, its corners
  * mitred (each piece's inner edge cut back where it turns, so the two meet on the diagonal) and its two ends square: each piece a
@@ -3037,6 +3040,25 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
   // (the edging's run, in the floor's frame (x = -lay, z = along): from the kamachi's end at the door round to the genkan's other side)
   const edging = useMemo(() => mitredRun([[-gl, a1], [-l1, a1], [-l1, a0], [-l0, a0], [-l0, g0]], EDGE_W, EDGE_H), [gl, a1, l1, a0, l0, g0])
   useEffect(() => () => edging.dispose(), [edging])
+  // (and out behind the room's back edge (item 423, the owner's 「模型地板延伸到這邊」「廁所地板也得有」): the toilets' rooms stood out past it with
+  // nothing under them, the base and the boards stopping at the back wall. A strip all along the back now, out to just past their back wall:
+  // the base and its fill under all of it, the boards where their own floors aren't (beside them, behind the drinks fridges' wall), its own
+  // edging round its three open sides. Along, from `al[0]` to the room's back edge; lay, `ly`; the toilets' rooms' own lay, `wc`)
+  const back = useMemo(() => {
+    const t = toiletsOf(counters)
+    if (!t || counters.length < 2) return null
+    const c1 = counters[1], half = WC_W + 0.06 + WC_ROOM.E + WC_SIDE_WALL
+    const ends = [t.door - half, t.door + half].map((z) => c1.at.clone().addScaledVector(c1.along, z).sub(c.at).dot(c.lay))
+    const wc: [number, number] = [Math.min(...ends), Math.max(...ends)]
+    const ly: [number, number] = [Math.min(l0, wc[0] - EDGE_W - 0.005), Math.max(l1, wc[1] + EDGE_W + 0.005)]
+    return { al: [a0 - (WC_ROOM.D + WC_BACK_PAST + EDGE_W + 0.003), a0] as [number, number], ly, wc }
+  }, [counters, c, a0, l0, l1])
+  const backEdging = useMemo(() => back && mitredRun([[-back.ly[1], back.al[1]], [-back.ly[1], back.al[0]], [-back.ly[0], back.al[0]], [-back.ly[0], back.al[1]]],
+    EDGE_W, EDGE_H), [back])
+  useEffect(() => () => backEdging?.dispose(), [backEdging])
+  const A0 = back?.al[0] ?? a0, L0 = back?.ly[0] ?? l0, L1 = back?.ly[1] ?? l1
+  const bases = useMemo(() => [[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]], ...(back ? [[back.al, back.ly]] : [])] as [[number, number], [number, number]][],
+    [a0, g0, l0, l1, a1, gl, back])
   // (the kitchen's cut out of the boards: it lies lower, KitchenPit)
   const piece = (al: [number, number], ly: [number, number], k: string) => minus(al, ly, kitchen).map(([a, l], i) => (
     <FloorPiece key={`${k}${i}`} w={l[1] - l[0]} l={a[1] - a[0]} position={[-(l[0] + l[1]) / 2, 0.004, (a[0] + a[1]) / 2]} />
@@ -3047,19 +3069,21 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
       <StaticBatch key={`${a0}|${a1}|${l0}|${l1}|${drop}`}>
       {piece([a0, g0], [l0, l1], 'a')}
       {piece([g0, a1], [gl, l1], 'b')}
-      <ShopBase rects={[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]]} genkan={[[g0, a1], [l0, gl]]} step={D} drop={baseDrop} />
+      {back && ([[back.ly[0], back.wc[0]], [back.wc[1], back.ly[1]]] as [number, number][]).filter(([p, q]) => q - p > 0.02).map(([p, q], i) => piece(back.al, [p, q], `k${i}`))}
+      <ShopBase rects={bases} genkan={[[g0, a1], [l0, gl]]} step={D} drop={baseDrop} />
       {/* (the floor's edge, dark, all the way round but where the genkan's kamachi is: from the kamachi's end by the door, round the
           room's open end, along its open side, up the side wall and along the back wall to the genkan, each corner mitred (the owner's: the
           strip along the side wall stopped short of the corner, and the open edges had none)) */}
       <mesh geometry={edging} material={EDGING} />
+      {backEdging && <mesh geometry={backEdging} material={EDGING} />}
       {/* (the whole shop's soft shadow on the ground it stands on, under its base and spreading out past it a little) */}
-      <mesh position={[-(l0 + l1) / 2 - 0.12, -baseDrop - 0.34, (a0 + a1) / 2 + 0.1]} rotation-x={-Math.PI / 2} renderOrder={-1}>
-        <planeGeometry args={[(l1 - l0) + 2.4, (a1 - a0) + 2.4]} />
+      <mesh position={[-(L0 + L1) / 2 - 0.12, -baseDrop - 0.34, (A0 + a1) / 2 + 0.1]} rotation-x={-Math.PI / 2} renderOrder={-1}>
+        <planeGeometry args={[(L1 - L0) + 2.4, (a1 - A0) + 2.4]} />
         <meshBasicMaterial map={GROUND_SHADOW} transparent depthWrite={false} toneMapped={false} />
       </mesh>
       {/* (and a solid fill under the boards right down to the base: round the kitchen's well when it's sunk, under the kitchen's dais as
           well when it's raised; nothing to see through between the floor and the base) */}
-      {[[[a0, g0], [l0, l1]], [[g0, a1], [gl, l1]]].flatMap(([al, ly], n) => (drop > 0 ? minus(al as [number, number], ly as [number, number], kitchen)
+      {bases.flatMap(([al, ly], n) => (drop > 0 ? minus(al as [number, number], ly as [number, number], kitchen)
         : [[al, ly] as [[number, number], [number, number]]]).map(([a, l], i) => (
         // (its sides, showing as the step down into the kitchen, in the base's dark timber boards)
         <mesh key={`fill${n}${i}`} position={[-(l[0] + l[1]) / 2, 0.001 - (baseDrop + 0.004) / 2, (a[0] + a[1]) / 2]}
