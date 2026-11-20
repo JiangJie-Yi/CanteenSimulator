@@ -162,7 +162,12 @@ def lathe(name, prof, mat, segs=24, top_uv=False):
 outside = [(0.0, 0.0), (R * 0.92, 0.0), (R * 0.97, 0.01), (R, 0.04), (R * 1.01, H - 0.02), (R * 1.04, H), (R * 1.055, H + 0.012), (R * 1.03, H + 0.02)]
 mesh("MisoPotBody", lathe("MisoPotBody", outside, "alu"), "alu")
 inside = [(R * 1.0, H + 0.018), (R * 0.975, H - 0.01), (R * 0.965, 0.03), (R * 0.9, 0.012), (0.0, 0.012)]
-mesh("MisoPotInside", lathe("MisoPotInside", inside, "inside"), "inside")
+bm_in = lathe("MisoPotInside", inside, "inside")
+# (the inside facing in, into the pot: its walls toward the middle and its floor up (item 393, the owner's 「湯鍋紅色加熱不應該穿透」):
+# lathe() turns its faces out as an outside's are, and so the inside faced out and down, every face of it unseen from above; looking in,
+# the warmer's red glow under the pot showed through its floor and the body's ink lines through its walls)
+bmesh.ops.reverse_faces(bm_in, faces=bm_in.faces)
+mesh("MisoPotInside", bm_in, "inside")
 mesh("MisoSoup", lathe("MisoSoup", [(0.0, SOUP), (R * 0.966, SOUP)], "soup", top_uv=True), "soup")
 # ---- its two handles: loops of round bar riveted to its sides ----
 for sd in (-1, 1):
