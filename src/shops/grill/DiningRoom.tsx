@@ -5409,6 +5409,12 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           return runs.map(([p, q]) => <Box key={`${z0}|${p}`} size={[0.05, 0.05, q - p]} color="#3a2416" position={[-0.02, WAINSCOT, (p + q) / 2]} />)
         })}
         <Box size={[0.08, 0.1, l]} color="#3a2416" position={[-0.03, WALL_H - 0.05, mid]} />
+        {/* (the wall with the toilets: its own skirting along its foot, as the floor's edging was there (item 436, the owner's 「這條線拿掉」): the
+            floor runs on out behind it now (item 423), and the edging left along the room's back edge was a dark line across the floor seen
+            from behind, the wall hidden; here it hides with the wall. Where it lay: 2.56 cm out from the face, 2 cm high, its back in the face) */}
+        {door !== undefined && spans.filter(([, , y0]) => y0 === 0).map(([z0, z1]) => (
+          <Box key={`sk${z0}`} size={[0.0316, 0.02, z1 - z0]} color="#3a2416" position={[-0.0098, 0.01, (z0 + z1) / 2]} />
+        ))}
         {/* (no upright posts along it) */}
         {/* a frieze of seigaiha waves under the beam, and the pictures hung along the plaster */}
         <mesh position={[-0.004, WALL_H - 0.2, mid]} rotation-y={-Math.PI / 2}>

@@ -3047,9 +3047,6 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
   const g0 = c.length / 2 + GENKAN.along[0], gl = GENKAN.lay[1], D = GENKAN.depth
   // (how far down the base's top lies: below the sunk kitchen's floor, or the genkan's stone, whichever's lower)
   const baseDrop = Math.max(drop, D + 0.02)
-  // (the edging's run, in the floor's frame (x = -lay, z = along): from the kamachi's end at the door round to the genkan's other side)
-  const edging = useMemo(() => mitredRun([[-gl, a1], [-l1, a1], [-l1, a0], [-l0, a0], [-l0, g0]], EDGE_W, EDGE_H), [gl, a1, l1, a0, l0, g0])
-  useEffect(() => () => edging.dispose(), [edging])
   // (and out behind the room's back edge (item 423, the owner's 「模型地板延伸到這邊」「廁所地板也得有」): the toilets' rooms stood out past it with
   // nothing under them, the base and the boards stopping at the back wall. A strip all along the back now, out to just past their back wall:
   // the base and its fill under all of it, the boards where their own floors aren't (beside them, behind the drinks fridges' wall), its own
@@ -3071,6 +3068,18 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
     const ly: [number, number] = [open[0] || wc[0] >= l0 ? l0 : wc[0] - 0.002, open[1] || wc[1] <= l1 ? l1 : wc[1] + 0.002]
     return { al: [a0 - (WC_ROOM.D + WC_BACK_PAST + EDGE_W + 0.003), a0] as [number, number], ly, wc, open }
   }, [counters, c, a0, l0, l1])
+  // (the edging's run, in the floor's frame (x = -lay, z = along): from the kamachi's end at the door round to the genkan's other side; with the
+  // floor run on out behind the back edge (item 423), not along that edge (item 436, the owner's 「這條線拿掉」: a dark line across the floor,
+  // seen from behind with the wall there hidden): two runs, the open end and side, and the side by the door; the wall's own skirting
+  // (DiningWall's) along its foot instead, hidden with it)
+  const edging = useMemo(() => {
+    if (!back) return mitredRun([[-gl, a1], [-l1, a1], [-l1, a0], [-l0, a0], [-l0, g0]], EDGE_W, EDGE_H)
+    const a = mitredRun([[-gl, a1], [-l1, a1], [-l1, a0]], EDGE_W, EDGE_H), b = mitredRun([[-l0, a0], [-l0, g0]], EDGE_W, EDGE_H)
+    const g = mergeGeometries([a, b])!
+    a.dispose(); b.dispose()
+    return g
+  }, [gl, a1, l1, a0, l0, g0, back])
+  useEffect(() => () => edging.dispose(), [edging])
   const backEdging = useMemo(() => back && mitredRun([...(back.open[1] ? [[-back.ly[1], back.al[1]] as [number, number]] : []),
     [-back.ly[1], back.al[0]], [-back.ly[0], back.al[0]], ...(back.open[0] ? [[-back.ly[0], back.al[1]] as [number, number]] : [])],
     EDGE_W, EDGE_H), [back])
