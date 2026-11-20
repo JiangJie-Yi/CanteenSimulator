@@ -183,14 +183,19 @@ if CREW == "server":
 _ct = _ct * (1 - 0.05 * (0.5 + 0.5 * np.sin(_u * 2 * np.pi * 9)))[..., None]
 
 
-def _creases(c, specs):
+CREASE_TINT = (1.0, 0.9, 0.62)
+
+
+def _creases(c, specs, u, v):
     """the cloth's creases (the owner's: the kappōgi wants its folds): each (u0, v0, u1, v1, width, depth) a fold from one point to the other on
     the body's picture (u round it from the front, wrapping; v up it, the body from 0.11 to 0.355), a shadow down one side of its line and a
-    little light along the other, both fading toward its ends"""
-    shade = np.zeros_like(_u)
+    little light along the other, both fading toward its ends; painted on the body's own picture at its size (u, v its pixels'), the shadow
+    going cool, its red down more than its blue (CREASE_TINT) (item 408, the owner's 「老闆衣服背後髒髒的?」: painted on the 256-pixel cotton
+    and blown up four times by the nearest pixel, the creases' edges went in steps; and a warm white only darker reads as dirt)"""
+    shade = np.zeros_like(u)
     for (u0, v0, u1, v1, w, d) in specs:
-        du = ((_u - u0 + 0.5) % 1.0) - 0.5
-        dv = _v - v0
+        du = ((u - u0 + 0.5) % 1.0) - 0.5
+        dv = v - v0
         ex, ey = ((u1 - u0 + 0.5) % 1.0) - 0.5, v1 - v0
         L = math.hypot(ex, ey)
         tx, ty = ex / L, ey / L
@@ -201,21 +206,29 @@ def _creases(c, specs):
         dark = np.where(across < 0, smooth(w, 0, -across), 0) * d
         light = np.where(across > 0, smooth(w * 0.5, 0, across), 0) * d * 0.35
         shade += (light - dark) * taper
-    return (c * (1 + np.clip(shade, -0.4, 0.2))[..., None]).clip(0, 1).astype(np.float32)
+    s = np.clip(shade, -0.25, 0.12)[..., None]
+    k = np.where(s < 0, 1 + s * np.array(CREASE_TINT, np.float32), 1 + s)
+    return (c * k).clip(0, 1).astype(np.float32)
 
 
-_W = 0.30 / 1.64     # (the apron's ties round the waist, where the cloth gathers)
+_W = 0.30 / 1.64     # (the apron's ties round the waist, where the cloth gathers: the cord's top edge)
+_CB = _W - 0.011     # (the cord's foot: it's 0.018 high)
 CREASES = [
-    # (behind: radiating from the ties, up toward the shoulders and down to the hem)
-    (0.5, _W, 0.4, 0.33, 0.024, 0.22), (0.5, _W, 0.46, 0.345, 0.02, 0.18), (0.5, _W, 0.54, 0.345, 0.02, 0.18), (0.5, _W, 0.6, 0.33, 0.024, 0.22),
-    (0.5, _W, 0.42, 0.12, 0.022, 0.2), (0.5, _W, 0.48, 0.113, 0.018, 0.16), (0.5, _W, 0.52, 0.113, 0.018, 0.16), (0.5, _W, 0.58, 0.12, 0.022, 0.2),
+    # (behind (item 408): the cloth taken in by the cord in a few short soft pleats just over it and under it, each its own, spread along it
+    # and leaning a little apart, each starting under the cord's paint; and from either shoulder blade one long faint drape toward the small of
+    # the back, stopping short of the cord (they were eight hard lines from the one point at the ties, deep and dark: a stain, the owner's
+    # 「老闆衣服背後髒髒的?」))
+    (0.432, _W - 0.006, 0.420, _W + 0.048, 0.013, 0.10), (0.474, _W - 0.006, 0.468, _W + 0.062, 0.014, 0.11),
+    (0.522, _W - 0.006, 0.528, _W + 0.056, 0.014, 0.11), (0.566, _W - 0.006, 0.578, _W + 0.044, 0.013, 0.10),
+    (0.452, _CB + 0.006, 0.444, 0.137, 0.012, 0.09), (0.503, _CB + 0.006, 0.506, 0.135, 0.012, 0.09), (0.551, _CB + 0.006, 0.560, 0.138, 0.012, 0.09),
+    (0.37, 0.30, 0.45, 0.215, 0.03, 0.06), (0.63, 0.30, 0.55, 0.215, 0.03, 0.06),
     # (down the sides from under the arms)
-    (0.22, 0.345, 0.27, 0.2, 0.022, 0.2), (0.27, 0.33, 0.31, 0.22, 0.018, 0.15), (0.78, 0.345, 0.73, 0.2, 0.022, 0.2), (0.73, 0.33, 0.69, 0.22, 0.018, 0.15),
+    (0.22, 0.345, 0.27, 0.2, 0.022, 0.13), (0.27, 0.33, 0.31, 0.22, 0.018, 0.1), (0.78, 0.345, 0.73, 0.2, 0.022, 0.13), (0.73, 0.33, 0.69, 0.22, 0.018, 0.1),
     # (across the chest along the crossed front, and a few short gathers at the hem)
-    (0.1, 0.345, 0.03, 0.27, 0.018, 0.16), (0.9, 0.345, 0.97, 0.27, 0.018, 0.16),
-    (0.15, 0.118, 0.16, 0.155, 0.014, 0.14), (0.32, 0.118, 0.33, 0.15, 0.014, 0.14), (0.68, 0.118, 0.67, 0.15, 0.014, 0.14), (0.85, 0.118, 0.84, 0.155, 0.014, 0.14),
+    (0.1, 0.345, 0.03, 0.27, 0.018, 0.11), (0.9, 0.345, 0.97, 0.27, 0.018, 0.11),
+    (0.15, 0.118, 0.16, 0.155, 0.014, 0.09), (0.32, 0.118, 0.33, 0.15, 0.014, 0.09), (0.68, 0.118, 0.67, 0.15, 0.014, 0.09), (0.85, 0.118, 0.84, 0.155, 0.014, 0.09),
 ]
-_ct = _creases(_ct, CREASES)
+# (the creases are painted on the body's own picture, at its size: see _coat)
 M["coat"] = pbr("BossCoat", (1, 1, 1), tex=image(f"{CREW or 'boss'}_cotton", _ct.astype(np.float32)), rough=0.75)
 if CREW:
     # (the cap's tenugui white, a band's white; the collar a shade of the coat, the kimono's white)
@@ -872,7 +885,19 @@ def _sample(img, u, v):
     return img[np.clip((v * h).astype(int), 0, h - 1), np.clip((u * w).astype(int) % w, 0, w - 1)]
 
 
-_coat = _sample(_ct, _bu, _by_ / 1.64)
+def _sample_lin(img, u, v):
+    """img (rows up, columns round) at u, v (0..1), between its pixels: round it wrapping, up it held at its ends (item 408: by the nearest
+    pixel the 256-pixel cotton blown up four times went in steps)"""
+    h, w = img.shape[:2]
+    x, y = u * w - 0.5, np.clip(v * h - 0.5, 0, h - 1)
+    x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
+    fx, fy = (x - x0)[..., None], (y - y0)[..., None]
+    x1, x0, y1 = (x0 + 1) % w, x0 % w, np.minimum(y0 + 1, h - 1)
+    return ((img[y0, x0] * (1 - fx) + img[y0, x1] * fx) * (1 - fy) + (img[y1, x0] * (1 - fx) + img[y1, x1] * fx) * fy).astype(np.float32)
+
+
+# (the coat's cotton, and its creases on it at the body's picture's own size)
+_coat = _creases(_sample_lin(_ct, _bu, _by_ / 1.64), CREASES, _bu, _by_ / 1.64)
 _pant = _sample(_weave_at(PANTS, 256, 256, 0.1), _bu, _by_ / 1.64)
 _body = np.where((_by_ < HEM)[..., None], _pant, _coat)
 # (which part each pixel's of: 1 the coat, 2 the apron, 3 the trousers, 0 the rest (item 376: written out for the game to recolour))
@@ -972,7 +997,9 @@ def _body_height():
         across = -du * ty + dv * tx
         t = np.clip(along / L, 0, 1)
         taper = np.where((along > 0) & (along < L), np.sin(np.pi * t) ** 0.7, 0)
-        h -= (np.exp(-(across / w) ** 2) - 0.35 * np.exp(-((across - w * 1.2) / w) ** 2)) * taper * d * 6.0
+        # (shallow and broad (item 408): six times as deep, a crease tipped the toon light past its step, a hard dark band down it)
+        w = w * 1.3
+        h -= (np.exp(-(across / w) ** 2) - 0.35 * np.exp(-((across - w * 1.2) / w) ** 2)) * taper * d * 3.5
     # (the apron's long gathers from its cord down, on its front, softer toward its sides)
     if CREW not in ("serverF", "stock"):
         _ain = (np.abs(_aw) < AP_A) & (_by_ >= AP[0][0]) & (_by_ <= AP[-1][0])
