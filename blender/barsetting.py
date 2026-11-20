@@ -706,21 +706,28 @@ def condiments(name, M, ps):
     return out
 
 
+# (how tall the bar's raised lip stands over its top: bar.ts's LIP_H, item 416)
+LIP_H = 0.3
+
+
 def cond_rack(name, M, ps):
     """the soy pot and the wasabi hung on the bar's raised lip (item 334, the owner's, 2026-11-18: 「醬料用掛的、垃圾桶在它下面」): a little
     shelf of the lip's own wood on two flat hooks over its top, a low rail along its front, the pot and the jar stood on it (no tray); the
     origin on the lip's customer face at the bar's top, +z into the lip (toward the cook), -z out over the counter. The lip stands 0 to 0.06
-    in z and up to 0.149; its ink a few millimetres round it: the hooks kept clear of both, the shelf high enough for the table bin under it"""
+    in z and up to LIP_H; its ink a few millimetres round it: the hooks kept clear of both, the shelf high enough for the table bin under it"""
     out = []
     wood = []
     # (the shelf: 16 by 7 cm, 1.2 cm thick, its top 10.4 cm over the counter; the bin's rim 8.7 cm, under its front)
     wood.append(board(f"{name}Shelf", -0.08, 0.08, 0.092, 0.104, -0.085, -0.013, ease=0.0012))
     wood.append(board(f"{name}Rail", -0.08, 0.08, 0.104, 0.116, -0.085, -0.079, ease=0))
+    # (the hooks over the lip's top as it stands (item 433, the owner's 「嗯?」 at two of them seen from above: made for the lip's 0.149 before
+    # item 416 doubled it, their tops hung halfway up its see-through lattice, hooked over nothing): 5 mm over its rail's ink)
+    hook = LIP_H + 0.009
     for k, hx in enumerate((-0.06, 0.06)):
         # (each hook: a strip up in front of the lip, over its top, a short way down its back)
-        wood.append(board(f"{name}HookFront{k}", hx - 0.008, hx + 0.008, 0.092, 0.158, -0.013, -0.008, ease=0))
-        wood.append(board(f"{name}HookTop{k}", hx - 0.008, hx + 0.008, 0.158, 0.164, -0.013, 0.073, ease=0))
-        wood.append(board(f"{name}HookBack{k}", hx - 0.008, hx + 0.008, 0.128, 0.158, 0.068, 0.073, ease=0))
+        wood.append(board(f"{name}HookFront{k}", hx - 0.008, hx + 0.008, 0.092, hook, -0.013, -0.008, ease=0))
+        wood.append(board(f"{name}HookTop{k}", hx - 0.008, hx + 0.008, hook, hook + 0.006, -0.013, 0.073, ease=0))
+        wood.append(board(f"{name}HookBack{k}", hx - 0.008, hx + 0.008, hook - 0.03, hook, 0.068, 0.073, ease=0))
     out.append(fin(joined(f"{name}Wood", wood), M["rackwood"], ps))
     # (the pot and the jar as on the tray, without it: stood on the shelf, set back from its rail)
     pots = condiments(f"{name}Cond", M, [])
