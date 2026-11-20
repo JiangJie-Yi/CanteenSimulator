@@ -286,6 +286,10 @@ for k, x in enumerate((TX1 + 0.18, TX1 + 0.5)):
     for sd in (-1, 1):
         soft(f"DormSlipper{k}{sd}", (x + sd * 0.055 - 0.04, FLOOR, SZ0 - 0.32), (x + sd * 0.055 + 0.04, FLOOR + 0.025, SZ0 - 0.1), "slipper", r=0.012, segs=1)
 
+# (the left wall, its trims, its cut edge and the closet's shell: a piece of their own (item 426), for the game to take away when the view's
+# turned round to that side, as a doll's house's near wall is; the closet's floor, shelf and what's in it stay)
+LEFT_CUT = "DormLeftCut"
+
 # ---------------------------------------------------------------------------------------------------- the walls
 # (the back wall round its window; the left round the closet; the right low over the board strip; skirting and a rail high round them)
 WX0, WX1, WY0, WY1 = -1.15, 0.0, 0.78, 1.66
@@ -294,17 +298,17 @@ block("DormWallBackR", (WX1, 0.0, Z0 - WALL), (X1 + WALL, H, Z0), "plaster", 1.2
 block("DormWallBackB", (WX0, 0.0, Z0 - WALL), (WX1, WY0, Z0), "plaster", 1.2)
 block("DormWallBackT", (WX0, WY1, Z0 - WALL), (WX1, H, Z0), "plaster", 1.2)
 OZ0, OZ1, OY1 = Z0 + 0.75, Z0 + 2.55, 1.8
-block("DormWallLeftB", (X0 - WALL, 0.0, Z0), (X0, H, OZ0), "plaster", 1.2)
-block("DormWallLeftF", (X0 - WALL, 0.0, OZ1), (X0, H, Z1), "plaster", 1.2)
-block("DormWallLeftT", (X0 - WALL, OY1, OZ0), (X0, H, OZ1), "plaster", 1.2)
+block("DormWallLeftB", (X0 - WALL, 0.0, Z0), (X0, H, OZ0), "plaster", 1.2, group=LEFT_CUT)
+block("DormWallLeftF", (X0 - WALL, 0.0, OZ1), (X0, H, Z1), "plaster", 1.2, group=LEFT_CUT)
+block("DormWallLeftT", (X0 - WALL, OY1, OZ0), (X0, H, OZ1), "plaster", 1.2, group=LEFT_CUT)
 block("DormWallRight", (X1, 0.0, Z0), (X1 + WALL, 0.9, Z1), "plaster", 1.2)
 block("DormRightCap", (X1 - 0.004, 0.9, Z0 - 0.004), (X1 + WALL + 0.004, 0.94, Z1), "wood", 0.6)
 for nm, lo, hi in (("BackL", (X0, 0.0, Z0), (WX0, 0.12, Z0 + 0.012)), ("BackR", (WX1, 0.0, Z0), (X1, 0.12, Z0 + 0.012)),
                    ("LeftB", (X0, 0.0, Z0 + 0.012), (X0 + 0.012, 0.12, OZ0)), ("LeftF", (X0, 0.0, OZ1), (X0 + 0.012, 0.12, Z1)),
                    ("BackRail", (X0, H - 0.42, Z0), (X1, H - 0.36, Z0 + 0.022)), ("LeftRail", (X0, H - 0.42, Z0 + 0.022), (X0 + 0.022, H - 0.36, Z1))):
-    block(f"DormTrim{nm}", lo, hi, "wood", 0.6)
+    block(f"DormTrim{nm}", lo, hi, "wood", 0.6, group=LEFT_CUT if nm.startswith("Left") else None)
 # (the cut walls' edges, toward the viewer: a dark core between the plaster's faces, as a doll's house is cut)
-block("DormCutLeft", (X0 - WALL, 0.0, Z1), (X0, H, Z1 + 0.004), "dark", 1.0)
+block("DormCutLeft", (X0 - WALL, 0.0, Z1), (X0, H, Z1 + 0.004), "dark", 1.0, group=LEFT_CUT)
 block("DormCutRight", (X1, 0.0, Z1), (X1 + WALL, 0.9, Z1 + 0.004), "dark", 1.0)
 
 # ---------------------------------------------------------------------------------------------------- the window
@@ -332,11 +336,11 @@ for k, (px0, pz) in enumerate(((WX0, Z0 + 0.012), (WX0 + 0.06, Z0 - 0.02))):
 # (its inside back in the wall: a floor, a shelf half way, a back and sides; the futons folded on the shelf, boxes under it; two fusuma, the
 # front one slid across the back one, the closet's front half open)
 OX0 = X0 - 0.8
-block("DormClosetBack", (OX0 - 0.03, 0.0, OZ0), (OX0, OY1, OZ1), "plaster", 1.0)
-block("DormClosetSideA", (OX0, 0.0, OZ0 - 0.03), (X0, OY1, OZ0), "plaster", 1.0)
-block("DormClosetSideB", (OX0, 0.0, OZ1), (X0, OY1, OZ1 + 0.03), "plaster", 1.0)
+block("DormClosetBack", (OX0 - 0.03, 0.0, OZ0), (OX0, OY1, OZ1), "plaster", 1.0, group=LEFT_CUT)
+block("DormClosetSideA", (OX0, 0.0, OZ0 - 0.03), (X0, OY1, OZ0), "plaster", 1.0, group=LEFT_CUT)
+block("DormClosetSideB", (OX0, 0.0, OZ1), (X0, OY1, OZ1 + 0.03), "plaster", 1.0, group=LEFT_CUT)
 block("DormClosetFloor", (OX0, 0.0, OZ0), (X0, 0.06, OZ1), "boards", 0.9)
-block("DormClosetTop", (OX0, OY1 - 0.03, OZ0), (X0, OY1, OZ1), "boards", 0.9)
+block("DormClosetTop", (OX0, OY1 - 0.03, OZ0), (X0, OY1, OZ1), "boards", 0.9, group=LEFT_CUT)
 block("DormClosetShelf", (OX0, 0.8, OZ0), (X0, 0.84, OZ1), "boards", 0.9)
 block("DormClosetShelfFace", (X0 - 0.04, 0.78, OZ0), (X0, 0.86, OZ1), "wood", 0.5)
 for k, (mat, h) in enumerate((("futon_b", 0.15), ("futon_p", 0.14), ("futon_b", 0.14), ("sheet", 0.07))):

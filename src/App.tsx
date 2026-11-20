@@ -284,6 +284,9 @@ const CAMERA_FOV = 40
 const WIDE_FOV = 85
 /** how long the camera takes flying from one view to another (s), eased in and out */
 const FLY_S = 0.9
+/** how far round the room upstairs may be turned either way from straight on at its open front (rad, item 426): to 70 degrees, its side
+ * walls still between the camera and the outside */
+const UP_TURN = 1.22
 /** which way along his own z the owner faces (+1 or -1): his view's looked out along it */
 const OWNER_FACING = 1
 
@@ -741,7 +744,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
   const lockRef = useRef(lockView)
   lockRef.current = lockView
   // (every view but the free one is fixed where it's set: no turning, sliding or zooming it; the developer mode leaves them all free)
-  const spotLock = !editing && !lockView && view !== 'free' && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
+  // (but upstairs (item 426, the owner's 「2F也可以轉視角」): turned round it within its open front's side, kept by the controls' bounds below)
+  const spotLock = !editing && !lockView && view !== 'free' && view !== 'upstairs' && !(import.meta.env.DEV && (window as unknown as { __freeCam?: boolean }).__freeCam)
   const spotRef = useRef(spotLock)
   spotRef.current = spotLock
   const editRef = useRef(editing)
@@ -975,6 +979,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
   // smooth wheel zoom: each notch nudges a target distance and the camera eases toward it
   const gl = useThree((s) => s.gl)
   const zoomGoal = useRef<number | null>(null)
+  /** whether upstairs' bounds are on the controls now (item 426) */
+  const upBounds = useRef(false)
   /** how near the grill's held view is drawn (1: camera 1 as it is; smaller nearer), by the wheel */
   const lockZoom = useRef(1)
   const lockZoomNow = useRef(1)
@@ -1005,7 +1011,8 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
         return
       }
       const now = zoomGoal.current ?? camera.position.distanceTo(c.target)
-      zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * (how === 'pinch' ? 0.01 : 0.0011)), 1.8, 20)
+      // (within the controls' own bounds: upstairs' nearer and further (item 426))
+      zoomGoal.current = THREE.MathUtils.clamp(now * Math.exp(e.deltaY * (how === 'pinch' ? 0.01 : 0.0011)), Math.max(1.8, c.minDistance), Math.min(20, c.maxDistance))
     }
     // (held at the grill: a right-button drag turns the view a little round what it looks at; the left button stays for the food)
     let drag: { x: number; y: number } | null = null
@@ -1110,6 +1117,37 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
     }
 
     const c = controls.current
+    // (upstairs, the view turned by hand within the room's open front (item 426, the owner's 「2F也可以轉視角」): round it up to UP_TURN
+    // either side of straight on, never under its floor nor straight down on it, nearer and further within reason, not slid off it; the
+    // shop's own bounds back as it's left)
+    if (c) {
+      const up = view === 'upstairs' && !editing
+      if (up && !upBounds.current) {
+        const a = scene.getObjectByName('look-dorm')
+        if (a) {
+          a.updateWorldMatrix(true, false)
+          const f = new THREE.Vector3(0, 0, 1).transformDirection(a.matrixWorld)
+          const th = Math.atan2(f.x, f.z)
+          c.minAzimuthAngle = th - UP_TURN
+          c.maxAzimuthAngle = th + UP_TURN
+          c.minPolarAngle = 0.3
+          c.maxPolarAngle = 1.25
+          c.minDistance = 5
+          c.maxDistance = 19
+          c.enablePan = false
+          upBounds.current = true
+        }
+      } else if (!up && upBounds.current) {
+        c.minAzimuthAngle = -Infinity
+        c.maxAzimuthAngle = Infinity
+        c.minPolarAngle = 0
+        c.maxPolarAngle = Math.PI * 0.45
+        c.minDistance = 1.8
+        c.maxDistance = 24
+        c.enablePan = true
+        upBounds.current = false
+      }
+    }
     // (a view that follows what it looks at (the owner, about his grill): its aim moved on with him every frame, the camera gliding after)
     const follow = VIEW_SPOTS.find((v) => v.id === view)?.follow && spotLock ? poseOf(view) : null
     // (first person: held to his eyes at once)

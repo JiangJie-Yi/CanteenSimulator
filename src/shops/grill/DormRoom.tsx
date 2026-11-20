@@ -71,6 +71,7 @@ const wardrobeTip = (w: (typeof WARDROBE)[number]) => {
 const FIG_SCALE = 1.646 / DORM_SCALE
 /** the pieces shown or put away by what's going on: the table and its tea, the table folded away, each futon laid */
 const PIECES = /^Dorm(Table|TableAway|Bedding\d)$/
+const CAM_IN = new THREE.Vector3()
 
 /** asks the app's views for one (the stair up behind the staff door, the stair down here) */
 export const askView = (id: string) => window.dispatchEvent(new CustomEvent('jgs-view', { detail: id }))
@@ -233,7 +234,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
   /** the ids of those on today's shift (the rest of those living in are off: up here all day); none given, all of them are */
   working?: readonly string[] }) {
   const gltf = useGLTF(DORM_URL) as unknown as { scene: THREE.Group }
-  const { root, look, marks, pieces, quilts } = useMemo(() => {
+  const { root, look, marks, pieces, quilts, leftCut, leftX } = useMemo(() => {
     const r = (gltf.scene.getObjectByName('DormRoot') ?? gltf.scene).clone(true)
     r.position.set(0, 0, 0)
     const made = new Map<THREE.Material, THREE.Material>()
@@ -271,7 +272,12 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       a.needsUpdate = true
       m.geometry = g
     })
-    mergeByMaterial(r, (o) => PIECES.test(o.name))
+    // (the left wall, its trims and the closet's shell, a piece of their own (blender/dorm.py's DormLeftCut), not merged: the view turned round
+    // to that side (item 426), they're taken away as a doll's house's near wall is, the closet's floor, shelf and what's in it left; the
+    // wall's inner face's x (the piece's furthest in less its trims' 2.2 cm))
+    const leftCut = r.getObjectByName('DormLeftCut') ?? new THREE.Group()
+    const leftX = new THREE.Box3().setFromObject(leftCut).max.x - 0.022
+    mergeByMaterial(r, (o) => PIECES.test(o.name) || o === leftCut)
     const at = (n: string, d: THREE.Vector3) => r.getObjectByName(n)?.position.clone() ?? d
     const mk: Marks = {
       seats: [0, 1, 2].map((k) => at(`DormSeat${k}`, new THREE.Vector3(-0.9 + k * 0.6, 0.125, 0))),
@@ -284,7 +290,8 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     for (const n of ['DormTable', 'DormTableAway', 'DormBedding0', 'DormBedding1']) ps[n] = r.getObjectByName(n)
     const byName = (n: string) => [...made.values()].find((x) => x.name === n) ?? null
     const lk = r.getObjectByName('DormLook')
-    return { root: r, look: lk ? lk.position.clone() : new THREE.Vector3(0.15, 0.6, 0.1), marks: mk, pieces: ps, quilts: [byName('DormFutonBlue'), byName('DormFutonPink')] }
+    return { root: r, look: lk ? lk.position.clone() : new THREE.Vector3(0.15, 0.6, 0.1), marks: mk, pieces: ps, quilts: [byName('DormFutonBlue'), byName('DormFutonPink')],
+      leftCut, leftX }
   }, [gltf])
   // (those living in: the cooks hired (the shop's own second cook when none is), two at most, the futons' and the cushions' number)
   // (the same list while it's the same people: a new array each time the scene's drawn)
@@ -303,7 +310,12 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     wasOpen.current = open
   }, [open, living])
   // (asleep: the table folded away, each sleeper's futon laid; else the table out, the futons in the closet)
-  useFrame(() => {
+  useFrame(({ camera }) => {
+    // (the left wall and the closet's shell away while the camera's out past it (item 426), back as it comes round)
+    CAM_IN.copy(camera.position)
+    root.worldToLocal(CAM_IN)
+    const out = CAM_IN.x < leftX - 0.05
+    if (leftCut.visible === out) leftCut.visible = !out
     dormViewTo()
     const asleep = dormDoing(getClock().minute) === 'sleep'
     let anyone = false
