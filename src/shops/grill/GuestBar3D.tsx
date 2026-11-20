@@ -2496,45 +2496,11 @@ function minus(al: [number, number], ly: [number, number], h: { along: [number, 
 const RISER = '#3a2416'
 /**
  * The genkan's footing in stone (item 287, the owner's, 2026-11-17: 「門口的厚度要改成石造」: seen from above, the edge of the genkan was a
- * dark board): granite blocks laid in courses, each a little its own grey, a dark mortar joint round each, a fine speckle; one picture laid
- * at one scale over every face (timberBox's: 0.6 along, 0.3 up a repeat, two courses), nothing stretched
+ * dark board), in the genkan floor's crazy paving (item 395, the owner's, 2026-11-20: 「石階很怪，目前這樣看有三種風格，應該是由裡面第一種為主」:
+ * the floor's stones inside, the footing's face in courses of blocks, the steps plain granite): the steps' picture (blender/stonesteps.py's
+ * crazy_paving) laid at its scale, a repeat every STONE_TILE (the script's TILE), on every face of it as on the steps'
  */
-const STONE_MASONRY = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 256; c.height = 128
-  const g = c.getContext('2d')!
-  g.fillStyle = '#3a3633'; g.fillRect(0, 0, 256, 128)
-  let seed = 11
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const greys = ['#8d8a84', '#9a958d', '#7e7c78', '#a39f97', '#86827b', '#94918b']
-  for (let row = 0; row < 2; row++) {
-    const y = row * 64
-    // (stones of a few lengths along the course, each course's joints off the last's)
-    let x = row ? -24 : 0
-    while (x < 256) {
-      const w = 52 + Math.floor(rnd() * 46)
-      const col = greys[Math.floor(rnd() * greys.length)]
-      g.fillStyle = col
-      g.beginPath(); g.roundRect(x + 2, y + 2, Math.min(w, 256 - x + 40) - 4, 60, 5); g.fill()
-      // (its face a little lighter at its top, as worn stone catches the light, and a few darker flecks)
-      const gr = g.createLinearGradient(0, y + 2, 0, y + 62)
-      gr.addColorStop(0, 'rgba(255,255,255,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0.12)')
-      g.fillStyle = gr; g.fillRect(x + 2, y + 2, w - 4, 60)
-      x += w
-    }
-  }
-  for (let k = 0; k < 900; k++) {
-    g.fillStyle = rnd() < 0.5 ? 'rgba(30,28,26,0.35)' : 'rgba(235,230,220,0.3)'
-    g.fillRect(Math.floor(rnd() * 256), Math.floor(rnd() * 128), 1, 1)
-  }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  return t
-})()
-const STONE_FOOT = new THREE.MeshToonMaterial({ color: '#ffffff', map: STONE_MASONRY })
-const STONE_TILE = { along: 0.6, across: 0.3 }
+const STONE_TILE = { along: 0.8, across: 0.8 }
 /** how far out each of the doorway's stone steps reaches (the bar's units: a tread a third of a metre deep, the dining room's metres) */
 const STEP_GO = 0.17
 /** the steps themselves (item 352, the owner's 「石階梯太假了吧」: they were boxes in the base's masonry picture, bricks stacked): a slab of
@@ -2543,17 +2509,25 @@ const STEP_GO = 0.17
 const STEPS_URL = import.meta.env.BASE_URL + 'models/stonesteps.glb'
 useGLTF.preload(STEPS_URL)
 const STEP_MADE: [number, number, number][] = [[1.2329, 0.2247, 0.168], [1.2289, 0.1123, 0.168]]
+/** the steps' crazy paving in the room's toon light, made once for the model's material and shared by the steps, the footing and the
+ * genkan's sides (item 395: one style of stone at the way in) */
+const PAVING = new Map<THREE.Material, THREE.MeshToonMaterial>()
+function pavingOf(sm: THREE.MeshStandardMaterial) {
+  let t = PAVING.get(sm)
+  if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: sm.map ?? null, normalMap: sm.normalMap ?? null }); PAVING.set(sm, t) }
+  return t
+}
+function usePaving() {
+  const gltf = useGLTF(STEPS_URL) as unknown as { scene: THREE.Group }
+  return useMemo(() => pavingOf((gltf.scene.getObjectByName('StoneStep1') as THREE.Mesh).material as THREE.MeshStandardMaterial), [gltf])
+}
 function useStepSlabs() {
   const gltf = useGLTF(STEPS_URL) as unknown as { scene: THREE.Group }
   return useMemo(() => {
-    const made = new Map<THREE.Material, THREE.Material>()
     return [1, 2].map((k) => {
       const src = gltf.scene.getObjectByName(`StoneStep${k}`) as THREE.Mesh
       const m = src.clone()
-      const sm = src.material as THREE.MeshStandardMaterial
-      let t = made.get(sm)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: sm.map ?? null, normalMap: sm.normalMap ?? null }); made.set(sm, t) }
-      m.material = t
+      m.material = pavingOf(src.material as THREE.MeshStandardMaterial)
       m.position.set(0, 0, 0)
       m.receiveShadow = true
       return m
@@ -2588,11 +2562,12 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   // same granite down from the genkan's stone toward the street, each a third of the way down and STEP_GO further out, the doorway's width)
   const rise = (gTop - gFoot) / 3
   const slabs = useStepSlabs()
+  const paving = usePaving()
   return (
     <>
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
       <mesh position={[-(gly[0] + gly[1]) / 2, (gTop + gFoot) / 2, (gal[0] + gal[1]) / 2]}
-        geometry={timberBox(gly[1] - gly[0], gTop - gFoot, gal[1] - gal[0], STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
+        geometry={timberBox(gly[1] - gly[0], gTop - gFoot, gal[1] - gal[0], STONE_TILE.along, STONE_TILE.across)} material={paving} />
       {[1, 2].map((k) => {
         const yTop = gTop - rise * k, z0 = gal[1] + STEP_GO * (k - 1) + 0.002, z1 = gal[1] + STEP_GO * k
         const [w0, h0, d0] = STEP_MADE[k - 1]
@@ -2864,6 +2839,7 @@ const GROUND_SHADOW = (() => {
   return t
 })()
 function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }) {
+  const paving = usePaving()
   const c = counters[0]
   const { along: [a0, a1], lay: [l0, l1] } = useMemo(() => roomOf(counters), [counters])
   const kitchen = useMemo(() => kitchenOf(counters), [counters])
@@ -2905,8 +2881,8 @@ function RoomFloorImpl({ counters, drop }: { counters: Counter[]; drop: number }
       {drop > 0 ? <KitchenPit counters={counters} drop={drop} /> : <KitchenDais counters={counters} rise={-drop} />}
       {/* (the wall's foot, and the room's open end, down to the genkan's pebble-wash (its stones, step and threshold: GenkanFloor, below)) */}
       {/* (in the genkan's stone, as its footing is (item 287): they were dark boards, the doorway's edge read as wood from above) */}
-      <mesh position={[-l0, -(D + GENKAN_SUNK) / 2, (g0 + a1) / 2]} geometry={timberBox(0.02, D + GENKAN_SUNK, a1 - g0, STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
-      <mesh position={[-(l0 + gl) / 2, -(D + GENKAN_SUNK) / 2, a1]} geometry={timberBox(gl - l0, D + GENKAN_SUNK, 0.012, STONE_TILE.along, STONE_TILE.across)} material={STONE_FOOT} />
+      <mesh position={[-l0, -(D + GENKAN_SUNK) / 2, (g0 + a1) / 2]} geometry={timberBox(0.02, D + GENKAN_SUNK, a1 - g0, STONE_TILE.along, STONE_TILE.across)} material={paving} />
+      <mesh position={[-(l0 + gl) / 2, -(D + GENKAN_SUNK) / 2, a1]} geometry={timberBox(gl - l0, D + GENKAN_SUNK, 0.012, STONE_TILE.along, STONE_TILE.across)} material={paving} />
       </StaticBatch>
       {/* the genkan: its stones laid crazy-paving in pebble-wash, the shoe-off stone at the step, the threshold, the polished keyaki step
           (item 185: one flat picture of stones and two thin boards before) */}
