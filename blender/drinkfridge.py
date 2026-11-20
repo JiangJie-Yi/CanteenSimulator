@@ -137,7 +137,8 @@ def slab(name, loops, z0, z1, mat, bev, segs=2):
     for pg in o.data.polygons:
         pg.use_smooth = True
     m = o.modifiers.new("b", "BEVEL")
-    m.width, m.segments, m.limit_method, m.angle_limit, m.harden_normals = bev, segs, "ANGLE", math.radians(40), True
+    # (50 degrees: a corner rounded in two steps (45 each, item 422) not rounded over again)
+    m.width, m.segments, m.limit_method, m.angle_limit, m.harden_normals = bev, segs, "ANGLE", math.radians(50), True
     bpy.ops.object.modifier_apply(modifier=m.name)
     o.name = name
     o.data.materials.clear()
@@ -201,13 +202,15 @@ open_y0, open_y1 = PLINTH, H - HEAD
 # (item 379, docs/MODELING.md's 造型感: the sides and the top one piece, an upside-down U from the front, its top corners rounded off (SHELL_R)
 # and every edge of it front and back rounded over (SHELL_ROUND), as a cartoon's fridge is; it was three boxes, every edge sharp. The back
 # under its top now, inside the round)
-SHELL_R, SHELL_ROUND = 0.07, 0.014
-shell_out = rounded_loop(x0, x1, 0.0, H, SHELL_R, 6, (False, False, True, True))
+# (item 422, the owner's 「冰箱的導角做得太明顯了，不用犧牲掉太多面數了，導角些微即可。」: 7 cm in six steps and 1.4 cm in two before, a
+# cartoon's fridge; a slight bevel now, as a shop's cooler's metal is folded: 1.2 cm in two steps at the top, 4 mm in one round the edges)
+SHELL_R, SHELL_ROUND = 0.012, 0.004
+shell_out = rounded_loop(x0, x1, 0.0, H, SHELL_R, 2, (False, False, True, True))
 # (the outline from its outer foot on the left in along the foot, up the inside, across under the top, down the inside, out along the right
 # foot, up round the top and back down: counter-clockwise)
 shell_in = [(x0 + T, 0.0), (x0 + T, H - T), (x1 - T, H - T), (x1 - T, 0.0)]
 body = [
-    slab("shell", [[shell_out[0]] + shell_in + shell_out[1:]], zb, zf, "shell", SHELL_ROUND),
+    slab("shell", [[shell_out[0]] + shell_in + shell_out[1:]], zb, zf, "shell", SHELL_ROUND, 1),
     box("back", x0 + T, x1 - T, 0, H - T, zb, zb + T, "shell"),
     box("head", x0 + T, x1 - T, open_y1, H - T, zf - 0.06, zf, "shell"),
     # (under the floor, not up into it: its top and its front lay in the floor's planes and fought them)
@@ -280,7 +283,8 @@ fridge_shelves = join(shelves, "FridgeShelves")
 dz0, dz1 = zf - 0.005, zf + 0.025
 fx0, fx1, fy0, fy1 = x0 + 0.008, x1 - 0.008, open_y0 - 0.01, open_y1 + 0.006
 fw = 0.04
-DOOR_R, DOOR_ROUND = 0.035, 0.008
+# (item 422: 3.5 cm in four steps and 8 mm in two before; 8 mm in two and 3 mm in one now, the pane's opening 5 mm in one)
+DOOR_R, DOOR_ROUND = 0.008, 0.003
 doors = []
 for side, (ax, bx) in (("L", (fx0, -0.002)), ("R", (0.002, fx1))):
     inner = bx if side == "L" else ax
@@ -290,8 +294,8 @@ for side, (ax, bx) in (("L", (fx0, -0.002)), ("R", (0.002, fx1))):
     # back rounded over; the handle a round bar on two round posts, its ends rounded. They were four boxes and a square bar, every edge sharp)
     hx = (hx0 + hx1) / 2
     parts_ = [
-        slab(f"dframe{side}", [rounded_loop(ax, bx, fy0, fy1, DOOR_R, 4),
-                               rounded_loop(ax + fw, bx - fw, fy0 + fw * 1.4, fy1 - fw, 0.012, 2)], dz0, dz1, "shell", DOOR_ROUND),
+        slab(f"dframe{side}", [rounded_loop(ax, bx, fy0, fy1, DOOR_R, 2),
+                               rounded_loop(ax + fw, bx - fw, fy0 + fw * 1.4, fy1 - fw, 0.005, 1)], dz0, dz1, "shell", DOOR_ROUND, 1),
         quad(f"pane{side}", [(ax + fw, fy0 + fw * 1.4, (dz0 + dz1) / 2), (bx - fw, fy0 + fw * 1.4, (dz0 + dz1) / 2),
                              (bx - fw, fy1 - fw, (dz0 + dz1) / 2), (ax + fw, fy1 - fw, (dz0 + dz1) / 2)], "glass"),
         rod(f"handle{side}", (hx, 0.75, dz1 + 0.038), (hx, 1.55, dz1 + 0.038), 0.011, "metal"),
