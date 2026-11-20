@@ -238,6 +238,20 @@ export type OwnerJob = 'serve' | 'wash' | 'plate'
  * other's started till he's back from it.
  */
 export const OWNER_OUT: { on: boolean; by: OwnerJob | null } = keep(import.meta.hot, 'OWNER_OUT', { on: false, by: null })
+/** the owner's futon (item 444, game/bossStamina): its size (the bar's units: he stands about 1.0 tall in them), how far into the room from
+ * the staff's door its middle lies and how far along the wall toward the corner; his way there from his fire and where its foot and its head
+ * lie (Roasting's BossBedWays, in the grill's frame: `frame` that frame's group); whether he's wanted (the shop open), when the player last
+ * came to his fire; and how far through laying it down, getting in and folding it away it is (Boss writes it, BossFuton draws it) */
+export const FUTON = { W: 0.62, L: 1.25, top: 0.07, out: 0.46, along: 0.1 }
+export const BOSS_BED = keep(import.meta.hot, 'BOSS_BED', {
+  frame: null as THREE.Object3D | null,
+  way: null as ((fromGrill: THREE.Vector3) => { path: THREE.Vector3[]; foot: THREE.Vector3; head: THREE.Vector3 } | null) | null,
+  wanted: false,
+  /** when the player last came to his fire (the hearth's view, the shop shut: they'll be cooking by hand with him), performance.now() */
+  callAt: -1,
+  futon: { on: false, foot: new THREE.Vector3(), yaw: 0, unroll: 0, pillow: 0, cover: 0, fold: 0 },
+})
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __bossBed?: typeof BOSS_BED }).__bossBed = BOSS_BED
 /** the owner off on a job, or back from it (only that job's own coming back frees him) */
 export function ownerAway(by: OwnerJob, on: boolean) {
   if (on) { OWNER_OUT.by = by; OWNER_OUT.on = true } else if (OWNER_OUT.by === by) { OWNER_OUT.by = null; OWNER_OUT.on = false }

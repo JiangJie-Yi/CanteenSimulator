@@ -3,7 +3,7 @@ import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 import { TONG_S, TONG_TAKE_S, TRAY_PLACES, trayPlace } from '@/game/tray'
-import { CALM_ASK, DORM_LIFE, FIRE_FLARE, FUMING, KAKUBAT } from './bar'
+import { BOSS_BED, CALM_ASK, DORM_LIFE, FIRE_FLARE, FUMING, FUTON, KAKUBAT } from './bar'
 import { calmedSince } from '@/game/calm'
 import { CALM_GUEST, CALM_OWNER, PROP_TALK } from '@/data/calmLines'
 import { SkewerStore } from './SkewerStore'
@@ -3813,6 +3813,105 @@ const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階
   )
 })
 
+/**
+ * Where the owner lays his futon down, the nights he's too tired for the stair (item 444, the owner's, 2026-11-21: 「老闆也有體力值，累了也會
+ * 在一樓打地舖睡」, game/bossStamina): at the stair's foot, before the staff's door, its length along the wall toward the corner (the one open
+ * stretch of the shop's floor a futon fits, clear of the side counter's stools; the others gone home or upstairs by then, and he's up and has
+ * it folded away before they're down again); and his way there from his fire, as his cooks who live upstairs go to the door: across the
+ * kitchen to the gate, out, along the aisle to its corner, to before the futon's foot and onto it. In the grill's frame (this group's).
+ */
+const BossBedWays = memo(function BossBedWays({ open, research }: { open: boolean; research: boolean }) {
+  const ref = useRef<THREE.Group>(null)
+  const scene = useThree((st) => st.scene)
+  // (wanted with the shop open; called, the player come to his fire with it shut (not already there as it shut: the hearth's view where
+  // the day was spent, he'd never get to bed))
+  useEffect(() => { BOSS_BED.wanted = open }, [open])
+  const wasAt = useRef(research)
+  useEffect(() => { if (research && !wasAt.current) BOSS_BED.callAt = performance.now(); wasAt.current = research }, [research])
+  useEffect(() => {
+    BOSS_BED.frame = ref.current
+    BOSS_BED.way = (fromGrill) => {
+      const g = ref.current, sd = scene.getObjectByName('staff-door'), fr = scene.getObjectByName('look-fridge')
+      if (!g || !sd) return null
+      g.updateWorldMatrix(true, false)
+      sd.updateWorldMatrix(true, false)
+      // (the door, the way into the room from it, and along the wall toward the corner (the side wall's way, where the fridges stand), in
+      // the bar's frame)
+      const bar = (w: THREE.Vector3) => toBar(g.worldToLocal(w.clone()))
+      const d = bar(sd.getWorldPosition(new THREE.Vector3())).setY(0)
+      const room = bar(sd.localToWorld(new THREE.Vector3(-1, 0, 0))).setY(0).sub(d).normalize()
+      const along = new THREE.Vector3(-room.z, 0, room.x)
+      if (fr && bar(fr.getWorldPosition(new THREE.Vector3())).setY(0).sub(d).dot(along) < 0) along.negate()
+      const mid = d.clone().addScaledVector(room, FUTON.out).addScaledVector(along, FUTON.along)
+      const head = mid.clone().addScaledVector(along, FUTON.L / 2), foot = mid.clone().addScaledVector(along, -FUTON.L / 2)
+      const onFloor = (v: THREE.Vector3) => { const q = fromBar(v); return q.setY(floorAt(q)) }
+      const out = staffWayOut(GRILL_COUNTERS)
+      const across = KITCHEN_ROUTE.route ? KITCHEN_ROUTE.route(toBar(fromGrill), out[0]) : null
+      const head0 = across ? [fromGrill.clone(), ...across.slice(1).map((v) => onFloor(v))] : [fromGrill.clone()]
+      const c0 = GRILL_COUNTERS[0], gate = gateOf(c0, BAR_GATES[0]).mid
+      const aisle = [gate.clone().addScaledVector(c0.lay, -aisleOf(c0)), aisleCornerOf(GRILL_COUNTERS, GRILL_COUNTERS[1])]
+      const before = foot.clone().addScaledVector(along, -0.4)
+      return { path: [...head0, onFloor(out[1]), ...aisle.map(onFloor), onFloor(before), onFloor(foot)], foot: onFloor(foot), head: onFloor(head) }
+    }
+    return () => { BOSS_BED.way = null; BOSS_BED.frame = null }
+  }, [scene])
+  return <group ref={ref} />
+})
+/**
+ * The futon itself (blender/futon.py), where its foot lies (BOSS_BED.futon, the grill's frame, at the bar's size): folded in three at its
+ * foot as he brings it, the mattress unrolled along to its head, the pillow put down at its head, the quilt unfolded up over him from his
+ * feet to his shoulders; in the morning the quilt thrown back, all of it folded up and the stack gone as he takes it off. Toon-lit as the
+ * room; unseen while it's put away.
+ */
+const FUTON_URL = import.meta.env.BASE_URL + 'models/futon.glb'
+useGLTF.preload(FUTON_URL)
+const BossFuton = memo(function BossFuton() {
+  const gltf = useGLTF(FUTON_URL) as unknown as { scene: THREE.Group }
+  const parts = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('FutonRoot') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) { t = new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      m.material = t
+      m.receiveShadow = true
+    })
+    inkModel(r, () => false, { width: 0.0009, weld: true })
+    return { r, shiki: r.getObjectByName('FutonShiki')!, kake: r.getObjectByName('FutonKake')!, pillow: r.getObjectByName('FutonMakura')!,
+      pillowAt: r.getObjectByName('FutonMakura')!.position.clone() }
+  }, [gltf])
+  const g = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const o = g.current, f = BOSS_BED.futon
+    if (!o) return
+    o.visible = f.on
+    if (!f.on) return
+    o.position.copy(f.foot)
+    o.rotation.y = f.yaw
+    // (folded in three at its foot as it comes; unrolled to its head; folded up again in the morning, the stack lifting away as he takes it)
+    const ease = (k: number) => k * k * (3 - 2 * k)
+    const fold = ease(Math.min(1, f.fold * 1.6)), gone = ease(Math.max(0, (f.fold - 0.62) / 0.38))
+    const len = (1 / 3 + (2 / 3) * ease(f.unroll)) * (1 - fold * (2 / 3))
+    parts.shiki.scale.set(1, 1 + (1 - len) * 1.6, len)
+    // (the quilt: folded at its foot on the mattress till it's pulled up over him (cover), its swell rising as it goes; back to its fold in
+    // the morning as he throws it back)
+    const cv = ease(f.cover) * (1 - fold)
+    parts.kake.scale.set(1, 0.35 + 0.65 * cv, 1 / 3 + (2 / 3) * cv)
+    parts.kake.position.set(0, (1 - len) * FUTON.top * 1.6, 0)
+    // (the pillow: dropped at its head, a little bounce; on the folded stack in the morning)
+    const pk = ease(f.pillow)
+    parts.pillow.visible = pk > 0
+    const pz = parts.pillowAt.z * len
+    parts.pillow.position.set(parts.pillowAt.x, parts.pillowAt.y + (1 - pk) * 0.25 + Math.sin(pk * Math.PI) * 0.03 + fold * 0.18, pz)
+    o.scale.setScalar(GRILL_SCALE * (1 - gone * 0.9))
+    o.position.y += gone * 0.4 * GRILL_SCALE
+  })
+  return <group ref={g} visible={false} name="boss-futon"><primitive object={parts.r} /></group>
+})
 /** the owner in his place, at the grill (open or shut: open, he's the head chef there, his second cook at the board): drawn again only when
  * that or the language changes, not with every redraw of the kitchen (he walks, turns and fades by his own frame loop) */
 const BossSpot = memo(function BossSpot({ open, lang }: { open: boolean; lang: Lang }) {
@@ -9641,6 +9740,9 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       {/* the owner: at his grill while the shop's shut; open, his chef has the grill and he stands along the aisle from it, keeping an eye  (he fades himself out of the way when he stands between the camera and what it looks at: Boss.tsx) */}
       {bar && (<>
         <BossSpot open={space === 'open'} lang={lang} />
+        {/* (his futon, the nights he's too tired for the stair, and his way to it (item 444)) */}
+        <BossBedWays open={space === 'open'} research={research} />
+        <Suspense fallback={null}><BossFuton /></Suspense>
         {/* (and the notch's wooden step he and his cook stand on) */}
         <NotchStep />
         <NotchStep id="soustep" label="三廚木台階" node="SousStep" at={SOUS_STEP_AT} yaw={SOUS_STEP_YAW} />

@@ -3441,6 +3441,14 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
 .ofc-seat .avatar { border-radius: 50%; box-shadow: 0 1px 4px rgb(59 42 32 / 0.25); }
 .ofc-seat.is-owner { cursor: default; }
 .ofc-seat.is-owner:hover { transform: none; }
+/* (the owner's spirit round his face (item 444): a faint track, the spirit's arc from the top round, green, amber below half, red worn out) */
+.ofc-seat-spirit { position: absolute; inset: -2px; width: 44px; height: 44px; transform: rotate(-90deg); pointer-events: none; }
+.ofc-seat-spirit circle { fill: none; stroke-width: 2.6; stroke-linecap: round; }
+.ofc-seat-spirit circle:first-child { stroke: rgb(59 42 32 / 0.16); }
+.ofc-seat-spirit circle:last-child { stroke: #5fa040; transition: stroke-dasharray 0.6s ease, stroke 0.6s ease; }
+.ofc-seat.is-low .ofc-seat-spirit circle:last-child { stroke: #d49a2a; }
+.ofc-seat.is-worn .ofc-seat-spirit circle:last-child { stroke: #c4442f; }
+.ofc-seat-zz { position: absolute; right: -6px; top: -6px; padding: 0 4px; border-radius: 8px; background: #2f3e63; color: #f4efe4; font-size: 10px; line-height: 15px; white-space: nowrap; box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); }
 /* (not on today's shift: the face greyed) */
 .ofc-seat.is-off .avatar { filter: grayscale(0.8); opacity: 0.55; }
 .ofc-seat.is-open { display: flex; flex-direction: column; gap: 1px; width: 40px; height: auto; }
@@ -6965,6 +6973,13 @@ body.be-tool .char-dock { right: calc(var(--bt-right) + 12px); top: calc(var(--b
 }
 /* (and a customer who loved what they had: hearts and stars out of their face (item 209)) */
 .boss-joy, .guest-joy { position: relative; display: block; width: 0; height: 0; }
+/* (item 444: the owner asleep on his futon, Zz rising off him in turn, larger as they go, fading) */
+.boss-zz { position: relative; display: block; width: 0; height: 0; }
+.boss-zz i { position: absolute; left: 0; bottom: 0; font: 900 28px/1 "Arial Black", sans-serif; color: #f6f1e6; font-style: normal;
+  -webkit-text-stroke: 2px #2f3e63; paint-order: stroke; text-shadow: 0 2px 4px rgb(0 0 0 / 0.45); opacity: 0; animation: boss-zz 3s ease-out infinite; }
+.boss-zz i:nth-child(2) { animation-delay: 1s; font-size: 22px; }
+.boss-zz i:nth-child(3) { animation-delay: 2s; font-size: 17px; }
+@keyframes boss-zz { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 0.95; } 100% { opacity: 0; transform: translate(26px, -48px) scale(1.25); } }
 .boss-joy i, .guest-joy i {
   position: absolute; left: 0; top: 0; font-style: normal; font-size: 18px; line-height: 1; opacity: 0;
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));

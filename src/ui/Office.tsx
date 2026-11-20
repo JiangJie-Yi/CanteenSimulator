@@ -1,3 +1,4 @@
+import { BOSS_BODY } from '@/game/bossStamina'
 import { personName } from '@/data/people'
 import { canDismiss } from '@/game/hiring'
 import { createPortal } from 'react-dom'
@@ -60,6 +61,8 @@ type Props = {
   /** (item 361, game/lodging) how many live upstairs; their asking answered, an offer, moving out */
   lodgers?: number
   onLodge?: (w: Worker, act: 'yes' | 'no' | 'offer' | 'out') => void
+  /** the owner's own tiredness (0..100, item 444): his spirit round his face in the roster */
+  bossFatigue?: number
   onClose: () => void
   /** which tab is showing, and the research notebook and the books to show in their own */
   tab: OfficeTab
@@ -94,7 +97,7 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
  */
 export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, owner, tab, onTab, book, ledger, shopOpen = false, rollsLeft, onRoll, today, onShift,
   pairs, atmos, mealDone, mealCost, onPraise, onMeal, seeing = null, canAsk, canGoOut, onAskOut, onGoOut, praiseOk, hoursOf, payOf, marketOf, onPay, lodgers = 0,
-  onLodge }: Props) {
+  onLodge, bossFatigue = 0 }: Props) {
   const roles = ROLES[dish.id] ?? []
   const people = CANDIDATES[dish.id] ?? []
   const ja = lang === 'ja'
@@ -158,9 +161,23 @@ export function Office({ dish, lang, hired, onHire, onFire, onClose, onReset, ow
             <div className="ofc-roster-group">
               <span className="ofc-roster-role">{t('大廚', '大将')}</span>
               <span className="ofc-roster-seats">
-                <span className="ofc-seat is-owner" title={`${owner || t('老闆', '店主')}${dot}${t('大廚（你）', '大将（あなた）')}`}>
-                  <Avatar id="owner" look={{ female: false, age: 'middle' }} role="owner" size={38} />
-                </span>
+                {/* (his spirit round his face (item 444): green, amber as he tires, red worn out; asleep on his futon down in the shop, a 睡 by
+                    it) */}
+                {(() => {
+                  const spirit = Math.round(100 - bossFatigue), worn = isTired(bossFatigue), asleep = BOSS_BODY.bed === 'asleep' || BOSS_BODY.bed === 'laying'
+                  const C = 2 * Math.PI * 20.5
+                  return (
+                    <span className={`ofc-seat is-owner${worn ? ' is-worn' : spirit < 50 ? ' is-low' : ''}`}
+                      title={`${owner || t('老闆', '店主')}${dot}${t('大廚（你）', '大将（あなた）')}${dot}${t('精神', '元気')} ${spirit}${worn ? `${dot}${t('疲勞', '疲労')}` : ''}${asleep ? `${dot}${t3('在一樓打地舖睡', '一階で布団を敷いて寝ている', 'asleep on a futon downstairs')}` : ''}`}>
+                      <Avatar id="owner" look={{ female: false, age: 'middle' }} role="owner" size={38} />
+                      <svg className="ofc-seat-spirit" viewBox="0 0 44 44" aria-hidden="true">
+                        <circle cx="22" cy="22" r="20.5" />
+                        <circle cx="22" cy="22" r="20.5" strokeDasharray={`${(C * spirit) / 100} ${C}`} />
+                      </svg>
+                      {asleep && <span className="ofc-seat-zz">{t3('睡', '寝', 'Zz')}</span>}
+                    </span>
+                  )
+                })()}
               </span>
             </div>
             {roles.map((r) => {

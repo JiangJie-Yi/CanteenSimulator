@@ -97,6 +97,7 @@ import { LINES, tallyNames } from '@/data/lines'
 import { CHEFS, type Chef } from '@/data/chefs'
 import { crowdPart, guestLabel, type CrowdPart } from '@/data/guests'
 import { activityOf, effective, isTired, restPerHour, ROLES, tireNow, workFatigue, type Role, type SkillId, type Worker as Hand } from '@/data/staff'
+import { BOSS_BODY, bossRest, bossTire } from '@/game/bossStamina'
 import { CLOSE_AT, OPEN_AT, crewPay, hoursEnd, hoursText, inHours, isLate, lastCall, lateBy } from '@/game/hours'
 import { cardFee, platformCut, rentDue } from '@/game/costs'
 import { GUIDE_KEY } from '@/game/firstDay'
@@ -427,6 +428,8 @@ const METER_KEY = 'jgs-utilities-1'
 const VISITS_KEY = 'jgs-reputation-1'
 /** each day's closing sheet in the books (ui/DaySummary, game/daySummary's DayRecord) */
 const DAYS_KEY = 'jgs-days-1'
+/** how tired the owner is (item 444, game/bossStamina): his own key, cleared only by starting over */
+const BOSS_FATIGUE_KEY = 'jgs-boss-fatigue-1'
 function useSky(): [Sky, (s: Sky) => void] {
   // (the part of the day on the game's clock (the owner's: day and night come round with the time, dawn and dusk between them): a new game's
   // ten in the morning, a page brought back after its 3D view was lost the time it was); on the page as its look (data-theme: dark by night
@@ -1676,6 +1679,13 @@ export default function App() {
     setOrdersBy((b) => ({ ...b, [space]: fn(b[space]) }))
   // the staff hired at each shop (by worker id) and how tired each is
   const [hired, setHired] = useState<Record<string, Record<string, Rota>>>(() => SAVED?.hired ?? {})
+  // (the owner's own tiredness (item 444, game/bossStamina): kept in its own key, brought back as the page loads; ticked with the staff's)
+  const [bossFatigue, setBossFatigue] = useState(() => {
+    let f = 0
+    try { f = Math.max(0, Math.min(100, Number(localStorage.getItem(BOSS_FATIGUE_KEY) ?? 0) || 0)) } catch { /* (storage blocked) */ }
+    BOSS_BODY.fatigue = f
+    return f
+  })
   const hiredNow = useRef(hired)
   hiredNow.current = hired
   // (the staff's feeling for each other, pair by pair, and the business day they last had their meal (game/affinity, item 323))
@@ -3102,6 +3112,18 @@ export default function App() {
       const st5 = slowTick.current
       st5.n++
       const fifth = st5.n % 5 === 0
+      // (the owner too (item 444): at his fire with the shop open, tiring, busy while someone's waiting for their food; with it shut, resting,
+      // faster asleep on his futon down here (game/bossStamina))
+      if (fifth) {
+        const hours = GAME_SPEED.value * 5 / 60
+        const busy = (guestsRef.current[aiRef.current.shop] ?? []).some((g) => g.state === 'waiting')
+        const f = aiRef.current.ai ? bossTire(BOSS_BODY.fatigue, hours, busy, LATE.on) : bossRest(BOSS_BODY.fatigue, hours, BOSS_BODY.bed === 'asleep')
+        if (Math.abs(f - BOSS_BODY.fatigue) > 1e-6) {
+          BOSS_BODY.fatigue = f
+          setBossFatigue(Math.round(f * 10) / 10)
+          try { localStorage.setItem(BOSS_FATIGUE_KEY, f.toFixed(2)) } catch { /* (storage blocked) */ }
+        }
+      }
       if (fifth) setHired((h) => {
         // (nothing changes for someone fully rested and resting: then nothing re-renders)
         let changed = false
@@ -3562,6 +3584,8 @@ export default function App() {
       localStorage.removeItem(TISSUES_KEY)
       // (and the sake the owner's tasted at the stand (item 363))
       localStorage.removeItem(TASTED_KEY)
+      // (and how tired the owner is (item 444))
+      localStorage.removeItem(BOSS_FATIGUE_KEY)
       // (and this tab's kept progress, from a lost 3D view: never brought back over the fresh start)
       sessionStorage.removeItem(RESUME_KEY)
     } catch {
@@ -4021,6 +4045,7 @@ export default function App() {
             pairs={pairs} atmos={atmosNow} mealDone={mealDay === dutyDay(ai)} mealCost={MEAL_COST * staffOf(dish.id).length}
             onPraise={(w) => praise(dish.id, w)} onMeal={() => giveMeal(dish.id)}
             praiseOk={(w) => canPraise(hoursToday(w.id), hired[dish.id]?.[w.id]?.praised === dutyDay(ai))} hoursOf={(w) => hoursToday(w.id)}
+            bossFatigue={bossFatigue}
             payOf={(w) => payOf(dish.id, w)} marketOf={(w) => wageOf(w.role, w)} onPay={(w, dir) => changePay(dish.id, w, dir)}
             lodgers={lodgerCount(dish.id)} onLodge={(w, act) => lodge(dish.id, w, act)}
             seeing={seeing(dish.id)} canAsk={(w) => { const r = hired[dish.id]?.[w.id]; return !!r && canConfess(w, r, dutyDay(ai), seeing(dish.id) !== null) }}

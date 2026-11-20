@@ -10,12 +10,13 @@ import { airbrush, gradientMap } from '@/scene/Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
-import { bossLineText, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
+import { bedLineText, bossLineText, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { bossSituation } from '@/game/talkTime'
 import { getClock } from '@/ui/clockStore'
 import { DrinkBottle } from './DiningRoom'
 import { gulpSound } from './chewSound'
-import { FIGURES, FRIDGE_STOCK, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
+import { BOSS_BED, FIGURES, FRIDGE_STOCK, FUTON, KITCHEN_FOLK, OWNER_GRILL, OWNER_OUT, type DrinkId } from './bar'
+import { BOSS_BODY, bossWorn, layBeat, riseBeat, sleepsDown, wakesUp } from '@/game/bossStamina'
 import { footDust, newSteps } from '@/scene/DustPuffs'
 const FEET = new THREE.Vector3()
 import { RUSH, SPEAKERS, STAFF_TALK } from '@/game/shopState'
@@ -157,6 +158,32 @@ const ROUND: Phase[] = [
 // (and a run back to it, after a taste or a drink taken down the aisle: at once past it when he's there)
 const ROUND_OPEN: Phase[] = [{ act: 'tongs', len: 6 }, { act: 'idle', len: 2.5 }, { act: 'run', len: 0 }]
 const WALK_SPEED = 0.9
+/** (item 444) his way to his futon the nights he's worn out, and back: where he is along it; laying it down, asleep, getting up; where its
+ * foot is and where he lies down on it (his own frame); how far he's lain back (0 standing .. 1 on his back) */
+type BedTrip = { phase: 'off' | 'go' | 'lay' | 'sleep' | 'rise' | 'back'; pts: THREE.Vector3[]; len: number; d: number; t: number
+  foot: THREE.Vector3; feet: THREE.Vector3; off: THREE.Vector3; head: THREE.Vector3; bar: number; lie: number }
+/** how far in from the futon's foot his feet go as he lies down, so his head comes to the pillow (the bar's units) */
+const FEET_IN = 0.29
+/** lain on his back, how far up off the floor his pivot (his feet's middle) comes: the mattress and his back's depth (the bar's units) */
+const LIE_LIFT = 0.07 + 0.11
+/** wanted while still laying it down: straight to folding it up (the rise's sit and stand skipped) */
+const RISE_SKIP = 0.9 + 0.7
+/** (dev) sent to bed now, however tired */
+const TO_BED = { now: false }
+/** whether the shop was open the frame before (the module's, not his: he's drawn afresh as the shop shuts, and his own memory of it went
+ * with the old one, the moment it shut never seen) */
+const SHOP_WAS = { open: false }
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __bossToBed: () => { TO_BED.now = true }, __bossBody: BOSS_BODY })
+const alongPts = (pts: THREE.Vector3[], d: number, out: THREE.Vector3) => {
+  for (let i = 1; i < pts.length; i++) {
+    const seg = pts[i].distanceTo(pts[i - 1])
+    if (d <= seg || i === pts.length - 1) return out.copy(pts[i - 1]).lerp(pts[i], seg > 1e-9 ? Math.min(1, d / seg) : 1)
+    d -= seg
+  }
+  return out.copy(pts[pts.length - 1])
+}
+const lengthOf = (pts: THREE.Vector3[]) => pts.reduce((n, p, i) => (i ? n + p.distanceTo(pts[i - 1]) : 0), 0)
+const easeIO = (k: number) => k * k * (3 - 2 * k)
 const RUN_SPEED = 2.4
 
 /** `to`: the far end of his walk, in the frame he stands in (x, z), from his place at its origin, facing +z */
@@ -394,6 +421,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       // (one bubble over him at a time (the owner's): while he's saying something to the shop (a greeting, a welcome: STAFF_TALK), his
       // muttering waits)
       if (STAFF_TALK.some((w) => (w.id === 'owner' || SPEAKERS.get(w.id) === SPEAKERS.get('owner')) && w.until > performance.now())) { h = window.setTimeout(next, 800); return }
+      // (nothing muttered from under his quilt, or as he lays it down or folds it up (item 444))
+      if (BOSS_BODY.bed !== 'off') { h = window.setTimeout(next, 1500); return }
       const s = bossSituation(getClock().minute, open)
       const i = nextBossLine(s, last?.s === s ? last.i : null, Math.random())
       last = { s, i }
@@ -444,6 +473,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   /** his palms' heights in the world as they're eased to where they're wanted at the fire (NaN: not at it) */
   const palmY = useRef({ r: NaN, l: NaN })
   const st = useRef({ last: 0, phase: 0, t: 0, x: 0, z: 0, yaw: 0, stride: 0, blinkAt: 2, blinks: 0, y: 0, vy: 0, ground: 0, probeAt: -1, probeX: 0, probeZ: 0, probeEdit: false })
+  const bed = useRef<BedTrip>({ phase: 'off', pts: [], len: 0, d: 0, t: 0, foot: new THREE.Vector3(), feet: new THREE.Vector3(), off: new THREE.Vector3(), head: new THREE.Vector3(), bar: 1, lie: 0 })
+  // (asleep on it: the Zz over him)
+  const [asleep, setAsleep] = useState(false)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const ray = useMemo(() => new THREE.Raycaster(), [])
@@ -554,7 +586,110 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     if (!m || !b) return
     const edit = getEdit().on
     // (the shop opening or shutting: he starts his round over, from his place)
+    const shutting = SHOP_WAS.open && !open
+    SHOP_WAS.open = open
     if (openRef.current !== open) { openRef.current = open; s.phase = 0; s.t = 0; s.x = 0; s.z = 0 }
+    // ---- (item 444) the nights he's worn out, as the shop's shut: off to the stair's foot by the staff's door, his futon down there, in under
+    // it, asleep; up again rested, or wanted (the shop opening, the player at his fire), the futon folded and taken off, back to his fire
+    const bd = bed.current, ff = BOSS_BED.futon
+    if (edit && bd.phase !== 'off') { bd.phase = 'off'; ff.on = false; BOSS_BODY.bed = 'off'; setAsleep(false); s.x = 0; s.z = 0; s.y = 0 }
+    if (bd.phase === 'off' && !edit && !open && m.parent && BOSS_BED.way && BOSS_BED.frame && ((shutting && sleepsDown(BOSS_BODY.fatigue)) || TO_BED.now)) {
+      TO_BED.now = false
+      const frame = BOSS_BED.frame
+      const w = BOSS_BED.way(frame.worldToLocal(m.getWorldPosition(new THREE.Vector3())))
+      if (w) {
+        const mine = (p: THREE.Vector3) => m.parent!.worldToLocal(frame.localToWorld(p.clone()))
+        bd.pts = w.path.map(mine)
+        bd.len = lengthOf(bd.pts)
+        bd.d = 0; bd.t = 0; bd.lie = 0
+        bd.foot = mine(w.foot); bd.head = mine(w.head)
+        bd.bar = bd.foot.distanceTo(bd.head) / FUTON.L
+        bd.feet = bd.foot.clone().lerp(bd.head, FEET_IN / FUTON.L)
+        bd.off = bd.foot.clone().lerp(bd.head, -0.14 / FUTON.L)
+        bd.phase = 'go'
+        BOSS_BODY.bed = 'going'; BOSS_BODY.since = performance.now()
+        // (a word as he sets off, worn out; gone again as his muttering's are)
+        const k = Date.now()
+        setSay({ text: bedLineText(Math.random(), lang), key: k })
+        window.setTimeout(() => setSay((v) => (v && v.key === k ? null : v)), 4200)
+        const dir = w.head.clone().sub(w.foot)
+        ff.foot.copy(w.foot); ff.yaw = Math.atan2(dir.x, dir.z)
+        ff.on = false; ff.unroll = 0; ff.pillow = 0; ff.cover = 0; ff.fold = 0
+      }
+    }
+    const bedOn = bd.phase !== 'off' && !edit
+    let bedSpeed = 0
+    const toward = (to: number, rate: number) => turnTo(s, to, dt, rate)
+    if (bedOn) {
+      const hd = Math.atan2(bd.head.x - bd.foot.x, bd.head.z - bd.foot.z)
+      if (bd.phase === 'go' || bd.phase === 'back') {
+        // (along his way; wanted on the way there, he turns back)
+        if (bd.phase === 'go' && (BOSS_BED.wanted || BOSS_BED.callAt > BOSS_BODY.since)) { bd.phase = 'back'; bd.pts = bd.pts.slice().reverse(); bd.d = Math.max(0, bd.len - bd.d) }
+        // (his own pace there; back at a run if the shop's opening without him)
+        bedSpeed = bd.phase === 'back' && open ? RUN_SPEED * 0.8 : WALK_SPEED
+        const was = alongPts(bd.pts, bd.d, new THREE.Vector3())
+        bd.d = Math.min(bd.len, bd.d + bedSpeed * dt)
+        const p = alongPts(bd.pts, bd.d, new THREE.Vector3())
+        s.stride += p.distanceTo(was)
+        s.x = p.x; s.z = p.z; s.y = p.y
+        if (p.distanceTo(was) > 1e-5) toward(Math.atan2(p.x - was.x, p.z - was.z), 8)
+        if (bd.d >= bd.len - 1e-6) {
+          if (bd.phase === 'go') { bd.phase = 'lay'; bd.t = 0; BOSS_BODY.bed = 'laying'; BOSS_BODY.since = performance.now(); ff.on = true }
+          else { bd.phase = 'off'; BOSS_BODY.bed = 'off'; s.x = 0; s.z = 0; s.y = 0; s.phase = 0; s.t = 0 }
+          bedSpeed = 0
+        }
+      } else if (bd.phase === 'lay') {
+        bd.t += dt
+        const beat = layBeat(bd.t)
+        if ((BOSS_BED.wanted || BOSS_BED.callAt > BOSS_BODY.since) && beat.phase !== 'asleep') { bd.phase = 'rise'; bd.t = RISE_SKIP }
+        if (beat.phase === 'unroll' || beat.phase === 'pillow') {
+          // (stood at its foot, bent to it, spreading it out along to its head, then the pillow down at its head)
+          ff.unroll = beat.phase === 'unroll' ? beat.k : 1
+          ff.pillow = beat.phase === 'pillow' ? beat.k : 0
+          s.x = bd.off.x; s.z = bd.off.z; s.y = bd.off.y
+          toward(hd, 8)
+        } else if (beat.phase === 'lie') {
+          // (a step on to where his feet go, turned round, his back to its head; then down onto his back, onto it)
+          ff.unroll = 1; ff.pillow = 1
+          const step = easeIO(Math.min(1, beat.k / 0.35)), down = easeIO(Math.max(0, (beat.k - 0.35) / 0.65))
+          s.x = bd.off.x + (bd.feet.x - bd.off.x) * step; s.z = bd.off.z + (bd.feet.z - bd.off.z) * step
+          s.y = bd.off.y + FUTON.top * bd.bar * step
+          toward(hd + Math.PI, 6)
+          bd.lie = down
+        } else {
+          ff.unroll = 1; ff.pillow = 1; bd.lie = 1
+          ff.cover = beat.phase === 'cover' ? beat.k : 1
+          if (beat.phase === 'asleep') { bd.phase = 'sleep'; BOSS_BODY.bed = 'asleep'; BOSS_BODY.since = performance.now(); setAsleep(true) }
+        }
+      } else if (bd.phase === 'sleep') {
+        bd.lie = 1; ff.cover = 1
+        if (wakesUp(BOSS_BODY.fatigue, BOSS_BED.wanted || BOSS_BED.callAt > BOSS_BODY.since)) { bd.phase = 'rise'; bd.t = 0; BOSS_BODY.bed = 'rising'; BOSS_BODY.since = performance.now(); setAsleep(false) }
+      } else if (bd.phase === 'rise') {
+        bd.t += dt
+        const beat = riseBeat(bd.t)
+        if (beat.phase === 'sit') {
+          // (the quilt thrown back as he sits up)
+          ff.cover = 1 - easeIO(beat.k)
+          bd.lie = 1 - 0.62 * easeIO(beat.k)
+        } else if (beat.phase === 'stand') {
+          // (up onto his feet, a step back off it to its foot, turned to fold it)
+          ff.cover = 0
+          bd.lie = 0.38 * (1 - easeIO(beat.k))
+          const k = easeIO(beat.k)
+          s.x = bd.feet.x + (bd.off.x - bd.feet.x) * k; s.z = bd.feet.z + (bd.off.z - bd.feet.z) * k
+          s.y = bd.off.y + FUTON.top * bd.bar * (1 - k)
+          toward(hd, 6)
+        } else if (beat.phase === 'fold') {
+          bd.lie = 0; ff.fold = beat.k
+          s.x = bd.off.x; s.z = bd.off.z; s.y = bd.off.y
+          toward(hd, 8)
+        } else {
+          // (folded and taken off; back to his fire the way he came)
+          ff.on = false; ff.fold = 0; ff.cover = 0; ff.unroll = 0; ff.pillow = 0
+          bd.phase = 'back'; bd.pts = bd.pts.slice().reverse(); bd.d = 0; BOSS_BODY.bed = 'off'
+        }
+      }
+    }
     const ROUNDS = open ? ROUND_OPEN : ROUND
     if (edit) { s.phase = 0; s.t = 0; s.x = 0; s.z = 0; s.yaw = 0 }
     const ph = ROUNDS[s.phase % ROUNDS.length]
@@ -576,7 +711,14 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // (at his fire through business: there to take things on and off it (Roasting's, while he's seen to be))
     const grill = open && !edit && !ask && !OWNER_OUT.on
     if (grill) OWNER_GRILL.seenAt = performance.now()
-    if (ask) {
+    // (his height on his way and at his futon as worked out above: the floor's under his way (the dining room's higher than the kitchen's),
+    // not the ground's probe or the kitchen's floor his walk round keeps to)
+    const bedY = s.y
+    if (bedOn) {
+      // (his futon (item 444): where he is and which way he faces worked out above; a walk's waddle while he walks)
+      speed = bedSpeed
+      act = 'idle'
+    } else if (ask) {
       // (the nearest he can come to it: on the aisle, by way of the notch's mouth; with no aisle given, along his walk's line, not behind it)
       let goal: [number, number]
       if (aisle) {
@@ -691,6 +833,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       s.y += s.vy * dt
       if (s.y <= s.ground) { s.y = s.ground; s.vy = s.vy < -1.2 ? -s.vy * 0.28 : 0 }
     } else { s.y = s.ground; s.vy = 0 }
+    if (bedOn) { s.y = bedY; s.vy = 0 }
     m.position.set(s.x, s.y, s.z)
     m.rotation.y = s.yaw
 
@@ -712,6 +855,17 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     b.rotation.z = moving ? Math.sin(step * Math.PI) * (run ? 0.13 : 0.09) : Math.sin(T * 0.7) * 0.025
     // (a little hop of joy as he waves)
     if (act === 'wave') b.position.y += Math.max(0, Math.sin(s.t * 5)) * 0.015
+    // (item 444: on his futon: lain back about his feet onto his back, lifted onto it by his back's depth; breathing slow asleep; bent over it
+    // as he spreads it out and folds it up)
+    if (bedOn) {
+      const bend = bd.phase === 'lay' && bd.lie === 0 && !(ff.unroll >= 1 && ff.pillow >= 1) ? 0.5 : bd.phase === 'rise' && ff.fold > 0 && ff.fold < 1 ? 0.45 : 0
+      if (bd.lie > 0) {
+        b.rotation.x = -bd.lie * Math.PI / 2
+        b.rotation.z = 0
+        b.position.y = bd.lie * LIE_LIFT * bd.bar
+        if (bd.phase === 'sleep') { const br = Math.sin(T * 1.3) * 0.02; b.scale.set(1 + br, 1, 1 + br * 1.4) }
+      } else if (bend) b.rotation.x = bend
+    }
 
     // ---- the hands
     const R = new THREE.Vector3(), L = new THREE.Vector3()
@@ -877,6 +1031,10 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       : act === 'drink' ? ((T - BOSS_DRINK.since) % 1.4 < 1 ? 'drink' : 'talk') : now - RUSH.at < 2500 ? 'panic' : now - BOSS_FX.joyAt < 2000 ? 'proud'
       : act === 'wave' ? 'happy' : 'idle'
     if (BOSS_FACE.face && now < BOSS_FACE.until) face = BOSS_FACE.face
+    // (item 444: asleep, his eyes shut; worn out, or getting up off his futon, tired)
+    const bedPhase = bed.current.phase
+    if (bedPhase === 'sleep' || (bedPhase === 'lay' && bed.current.lie > 0.6)) face = 'blink'
+    else if (bedPhase !== 'off' || (bossWorn(BOSS_BODY.fatigue) && face === 'idle')) face = 'tired'
     // (the face's life over it (item 368, game/faceLife): a blink at no fixed beat that closes and opens, now and then twice; a new face
     // through a blink; the mouth in syllables while a line of his is up (his muttering or a word to the shop); a glance aside, idle)
     const word = talking || STAFF_TALK.some((w) => w.id === 'owner' && w.until > now)
@@ -922,6 +1080,12 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         </Html>
       )}
       <group ref={body}><primitive object={root} />
+        {/* (asleep on his futon (item 444): Zz rising off his head, as he lies) */}
+        {asleep && !getEdit().on && (
+          <Html position={[0, 1.3, 0]} center zIndexRange={zr(20, 10)} style={NO_POINTER}>
+            <span ref={floatEl} className="boss-zz" aria-hidden="true"><i>Z</i><i>z</i><i>z</i></span>
+          </Html>
+        )}
         <group ref={drinkRef} name="boss-drink-held" visible={false}>{drinkId && <DrinkBottle id={drinkId} wet />}</group>
         <group ref={bowlRef} name="boss-taste-bowl" scale={SHRUNK}>
           <mesh geometry={TASTE_BOWL_GEO} material={TASTE_BOWL_MAT} /><mesh geometry={TASTE_BAND_GEO} material={TASTE_BAND_MAT} />

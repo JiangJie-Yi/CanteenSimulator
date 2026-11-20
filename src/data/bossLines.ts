@@ -200,6 +200,16 @@ export const drinkLineText = (r: number, lang: Lang) => {
   const l = DRINK_LINES[Math.floor(r * DRINK_LINES.length) % DRINK_LINES.length]
   return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
 }
+/** what the owner says, worn out, as he sets off to lay his futon down by the stair instead of going up it (item 444) */
+export const BED_LINES: Line[] = [
+  { zh: '累壞了……今晚就睡這裡吧', ja: 'くたくただ……今夜はここで寝よう', en: "Worn out... I'll sleep down here tonight" },
+  { zh: '樓梯今天爬不上去了……', ja: '今日はもう階段を上がれん……', en: "Can't face the stairs tonight..." },
+  { zh: '鋪個被子，躺一下就好……', ja: '布団を敷いて、ちょっと横になろう……', en: 'Just a futon, a little lie-down...' },
+]
+export const bedLineText = (r: number, lang: Lang) => {
+  const l = BED_LINES[Math.floor(r * BED_LINES.length) % BED_LINES.length]
+  return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
+}
 /** what the owner says, delighted, as the money's taken out of the till's drawer (the owner's) */
 export const CASH_LINES: Line[] = [
   { zh: '喔喔！今天收成真好！', ja: 'おおっ！今日は大漁だ！', en: 'Ooh! A good haul today!' },
