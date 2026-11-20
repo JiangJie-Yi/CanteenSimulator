@@ -427,17 +427,21 @@ function OwnerWalkerImpl() {
 const STAFF_DOOR_AT = -3.55
 /** the koi print, moved (the owner's): on the toilets' wall past the drinks fridges, on the plain plaster there; once only, the same array
  * each time (the wall's memo compares it) */
-const koiHangs = new Map<string, { z: number; print: 'koi' }[]>()
+const koiHangs = new Map<string, { z: number; print: 'koi' | 'rainBridge' }[]>()
 // (by the men's toilet now, on the wall between the drinks fridges and its doorway, over the supplies' stack (the owner's, 2026-11-11): it hung on
 // the fridges' other side)
-function koiHang(clear: [number, number][], from: number, door?: number) {
+// (and the rain on the bridge (雨中橋) by the women's toilet, in the middle of the wall between its doorway and the corner (item 430, the
+// owner's 「原本的畫不見了，幫我搬到女廁旁」: it hung in the bay past the drinks fridges, and item 425's move of the toilets and the fridges by
+// 2.6 cm put that bay's place inside the 30 cm kept clear of them, and it was gone; the bay is the storeroom's way in now))
+function koiHang(clear: [number, number][], from: number, door?: number, to?: number) {
   const g0 = door === undefined ? undefined : door - WC_W - 0.12
   const below = g0 === undefined ? [] : clear.filter((r) => r[1] <= g0)
   const lo = clear.length ? Math.min(...clear.map((r) => r[0])) : from + 1
   const z = g0 !== undefined && below.length ? (Math.max(...below.map((r) => r[1])) + g0) / 2 : Math.max(from + 0.4, lo - 0.55)
-  const key = z.toFixed(3)
+  const rain = door !== undefined && to !== undefined && to - (door + WC_W + 0.12) > 0.75 ? (door + WC_W + 0.12 + to) / 2 : null
+  const key = `${z.toFixed(3)}|${rain?.toFixed(3) ?? ''}`
   let v = koiHangs.get(key)
-  if (!v) { v = [{ z, print: 'koi' }]; koiHangs.set(key, v) }
+  if (!v) { v = [{ z, print: 'koi' as const }, ...(rain === null ? [] : [{ z: rain, print: 'rainBridge' as const }])]; koiHangs.set(key, v) }
   return v
 }
 /** a customer in the boss's style, drawn in the customers' frame (PEOPLE_SCALE): the staff's size */
@@ -9116,7 +9120,7 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
             <DiningFloor c={c} from={-c.length / 2 - 0.35} to={meet} far={farOf(c)} bare={!!given} wall={!given} />
             {/* (its wall runs on into the corner, to meet the first counter's: the toilet's door in that stretch) */}
             {given && <DiningWall c={c} from={-c.length / 2 - 0.35} to={corner} far={farOf(c)} lampId="sidelamp" lampName="側吧台" top={top} door={wcs?.door ?? (meet + corner) / 2}
-              clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35, wcs?.door ?? (meet + corner) / 2)} />}
+              clear={fridgeClear} hang={koiHang(fridgeClear ?? [], -c.length / 2 - 0.35, wcs?.door ?? (meet + corner) / 2, corner)} />}
           </group>
         )
       })}
