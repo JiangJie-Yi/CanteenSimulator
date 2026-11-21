@@ -3298,18 +3298,21 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
         {/* its floor, the toilets' hinoki boards, a hair over the shop's own floor run out behind the wall */}
         <WcFloor wx={dx} wz={len} at={[(WALL_OUT + deep) / 2, 0.007, mid]} />
         {/* inside: its back wall, its near end; its far end in front of the men's room's end wall (2 mm off it) */}
-        <WcWall len={len} at={[deep, 0, mid]} yaw={-Math.PI / 2} top={top} />
+        {/* (its back cut open as the toilets' rooms' are, seen through from outside (item 482, the owner's 「這邊要通透」: a solid back made it a
+            blank grey box from behind the shop, the stocker and the stock out of sight): one face, turned in, nothing behind it) */}
+        <WcWall len={len} at={[deep, 0, mid]} yaw={-Math.PI / 2} top={top} cut />
         <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, z0]} yaw={0} top={top} />
         <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, zE - 0.002]} yaw={Math.PI} top={top} />
-        {/* outside: the walls' bodies, from a little behind the shop's wall: its near end, its back, and the short end past the men's room */}
-        <WcMass x={[WC_IN, deep + WC_T]} y={[0, top]} z={[z0 - WC_T, z0 - 0.002]} />
-        <WcMass x={[deep + 0.002, deep + WC_T]} y={[0, top]} z={[z0 - WC_T, zE + WC_T]} />
+        {/* outside: the walls' bodies, from a little behind the shop's wall: its near end, and the short end past the men's room (its back
+            open, item 482) */}
+        <WcMass x={[WC_IN, deep]} y={[0, top]} z={[z0 - WC_T, z0 - 0.002]} />
         <WcMass x={[WC_ROOM.D + WC_T + 0.002, deep]} y={[0, top]} z={[zE, zE + WC_T]} />
         {/* the slatted ceiling on the caps */}
         <WcSlats x={[WALL_OUT, deep]} z={[z0, zE]} y={top + WC_CAP + 0.011} />
-        {/* (dark posts at its two outer corners) */}
+        {/* (dark posts at its two back corners, the open back's edges) */}
         {[z0 - WC_T, zE + WC_T].map((z, k) => (
-          <mesh key={k} position={[deep + WC_T / 2, top / 2, z + (k ? -0.015 : 0.015)]}><boxGeometry args={[WC_T + 0.012, top, 0.034]} /><meshToonMaterial color="#2e1c10" /></mesh>
+          // (4 mm proud of the end walls' backs: not in one plane with them)
+          <mesh key={k} position={[deep - WC_T / 2 + 0.004, top / 2, z + (k ? -0.015 : 0.015)]}><boxGeometry args={[WC_T, top, 0.034]} /><meshToonMaterial color="#2e1c10" /></mesh>
         ))}
         {/* the doorway's frame: two dark cedar posts in the wall's line, proud of its face, through its thickness; the head over them; the
             jambs lined; a low sill across its foot */}
