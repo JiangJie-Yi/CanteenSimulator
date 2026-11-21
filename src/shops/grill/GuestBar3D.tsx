@@ -2468,6 +2468,10 @@ let SHOE_WOOD_MAT: THREE.MeshToonMaterial | null = null
 const SHOE_TINT: Record<string, THREE.Color> = { ShoeWood: new THREE.Color('#fbf6ef'), ShoeTop: new THREE.Color('#ece0d0'), ShoeSlat: new THREE.Color('#ffffff') }
 /** one of a pair of shoes put away in a cubby */
 const SHOE_PAIR_GEO = new RoundedBoxGeometry(0.07, 0.052, 0.17, 2, 0.02)
+/** the dark veil behind its back's slats (item 497, the owner's 「然後雖然這邊能透視內容但要給與黑黑一層朦朧感」): the shoes in the cubbies seen
+ * from behind between the slats, dim through it; the program the toilets' dark boxes' (a dark see-through basic); both its sides (its one
+ * face's way round is the exporter's: from the front it's behind the cubbies' back board anyway) */
+const SHOE_VEIL_MAT = new THREE.MeshBasicMaterial({ color: '#0d0907', transparent: true, opacity: 0.74, depthWrite: false, side: THREE.DoubleSide })
 /** the cupboard's shoes, all of them one instanced mesh in this material, each shoe its customer's colour (item 227) */
 const SHOES_IN_MAT = new THREE.MeshToonMaterial({ color: '#ffffff' })
 const SHOE_NONE = new THREE.Matrix4().makeScale(0, 0, 0)
@@ -2540,6 +2544,9 @@ function ShoeCupboard() {
     }
     for (const d of doors) together(d.o)
     if (cab) together(cab)
+    // (the veil left apart, a dark see-through, casting nothing)
+    const veil = root.getObjectByName('ShoeVeil') as THREE.Mesh | undefined
+    if (veil?.isMesh) { veil.material = SHOE_VEIL_MAT; veil.castShadow = veil.receiveShadow = false }
     // (all eight shut, drawn as one with one ink line, two draws not eighteen; any of them swinging, each its own again)
     const shut = homeCopy(root, doors.map((d) => d.o))
     return { root, doors, cells, shut }

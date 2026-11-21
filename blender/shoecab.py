@@ -11,7 +11,8 @@ into its part, so the game's one grained material draws wood and paper together;
 for ShoeWood / ShoeTop / ShoeSlat are to be paled to match (see the report). Every piece a plain box (no subdivisions) but the rings, the faces against the
 floor, the wall and each other left off.
 
-Nodes the game finds: "ShoeCab" (the carcass and what's inside, still), "ShoeDoorL<k>" / "ShoeDoorR<k>" (each door, hinged on its left or
+Nodes the game finds: "ShoeCab" (the carcass and what's inside, still; its back solid wood since item 497, a row of slats to each cubby),
+"ShoeVeil" (the dark veil behind those slats, item 497: the game draws it a dark see-through), "ShoeDoorL<k>" / "ShoeDoorR<k>" (each door, hinged on its left or
 right edge, its origin on its hinge: the game swings it open 75 degrees), numbered row by row from the bottom left.
 
 The game's frame (y up), the foot's middle at the origin, the front toward +z, x across it.
@@ -120,6 +121,8 @@ M = {
     "back": pbr("ShoeBack", lin("#1c120c"), rough=0.8),
     "inside": pbr("ShoeInside", lin("#2e2016"), rough=0.8),
     "pull": pbr("ShoePull", lin("#141010"), rough=0.4),
+    # (the dark veil behind its back's slats (item 497): the game draws it a dark see-through of its own)
+    "veil": pbr("ShoeVeil", lin("#0d0907"), rough=1.0),
 }
 
 
@@ -190,18 +193,35 @@ ys[-1] = y_in1
 cells_x = [(xs[c] + (T / 2 if c else 0), xs[c + 1] - (T / 2 if c + 1 < COLS else 0)) for c in range(COLS)]
 cells_y = [(ys[r] + (T / 2 if r else 0), ys[r + 1] - (T / 2 if r + 1 < ROWS else 0)) for r in range(ROWS)]
 # (the plinth, set back; the sides; the floor; the top, overhanging; the back; the dividers; the shelves)
-carcass.append(box("Plinth", x0 + 0.02, x1 - 0.02, 0, PLINTH, z0 + 0.01, z1 - 0.03, "back", drop=('-y', '-z')))
-carcass.append(box("SideL", x0, x0 + T, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
-carcass.append(box("SideR", x1 - T, x1, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y', '-z')))
-carcass.append(box("Floor", x0 + T, x1 - T, PLINTH, y_in0, z0, z1, "wood", drop=('-y', '-x', '+x', '-z')))
-carcass.append(box("Top", x0 - 0.015, x1 + 0.015, H - TOP, H, z0, z1 + 0.018, "top", drop=('-z',), bevel=0.004))
+# (their backs closed now (item 497, the owner's 「背面看必須要實心的木條」: it was made to stand on a wall, its boards' backs left off, and
+# seen from behind it was hollow, thin sheets of wood round the cubbies): every board's back face, the dividers and the shelves out to the
+# back's line)
+carcass.append(box("Plinth", x0 + 0.02, x1 - 0.02, 0, PLINTH, z0 + 0.01, z1 - 0.03, "back", drop=('-y',)))
+carcass.append(box("SideL", x0, x0 + T, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y')))
+carcass.append(box("SideR", x1 - T, x1, PLINTH, H - TOP, z0, z1, "wood", drop=('-y', '+y')))
+carcass.append(box("Floor", x0 + T, x1 - T, PLINTH, y_in0, z0, z1, "wood", drop=('-y', '-x', '+x')))
+carcass.append(box("Top", x0 - 0.015, x1 + 0.015, H - TOP, H, z0, z1 + 0.018, "top", bevel=0.004))
 carcass.append(box("Back", x0 + T, x1 - T, y_in0, y_in1, z0, z0 + 0.008, "inside", drop=('-z', '-x', '+x', '-y', '+y')))
 for c in range(1, COLS):
-    carcass.append(box("Divider", xs[c] - T / 2, xs[c] + T / 2, y_in0, y_in1, z0 + 0.008, z1, "wood", drop=('-y', '+y', '-z')))
+    carcass.append(box("Divider", xs[c] - T / 2, xs[c] + T / 2, y_in0, y_in1, z0, z1, "wood", drop=('-y', '+y')))
 for r in range(1, ROWS):
     for sx0, sx1 in cells_x:
-        carcass.append(box("Shelf", sx0, sx1, ys[r] - T / 2, ys[r] + T / 2, z0 + 0.008, z1, "wood", drop=('-x', '+x', '-z')))
+        carcass.append(box("Shelf", sx0, sx1, ys[r] - T / 2, ys[r] + T / 2, z0, z1, "wood", drop=('-x', '+x')))
+# (and each cubby's back a row of upright slats (縦格子), solid wood, 2 cm across, 1.2 cm through, five to a cubby with a gap of 1.6 cm
+# between, their backs in the back's line; inside each cubby they stand 4 mm proud of its dark back board; the shoes seen between them
+# from behind, through the veil)
+SLATS, SLAT_D = 5, 0.012
+for (cx0, cx1) in cells_x:
+    gap = (cx1 - cx0 - SLATS * 0.02) / (SLATS + 1)
+    for (cy0, cy1) in cells_y:
+        for i in range(SLATS):
+            sx = cx0 + gap + i * (0.02 + gap)
+            carcass.append(box("BackSlat", sx, sx + 0.02, cy0, cy1, z0, z0 + SLAT_D, "wood", drop=('-y', '+y')))
 cab = join(carcass, "ShoeCab")
+# (the dark veil behind the slats (item 497, the owner's 「然後雖然這邊能透視內容但要給與黑黑一層朦朧感」): one face toward the back across the
+# whole opening, 3 mm in from the back's line, between the slats' backs and the back board; its own node, drawn by the game a dark
+# see-through; from the front it's behind the back board, and turned away)
+veil = box("ShoeVeil", x0 + T, x1 - T, y_in0, y_in1, z0 + 0.003, z0 + 0.0031, "veil", drop=('+z', '-x', '+x', '-y', '+y'))
 
 # (the doors: each a frame of stiles and rails, louvres across it over a dark backing, a sunk pull at its free edge; its origin on its hinge)
 doors = []
@@ -254,7 +274,7 @@ for k, (col, row) in enumerate(CELLS):
 
 root = bpy.data.objects.new("ShoeCabinet", None)
 bpy.context.collection.objects.link(root)
-for o in [cab] + doors:
+for o in [cab] + doors + [veil]:
     o.parent = root
-export_dish(root, [cab] + doors + [root], os.path.join(PROJECT, "public", "models", "shoecab.glb"), os.path.join(PROJECT, "blender", "shoecab.blend"), PREVIEW, ladder=False)
-print("SHOECAB_TRIS", sum(len(p.vertices) - 2 for o in [cab] + doors for p in o.data.polygons))
+export_dish(root, [cab] + doors + [veil, root], os.path.join(PROJECT, "public", "models", "shoecab.glb"), os.path.join(PROJECT, "blender", "shoecab.blend"), PREVIEW, ladder=False)
+print("SHOECAB_TRIS", sum(len(p.vertices) - 2 for o in [cab] + doors + [veil] for p in o.data.polygons))
