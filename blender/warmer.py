@@ -46,7 +46,10 @@ WELL_X, WELL_R = 0.0, 0.4
 # model only what stands on it)
 PREP_DX = WARMER_L / 2 + 0.02 + 0.002 + 0.02 + PREP_L / 2
 # (to the right: the cooker stands at its left end now, by the miso pot (the owner's, 2026-11-11))
-BOARD_X = 0.35
+# (and further right since item 494 (the owner's 「做飯糰的區域減少至二分之一」, an arrow from the fryer over to beside the stove): the fryer
+# on the counter by the stove where the garnishes and the hand-water bowl were, the rice balls' things in half their room after it (from
+# x 0.0 to 0.92: they took 1.8), the garnishes at the counter's right end)
+BOARD_X = 0.47
 
 
 def P(x, y, z):
@@ -710,12 +713,12 @@ def rice_ball(name, x, y0, z, r, t):
 
 
 # (the hinoki board, its edges eased; two rice balls on it, shaped, and the third cook's one in the making between them is the game's)
-made(boxed("board", BOARD_X - 0.36, BOARD_X + 0.36, H, H + 0.035, -0.2, 0.22, parts, AM, bev=0.006, segs=2), "hinoki")
-for i, dx in enumerate((-0.2, 0.2)):
+made(boxed("board", BOARD_X - 0.21, BOARD_X + 0.21, H, H + 0.035, -0.2, 0.22, parts, AM, bev=0.006, segs=2), "hinoki")
+for i, dx in enumerate((-0.12, 0.12)):
     set_.extend(rice_ball(f"onigiri{i}", BOARD_X + dx, H + 0.035, 0.04, 0.072, 0.056))
 
 # (the bowl of hand water (手水): a lacquered bowl on a foot ring, red without and black within, the water a little under its rim)
-WX, WZ = BOARD_X - 0.62, 0.02
+WX, WZ = BOARD_X - 0.345, 0.02
 made(facing(turned("bowl", WX, H, WZ, [(0.068, 0.0), (0.072, 0.012), (0.076, 0.016), (0.096, 0.034), (0.116, 0.066), (0.125, 0.092),
                                         (0.123, 0.0985), (0.119, 0.0992), (0.117, 0.097)], parts, AM, segs=20, cap=False), True), "lacq")
 made(facing(turned("bowlin", WX, H, WZ, [(0.117, 0.097), (0.114, 0.088), (0.1, 0.058), (0.082, 0.036), (0.06, 0.026)], parts, AM, segs=20,
@@ -724,7 +727,7 @@ made(facing(turned("water", WX, H, WZ, [(0.104, 0.072)], parts, AM, segs=20, cap
 
 # (the fillings, each in a little sometsuke dish before the board: pickled plums, flaked salmon, kombu)
 DISH = [(0.03, 0.0), (0.034, 0.006), (0.05, 0.016), (0.055, 0.0225), (0.05, 0.0215), (0.037, 0.012), (0.032, 0.0095)]
-for i, (fill, dx) in enumerate((("ume", -0.2), ("salmon", 0.0), ("kombu", 0.2))):
+for i, (fill, dx) in enumerate((("ume", -0.115), ("salmon", 0.0), ("kombu", 0.115))):
     x = BOARD_X + dx
     made(facing(turned(f"dish{i}", x, H, 0.345, DISH, parts, AM, segs=16, cap=True, uv="polar", R=0.056), True), "dish")
     if fill == "ume":
@@ -737,39 +740,40 @@ for i, (fill, dx) in enumerate((("ume", -0.2), ("salmon", 0.0), ("kombu", 0.2)))
         o = turned(f"fill{i}", x, H + 0.0096, 0.345, prof, parts, AM, segs=16, cap=True, uv="polar", R=0.032)
         made(facing(jitter(o, 0.06, 353 + i), True), fill)
 
-# (behind the board: the rice paddle on its little rest, a dish of pickled daikon, the pot of sesame)
+# (behind the board: the rice paddle on its little rest, a dish of pickled daikon; the pot of sesame behind the hand-water bowl (item 494:
+# clear of the shelf's middle post, its head 2 cm left of it))
 made(slab("paddlehandle", [(-0.12, -0.012), (0.02, -0.014), (0.02, 0.014), (-0.12, 0.012), (-0.126, 0.0)], H + 0.0005, 0.008, parts, AM,
-          x=BOARD_X - 0.12, z=-0.31), "bamboo")
+          x=BOARD_X - 0.15, z=-0.29), "bamboo")
 head = [(0.055 * math.cos(a), 0.046 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 18, endpoint=False)]
-made(slab("paddlehead", head, H + 0.0005, 0.0095, parts, AM, x=BOARD_X - 0.1 + 0.044, z=-0.31), "bamboo")
-made(facing(turned("pickledish", BOARD_X + 0.3, H, -0.32, DISH, parts, AM, segs=16, cap=True, uv="polar", R=0.056), True), "dish")
+made(slab("paddlehead", head, H + 0.0005, 0.0095, parts, AM, x=BOARD_X - 0.15 + 0.064, z=-0.29), "bamboo")
+made(facing(turned("pickledish", BOARD_X + 0.13, H, -0.32, DISH, parts, AM, segs=16, cap=True, uv="polar", R=0.056), True), "dish")
 half = [(0.022 * math.cos(a), 0.022 * math.sin(a)) for a in np.linspace(0, math.pi, 9)]
 half = [(0.018 * math.cos(a), 0.018 * math.sin(a)) for a in np.linspace(0, math.pi, 9)]
 for k in range(3):
-    made(slab(f"takuan{k}", half, H + 0.0098 + k * 0.0032, 0.003, parts, AM, x=BOARD_X + 0.3 - 0.012 + k * 0.012, z=-0.326 + 0.006 * k,
+    made(slab(f"takuan{k}", half, H + 0.0098 + k * 0.0032, 0.003, parts, AM, x=BOARD_X + 0.13 - 0.012 + k * 0.012, z=-0.326 + 0.006 * k,
               turn=-0.3 + k * 0.25), "takuan")
-made(facing(turned("sesamepot", BOARD_X + 0.46, H, -0.32, [(0.025, 0.0), (0.03, 0.006), (0.034, 0.025), (0.033, 0.048), (0.027, 0.062),
+made(facing(turned("sesamepot", BOARD_X - 0.42, H, -0.32, [(0.025, 0.0), (0.03, 0.006), (0.034, 0.025), (0.033, 0.048), (0.027, 0.062),
                                                          (0.025, 0.068)], parts, AM, segs=16, cap=False), True), "stoneware")
-made(facing(turned("sesamelid", BOARD_X + 0.46, H, -0.32, [(0.0285, 0.067), (0.03, 0.072), (0.027, 0.077), (0.014, 0.0795)], parts, AM,
+made(facing(turned("sesamelid", BOARD_X - 0.42, H, -0.32, [(0.0285, 0.067), (0.03, 0.072), (0.027, 0.077), (0.014, 0.0795)], parts, AM,
                    segs=16, cap=True, uv="cyl"), True), "wood")
-made(facing(turned("sesameknob", BOARD_X + 0.46, H, -0.32, [(0.006, 0.0792), (0.0075, 0.084), (0.005, 0.088)], parts, AM, segs=8, cap=True), True), "wood")
+made(facing(turned("sesameknob", BOARD_X - 0.42, H, -0.32, [(0.006, 0.0792), (0.0075, 0.084), (0.005, 0.088)], parts, AM, segs=8, cap=True), True), "wood")
 
 # (a folded tenugui, its indigo dots, between the water bowl and the board's front corner)
-made(boxed("towel", BOARD_X - 0.5, BOARD_X - 0.34, H, H + 0.034, 0.28, 0.4, parts, AM, bev=0.011, segs=2), "tenugui")
+made(boxed("towel", BOARD_X - 0.47, BOARD_X - 0.31, H, H + 0.034, 0.28, 0.4, parts, AM, bev=0.011, segs=2), "tenugui")
 
 # (the box of nori sheets, black lacquer, its lid slid back off half of it; the box of food wrap behind it; the little porcelain salt pot)
-NX0, NX1, NZ0, NZ1 = BOARD_X + 0.5, BOARD_X + 0.78, -0.22, 0.0
+NX0, NX1, NZ0, NZ1 = BOARD_X + 0.23, BOARD_X + 0.45, -0.33, -0.11
 made(boxed("noribox", NX0, NX1, H, H + 0.055, NZ0, NZ1, parts, AM, bev=0.004), "black")
 made(boxed("norisheets", NX0 + 0.012, NX1 - 0.012, H + 0.0552, H + 0.0585, NZ0 + 0.136, NZ1 - 0.012, parts, AM), "nori")
 made(boxed("norilid", NX0 - 0.004, NX1 + 0.004, H + 0.0552, H + 0.0672, NZ0 - 0.004, NZ0 + 0.13, parts, AM, bev=0.004), "black")
-made(boxed("wrapbox", BOARD_X + 0.52, BOARD_X + 0.78, H, H + 0.06, -0.4, -0.3, parts, AM, bev=0.003), "wrap")
-made(facing(turned("salt", BOARD_X + 0.5, H, 0.12, [(0.026, 0.0), (0.033, 0.01), (0.036, 0.045), (0.03, 0.064), (0.031, 0.07)], parts, AM,
+made(facing(turned("salt", BOARD_X - 0.33, H, -0.33, [(0.026, 0.0), (0.033, 0.01), (0.036, 0.045), (0.03, 0.064), (0.031, 0.07)], parts, AM,
                    segs=16, cap=False), True), "porcelain")
-made(facing(turned("saltlid", BOARD_X + 0.5, H, 0.12, [(0.0335, 0.0695), (0.034, 0.074), (0.026, 0.08), (0.012, 0.083)], parts, AM,
+made(facing(turned("saltlid", BOARD_X - 0.33, H, -0.33, [(0.0335, 0.0695), (0.034, 0.074), (0.026, 0.08), (0.012, 0.083)], parts, AM,
                    segs=16, cap=True), True), "porcelain")
 
 # (the bamboo tray of finished rice balls at the right end: its floor and four low walls, eased; bamboo leaves laid on it under them)
-TX0, TX1, TZ0, TZ1 = BOARD_X + 0.62, BOARD_X + 1.05, 0.04, 0.36
+# (turned to run front to back beside the board (item 494), the three in a row toward the cook, the nori's box behind it)
+TX0, TX1, TZ0, TZ1 = BOARD_X + 0.23, BOARD_X + 0.45, -0.06, 0.42
 made(boxed("trayfloor", TX0, TX1, H, H + 0.008, TZ0, TZ1, parts, AM, bev=0.002), "bamboo")
 for nm, a0, a1, b0, b1 in (("traywallb", TX0, TX1, TZ0, TZ0 + 0.012), ("traywallf", TX0, TX1, TZ1 - 0.012, TZ1),
                           ("traywalll", TX0, TX0 + 0.012, TZ0 + 0.012, TZ1 - 0.012), ("traywallr", TX1 - 0.012, TX1, TZ0 + 0.012, TZ1 - 0.012)):
@@ -808,7 +812,7 @@ def sasa(name, lx, y, lz, ang, L_=0.24, W_=0.07):
 
 
 for k in range(3):
-    sasa(f"sasa{k}", TX0 + 0.075 + k * 0.14, H + 0.0095 + 0.0006 * k, (TZ0 + TZ1) / 2 - 0.02, math.pi / 2 + (k - 1) * 0.18)
+    sasa(f"sasa{k}", (TX0 + TX1) / 2, H + 0.0095 + 0.0006 * k, TZ0 + 0.09 + k * 0.15, (k - 1) * 0.15, L_=0.17)
 
 done_ = []
 
@@ -821,7 +825,7 @@ def onigiri_at(name, x, y0, z):
 
 
 for k in range(3):
-    onigiri_at(f"PrepDone{k}", TX0 + 0.075 + k * 0.14, H + 0.017, (TZ0 + TZ1) / 2 - 0.02)
+    onigiri_at(f"PrepDone{k}", (TX0 + TX1) / 2, H + 0.017, TZ0 + 0.09 + k * 0.15)
 # ---- (item 392) the prep station's other things
 from mathutils import Matrix  # noqa: E402
 
@@ -834,9 +838,9 @@ def laid(o, at, turn):
     return o
 
 
-# (the garnishes, between the cooker and the hand-water bowl (x -0.74..-0.42): a ceramic grater with half a daikon lying on it, a bowl of
-# grated daikon, a dish of lemon slices and sudachi halves)
-GX = -0.585
+# (the garnishes: a ceramic grater with half a daikon lying on it, a bowl of grated daikon, a dish of lemon slices and sudachi halves; at the
+# counter's right end past the rice balls' things since item 494 (they were between the cooker and the hand-water bowl, where the fryer is))
+GX = 1.15
 made(slab("grater", [(0.055 * math.cos(a), 0.095 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)], H, 0.012, parts, AM,
           x=GX, z=0.1), "oroshi")
 # (the daikon its own node, made upright from its top's end at the origin and laid down by its transform, not its vertices: the game takes
@@ -846,12 +850,12 @@ dk = turned("PrepDaikon", 0.0, 0.0, 0.0, [(0.009, 0.0), (0.02, 0.006), (0.027, 0
 made(dk, "daikon")
 dk.rotation_euler = (0.0, math.pi / 2, 0.5)
 dk.location = P(GX - 0.07, H + 0.012 + 0.033 + 0.002, 0.05)
-OX, OZ = -0.65, -0.17
+OX, OZ = GX - 0.065, -0.17
 made(facing(turned("oroshibowl", OX, H, OZ, [(0.025, 0.0), (0.03, 0.006), (0.043, 0.02), (0.048, 0.036), (0.045, 0.037), (0.041, 0.03)], parts, AM,
                    segs=16, cap=False, uv="polar", R=0.048), True), "dish")
 made(facing(turned("oroshi", OX, H + 0.02, OZ, [(0.038, 0.0), (0.034, 0.012), (0.024, 0.021), (0.01, 0.026)], parts, AM, segs=12, cap=True,
                    uv="polar", R=0.038), True), "daikon")
-LX, LZ = -0.515, -0.2
+LX, LZ = GX + 0.07, -0.2
 made(facing(turned("citrusdish", LX, H, LZ, DISH, parts, AM, segs=16, cap=True, uv="polar", R=0.056), True), "dish")
 for k, (ox, oz) in enumerate(((-0.014, 0.008), (0.002, -0.004), (0.016, 0.01))):
     made(facing(turned(f"lemon{k}", LX + ox, H + 0.0098 + 0.0025 * k, LZ + oz, [(0.022, 0.0), (0.023, 0.003)], parts, AM, segs=12, cap=True,
@@ -904,7 +908,9 @@ for k, (xx, key) in enumerate(((-0.64, "bottle"), (-0.56, "amber"), (-0.48, "bot
     made(facing(turned(f"bottle{k}", xx, L2, SZ, BOTTLE, parts, AM, segs=12, cap=False), True), key)
     made(facing(turned(f"bottlecap{k}", xx, L2, SZ, [(0.013, 0.194), (0.014, 0.214), (0.008, 0.217)], parts, AM, segs=10, cap=True), True), "lacq")
 made(boxed("longplates2", 0.53, 0.81, L2, L2 + 0.04, SZ - 0.05, SZ + 0.05, parts, AM, bev=0.006), "porcelain")
-made(facing(turned("jar2", 1.05, L2, SZ, [(0.04, 0.0), (0.048, 0.03), (0.048, 0.08), (0.04, 0.1), (0.041, 0.106)], parts, AM, segs=14, cap=True),
+# (the box of food wrap up here now (item 494: the rice balls' things in half their room), by the second stack of long plates)
+made(boxed("wrapbox", 0.84, 1.1, L2, L2 + 0.06, SZ - 0.05, SZ + 0.05, parts, AM, bev=0.003), "wrap")
+made(facing(turned("jar2", 1.25, L2, SZ, [(0.04, 0.0), (0.048, 0.03), (0.048, 0.08), (0.04, 0.1), (0.041, 0.106)], parts, AM, segs=14, cap=True),
             True), "stoneware")
 for k, xx in enumerate((-0.25, -0.13)):
     made(facing(turned(f"plates2{k}", xx, L2, SZ, [(0.045, 0.0), (0.05, 0.004), (0.05, 0.022), (0.046, 0.024)], parts, AM, segs=14, cap=True,

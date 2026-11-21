@@ -43,7 +43,7 @@ const STAND_ALONG = 3.55
 /** the stove's state, the game's: lit or not (the cook's work sets it) */
 export const STOVE = { on: false, flame: 0 }
 
-const SAYS = nameOver('【廚具】卡式瓦斯爐', '煎玉子燒、蛋包飯的蛋皮；平底鍋在爐上，方形的玉子燒鍋掛在旁邊架子上')
+const SAYS = nameOver('【廚具】卡式瓦斯爐', '煎玉子燒、蛋包飯的蛋皮，雪平鍋煮蛋花湯；平底鍋在爐上，玉子燒鍋掛在旁邊架子上，後面筷筒插著湯勺、鍋鏟、長筷，左前方一碗打好的蛋')
 
 /** a model's materials made the shop's toon (those lit from within kept so), each once */
 function toToon(r: THREE.Object3D, lit: (name: string) => THREE.Material | null) {
@@ -87,8 +87,15 @@ export const GasStove = memo(function GasStove() {
     toToon(r, (n) => (n === 'StoveFlame' ? new THREE.MeshBasicMaterial({ color: '#6aa8ff', transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }) : null))
     r.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = (m.material as THREE.Material).name !== 'StoveFlame' })
     const flame = r.getObjectByName('StoveFlame0')!, knob = r.getObjectByName('StoveKnob0')!
-    const fry = r.getObjectByName('FryPan')!, egg = r.getObjectByName('EggPan')!
+    const fry = r.getObjectByName('FryPan')!, egg = r.getObjectByName('EggPan')!, pot = r.getObjectByName('SoupPot')!
     fry.rotation.y = PAN_TURN
+    // (the yukihira pot (item 494): it waits at the stove's front left; its own copy on the burner for an egg-drop soup, its handle where the
+    // frying pan's is (the cook's hand on it there), the soup in it, the one at the front left gone meanwhile)
+    const potOn = pot.clone(true)
+    potOn.position.copy(fry.position)
+    potOn.rotation.set(0, PAN_TURN, 0)
+    potOn.visible = false
+    r.add(potOn)
     // (the square pan's own copy for the burner, for a tamagoyaki: the hung one down off its hook meanwhile)
     const eggOn = egg.clone(true)
     eggOn.position.copy(fry.position)
@@ -108,6 +115,13 @@ export const GasStove = memo(function GasStove() {
     panRoll.position.copy(eggOn.position).add(new THREE.Vector3(0, 0.006, 0))
     panEgg.visible = panRoll.visible = false
     r.add(panEgg, panRoll)
+    // (the egg-drop soup in the pot on the burner: its face (the bowl's own), as wide as the pot is inside at its level)
+    const potSoup = foodOf(food.scene, 'EggDropTop')
+    toToon(potSoup, () => null)
+    potSoup.position.copy(fry.position).add(new THREE.Vector3(0, 0.046, 0))
+    potSoup.scale.setScalar(1.45)
+    potSoup.visible = false
+    r.add(potSoup)
     // (the marks the third cook goes by: the pan's middle, its handle half way along (the right hand there), where he stands, out in the
     // aisle in front of the counter)
     const dir = new THREE.Vector3(-Math.cos(PAN_TURN), 0, Math.sin(PAN_TURN))
@@ -118,13 +132,16 @@ export const GasStove = memo(function GasStove() {
     // merged as one: the body, the frying pan, the knob, the square pan (on the burner, and hung))
     plainColours(r)
     plainColours(egg)
-    const moves = new Set<THREE.Object3D>([flame, knob, fry, eggOn, panEgg, panRoll])
+    const moves = new Set<THREE.Object3D>([flame, knob, fry, eggOn, panEgg, panRoll, pot, potOn, potSoup])
     mergeByMaterial(r, (o) => moves.has(o) || o.name.startsWith('stove-'))
-    for (const part of [fry, knob, eggOn, egg]) mergeByMaterial(part)
-    inkModel(r, (m) => (m.material as THREE.Material).name === 'StoveFlame', { width: 0.0012, weld: true })
+    for (const part of [fry, knob, eggOn, egg, pot, potOn]) mergeByMaterial(part)
+    // (no line round the soup's face in the pot (item 494): a flat round of one side, its hull was a black round laid over it)
+    const soupFace = new Set<THREE.Object3D>()
+    potSoup.traverse((o) => soupFace.add(o))
+    inkModel(r, (m) => (m.material as THREE.Material).name === 'StoveFlame' || soupFace.has(m), { width: 0.0012, weld: true })
     inkModel(egg, () => false, { width: 0.0012, weld: true })
     flame.visible = false
-    return { r, flame, knob, fry, egg, eggOn, panEgg, panRoll, steamAt: fry.position.clone().add(new THREE.Vector3(0, 0.05, 0)) }
+    return { r, flame, knob, fry, egg, eggOn, panEgg, panRoll, pot, potOn, potSoup, steamAt: fry.position.clone().add(new THREE.Vector3(0, 0.05, 0)) }
   }, [gltf, food])
   // (the pan hung: its handle (+z) up, its inside (+y) toward the stove (-LAY), its width along the counter's depth)
   const hang = useMemo(() => {
@@ -144,14 +161,17 @@ export const GasStove = memo(function GasStove() {
     const ck = KITCHEN.cooking?.station === 'stove' ? KITCHEN.cooking : null
     STOVE.on = !!ck
     const step = ck ? stepOf(ck.t, ck.of) : 'done'
-    const tama = ck?.id === 'Tamagoyaki'
+    const tama = ck?.id === 'Tamagoyaki', soup = ck?.id === 'EggDropSoup'
     // (the square pan down onto the burner for a tamagoyaki, the frying pan by; the egg spread in the frying pan as it's poured, the roll
-    // fattening as it's rolled up layer on layer)
-    parts.fry.visible = !tama
+    // fattening as it's rolled up layer on layer; the yukihira pot on the burner for an egg-drop soup (item 494), its soup in it)
+    parts.fry.visible = !tama && !soup
     parts.eggOn.visible = tama
     parts.egg.visible = !tama
+    parts.potOn.visible = soup
+    parts.pot.visible = !soup
+    parts.potSoup.visible = !!ck && soup && step !== 'done'
     const spread = ck ? Math.min(1, ck.t / 2.5) : 0
-    parts.panEgg.visible = !!ck && !tama && step !== 'done'
+    parts.panEgg.visible = !!ck && !tama && !soup && step !== 'done'
     parts.panEgg.scale.set(0.45 + 0.55 * spread, 1, 0.45 + 0.55 * spread)
     parts.panRoll.visible = !!ck && tama && step !== 'done'
     const rolled = ck ? Math.min(1, ck.t / Math.max(1, ck.of * 0.85)) : 0
@@ -183,16 +203,18 @@ export const GasStove = memo(function GasStove() {
 })
 
 /**
- * The frying station (item 469, the owner's, 2026-11-21: 「料理台在增加油炸台，可以炸薯條、天婦羅」; blender/fryer.py): a stainless work
- * table of its own at the work counter's right end (the counter itself full), its top as high as the counter's; on it the tabletop fryer
- * (its oil well, its basket hung on its back rim, its control box with the knob and the lamp) and the draining tray with its rack. While
+ * The frying station (item 469, the owner's, 2026-11-21: 「料理台在增加油炸台，可以炸薯條、天婦羅」; blender/fryer.py): on the work counter
+ * beside the stove (item 494, the owner's 「做飯糰的區域減少至二分之一」, an arrow from the fryer over to the stove: the rice balls' place
+ * halved, the hot work together; it stood on a stainless table of its own past the counter's right end), the tabletop fryer (its oil well,
+ * its basket hung on its back rim, its control box with the knob and the lamp) and the draining tray with its rack at its right. While
  * the third cook fries (bar.ts's KITCHEN.cooking): the basket let down into the oil, the oil trembling and bubbling, a sizzle as it goes
  * in and the bubbling heard after; lifted out at the end, what's fried set on the rack to drain.
  */
 const FRYER_URL = import.meta.env.BASE_URL + 'models/fryer.glb'
 useGLTF.preload(FRYER_URL)
-/** where it stands: the fryer's middle (its table's left edge 0.19 left of it), the table 4 cm past the counter's end (lay 2.327), in its line */
-export const FRYER_AT = { along: 4.26, lay: 2.327 + 0.04 + 0.19 * 1.1 }
+/** where it stands: the fryer's middle, on the counter 4 cm right of the stove's right side (the stove 0.34 across at its 0.95, the fryer
+ * 0.3 at its 1.1), its draining tray past it to its right; 4 cm forward of the counter's middle (item 494) */
+export const FRYER_AT = { along: 4.26, lay: STOVE_AT.lay + 0.17 * STOVE_SCALE + 0.04 + 0.15 * 1.1 }
 export const FRYER_SCALE = 1.1
 /** how far the basket's let down into the oil when it's frying (its model's metres) */
 const BASKET_DROP = 0.085

@@ -1574,10 +1574,12 @@ const PREP_URL = import.meta.env.BASE_URL + 'models/prepcounter.glb'
 useGLTF.preload(PREP_URL)
 // (up against the warmer's right end, in line with it (the owner's, 2026-11-11: 併桌): their tops' ends 2 mm apart (each 0.02 proud of its
 // cabinet); it stood back in the kitchen at along 5.19, lay 3.4)
-/** the board's middle along the counter and the counter's top, in its own frame (blender/warmer.py's BOARD_X, H + the board) */
-const PREP_BOARD_X = 0.35, PREP_TOP = 1.236 + 0.035
-/** (item 392) the garnishes' grater along the rice-ball counter, between the cooker and the hand-water bowl (blender/warmer.py's GX) */
-const PREP_GRATER_X = -0.585
+/** the board's middle along the counter and the counter's top, in its own frame (blender/warmer.py's BOARD_X, H + the board; right of the
+ * fryer since item 494, the rice balls' things in half the room they had) */
+const PREP_BOARD_X = 0.47, PREP_TOP = 1.236 + 0.035
+/** (item 392) the garnishes' grater along the rice-ball counter (blender/warmer.py's GX): at its right end since item 494 (between the
+ * cooker and the hand-water bowl it was, where the fryer stands now) */
+const PREP_GRATER_X = 1.15
 const GRATE_V = new THREE.Vector3(), GRATE_W = new THREE.Vector3(), GRATE_UP = new THREE.Vector3(0, 1, 0)
 const PREP_AT = { along: 4.3, lay: -0.5 + 0.7 + 0.02 + 0.002 + 0.02 + 1.5 - 0.937 }
 function PrepCounter() {

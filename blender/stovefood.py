@@ -303,7 +303,11 @@ for f in ladder_fill(bm, ring):
     for lp in f.loops:
         co = lp.vert.co
         lp[uvl].uv = (0.5 + co.x / 0.1, 0.5 + co.y / 0.1)
-obj_of("EggDropTop", bm, [M["soup"]])
+_soup = obj_of("EggDropTop", bm, [M["soup"]])
+# (its face up (item 494): a flat round of one side, its normals worked out round its own middle came out facing down, and seen from
+# above, in the bowl and in the pot, it was culled: the bowl looked empty)
+if _soup.data.polygons[0].normal.z < 0:
+    _soup.data.flip_normals()
 
 # ---- in the pans: beaten egg spread thin over the frying pan's face (an uneven round); the half-rolled omelette in the square pan
 bm = bmesh.new()
