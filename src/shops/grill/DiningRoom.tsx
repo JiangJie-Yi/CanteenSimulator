@@ -3226,6 +3226,11 @@ const WC_WINDOW_FALL = (() => {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
   return t
 })()
+/** how far in from a room's walls its dark (and its warm light) is laid (item 489, the owner's 「這有奇怪的陰影，要拿掉」): laid to the
+ * walls, its faces lay in theirs (its front in the doorway's plane, up past the door to the ceiling; its sides in the walls' faces), and
+ * seen from the shop or from above, a dark band ran over the plaster above the doors and down beside the stalls' noren, flickering with the
+ * walls it shared a plane with. In from them, the walls in front of it hide it and nothing outside the room is darkened */
+const WC_DARK_IN = 0.02
 function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number, number, number][] }) {
   const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0, depthWrite: false }), [])
   /** and the other way: its light on after dark, its rooms warmly lit within (item 126, the owner's, 2026-11-15: "the toilets' light at night
@@ -3248,10 +3253,10 @@ function WcDark({ who, rooms }: { who: 'm' | 'f'; rooms: [number, number, number
   return (
     <>
       <group ref={group} visible={false}>
-        {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={mat} position={[x, sy / 2, z]} scale={[sx, sy, sz]} renderOrder={4} />)}
+        {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={mat} position={[x, sy / 2, z]} scale={[sx - 2 * WC_DARK_IN, sy, sz - 2 * WC_DARK_IN]} renderOrder={4} />)}
       </group>
       <group ref={lit} visible={false}>
-        {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={warm} position={[x, sy / 2, z]} scale={[sx, sy, sz]} renderOrder={4} raycast={() => {}} />)}
+        {rooms.map(([sx, sy, sz, x, z], i) => <mesh key={i} geometry={WC_DARK} material={warm} position={[x, sy / 2, z]} scale={[sx - 2 * WC_DARK_IN, sy, sz - 2 * WC_DARK_IN]} renderOrder={4} raycast={() => {}} />)}
       </group>
     </>
   )
@@ -3416,18 +3421,17 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
         {/* (its back cut open as the toilets' rooms' are, seen through from outside (item 482, the owner's 「這邊要通透」: a solid back made it a
             blank grey box from behind the shop, the stocker and the stock out of sight): one face, turned in, nothing behind it) */}
         <WcWall len={len} at={[deep, 0, mid]} yaw={-Math.PI / 2} top={top} cut />
-        <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, z0]} yaw={0} top={top} />
+        {/* (its near end, by the wall's start, taken away (item 488, the owner's 「這面牆拿掉」: past the side wall's end it stood alone, a panel
+            of cedar and plaster beside the doorway, from the room and from outside); the far end, in front of the men's room's end wall) */}
         <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, zE - 0.002]} yaw={Math.PI} top={top} />
-        {/* outside: the walls' bodies, from a little behind the shop's wall: its near end, and the short end past the men's room (its back
-            open, item 482) */}
-        <WcMass x={[WC_IN, deep]} y={[0, top]} z={[z0 - WC_T, z0 - 0.002]} />
+        {/* outside: the short end's body past the men's room (its back open, item 482) */}
         <WcMass x={[WC_ROOM.D + WC_T + 0.002, deep]} y={[0, top]} z={[zE, zE + WC_T]} />
         {/* the slatted ceiling on the caps */}
         <WcSlats x={[WALL_OUT, deep]} z={[z0, zE]} y={top + WC_CAP + 0.011} />
-        {/* (dark posts at its two back corners, the open back's edges) */}
-        {[z0 - WC_T, zE + WC_T].map((z, k) => (
+        {/* (a dark post at its far back corner, the open back's edge; the near one went with the near end) */}
+        {[zE + WC_T].map((z) => (
           // (4 mm proud of the end walls' backs: not in one plane with them)
-          <mesh key={k} position={[deep - WC_T / 2 + 0.004, top / 2, z + (k ? -0.015 : 0.015)]}><boxGeometry args={[WC_T, top, 0.034]} /><meshToonMaterial color="#2e1c10" /></mesh>
+          <mesh key={z} position={[deep - WC_T / 2 + 0.004, top / 2, z - 0.015]}><boxGeometry args={[WC_T, top, 0.034]} /><meshToonMaterial color="#2e1c10" /></mesh>
         ))}
         {/* the doorway's frame: two dark cedar posts in the wall's line, proud of its face, through its thickness; the head over them; the
             jambs lined; a low sill across its foot */}
@@ -9844,7 +9848,11 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   // (the drinks' stock in the stock room now (item 430: its doorway's where they stood): along its back wall, the beer crates behind the near
   // fridge, the cartons behind the far one, the milk crates behind the doorway, seen through it (item 437); each against the back wall)
   const st = useMemo(() => storeOf(counters), [counters])
-  const crateAt = useMemo(() => (fr && st ? st.at(fr[0].z - 0.21, STORE.deep - 0.16) : new THREE.Vector3()), [fr, st])
+  // (packed along the back wall into its far corner, by the men's room (item 490, the owner's 「盡量靠牆角」): the beer crates 3 cm from the
+  // room's end wall, the cartons beside them, the milk crates beside those, 3 cm between each stack (measured, tests/e2e/_store490.mjs: the
+  // beer crates 0.43 across, the cartons 0.83, the milk crates' two stacks 0.73 from the first's middle); they were spread along it behind
+  // the fridges and the doorway, 0.44 bare by the end)
+  const crateAt = useMemo(() => (fr && st ? st.at(st.room[1] - 0.241, STORE.deep - 0.16) : new THREE.Vector3()), [fr, st])
   // (the premium liquor's shelf over the bar (item 450): its corner where the two counters' lamp lines meet (each one's middle line 5 cm
   // toward its customers, as DiningWall hangs them: its frame's x, (along.z, 0, -along.x)), its run A out along the long counter, B along
   // the side one (the model's z, the side counter's way out from the corner); its foot at BAR_SHELF.foot)
@@ -9862,9 +9870,10 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   }, [counters])
   // (the milk crates of cold drinks (item 437): behind the doorway against the back wall, two stacked by the room's end, one beside them,
   // seen through the doorway; clear of the room's end (2.5 cm) and of the cartons (1.7 cm), their backs a centimetre off the wall)
-  const milkAt = useMemo(() => (st ? [st.at(st.mid - 0.133, STORE.deep - 0.16), st.at(st.mid + 0.217, STORE.deep - 0.16)] : null), [st])
+  // (the stack of two 4 cm further from the single than they stood (item 437): the two had run 2.5 cm into each other)
+  const milkAt = useMemo(() => (st ? [st.at(st.room[1] - 1.919, STORE.deep - 0.16), st.at(st.room[1] - 1.529, STORE.deep - 0.16)] : null), [st])
   // (the cartons' stack 0.44 deep: its back a centimetre off the back wall, not in its face)
-  const cartonAt = useMemo(() => (fr && st ? st.at(fr[fr.length - 1].z, STORE.deep - 0.23) : new THREE.Vector3()), [fr, st])
+  const cartonAt = useMemo(() => (fr && st ? st.at(st.room[1] - 0.894, STORE.deep - 0.23) : new THREE.Vector3()), [fr, st])
   return (
     // (each piece is its own batch inside its own Movable, so each can be moved by hand when the shop's shut: key G)
     // (not keyed by the language any more: that was for a mat with words on it, long gone, and each switch built all four again, their
