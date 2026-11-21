@@ -49,10 +49,11 @@ def P(x, y, z):
 
 
 L_A, L_B = 3.76, 3.41                     # its two runs: from the corner (the lamp lines' meeting) out past each counter's last seat
-D, H, T = 0.17, 0.23, 0.012               # its depth, its height, its boards' thickness
-ROD_UP = 0.05                              # its rods up to the room's top (the shelf's foot hung at 2.02 of the room's 2.3)
+# (taller (item 508, the owner's 「並拉高」「是酒櫃的 height」: 0.23 it was, a low slot the bottles' caps all but touched), its bottles a fifth bigger with it)
+D, H, T = 0.17, 0.32, 0.012               # its depth, its height, its boards' thickness
+ROD_UP = 0.03                              # its rods up to the room's top (the shelf's foot hung at 2.02 of the room's 2.3)
 BAYS_A, BAYS_B = 5, 4
-S = 0.6                                    # the bottles at their true size against the room (the cabinet's were made 1.6 times too big)
+S = 0.72                                   # the bottles at their true size against the room (the cabinet's were made 1.6 times too big)
 COLS, ROWS = 8, 4                          # the labels' picture's cells
 
 # ---------------------------------------------------------------- pictures
@@ -66,19 +67,11 @@ wood = wood * (0.92 + 0.1 * fbm(N, 4, 24, 3))[..., None]
 WOOD_TEX = image("liquor_walnut", np.clip(wood, 0, 1).astype(np.float32))
 WOOD_NRM = image("liquor_walnut_nrm", to_normal(grain * 0.6 + fbm(N, 6, 30, 3) * 0.4, 1.0).astype(np.float32), data=True)
 
-# (item 504: the bays' backs, warm washi lit from behind: its fibres and a few long ones, warm cream at its middle where the bottles stand,
-# falling off to amber and dusk at its edges, a little more at its foot and its top; one bay's worth, each bay's back laid over all of it)
-bu, bv = grid01(256)
-# (washi: soft clouding, and its fibres short and fine, a few here and there, mostly up and down (long waving lines read as wood grain))
-fib = smooth(0.8, 0.9, vnoise(256, 90, 26)) * 0.07 + (fbm(256, 5, 4, 3) - 0.5) * 0.07
-glow = np.exp(-((bu - 0.5) / 0.36) ** 2) * np.exp(-((bv - 0.52) / 0.42) ** 2)
-back = mix((0.32, 0.17, 0.07), (1.0, 0.86, 0.62), np.clip(glow, 0, 1) ** 0.8)
-back = np.clip(back + fib[..., None], 0, 1)
-BACK_TEX = image("liquor_back", back.astype(np.float32))
-
 M = {
     "wood": pbr("LiquorWood", (1, 1, 1), tex=WOOD_TEX, nrm=WOOD_NRM, nrm_strength=0.5, rough=0.45),
-    "back": pbr("LiquorBack", (1, 1, 1), tex=BACK_TEX, rough=0.9),
+    # (its body glass (item 508, the owner's 「酒櫃主體為玻璃質感」「會通透」「但上下層還是木質」): the bays' backs, the dividers and the ends
+    # clear panes the game draws see-through; its top, its foot, the fascia and the lips walnut)
+    "back": pbr("LiquorPane", (0.8, 0.9, 0.9), rough=0.05),
     "brass": pbr("LiquorBrass", (0.72, 0.57, 0.25), rough=0.35, metal=0.8),
     "led": pbr("LiquorLED", (1.0, 0.86, 0.62), rough=0.4, emit=(1.0, 0.86, 0.62), emit_strength=3.0),
     "rod": pbr("LiquorRod", (0.05, 0.05, 0.055), rough=0.35, metal=0.8),
@@ -124,26 +117,8 @@ def board(lo, hi, mat, grain_axis=0, tile=0.6):
 
 
 def back_board(lo, hi, axis, sign):
-    """a bay's back (item 504): a box from lo to hi, its face toward the customers (normal along `axis`, `sign`) the warm washi over all of it
-    (u across the bay from the customers' left, v up), its other faces walnut"""
-    (x0, y0, z0), (x1, y1, z1) = lo, hi
-    board(lo, hi, MAT["wood"], 2 if axis == 0 else 0)
-    # (the last board's six faces: the one toward the customers turned to the washi)
-    cab.faces.ensure_lookup_table()
-    for f in list(cab.faces)[-6:]:
-        n_ = f.normal
-        g = (n_.x, n_.z, -n_.y)
-        if abs(g[axis] - sign) > 1e-3:
-            continue
-        f.material_index = MAT["back"]
-        for lp in f.loops:
-            c = lp.vert.co
-            gc = (c.x, c.z, -c.y)
-            if axis == 2:
-                uu = (gc[0] - x0) / (x1 - x0)
-            else:
-                uu = (z1 - gc[2]) / (z1 - z0)
-            lp[CL["uv"]].uv = (uu, (gc[1] - y0) / (y1 - y0))
+    """a bay's back: a pane of glass (item 508; it was warm washi lit from behind, item 504)"""
+    board(lo, hi, MAT["back"], 1)
 
 
 def rod(x, z, y0, y1):
@@ -170,11 +145,11 @@ B0, B1 = D / 2, L_B
 board((A0, 0.0, -D / 2), (A1, T, D / 2), MAT["wood"], 0)
 board((A0, H - T, -D / 2), (A1, H, D / 2), MAT["wood"], 0)
 for xe in (A0, A1 - T):
-    board((xe, T, -D / 2), (xe + T, H - T, D / 2), MAT["wood"], 1)
+    board((xe, T, -D / 2), (xe + T, H - T, D / 2), MAT["back"], 1)
 # (B: its foot, its top (from A's back on), its far end)
 board((-D / 2, 0.0, B0), (D / 2, T, B1), MAT["wood"], 2)
 board((-D / 2, H - T, B0), (D / 2, H, B1), MAT["wood"], 2)
-board((-D / 2, T, B1 - T), (D / 2, H - T, B1), MAT["wood"], 1)
+board((-D / 2, T, B1 - T), (D / 2, H - T, B1), MAT["back"], 1)
 # (the bays: A's from past the corner square to its far end, B's from A's back; a divider between each two)
 bays_a = []
 xa0, xa1 = D / 2, A1 - T
@@ -183,7 +158,7 @@ for k in range(BAYS_A):
     bays_a.append((xa0 + wa * k + (T / 2 if k else 0.0), xa0 + wa * (k + 1) - (T / 2 if k < BAYS_A - 1 else 0.0)))
     if k:
         xd = xa0 + wa * k
-        board((xd - T / 2, T, -D / 2 + 0.004), (xd + T / 2, H - T, D / 2 - 0.004), MAT["wood"], 1)
+        board((xd - T / 2, T, -D / 2 + 0.004), (xd + T / 2, H - T, D / 2 - 0.004), MAT["back"], 1)
 bays_b = []
 zb0, zb1 = B0, B1 - T
 wb = (zb1 - zb0) / BAYS_B
@@ -191,7 +166,7 @@ for k in range(BAYS_B):
     bays_b.append((zb0 + wb * k + (T / 2 if k else 0.0), zb0 + wb * (k + 1) - (T / 2 if k < BAYS_B - 1 else 0.0)))
     if k:
         zd = zb0 + wb * k
-        board((-D / 2 + 0.004, T, zd - T / 2), (D / 2 - 0.004, H - T, zd + T / 2), MAT["wood"], 1)
+        board((-D / 2 + 0.004, T, zd - T / 2), (D / 2 - 0.004, H - T, zd + T / 2), MAT["back"], 1)
 # (item 504: each bay's back, warm washi toward the customers (the rail that ran along the kitchen's side at the bottles' shoulders gone with
 # them: they keep the bottles now); a low lip along each foot's front; under the top's front edge a fascia hiding the strip, a fine brass
 # line along its face)

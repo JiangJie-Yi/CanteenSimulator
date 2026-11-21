@@ -8979,6 +8979,9 @@ const liquorMatOf = (src: THREE.MeshStandardMaterial) => {
       LiquorRod: new THREE.MeshToonMaterial({ color: '#1c1c1f' }),
       // (the fine brass line along the fascia under its top (item 504))
       LiquorBrass: new THREE.MeshToonMaterial({ color: '#c49a48' }),
+      // (its body's panes (item 508, the owner's 「酒櫃主體為玻璃質感」「會通透」「但上下層還是木質」): clear glass, a breath of green in it, the
+      // studio's gleams on it; see-through, no transmission)
+      LiquorPane: (() => { const g = new THREE.MeshStandardMaterial({ color: '#d4e8e6', transparent: true, opacity: 0.2, depthWrite: false, roughness: 0.05, metalness: 0.1, envMapIntensity: 1.3 }); reflectStudio(g); return g })(),
       LiquorLabel: new THREE.MeshToonMaterial({ color: '#ffffff', map: LIQUOR_LABEL_TEX }),
     }
   }
@@ -9013,7 +9016,8 @@ function LiquorShelf() {
   // (in the way of what's looked at (scene/OccluderFade), all but gone: at a third its dark boards and its bottles lay a veil over what's
   // behind it, read as a shadow (item 478, the owner's 「有不明陰影 很不自然」: over the beckoning cats' stand from the room's height); its
   // ink lines put away while it's faded, as every faded hanging's are)
-  return <group name="look-liquor" userData={{ fadeOccluder: 0.06 }}><primitive object={obj} /></group>
+  // (and seen from over it, the room looked down on, half of it: the bar under it shows through (fadeAbove))
+  return <group name="look-liquor" userData={{ fadeOccluder: 0.06, fadeAbove: 0.5 }}><primitive object={obj} /></group>
 }
 /**
  * The milk crates of cold drinks (item 437, the owner's, 2026-11-21: 「新整另一種籃子風格，裡面也是用來裝冷飲類」, after a pink milk crate):
