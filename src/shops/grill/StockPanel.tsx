@@ -139,7 +139,13 @@ export function StockPanel(p: Props) {
   // (slid off to the right by the handle on its left edge, all but the handle and its upright name, which bring it back (the owner's); opened
   // again, or sent to a tab or a thing by a click in the room, it's out)
   const [tucked, setTucked] = useState(false)
-  useEffect(() => { setTucked(false) }, [tab, p.focus])
+  // (out again as its tab or what's asked for changes: put right while it's being drawn, by what it was last drawn for, not by an effect
+  // after it, which drew the panel once more each time)
+  const [drawnFor, setDrawnFor] = useState<{ tab: StockTab; focus: Props['focus'] }>({ tab, focus: p.focus })
+  if (drawnFor.tab !== tab || drawnFor.focus !== p.focus) {
+    setDrawnFor({ tab, focus: p.focus })
+    setTucked(false)
+  }
   usePanelSound(!tucked)
   // (to the freezer's tab: the soft breath of its seal and a tick of ice)
   const tabWas = useRef(tab)
