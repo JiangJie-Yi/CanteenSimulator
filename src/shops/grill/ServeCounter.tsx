@@ -48,7 +48,13 @@ function ServeCounterImpl() {
       if (!m.isMesh) return
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
-      if (!t) { t = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null }); t.name = src.name; made.set(src, t) }
+      // (with its relief (item 499, the owner's 「貼圖部份，不夠立體，再美化」): the split bamboo's strips rounded, its nodes and the culms' raised,
+      // in normal maps of their own; every lit material has one already (a flat one: scene/materialNormalize), so no new program)
+      if (!t) {
+        const tt = new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, normalMap: src.normalMap ?? null })
+        if (src.normalMap) tt.normalScale.copy(src.normalScale)
+        tt.name = src.name; made.set(src, tt); t = tt
+      }
       m.material = t
       m.castShadow = true
       m.receiveShadow = true

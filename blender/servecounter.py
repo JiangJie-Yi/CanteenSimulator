@@ -84,17 +84,36 @@ si = np.floor(u * STRIPS).astype(int)
 fu = u * STRIPS - si
 rs = np.random.default_rng(403)
 tone = (0.84 + 0.22 * rs.random(STRIPS))[si]
-roundness = 0.7 + 0.3 * np.sin(np.pi * np.clip(fu, 0, 1)) ** 0.6
-gaps = smooth(0.0, 0.07, fu) * smooth(0.0, 0.07, 1 - fu)
-split = base[None, None, :] * (tone * roundness * (0.3 + 0.7 * gaps))[..., None]
+# (item 499, the owner's 「貼圖部份，不夠立體，再美化」: the strips read flat. Each strip an arch across (0 at its edges, 1 along its crest): its
+# skin darker where it turns away, a sheen along its crest, the gap between deeper and a hair wider; a few strips more golden, a few
+# browner, as a screen of old split bamboo is; its relief in a normal map of its own (below), so the light rounds each strip)
+arch = 1.0 - (2 * np.clip(fu, 0, 1) - 1) ** 2
+gaps = smooth(0.0, 0.09, fu) * smooth(0.0, 0.09, 1 - fu)
+split = base[None, None, :] * (tone * (0.48 + 0.52 * arch ** 0.6) * (0.18 + 0.82 * gaps))[..., None]
+hue = rs.random(STRIPS)[si]
+split = mix(split, (0.88, 0.71, 0.4), (hue > 0.72).astype(np.float32) * 0.32)
+split = mix(split, (0.56, 0.38, 0.21), (hue < 0.22).astype(np.float32) * 0.36)
+split = mix(split, (1.0, 0.94, 0.76), np.exp(-((fu - 0.38) / 0.06) ** 2) * gaps * 0.34)
 split = split * (0.95 + 0.05 * np.sin((v * 70 + fu * 2) * 2 * math.pi))[..., None]
 nodes_at = rs.random(STRIPS)[si]
 for k0 in (0.0, 0.5):
     dd = ((v - (nodes_at + k0) % 1.0 + 0.5) % 1.0) - 0.5
-    split = mix(split, (0.94, 0.86, 0.66), np.exp(-((dd - 0.012) / 0.008) ** 2) * 0.45)
-    split = mix(split, (0.34, 0.24, 0.13), np.exp(-(dd / 0.006) ** 2) * 0.85)
+    split = mix(split, (0.95, 0.87, 0.67), np.exp(-((dd - 0.012) / 0.009) ** 2) * 0.5 * gaps)
+    split = mix(split, (0.3, 0.2, 0.11), np.exp(-(dd / 0.006) ** 2) * 0.9)
+    split = mix(split, (0.5, 0.36, 0.2), np.exp(-((dd + 0.016) / 0.012) ** 2) * 0.3)
 # (and a few strips' skin flaked, paler, as the culms' is: in long narrow patches up a strip, not blots across several)
 split = mix(split, (0.88, 0.8, 0.62), smooth(0.74, 0.78, fbm(N, 24, 3, 4)) * 0.6 * gaps)
+# (the relief: each strip's arch, a V of a gap, its nodes a ridge with a groove under it, fibres up it)
+h_split = 0.8 * arch ** 0.5
+for k0 in (0.0, 0.5):
+    dd = ((v - (nodes_at + k0) % 1.0 + 0.5) % 1.0) - 0.5
+    h_split = h_split + 0.24 * np.exp(-((dd - 0.012) / 0.009) ** 2) * arch - 0.2 * np.exp(-(dd / 0.005) ** 2)
+h_split = h_split + 0.04 * fbm(N, 64, 2, 3)
+# (the culm's: its nodes a ring standing proud of the skin with its groove, its fibres along it)
+h_culm = 0.03 * fbm(N, 48, 2, 3)
+for c0 in (0.25, 0.75):
+    d = v - c0
+    h_culm = h_culm + 0.8 * np.exp(-((d - 0.012) / 0.012) ** 2) - 0.4 * np.exp(-(d / 0.005) ** 2)
 
 
 def wood_picture(base_, dark, rings, seed_):
@@ -111,8 +130,10 @@ top_wood = wood_picture((0.86, 0.72, 0.52), (0.68, 0.52, 0.34), 16, 4031)
 # (a mid brown: darker it went black in the kitchen's shade)
 frame_wood = wood_picture((0.54, 0.35, 0.2), (0.38, 0.24, 0.13), 12, 4032)
 M = {
-    "culm": pbr("ServeCulm", (1, 1, 1), tex=image("servecounter_culm", np.clip(culm, 0, 1).astype(np.float32)), rough=0.55),
-    "split": pbr("ServeSplit", (1, 1, 1), tex=image("servecounter_split", np.clip(split, 0, 1).astype(np.float32)), rough=0.55),
+    "culm": pbr("ServeCulm", (1, 1, 1), tex=image("servecounter_culm", np.clip(culm, 0, 1).astype(np.float32)),
+                nrm=image("servecounter_culm_nrm", to_normal(h_culm, 8.0).astype(np.float32), data=True), nrm_strength=1.0, rough=0.55),
+    "split": pbr("ServeSplit", (1, 1, 1), tex=image("servecounter_split", np.clip(split, 0, 1).astype(np.float32)),
+                 nrm=image("servecounter_split_nrm", to_normal(h_split, 12.0).astype(np.float32), data=True), nrm_strength=1.0, rough=0.55),
     "top": pbr("ServeTopWood", (1, 1, 1), tex=image("servecounter_top", np.clip(top_wood, 0, 1).astype(np.float32)), rough=0.5),
     "frame": pbr("ServeFrameWood", (1, 1, 1), tex=image("servecounter_frame", np.clip(frame_wood, 0, 1).astype(np.float32)), rough=0.55),
 }
