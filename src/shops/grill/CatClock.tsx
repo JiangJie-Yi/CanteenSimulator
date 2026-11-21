@@ -8,7 +8,8 @@ import { getClock } from '@/ui/clockStore'
 import { nameOver } from './bar'
 
 /**
- * The cat wall clock (item 477, the owner's, 2026-11-21: 「這邊增加一個喵咪掛鐘」; blender/catclock.py): our own, a calico cat sitting up,
+ * The cat wall clock (item 477, the owner's, 2026-11-21: 「這邊增加一個喵咪掛鐘」; a black cat since item 483: 「貓咪時鐘要黑貓」;
+ * blender/catclock.py): our own, a black cat sitting up,
  * its round belly the clock's case and the dial on it, its face over it, a red collar and a gold bell at its neck, its paws at its foot,
  * its tail hanging under it for the pendulum. Its hands on the shop's own clock (eased round, the clock moving on by the second), its tail
  * swung; the head's front and the dial painted here in one picture (the face on its left half, the dial on its right), as the drinks
@@ -25,22 +26,18 @@ function paintPrint() {
   const g = c.getContext('2d')!
   g.lineCap = 'round'
   g.lineJoin = 'round'
-  // ---- the face: white, a black patch about its left ear and a ginger one about its right (calico), eyes shut in a smile, a pink nose,
-  // a little ω of a mouth, rosy cheeks, three whiskers a side
-  g.fillStyle = '#f7f2e8'; g.fillRect(0, 0, 256, 256)
-  g.fillStyle = '#2e2826'
-  g.beginPath(); g.moveTo(0, 0); g.lineTo(104, 0); g.bezierCurveTo(98, 40, 70, 66, 30, 74); g.bezierCurveTo(16, 76, 4, 70, 0, 64); g.closePath(); g.fill()
-  g.fillStyle = '#e3953f'
-  g.beginPath(); g.moveTo(256, 0); g.lineTo(150, 0); g.bezierCurveTo(156, 44, 190, 76, 230, 86); g.bezierCurveTo(244, 88, 252, 84, 256, 78); g.closePath(); g.fill()
-  g.fillStyle = '#f4b6ae'
+  // ---- the face (a black cat's since item 483, the owner's 「貓咪時鐘要黑貓」): its fur, its eyes shut in a smile in gold (to be seen on the
+  // black), a pink nose, a little ω of a mouth in pale pink, cheeks a soft rose, three cream whiskers a side
+  g.fillStyle = '#2b2727'; g.fillRect(0, 0, 256, 256)
+  g.fillStyle = '#6e3e46'
   for (const x of [72, 184]) { g.beginPath(); g.ellipse(x, 150, 17, 10, 0, 0, Math.PI * 2); g.fill() }
-  g.strokeStyle = '#2e2826'; g.lineWidth = 7
+  g.strokeStyle = '#f2c34e'; g.lineWidth = 8
   for (const x of [90, 166]) { g.beginPath(); g.moveTo(x - 18, 126); g.quadraticCurveTo(x, 104, x + 18, 126); g.stroke() }
-  g.fillStyle = '#e8828a'
+  g.fillStyle = '#ec8c94'
   g.beginPath(); g.moveTo(118, 136); g.lineTo(138, 136); g.quadraticCurveTo(128, 152, 128, 150); g.closePath(); g.fill()
-  g.strokeStyle = '#5a3a34'; g.lineWidth = 4
+  g.strokeStyle = '#e9b3ac'; g.lineWidth = 4
   g.beginPath(); g.moveTo(128, 148); g.quadraticCurveTo(122, 164, 113, 158); g.moveTo(128, 148); g.quadraticCurveTo(134, 164, 143, 158); g.stroke()
-  g.strokeStyle = '#6a5a54'; g.lineWidth = 3
+  g.strokeStyle = '#efe6d6'; g.lineWidth = 3
   for (const [y0, y1] of [[140, 132], [150, 150], [160, 168]]) {
     g.beginPath(); g.moveTo(58, y0); g.lineTo(8, y1); g.moveTo(198, y0); g.lineTo(248, y1); g.stroke()
   }
@@ -74,7 +71,7 @@ function paintPrint() {
 }
 let PRINT: THREE.CanvasTexture | null = null
 
-const SAYS = nameOver('【掛鐘】三毛貓掛鐘', '尾巴當鐘擺左右搖，指針跟著店裡的時間走')
+const SAYS = nameOver('【掛鐘】黑貓掛鐘', '尾巴當鐘擺左右搖，指針跟著店裡的時間走')
 /** the shortest way round from one angle to another */
 const turnBy = (from: number, to: number) => ((((to - from + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) - Math.PI
 

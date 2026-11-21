@@ -1,9 +1,10 @@
-"""The cat wall clock (catclock.glb; item 477, the owner's, 2026-11-21: 「這邊增加一個喵咪掛鐘」): our own, a calico cat sitting up, its
+"""The cat wall clock (catclock.glb; item 477, the owner's, 2026-11-21: 「這邊增加一個喵咪掛鐘」; black since item 483: 「貓咪時鐘要黑貓」): our
+own, a black cat sitting up, its
 round belly the clock's case with the dial on it, its face over it, a red collar and a gold bell at its neck, its two front paws at the
 case's foot, its tail hanging under it for the pendulum. Hung on the back wall right of the round window.
 
 Nodes:
-- "CatClockBody": all that stands still: the case, the dial, the head, the ears (one black, one ginger, pink inside), the collar, the bell,
+- "CatClockBody": all that stands still: the case, the dial, the head, the ears (black, pink inside), the collar, the bell,
   the paws, the cap over the hands' pivot. The head's front and the dial's are one material, "CatClockPrint": the game paints them in one
   picture (the face on its left half, the dial on its right: its ticks and numbers), as the drinks fridge's sign is painted.
 - "CatClockHour", "CatClockMinute": the hands, each its pivot at its origin (the dial's middle), pointing up (+y) at twelve.
@@ -43,7 +44,8 @@ def lin(hexs):
 
 
 M = {
-    "white": pbr("CatClockWhite", lin("#f7f2e8"), rough=0.6),
+    # (a black cat (item 483, the owner's 「貓咪時鐘要黑貓」): its fur near black, a little warm; pink inside its ears)
+    "white": pbr("CatClockFur", lin("#2b2727"), rough=0.6),
     "print": pbr("CatClockPrint", (1, 1, 1), rough=0.6),
     "black": pbr("CatClockBlack", lin("#2e2826"), rough=0.6),
     "ginger": pbr("CatClockGinger", lin("#e3953f"), rough=0.6),
@@ -115,7 +117,7 @@ body.append(part("cc_head", lambda bm, uvl: slab(bm, ellipse(0, HEAD_C, HEAD_W, 
                                                   lambda x, y: (0.25, 0.5) if x is None else (0.5 * (x + PRINT_HEAD / 2) / PRINT_HEAD, (y - HEAD_C + PRINT_HEAD / 2) / PRINT_HEAD), uvl), M["print"]))
 # (the ears: prisms up off the head's top, leaning out a little; the left black, the right ginger; pink inside, a little in front)
 top = HEAD_C + HEAD_H
-for sd, mat in ((-1, M["black"]), (1, M["ginger"])):
+for sd, mat in ((-1, M["white"]), (1, M["white"])):
     base = [(sd * 0.026, top - 0.022), (sd * 0.074, top - 0.03), (sd * 0.064, top + 0.038)]
     tri = [base[0], base[1], base[2]]
     body.append(part(f"cc_ear{sd}", lambda bm, uvl, t=tri: slab(bm, t, 0.02, 0.046), mat))
@@ -186,7 +188,7 @@ def tail(bm, uvl):
     ladder_fill(bm, rings[-1])
 
 
-TAIL = part("CatClockTail", tail, M["ginger"])
+TAIL = part("CatClockTail", tail, M["white"])
 TAIL.location = P(0.0, -0.105, 0.02)
 
 root = bpy.data.objects.new("CatClock", None)
