@@ -126,6 +126,7 @@ import { Glyph, StarIcon } from '@/ui/GameIcons'
 import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
+import { DORM_LAYER, FLOOR, lightsBoth } from '@/scene/floors'
 import { Steam } from '@/scene/Steam'
 import { DISHES, type Dish as DishInfo } from '@/data/menu'
 import { VIEW_SPOTS, viewKey, viewName, type ViewId } from '@/data/views'
@@ -399,6 +400,8 @@ const ShadowPacer = memo(function ShadowPacer() {
       seen.current = clock.elapsedTime
       const v = new THREE.Vector3()
       scene.traverse((o) => {
+        // (every light lit on both floors' layers (item 457, scene/floors): the same lights seen up or down, no program made afresh)
+        if ((o as THREE.Light).isLight) { if (!o.layers.isEnabled(DORM_LAYER)) o.layers.enable(DORM_LAYER); return }
         const m = o as THREE.Mesh
         if (!m.isMesh) return
         // (and anything see-through and two-sided drawn in one pass: three otherwise draws it twice a frame, back faces then front, flagging
@@ -418,8 +421,24 @@ const ShadowPacer = memo(function ShadowPacer() {
         if (r < CASTER_R) m.castShadow = false
       })
     }
-    if (++n.current % 3 === 0) gl.shadowMap.needsUpdate = true
+    // (upstairs the shop isn't drawn, nor its shadows (item 457): its map kept as it was, drawn again once it's come back down to)
+    if (++n.current % 3 === 0 && !FLOOR.up) gl.shadowMap.needsUpdate = true
   })
+  return null
+})
+/** which floor's drawn (item 457, scene/floors): the camera and the pointer's ray on the room upstairs' layer while the view's up there, else
+ * the shop's; the shop's labels and bubbles (drei's, beside the canvas) hidden meanwhile (`data-floor` on the page) */
+const FloorLayers = memo(function FloorLayers({ up }: { up: boolean }) {
+  const camera = useThree((st) => st.camera)
+  const raycaster = useThree((st) => st.raycaster)
+  const scene = useThree((st) => st.scene)
+  useLayoutEffect(() => {
+    lightsBoth(scene)
+    FLOOR.up = up
+    camera.layers.set(up ? DORM_LAYER : 0)
+    raycaster.layers.set(up ? DORM_LAYER : 0)
+    document.documentElement.dataset.floor = up ? 'up' : 'down'
+  }, [up, camera, raycaster, scene])
   return null
 })
 /** the water and power meter, the month so far (game/utilities), kept in the browser; cleared with a fresh start */
@@ -702,8 +721,27 @@ const HOLD_POSE = { next: false }
 function Drawn({ onDrawn }: { onDrawn?: () => void }) {
   const said = useRef(false)
   const frames = useRef(0)
+  const gl = useThree((st) => st.gl)
+  const scene = useThree((st) => st.scene)
+  const camera = useThree((st) => st.camera)
   useFrame(() => {
-    if (said.current || ++frames.current < 3) return
+    if (said.current) return
+    // (item 457: the room's on a layer of its own, not drawn till the camera's up there: its programs made and its pictures sent up now,
+    // behind the cover, with the lights both floors share, so its first frame up there makes nothing)
+    if (++frames.current === 1) {
+      const room = scene.getObjectByName('look-dorm')?.parent
+      if (room) {
+        lightsBoth(scene)
+        gl.compile(room, camera, scene)
+        const sent = new Set<THREE.Texture>()
+        room.traverse((o) => {
+          for (const mat of ([] as THREE.Material[]).concat((o as THREE.Mesh).material ?? [])) {
+            for (const v of Object.values(mat)) if ((v as THREE.Texture | null)?.isTexture && !sent.has(v as THREE.Texture)) { sent.add(v as THREE.Texture); gl.initTexture(v as THREE.Texture) }
+          }
+        })
+      }
+    }
+    if (frames.current < 3) return
     said.current = true
     onDrawn?.()
   })
@@ -1222,6 +1260,7 @@ function Scene({ omiki, active, orders, theme, sky, reducedMotion, fire, heat, f
         shadow-mapSize={[QUALITY.shadowSize, QUALITY.shadowSize]} shadow-bias={-0.0008} shadow-normalBias={0.04} shadow-radius={shadowSoft(theme === 'dark')}
         shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-near={1} shadow-camera-far={48} />
       <ShadowPacer />
+      <FloorLayers up={view === 'upstairs'} />
       {/* (the staff room upstairs, a scene of its own off to the side (item 325)); those living in it up there while the shop's shut (item 339) */}
       {dorm && (
         <Suspense fallback={null}>

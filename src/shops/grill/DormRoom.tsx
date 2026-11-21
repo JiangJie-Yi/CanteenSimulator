@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -7,6 +7,7 @@ import type { Look, Role } from '@/data/staff'
 import { commuteOf } from '@/game/commute'
 import { CLIMB_S, downBeat, downLength, dormDoing, upBeat, upstairs } from '@/game/dormLife'
 import { SHOP } from '@/game/shopState'
+import { toDorm } from '@/scene/floors'
 import { inkModel } from '@/scene/inkHull'
 import { mergeByMaterial } from '@/scene/StaticBatch'
 import { setTip } from '@/scene/hoverTip'
@@ -41,8 +42,8 @@ function alleyTo() {
   const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
   ALLEY?.paint((['dawn', 'day', 'dusk', 'night'].includes(s) ? s : 'day') as AlleySky)
 }
+// (not fetched with the page (item 457, the owner's 「loading 時1層1層」): only as the room's first gone up to, under the cover's bar)
 const DORM_URL = import.meta.env.BASE_URL + 'models/dorm.glb'
-useGLTF.preload(DORM_URL)
 /** where it stands in the world: off to the side of the shop, on its floor's level (the dining room's floor, the staff door's foot) */
 export const DORM_AT = new THREE.Vector3(60, -1.16, -1.69)
 const DORM_SCALE = 2
@@ -267,7 +268,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
   /** the ids of those on today's shift (the rest of those living in are off: up here all day); none given, all of them are */
   working?: readonly string[] }) {
   const gltf = useGLTF(DORM_URL) as unknown as { scene: THREE.Group }
-  const { root, look, marks, pieces, quilts, leftCut, leftX, bathDoor, bathX, bathCut, bathCutX } = useMemo(() => {
+  const { root, look, marks, pieces, quilts, leftCut, leftX, bathDoor, bathX, bathCut, bathCutX, mats } = useMemo(() => {
     const r = (gltf.scene.getObjectByName('DormRoot') ?? gltf.scene).clone(true)
     r.position.set(0, 0, 0)
     const made = new Map<THREE.Material, THREE.Material>()
@@ -319,7 +320,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     const byName = (n: string) => [...made.values()].find((x) => x.name === n) ?? null
     const lk = r.getObjectByName('DormLook')
     return { root: r, look: lk ? lk.position.clone() : new THREE.Vector3(0.15, 0.6, 0.1), marks: mk, pieces: ps, quilts: [byName('DormFutonBlue'), byName('DormFutonPink')],
-      leftCut, leftX, bathDoor, bathX: bathDoor?.position.x ?? 0, bathCut, bathCutX }
+      leftCut, leftX, bathDoor, bathX: bathDoor?.position.x ?? 0, bathCut, bathCutX, mats: [...made.values()] }
   }, [gltf])
   // (those living in: the cooks hired (the shop's own second cook when none is), two at most, the futons' and the cushions' number)
   // (the same list while it's the same people: a new array each time the scene's drawn)
@@ -334,12 +335,28 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
   // (the shop shut with one of them still not up the stair (cut short on their way out, or the shop shut by hand): up it now, from its foot)
   const wasOpen = useRef(open)
   const alley = useRef<THREE.Mesh>(null)
+  // (item 457: the room on a layer of its own, and only that (scene/floors): drawn, cast into shadows and pointed at only while the camera's up
+  // here; what comes into it later (its residents' figures) put there too, a few times a second)
+  const outer = useRef<THREE.Group>(null)
+  const layered = useRef(0)
+  useLayoutEffect(() => { if (outer.current) toDorm(outer.current) })
+  // (gone down from, the room let go of the GPU (item 457: the shop alone loaded downstairs): every geometry in it (the model's, kept by the
+  // loader, sent up again as it's next gone up to; its ink lines' and its merges', made again) and its own materials and their pictures; not
+  // the ink's one material, nor anything the shop shares)
+  useEffect(() => () => {
+    root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry?.dispose() })
+    for (const mat of mats) {
+      for (const v of Object.values(mat)) if ((v as THREE.Texture | null)?.isTexture) (v as THREE.Texture).dispose()
+      mat.dispose()
+    }
+  }, [root, mats])
   useEffect(() => {
     if (wasOpen.current && !open) for (const m of living) if (DORM_LIFE.downAt.has(m.id) && !DORM_LIFE.upAt.has(m.id)) { DORM_LIFE.upAt.set(m.id, performance.now()); DORM_LIFE.downAt.delete(m.id) }
     wasOpen.current = open
   }, [open, living])
   // (asleep: the table folded away, each sleeper's futon laid; else the table out, the futons in the closet)
   useFrame(({ camera }) => {
+    if (++layered.current % 20 === 0 && outer.current) toDorm(outer.current)
     // (the left wall and the closet's shell away while the camera's out past it (item 426), back as it comes round)
     CAM_IN.copy(camera.position)
     root.worldToLocal(CAM_IN)
@@ -375,7 +392,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     if (pieces.DormTableAway) pieces.DormTableAway.visible = anyone
   })
   return (
-    <group position={DORM_AT} scale={DORM_SCALE}>
+    <group ref={outer} position={DORM_AT} scale={DORM_SCALE}>
       <primitive object={root} />
       {living.map((m, k) => <Resident key={m.id} m={m} k={k} marks={marks} open={open} quilt={quilts[k % 2]} off={offToday(m.id)} />)}
       {/* (what the view 二樓 looks at: over the table; its +z the room's open front, which the view faces) */}
