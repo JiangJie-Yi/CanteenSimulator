@@ -5507,6 +5507,22 @@ function PendantLight({ y }: { y: number }) {
   })
   return <AnchoredLight light={lamp} position={[0, y, 0]} color="#ffb46a" intensity={getLights().on ? PENDANT_LIGHT : 0} distance={3.4} decay={2} />
 }
+/** (item 492) the pendant lamps' own parts made once for them all (each lamp made its own of every one: six of each the same), and their
+ * cord, rings and loop drawn as one (StaticBatch plain): nine draws a lamp were six */
+const PENDANT_RING_GEO = new THREE.CylinderGeometry(0.056, 0.056, 0.024, 12)
+const PENDANT_LOOP_GEO = new THREE.TorusGeometry(0.012, 0.0025, 4, 8)
+const PENDANT_POOL_GEO = new THREE.PlaneGeometry(1.3, 1.3)
+const PENDANT_CORDS = new Map<number, THREE.CylinderGeometry>()
+const pendantCord = (len: number) => {
+  const k = Math.round(len * 1e4)
+  let g = PENDANT_CORDS.get(k)
+  if (!g) { g = new THREE.CylinderGeometry(0.004, 0.004, len, 4); PENDANT_CORDS.set(k, g) }
+  return g
+}
+const PENDANT_CORD_MAT = new THREE.MeshToonMaterial({ color: INK })
+const PENDANT_RING_MAT = new THREE.MeshToonMaterial({ color: '#cdb083' })
+const PENDANT_LOOP_MAT = new THREE.MeshToonMaterial({ color: '#8a6a3a' })
+const PENDANT_INK_MAT = new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide })
 /** a pendant lamp, an oval washi lantern, its band 鱗 or 立涌 (`band` 0 or 1; the owner's: every one the plain lantern again, the round
  * one with 日式烤魚 and the fish taken down) */
 function Pendant({ z, drop, pool, band = 0, hang = 0 }: { z: number; drop: number; pool: number; band?: number
@@ -5514,24 +5530,19 @@ function Pendant({ z, drop, pool, band = 0, hang = 0 }: { z: number; drop: numbe
   hang?: number }) {
   return (
     <group position={[0, WALL_H, z]}>
-      <mesh position-y={-(hang + drop) / 2}>
-        <cylinderGeometry args={[0.004, 0.004, drop - hang, 4]} />
-        <meshBasicMaterial color={INK} />
-      </mesh>
-      {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord) */}
+      {/* (a paper lantern: the oval of ribbed washi, a pale wooden ring at each end, a little ring at the top for the cord; the cord, the
+          rings and the loop never move: drawn as one) */}
+      <StaticBatch plain>
+        <mesh position-y={-(hang + drop) / 2} geometry={pendantCord(drop - hang)} material={PENDANT_CORD_MAT} />
+        <group position-y={-drop - 0.13}>
+          {[LANTERN_END + 0.004, -LANTERN_END - 0.004].map((y) => <mesh key={y} position-y={y} geometry={PENDANT_RING_GEO} material={PENDANT_RING_MAT} />)}
+          <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2} geometry={PENDANT_LOOP_GEO} material={PENDANT_LOOP_MAT} />
+        </group>
+      </StaticBatch>
       {/* (a lamp casts no shadow: the moon threw the lit lanterns' onto the floor, well away under them) */}
       <group position-y={-drop - 0.13}>
         <mesh geometry={LANTERN_GEO} material={band ? LANTERN_SHADE_TATEWAKU : LANTERN_SHADE} />
-        <mesh geometry={LANTERN_GEO} scale={1.035} raycast={NO_RAY}>
-          <meshBasicMaterial color={INK} side={THREE.BackSide} />
-        </mesh>
-        {[LANTERN_END + 0.004, -LANTERN_END - 0.004].map((y) => (
-          <mesh key={y} position-y={y}>
-            <cylinderGeometry args={[0.056, 0.056, 0.024, 12]} />
-            <meshToonMaterial color="#cdb083" />
-          </mesh>
-        ))}
-        <mesh position-y={LANTERN_END + 0.028} rotation-x={Math.PI / 2}><torusGeometry args={[0.012, 0.0025, 4, 8]} /><meshToonMaterial color="#8a6a3a" /></mesh>
+        <mesh geometry={LANTERN_GEO} scale={1.035} raycast={NO_RAY} material={PENDANT_INK_MAT} />
         {/* (light, not the lamp: the pointer goes through them (they took clicks meant for the drinks behind, 3.6 m of bloom there by day too)) */}
         <sprite scale={0.85} material={PENDANT_GLOW} raycast={NO_RAY} />
         {/* (and by night a wide soft bloom round it) */}
@@ -5540,8 +5551,7 @@ function Pendant({ z, drop, pool, band = 0, hang = 0 }: { z: number; drop: numbe
         {QUALITY.tier !== 'low' && <PendantLight y={-0.12} />}
       </group>
       {/* (the pool of light on the bar top below, down from the lamp's height) */}
-      <mesh position-y={pool - WALL_H + 0.004} rotation-x={-Math.PI / 2} renderOrder={1} raycast={NO_RAY}>
-        <planeGeometry args={[1.3, 1.3]} />
+      <mesh position-y={pool - WALL_H + 0.004} rotation-x={-Math.PI / 2} renderOrder={1} raycast={NO_RAY} geometry={PENDANT_POOL_GEO}>
         <primitive object={PENDANT_POOL} attach="material" />
       </mesh>
     </group>

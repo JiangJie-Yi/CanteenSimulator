@@ -3350,7 +3350,9 @@ const BarTableware = memo(function BarTableware() {
                   <Movable id={`chopsticks${seat}`} label={`筷架（座位 ${no}）`}>
                     <group ref={keep(k++)} name={`chop-set-${seat}`} position={[x, BAR_TOP, PLACE.chop]} {...nameOver('筷架', '靛藍釉的筷架，黑漆塗箸擱在上面')}>
                       {/* (itself, 136 triangles, its glaze shining (item 281): as a flat sheet (item 144) it was a blue line along the bar) */}
-                      <StaticBatch plain><group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group></StaticBatch>
+                      {/* (its model's own shapes, the same for every place (item 492: batched one by one, each place made its own copy of each, sixteen
+                          on the card for two)) */}
+                      <group position={[SETTING.restX, 0, 0]} rotation-y={Math.PI / 2}><BarPiece name="BarHashioki" /></group>
                     </group>
                   </Movable>
                   {/* (the pair of chopsticks: a piece of its own, moved apart from the rest; BarChopsticks, instanced, lays them where this stands, and
@@ -3372,7 +3374,8 @@ const BarTableware = memo(function BarTableware() {
                       {...nameOver('醬油碟', '染付的小碟，客人坐下時倒醬油、放一點蘿蔔泥')}>
                       {/* (itself, its little well and rim in the round (item 344, the owner's: 「醬油碟是平的?」): one flat sheet with its picture from
                           above it was (item 144), and the soy poured into it lay on nothing) */}
-                      <StaticBatch plain><BarPiece name="BarSoyDish" design={n} /></StaticBatch>
+                      {/* (its shape the model's own, shared by every place (item 492), not batched into a copy of its own) */}
+                      <BarPiece name="BarSoyDish" design={n} />
                     </group>
                   </Movable>
                 </group>

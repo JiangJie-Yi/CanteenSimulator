@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { inkModel } from '@/scene/inkHull'
+import { mergeByMaterial, plainColours } from '@/scene/StaticBatch'
 import { Steam } from '@/scene/Steam'
 import { stepOf } from '@/game/station'
 import { ALONG, KITCHEN, LAY, nameOver } from './bar'
@@ -113,9 +114,16 @@ export const GasStove = memo(function GasStove() {
     r.add(marker('stove-top', fry.position.x, fry.position.y + 0.04, fry.position.z),
       marker('stove-grip', fry.position.x + dir.x * 0.2, fry.position.y + 0.071, fry.position.z + dir.z * 0.2),
       marker('stove-front', fry.position.x, (FLOOR - TOP) / STOVE_SCALE, (STOVE_AT.along - STAND_ALONG) / STOVE_SCALE))
+    // (item 492: twelve draws standing cold, a part each colour: the plain colours one material, on their points, and what moves together
+    // merged as one: the body, the frying pan, the knob, the square pan (on the burner, and hung))
+    plainColours(r)
+    plainColours(egg)
+    const moves = new Set<THREE.Object3D>([flame, knob, fry, eggOn, panEgg, panRoll])
+    mergeByMaterial(r, (o) => moves.has(o) || o.name.startsWith('stove-'))
+    for (const part of [fry, knob, eggOn, egg]) mergeByMaterial(part)
     inkModel(r, (m) => (m.material as THREE.Material).name === 'StoveFlame', { width: 0.0012, weld: true })
     inkModel(egg, () => false, { width: 0.0012, weld: true })
-    flame.scale.setScalar(0.001)
+    flame.visible = false
     return { r, flame, knob, fry, egg, eggOn, panEgg, panRoll, steamAt: fry.position.clone().add(new THREE.Vector3(0, 0.05, 0)) }
   }, [gltf, food])
   // (the pan hung: its handle (+z) up, its inside (+y) toward the stove (-LAY), its width along the counter's depth)
@@ -128,6 +136,8 @@ export const GasStove = memo(function GasStove() {
   }, [])
   const at = useMemo(() => new THREE.Vector3().addScaledVector(ALONG, STOVE_AT.along).addScaledVector(LAY, STOVE_AT.lay), [])
   const steam = useRef(0)
+  // (the steam's layers not drawn while there's none)
+  const steamOn = useRef<THREE.Group>(null)
   const heard = useRef({ was: false, at: 0 })
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -148,11 +158,13 @@ export const GasStove = memo(function GasStove() {
     parts.panRoll.scale.set(1, 0.5 + 0.5 * rolled, 0.55 + 0.45 * rolled)
     // (lit: the flames up, licking; off: down to nothing; the knob turned with it)
     STOVE.flame += ((STOVE.on ? 1 : 0) - STOVE.flame) * 0.2
-    const k = STOVE.flame < 0.01 ? 0.001 : STOVE.flame * (0.9 + 0.1 * Math.sin(t * 23) * Math.sin(t * 7.3))
-    parts.flame.scale.set(STOVE.flame < 0.01 ? 0.001 : 1, k, STOVE.flame < 0.01 ? 0.001 : 1)
+    // (out, not drawn at all: shrunk to nothing it was still a draw (item 492))
+    parts.flame.visible = STOVE.flame >= 0.01
+    if (parts.flame.visible) parts.flame.scale.set(1, STOVE.flame * (0.9 + 0.1 * Math.sin(t * 23) * Math.sin(t * 7.3)), 1)
     parts.knob.rotation.z = -STOVE.flame * 1.4
     // (the steam off it while it cooks; the sizzle as the egg goes in, and now and then after)
     steam.current += ((ck && step !== 'done' ? 0.7 : 0) - steam.current) * 0.05
+    if (steamOn.current) steamOn.current.visible = steam.current > 0.01
     const h = heard.current
     if (ck && !h.was) { sizzleSound(1.3, 1); h.at = t }
     else if (ck && step === 'cook' && t - h.at > 2.6) { sizzleSound(1.0, 0.45); h.at = t }
@@ -162,7 +174,7 @@ export const GasStove = memo(function GasStove() {
     <group>
       <group position={[at.x, TOP, at.z]} rotation-y={Math.atan2(-ALONG.x, -ALONG.z)} scale={STOVE_SCALE}>
         <primitive object={parts.r} />
-        <group position={parts.steamAt}><Steam width={0.18} height={0.3} opacity={0.3} layers={2} level={steam} face /></group>
+        <group ref={steamOn} visible={false} position={parts.steamAt}><Steam width={0.18} height={0.3} opacity={0.3} layers={2} level={steam} face /></group>
         <mesh visible={false} position={[0, 0.08, 0]} {...SAYS}><boxGeometry args={[0.36, 0.18, 0.3]} /></mesh>
       </group>
       <group position={hang.p} quaternion={hang.q}><primitive object={parts.egg} /></group>
@@ -200,8 +212,14 @@ export const Fryer = memo(function Fryer() {
     // (the lamp lit from within; the rest the shop's toon)
     toToon(r, (n) => (n === 'FryerLamp' ? new THREE.MeshBasicMaterial({ color: '#ff6a46' }) : null))
     r.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = !/FryerOil|FryerLamp/.test((m.material as THREE.Material).name) })
-    inkModel(r, (m) => /FryerOil|FryerLamp/.test((m.material as THREE.Material).name), { width: 0.0012, weld: true })
     const basket = r.getObjectByName('FryerBasket')!, oil = r.getObjectByName('FryerOil')!
+    // (item 492: eleven draws, a part each colour: the plain colours one material, on their points, the still parts merged as one and the
+    // basket as one (it's let down and lifted); the oil (its face trembles) and the lamp (lit) their own)
+    plainColours(r)
+    mergeByMaterial(r, (o) => o === basket || o === oil)
+    mergeByMaterial(basket)
+    // (no line round the oil's face or the lamp: the oil known by itself now its colour's on its points)
+    inkModel(r, (m) => m === oil || /FryerLamp/.test((m.material as THREE.Material).name), { width: 0.0012, weld: true })
     // (what's been fried, set on the rack to drain at the end: the chips (out of their cone), the tempura)
     const fries = foodOf(food.scene, 'Fries'), tempura = foodOf(food.scene, 'Tempura')
     toToon(fries, () => null)
