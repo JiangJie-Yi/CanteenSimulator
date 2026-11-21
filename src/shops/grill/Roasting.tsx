@@ -3820,6 +3820,29 @@ const NotchStep = memo(function NotchStep({ id = 'notchstep', label = '木台階
  * it folded away before they're down again); and his way there from his fire, as his cooks who live upstairs go to the door: across the
  * kitchen to the gate, out, along the aisle to its corner, to before the futon's foot and onto it. In the grill's frame (this group's).
  */
+/** the boss's futon's place (item 480), in the world: its foot, its head and before its foot, from where the barrel and the rice sacks stand
+ * (their middles; across the line between them, its head toward the floor's edge, away from the room's middle); null without them */
+function futonSpot(scene: THREE.Object3D) {
+  let barrel: THREE.Object3D | null = null, sacks: THREE.Object3D | null = null
+  scene.traverse((q) => {
+    if (!barrel && q.userData?.editId === 'takeoutstand') barrel = q
+    if (!sacks && q.userData?.editId === 'ricesacks') sacks = q
+  })
+  const floor = scene.getObjectByName('room-floor')
+  if (!barrel || !sacks || !floor) return null
+  const a = new THREE.Box3().setFromObject(barrel).getCenter(new THREE.Vector3())
+  const b = new THREE.Box3().setFromObject(sacks).getCenter(new THREE.Vector3())
+  const axis = b.clone().sub(a).setY(0)
+  if (axis.lengthSq() < 1e-6) return null
+  axis.normalize()
+  const mid = a.clone().lerp(b, 0.5), room = floor.getWorldPosition(new THREE.Vector3())
+  const inward = new THREE.Vector3(-axis.z, 0, axis.x)
+  if (inward.dot(room.sub(mid)) < 0) inward.negate()
+  // (the world's units: its middle 0.74 on from halfway toward the sacks and 0.53 in from the line; 2.5 long (the bar's 1.25), its foot inward)
+  const c = mid.addScaledVector(axis, 0.74).addScaledVector(inward, 0.53)
+  const half = FUTON.L * GRILL_SCALE / 2
+  return { foot: c.clone().addScaledVector(inward, half), head: c.clone().addScaledVector(inward, -half), before: c.clone().addScaledVector(inward, half + 0.8) }
+}
 const BossBedWays = memo(function BossBedWays({ open, research }: { open: boolean; research: boolean }) {
   const ref = useRef<THREE.Group>(null)
   const scene = useThree((st) => st.scene)
@@ -3832,8 +3855,20 @@ const BossBedWays = memo(function BossBedWays({ open, research }: { open: boolea
     BOSS_BED.frame = ref.current
     BOSS_BED.way = (fromGrill) => {
       const g = ref.current, sd = scene.getObjectByName('staff-door'), fr = scene.getObjectByName('look-fridge')
-      if (!g || !sd) return null
+      if (!g) return null
       g.updateWorldMatrix(true, false)
+      // (item 480, the owner's 「老闆打地鋪在這邊」: on the floor between the barrel and the rice sacks at the back, where the willow stood (moved
+      // up by the barrel, item 479): across it, his head to the wall, his feet into the room, a little nearer the sacks than the barrel (the
+      // willow's by that); his way there across the kitchen as it routes him, to before its foot and onto it)
+      const spot = futonSpot(scene)
+      if (spot && KITCHEN_ROUTE.route) {
+        const toB = (w: THREE.Vector3) => toBar(g.worldToLocal(w.clone()))
+        const onFloor = (v: THREE.Vector3) => { const q = fromBar(v); return q.setY(floorAt(q)) }
+        const foot = toB(spot.foot), head = toB(spot.head), before = toB(spot.before)
+        const across = KITCHEN_ROUTE.route(toBar(fromGrill), before)
+        if (across && across.length) return { path: [fromGrill.clone(), ...across.slice(1).map((v) => onFloor(v)), onFloor(before), onFloor(foot)], foot: onFloor(foot), head: onFloor(head) }
+      }
+      if (!sd) return null
       sd.updateWorldMatrix(true, false)
       // (the door, the way into the room from it, and along the wall toward the corner (the side wall's way, where the fridges stand), in
       // the bar's frame)
@@ -3881,8 +3916,9 @@ const BossFuton = memo(function BossFuton() {
       m.receiveShadow = true
     })
     inkModel(r, () => false, { width: 0.0009, weld: true })
-    return { r, shiki: r.getObjectByName('FutonShiki')!, kake: r.getObjectByName('FutonKake')!, pillow: r.getObjectByName('FutonMakura')!,
-      pillowAt: r.getObjectByName('FutonMakura')!.position.clone() }
+    const kake = r.getObjectByName('FutonKake')!
+    return { r, shiki: r.getObjectByName('FutonShiki')!, kake, pillow: r.getObjectByName('FutonMakura')!,
+      pillowAt: r.getObjectByName('FutonMakura')!.position.clone(), kakeMap: ((kake as THREE.Mesh).material as THREE.MeshToonMaterial)?.map ?? null }
   }, [gltf])
   const g = useRef<THREE.Group>(null)
   useFrame(() => {
@@ -3900,7 +3936,11 @@ const BossFuton = memo(function BossFuton() {
     // (the quilt: folded at its foot on the mattress till it's pulled up over him (cover), its swell rising as it goes; back to its fold in
     // the morning as he throws it back)
     const cv = ease(f.cover) * (1 - fold)
-    parts.kake.scale.set(1, 0.35 + 0.65 * cv, 1 / 3 + (2 / 3) * cv)
+    const kl = 1 / 3 + (2 / 3) * cv
+    parts.kake.scale.set(1, 0.35 + 0.65 * cv, kl)
+    // (its picture as long as what's shown of it, its head's band at its head (item 474, the owner's 「棉被被拉開的時候破圖了」: shortened, the
+    // whole picture was squeezed into it, the crosses a third their size and running, as it was pulled up over him))
+    if (parts.kakeMap) { parts.kakeMap.repeat.set(1, kl); parts.kakeMap.offset.set(0, 1 - kl) }
     parts.kake.position.set(0, (1 - len) * FUTON.top * 1.6, 0)
     // (the pillow: dropped at its head, a little bounce; on the folded stack in the morning)
     const pk = ease(f.pillow)

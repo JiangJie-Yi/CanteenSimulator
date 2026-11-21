@@ -53,7 +53,8 @@ shiki = shiki * (0.95 + 0.06 * fbm(N, 64, 64, 2))[..., None]
 SHIKI_TEX = image("futon_shiki", np.clip(shiki, 0, 1).astype(np.float32))
 # (the quilt: indigo, a white kasuri cross every 8 cm in a staggered grid, each a little ragged, a plain lighter band at its head end)
 ind = mix((0.10, 0.16, 0.33), (0.14, 0.21, 0.40), fbm(N, 5, 5, 4))
-gx, gy = u * KW / 0.08, v * KL / 0.08
+# (ten crosses across exactly: the picture repeats across the quilt, laid round its swell (item 474), and meets itself with no seam)
+gx, gy = u * 10, v * KL / 0.08
 row = np.floor(gy)
 cx = (gx + (row % 2) * 0.5) % 1.0 - 0.5
 cy = gy % 1.0 - 0.5
@@ -129,8 +130,10 @@ def shiki_top(x, z):
     return ST * (0.55 + 0.45 * math.sin(e * math.pi / 2))
 
 
+# (uv_of is given (x, along, height): grid_slab passes co.x, -co.y, co.z of P's (x, -along, height); item 474: the along was taken for the
+# height, and the pictures ran by how high each point was)
 make("FutonShiki", "shiki", lambda bm, uvl: grid_slab(bm, uvl, SW, SL, shiki_top, 0.002, 4, 6,
-                                                     lambda x, y, z: ((x + SW / 2) / SW, z / SL)))
+                                                     lambda x, along, h: ((x + SW / 2) / SW, along / SL)))
 
 
 # ---------------------------------------------------------------- the quilt: its middle swelling over him, its sides falling to the mattress
@@ -143,8 +146,37 @@ def kake_top(x, z):
     return ST + 0.004 + KT + HUMP * a * along
 
 
-make("FutonKake", "kake", lambda bm, uvl: grid_slab(bm, uvl, KW, KL, kake_top, ST + 0.003, 6, 6,
-                                                    lambda x, y, z: ((x + KW / 2) / KW, z / KL)))
+def kake_uv(x, along, h):
+    # (along the quilt by its length; across by its surface (kake_u); down its edges' walls the picture runs on, by how far down: the
+    # head's end stands as high as his shoulders, and at one v all the way down it was the picture's one row drawn out (item 474))
+    drop = max(0.0, kake_top(x, along) - h)
+    u, v = kake_u(x, along), along / KL
+    if drop > 1e-5:
+        if along < 1e-4:
+            v -= drop / KL
+        elif along > KL - 1e-4:
+            v += drop / KL
+        if abs(x) > KW / 2 - 1e-4:
+            u += (1 if x > 0 else -1) * drop / KW
+    return (u, v)
+
+
+def kake_u(x, z):
+    # (item 474, the owner's 「棉被被拉開的時候破圖了」: laid on from above, the picture was drawn out over the swell's steep sides, the crosses
+    # into dashes; across, it's laid along the cloth now: how far along the quilt's surface from its middle, in its own width's measure,
+    # so a cross is a cross wherever it lies)
+    n = 48
+    side = 1 if x >= 0 else -1
+    s, px, py = 0.0, 0.0, kake_top(0.0, z)
+    for i in range(1, n + 1):
+        qx = abs(x) * i / n
+        qy = kake_top(side * qx, z)
+        s += math.hypot(qx - px, qy - py)
+        px, py = qx, qy
+    return 0.5 + side * s / KW
+
+
+make("FutonKake", "kake", lambda bm, uvl: grid_slab(bm, uvl, KW, KL, kake_top, ST + 0.003, 10, 8, kake_uv))
 
 
 # ---------------------------------------------------------------- the pillow: a soft roll, its ends rounded
