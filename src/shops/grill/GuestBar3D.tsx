@@ -3063,17 +3063,15 @@ function timberBox(w: number, h: number, d: number, along = 1, across = 0.25) {
  */
 function KitchenDais({ counters, rise }: { counters: Counter[]; rise: number }) {
   const k = useMemo(() => kitchenOf(counters), [counters])
-  const gates = useMemo(() => kitchenGatesOf(counters), [counters])
   const [kx0, kx1] = k.along, [ky0, ky1] = k.lay
-  const S = 0.17
   // (in the floor's frame: x is minus lay, z is along)
   return (
     <>
       <mesh position={[-(ky0 + ky1) / 2, rise / 2, (kx0 + kx1) / 2]} geometry={timberBox(ky1 - ky0, rise, kx1 - kx0, BASE_TILE.along, BASE_TILE.across)} material={BASE_TIMBER[1]} receiveShadow />
       <FloorPiece w={ky1 - ky0} l={kx1 - kx0} tint="#d2c4b2" position={[-(ky0 + ky1) / 2, rise + 0.004, (kx0 + kx1) / 2]} />
-      {/* (one step: half its height, outside its edge at the side counter's gate; the first counter's gate's and the one along its open end
-          taken away (the owner's: pale planks lying across the aisle by the stools' feet)) */}
-      {gates.side && <mesh name="dais-step-side" position={[-(gates.side[0] + gates.side[1]) / 2, rise / 4, kx0 - S / 2]} geometry={timberBox(gates.side[1] - gates.side[0] + 0.2, rise / 2, S)} material={TIMBER} castShadow receiveShadow ref={(m) => { if (m) inkModel(m) }} />}
+      {/* (no step at the side counter's gate either (item 501, the owner's 「這塊拿掉」: a pale plank lying across the way by the swing door);
+          the first counter's gate's and the one along its open end went before (the owner's: pale planks lying across the aisle by the
+          stools' feet)) */}
     </>
   )
 }
