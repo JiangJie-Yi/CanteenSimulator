@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { GUEST_FACES, guestFaceStrip, guestFrame, type FaceKind, type GuestFace } from './faceSheet'
+import { GUEST_FACES, LOOKS, guestFaceStrip, guestFrame, type FaceKind, type GuestFace } from './faceSheet'
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { GAZE, LATE } from '@/game/shopState'
 /** (where one's looking at a thing in the room, worked out) */
@@ -7,7 +7,7 @@ const GZ_P = new THREE.Vector3()
 /** how tall each shape stands in its own units, its copies sharing its position data (the key); and a vector for the world's scale on one */
 const TALL_OF = new WeakMap<object, number>()
 const TALL_SCALE = new THREE.Vector3()
-import { useFrame, useLoader } from '@react-three/fiber'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { BOWL_LIFT } from './bowlLift'
@@ -222,7 +222,11 @@ const FOLK_BONES = ['body', 'head', 'handL', 'handR', 'chop', 'bite', 'phone', '
 const FORCE_HAIR = import.meta.env.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search).get('hair') : null
 
 export type FolkSpec = { kind: GuestKind; hair: string; acc: string[]; face: FaceType; outfit: string; size: number; skin: string; hairColor: string
-  top: string; briefcase: boolean }
+  top: string; briefcase: boolean
+  /** which of their face type's designs their face is (scene/faceSheet's LOOKS; item 466, the owner's 「你的臉都豆子臉??」) */
+  faceLook: number }
+/** a customer's face's picture's name: their face type's, and its design's number after it but for the first */
+export const faceKey = (s: Pick<FolkSpec, 'face' | 'faceLook'>) => `face_${s.face}${s.faceLook ? `_${s.faceLook}` : ''}`
 /** how this customer looks: their kind's hair and things, their colours */
 export function folkSpec(id: number): FolkSpec {
   const kind = kindOf(id).kind
@@ -241,7 +245,7 @@ export function folkSpec(id: number): FolkSpec {
   // (dressed as a shrine maiden, no maid's frilled cap)
   if (kind === 'maidCoser' && style === 2) acc.splice(acc.indexOf('maidcap'), 1)
   return { kind, hair, acc, face, outfit: `outfit_${kind}_${style + (id % 2)}`, size: l.size, skin: l.skin, hairColor: l.hair, top: l.top,
-    briefcase: (kind === 'salaryman' && id % 2 === 0) || kind === 'civilServant' }
+    briefcase: (kind === 'salaryman' && id % 2 === 0) || kind === 'civilServant', faceLook: Math.floor(hash(id, 59) * LOOKS[face].length) % LOOKS[face].length }
 }
 
 /** the pictures: every kind's clothes (two ways, two colours each: item 377) and the four faces, loaded together before any customer's drawn */
@@ -253,6 +257,20 @@ const FOLD_N: { t: THREE.Texture | null } = { t: null }
 // (the clothes JPEGs (item 347: at twice the pixels, PNGs were four times the bytes), the faces PNGs (their strip's painted afresh anyway))
 const PICTURE_URLS = PICTURES.map((n) => TEX + n + (n.startsWith('outfit_') && n !== 'outfit_normal' ? '.jpg' : '.png'))
 const prepared = new WeakSet<THREE.Texture>()
+const otherFaces = new Map<string, THREE.Texture>()
+/** a face type's other design's strip, as a picture set up as the loaded faces are */
+function otherFace(kind: FaceKind, n: number) {
+  const key = `${kind}_${n}`
+  let t = otherFaces.get(key)
+  if (!t) {
+    t = new THREE.CanvasTexture(guestFaceStrip(kind, n))
+    t.colorSpace = THREE.SRGBColorSpace
+    t.flipY = false
+    t.anisotropy = 4
+    otherFaces.set(key, t)
+  }
+  return t
+}
 function usePictures() {
   const list = useLoader(THREE.TextureLoader, PICTURE_URLS)
   return useMemo(() => {
@@ -274,6 +292,8 @@ function usePictures() {
       }
       out.set(PICTURES[i], t)
     })
+    // (each face type's other designs (item 466): their strips painted as the first's are, made once for the page)
+    for (const kind of ['male', 'female', 'elder', 'kid'] as const) for (let n = 1; n < LOOKS[kind].length; n++) out.set(`face_${kind}_${n}`, otherFace(kind, n))
     return out
   }, [list])
 }
@@ -445,16 +465,19 @@ export const FolkWarm = memo(FolkWarmImpl)
 function FolkWarmImpl() {
   const gltf = useGLTF(URL) as unknown as { scene: THREE.Group }
   const pictures = usePictures()
+  const gl = useThree((st) => st.gl)
   useEffect(() => {
     // (once for the page: the bar mounted again (or twice, in development) makes no more of it)
     if (folkWarmed.has(gltf.scene)) return
     folkWarmed.add(gltf.scene)
+    // (every face's strip, every design of it (item 466), sent to the GPU now, not as the first customer with that face comes in)
+    for (const [k, t] of pictures) if (k.startsWith('face_')) gl.initTexture(t)
     const spec = folkSpec(0)
     const root = cloneFigure(template(gltf.scene, spec.hair, spec.acc, spec.briefcase).root) as THREE.Group
     const mesh = root.getObjectByName('FolkMesh') as THREE.SkinnedMesh
-    mesh.material = folkMaterial(pictures.get(spec.outfit) ?? null, pictures.get(`face_${spec.face}`) ?? null, null).material
+    mesh.material = folkMaterial(pictures.get(spec.outfit) ?? null, pictures.get(faceKey(spec)) ?? null, null).material
     warmLater(root)
-  }, [gltf, pictures])
+  }, [gltf, pictures, gl])
   return null
 }
 
@@ -514,7 +537,7 @@ function FolkFigureImpl({ id, eating, walking, still, clock, talk = 0, mood = nu
   useLayoutEffect(() => {
     const m = fig.mesh
     const was = m.material
-    const { material, face } = folkMaterial(pictures.get(spec.outfit) ?? null, pictures.get(`face_${spec.face}`) ?? null,
+    const { material, face } = folkMaterial(pictures.get(spec.outfit) ?? null, pictures.get(faceKey(spec)) ?? null,
       spec.acc.includes('shawl') ? cloth('knit', '#8a6a9a', [6, 2]) : null)
     m.material = material
     fig.face = face

@@ -12,7 +12,7 @@ import { cloneFigure, paintable, releaseFigure, rigidFigure, thinWithFade, type 
 import { bakeable, colourVertices } from './StaticBatch'
 import { warmLater } from './Prewarm'
 import { holdVeil } from './Later'
-import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace } from './faceSheet'
+import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squash as jelly, type CrewFace, type FaceKind } from './faceSheet'
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { ATMOS, CREW_BONDS, CREW_LOAD, CREW_MOOD, RUSH, SPEAKERS, STAFF_IDLE, STAFF_SAY, STAFF_TALK, STAFF_TIRED, URGED } from '@/game/shopState'
 import { crewMood, newCrewMood, type CrewEmote, type CrewMoodState } from '@/game/crewMood'
@@ -40,6 +40,8 @@ import { FigureHit } from './FigureHit'
 type Variant = CrewVariant
 const url = (v: Variant) => import.meta.env.BASE_URL + `models/crew_${v}.glb`
 const VARIANTS: Variant[] = ['chef', 'chefF', 'server', 'serverF', 'stock']
+/** which face each place wears (item 466): its kind and its design's number on scene/faceSheet's LOOKS */
+const CREW_LOOK: Record<Variant, [FaceKind, number]> = { chef: ['male', 0], server: ['male', 1], stock: ['male', 2], chefF: ['female', 0], serverF: ['female', 1] }
 
 /** the small parts: no ink line round them */
 /** the head and what's on it, which take no shadow (as the customers' don't): the face's and the glasses' patches are see-through
@@ -322,7 +324,8 @@ function build(scene: THREE.Group, v: Variant): Built {
     m.userData.tint = /CrewSkin|CrewFace/.test(n) ? 'skin' : /CrewHair/.test(n) ? 'hair' : /CrewNose/.test(n) ? 'nose' : undefined
     // (the face's sheet of expressions and the glasses' frames painted, for the atlas to take in)
     // (the face is the head's own front: its sheet over each person's skin (their tint), where nothing's drawn the skin)
-    if (n === 'CrewFace') (m.material as THREE.MeshStandardMaterial).map = crewFaceSheet(v === 'chefF' || v === 'serverF' ? 'female' : 'male')
+    // (each place's face its own design (item 466, the owner's 「你的臉都豆子臉??」): scene/faceSheet's LOOKS)
+    if (n === 'CrewFace') (m.material as THREE.MeshStandardMaterial).map = crewFaceSheet(...CREW_LOOK[v])
   })
   // (their clothes' folds and weave in the light (item 375), as the owner's: blender/boss.py's _body_normals, packed beside their picture)
   const mat = atlasModel(s, (m) => partOf(m) !== 'drop', (atlas, normals) => paintable(airbrush(new THREE.MeshToonMaterial({ color: '#ffffff', map: atlas, vertexColors: true, gradientMap,
