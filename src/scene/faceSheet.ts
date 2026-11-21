@@ -59,15 +59,16 @@ export type Look = {
  * keeper's the third; the women cooks' and servers' the first two of theirs); the customers one of their kind's, by who they are
  */
 export const LOOKS: Record<FaceKind, Look[]> = {
-  // (the master: almond eyes a little lidded under his glasses, bushy brows, the lines of his years at their corners)
-  boss: [{ eye: 'almond', lid: 0.2, size: 1, brow: 'bushy', nose: 'plain', mouth: 1, marks: ['crowsfeet'] }],
+  // (the master: round eyes (item 491, the owner's 「老闆眼睛改圓一點」: almonds a fifth lidded came out two dark slits behind his glasses), a
+  // little lidded under his glasses, bushy brows, the lines of his years at their corners)
+  boss: [{ eye: 'round', lid: 0.1, size: 1.05, brow: 'bushy', nose: 'plain', mouth: 1, marks: ['crowsfeet'] }],
   male: [
     // (steady: almond eyes a little lidded, thick straight brows, a shadow under his nose)
     { eye: 'almond', lid: 0.14, size: 1, brow: 'thick', nose: 'shadow', mouth: 1, marks: [] },
     // (bright: round white eyes, short brows, freckles, a wide mouth)
     { eye: 'round', lid: 0, size: 1, brow: 'short', nose: 'plain', mouth: 1.15, marks: ['freckles'] },
     // (weary: heavy lids, stern brows, his nose's hook, stubble, bags under his eyes)
-    { eye: 'almond', lid: 0.34, size: 0.95, brow: 'stern', nose: 'hook', mouth: 0.9, marks: ['stubble', 'bags'] },
+    { eye: 'almond', lid: 0.24, size: 0.95, brow: 'stern', nose: 'hook', mouth: 0.9, marks: ['stubble', 'bags'] },
   ],
   female: [
     // (poised: almond eyes, lashes, thin arched brows, red lips, a mole by her mouth)
@@ -81,7 +82,7 @@ export const LOOKS: Record<FaceKind, Look[]> = {
     // (kindly: eyes smiling shut, bushy grey brows, a forehead's lines, crow's feet, the folds by the mouth)
     { eye: 'smile', lid: 0, size: 1, brow: 'bushy', browC: '#a49e96', nose: 'shadow', mouth: 1, marks: ['wrinkles', 'crowsfeet', 'folds'] },
     // (shrewd: heavy almond eyes, thin grey brows, his nose's hook, bags, crow's feet, a mole)
-    { eye: 'almond', lid: 0.3, size: 0.92, brow: 'thin', browC: '#8a8580', nose: 'hook', mouth: 0.9, marks: ['bags', 'crowsfeet', 'mole'] },
+    { eye: 'almond', lid: 0.22, size: 0.92, brow: 'thin', browC: '#8a8580', nose: 'hook', mouth: 0.9, marks: ['bags', 'crowsfeet', 'mole'] },
   ],
   kid: [
     { eye: 'bean', lid: 0, size: 1.12, brow: 'short', nose: 'plain', mouth: 1, marks: ['freckles', 'rosy'] },
@@ -182,18 +183,19 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
       const blinkLine = (k = 1) => stroke(2.2, () => { g.moveTo(-rx * 1.1 * k, 0.5); g.quadraticCurveTo(0, 0.35 * ry, rx * 1.1 * k, 0.5) })
       const squeeze = () => stroke(2.4, () => { g.moveTo(sd * 1.1 * rx, -0.6 * ry); g.lineTo(-sd * 0.8 * rx, 0); g.lineTo(sd * 1.1 * rx, 0.6 * ry) })
       if (look.eye === 'almond' || look.eye === 'round') {
-        // ---- (item 466) an eye with its white: the white's outline (an almond's pointed corners, its outer one a little up; or round), its
-        // iris one dark round with its tiny light, all below the upper lid's line; the lid's line thick, the lower one fine
+        // ---- (item 466) an eye with its white: the white's outline (an almond's soft corners, level, its outer a hair lower (item 486, the
+        // owner's 「鳳眼不討喜，改掉」: its outer corner was up, a phoenix's eye); or round), its iris one dark round with its tiny light, all
+        // below the upper lid's line; the lid's line thick, the lower one fine
         const almond = look.eye === 'almond'
-        const W = almond ? rx * 1.3 : rx * 1.08
+        const W = almond ? rx * 1.22 : rx * 1.08
         wide = W
         // (the face's lid, its tilt (its inner end down when cross, its outer when sad), the iris's look, how open)
         const lidAt = face === 'half' ? Math.max(look.lid, 0.5) : face === 'tired' ? Math.max(look.lid, 0.6) : face === 'focused' ? Math.max(look.lid, 0.3)
           : face === 'mad' ? Math.max(look.lid, 0.32) : face === 'sad' ? Math.max(look.lid, 0.2) : face === 'shy' ? look.lid + 0.1
           : face === 'panic' || face === 'surprised' ? 0 : look.lid
         const open = face === 'panic' || face === 'surprised' ? 1.14 : 1
-        const H = (almond ? ry * 0.8 : ry * 0.92) * open
-        const inner = face === 'mad' ? 0.55 : face === 'focused' ? 0.12 : 0, outer = face === 'sad' ? 0.5 : 0
+        const H = (almond ? ry * 0.9 : ry * 0.92) * open
+        const inner = face === 'mad' ? 0.14 : face === 'focused' ? 0.04 : 0, outer = face === 'sad' ? 0.5 : 0
         const lx = face === 'lookL' ? -0.5 : face === 'lookR' ? 0.5 : face === 'shy' ? -0.3 : 0, ly = face === 'shy' ? 0.45 : face === 'sad' ? 0.2 : 0
         const irisK = face === 'panic' || face === 'surprised' ? 0.55 : 1
         // (x's toward the outside of the face: `sd` across)
@@ -201,14 +203,14 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
         const whitePath = () => {
           g.beginPath()
           if (almond) {
-            g.moveTo(X(-W), 0.1 * H)
-            g.bezierCurveTo(X(-0.5 * W), -1.1 * H, X(0.5 * W), -1.12 * H, X(W), -0.12 * H)
-            g.bezierCurveTo(X(0.55 * W), 0.9 * H, X(-0.55 * W), 0.94 * H, X(-W), 0.1 * H)
+            g.moveTo(X(-W), 0.04 * H)
+            g.bezierCurveTo(X(-0.5 * W), -1.14 * H, X(0.5 * W), -1.14 * H, X(W), 0.08 * H)
+            g.bezierCurveTo(X(0.55 * W), 1.0 * H, X(-0.55 * W), 1.0 * H, X(-W), 0.04 * H)
           } else g.ellipse(0, 0, W, H, 0, 0, Math.PI * 2)
           g.closePath()
         }
         // (the white's top at its middle and corners, the lid's line from the inner corner over to the outer, down by `lidAt`)
-        const topMid = almond ? -0.84 * H : -H, cornerIn = almond ? 0.1 * H : -0.2 * H, cornerOut = almond ? -0.12 * H : -0.2 * H
+        const topMid = almond ? -0.86 * H : -H, cornerIn = almond ? 0.04 * H : -0.2 * H, cornerOut = almond ? 0.08 * H : -0.2 * H
         const yIn = cornerIn + (lidAt + inner) * 0.9 * H, yOut = cornerOut + (lidAt + outer) * 0.9 * H, yMid = topMid + lidAt * 2.1 * H + (inner + outer) * 0.5 * H
         const flat = face === 'focused' || face === 'mad'
         const lidPath = () => { g.moveTo(X(-W * 1.02), yIn); g.quadraticCurveTo(0, flat ? (yIn + yOut) / 2 - 0.05 * H : 2 * yMid - (yIn + yOut) / 2, X(W * 1.02), yOut) }
@@ -226,7 +228,7 @@ function paintFace(g: CanvasRenderingContext2D, f: Frame, kind: FaceKind, face: 
           g.fillStyle = '#ffffff'; g.beginPath(); g.arc(ix + 0.34 * ir * sd, iy - 0.36 * ir, 0.3 * ir, 0, Math.PI * 2); g.fill()
           g.restore()
           // (the lower line fine (on an almond only its outer two thirds), the lid's line thick)
-          if (almond) stroke(1.05, () => { g.moveTo(X(-0.35 * W), 0.7 * H); g.quadraticCurveTo(X(0.45 * W), 0.82 * H, X(W), -0.12 * H) })
+          if (almond) stroke(1.05, () => { g.moveTo(X(-0.35 * W), 0.76 * H); g.quadraticCurveTo(X(0.45 * W), 0.9 * H, X(W), 0.08 * H) })
           else stroke(1.05, () => { g.ellipse(0, 0, W, H, 0, 0.15 * Math.PI, 0.85 * Math.PI) })
           stroke(look.lid > 0.25 || lidAt > 0.25 ? 2.6 : 2.3, lidPath)
         }
