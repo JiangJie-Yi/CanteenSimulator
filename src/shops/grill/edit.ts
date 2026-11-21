@@ -374,6 +374,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-39', ['bench']],
   // (the willow where the owner moved it on, made its default (item 479))
   ['jgs-edit-relaid-40', ['willow']],
+  // (the waiting benches brought out from the wall, made their default (item 487, item 462 done at last))
+  ['jgs-edit-relaid-41', ['bench', 'bench2']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -548,7 +550,14 @@ export const BASES: Record<string, V3> = {
   // (the waiting bench moved X 0.115 (item 302, the owner's, 2026-11-17: 「候位長凳 X: 0.115 然後Reset」), then X -0.21 (item 463, the owner's,
   // 2026-11-21: 「候位長凳第一張 位置X: -0.21 然後 Reset」, along the wall toward the second): its panel axes turned 36.1 from its parent's (the
   // room's), into its parent's units)
-  bench: [-0.0768, 0, 0.056],
+  // (and out from the wall as the second is, item 487: the two in one line along it, those sat on it off the wall)
+  bench: [-0.0238, 0, 0.1287],
+  // (the second waiting bench out from the wall Z 0.09 (item 462, the owner's, 2026-11-21: 「你的候位長鄧 Z: 0.9 位移，並 Reset」, not done then;
+  // the owner again, item 487: 「你的椅子還未改」「位置」): Z 0.9 as written put it on the first counter's stools (its places at lay -0.63, the
+  // stools' at -0.58, the third stool within it: tests/e2e/_bench487.mjs), so 0.09, a tenth: out of the wall, those sat on it with their
+  // backs 2.2 cm clear of the wall's line (they were 6.8 cm into it), its front 4.8 cm clear of those walking the aisle; its panel axes
+  // turned 36.1 from its parent's, into its parent's units (the panel's own numbers: tests/e2e/_panelmove.mjs)
+  bench2: [0.053, 0, 0.0727],
   // (the till's two stools moved X 0.25 together (item 309, the owner's, 2026-11-18: 「收銀機前的兩個凳子都幫我調整位置 X:0.25 然後 Reset」): the
   // high one's panel axes (its own, turned 36.1 from its parent's, as the room's are), into their parent's units; the same for both, as they
   // go when picked together)
