@@ -78,7 +78,7 @@ const DEFAULT_GROUPS: Record<string, { zh: string; ja: string; members: string[]
   'grp-stools': { zh: '吧台座椅', ja: 'カウンター席', members: Array.from({ length: GRILL_SEATS.length }, (_, n) => `stool${n}`), spans: true },
   // (each part of the shop kept together, as the owner asked (2026-11-11: every piece in its area's group, the warmer and the rice ball
   // counter as one): the warmer with its miso pot and the rice ball counter with its cooker, side by side between the cook table and the till)
-  'grp-ricestation': { zh: '料理台組', ja: '調理台一式', members: ['warmer', 'misopot', 'prepcounter', 'denkinabe', 'gasstove'] },
+  'grp-ricestation': { zh: '料理台組', ja: '調理台一式', members: ['warmer', 'misopot', 'prepcounter', 'denkinabe', 'gasstove', 'fryer'] },
   // (the signed wall by the way in, every piece of it its own (items 402 and 406, the owner's 「物件要拆細、拆散 然後再group」): the cork board, its
   // notes, the photographs, the signed pieces and the plaster's writing (wallPhotos' WALL_PIECES, CORK_NOTES))
   'grp-signwall': { zh: '簽名留言牆', ja: 'サインと伝言の壁', members: ['sign-cork', 'sign-photo0', 'sign-photo1', 'sign-card1', 'sign-card2', 'sign-card3',

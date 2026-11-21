@@ -266,6 +266,7 @@ export const EDIT_TEXT = {
 
 /** each piece's name in Japanese, by its Chinese name */
 const PIECES_JA: Record<string, string> = {
+  油炸台: 'フライヤー台',
   瓦斯爐: 'カセットコンロ',
   貓咪掛鐘: '三毛猫の掛け時計',
   高級酒吊棚: '高級酒の吊り棚',
@@ -289,6 +290,7 @@ const PIECES_JA: Record<string, string> = {
 }
 /** each piece's name in English, by its Chinese name (the rest, numbered as they're placed, keep theirs) */
 const PIECES_EN: Record<string, string> = {
+  油炸台: 'Frying station',
   瓦斯爐: 'Gas stove',
   貓咪掛鐘: 'Calico cat wall clock',
   高級酒吊棚: 'Premium liquor shelf',

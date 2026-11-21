@@ -95,3 +95,62 @@ export const GasStove = memo(function GasStove() {
     </group>
   )
 })
+
+/**
+ * The frying station (item 469, the owner's, 2026-11-21: 「料理台在增加油炸台，可以炸薯條、天婦羅」; blender/fryer.py): a stainless work
+ * table of its own at the work counter's right end (the counter itself full), its top as high as the counter's; on it the tabletop fryer
+ * (its oil well, its basket hung on its back rim, its control box with the knob and the lamp) and the draining tray with its rack. The basket
+ * let down into the oil and lifted out, the oil shimmering and bubbling while something's in it, the game's (FRYER).
+ */
+const FRYER_URL = import.meta.env.BASE_URL + 'models/fryer.glb'
+useGLTF.preload(FRYER_URL)
+/** where it stands: the fryer's middle (its table's left edge 0.19 left of it), the table 4 cm past the counter's end (lay 2.327), in its line */
+export const FRYER_AT = { along: 4.26, lay: 2.327 + 0.04 + 0.19 * 1.1 }
+export const FRYER_SCALE = 1.1
+/** how far the basket's let down into the oil when it's frying (its model's metres) */
+const BASKET_DROP = 0.085
+/** the fryer's state, the game's: frying (the basket down, the oil bubbling) */
+export const FRYER = { on: false, down: 0 }
+
+const FRYER_SAYS = nameOver('【廚具】油炸台', '炸薯條、天婦羅；炸好放上旁邊的瀝油架瀝油')
+
+export const Fryer = memo(function Fryer() {
+  const gltf = useGLTF(FRYER_URL) as unknown as { scene: THREE.Group }
+  const parts = useMemo(() => {
+    const r = (gltf.scene.getObjectByName('FryerRoot') ?? gltf.scene).clone(true)
+    r.position.set(0, 0, 0)
+    const made = new Map<THREE.Material, THREE.Material>()
+    r.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      const src = m.material as THREE.MeshStandardMaterial
+      let t = made.get(src)
+      if (!t) {
+        // (the lamp lit from within; the rest the shop's toon)
+        t = src.name === 'FryerLamp' ? new THREE.MeshBasicMaterial({ color: '#ff6a46' }) : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null })
+        t.name = src.name
+        made.set(src, t)
+      }
+      m.material = t
+      m.castShadow = src.name !== 'FryerOil' && src.name !== 'FryerLamp'
+      m.receiveShadow = true
+    })
+    inkModel(r, (m) => /FryerOil|FryerLamp/.test((m.material as THREE.Material).name), { width: 0.0012, weld: true })
+    const basket = r.getObjectByName('FryerBasket')!, oil = r.getObjectByName('FryerOil')!
+    return { r, basket, oil, basketY: basket.position.y, oilY: oil.position.y }
+  }, [gltf])
+  const at = useMemo(() => new THREE.Vector3().addScaledVector(ALONG, FRYER_AT.along).addScaledVector(LAY, FRYER_AT.lay), [])
+  useFrame(({ clock }) => {
+    // (the basket eased down into the oil while frying, up out of it after; the oil's face trembling as it bubbles)
+    FRYER.down += ((FRYER.on ? 1 : 0) - FRYER.down) * 0.12
+    parts.basket.position.y = parts.basketY - BASKET_DROP * FRYER.down
+    const t = clock.elapsedTime
+    parts.oil.position.y = parts.oilY + (FRYER.down > 0.05 ? 0.0015 * Math.sin(t * 31) * Math.sin(t * 13.7) * FRYER.down : 0)
+  })
+  return (
+    <group position={[at.x, TOP, at.z]} rotation-y={Math.atan2(-ALONG.x, -ALONG.z)} scale={FRYER_SCALE}>
+      <primitive object={parts.r} />
+      <mesh visible={false} position={[0.13, 0.1, 0]} {...FRYER_SAYS}><boxGeometry args={[0.66, 0.3, 0.44]} /></mesh>
+    </group>
+  )
+})

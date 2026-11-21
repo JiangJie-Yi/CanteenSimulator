@@ -3687,7 +3687,7 @@ function frontOf(at: THREE.Vector3, stand: THREE.Vector3, thing: THREE.Vector3) 
   return at.clone().setY(0).addScaledVector(into, -at.clone().sub(stand).setY(0).dot(into))
 }
 /** what stands on the kitchen's floor that a server crossing it to the racks goes round (with the cook's table) */
-const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegcrate2', 'vegbasket', 'coalsack', 'servecounter'])
+const KITCHEN_BLOCKS = new Set(['warmer', 'prepcounter', 'ricetub', 'misopot', 'denkinabe', 'fryer', 'freezer', 'platerack', 'platerack2', 'lowrack', 'sink', 'sink-bin', 'produce', 'vegcrate', 'vegcrate2', 'vegbasket', 'coalsack', 'servecounter'])
 /** how much room is left round each of them for a server to pass (the bar's units) */
 const PASS_ROOM = 0.13
 /** with no cashier at the till (item 203: the register rang them up by itself): how long (the bar's clock, s) one waits there for a server to

@@ -22,7 +22,7 @@ import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
-import { GasStove } from './Stove'
+import { Fryer, GasStove } from './Stove'
 import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
 import { HEAT_S, heatNow, nextHeat, setSoup, soupGoes, SOUP_BOWLS } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
@@ -2115,6 +2115,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="denkinabe" label="電鍋"><DenkiNabe /></Movable>
       <Movable id="gasstove" label="瓦斯爐"><Suspense fallback={null}><GasStove /></Suspense></Movable>
+      <Movable id="fryer" label="油炸台"><Suspense fallback={null}><Fryer /></Suspense></Movable>
       <Movable id="knives" label="刀具組" blocks><KnifeSet /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><VegAt /><CharcoalSackAt /></group>
     </>
