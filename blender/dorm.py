@@ -129,6 +129,7 @@ bathfloor = mix(bathfloor, (0.86, 0.86, 0.84), groutf)
 frost = mix((0.86, 0.88, 0.88), (0.80, 0.83, 0.84), fbm(NB, 3, 24, 4))
 hg = np.sin((vb * 60 + (fbm(NB, 2, 12, 3) - 0.5) * 1.6) * 2 * math.pi) * 0.5 + 0.5
 hinoki = mix((0.93, 0.83, 0.62), (0.84, 0.71, 0.5), smooth(0.65, 1.0, hg) * 0.55) * (0.95 + 0.07 * fbm(NB, 3, 3, 3))[..., None]
+FROST_IMG = image("dorm_frosted", np.clip(frost, 0, 1).astype(np.float32))
 M = {
     "tatami": pbr("DormTatami", (1, 1, 1), tex=image("dorm_tatami", np.clip(tatami, 0, 1).astype(np.float32)), rough=0.8),
     "heri": pbr("DormHeri", (1, 1, 1), tex=image("dorm_heri", np.clip(heri, 0, 1).astype(np.float32)), rough=0.8),
@@ -168,7 +169,9 @@ M = {
     "frp": pbr("DormBathFRP", lin("#efeadd"), rough=0.35),
     "water": pbr("DormBathWater", lin("#bcd9e2"), rough=0.1),
     "chrome": pbr("DormChrome", lin("#c9ccd0"), rough=0.2, metal=0.8),
-    "frost": pbr("DormFrosted", (1, 1, 1), tex=image("dorm_frosted", np.clip(frost, 0, 1).astype(np.float32)), rough=0.6),
+    "frost": pbr("DormFrosted", (1, 1, 1), tex=FROST_IMG, rough=0.6),
+    # (the bath's window's panes (item 456): the same frosted glass, a material of their own for the game to light by the part of the day)
+    "frostwin": pbr("DormBathWindow", (1, 1, 1), tex=FROST_IMG, rough=0.6),
     "mirror": pbr("DormMirror", lin("#9fb0b8"), rough=0.05, metal=0.6),
     "bathmat": pbr("DormBathMat", lin("#4f7f9a"), rough=0.95),
     "towel": pbr("DormTowel", lin("#e8d6b8"), rough=0.95),
@@ -546,15 +549,42 @@ BATH_CUT = "DormBathCut"
 block("DormBathFloor", (BX0, 0.0, BZ0), (BX1, BW, PZ0), "bathfloor", 0.5)
 block("DormBathMidFloor", (BX0, 0.0, PZ0), (BX1, BW, PZ1), "bathfloor", 0.5)
 block("DormWashFloor", (BX0, 0.0, PZ1), (BX1, BF, BZ1), "boards", 0.9)
-# (its walls: the back, the left, the right, each a slab of plaster; the wall across round the bath's doorway (its jambs 3 cm within))
-for nm, lo, hi in (("Back", (BX0 - WALL, 0.0, BZ0 - WALL), (BX1 + WALL, H, BZ0)), ("Left", (BX0 - WALL, 0.0, BZ0), (BX0, H, BZ1)),
-                   ("Right", (BX1, 0.0, BZ0), (BX1 + WALL, H, BZ1))):
+# (the bath's window (item 456, the owner's 「開個窗口」): a little frosted one high over the tub, as a house's bath's is, for its steam and
+# its light: x from BWX0 to BWX1 over the tub (its taps, its shower's rail and its mirror off at the right, clear of it), y from BWY0 to BWY1)
+BWX0, BWX1 = BX0 + 0.11, BX0 + 0.65
+BWY0, BWY1 = BW + 1.02, BW + 1.47
+# (its walls: the back (round the window: either side of it, under it, over it), the left, the right, each a slab of plaster; the wall
+# across round the bath's doorway (its jambs 3 cm within))
+for nm, lo, hi in (("Back", (BX0 - WALL, 0.0, BZ0 - WALL), (BWX0, H, BZ0)), ("BackR", (BWX1, 0.0, BZ0 - WALL), (BX1 + WALL, H, BZ0)),
+                   ("BackB", (BWX0, 0.0, BZ0 - WALL), (BWX1, BWY0, BZ0)), ("BackT", (BWX0, BWY1, BZ0 - WALL), (BWX1, H, BZ0)),
+                   ("Left", (BX0 - WALL, 0.0, BZ0), (BX0, H, BZ1)), ("Right", (BX1, 0.0, BZ0), (BX1 + WALL, H, BZ1))):
     block(f"DormBath{nm}Wall", lo, hi, "plaster", 1.2, group=BATH_CUT if nm == "Right" else None)
 block("DormBathMidL", (BX0, 0.0, PZ0), (DX0 - 0.03, H, PZ1), "plaster", 1.2, group=BATH_CUT)
 block("DormBathMidR", (DX1 + 0.03, 0.0, PZ0), (BX1, H, PZ1), "plaster", 1.2, group=BATH_CUT)
 block("DormBathMidT", (DX0 - 0.03, BDH2 + 0.05, PZ0), (DX1 + 0.03, H, PZ1), "plaster", 1.2, group=BATH_CUT)
 # (the bath's walls tiled: a skin 2 mm in front of each slab: its back, its left, its right (away with the wall), the wall across's back)
-block("DormBathSkinBack", (BX0, BW, BZ0), (BX1, H, BZ0 + 0.002), "bathwall", 0.9)
+for nm, lo, hi in (("", (BX0, BW, BZ0), (BWX0, H, BZ0 + 0.002)), ("R", (BWX1, BW, BZ0), (BX1, H, BZ0 + 0.002)),
+                   ("B", (BWX0, BW, BZ0), (BWX1, BWY0, BZ0 + 0.002)), ("T", (BWX0, BWY1, BZ0), (BWX1, H, BZ0 + 0.002))):
+    block(f"DormBathSkinBack{nm}", lo, hi, "bathwall", 0.9)
+# (the window in its hole: an aluminium frame in the wall's outer half; two frosted panes on their two tracks, the left behind, the right
+# before it, overlapping at the middle, each its meeting stile; the hole's sides and head tiled in from the frame to the wall's face; a
+# tiled sill under it, a little out into the bath, its top 4 mm over the wall's)
+FZ0, FZ1, FB = BZ0 - 0.09, BZ0 - 0.04, 0.025
+for nm, lo, hi in (("L", (BWX0 + 0.001, BWY0 + 0.001, FZ0), (BWX0 + FB, BWY1 - 0.001, FZ1)),
+                   ("R", (BWX1 - FB, BWY0 + 0.001, FZ0), (BWX1 - 0.001, BWY1 - 0.001, FZ1)),
+                   ("B", (BWX0 + FB, BWY0 + 0.001, FZ0), (BWX1 - FB, BWY0 + FB, FZ1)),
+                   ("T", (BWX0 + FB, BWY1 - FB, FZ0), (BWX1 - FB, BWY1 - 0.001, FZ1))):
+    block(f"DormBathWinFrame{nm}", lo, hi, "chrome", 0.2)
+BWM = (BWX0 + BWX1) / 2
+for k, (x0_, x1_, zz) in enumerate(((BWX0 + FB - 0.004, BWM + 0.02, FZ0 + 0.014), (BWM - 0.02, BWX1 - FB + 0.004, FZ0 + 0.03))):
+    block(f"DormBathWinPane{k}", (x0_, BWY0 + FB - 0.004, zz), (x1_, BWY1 - FB + 0.004, zz + 0.005), "frostwin", 0.6)
+    sx_ = (x1_ - 0.016, x1_) if k == 0 else (x0_, x0_ + 0.016)
+    block(f"DormBathWinStile{k}", (sx_[0], BWY0 + FB - 0.004, zz - 0.004), (sx_[1], BWY1 - FB + 0.004, zz + 0.009), "chrome", 0.2)
+for nm, lo, hi in (("L", (BWX0, BWY0 + 0.004, FZ1), (BWX0 + 0.003, BWY1, BZ0 + 0.002)),
+                   ("R", (BWX1 - 0.003, BWY0 + 0.004, FZ1), (BWX1, BWY1, BZ0 + 0.002)),
+                   ("T", (BWX0 + 0.003, BWY1 - 0.003, FZ1), (BWX1 - 0.003, BWY1, BZ0 + 0.002))):
+    block(f"DormBathWinReveal{nm}", lo, hi, "bathwall", 0.9)
+block("DormBathWinSill", (BWX0 - 0.03, BWY0 - 0.018, FZ1 + 0.005), (BWX1 + 0.03, BWY0 + 0.004, BZ0 + 0.04), "bathwall", 0.9)
 block("DormBathSkinLeft", (BX0, BW, BZ0 + 0.002), (BX0 + 0.002, H, PZ0), "bathwall", 0.9)
 block("DormBathSkinRight", (BX1 - 0.002, BW, BZ0 + 0.002), (BX1, H, PZ0), "bathwall", 0.9, group=BATH_CUT)
 block("DormBathSkinMidL", (BX0 + 0.002, BW, PZ0 - 0.002), (DX0 - 0.03, H, PZ0), "bathwall", 0.9, group=BATH_CUT)

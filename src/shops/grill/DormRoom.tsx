@@ -41,6 +41,16 @@ function alleyTo() {
   const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
   ALLEY?.paint((['dawn', 'day', 'dusk', 'night'].includes(s) ? s : 'day') as AlleySky)
 }
+/** the bath's frosted window lit by the part of the day (item 456, the owner's 「開個窗口」): the day's light through it, the dawn's and the
+ * dusk's colour, dark by night; its emissive only (a uniform: no program made), set as the page's data-sky changes */
+const WIN_GLOW: Record<string, string> = { dawn: '#9c8d90', day: '#b9c5c8', dusk: '#a3744e', night: '#121722' }
+function windowTo(m: THREE.MeshToonMaterial | null) {
+  if (!m) return
+  const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
+  if (m.userData.sky === s) return
+  m.userData.sky = s
+  m.emissive.set(WIN_GLOW[s] ?? WIN_GLOW.day)
+}
 // (not fetched with the page (item 457, the owner's 「loading 時1層1層」): only as the room's first gone up to, under the cover's bar)
 const DORM_URL = import.meta.env.BASE_URL + 'models/dorm.glb'
 /** where it stands in the world: off to the side of the shop, on its floor's level (the dining room's floor, the staff door's foot) */
@@ -307,7 +317,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
   /** the ids of those on today's shift (the rest of those living in are off: up here all day); none given, all of them are */
   working?: readonly string[] }) {
   const gltf = useGLTF(DORM_URL) as unknown as { scene: THREE.Group }
-  const { root, look, marks, pieces, quilts, leftCut, leftX, bathDoor, bathX, bathCut, bathCutX, mats } = useMemo(() => {
+  const { root, look, marks, pieces, quilts, leftCut, leftX, bathDoor, bathX, bathCut, bathCutX, bathWin, mats } = useMemo(() => {
     const r = (gltf.scene.getObjectByName('DormRoot') ?? gltf.scene).clone(true)
     r.position.set(0, 0, 0)
     const made = new Map<THREE.Material, THREE.Material>()
@@ -331,8 +341,8 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       m.receiveShadow = true
     })
     // (the room's line, in its own metres: the dining room's 0.0016 a metre; none round the glow, the night, the screen)
-    // (nor round the bathroom's water, its mirror, its frosted pane (item 427))
-    inkModel(r, (m) => /DormLampShade|DormNightView|DormScreen|DormBathWater|DormMirror|DormFrosted/.test((m.material as THREE.Material).name), { width: 0.0016, weld: true })
+    // (nor round the bathroom's water, its mirror, its frosted panes (items 427, 456))
+    inkModel(r, (m) => /DormLampShade|DormNightView|DormScreen|DormBathWater|DormMirror|DormFrosted|DormBathWindow/.test((m.material as THREE.Material).name), { width: 0.0016, weld: true })
     // (the left wall, its trims and the closet's shell, a piece of their own (blender/dorm.py's DormLeftCut), not merged: the view turned round
     // to that side (item 426), they're taken away as a doll's house's near wall is, the closet's floor, shelf and what's in it left; the
     // wall's inner face's x (the piece's furthest in less its trims' 2.2 cm))
@@ -359,7 +369,8 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     const byName = (n: string) => [...made.values()].find((x) => x.name === n) ?? null
     const lk = r.getObjectByName('DormLook')
     return { root: r, look: lk ? lk.position.clone() : new THREE.Vector3(0.15, 0.6, 0.1), marks: mk, pieces: ps, quilts: [byName('DormFutonBlue'), byName('DormFutonPink')],
-      leftCut, leftX, bathDoor, bathX: bathDoor?.position.x ?? 0, bathCut, bathCutX, mats: [...made.values()] }
+      leftCut, leftX, bathDoor, bathX: bathDoor?.position.x ?? 0, bathCut, bathCutX, bathWin: byName('DormBathWindow') as THREE.MeshToonMaterial | null,
+      mats: [...made.values()] }
   }, [gltf])
   // (those living in: the cooks hired (the shop's own second cook when none is), two at most, the futons' and the cushions' number)
   // (the same list while it's the same people: a new array each time the scene's drawn)
@@ -418,6 +429,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       ALLEY.mat.uniforms.uCam.value.copy(ALLEY_CAM)
     }
     alleyTo()
+    windowTo(bathWin)
     let anyone = false
     living.forEach((m, k) => {
       // (laid while they lie in it, and while they're getting up out of it (item 474): the futon's put away, and the table brought out, once
