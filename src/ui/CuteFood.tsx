@@ -68,22 +68,27 @@ type Fish2 = { back: string; belly: string; fin: string; len: number; deep: numb
   mid?: string; scales?: string; lateral?: string; edge?: string; mouth?: boolean
   /** (item 453) the horse mackerel's scutes along the lateral line's back half; the sardine's row of dark spots; the shishamo's belly full
    * of roe; the hokke's dark bands */
-  zengo?: string; dots?: string; roe?: string; bands?: string }
+  zengo?: string; dots?: string; roe?: string; bands?: string
+  /** (item 454) how strong the fine scales show (0.45 if not given: the hokke's, the owner's 「這三個品質還OK」); the ayu's and the saury's
+   * fainter, a texture under the colour, not a row of squiggles over it */
+  scaleO?: number }
 const FISH2: Record<string, Fish2> = {
   // (ayu: slender, olive down through a golden middle to the cream belly, its tall dorsal dark along its front and the little adipose fin,
   // the yellow spot behind the gill glowing (no bright dot in it: it read as an eye), yellowed fins, fine scales over its back, its lateral
   // line, its tail's fork edged dark, the little mouth (items 316, 354; its build kept, the owner's 「香魚的基底造型還可以」))
   ExtraFish: { back: '#557f52', mid: '#bdb768', belly: '#f8f3de', fin: '#efc860', len: 1.06, deep: 0.7, nose: 0.5, hump: 0.38, fork: 0.58, tailW: 0.98,
     dorsal: [{ at: 0.4, w: 0.25, h: 0.98 }], anal: { at: 0.72, w: 0.14, h: 0.44 }, adipose: 0.83, spot: '#f9c62f', flank: '#efd27a',
-    scales: '#3f6a43', lateral: '#8ea46c', edge: '#6a5528', mouth: true },
+    scales: '#3f6a43', lateral: '#8ea46c', edge: '#6a5528', mouth: true, scaleO: 0.24 },
   // (saury: long and thin as a blade, its snout pointed and its lower jaw out yellow, blue over silver cut sharp, a silver line along it,
   // its little fins far back, finlets above and below before its small deep-forked tail)
   Saury: { back: '#2b5d9e', belly: '#eef3fa', fin: '#9fb6d4', len: 1.05, deep: 0.5, nose: 0.9, hump: 0.5, fork: 0.85, tailW: 1.5,
-    dorsal: [{ at: 0.77, w: 0.09, h: 0.8 }], anal: { at: 0.75, w: 0.09, h: 0.7 }, finlets: 5, beak: '#f2b43a', sheen: '#eaf2fb', sharp: true,
-    scales: '#1f4a82', lateral: '#5c84bc' },
-  // (mackerel: a full spindle, teal over silver, the dark wavy markings down its back, a spiny first dorsal and a second, finlets, a deep fork)
-  Mackerel: { back: '#2f8088', belly: '#f0f5f4', fin: '#9fc2c2', len: 1.06, deep: 0.95, nose: 0.45, hump: 0.42, fork: 0.9, tailW: 1,
-    dorsal: [{ at: 0.3, w: 0.15, h: 0.55, spiny: true }, { at: 0.6, w: 0.1, h: 0.45 }], anal: { at: 0.62, w: 0.1, h: 0.42 }, finlets: 4, worms: '#14444b',
+    dorsal: [{ at: 0.76, w: 0.11, h: 0.62 }], anal: { at: 0.74, w: 0.11, h: 0.56 }, finlets: 3, beak: '#f2b43a', sheen: '#eaf2fb', sharp: true,
+    scales: '#1f4a82', lateral: '#5c84bc', scaleO: 0.22 },
+  // (mackerel: a slim spindle (item 454: it was as deep as a bream), teal over silver, the dark wavy stripes slanting down its back (drawn as
+  // the hokke's bands are: soft, inside its outline; they were a row of S squiggles), a small first dorsal and a second well back, finlets,
+  // a deep fork)
+  Mackerel: { back: '#2f8088', belly: '#f0f5f4', fin: '#9fc2c2', len: 1.08, deep: 0.74, nose: 0.45, hump: 0.4, fork: 0.9, tailW: 1.05,
+    dorsal: [{ at: 0.3, w: 0.13, h: 0.5 }, { at: 0.62, w: 0.09, h: 0.4 }], anal: { at: 0.64, w: 0.09, h: 0.36 }, finlets: 3, worms: '#173f45',
     lateral: '#5fa0a4' },
   // (horse mackerel (aji): a spindle, blue-grey over a yellowish middle to a silver belly, a spiny first dorsal and a long soft second, the
   // row of hard scutes (zengo) along the back half of its lateral line, yellowish fins, a deep fork)
@@ -162,6 +167,9 @@ function Fish2Art({ c, f }: { c: Ctx; f: Fish2 }) {
       }
       return `${d} Q${x1 + w * 0.08} ${base - s * D * 0.25} ${x1} ${base} Z`
     }
+    // (a small fin (item 454: as a sail, narrow, it stood up a rounded tab, two of them ears on the mackerel's back): swept back, its front
+    // edge rising in a curve to a tip behind its foot, its back edge hollowed down to the body)
+    if (g.w < 0.16) return `M${x0} ${base} Q${x0 + w * 0.08} ${top + s * g.h * D * 0.1} ${x0 + w * 0.78} ${top} Q${x0 + w * 0.82} ${(base + top) / 2} ${x1 + w * 0.5} ${base} Z`
     // (a sail: its front edge leaning back to a rounded tip, its back edge sweeping down)
     return `M${x0} ${base} Q${x0 + w * 0.06} ${top} ${x0 + w * 0.42} ${top} Q${x1 + w * 0.12} ${top + s * g.h * D * 0.2} ${x1 + w * 0.06} ${base} Z`
   }
@@ -172,6 +180,8 @@ function Fish2Art({ c, f }: { c: Ctx; f: Fish2 }) {
       return line(`M${x} ${edgeY(x, up)} L${x + 1.6} ${edgeY(x, up) + s * rise * 0.85}`, finDark, 1, `${up}${i}`)
     })
     const top = cy + s * (D * (up ? 1 : 0.95) + g.h * D * 0.6)
+    // (the swept small fin's rays fanning back toward its tip)
+    if (g.w < 0.16) return [0.2, 0.5, 0.8].map((k) => line(`M${x0 + (x1 - x0) * k * 0.9} ${cy + s * D * 0.92} L${x0 + (x1 - x0) * (0.5 + 0.42 * k)} ${cy + s * (D * (up ? 1 : 0.95) + g.h * D * 0.75 * (0.82 - 0.4 * k))}`, finDark, 1.1, `${up}${k}`))
     return [0.3, 0.55, 0.8].map((k) => line(`M${x0 + (x1 - x0) * k * 0.8} ${cy + s * D * 0.9} L${x0 + (x1 - x0) * (k * 0.8 + 0.12)} ${top}`, finDark, 1.1, `${up}${k}`))
   }
   return (
@@ -185,7 +195,6 @@ function Fish2Art({ c, f }: { c: Ctx; f: Fish2 }) {
             : <><stop offset="0" stopColor={tone(f.back, 0.12)} /><stop offset="0.42" stopColor={f.back} /><stop offset="0.6" stopColor={tone(f.belly, -0.05)} /><stop offset="1" stopColor={f.belly} /></>}
         </linearGradient>
         <clipPath id={`${id}c`}><path d={body} /></clipPath>
-        {f.spot && <radialGradient id={`${id}s`}><stop offset="0" stopColor={tone(f.spot, 0.4)} /><stop offset="0.5" stopColor={f.spot} /><stop offset="1" stopColor={f.spot} stopOpacity="0" /></radialGradient>}
         {f.roe && <radialGradient id={`${id}r`} cx="50%" cy="40%" r="60%"><stop offset="0" stopColor={tone(f.roe, 0.3)} /><stop offset="0.7" stopColor={f.roe} /><stop offset="1" stopColor={f.roe} stopOpacity="0" /></radialGradient>}
       </defs>
       {/* (behind the body: the tail and its rays, the fins on the back and under it, the adipose fin, the finlets) */}
@@ -220,17 +229,18 @@ function Fish2Art({ c, f }: { c: Ctx; f: Fish2 }) {
           })}
         </g>}
         {/* (the fine scales over the back (item 354)) */}
-        {f.scales && <g opacity="0.45">
+        {f.scales && <g opacity={f.scaleO ?? 0.45}>
           {Array.from({ length: 4 }, (_, r) => Array.from({ length: 13 }, (_, k) => {
             const x = cx - L * 0.36 + k * L * 0.1 + (r % 2) * L * 0.05, y = cy - D * (0.82 - r * 0.2)
             return <path key={`s${r}${k}`} d={`M${x} ${y} q${L * 0.05} ${D * 0.14} ${L * 0.1} 0`} fill="none" stroke={f.scales} strokeWidth="0.9" />
           }))}
         </g>}
-        {/* (the mackerel's dark wavy markings down its back) */}
-        {f.worms && Array.from({ length: 7 }, (_, k) => {
-          const x = cx - L * 0.38 + k * L * 0.17
-          return line(`M${x} ${cy - D * 0.9} q3.2 ${D * 0.14} 0 ${D * 0.28} t0 ${D * 0.28} t0 ${D * 0.2}`, f.worms, 2.1, `w${k}`)
-        })}
+        {/* (the mackerel's dark stripes down its back: from over the top slanting back down to its lateral line, each one gentle wave, long and
+            shorter by turns; soft as the hokke's bands are (item 454: they were S squiggles standing in a row)) */}
+        {f.worms && <g opacity="0.78">{Array.from({ length: 9 }, (_, k) => {
+          const x = cx - L * 0.4 + k * L * 0.15, y0 = cy - D * 1.1, y1 = latY(x + 6) - D * (k % 2 ? 0.26 : 0.06)
+          return line(`M${x} ${y0} C${x + 5} ${y0 + (y1 - y0) * 0.35} ${x - 1} ${y0 + (y1 - y0) * 0.65} ${x + 6} ${y1}`, f.worms, 2.4, `w${k}`)
+        })}</g>}
       </g>
       <path d={body} fill="none" stroke={INK} strokeWidth={LINE} strokeLinejoin="round" />
       {/* (its markings) */}
@@ -247,9 +257,9 @@ function Fish2Art({ c, f }: { c: Ctx; f: Fish2 }) {
         const x = cx - L * 0.4 + k * L * 0.14
         return <circle key={`dt${k}`} cx={x} cy={latY(x) + D * 0.2} r={2.2} fill={f.dots} />
       })}
-      {f.spot && (f.mid
-        ? <><ellipse cx={cx - L * 0.44} cy={cy - D * 0.14} rx={11} ry={7.5} fill={`url(#${id}s)`} /><ellipse cx={cx - L * 0.44} cy={cy - D * 0.14} rx={4.4} ry={3} fill={f.spot} /></>
-        : <><ellipse cx={cx - L * 0.46} cy={cy - D * 0.16} rx={9} ry={6} fill={f.spot} opacity={0.35} /><ellipse cx={cx - L * 0.46} cy={cy - D * 0.16} rx={5.2} ry={3.6} fill={f.spot} /></>)}
+      {/* (the ayu's yellow spot behind its gill: a clean mark, a soft rim round it (item 454: a glow before, smudged, like a light)) */}
+      {f.spot && <><ellipse cx={cx - L * 0.44} cy={cy - D * 0.14} rx={8.6} ry={5.6} fill={f.spot} opacity={0.32} transform={`rotate(-8 ${cx - L * 0.44} ${cy - D * 0.14})`} />
+        <ellipse cx={cx - L * 0.44} cy={cy - D * 0.14} rx={5.6} ry={3.7} fill={f.spot} transform={`rotate(-8 ${cx - L * 0.44} ${cy - D * 0.14})`} /></>}
       {f.mouth && line(`M${sx + 1.2} ${sy + 1.4} q${L * 0.05} ${D * 0.1} ${L * 0.12} ${D * 0.02}`, tone(f.back, -0.45), 1.4, 'mo')}
       {f.beak && <path d={`M${sx + 4} ${sy - 0.4} L${sx - beak} ${sy + 2.4} L${sx + 5} ${sy + 4.8} Z`} fill={f.beak} stroke={INK} strokeWidth="1.6" strokeLinejoin="round" />}
       {/* (the gill cover's curve, and the pectoral fin behind it, a little lighter, its ray) */}
