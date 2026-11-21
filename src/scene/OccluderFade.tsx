@@ -16,6 +16,8 @@ const FADED = 0.18
 const AIM: [number, number][] = [-0.3, -0.15, 0, 0.15, 0.3].flatMap((x) => [-0.3, -0.15, 0, 0.15, 0.3].map((y) => [x, y] as [number, number]))
 
 type Fader = { root: THREE.Object3D; hit: THREE.Mesh[]; box: THREE.Box3; drawn: THREE.Mesh[]; ink: THREE.Mesh[]; low: number; k: number; want: number; own: Map<THREE.Material, THREE.Material>
+  /** how much of it shows looked down on from over its top (`userData.fadeAbove`: the shelf over the bar, half; 1: as it is) */
+  above: number
   /** the look it was last found in (gather's), and whether its meshes are on their see-through copies now (setOpacity's) */
   gen: number; onCopy: boolean }
 /** a material drawn on its back faces only (an ink line's) */
@@ -75,9 +77,10 @@ export const OccluderFade = memo(function OccluderFade({ target }: { target: () 
       // them was tried by these rays every third frame, a skinned figure's every vertex posed for it, some 420 a second (2026-11-15))
       if (!o.userData.fadeOccluder) return
       let f = known.get(o)
-      if (!f) { f = { root: o, hit: [], box: new THREE.Box3(), drawn: [], ink: [], low: FADED, k: 1, want: 1, own: new Map(), gen, onCopy: false }; known.set(o, f) }
+      if (!f) { f = { root: o, hit: [], box: new THREE.Box3(), drawn: [], ink: [], low: FADED, k: 1, want: 1, own: new Map(), gen, onCopy: false, above: 1 }; known.set(o, f) }
       // (how far it fades: a number on the mark, or FADED; a lit lamp keeps more of itself, or it goes dark against the wall behind)
       f.low = typeof o.userData.fadeOccluder === 'number' ? o.userData.fadeOccluder : FADED
+      f.above = typeof o.userData.fadeAbove === 'number' ? o.userData.fadeAbove : 1
       f.want = 1
       f.gen = gen
       f.hit.length = 0; f.drawn.length = 0; f.ink.length = 0
@@ -156,7 +159,9 @@ export const OccluderFade = memo(function OccluderFade({ target }: { target: () 
         }
       }
       RAY_HITS.length = 0
-      for (const f of faders.current) f.want = hits.has(f) ? f.low : 1
+      // (looked down on from over its top, a thing that lies over what's under it (the liquor's shelf over the bar: the owner's 「這個角度看
+      // 上方的系統櫃酒台須有透明度50%」) shows that much of itself; from the room's height it's whole)
+      for (const f of faders.current) f.want = hits.has(f) ? f.low : f.above < 1 && !f.box.isEmpty() && camera.position.y > f.box.max.y + 0.4 ? f.above : 1
     }
     for (const f of faders.current) {
       if (Math.abs(f.k - f.want) >= 0.002) {

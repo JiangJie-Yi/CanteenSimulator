@@ -12,6 +12,11 @@ Nodes (each its own, for the game to work):
 - "FryPan": the frying pan, its bottom's middle at its origin, resting on the burner's supports; its handle out to the left.
 - "EggPan": the tamagoyaki pan (玉子焼き器), square, copper outside, tinned inside, its wooden handle toward the front; its bottom's middle
   at its origin (the game hangs it, and sets it on the burner for a tamagoyaki).
+- "SoupPot": a little yukihira pot (雪平鍋), hammered aluminium, its wooden handle out to its left; its bottom's middle at its origin, where
+  it waits on the counter at the stove's front left (the game sets it on the burner for an egg-drop soup).
+- "StoveTools": what a stove's corner has by it (item 494, the owner's 「加入 鍋碗等料理用具」 round the stove): behind it a stoneware crock of
+  tools standing in it, a ladle, a turner and a pair of long cooking chopsticks; at its front left a bowl of beaten egg with its chopsticks
+  across it; still.
 
 The frame: metres; y up; x across the stove (its left burner at -x); z out toward the cook in front of it (its knobs at +z); the stove's
 foot's middle at the origin.
@@ -279,6 +284,100 @@ for f in ladder_fill(bm, hr[0][::-1]) + ladder_fill(bm, hr[1]):
 EGG = obj_of("EggPan", bm, [M["copper"], M["tin"], M["wood"]])
 EGG.location = P(-BURN_X + 0.32, REST_Y, BURN_Z)
 parts.append(EGG)
+
+# ---- (item 494) the stove's corner's things: where each stands, on the counter round the stove (its frame: the counter's top at y 0), clear
+# of the rice cooker's paddle holder behind it on its left, the tamagoyaki pan hung on the shelf's post at its right, the fryer past it, the
+# pan's handle and the cook's hands at the front; each measured in the game (tests/e2e/_stovearea494.mjs)
+M["crock"] = pbr("StoveCrock", lin("#5b4636"), rough=0.5)
+M["crockin"] = pbr("StoveCrockIn", lin("#2a1f18"), rough=0.7)
+M["bowl"] = pbr("StoveBowl", lin("#eeeae2"), rough=0.3)
+M["indigo"] = pbr("StoveIndigo", lin("#2c4a7a"), rough=0.3)
+M["egg"] = pbr("StoveBeatenEgg", lin("#e7b02c"), rough=0.4)
+M["bamboo"] = pbr("StoveChopsticks", lin("#d8bd8a"), rough=0.6)
+M["alu"] = pbr("StovePotAlu", lin("#c3c6ca"), rough=0.35, metal=0.7)
+M["aluin"] = pbr("StovePotInside", lin("#8d9197"), rough=0.4, metal=0.6)
+
+
+def stick(bm, a, b, w0, w1, mi):
+    """a four-sided stick from a to b (the game's frame), w0 across at a, w1 at b, its ends shut"""
+    a, b = Vector(a), Vector(b)
+    ax = (b - a).normalized()
+    t = Vector((0, 1, 0)) if abs(ax.y) < 0.9 else Vector((1, 0, 0))
+    e1 = ax.cross(t).normalized()
+    e2 = ax.cross(e1).normalized()
+    rings = []
+    for c, w in ((a, w0), (b, w1)):
+        rings.append([bm.verts.new(P(*(c + (e1 * sx + e2 * sy) * (w / 2)))) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
+    for j in range(4):
+        f = bm.faces.new((rings[0][j], rings[0][(j + 1) % 4], rings[1][(j + 1) % 4], rings[1][j]))
+        f.material_index = mi
+    for ring_, rev in ((rings[0], True), (rings[1], False)):
+        f = bm.faces.new(ring_[::-1] if rev else ring_)
+        f.material_index = mi
+
+
+TOOLS = []
+# (the crock, behind the stove: stoneware, its mouth a little narrower than its shoulder, dark within, a floor inside 3 cm up)
+CX, CZ = -0.033, -0.279
+bm = bmesh.new()
+out = lathe(bm, CX, CZ, [(0.04, 0.0), (0.047, 0.045), (0.043, 0.12)], 16, mi=0, shut=(False, False))
+inn = lathe(bm, CX, CZ, [(0.037, 0.03), (0.039, 0.12)], 16, mi=1, shut=(True, False))
+for k in range(16):
+    f = bm.faces.new((out[-1][k], inn[-1][k], inn[-1][(k + 1) % 16], out[-1][(k + 1) % 16]))
+    f.material_index = 0
+# (in it, heads up and leaning out a little: the ladle, its bowl turned toward the back; the turner; the long chopsticks)
+stick(bm, (CX - 0.012, 0.035, CZ + 0.006), (CX - 0.036, 0.25, CZ - 0.004), 0.012, 0.01, 2)
+lad = lathe(bm, 0, 0, [(0.012, -0.024), (0.03, -0.016), (0.038, 0.0), (0.034, 0.0), (0.026, -0.013), (0.01, -0.02)], 10, mi=2, shut=(True, True))
+# (the ladle's bowl: made round the upright at the origin, turned so its mouth faces the back and set at the handle's top)
+from mathutils import Matrix  # noqa: E402
+xf = Matrix.Translation(P(CX - 0.04, 0.265, CZ - 0.03)) @ Matrix.Rotation(math.pi / 2, 4, 'X')
+for ring_ in lad:
+    for v_ in ring_:
+        v_.co = xf @ v_.co
+stick(bm, (CX + 0.01, 0.035, CZ - 0.004), (CX + 0.026, 0.22, CZ - 0.012), 0.012, 0.01, 3)
+# (the turner's blade: a flat steel plate on its handle's top)
+box(bm, (CX + 0.0, 0.222, CZ - 0.0155), (CX + 0.062, 0.3, CZ - 0.0125), mi=2)
+for dx in (0.0, 0.009):
+    stick(bm, (CX + 0.004 + dx, 0.035, CZ + 0.012), (CX - 0.004 + dx * 2, 0.33, CZ + 0.03), 0.006, 0.0035, 4)
+TOOLS.append(obj_of("tc", bm, [M["crock"], M["crockin"], M["steel"], M["pan"], M["bamboo"]], smooth=True))
+# (the bowl of beaten egg, at the stove's front left: white porcelain, an indigo line round under its rim, the egg in it, its chopsticks
+# laid across it)
+EX, EZ = -0.286, 0.353
+bm = bmesh.new()
+out = lathe(bm, EX, EZ, [(0.032, 0.0), (0.056, 0.03), (0.062, 0.044)], 16, mi=0, shut=(True, False))
+band = lathe(bm, EX, EZ, [(0.062, 0.044), (0.066, 0.055)], 16, mi=1, shut=(False, False))
+inn = lathe(bm, EX, EZ, [(0.054, 0.036), (0.062, 0.055)], 16, mi=0, shut=(False, False))
+for k in range(16):
+    f = bm.faces.new((band[-1][k], inn[-1][k], inn[-1][(k + 1) % 16], band[-1][(k + 1) % 16]))
+    f.material_index = 0
+# (the beaten egg: its face across the inside, 3.6 cm up, on the inside's bottom ring)
+for f in ladder_fill(bm, inn[0]):
+    f.material_index = 2
+for dz in (-0.006, 0.006):
+    stick(bm, (EX - 0.09, 0.062, EZ + dz - 0.03), (EX + 0.11, 0.058, EZ + dz + 0.03), 0.0055, 0.0035, 3)
+TOOLS.append(obj_of("tb", bm, [M["bowl"], M["indigo"], M["egg"], M["bamboo"]], smooth=True))
+bpy.ops.object.select_all(action="DESELECT")
+for o in TOOLS:
+    o.select_set(True)
+bpy.context.view_layer.objects.active = TOOLS[0]
+bpy.ops.object.join()
+tools = bpy.context.view_layer.objects.active
+tools.name = "StoveTools"
+parts.append(tools)
+
+# ---- (item 494) the yukihira pot: straight walls a little flared, hammered aluminium (its dimples in the light), its wooden handle on a
+# socket out to its left, rising a little; its bottom's middle at its origin, where it waits at the stove's front left
+bm = bmesh.new()
+out = lathe(bm, 0, 0, [(0.072, 0.0), (0.078, 0.062), (0.079, 0.066)], 16, mi=0, shut=(True, False))
+inn = lathe(bm, 0, 0, [(0.07, 0.006), (0.076, 0.066)], 16, mi=1, shut=(True, False))
+for k in range(16):
+    f = bm.faces.new((out[-1][k], inn[-1][k], inn[-1][(k + 1) % 16], out[-1][(k + 1) % 16]))
+    f.material_index = 0
+box(bm, (-0.098, 0.034, -0.009), (-0.074, 0.052, 0.009), mi=0)
+stick(bm, (-0.098, 0.043, 0.0), (-0.235, 0.075, 0.0), 0.02, 0.017, 2)
+POT = obj_of("SoupPot", bm, [M["alu"], M["aluin"], M["wood"]], smooth=True)
+POT.location = P(-0.307, 0.0, 0.553)
+parts.append(POT)
 
 root = bpy.data.objects.new("GasStoveRoot", None)
 bpy.context.collection.objects.link(root)

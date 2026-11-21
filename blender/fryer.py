@@ -8,8 +8,8 @@ Nodes (each its own, for the game to work):
 - "FryerBasket": the basket (a wire box: its frame and its mesh's bars) with its handle out toward the front, hung over the back rim; its
   origin its floor's middle (the game lowers it into the oil and lifts it out).
 - "FryerRack": the draining tray (天ぷらバット) with its wire rack over it, beside the fryer at its right.
-- "FryerStand": the stainless work table they stand on (its top at the origin's height, as high as the work counter's beside it; four legs
-  and a shelf under it), at the work counter's right end (the counter was full: item 469 put the frying station on a table of its own).
+(Its stainless work table of its own, "FryerStand", is gone (item 494, the owner's 「做飯糰的區域減少至二分之一」, an arrow from the fryer to
+beside the stove): the rice balls' place halved, the fryer stands on the work counter itself now, by the stove.)
 
 The frame: metres; y up; x across (the rack at +x); z toward the cook in front (the basket's handle at +z); the fryer's foot's middle at
 the origin.
@@ -205,18 +205,7 @@ for x in (RX - TW / 2 + 0.014, RX + TW / 2 - 0.014):
 RACK = obj_of("FryerRack", bm, [M["steel"], M["dark"], M["wire"]])
 parts.append(RACK)
 
-# ---- the stand: a stainless work table under them both, its top at y 0 (the fryer's and the tray's feet on it), its legs down to the
-# floor STAND_H under it (the work counter's top over the kitchen's floor, in the game's units over the scale it's drawn at), a shelf low
-SX0, SX1, SZ0_, SZ1_ = -FW / 2 - 0.04, RX + TW / 2 + 0.04, -0.22, 0.22
-STAND_H = float(os.environ.get("STAND_H", "1.124"))
-bm = bmesh.new()
-box(bm, (SX0, -0.03, SZ0_), (SX1, -0.0005, SZ1_))
-for x in (SX0 + 0.015, SX1 - 0.045):
-    for z in (SZ0_ + 0.015, SZ1_ - 0.045):
-        box(bm, (x, -STAND_H, z), (x + 0.03, -0.03, z + 0.03))
-box(bm, (SX0 + 0.012, -STAND_H + 0.16, SZ0_ + 0.012), (SX1 - 0.012, -STAND_H + 0.18, SZ1_ - 0.012))
-STAND = obj_of("FryerStand", bm, M["steel"])
-parts.append(STAND)
+# (no stand of its own (item 494): the fryer and the tray stand on the work counter, beside the stove)
 
 root = bpy.data.objects.new("FryerRoot", None)
 bpy.context.collection.objects.link(root)

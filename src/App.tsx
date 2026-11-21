@@ -3010,8 +3010,14 @@ export default function App() {
    * from what's been worked out) */
   const researchDish = (d: DishInfo): DishInfo => (d.roast ? { ...d, bases: d.bases.filter((b) => !b.includes) } : d)
   /** how many of each dish on the menu could be made from what's in stock */
-  const entryStock = (d: DishInfo) => Object.fromEntries(entriesOf(d.id).map((e) =>
-    [e.key, portionsLeft(e, stock)]))
+  // (this and the three restocks' sums below kept from one drawing of the page to the next while the menu and the stock they're worked out
+  // from are the same: with the shop open the page is drawn again two or three times a second (the ledger, the talk, the customers), and
+  // working these out anew each time was most of what the page's own drawing took, built: 1.8 of 2.75 ms a second. Both are game/economy's,
+  // worked out from what they're given and nothing else)
+  const entryStockNow = useMemo(() => Object.fromEntries((menuBy[dish.id] ?? []).map((e) =>
+    [e.key, portionsLeft(e, stock)])), [dish, menuBy, stock])
+  /** what each of the three ways to restock all at once would cost now (the menu board's and the stock's buttons) */
+  const restockCostNow = useMemo(() => ({ avg: averageOrder(dish, stock).cost, each: eachOrder(dish, 5, stock).cost, full: topUpOrder(dish, stock).cost }), [dish, stock])
 
   // dev only: mirror what's on screen into the open Blender (vite.config.ts -> blender/open_live.py)
   useEffect(() => {
@@ -4193,9 +4199,9 @@ export default function App() {
         layoutLike={!hand ? { tags: researchDish(dish).bases.length + researchDish(dish).items.length, bases: researchDish(dish).bases.length } : undefined}
         cash={cash} unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? { price: 0 })} days={days}
         onBuy={!hand ? undefined : (id, n) => buyIn(dish, id, n)} onRestock={!hand ? undefined : (how) => restock(dish, how)} onClose={hand ? () => setFridgeOpen(false) : undefined}
-        restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
+        restockCost={restockCostNow}
          lang={lang} quantities={hand ? orders[dish.id] : entryCount}
-        feed={feed} locked={!hand} stock={hand ? stock : entryStock(dish)} fresh={fresh}
+        feed={feed} locked={!hand} stock={hand ? stock : entryStockNow} fresh={fresh}
         onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)}
         onClear={putAllBack} />
       </>)}
@@ -4209,7 +4215,7 @@ export default function App() {
           unitCost={(id) => costOf(ALL_ITEMS.get(id) ?? dish.bases.find((b) => b.id === id) ?? SEASON_GOODS.find((g) => g.id === id) ?? { price: 0 })}
           research={hand} quantities={orders[dish.id] ?? {}} onAdd={(id) => changeQty(id, 1)} onRemove={(id) => changeQty(id, -1)} onClear={putAllBack}
           onBuy={(id, n) => buyIn(dish, id, n)} onRestock={(how) => restock(dish, how)} onToss={(id) => { tossFood(id) }}
-          restockCost={{ avg: restockOf(dish, 'avg').cost, each: restockOf(dish, 'each').cost, full: restockOf(dish, 'full').cost }}
+          restockCost={restockCostNow}
           onBuyCharcoal={buyCharcoal} onBuyTissues={buyTissues} onBuyReceipts={buyReceipts} onBuyHousehold={buyHousehold} onBuyWashroom={buyWashroom} onClose={() => setFridgeOpen(false)} />
       )}
       {/* (the fold tab only for the open shop's menu: researching, the fridge button opens and shuts the panel) */}
