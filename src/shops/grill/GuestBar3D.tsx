@@ -546,19 +546,26 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
   const statusEl = useRef<HTMLSpanElement>(null)
   const c1 = counters[1]
   const home = useMemo(() => {
+    // (in the stock room, standing by or slacking (item 481, the owner's 「倉儲如果在待命或是偷閒就待在倉庫內即可」): a little along from its
+    // doorway's middle toward the wall's end and in from it, before the milk crates (their fronts 0.84 in), clear of the way along behind the
+    // fridges to their backs)
+    const sto = storeOf(counters)
+    if (sto) return sto.at(sto.mid - 0.25, 0.6)
     const last = fridges[fridges.length - 1]
     // (out from the crates and the cartons into the aisle (the owner's: stood against them, he read as staring at the wall), clear of the
     // fridge's front and its doors, a little along from it (the owner's: squeezed half into the gap by it). The wall's at farOf (the crates
     // 0.32 in from it): a move into the room is +lay (the last move went the other way, and stood him in the middle of the beer crates: the
     // owner saw him sunk in a red box, 2026-11-10))
     return c1.at.clone().addScaledVector(c1.along, last.z - FRIDGE.W / 2 - 0.42).addScaledVector(c1.lay, farOf(c1) + 0.32 + 0.95)
-  }, [c1, fridges])
+  }, [c1, fridges, counters])
   const seats = useMemo(() => seatsOf(counters), [counters])
   const wcs = useMemo(() => toiletsOf(counters), [counters])
   // (the stock room's way in (items 430, 431): before its doorway in the aisle, in it, and just inside it; the drinks are fetched in there now
   // and put in the fridges from behind, out of the customers' way)
   const store = useMemo(() => storeOf(counters), [counters])
   const storeWay = useMemo(() => store && { out: store.at(store.mid, -0.42), mid: store.at(store.mid, 0.1), inside: store.at(store.mid, 0.46) }, [store])
+  /** out of the stock room from his place in it (item 481): just inside its doorway, through it, before it in the aisle; none without it */
+  const outOfStore = () => (storeWay ? [storeWay.inside.clone(), storeWay.mid.clone(), storeWay.out.clone()] : [])
   /** his way out into the side counter's aisle, across from his place */
   const homeAisle = useMemo(() => c1.at.clone().addScaledVector(c1.along, home.clone().sub(c1.at).dot(c1.along) / c1.along.lengthSq()).addScaledVector(c1.lay, -AISLE), [home, c1])
   const st = useRef({ phase: 'idle' as 'idle' | 'take' | 'go' | 'work' | 'back', t: 0, chore: null as StockChore, path: [] as THREE.Vector3[], len: 0, d: 0,
@@ -586,7 +593,7 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
     const bin = local(front)
     const inner = route(gateIn, bin)
     if (!inner.length || inner[inner.length - 1].distanceTo(bin) > 0.02) inner.push(bin.clone())
-    const toBin = [home.clone(), homeAisle.clone(), aisleCornerOf(counters, c1), gateOut.clone(), gate.clone(), gateIn.clone(), ...inner.slice(1)]
+    const toBin = [home.clone(), ...outOfStore(), homeAisle.clone(), aisleCornerOf(counters, c1), gateOut.clone(), gate.clone(), gateIn.clone(), ...inner.slice(1)]
     sd.updateWorldMatrix(true, false)
     const dW = sd.getWorldPosition(new THREE.Vector3()), room = sd.localToWorld(new THREE.Vector3(-1, 0, 0)).sub(dW).setY(0).normalize()
     const at = (k: number) => par.worldToLocal(dW.clone().addScaledVector(room, k)).setY(0)
@@ -610,7 +617,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
       if ((!c.arrived || SHOP.leaving) && statusEl.current) statusEl.current.style.visibility = 'hidden'
       const wayFrom = (from: THREE.Vector3) => {
         // (on out through the sliding door's open way and down its steps (item 410: a step past the door, through its shut middle))
-        return [from.clone(), homeAisle.clone(), aisleCornerOf(counters, c1), doorOf(counters), ...doorOutOf(counters)]
+        // (out of the stock room first, from his place in it (item 481))
+        return [from.clone(), ...(from.distanceTo(home) < 0.05 ? outOfStore() : []), homeAisle.clone(), aisleCornerOf(counters, c1), doorOf(counters), ...doorOutOf(counters)]
       }
       const apply = (tr: Trip) => {
         const pose = tripStep(tr, dt, 1.0, (v) => (o.parent ? o.parent.localToWorld(v.clone()) : v.clone()))
@@ -701,7 +709,8 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
             const f = fridges.find((x) => x.n === next.unit)!
             // (in through the stock room's noren and along behind the fridges to this one's back (item 431); to its front, as before, if
             // there's no stock room)
-            set(storeWay ? [home.clone(), storeWay.out.clone(), storeWay.mid.clone(), storeWay.inside.clone(), f.back.clone()] : [home.clone(), f.front.clone()])
+            // (his place is in there now (item 481): straight along behind the fridges)
+            set(storeWay ? [home.clone(), f.back.clone()] : [home.clone(), f.front.clone()])
           }
           else if (next.kind === 'bin') {
             s.ways = ways
@@ -713,12 +722,12 @@ function StockerImpl({ counters, fridges, who }: { counters: Counter[]; fridges:
             const w = wcs![next.who]
             STOCKER_WC.who = next.who
             // (in at the door, past the washstand, round the corner to the toilet's paper)
-            set([home.clone(), homeAisle.clone(), w.aisle.clone(), w.front.clone(), w.inside.clone(), w.turn.clone(), w.stall.clone()])
+            set([home.clone(), ...outOfStore(), homeAisle.clone(), w.aisle.clone(), w.front.clone(), w.inside.clone(), w.turn.clone(), w.stall.clone()])
           } else {
             const seat = seats[next.seat]
             // (beside the stool, on the drawer's side (the customer's left, + along), facing the bar)
             const beside = seat.aisle.clone().lerp(seat.stool, 0.55).addScaledVector(seat.along, 0.3)
-            set([home.clone(), homeAisle.clone(), ...(seat.counter === 1 ? [] : [aisleCornerOf(counters, c1)]), seat.aisle.clone(), beside])
+            set([home.clone(), ...outOfStore(), homeAisle.clone(), ...(seat.counter === 1 ? [] : [aisleCornerOf(counters, c1)]), seat.aisle.clone(), beside])
           }
           // (the drinks: first bent to the cartons for a case, then off with it; with the stock room, in there first, the case taken from the
           // stock along its back wall behind him, then turned to the fridge's back)
