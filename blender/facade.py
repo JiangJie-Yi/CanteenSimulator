@@ -92,7 +92,9 @@ def under(z):
 # (bigger and wider (item 440, the owner's 「這拱形再大一些寬一點」): 0.27 over 0.47 either side to 0.36 over 0.64, its sides drawn in a little
 # more (KARA_P) as a karahafu's are, low and long out to the eave, the crown up in the middle: so its shoulders stay under the band's lanterns
 # either side of the middle, its crown before the middle bay's)
-KARA_X, KARA_HW, KARA_H, KARA_P = -0.12, 0.64, 0.36, 1.3
+# (lower (item 455, the owner's 「這個寬度可以，但拱的有點高」): its width kept, its crown 0.36 down to 0.28 over the straight eave: its ridge
+# plate no longer up before the band's second row of lanterns)
+KARA_X, KARA_HW, KARA_H, KARA_P = -0.12, 0.64, 0.28, 1.3
 KARA_FROM = 0.5
 
 
