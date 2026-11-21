@@ -30,6 +30,7 @@ import { CARTON_CASES, cartonStack } from '@/game/cartonStack'
 import { cartonMaterials } from './drinkCartons'
 import { STAFF_DOOR_HOLD, askPantry, SUPPLIES, fridgesOf, farOf, storeOf, STORE, STORE_STATE, WALL_OUT, DRINK_BACK, setDrinkPanel, DRINKS, FRIDGE, FRIDGE_AT, FRIDGE_STATE, FRIDGE_STOCK, FRIDGE_UNITS, isCan, moveDrink, moveOut, tipOver, handOver, POINTER_HINT, pullOut, putBack, setShrineFlower, SHRINE_FLOWERS, tableHit, TOILETS, WC_ROOM, WC_SLIDE, WC_W, lampsAlong, nameOver, SPILLS, SHOP_MENU, type Counter, type DrinkId } from './bar'
 import { EditBlock, Movable } from './Movable'
+import { CatClock } from './CatClock'
 import { getEdit } from './edit'
 import { askView } from './DormRoom'
 import { FLOWERS, nextFlower, type Flower } from '@/game/shrineFlowers'
@@ -5631,6 +5632,14 @@ function DiningWallImpl({ c, from, to, far, lampId, lampName, top, door, altar =
           {a.scroll === 'bijin' && (
             <mesh visible={false} position={[-0.01, 1.42, a.z + nudgeArt(a.z)]} {...BIJIN_SAYS}><boxGeometry args={[0.02, 0.92, 0.34]} /></mesh>
           )}
+          </Movable>
+        ))}
+        {/* (the cat wall clock (item 477, the owner's 「這邊增加一個喵咪掛鐘」): on the wall with the round window, right of it (the window's 40 cm
+            round and its frame, a hand's gap, the clock's own 11), under the frieze (its ears' tips 11 cm under the frieze's foot), its back
+            3 mm off the plaster) */}
+        {art.filter((a) => a.round).slice(0, 1).map((a) => (
+          <Movable key="catclock" id="catclock" label="貓咪掛鐘">
+            <group position={[-0.003, 1.62, a.z + nudgeArt(a.z) + 0.68]} rotation-y={-Math.PI / 2}><Suspense fallback={null}><CatClock /></Suspense></group>
           </Movable>
         ))}
         {/* (the supplies in the corner between the drinks fridges and the toilets' doorway) */}
