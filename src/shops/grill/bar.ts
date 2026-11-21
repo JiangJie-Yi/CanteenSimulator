@@ -436,15 +436,18 @@ const WC_END_T = 0.06
  * the stocker goes in. In the side counter's frame: `door` its doorway's clear opening along the wall, `room` the room's two ends along it,
  * `deep` how far its back wall's inside is behind the wall's face (its inside from WALL_OUT to there), `doorH` the doorway's clear height
  */
-export const STORE = { doorW: 0.56, doorH: 1.85, deep: 1.15, sill: 0.06 }
+export const STORE = { doorW: 0.56, doorH: 1.85, deep: 1.15, sill: 0.06, post: 0.05 }
 export function storeOf(cs: Counter[]) {
   const t = toiletsOf(cs), fr = fridgesOf(cs)
   if (!t || !fr) return null
   const c = cs[1]
-  // (the wall's own start (GuestBar3D's side wall: from -length / 2 - 0.35) and the far fridge's side, with its 3 cm)
-  const start = -c.length / 2 - 0.35, near = fr[fr.length - 1].z - FRIDGE.W / 2 - 0.03
+  // (the wall's own start (GuestBar3D's side wall: from -length / 2 - 0.35) and the far fridge's side, where the wall's let out round it
+  // (its 4 mm, GuestBar3D's storeWall))
+  const start = -c.length / 2 - 0.35, near = fr[fr.length - 1].z - FRIDGE.W / 2 - 0.004
   const mid = (start + near) / 2
-  const door: [number, number] = [mid - STORE.doorW / 2, mid + STORE.doorW / 2]
+  // (the doorway the whole of that stretch (item 467, the owner's 「圓圈挖空，門的寬度應當一致」: it was 0.56 wide in its middle, a strip of wall
+  // left either side, the one by the wall's end a block from the room's side): its posts at the wall's end and against the fridge's side)
+  const door: [number, number] = [start + STORE.post, near - STORE.post]
   // (from just in from the wall's start to just short of the men's room's end wall's outside)
   const room: [number, number] = [start + 0.03, t.m.z - WC_W / 2 - WC_ROOM.E - WC_END_T - 0.004]
   /** a spot in it (or by it): `along` the wall, `behind` its face (minus: out in the room) */

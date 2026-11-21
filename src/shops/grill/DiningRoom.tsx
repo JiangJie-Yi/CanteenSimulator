@@ -3195,16 +3195,17 @@ function WcMass({ x, y, z, cap = true }: { x: [number, number]; y: [number, numb
   )
 }
 /** the stock room's doorway's frame (items 430): its posts' width in the wall's line, its head's height over the opening */
-const STORE_POST = 0.05, STORE_HEAD = 0.07
-/** the stock room's noren (a half-noren, to the stocker's shoulders): as wide as the frame's posts' outer sides, and how long */
-const STORE_NOREN_W = STORE.doorW + 2 * STORE_POST, STORE_NOREN_L = 0.6
+const STORE_POST = STORE.post, STORE_HEAD = 0.07
+/** the stock room's noren (a half-noren, to the stocker's shoulders): as wide as the frame's posts' outer sides (the doorway's as laid out,
+ * item 467), and how long */
+const STORE_NOREN_L = 0.6
 /**
  * The stock room's noren (item 430, the owner's 「這邊挖空並加上掛簾，後面是小儲藏室，倉儲員工專用」): indigo cotton, the shop's back rooms'
  * plain kind: its top band darker where it's sewn over the rod; across its middle, where its two panels part, a white ring round 倉 (the
  * store), and under it in small spaced capitals STAFF ONLY; a white line along its hem; the cotton's weave. One picture over both panels.
  */
-const STORE_NOREN = (() => {
-  const PX = 1024 / STORE_NOREN_W, H = Math.round(STORE_NOREN_L * PX)
+const storeNoren = (wide: number) => {
+  const PX = 1024 / wide, H = Math.round(STORE_NOREN_L * PX)
   return canvasTex(1024, H, (g) => {
     const cloth = '#1f2f52'
     const band = Math.round(0.034 * PX), cy = Math.round(band + (H - band) * 0.43)
@@ -3230,9 +3231,16 @@ const STORE_NOREN = (() => {
     g.fillRect(0, H - Math.round(0.022 * PX), 1024, 5)
     g.restore()
   })
-})()
-/** the noren's cloth: both sides, its picture read from the room (the side toward the stock room mirrored, as a dyed cloth is) */
-const STORE_NOREN_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: STORE_NOREN, side: THREE.DoubleSide })
+}
+/** the noren's cloth for its width: both sides, its picture read from the room (the side toward the stock room mirrored, as a dyed cloth
+ * is); made once for the doorway's width (it's laid out once, as the shop loads: no program made while it's open) */
+const STORE_NOREN_MATS = new Map<number, THREE.MeshToonMaterial>()
+function storeNorenMat(wide: number) {
+  const k = Math.round(wide * 1000)
+  let m = STORE_NOREN_MATS.get(k)
+  if (!m) STORE_NOREN_MATS.set(k, (m = new THREE.MeshToonMaterial({ color: '#ffffff', map: storeNoren(wide), side: THREE.DoubleSide })))
+  return m
+}
 /**
  * The stock room (items 430, 431, 437; the owner's, 2026-11-21: 「這邊挖空並加上掛簾，後面是小儲藏室，倉儲員工專用」「飲料可以從冷飲櫃後面直接
  * 補」): a narrow room behind the side wall, from the wall's start along behind the drinks fridges to the men's toilet's room, its way in a
@@ -3255,6 +3263,10 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
   // back)
   const zE = z1 + 0.004
   const mid = (z0 + zE) / 2, len = zE - z0, dx = deep - WALL_OUT
+  // (the doorway's whole stretch (item 467), its frame's posts against the wall's end and the fridge's side: the noren, its rod and their
+  // brackets within the posts' outer sides (they reached 1 to 2 cm past them, into the fridge now it's beside), the head 2 mm in from them
+  // (its ends not in one plane with the posts' sides))
+  const outerW = door[1] - door[0] + 2 * STORE_POST, norenW = outerW - 0.012
   const noren = useRef<THREE.Group>(null)
   // (none of the sun's shadows inside it (item 476))
   const whole = useRef<THREE.Group>(null)
@@ -3304,14 +3316,14 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
         {[door[0] - STORE_POST / 2, door[1] + STORE_POST / 2].map((z) => (
           <mesh key={z} position={[(WALL_OUT - 0.03) / 2, (h + STORE_HEAD) / 2, z]}><boxGeometry args={[WALL_OUT + 0.03, h + STORE_HEAD, STORE_POST]} /><meshToonMaterial color="#3d2414" /></mesh>
         ))}
-        <mesh position={[(WALL_OUT - 0.035) / 2, h + STORE_HEAD / 2, (door[0] + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.035, STORE_HEAD, door[1] - door[0] + 2 * STORE_POST + 0.02]} /><meshToonMaterial color="#35200f" /></mesh>
+        <mesh position={[(WALL_OUT - 0.035) / 2, h + STORE_HEAD / 2, (door[0] + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.035, STORE_HEAD, outerW - 0.004]} /><meshToonMaterial color="#35200f" /></mesh>
         <mesh position={[WALL_OUT / 2, 0.006, (door[0] + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.02, 0.012, door[1] - door[0]]} /><meshToonMaterial color="#4a2e1a" /></mesh>
         {/* the noren's rod on its two brackets off the head's face */}
         <mesh position={[-0.05, h + STORE_HEAD - 0.02, (door[0] + door[1]) / 2]} rotation-x={Math.PI / 2}>
-          <cylinderGeometry args={[0.01, 0.01, STORE_NOREN_W + 0.04, 10]} /><meshToonMaterial color="#d9b884" />
+          <cylinderGeometry args={[0.01, 0.01, norenW + 0.004, 10]} /><meshToonMaterial color="#d9b884" />
         </mesh>
         {[-1, 1].map((k) => (
-          <mesh key={k} position={[-0.033, h + STORE_HEAD - 0.036, (door[0] + door[1]) / 2 + k * (STORE_NOREN_W / 2 + 0.006)]}>
+          <mesh key={k} position={[-0.033, h + STORE_HEAD - 0.036, (door[0] + door[1]) / 2 + k * (norenW / 2 - 0.012)]}>
             <boxGeometry args={[0.034, 0.01, 0.014]} /><meshToonMaterial color="#3a2416" />
           </mesh>
         ))}
@@ -3320,7 +3332,7 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
       {/* the noren: its two panels hung from the rod, each its half of the one picture, a slit between; swung aside as the stocker goes
           through (not merged: it moves) */}
       <group ref={noren} name="look-store" position={[-0.05, h + STORE_HEAD - 0.02, (door[0] + door[1]) / 2]}>
-        {[-1, 1].map((sd) => <StoreNorenPanel key={sd} sd={sd} />)}
+        {[-1, 1].map((sd) => <StoreNorenPanel key={sd} sd={sd} wide={norenW} />)}
       </group>
       {/* the doorway as one thing to point at: what's in there and what's lowest, a click opens the drinks' stock */}
       <mesh position={[-0.06, (h + STORE_HEAD) / 2, (door[0] + door[1]) / 2]} rotation-y={-Math.PI / 2} {...hit}>
@@ -3331,22 +3343,22 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
   )
 }
 /** one of the stock room noren's two panels: its half of the picture, hung from the rod (its top), a slit between the two */
-function StoreNorenPanel({ sd }: { sd: number }) {
+function StoreNorenPanel({ sd, wide }: { sd: number; wide: number }) {
   const geo = useMemo(() => {
-    const w = (STORE_NOREN_W - 0.008) / 2
+    const w = (wide - 0.008) / 2
     const g = new THREE.PlaneGeometry(w, STORE_NOREN_L)
-    const u0 = sd < 0 ? 0 : 1 - w / STORE_NOREN_W, u1 = u0 + w / STORE_NOREN_W
+    const u0 = sd < 0 ? 0 : 1 - w / wide, u1 = u0 + w / wide
     const uv = g.attributes.uv as THREE.BufferAttribute
     for (let k = 0; k < uv.count; k++) uv.setX(k, u0 + uv.getX(k) * (u1 - u0))
     // (hung from its top: the cloth below the rod)
     g.translate(0, -STORE_NOREN_L / 2 + 0.012, 0)
     return { g, z: sd * (0.008 + w) / 2 }
-  }, [sd])
+  }, [sd, wide])
   useEffect(() => () => geo.g.dispose(), [geo])
   // (in the doorway's plane, its face to the room: seen from the room the picture reads right)
   return (
     <group position-z={geo.z}>
-      <mesh geometry={geo.g} rotation-y={-Math.PI / 2} material={STORE_NOREN_MAT} />
+      <mesh geometry={geo.g} rotation-y={-Math.PI / 2} material={storeNorenMat(wide)} />
     </group>
   )
 }
