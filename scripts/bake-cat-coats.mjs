@@ -8,7 +8,8 @@
 //
 //   node scripts/bake-cat-coats.mjs [url]       (default http://localhost:5173/GrilledFishBusiness/?pace=0)
 //
-// The models carry their coats once it's run: run again on them and the coat goes on twice. To change a coat, take the four models back to
+// (Item 465, the owner's 「這些貓咪的斑紋怎回事? 請回朔」: the coats taken off again, the four models back to before item 429; nothing
+// carries a coat now.) The models carry their coats once it's run: run again on them and the coat goes on twice. To change a coat, take the four models back to
 // before it was run (git: the commit before item 429's) and run it; after remaking ownluckycat.glb (blender/ownluckycat.py), run it on that.
 import { chromium } from 'playwright-core'
 import { readFileSync, writeFileSync } from 'node:fs'
