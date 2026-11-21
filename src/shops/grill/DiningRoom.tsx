@@ -3417,13 +3417,16 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
       <StaticBatch plain>
         {/* its floor, the toilets' hinoki boards, a hair over the shop's own floor run out behind the wall */}
         <WcFloor wx={dx} wz={len} at={[(WALL_OUT + deep) / 2, 0.007, mid]} />
-        {/* inside: its back wall, its near end; its far end in front of the men's room's end wall (2 mm off it) */}
+        {/* inside: its back wall; its far end in front of the men's room's end wall (6 mm off it) */}
         {/* (its back cut open as the toilets' rooms' are, seen through from outside (item 482, the owner's 「這邊要通透」: a solid back made it a
             blank grey box from behind the shop, the stocker and the stock out of sight): one face, turned in, nothing behind it) */}
         <WcWall len={len} at={[deep, 0, mid]} yaw={-Math.PI / 2} top={top} cut />
         {/* (its near end, by the wall's start, taken away (item 488, the owner's 「這面牆拿掉」: past the side wall's end it stood alone, a panel
             of cedar and plaster beside the doorway, from the room and from outside); the far end, in front of the men's room's end wall) */}
-        <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, zE - 0.002]} yaw={Math.PI} top={top} />
+        {/* (6 mm in front of that wall's plaster, 4 mm clear of its corner post's face (item 503, the owner's 「紅圈處理」: 2 mm off it stood
+            in one plane with the men's room's dark corner post, itself 2 mm proud of that plaster (item 425), and the post showed through the
+            stock room's plaster as a dark strip up its far corner)) */}
+        <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, zE - 0.006]} yaw={Math.PI} top={top} />
         {/* outside: the short end's body past the men's room (its back open, item 482) */}
         <WcMass x={[WC_ROOM.D + WC_T + 0.002, deep]} y={[0, top]} z={[zE, zE + WC_T]} />
         {/* (no slatted ceiling on its caps (item 498, the owner's 「倉庫不用這個」): it's open over, the stock seen from above) */}
@@ -3432,13 +3435,15 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
           // (4 mm proud of the end walls' backs: not in one plane with them)
           <mesh key={z} position={[deep - WC_T / 2 + 0.004, top / 2, z - 0.015]}><boxGeometry args={[WC_T, top, 0.034]} /><meshToonMaterial color="#2e1c10" /></mesh>
         ))}
-        {/* the doorway's frame: two dark cedar posts in the wall's line, proud of its face, through its thickness; the head over them; the
-            jambs lined; a low sill across its foot */}
-        {[door[0] - STORE_POST / 2, door[1] + STORE_POST / 2].map((z) => (
+        {/* the doorway's frame: a dark cedar post in the wall's line against the fridge's side, proud of its face, through its thickness (the
+            one at the wall's end taken away (item 503, the owner's 「拿掉」): the near end wall gone (item 488), it stood alone at the room's
+            corner); the head over the doorway out to the wall's end, the wall over it carrying it; a low sill across its foot, the post's
+            place too */}
+        {[door[1] + STORE_POST / 2].map((z) => (
           <mesh key={z} position={[(WALL_OUT - 0.03) / 2, (h + STORE_HEAD) / 2, z]}><boxGeometry args={[WALL_OUT + 0.03, h + STORE_HEAD, STORE_POST]} /><meshToonMaterial color="#3d2414" /></mesh>
         ))}
         <mesh position={[(WALL_OUT - 0.035) / 2, h + STORE_HEAD / 2, (door[0] + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.035, STORE_HEAD, outerW - 0.004]} /><meshToonMaterial color="#35200f" /></mesh>
-        <mesh position={[WALL_OUT / 2, 0.006, (door[0] + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.02, 0.012, door[1] - door[0]]} /><meshToonMaterial color="#4a2e1a" /></mesh>
+        <mesh position={[WALL_OUT / 2, 0.006, (door[0] - STORE_POST + door[1]) / 2]}><boxGeometry args={[WALL_OUT + 0.02, 0.012, door[1] - door[0] + STORE_POST]} /><meshToonMaterial color="#4a2e1a" /></mesh>
         {/* the noren's rod on its two brackets off the head's face */}
         <mesh position={[-0.05, h + STORE_HEAD - 0.02, (door[0] + door[1]) / 2]} rotation-x={Math.PI / 2}>
           <cylinderGeometry args={[0.01, 0.01, norenW + 0.004, 10]} /><meshToonMaterial color="#d9b884" />
