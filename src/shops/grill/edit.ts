@@ -372,6 +372,8 @@ const RELAIDS: [string, string[]][] = [
   ['jgs-edit-relaid-38', ['crates', 'drinkfridge0', 'drinkfridge1']],
   // (the first waiting bench where the owner moved it on, made its default (item 463))
   ['jgs-edit-relaid-39', ['bench']],
+  // (the willow where the owner moved it on, made its default (item 479))
+  ['jgs-edit-relaid-40', ['willow']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -496,8 +498,10 @@ export const BASES: Record<string, V3> = {
   // (no lift: sized about its foot it stands on the dais (Movable's ground); the 0.19 made up for its sinking when it was sized about its middle)
   freezer: [-0.9694, 0, 1.3355],
   // (moved on by X 0.215 in the room's frame, taken into this parent's units)
-  // (moved by the owner X -0.465, Z -0.367 (its object frame was the world's then), made so)
-  willow: [0.2534 - 0.465, 0, 0.0272 - 0.367],
+  // (moved by the owner X -0.465, Z -0.367 (its object frame was the world's then), made so; then Z -0.45 in the panel (item 479, the owner's,
+  // 2026-11-21: 「柳樹 Z: -0.45 然後 Reset」: its own axes, turned 1.4 from its parent's), toward the barrel, clear of the floor the boss's
+  // bedding goes down on (item 480), into its parent's units)
+  willow: [0.2534 - 0.465 - 0.4435, 0, 0.0272 - 0.367 - 0.0765],
   // (the speaker set at X -0.285 Y 0.518 Z 0.169, in the room's frame: back in its corner (the owner's); the red lantern raised 0.25)
   // (then on 0.05 along its own width, as the owner set it (2026-11-12): [0.0039, 0, -0.0247] in this parent's units)
   speaker: [0.3083, 0.518, 0.1062],
