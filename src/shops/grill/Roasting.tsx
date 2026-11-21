@@ -112,7 +112,14 @@ export { BAR_AT, BAR_TOP }
 const baseName = (name: string) => name.replace(/\d+$/, '')
 
 // colour multipliers over the (grilled-looking) textures: pale when raw, as authored when done, charred when burnt
-const RAW_TINT = new THREE.Color(1.3, 1.28, 1.25)
+/** (item 473, the owner's 「東西烤好的感覺要有，不能太隨意」) what stands round the fire on its stick browns on the side it shows the coals
+ * first: that side cooks SIDE_LEAD faster than the piece as a whole and the other as much slower (some 1.4 to 0.6); the cook turns it on
+ * its stick at TURN_AT of its time (TURN_S the turn), the other side then the faster, the two even as it's done. Left unturned it would
+ * be charring one side with the other still pale */
+const SIDE_LEAD = 0.38, TURN_AT = 0.5, TURN_S = 0.5
+const STICK_AXIS = new THREE.Vector3(1, 0, 0)
+/** (scratch) the way to the fire in a piece's own frame, its turn undone, its turn on its stick */
+const FIRE_SIDE = new THREE.Vector3(), FIRE_INV = new THREE.Quaternion(), STICK_TURN = new THREE.Quaternion()
 const DONE_TINT = new THREE.Color(1, 1, 1)
 const BURNT_TINT = new THREE.Color(0.22, 0.17, 0.14)
 // past done, food keeps darkening slowly, reaching full char at this many cook-times
@@ -4704,7 +4711,10 @@ type Uniform = { value: number }
 /** per-piece look: how charred it is, and how much of each seasoning is on it (all 0 → 1) */
 type Looks = { uChar: Uniform; uSear?: Uniform; uSalt: Uniform; uSoy: Uniform; uMilk: Uniform; uPeanut: Uniform
   /** miso glaze; green dabs (wasabi, yuzu kosho); red flakes (shichimi); a glisten of lemon juice */
-  uMiso: Uniform; uGreen: Uniform; uRed: Uniform; uLemon: Uniform }
+  uMiso: Uniform; uGreen: Uniform; uRed: Uniform; uLemon: Uniform
+  /** (item 473) how done each of its two sides is, of its roasting time (1 done): A the side that faced the fire first, B the other; its
+   * fat's shine; and which way its A side looks, in its own frame */
+  uCookA: Uniform; uCookB: Uniform; uOil: Uniform; uSide: { value: THREE.Vector3 } }
 
 /**
  * Burn patches for over-roasted food: a value-noise mask over the texture that grows as uChar goes 0 → 1, so the
@@ -4712,8 +4722,10 @@ type Looks = { uChar: Uniform; uSear?: Uniform; uSalt: Uniform; uSoy: Uniform; u
  * specks, soy as a dark lacquer over everything, condensed milk in wavy drizzled ribbons.
  */
 /** a fish's eyes neither brown, char nor take the seasoning: they stay a clear white with a dark pupil */
+// (set, not raw (they'd pale as raw flesh does), and no further)
 const EYE_LOOKS: Looks = { uChar: { value: 0 }, uSear: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
-  uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
+  uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 },
+  uCookA: { value: 0.3 }, uCookB: { value: 0.3 }, uOil: { value: 0 }, uSide: { value: new THREE.Vector3(1, 0, 0) } }
 
 function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
   const hasMap = !!mat.map && !isDummyMap(mat.map)
@@ -4722,7 +4734,9 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
     shader.uniforms.uCharColor = { value: CHAR_COLOR }
     // (whether it has a picture of its own: the white one scene/materialNormalize gives the rest doesn't count)
     shader.uniforms.uHasMap = { value: hasMap ? 1 : 0 }
-    shader.vertexShader = BITE_VERTEX(shader.vertexShader)
+    // (its own frame's normal passed on: which of its two sides a point's on (item 473))
+    shader.vertexShader = 'varying vec3 vCharN;\n' + BITE_VERTEX(shader.vertexShader).replace('#include <defaultnormal_vertex>',
+      '#include <defaultnormal_vertex>\n  vCharN = objectNormal;')
     shader.fragmentShader = BITE_FRAGMENT(shader.fragmentShader
       .replace('#include <common>', /* glsl */ `#include <common>
         uniform float uChar;
@@ -4737,6 +4751,11 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
         uniform float uLemon;
         uniform float uHasMap;
         uniform vec3 uCharColor;
+        uniform float uCookA;
+        uniform float uCookB;
+        uniform float uOil;
+        uniform vec3 uSide;
+        varying vec3 vCharN;
         float charHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float charNoise(vec2 p) {
           vec2 i = floor(p), f = fract(p);
@@ -4746,13 +4765,27 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
         }`)
       .replace('#include <map_fragment>', /* glsl */ `#include <map_fragment>
         float charN = uHasMap > 0.5 ? charNoise(vMapUv * 9.0) * 0.65 + charNoise(vMapUv * 23.0) * 0.35 : 0.5;
+        // (item 473) how done this side is: its A the side toward the fire first, its B the other, each its own till it's turned and they
+        // even out
+        float cook = mix(uCookB, uCookA, smoothstep(-0.35, 0.35, dot(normalize(vCharN), uSide)));
+        // raw: pale and a little cold, its colour thin; set as it warms through
+        diffuseColor.rgb *= mix(vec3(1.26, 1.27, 1.3), vec3(1.0), smoothstep(0.0, 0.4, cook));
+        // browning: golden first in patches where the skin blisters, the patches closing up and deepening as it's done
+        float blotch = uHasMap > 0.5 ? charNoise(vMapUv * 6.0 + 2.7) * 0.6 + charNoise(vMapUv * 17.0 + 5.1) * 0.4 : 0.5;
+        float brown = smoothstep(0.3, 1.0, cook) * mix(smoothstep(0.35, 0.7, blotch), 1.0, smoothstep(0.55, 1.0, cook));
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.95, 0.7, 0.42) + vec3(0.05, 0.025, 0.0), brown * 0.62);
+        // its skin's little blisters, darker, from three quarters done
+        if (uHasMap > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.26, 0.14, 0.07),
+          smoothstep(0.74, 0.82, charNoise(vMapUv * 34.0 + 9.0)) * smoothstep(0.7, 1.15, cook) * 0.5);
         // the grill's bars seared across it as it cooks (none on it raw): dark brown, blistered and broken up, deepening as it roasts
         if (uHasMap > 0.5) {
           float searBar = smoothstep(0.84, 0.95, 0.5 + 0.5 * sin((vMapUv.y * 11.0 + vMapUv.x * 1.5) * 6.2831853))
             * smoothstep(0.55, 0.8, charNoise(vMapUv * 8.0) + 0.3);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.12, 0.06), clamp(searBar * 0.75, 0.0, 1.0) * uSear);
         }
-        float charMask = smoothstep(1.0 - uChar * 1.15, 1.0 - uChar * 1.15 + 0.2, charN);
+        // (charring by side too: left past done, the side toward the fire blackens first)
+        float charAmt = max(uChar, smoothstep(1.15, 3.0, cook));
+        float charMask = smoothstep(1.0 - charAmt * 1.15, 1.0 - charAmt * 1.15 + 0.2, charN);
         diffuseColor.rgb = mix(diffuseColor.rgb, uCharColor, charMask);
         // soy brushed on: a dark, rich lacquer over the whole surface
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.3, 0.15) + vec3(0.05, 0.02, 0.0), uSoy * 0.85);
@@ -4777,7 +4810,13 @@ function addCharring(mat: THREE.MeshToonMaterial, looks: Looks, bites: Bites) {
           float ribbon = abs(fract(vMapUv.x * (4.0 + 4.0 * step(0.5, uMilk)) + sin(vMapUv.y * 9.0) * 0.25) - 0.5);
           float milk = (1.0 - smoothstep(0.04, 0.08, ribbon)) * step(0.3, charNoise(vMapUv * 5.0 + 3.0));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.99, 0.95, 0.84), milk * min(1.0, uMilk * 2.0));
-        }`))
+        }`)
+      .replace('#include <opaque_fragment>', /* glsl */ `{
+          // (item 473) its fat's shine as it cooks: a soft light on it from over the cook's shoulder, gone as it dries and chars
+          float gl = pow(max(dot(normalize(vNormal), normalize(vec3(0.3, 0.75, 0.6))), 0.0), 26.0);
+          outgoingLight += vec3(1.0, 0.94, 0.82) * gl * uOil * 0.5;
+        }
+        #include <opaque_fragment>`))
   }
   mat.customProgramCacheKey = () => 'charring'
   // (scene/materialNormalize gives it the features it lacks in their do-nothing form, a white map among them, so a fish with a picture and
@@ -5211,6 +5250,14 @@ type Piece = {
   homeQ0: THREE.Quaternion
   /** seconds spent over the fire */
   progress: number
+  /** (item 473) how far its side toward the fire is ahead of the piece as a whole (of its roasting time; the other side as far behind);
+   * whether it's been turned on its stick and how far through the turn it is (0..1); whether its fire side's been taken; whether it's
+   * been done over the fire yet (its hiss and its wisp once) */
+  lead: number
+  turned: boolean
+  turnT: number
+  sideSet: boolean
+  wasDone: boolean
   collected: boolean
   /** 0..1 along the flight to the plate */
   flight: number
@@ -5572,11 +5619,12 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         }
       }
       const looks: Looks = { uChar: { value: 0 }, uSear: { value: 0 }, uSalt: { value: 0 }, uSoy: { value: 0 }, uMilk: { value: 0 },
-        uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 } }
+        uPeanut: { value: 0 }, uMiso: { value: 0 }, uGreen: { value: 0 }, uRed: { value: 0 }, uLemon: { value: 0 },
+        uCookA: { value: 0 }, uCookB: { value: 0 }, uOil: { value: 0 }, uSide: { value: new THREE.Vector3(1, 0, 0) } }
       pieces.current.push({
         key: obj.uuid, id, copy: (obj.userData.copy as number | undefined) ?? 0, loose: roast.loose.includes(id),
         node: obj, homeP: obj.position.clone(), homeQ: faceCamera(id, obj), homeQ0: obj.quaternion.clone(),
-        progress: 0, collected: false,
+        progress: 0, lead: 0, turned: false, turnT: 0, sideSet: false, wasDone: false, collected: false,
         flight: 0, fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), toP: new THREE.Vector3(),
         toQ: new THREE.Quaternion(), mats, looks, bites: newBites(), sticks: [], food: [], puffs: [], stickOnly: false,
         netSpot: null, awaitBoss: 0, container: null, local: new THREE.Vector3(), carried: false, trash: -1,
@@ -6695,7 +6743,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
   // coals (the owner's, 2026-11-10), and what had been skewered by hand on the board had to be skewered again)
   const SCALARS = ['progress', 'collected', 'flight', 'stickOnly', 'netSpot', 'container', 'staged', 'stagedAt', 'wasPresent',
     'homeFlight', 'unwrapped', 'unwrapT', 'chefSeasoned', 'trash', 'landed', 'slot', 'eat', 'eaten', 'guest', 'seat', 'skewerAt', 'pullAt', 'trayAt', 'tonged',
-    'tong'] as const
+    'tong', 'lead', 'turned', 'turnT', 'sideSet', 'wasDone'] as const
   const VECS = ['fromP', 'fromQ', 'toP', 'toQ', 'local', 'trashFrom'] as const
   const save = (): Snap => {
     const out = new Map<string, Record<string, unknown>>()
@@ -6706,7 +6754,9 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       r.body = p.body ? { v: p.body.v.clone(), r: p.body.r, live: p.body.live } : null
       r.dabs = { ...p.dabs }
       r.steps = [...p.steps]
-      r.looks = Object.fromEntries(Object.entries(p.looks).map(([k, u]) => [k, u.value]))
+      // (its numbers; which way its first side looks (item 473) kept apart, a copy)
+      r.looks = Object.fromEntries(Object.entries(p.looks).filter(([, u]) => typeof u.value === 'number').map(([k, u]) => [k, u.value]))
+      r.side = p.looks.uSide.value.clone()
       r.want = p.want
       r.bites = { n: p.bites.uBiteCount.value, v: p.bites.uBites.value.map((b) => b.clone()) }
       r.pos = p.node.position.clone()
@@ -6735,13 +6785,14 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
     for (const k of Object.keys(p.dabs) as Seasoning[]) p.dabs[k] = 0
     p.steps = []
     p.progress = 0
+    p.lead = 0; p.turned = false; p.turnT = 0; p.sideSet = false; p.wasDone = false
     p.netSpot = null
     p.ringSlot = undefined
     p.container = null
     p.carried = false
     p.trash = -1
     p.body = null
-    for (const u of Object.values(p.looks)) u.value = 0
+    for (const u of Object.values(p.looks)) { if (typeof u.value === 'number') u.value = 0; else u.value.set(1, 0, 0) }
     p.stickOnly = false
     for (const m of p.food) if (m !== p.node) m.visible = true
     p.bites.uBiteCount.value = 0
@@ -6796,7 +6847,8 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         Object.assign(p.dabs, r.dabs)
         p.steps = [...((r.steps as Step[] | undefined) ?? [])]
         p.want = (r.want as Piece['want']) ?? null
-        for (const [k, v] of Object.entries(r.looks as Record<string, number>)) (p.looks as Record<string, { value: number }>)[k].value = v
+        for (const [k, v] of Object.entries(r.looks as Record<string, number>)) (p.looks as unknown as Record<string, { value: number }>)[k].value = v
+        if (r.side) p.looks.uSide.value.copy(r.side as THREE.Vector3)
         const bites = r.bites as { n: number; v: THREE.Vector4[] }
         p.bites.uBiteCount.value = bites.n
         bites.v.forEach((v, i) => p.bites.uBites.value[i].copy(v))
@@ -9266,13 +9318,14 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         for (const k of Object.keys(p.dabs) as Seasoning[]) p.dabs[k] = 0
         p.steps = []
         p.progress = 0
+        p.lead = 0; p.turned = false; p.turnT = 0; p.sideSet = false; p.wasDone = false
         p.netSpot = null
         p.ringSlot = undefined
         p.container = null
         p.carried = false
         p.trash = -1
         p.body = null
-        for (const u of Object.values(p.looks)) u.value = 0
+        for (const u of Object.values(p.looks)) { if (typeof u.value === 'number') u.value = 0; else u.value.set(1, 0, 0) }
         p.stickOnly = false
         // (its bitten-away parts back; not the piece itself where it's a single mesh (the daikon, the onion, the mochi): that's Dish's to show
         // or hide, and set shown here every frame it was drawn shrunk to nothing on the net, never ordered)
@@ -9378,12 +9431,33 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
           // (fat dripping onto the coals as it cooks (item 276): a fatty fish or meat, from a third done on, now and then, a flare of flame
           // under it a moment and the hiss of it; nothing over a bed too low to flame)
           const r = p.progress / (roast.times[p.id] ?? 1)
+          // (item 473: standing round the fire on its stick, the flank it shows the coals browns first; turned on its stick half way (a
+          // hiss as its paler side meets the heat), the other catches up. What lies on the net, loose in the ash, or swells as it
+          // toasts cooks evenly)
+          if (p.netSpot === null && !p.loose && !p.puffs.length) {
+            FIRE_SIDE.set(-p.node.position.x, -0.25, -p.node.position.z).normalize().applyQuaternion(FIRE_INV.copy(p.node.quaternion).invert())
+            if (!p.sideSet) { p.looks.uSide.value.copy(FIRE_SIDE); p.sideSet = true }
+            p.lead += (dt * roastRate(heatOf()) / (roast.times[p.id] ?? 1)) * SIDE_LEAD * Math.sign(FIRE_SIDE.dot(p.looks.uSide.value))
+            if (!p.turned && r >= TURN_AT) { p.turned = true; p.turnT = 0.0001; sizzleBurst(p.node.getWorldPosition(SIZZLE_AT), 0.55) }
+          }
+          // (just right: a hiss, a wisp of its smell off it, a warm glint on it a moment)
+          if (!p.wasDone && r >= 1) {
+            p.wasDone = true
+            flashUntil.current.set(p.key, performance.now() + 650)
+            sizzleBurst(p.node.getWorldPosition(SIZZLE_AT), 1)
+            WISP_FEED.to?.({ key: `done-${p.key}`, at: [p.node.position.x, p.node.position.y + 0.05, p.node.position.z] })
+          }
           if (FATTY.test(p.id) && r > 0.33 && r < 1.1 && heatOf() > 0.15 && Math.random() < dt * 0.14) {
             FIRE_FLARE.fat = Math.max(FIRE_FLARE.fat, 0.55 + 0.45 * Math.random())
             sizzleBurst(p.node.getWorldPosition(SIZZLE_AT), 0.8)
           }
         }
         p.node.quaternion.copy(p.homeQ)
+        // (item 473: turned on its stick, half a second, eased; turned, it stays so)
+        if (p.turnT > 0) {
+          if (p.turnT < 1) p.turnT = Math.min(1, p.turnT + dt / TURN_S)
+          p.node.quaternion.multiply(STICK_TURN.setFromAxisAngle(STICK_AXIS, p.turnT * p.turnT * (3 - 2 * p.turnT) * Math.PI))
+        }
         p.node.position.x = p.homeP.x
         p.node.position.z = p.homeP.z
         if (p.netSpot !== null) {
@@ -9596,7 +9670,12 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       // deepening the longer it's left on
       const r = p.progress / time
       const charred = THREE.MathUtils.smootherstep(r, CHAR_START, CHAR_FULL)
-      p.looks.uChar.value = charred
+      // (item 473: its two sides' own doneness, the shader browning and charring each by its own; its fat's shine from a third done,
+      // going as it dries past done)
+      p.looks.uChar.value = 0
+      p.looks.uCookA.value = Math.max(0, r + p.lead)
+      p.looks.uCookB.value = Math.max(0, r - p.lead)
+      p.looks.uOil.value = THREE.MathUtils.smoothstep(r, 0.3, 0.9) * (1 - THREE.MathUtils.smoothstep(r, 1.3, 2.2)) * (FATTY.test(p.id) ? 1 : 0.4)
       // (the grill's marks come on as it browns: none raw, full by the time it's done)
       if (p.looks.uSear) p.looks.uSear.value = THREE.MathUtils.smoothstep(r, 0.25, 0.9)
       // mochi on the net swells up as it toasts, and breathes a little while it's still over the coals
@@ -9605,7 +9684,8 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         const breathe = p.collected ? 0 : Math.sin(performance.now() / 380 + p.copy) * 0.05 * puff
         for (const m of p.puffs) m.morphTargetInfluences![0] = Math.min(1, puff + breathe)
       }
-      if (r < 1) tint.copy(RAW_TINT).lerp(DONE_TINT, r)
+      // (raw to done its sides' own colour now, the shader's; past done the whole of it darkening as before)
+      if (r < 1) tint.copy(DONE_TINT)
       else tint.copy(DONE_TINT).lerp(BURNT_TINT, charred * 0.6)
       const glow = hovered.current === p || (flashUntil.current.get(p.key) ?? 0) > performance.now()
       // potatoes: wrapped and whole in the ash. Picked up, the foil is unwrapped on the way over — the sheet opens
