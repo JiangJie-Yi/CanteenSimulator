@@ -16,7 +16,7 @@ import { STORAGES, stockNameOf, storageName, storageOf, type Storage } from '@/d
 import { PAR, STOCK_CAP, inPacks, keepsDry, packOf, roomFor } from '@/game/economy'
 import { freshGrade } from '@/game/freshness'
 import { lotGrades, type Lot } from '@/game/lots'
-import { CHARCOAL, NORI, NORI_COST, NORI_PAR, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
+import { CHARCOAL, EGG, FRYOIL, GARNISH_GOODS, GARNISH_PAR, NORI, SACK_COST, SACK_STICKS, SEASON_PAR, seasonId, supplyName } from '@/game/supplies'
 import { FitLine } from '@/ui/FitLine'
 import { Glyph } from '@/ui/GameIcons'
 import { FoodArt } from '@/ui/FoodArt'
@@ -277,25 +277,33 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
       </div>
     )
   }
-  /** the nori: by the sheet, one round every onigiri (game/supplies GARNISH), kept to its usual stock */
-  const noriBin = () => {
-    const have = stock[NORI] ?? 0
+  /** a garnish kept to its usual stock (game/supplies GARNISH): the nori by the sheet, one round every onigiri; the eggs (item 461) and the
+   * frying oil (item 469) as the kitchen's dishes use them; its picture, and what one of it is called (片, 顆, 份) */
+  const GARNISH_LOOK: Record<string, { art: string; store: 'chilled' | 'ambient'; unit: [string, string, string]; each: [string, string, string] }> = {
+    [NORI]: { art: 'Nori', store: 'ambient', unit: [' 片', '枚', ''], each: ['每片', '1枚', 'Each'] },
+    [EGG]: { art: 'Egg', store: 'chilled', unit: [' 顆', '個', ''], each: ['每顆', '1個', 'Each'] },
+    [FRYOIL]: { art: 'FryOil', store: 'ambient', unit: [' 份', '回分', ''], each: ['每份', '1回分', 'Each'] },
+  }
+  const garnishBin = (id: string) => {
+    const look = GARNISH_LOOK[id], par = GARNISH_PAR[id], unitCost = GARNISH_GOODS.find((g) => g.id === id)?.cost ?? 0
+    const have = stock[id] ?? 0
     const out = have <= 0
-    const need = Math.max(0, NORI_PAR - have)
-    const can = (n: number) => n > 0 && cash >= NORI_COST * n
-    const buy = (n: number) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (can(n)) p.onBuy(NORI, n) }
+    const need = Math.max(0, par - have)
+    const can = (n: number) => n > 0 && cash >= unitCost * n
+    const buy = (n: number) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); if (can(n)) p.onBuy(id, n) }
+    const unit = tl(lang, ...look.unit)
     return (
-      <div key={NORI} className={`chiller-bin season-bin is-still${out ? ' is-out' : ''}`} aria-label={`${supplyName(NORI, lang)}，${tl(lang, '庫存', '在庫', 'Stock')} ${have}`}>
-        <span className="chiller-bin-head"><FoodArt id="Nori" store="ambient" band /><FitLine className="chiller-bin-name">{supplyName(NORI, lang)}</FitLine></span>
-        <span className={`chiller-level${out ? ' is-zero' : have < NORI_PAR / 3 ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / NORI_PAR) * 100)}%` }} /></span>
+      <div key={id} className={`chiller-bin season-bin is-still${out ? ' is-out' : ''}`} aria-label={`${supplyName(id, lang)}，${tl(lang, '庫存', '在庫', 'Stock')} ${have}`}>
+        <span className="chiller-bin-head"><FoodArt id={look.art} store={look.store} band /><FitLine className="chiller-bin-name">{supplyName(id, lang)}</FitLine></span>
+        <span className={`chiller-level${out ? ' is-zero' : have < par / 3 ? ' is-low' : ''}`} aria-hidden="true"><i style={{ width: `${Math.min(100, (have / par) * 100)}%` }} /></span>
         <span className="chiller-bin-info" aria-hidden="true">
-          <b className={out ? 'is-zero' : ''}>{tl(lang, '剩', '残り', 'Left')} <em>{have}</em>{tl(lang, ' 片', '枚', '')}</b>
-          <small>{tl(lang, '每片', '1枚', 'Each')} <em>{NORI_COST}</em></small>
+          <b className={out ? 'is-zero' : ''}>{tl(lang, '剩', '残り', 'Left')} <em>{have}</em>{unit}</b>
+          <small>{tl(lang, ...look.each)} <em>{unitCost}</em></small>
         </span>
         <span className="chiller-buy season-buy">
-          <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, '叫 10 片', '10枚仕入れる', 'Order 10')} onClick={buy(10)}>+10</span>
+          <span role="button" tabIndex={-1} className={`chiller-btn${can(10) ? '' : ' is-off'}`} title={tl(lang, `叫 10${unit.trim()}`, `10${unit.trim()}仕入れる`, 'Order 10')} onClick={buy(10)}>+10</span>
           <span role="button" tabIndex={-1} className={`chiller-btn chiller-fill${can(need) ? '' : ' is-off'}`}
-            title={need ? tl(lang, `補到 ${NORI_PAR} 片（NT$${NORI_COST * need}）`, `${NORI_PAR}枚まで補充`, `Fill up to ${NORI_PAR} (NT$${NORI_COST * need})`) : tl(lang, '已經夠了', '十分あります', 'Enough already')}
+            title={need ? tl(lang, `補到 ${par}${unit}（NT$${unitCost * need}）`, `${par}${unit.trim()}まで補充`, `Fill up to ${par} (NT$${unitCost * need})`) : tl(lang, '已經夠了', '十分あります', 'Enough already')}
             onClick={buy(need)}>{tl(lang, '補', '補', '+')}</span>
         </span>
       </div>
@@ -337,8 +345,15 @@ function Foods(p: Props & { zone: Storage; foods: Dish['items'] }) {
         </section>
         {zone === 'ambient' && (
           <section className={`chiller-zone is-${zone} is-seasonings`}>
-            <h3 className="chiller-zone-head"><span>{tl(lang, '配料', '付け合わせ', 'Garnish')}</span><i aria-hidden="true">{tl(lang, '一個飯糰一片', 'おにぎり1個に1枚', 'a sheet an onigiri')}</i></h3>
-            <div className="chiller-bins">{noriBin()}</div>
+            <h3 className="chiller-zone-head"><span>{tl(lang, '配料', '付け合わせ', 'Garnish')}</span><i aria-hidden="true">{tl(lang, '海苔與炸油', '海苔と揚げ油', 'nori, frying oil')}</i></h3>
+            <div className="chiller-bins">{garnishBin(NORI)}{garnishBin(FRYOIL)}</div>
+          </section>
+        )}
+        {/* (the eggs (item 461), with the chilled food) */}
+        {zone === 'chilled' && (
+          <section className={`chiller-zone is-${zone} is-seasonings`}>
+            <h3 className="chiller-zone-head"><span>{tl(lang, '蛋', '卵', 'Eggs')}</span><i aria-hidden="true">{tl(lang, '玉子燒、蛋包飯、蛋花湯、手卷', '玉子焼き、オムライス、かき玉汁、手巻き', 'tamagoyaki, omurice, soup, rolls')}</i></h3>
+            <div className="chiller-bins">{garnishBin(EGG)}</div>
           </section>
         )}
         {seasonings.length > 0 && (

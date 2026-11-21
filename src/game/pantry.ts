@@ -2,10 +2,10 @@
 // 系統櫃門」「這個遊戲是模擬真實世界，不是亂塞些模型的」): every package, bottle, tray and bundle in the cupboards stands for stock of its own,
 // and as much of it is shown as there's stock: all of it at the usual stock and over, none at none, at least one while there's any.
 import { PAR } from './economy'
-import { NORI, NORI_PAR, SEASON_PAR, isSeasonId } from './supplies'
+import { GARNISH_PAR, NORI, SEASON_PAR, isSeasonId } from './supplies'
 
 /** what's the usual stock of something: a seasoning's doses, nori's sheets, a food's portions */
-export const parOf = (id: string) => (isSeasonId(id) ? SEASON_PAR : id === NORI ? NORI_PAR : PAR)
+export const parOf = (id: string) => (isSeasonId(id) ? SEASON_PAR : GARNISH_PAR[id] ?? PAR)
 
 /**
  * How many of `all` (packages, bottles, skewers...) are shown for `have` in stock: every one at the usual stock (`par`) and over, none at

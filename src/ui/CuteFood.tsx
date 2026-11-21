@@ -530,6 +530,21 @@ function draw(id: string, c: Ctx): ReactNode {
       {[0, 1, 2, 3, 4].map((k) => line(`M${30 + k * 16} 34 v60`, '#3e5244', 1.4, k))}
       <Gleam x={36} y={40} rx={10} ry={2.6} rot={0} o={0.35} />
     </g>
+    case 'Egg': return <g>
+      {/* (two eggs: a brown one lying behind, a white one standing before it) */}
+      <Blob c={c} k="#e8c39a" d="M58 86 C58 66 74 54 92 56 C110 58 116 74 112 88 C108 102 92 106 78 104 C64 102 58 96 58 86 Z" />
+      <Blob c={c} k="#f8f1e4" d="M50 28 C66 28 78 52 78 74 C78 94 66 106 50 106 C34 106 22 94 22 74 C22 52 34 28 50 28 Z" />
+      <Gleam x={40} y={52} rx={5} ry={11} rot={-14} o={0.8} />
+      <Gleam x={96} y={68} rx={7} ry={3} rot={-20} o={0.55} />
+    </g>
+    case 'FryOil': return <g>
+      {/* (a bottle of frying oil: golden, its red cap, a label with 油 on it) */}
+      <Blob c={c} k="#eab33e" d="M54 26 H74 V36 C74 42 88 48 88 60 V104 C88 110 84 112 80 112 H48 C44 112 40 110 40 104 V60 C40 48 54 42 54 36 Z" />
+      <Blob c={c} k="#c8342a" d={rrect(52, 14, 24, 14, 3)} sw={2.6} />
+      <Blob c={c} k="#fbf5e6" d={rrect(46, 66, 36, 30, 4)} sw={2.6} />
+      <text x="64" y="88" textAnchor="middle" fontSize="20" fontWeight="700" fill="#2a2a2a" fontFamily="serif">油</text>
+      <Gleam x={48} y={56} rx={2.6} ry={10} rot={0} o={0.75} />
+    </g>
     case 'RiceBag': return <g>
       <Blob c={c} k="#f2ead6" d="M28 30 C40 24 88 24 100 30 L104 102 C90 108 38 108 24 102 Z" />
       <path d="M28 30 C40 36 88 36 100 30" fill="none" stroke={INK} strokeWidth="2.4" />
@@ -544,7 +559,7 @@ function draw(id: string, c: Ctx): ReactNode {
 export const CUTE_IDS = new Set(['ExtraFish', 'Saury', 'Mackerel', 'Aji', 'Iwashi', 'Shishamo', 'Hokke', 'Nodoguro', 'Salmon', 'Buri', 'Gindara',
   'ShrimpSkewer', 'Squid', 'Scallop', 'Yakitori', 'PorkBelly', 'BloodCake', 'Sausage', 'GrilledCorn', 'GrilledShiitake', 'KingOyster', 'Shishito',
   'Okra', 'Asparagus', 'Potato', 'SweetPotato', 'Onion', 'Negi', 'Carrot', 'Gobo', 'Daikon', 'Tomato', 'Cucumber', 'Eggplant', 'Piman', 'Paprika',
-  'Onigiri', 'NetMochi', 'MisoSoup', 'Sake', 'Nori', 'RiceBag'])
+  'Onigiri', 'NetMochi', 'MisoSoup', 'Sake', 'Nori', 'RiceBag', 'Egg', 'FryOil'])
 /** a food's cute picture, on the 128 square (`u`: the ids of its gradients, unique to this picture) */
 export function CuteFood({ id, u }: { id: string; u: string }) {
   return <g>{draw(id, { u, n: 0 })}</g>

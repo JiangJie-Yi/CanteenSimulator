@@ -1,6 +1,6 @@
 import { ROLL, SOAP, TOWEL } from './washroom'
 import { DISH_SOAP, TOILET_CLEANER } from './household'
-import { GARNISH_GOODS, NORI, NORI_PAR } from '@/game/supplies'
+import { GARNISH_GOODS, GARNISH_PAR } from '@/game/supplies'
 // The rules of the game, checked on their own (npm test). Each block guards one module in src/game or src/data.
 import { TISSUE } from '@/game/tissues'
 import { RECEIPT } from './receipts'
@@ -247,7 +247,7 @@ describe('game/economy: 一鍵補貨', () => {
     // (the seasonings are topped up too, each to its own usual stock)
     const all = [...goodsOf(grill), ...SEASON_GOODS, ...GARNISH_GOODS]
     expect(cost).toBe(Object.entries(buy).reduce((n, [id, q]) => n + costOf(all.find((g) => g.id === id)!) * q, 0))
-    expect(topUpOrder(grill, Object.fromEntries([...goodsOf(grill).map((g) => [g.id, parOf(g.id)]), ...SEASON_GOODS.map((g) => [g.id, SEASON_PAR]), [NORI, NORI_PAR]])).cost).toBe(0)
+    expect(topUpOrder(grill, Object.fromEntries([...goodsOf(grill).map((g) => [g.id, parOf(g.id)]), ...SEASON_GOODS.map((g) => [g.id, SEASON_PAR]), ...Object.entries(GARNISH_PAR)])).cost).toBe(0)
   })
 })
 

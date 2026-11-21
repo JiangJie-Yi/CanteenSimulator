@@ -6,7 +6,7 @@ import { RECEIPT, RECEIPT_LOW, receiptOrder } from './receipts'
 import { HOUSEHOLD, HOUSEHOLD_LOW, householdOrder } from './household'
 import { DISHES, type Dish } from '@/data/menu'
 import { findItem, SEASON_COST, suggestPrice, type Entry, type Part, type Seasoning } from '@/data/recipes'
-import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, GARNISH, GARNISH_GOODS, NORI, NORI_PAR, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
+import { CHARCOAL, CHARCOAL_LOW, charcoalOrder, FRYOIL, GARNISH, GARNISH_GOODS, GARNISH_PAR, NORI, SEASON_GOODS, SEASON_PAR, seasonId, isSeasonId } from './supplies'
 import { RICE_FULL } from './rice'
 import { SOUP_BOWLS } from './soup'
 import { storageOf } from '@/data/storage'
@@ -93,6 +93,8 @@ export const COST_SHARE: Record<string, number> = {
   KingOyster: 0.23, Asparagus: 0.24, Okra: 0.21, Potato: 0.17, SweetPotato: 0.17, Onigiri: 0.17, NetMochi: 0.18,
   Rice: 0.14, MisoSoup: 0.15, Sake: 0.3, Onion: 0.18, Negi: 0.2, Carrot: 0.18, Gobo: 0.23, Daikon: 0.18,
   Tomato: 0.21, Cucumber: 0.18, Eggplant: 0.21, Piman: 0.2, Paprika: 0.24,
+  // (the kitchen's dishes (data/kitchenDishes): their own food's share, their eggs, oil and nori bought apart (supplies' GARNISH))
+  Tamagoyaki: 0.12, Omurice: 0.2, HandRoll: 0.28, EggDropSoup: 0.12, Fries: 0.18, Tempura: 0.32,
 }
 /** the share for anything not in the list */
 export const COST_SHARE_ELSE = 0.29
@@ -173,7 +175,7 @@ export const packOf = (id: string) => PACK[id] ?? 1
 /** n portions wanted, as whole packs' worth (none for none) */
 export const inPacks = (id: string, n: number) => n <= 0 ? 0 : Math.ceil(n / packOf(id)) * packOf(id)
 /** what's dry and keeps (the rice): it doesn't go off */
-export const keepsDry = (id: string) => id === 'Onigiri' || id === NORI
+export const keepsDry = (id: string) => id === 'Onigiri' || id === NORI || id === FRYOIL
 
 /** what buying n of every good of a shop costs (what comes in packs, whole packs) */
 export const buyAllCost = (d: Dish, n: number) => goodsOf(d).reduce((t, g) => t + costOf(g) * inPacks(g.id, n), 0)
@@ -185,7 +187,7 @@ export const buyAllCost = (d: Dish, n: number) => goodsOf(d).reduce((t, g) => t 
  */
 export const STOCK_CAP = 100
 /** whether a good is kept within STOCK_CAP: a food */
-export const capped = (id: string) => !isSeasonId(id) && id !== NORI && id !== CHARCOAL && !id.startsWith('supply:')
+export const capped = (id: string) => !isSeasonId(id) && !(id in GARNISH_PAR) && id !== CHARCOAL && !id.startsWith('supply:')
 /** how many more of a good there's room for, in whole packs (no end to it for what isn't capped) */
 export const roomFor = (id: string, have: number) => {
   if (!capped(id)) return Infinity
@@ -207,7 +209,7 @@ export const LEAN_PAR: Record<'chilled' | 'ambient', number> = { chilled: 3, amb
 export const LEAN_LOW = 1
 const KEEPS_LONG = new Set(['charcoal', 'Sake'])
 /** whether a good's ordered lean (it goes off soon): not frozen, not the sides' rice or soup, nor what keeps */
-export const orderedLean = (id: string) => storageOf(id) !== 'frozen' && !(id in SIDE_PAR) && !keepsDry(id) && !KEEPS_LONG.has(id) && !isSeasonId(id) && id !== NORI
+export const orderedLean = (id: string) => storageOf(id) !== 'frozen' && !(id in SIDE_PAR) && !keepsDry(id) && !KEEPS_LONG.has(id) && !isSeasonId(id) && !(id in GARNISH_PAR)
 /** the rice and the miso soup had alongside the dishes, whatever's on the menu board (items 205, 207: kept to PAR, ten portions, like any good,
  * a pot of rice was cooked with what rice there was, three bowls' worth, the cooker holding twenty; and the miso, not on the board, was never
  * ordered at all: in a rush three of twenty-one who'd asked for rice had it, one of ten their soup): kept to a day's worth, two pots of rice
@@ -236,7 +238,7 @@ export function restockOrder(d: Dish, menu: Entry[], stock: Stock, cash: number,
     const g = goods.get(id)
     const have = stock[id] ?? 0
     // (a seasoning, counted in doses, is kept at its own usual stock: ordered once it's down to a third of it)
-    const kept = isSeasonId(id) ? SEASON_PAR : id === NORI ? NORI_PAR : 0
+    const kept = isSeasonId(id) ? SEASON_PAR : GARNISH_PAR[id] ?? 0
     // (what goes off soon, a few portions' worth on hand, ordered again at its last (item 343))
     const lean = !kept && orderedLean(id)
     const where = storageOf(id)
@@ -301,7 +303,7 @@ export function topUpOrder(d: Dish, stock: Stock, par = PAR) {
     cost += costOf(g) * n
   }
   for (const g of [...SEASON_GOODS, ...GARNISH_GOODS]) {
-    const n = (g.id === NORI ? NORI_PAR : SEASON_PAR) - (stock[g.id] ?? 0)
+    const n = (GARNISH_PAR[g.id] ?? SEASON_PAR) - (stock[g.id] ?? 0)
     if (n <= 0) continue
     buy[g.id] = n
     cost += costOf(g) * n

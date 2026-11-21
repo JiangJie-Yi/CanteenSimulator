@@ -1,4 +1,4 @@
-import { NORI, NORI_COST, NORI_PAR } from '@/game/supplies'
+import { GARNISH_GOODS, GARNISH_PAR, NORI, NORI_PAR } from '@/game/supplies'
 import { expect } from 'vitest'
 import { TISSUE, TISSUE_PACK } from '@/game/tissues'
 import { ROLL, SOAP, TOWEL, WASHROOM_PACKS } from '@/game/washroom'
@@ -69,9 +69,11 @@ feature('倉儲自動補貨', () => {
       // (the sides' rice and soup to a day's worth: item 207)
       for (const g of rest) expect(w.o.buy[g.id]).toBe(parOf(g.id))
       for (const g of SEASON_GOODS) expect(w.o.buy[g.id]).toBe(SEASON_PAR)
-      // (and the nori, by the sheet, to its own usual stock)
+      // (and the nori, by the sheet, the eggs and the frying oil (item 461), each to its own usual stock)
       expect(w.o.buy[NORI]).toBe(NORI_PAR)
-      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * parOf(g.id), 0) + SEASON_GOODS.reduce((t, g) => t + costOf(g) * SEASON_PAR, 0) + NORI_COST * NORI_PAR)
+      for (const g of GARNISH_GOODS) expect(w.o.buy[g.id]).toBe(GARNISH_PAR[g.id])
+      expect(w.o.cost).toBe(rest.reduce((t, g) => t + costOf(g) * parOf(g.id), 0) + SEASON_GOODS.reduce((t, g) => t + costOf(g) * SEASON_PAR, 0)
+        + GARNISH_GOODS.reduce((t, g) => t + costOf(g) * GARNISH_PAR[g.id], 0))
     })
   })
 

@@ -8,6 +8,7 @@ import { householdName, householdStart, isHousehold } from './household'
 import { SEASONINGS, SEASON_COST, SEASON_NAME, type Seasoning } from '@/data/recipes'
 import type { Lang } from '@/data/i18n'
 import type { Stock } from './economy'
+import { KITCHEN_DISHES } from '@/data/kitchenDishes'
 
 /** a seasoning's place in the stock (counted in doses: one a dab) */
 export const seasonId = (k: Seasoning) => `season:${k}`
@@ -39,15 +40,32 @@ export const SEASON_GOODS = SEASONINGS.map((k) => ({ id: seasonId(k), price: 0, 
 export const NORI = 'supply:nori'
 export const NORI_COST = 3
 export const NORI_PAR = 30
-/** what each dish uses beside its own food, a portion each (the onigiri's sheet of nori) */
-export const GARNISH: Record<string, Record<string, number>> = { Onigiri: { [NORI]: 1 } }
-export const GARNISH_GOODS = [{ id: NORI, price: 0, cost: NORI_COST }]
+/** eggs (items 461, 470, the owner's 「倉儲加「蛋」」: the tamagoyaki's three, the omurice's two, the egg-drop soup's, the hand roll's
+ * tamago), each; kept in the fridge to their usual stock like the nori */
+export const EGG = 'supply:egg'
+export const EGG_COST = 6
+export const EGG_PAR = 30
+/** frying oil (item 469): a fried portion's share of the fryer's oil, each; kept at room temperature, to its usual stock */
+export const FRYOIL = 'supply:fryoil'
+export const FRYOIL_COST = 8
+export const FRYOIL_PAR = 20
+/** what each dish uses beside its own food, a portion each (the onigiri's sheet of nori; the kitchen's dishes' eggs, oil and nori:
+ * data/kitchenDishes) */
+export const GARNISH: Record<string, Record<string, number>> = {
+  Onigiri: { [NORI]: 1 },
+  ...Object.fromEntries(KITCHEN_DISHES.map((d) => [d.id, Object.fromEntries(([[EGG, d.eggs], [FRYOIL, d.oil], [NORI, d.nori]] as [string, number][]).filter(([, n]) => n > 0))])),
+}
+export const GARNISH_GOODS = [{ id: NORI, price: 0, cost: NORI_COST }, { id: EGG, price: 0, cost: EGG_COST }, { id: FRYOIL, price: 0, cost: FRYOIL_COST }]
+/** each of them's usual stock (補滿 tops it up to this) */
+export const GARNISH_PAR: Record<string, number> = { [NORI]: NORI_PAR, [EGG]: EGG_PAR, [FRYOIL]: FRYOIL_PAR }
 
 /** what a new shop starts with besides its food */
 export const startingSupplies = (): Stock => ({
   ...Object.fromEntries(SEASONINGS.map((k) => [seasonId(k), SEASON_START])),
   [CHARCOAL]: CHARCOAL_START,
   [NORI]: NORI_PAR,
+  [EGG]: EGG_PAR,
+  [FRYOIL]: FRYOIL_PAR,
   // (spare boxes of tissues for the places' drawers: game/tissues)
   [TISSUE]: TISSUE_START,
   // (and spare rolls of receipt paper for the register's printer: game/receipts)
@@ -87,6 +105,8 @@ export function supplyName(id: string, lang: Lang): string | null {
   const k = seasonOf(id)
   if (k) return SEASON_NAME[lang][k]
   if (id === NORI) return lang === 'ja' ? '焼き海苔' : lang === 'en' ? 'nori' : '海苔'
+  if (id === EGG) return lang === 'ja' ? '卵' : lang === 'en' ? 'eggs' : '雞蛋'
+  if (id === FRYOIL) return lang === 'ja' ? '揚げ油' : lang === 'en' ? 'frying oil' : '炸油'
   if (id === TISSUE) return lang === 'ja' ? 'ティッシュ（箱）' : lang === 'en' ? 'tissues (boxes)' : '衛生紙（盒）'
   if (id === RECEIPT) return lang === 'ja' ? 'レシート用紙（巻）' : lang === 'en' ? 'receipt paper (rolls)' : '收據紙（捲）'
   if (id === ROLL) return lang === 'ja' ? 'トイレットペーパー' : lang === 'en' ? 'toilet rolls' : '捲筒衛生紙'
