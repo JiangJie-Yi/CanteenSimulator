@@ -2771,6 +2771,8 @@ function pavingOf(sm: THREE.MeshStandardMaterial, tinted: boolean) {
   let t = PAVING.get(sm)
   if (!t) {
     t = new THREE.MeshToonMaterial({ color: '#ffffff', map: sm.map ?? null, normalMap: sm.normalMap ?? null, vertexColors: tinted })
+    // (the steps' stones as smooth as the genkan's inside (item 485: 「光澤還差這麼一點」): its normals at the floor's 0.8)
+    if (sm.normalMap && /StepStone/.test(sm.name)) t.normalScale.set(0.8, 0.8)
     t.name = sm.name
     PAVING.set(sm, t)
   }

@@ -259,7 +259,7 @@ SK = 0.016               # a stone's thickness, its crown to its foot in the peb
 OVER = 0.002             # a tread's front stones this far out over its riser's crowns
 S_RINGS = (0.0, 0.0025, 0.005, 0.009, 0.028)
 S_ROUND = 0.009
-S_DOME = 0.004
+S_DOME = 0.0025          # (item 485: 0.004, the crowns' rise; lower, the stones read smoother, as the genkan's inside)
 GREEN = (0.55, 0.76, 0.36)   # what moss does to a stone's colour where it creeps onto it
 MOSS_TINT = (0.46, 0.70, 0.26)  # ...and to the pebble-wash's
 
@@ -585,7 +585,8 @@ def build_step(name):
     if name == "StoneStep0":
         # (the band: one face, its stones on edge, thin (the band's 1.2 cm): smaller rounding, its pebble-wash a plate behind them)
         moss.lines.append(((-W / 2 + 0.02, -H / 2 - 0.002, D / 2), (-W / 2 + 0.12, -H / 2 - 0.002, D / 2), 0.008))
-        for poly in paving(-W / 2, W / 2, -H / 2, H / 2, 0.15):
+        # (its stones as big as the steps' now (item 485): 0.15 apart they were a smaller paving than the treads below them)
+        for poly in paving(-W / 2, W / 2, -H / 2, H / 2, 0.22):
             tris["stone"] += stone(bm, L, poly, "front", D / 2, tint_of(), moss, rnd=0.005, rings=(0.0, 0.0015, 0.003, 0.005, 0.016), dome=0.002, thick=0.0105)
         tris["mortar"] += mortar(bm, L, (-W / 2, -H / 2, -D / 2), (W / 2, H / 2, -D / 2 + 0.004), moss)
     else:
@@ -615,16 +616,35 @@ def build_step(name):
                  ((-W / 2, gnd, -D / 2 + 0.03), (-W / 2, gnd, D / 2 - 0.04), UP, LX, 0.012)]
         for p0, p1, nf, nw, r in cush:
             moss.lines.append((p0, p1, r))
-        # (the tread: its stones flush to the ends and out over the riser at the nosing)
-        for poly in paving(-W / 2 - SJ, W / 2 + SJ, -D / 2, D / 2 + OVER + SJ, 0.17):
-            tris["stone"] += stone(bm, L, poly, "top", H / 2, tint_of(), moss)
-        # (the riser: to the corners, a joint under the tread's stones)
-        for poly in paving(-W / 2 - SJ, W / 2 + SJ, r_lo, H / 2 - SK - SJ, 0.16):
-            tris["stone"] += stone(bm, L, poly, "front", D / 2, tint_of(), moss)
-        # (the ends: from the step's back to behind the riser's stones, from its foot to under the tread's)
-        for face in ("right", "left"):
-            for poly in paving(-D / 2 - SJ, D / 2 - SK - SJ, -H / 2, H / 2 - SK - SJ, 0.12):
-                tris["stone"] += stone(bm, L, poly, face, W / 2, tint_of(), moss)
+        # (the tread: its stones flush to the ends and out over the riser at the nosing; as big as the genkan's inside (item 485, the owner's
+        # 「石階的大小，光澤還差這麼一點；要順著紋路」: 0.17 apart they were half the size of the floor's beyond the door), each a stone of the step,
+        # its face on the tread and on down the riser and the ends)
+        tread = paving(-W / 2 - SJ, W / 2 + SJ, -D / 2, D / 2 + OVER + SJ, 0.24)
+        tints = [tint_of() for _ in tread]
+        for poly, tn in zip(tread, tints):
+            tris["stone"] += stone(bm, L, poly, "top", H / 2, tn, moss)
+        def edge_spans(axis, at, side):
+            # (each tread stone's run along an edge of the tread: its vertices on that edge (within a mm), their extent on the other axis)
+            out = []
+            for poly, tn in zip(tread, tints):
+                on = [p[1 - axis] for p in poly if abs(p[axis] - at) < 0.001]
+                if len(on) >= 2:
+                    out.append((min(on), max(on), tn))
+            return sorted(out)
+        # (the riser: one stone under each of the tread's at the nosing, its joints going on down from the tread's (they were laid apart, the
+        # riser's stones a row of their own: the owner's red lines, the tread's joints to be followed down), the same stone's tint)
+        r_hi = H / 2 - SK - 2 * SJ
+        for a0, a1, tn in edge_spans(1, D / 2 + OVER, None):
+            tris["stone"] += stone(bm, L, [(a0, r_lo + SJ), (a1, r_lo + SJ), (a1, r_hi), (a0, r_hi)], "front", D / 2, tn, moss)
+        # (the ends likewise: a stone under each tread stone at that end, from the step's back to behind the riser's stones, from its foot to
+        # under the tread's)
+        z_hi = D / 2 - SK - 2 * SJ
+        for face, ax in (("right", W / 2), ("left", -W / 2)):
+            for z0, z1, tn in edge_spans(0, ax, None):
+                z0, z1 = max(z0, -D / 2), min(z1, z_hi)
+                if z1 - z0 < 0.02:
+                    continue
+                tris["stone"] += stone(bm, L, [(z0, -H / 2 + SJ), (z1, -H / 2 + SJ), (z1, r_hi), (z0, r_hi)], face, W / 2, tn, moss)
         # (the pebble-wash's block: where the stones are, a recess under their crowns; the upper step's lower front (behind the lower
         # step) flush)
         if upper:
