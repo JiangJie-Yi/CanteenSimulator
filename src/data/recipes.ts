@@ -4,6 +4,7 @@
 
 import type { Lang } from './i18n'
 import type { Dish, MenuItem } from './menu'
+import { KITCHEN_IDS } from './kitchenDishes'
 
 export type Seasoning = 'salt' | 'soy' | 'milk' | 'peanut' | 'miso' | 'wasabi' | 'shichimi' | 'yuzu' | 'lemon'
 /** at the grill: salt and soy, the Taiwanese condensed milk and peanut powder, and what a Japanese yakitori counter
@@ -35,6 +36,11 @@ export const SEASON_NAME: Record<Lang, Record<Seasoning, string>> = {
 export const signature = (dabs: Partial<Record<string, number>> | Seasoning[] | undefined): Seasoning[] =>
   Array.isArray(dabs) ? SEASONINGS.filter((k) => dabs.includes(k)) : SEASONINGS.filter((k) => (dabs?.[k] ?? 0) > 0)
 export const recipeKey = (id: string, dabs: Seasoning[]) => (dabs.length ? `${id}|${dabs.join('+')}` : id)
+/** a menu entry's dish, whatever order its seasonings were put in (item 470: miso and soy, soy and miso, the one dish) */
+export const dishOf = (e: { parts: { id: string; dabs: Seasoning[] }[] }) => e.parts.map((p) => recipeKey(p.id, signature(p.dabs))).join('&')
+/** a menu with each dish on it once, the first of them kept */
+export const oneOfEach = <E extends { parts: { id: string; dabs: Seasoning[] }[] }>(list: readonly E[]): E[] =>
+  list.filter((e, i) => list.findIndex((o) => dishOf(o) === dishOf(e)) === i)
 
 // what such a dish is called in Taiwan, where it has a name of its own
 const SPECIAL: Record<string, Partial<Record<string, string>>> = {
@@ -71,7 +77,9 @@ export function partName(item: { name: string; ja?: string; en?: string }, short
   kind: 'grill' | 'plain' = 'grill') {
   const ja = item.ja ?? item.name
   const en = item.en ?? item.name
-  if (kind === 'plain') return lang === 'ja' ? ja : lang === 'en' ? en : item.name
+  // (a dish made off the fire (items 461, 469: at the stove, in the fryer, at the board) is named as it is, 玉子燒 and Fries, beside the
+  // grilled ones on a grill's menu: not 烤玉子燒, Grilled fries)
+  if (kind === 'plain' || KITCHEN_IDS.has(id)) return lang === 'ja' ? ja : lang === 'en' ? en : item.name
   // (in English: what went on it, then grilled, then the food: "Salt & soy grilled saury", "Grilled corn")
   if (lang === 'en') {
     const how = dabs.map((k) => SEASON_NAME.en[k]).join(' & ')
@@ -97,9 +105,10 @@ export function partName(item: { name: string; ja?: string; en?: string }, short
  * A dish's English name, for the small line down its menu tag: how it's grilled, the food, and what it's served
  * with (Salt & Soy Grilled Saury with Wasabi & Lemon).
  */
-export function partEn(en: string | undefined, dabs: Seasoning[], kind: 'grill' | 'plain' = 'grill') {
+export function partEn(en: string | undefined, dabs: Seasoning[], kind: 'grill' | 'plain' = 'grill', id?: string) {
   if (!en) return undefined
-  if (kind === 'plain') return en
+  // (as partName: a dish off the fire as it is)
+  if (kind === 'plain' || (id !== undefined && KITCHEN_IDS.has(id))) return en
   en = bareEn(en, dabs)
   const W: Record<string, string> = { salt: 'Salt', soy: 'Soy', miso: 'Miso', milk: 'Condensed Milk', peanut: 'Peanut',
     wasabi: 'Wasabi', shichimi: 'Shichimi', yuzu: 'Yuzu Kosho', lemon: 'Lemon' }

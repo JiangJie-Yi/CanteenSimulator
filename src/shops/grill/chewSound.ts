@@ -81,3 +81,16 @@ export function gulpSound() {
   n.connect(f).connect(g).connect(a.destination)
   n.start(t + 0.05)
 }
+
+/** (items 461, 469) a sizzle: egg going into a hot pan, or what's let down into the fryer's oil: a hiss of high noise with crackle in it,
+ * fading over `seconds`; `loud` 0..1 */
+export function sizzleSound(seconds = 1.1, loud = 1) {
+  const a = ctx()
+  if (!a) return
+  const t = a.currentTime
+  const n = noise(a, seconds, (x) => (x < 0.06 ? x / 0.06 : 1) * Math.pow(1 - x, 1.6) * (0.7 + 0.3 * Math.random()), 0.25)
+  const f = a.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2200 + Math.random() * 600
+  const g = a.createGain(); g.gain.value = 0.05 * loud
+  n.connect(f).connect(g).connect(a.destination)
+  n.start(t)
+}

@@ -4,6 +4,7 @@ import { nameIn, UI, type Lang } from '@/data/i18n'
 import { toChineseNumber, type Dish } from '@/data/menu'
 import { PAR } from '@/game/economy'
 import { STORAGES, storageName, storageOf } from '@/data/storage'
+import { sectionName, sectionOf, sectionRank, type Section } from '@/data/kitchenDishes'
 import { Icon, iconFor } from './Icon'
 import { tl } from '@/data/i18n'
 import { freshGrade } from '@/game/freshness'
@@ -417,7 +418,9 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
             {/* (in three: the freezer, the fridge, and the larder at room temperature) */}
             <div className="chiller-scroll">
               {STORAGES.map((st) => {
+                // (in the menu's sections' order (item 470), each section's as they were)
                 const goods = [...dish.bases.filter((b) => !b.includes), ...dish.items].filter((x) => storageOf(x.id) === st.id)
+                  .map((x, i) => ({ x, i })).sort((a, b) => sectionRank(a.x.id) - sectionRank(b.x.id) || a.i - b.i).map(({ x }) => x)
                 if (!goods.length) return null
                 return (
                   <section key={st.id} className={`chiller-zone is-${st.id}`}>
@@ -445,7 +448,24 @@ export function Menu({ fresh, dish, lang, quantities, onAdd, onRemove, onClear, 
           }}>
           {/* bases (the dark walnut tags) are ordered the same way as everything else */}
           {dish.bases.map((b) => tag(b, iconFor(dish.id, { ...b, icon: iconOf(b) }, true), true))}
-          {dish.items.map((item) => tag(item, iconFor(dish.id, { ...item, icon: iconOf(item) }, false), false))}
+          {(() => {
+            // (the open menu in its sections (item 470): before each, a narrow plaque with the section's name, as a wall menu's 焼き物,
+            // 揚げ物 heads; where there's more than one section and no sets along the top row)
+            const secOf = (x: object & { id: string }) => sectionOf(iconOf(x) ?? x.id)
+            const heads = !research && !dish.bases.length && new Set(dish.items.map(secOf)).size > 1
+            let last: Section | null = null
+            return dish.items.flatMap((item) => {
+              const s = secOf(item)
+              const head = heads && s !== last
+              last = s
+              const strip = tag(item, iconFor(dish.id, { ...item, icon: iconOf(item) }, false), false)
+              return head ? [
+                <div key={`sec-${s}-${item.id}`} className="strip-head" aria-hidden="true">
+                  <b>{sectionName(s, lang)}</b>
+                  {lang !== 'en' && <small lang="en">{sectionName(s, 'en')}</small>}
+                </div>, strip] : [strip]
+            })
+          })()}
         </div>
       </div>
       )}

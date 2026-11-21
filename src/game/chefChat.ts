@@ -6,6 +6,7 @@ import type { Lang } from '@/data/i18n'
 import { FOOD_KINDS, type FoodKind } from '@/data/foodKinds'
 import type { Dish } from '@/data/menu'
 import { findItem, partName, SEASONINGS, type Seasoning } from '@/data/recipes'
+import { KITCHEN_IDS } from '@/data/kitchenDishes'
 import { PAIRING, PAIRING_DEFAULT } from '@/game/taste'
 
 export type Intent =
@@ -77,7 +78,8 @@ function lexicon(d: Dish) {
     const short = d.roast?.names[it.id] ?? it.name
     const raw = [it.name, short, it.ja, (it as { en?: string }).en?.toLowerCase(), it.name.replace(/麵團$/, ''), (it.ja ?? '').replace(/生地$/, '')]
     for (const w of raw) if (w && w.length > 1) out.push({ word: w, id: it.id, dabs: null })
-    if (kind === 'plain') continue
+    // (a dish off the fire has no seasoned names (items 461, 469))
+    if (kind === 'plain' || KITCHEN_IDS.has(it.id)) continue
     const combos: Seasoning[][] = [[], ...seas.map((k) => [k])]
     for (const a of seas) for (const b of seas) if (seas.indexOf(a) < seas.indexOf(b)) combos.push([a, b])
     for (const dabs of combos) for (const lang of ['zh', 'ja'] as const) {

@@ -7,9 +7,11 @@
 // one plate's luck). Item 53, an ordinary evening at x2 for 240 s, two runs each: dirty plates at seats at any moment 3.92 before, 0.92 after.
 //
 //   npm run dev     (in another terminal)
-//   node tests/e2e/flowhealth.mjs     (WATCH=<ms> default 240000; CALM=1 the usual crowd; AT=<min>; STUCK=<shop minutes> listed over)
+//   node tests/e2e/flowhealth.mjs     (WATCH=<ms> default 240000; CALM=1 the usual crowd; AT=<min>; STUCK=<shop minutes> listed over;
+//                                      NOKITCHEN=1 the cook's menu without the kitchen's own dishes)
 import { boot, openShop, rush } from './shop.mjs'
-const { browser, page: p } = await boot({ width: 1280, height: 800 })
+// (NOKITCHEN=1: the cook's menu made without the stove's, the fryer's and the board's dishes (App's dev flag), an evening to weigh against)
+const { browser, page: p } = await boot({ width: 1280, height: 800, before: process.env.NOKITCHEN ? (pg) => pg.addInitScript(() => { window.__noKitchen = true }) : undefined })
 await openShop(p, { x2: true, at: +(process.env.AT ?? 17 * 60) })
 if (!process.env.CALM) await rush(p)
 await p.evaluate(() => {

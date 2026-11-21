@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CHEF_TALK } from '@/data/chefTalk'
 import type { Lang } from '@/data/i18n'
 import type { Dish } from '@/data/menu'
@@ -9,6 +9,7 @@ import { Glyph, Stars } from './GameIcons'
 import { panelSound } from './uiSound'
 import { idealSteps, recipeSteps, timingTips } from '@/game/research'
 import { menuPrice } from '@/game/economy'
+import { sectionName, sectionOf, sectionRank, type Section } from '@/data/kitchenDishes'
 import type { Notes, Talk, Try } from '@/game/types'
 
 
@@ -94,7 +95,8 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
       recipes.push({ key: k, part, best: tries.reduce((a, b) => (b.taste > a.taste ? b : a)), tries: tries.length, cost: partCost(part) })
     }
   }
-  recipes.sort((a, b) => b.best.taste - a.best.taste)
+  // (in the menu's sections (item 470), the tastiest first in each)
+  recipes.sort((a, b) => sectionRank(a.part.id) - sectionRank(b.part.id) || b.best.taste - a.best.taste)
   const onMenu = new Set(entries.map((e) => e.key))
   const full = entries.length >= MENU_MAX
   const min = MENU_MIN[dish.id] ?? 1
@@ -116,6 +118,18 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
     return bits.join('・')
   }
 
+
+  /** a list in the menu's sections (item 470): each section's name over its first, where there's more than one */
+  const bySections = <X,>(list: X[], idOf: (x: X) => string, row: (x: X) => ReactNode) => {
+    const heads = new Set(list.map((x) => sectionOf(idOf(x)))).size > 1
+    let last: Section | null = null
+    return list.flatMap((x) => {
+      const s = sectionOf(idOf(x))
+      const head = heads && s !== last
+      last = s
+      return head ? [<li key={`sec-${s}-${idOf(x)}`} className="nb-section" aria-hidden="true">{sectionName(s, lang)}</li>, row(x)] : [row(x)]
+    })
+  }
 
   const singles = entries.filter((e) => e.parts.length === 1)
   const setParts = picked.map((k) => entries.find((e) => e.key === k)).filter((e): e is Entry => !!e)
@@ -145,7 +159,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
               'Nothing tried yet. While closed, take a dish from the board on the right, season it, taste it: it’s noted here, and the good ones go on the menu with “List”. Or ask the sous chef in “Recipes”.')}</p>
           ) : (
             <ul>
-              {recipes.map((r) => {
+              {bySections(recipes, (r) => r.part.id, (r) => {
                 const listed = onMenu.has(r.key)
                 const fallback = roast ? menuPrice(dish, r.part) : suggestPrice(r.cost)
                 return (
@@ -191,7 +205,7 @@ export function Notebook({ dish, lang, notes, entries, onPublish, onUnpublish, o
                 <p className="notebook-empty">{t(lang, '菜單還是空的：到「試菜」把做過的菜上架。上架兩樣以上，就能在這裡組套餐。', 'メニューはまだ空です。', 'The menu’s empty: list dishes you’ve tried under “Tried”. With two or more, you can make sets here.')}</p>
               ) : (
                 <ul>
-                  {entries.map((e) => {
+                  {bySections(entries, (e) => e.parts[0]?.id ?? '', (e) => {
                     const cost = e.parts.reduce((n, p) => n + partCost(p), 0)
                     return (
                       <li key={e.key} className="nb-entry">

@@ -1,3 +1,4 @@
+import type { Station } from '@/data/kitchenDishes'
 import type { PlateKind } from '@/game/plateSize'
 import * as THREE from 'three'
 import type { TakeoutOrder } from '@/game/takeout'
@@ -289,7 +290,9 @@ export const FIRE_FLARE = keep(import.meta.hot, 'FIRE_FLARE', { fat: 0, catch: 0
  * The menu as it stands, for the boards over the way in (item 300: 「兩側掛直式的發光菜單招牌（本店真的菜名與價格，跟菜單連動）」): App puts
  * each change of it here, each dish's names and its price, and counts `v` on, so the boards know to write themselves out again.
  */
-export type FrontDish = { name: string; ja: string; price: number }
+export type FrontDish = { name: string; ja: string; price: number
+  /** the food it's made of (its first part's): which section of the menu it's in (item 471: the wall's tags in their sections) */
+  id?: string }
 export const SHOP_MENU = keep(import.meta.hot, 'SHOP_MENU', { dishes: [] as FrontDish[], v: 0 })
 /** (item 317) the open shop's square iron tray by the fire: whether it's out (the shop open), and how many pieces lie on it just now (waiting
  * there for their plates, or kept warm); Roasting counts them each frame, the stock's tableware tab and the back office show them */
@@ -1135,6 +1138,23 @@ export const RICE: { rice: number; kama: Kama; washing: boolean; batch: number
  */
 export const BOWLS = keep(import.meta.hot, 'BOWLS', { want: [] as { guest: number; rice: boolean; soup: boolean }[], asked: new Set<number>(), got: new Set<string>(),
   setAt: new Map<string, number>(), ver: 0 })
+/**
+ * The kitchen's made-to-order dishes (items 461, 469: data/kitchenDishes): Roasting asks for each a customer's ordered (`want`: the
+ * customer and the dish; `asked`, each customer's asked for), the third cook makes it at its station (`cooking`: which, where, how far
+ * along: the stove's and the fryer's looks go by it) and sets it on the serving counter for a server (GuestBar3D's pass, as the bowls
+ * are); set at the customer's place it's theirs (`got`: `<dish>:<guest>`, counted; Roasting has them eat it) and drawn there (`seats`:
+ * each place's dishes); `ver` counts each change, for the drawing to see.
+ */
+export const KITCHEN = keep(import.meta.hot, 'KITCHEN', {
+  // (`at`: when it was asked for (performance.now()): one waited on long enough is made before the sake's poured (GuestBar3D's plater))
+  want: [] as { guest: number; id: string; at?: number }[],
+  asked: new Map<number, string[]>(),
+  got: new Map<string, number>(),
+  cooking: null as null | { id: string; station: Station; t: number; of: number },
+  seats: new Map<number, string[]>(),
+  ver: 0,
+})
+if (import.meta.env?.DEV && typeof window !== 'undefined') Object.assign(window, { __kitchen: KITCHEN })
 /** the places with a bowl of rice set at them (as SOUP_SEATS has the soup's) */
 export const RICE_SEATS = keep(import.meta.hot, 'RICE_SEATS', new Set<number>())
 /** a bowl of rice sold to a customer as they order (App's: its price on their bill, a portion of rice off the stock); false: none to be had */

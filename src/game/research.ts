@@ -1,4 +1,5 @@
 // Working out the menu: what a shop's foods could be made into, and how good each ought to come out.
+import { KITCHEN_IDS } from '@/data/kitchenDishes'
 import type { Dish } from '@/data/menu'
 import { SEASONINGS, type Seasoning } from '@/data/recipes'
 import type { Lang } from '@/data/i18n'
@@ -25,6 +26,8 @@ export function trialIdeas(d: Dish): Idea[] {
         ideas.push({ id: it.id, dabs: [good[i].k, good[j].k], taste: Math.min(98, 62 + good[i].w + good[j].w * 0.6) })
       }
     }
+    // (and the dishes made off the fire, as they come (items 461, 469): no seasoning dabbed on them at the grill)
+    for (const it of d.items) if (KITCHEN_IDS.has(it.id)) ideas.push({ id: it.id, dabs: [], taste: 72 })
   } else {
     for (const it of [...d.bases.filter((b) => !b.includes), ...d.items]) ideas.push({ id: it.id, dabs: [], taste: 72 })
   }

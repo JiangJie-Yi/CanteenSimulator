@@ -1,9 +1,10 @@
 import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { KITCHEN_DISHES, SECTIONS, bySection, sectionOf } from '@/data/kitchenDishes'
-import { canCook, cookSeconds, extrasOf, stationOf, stepOf } from '@/game/station'
+import { batchSeconds, canCook, cookSeconds, extrasOf, kitchenBatch, sideAllowed, stationOf, stepOf } from '@/game/station'
 import { costOf } from '@/game/economy'
 import { EGG, FRYOIL, GARNISH_GOODS, GARNISH_PAR, NORI, startingSupplies } from '@/game/supplies'
+import { dishOf, oneOfEach, partEn, partName } from '@/data/recipes'
 
 feature('爐子、油炸台與手卷的菜', () => {
   scenario('新菜照日式烤魚店的分類排進菜單', ({ given, then, and }) => {
@@ -89,6 +90,63 @@ feature('爐子、油炸台與手卷的菜', () => {
       expect(stepOf(20, 40)).toBe('cook')
       expect(stepOf(38, 40)).toBe('plate')
       expect(stepOf(40, 40)).toBe('done')
+    })
+  })
+
+  scenario('同一道菜一次做幾份：炸籃三份、手卷與湯兩份、平底鍋一份', ({ then, and }) => {
+    then('每個站一次能做的份數', () => {
+      expect(kitchenBatch('Fries')).toBe(3)
+      expect(kitchenBatch('Tempura')).toBe(3)
+      expect(kitchenBatch('HandRoll')).toBe(2)
+      expect(kitchenBatch('EggDropSoup')).toBe(2)
+      expect(kitchenBatch('Tamagoyaki')).toBe(1)
+      expect(kitchenBatch('Omurice')).toBe(1)
+      expect(kitchenBatch('Saury')).toBe(1)
+    })
+    and('多做一份只多花一點時間，比分開做快得多', () => {
+      const one = batchSeconds('Fries', 1), three = batchSeconds('Fries', 3)
+      expect(one).toBeCloseTo(cookSeconds('Fries'))
+      expect(three).toBeGreaterThan(one)
+      expect(three).toBeLessThan(one * 1.5)
+    })
+  })
+
+  scenario('客人點新菜：外帶不賣、內用每人最多一道', ({ then, and }) => {
+    then('外帶不能點爐子、油炸台、砧板的菜', () => {
+      expect(sideAllowed([], ['Fries'], false)).toBe(false)
+      expect(sideAllowed([], ['Saury'], false)).toBe(true)
+    })
+    and('內用點了一道新菜，第二道新菜就不點', () => {
+      expect(sideAllowed([], ['Omurice'], true)).toBe(true)
+      expect(sideAllowed(['Omurice'], ['Fries'], true)).toBe(false)
+      expect(sideAllowed(['Omurice'], ['Saury'], true)).toBe(true)
+    })
+  })
+
+  scenario('新菜在烤魚店的菜單上照原名，不加「烤」', ({ given, then, and }) => {
+    given('烤魚店的菜單', (w) => { w.items = KITCHEN_DISHES })
+    then('中文、日文都是菜的本名', (w) => {
+      for (const it of w.items as typeof KITCHEN_DISHES) {
+        expect(partName(it, it.name, it.id, [], 'zh', 'grill')).toBe(it.name)
+        expect(partName(it, it.name, it.id, [], 'ja', 'grill')).toBe(it.ja)
+      }
+    })
+    and('英文也不會變成 Grilled Fries', (w) => {
+      for (const it of w.items as typeof KITCHEN_DISHES) {
+        expect(partName(it, it.name, it.id, [], 'en', 'grill')).toBe(it.en)
+        expect(partEn(it.en, [], 'grill', it.id)).toBe(it.en)
+      }
+      expect(partEn('Fries', [], 'grill', 'Fries')).toBe('Fries')
+    })
+    and('同一道菜調味的順序不同，在菜單上還是只有一份', () => {
+      const e = (id: string, dabs: ('soy' | 'miso' | 'salt')[]) => ({ key: dabs.length ? `${id}|${dabs.join('+')}` : id, parts: [{ id, dabs }] })
+      const menu = [e('Gindara', ['miso', 'soy']), e('Saury', ['salt']), e('Gindara', ['soy', 'miso']), e('Fries', [])]
+      expect(oneOfEach(menu).map((x) => x.key)).toEqual(['Gindara|miso+soy', 'Saury|salt', 'Fries'])
+      expect(dishOf(menu[0])).toBe(dishOf(menu[2]))
+    })
+    and('烤的照舊加「烤」', () => {
+      expect(partName({ name: '秋刀魚', en: 'Saury' }, '秋刀魚', 'Saury', [], 'zh', 'grill')).toBe('烤秋刀魚')
+      expect(partEn('Saury', [], 'grill', 'Saury')).toBe('Grilled Saury')
     })
   })
 })

@@ -1,9 +1,11 @@
+import { KITCHEN_IDS } from '@/data/kitchenDishes'
+import { cookSeconds, sideAllowed } from '@/game/station'
 import { memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { isDummyMap, isFlatNormal } from '@/scene/materialNormalize'
 import { SKEWER_POOL, skewerTotal, takeSkewer, usedSkewer, washAll } from '@/game/skewers'
 import { BOWL_HAND_MAX, BOWL_WARM_MAX, bowlPlace, warmToEat } from '@/game/plates'
 import { TONG_S, TONG_TAKE_S, TRAY_PLACES, trayPlace } from '@/game/tray'
-import { BOSS_BED, CALM_ASK, DORM_LIFE, FIRE_FLARE, FUMING, FUTON, KAKUBAT } from './bar'
+import { BOSS_BED, CALM_ASK, KITCHEN, DORM_LIFE, FIRE_FLARE, FUMING, FUTON, KAKUBAT } from './bar'
 import { calmedSince } from '@/game/calm'
 import { CALM_GUEST, CALM_OWNER, PROP_TALK } from '@/data/calmLines'
 import { SkewerStore } from './SkewerStore'
@@ -121,6 +123,8 @@ const FACE_CAMERA = new THREE.Vector3(2.9, 2.2, 4.0)
 /** how many sips a bowl of soup takes, and how good it is (miso soup doesn't take seasoning) */
 const SIPS = 3
 const SOUP_TASTE = 78
+/** how a dish from the stove, the fryer or the board pleases (items 461, 469), as the soup's */
+const DISH_TASTE = 80
 // the fan (団扇): waved over the fire, how much hotter it gets per unit the fan travels, and at most; the extra heat
 // dies back (per second) once the fanning stops, and while it lasts the coals burn away faster in proportion to it
 // (per second, at the most it can add: the plain burn is about 0.0002 a second, so fanning flat out burns some 65 times
@@ -7095,12 +7099,15 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       if (entries) pickOrders(entries, Math.min(want, blessed ? 3 : 2), (e) => {
         // a dish (or a set) off the menu, made the way it's listed
         // (the miso soup too, ladled from the pot (the owner's, 2026-11-11): it was left off, not grilled, and every set with it never ordered)
-        if (!e.parts.every((pt) => pt.id in roast.times || pt.id === 'MisoSoup')) return false
+        if (!e.parts.every((pt) => pt.id in roast.times || pt.id === 'MisoSoup' || KITCHEN_IDS.has(pt.id))) return false
+        // (a dish off the stove, the fryer or the board: not to take away, and one a customer (game/station's sideAllowed, item 461's evening:
+        // a takeaway with one was never ready, 'cooking' 228 shop minutes; with one or two each, those who'd ordered them sat hours))
+        if (!sideAllowed(orders, e.parts.map((pt) => pt.id), seated)) return false
         // (a takeaway in the last half hour: only what can be grilled, packed and handed over by closing (game/takeout's fitsBeforeClose,
         // item 329), each part's time on the fire as it burns now; the soup's ladled)
         if (!seated && LAST_CALL.on) {
           const rate = roastRate(heatOf()), left = (CLOSE_AT - getClock().minute + 1440) % 1440
-          if (!fitsBeforeClose(e.parts.map((pt) => (pt.id === 'MisoSoup' ? 0 : (roast.times[pt.id] ?? 0) / rate)), left)) return false
+          if (!fitsBeforeClose(e.parts.map((pt) => (pt.id === 'MisoSoup' ? 0 : KITCHEN_IDS.has(pt.id) ? cookSeconds(pt.id) : (roast.times[pt.id] ?? 0) / rate)), left)) return false
         }
         if (Math.random() > takesAt(e.price, fairPrice(e))) { dear++; return false }
         wants.current.push(...e.parts)
@@ -7131,7 +7138,8 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
         wants.current.splice(wants.current.length - e.parts.length, e.parts.length)
         return false
       })
-      else pickOrders(itemIds.filter((x) => x in roast.times || x === 'MisoSoup'), want, (pick) => {
+      else pickOrders(itemIds.filter((x) => x in roast.times || x === 'MisoSoup' || (seated && KITCHEN_IDS.has(x))), want, (pick) => {
+        if (!sideAllowed(orders, [pick], seated)) return false
         const warm = warmFor(pick, new Set())
         const again = !warm ? recyclable(pick, new Set()) : undefined
         if (!onOrder?.(pick, id, !!(again || warm))) return false
@@ -7298,7 +7306,7 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       if (orders.length) {
         guests.current.push({ id, orders, ate: [], eaten: [], since: now, state: 'waiting', seat: -1, takeout: true })
         // (its soup in a cup of its own, not in the box: only what's grilled is packed there)
-        TAKEOUT.orders.push({ id, rider, items: orders.filter((x) => x !== 'MisoSoup').length, packed: 0, ready: false, taken: false, handed: false, gone: false })
+        TAKEOUT.orders.push({ id, rider, items: orders.filter((x) => x !== 'MisoSoup' && !KITCHEN_IDS.has(x)).length, packed: 0, ready: false, taken: false, handed: false, gone: false })
         onSay?.('chef', L().takeoutOrder(said, rider))
       }
     }
@@ -7402,6 +7410,10 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       // (their soup bowl cleared with their plate, and their rice bowl; their bowls not yet brought, not to be now)
       if (SOUP_SEATS.delete(g.seat)) SOUP.served++
       if (RICE_SEATS.delete(g.seat)) BOWLS.ver++
+      // (and the dishes from the stove and the fryer at their place, and what of theirs wasn't made yet (items 461, 469))
+      if (KITCHEN.seats.delete(g.seat)) KITCHEN.ver++
+      KITCHEN.want = KITCHEN.want.filter((x) => x.guest !== g.id)
+      KITCHEN.asked.delete(g.id)
       BOWLS.setAt.delete(`rice:${g.seat}`)
       BOWLS.setAt.delete(`soup:${g.seat}`)
       BOWLS.want = BOWLS.want.filter((x) => x.guest !== g.id)
@@ -7472,6 +7484,42 @@ function RoastingImpl({ url, roast, itemIds, quantities, active, instant = false
       }
       const owed = [...g.orders]
       for (const id of g.ate) owed.splice(owed.indexOf(id), 1)
+      // (their dishes from the stove, the fryer and the board (items 461, 469): each asked for once (bar.ts's KITCHEN), made at its station by
+      // the third cook and carried out to them (GuestBar3D); theirs, and eaten, once set at their place. A takeaway's, or with no room drawn,
+      // made meanwhile: had once its time's gone by)
+      const dishOwed = owed.filter((id) => KITCHEN_IDS.has(id))
+      if (space === 'open' && dishOwed.length) {
+        if (bar && !g.takeout) {
+          const asked = KITCHEN.asked.get(g.id) ?? []
+          const left = [...asked]
+          for (const id of dishOwed) {
+            const k = left.indexOf(id)
+            if (k >= 0) left.splice(k, 1)
+            else { KITCHEN.want.push({ guest: g.id, id, at: performance.now() }); asked.push(id) }
+          }
+          KITCHEN.asked.set(g.id, asked)
+          const got = dishOwed.find((id) => (KITCHEN.got.get(`${id}:${g.id}`) ?? 0) > 0)
+          if (got) {
+            const key = `${got}:${g.id}`
+            KITCHEN.got.set(key, (KITCHEN.got.get(key) ?? 1) - 1)
+            asked.splice(asked.indexOf(got), 1)
+            g.firstAte ??= now
+            g.eaten.push(Math.max(0, DISH_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
+            g.ate.push(got)
+            g.sideUntil = Math.max(g.sideUntil ?? 0, now + SIDE_EAT_S)
+            g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
+            report()
+            return
+          }
+        } else if (now - g.since > cookSeconds(dishOwed[0]) + 6) {
+          g.firstAte ??= now
+          g.eaten.push(Math.max(0, DISH_TASTE - (WC_GRUMBLE.get(g.id) ?? 0)))
+          g.ate.push(dishOwed[0])
+          g.state = g.eaten.length >= g.orders.length ? 'done' : 'eating'
+          report()
+          return
+        }
+      }
       // (their rice and soup, sat at the bar with the room drawn (items 205, 206): asked for once, scooped and ladled at the counter and carried
       // out to them (bar.ts's BOWLS, GuestBar3D); theirs, and eaten, once they're set down at their place)
       if (space === 'open' && bar && !g.takeout && (owed.includes('MisoSoup') || owed.includes(RICE_SIDE.id))) {

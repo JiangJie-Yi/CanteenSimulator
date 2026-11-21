@@ -1,3 +1,4 @@
+import { KITCHEN_IDS, entriesBySection } from '@/data/kitchenDishes'
 import { personName } from '@/data/people'
 import { pieceOf, solidHit } from '@/scene/pickable'
 import { setTip } from '@/scene/hoverTip'
@@ -25,7 +26,7 @@ import { Fullness } from '@/ui/Fullness'
 import { CashChip } from '@/ui/CashChip'
 import { fullHouse } from '@/game/fullHouse'
 import { bestOf, Notebook } from '@/ui/Notebook'
-import { findItem, MENU_MAX, MENU_MIN, partEn, partName, recipeKey, SEASON_NAME, signature, type Entry, type Seasoning } from '@/data/recipes'
+import { findItem, MENU_MAX, MENU_MIN, oneOfEach, partEn, partName, recipeKey, SEASON_NAME, signature, type Entry, type Seasoning } from '@/data/recipes'
 import { idealSteps, trialIdeas } from '@/game/research'
 import { bestDabs, cookable, dishName, expectedTaste, understand } from '@/game/chefChat'
 import { CHEF_TALK } from '@/data/chefTalk'
@@ -2265,12 +2266,14 @@ export default function App() {
     return () => { window.removeEventListener('pointerdown', onDown, true); window.removeEventListener('pointerup', onUp, true) }
   }, [viewMenu])
   // 研發菜單: what's on each shop's menu (nothing to begin with: it's worked out with the shop closed)
-  const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>(() => SAVED?.menuBy ?? {})
+  // (each shop's menu kept in its sections' order (item 470), a saved one put in it as it's loaded)
+  // (and one of each dish: a menu saved with the same dish twice, its seasonings in another order (miso and soy, soy and miso), keeps the first)
+  const [menuBy, setMenuBy] = useState<Record<string, Entry[]>>(() => Object.fromEntries(Object.entries(SAVED?.menuBy ?? {}).map(([k, v]) => [k, entriesBySection(oneOfEach(v))])))
   const menuByRef = useRef(menuBy)
   menuByRef.current = menuBy
   // (the boards over the way in say what's on the menu as it stands (item 300))
   useEffect(() => {
-    SHOP_MENU.dishes = (menuBy.grilledfish ?? []).map((e) => ({ name: e.name, ja: e.ja, price: e.price }))
+    SHOP_MENU.dishes = (menuBy.grilledfish ?? []).map((e) => ({ name: e.name, ja: e.ja, price: e.price, id: e.parts[0]?.id }))
     SHOP_MENU.v++
   }, [menuBy])
   // (dev: the menus put out, for checking what's ordered off them)
@@ -2349,6 +2352,11 @@ export default function App() {
     const listed = new Set(entriesOf(d.id).map((e) => e.key))
     const pool = trialIdeas(d).filter((x) => !listed.has(recipeKey(x.id, x.dabs)) && (stock[x.id] ?? 0) > 0)
       .map((x) => ({ ...x, pick: x.taste + Math.random() * 18 })).sort((a, b) => b.pick - a.pick)
+    // (the menu's every section with something in it (item 470, the owner's 「菜單在整合一下」): the dishes off the fire (the fried, the egg's,
+    // the rice's, the soup's) put up first, one each that's in stock; the grill's after them, the best first)
+    pool.sort((a, b) => Number(KITCHEN_IDS.has(b.id)) - Number(KITCHEN_IDS.has(a.id)))
+    // (dev: a menu with none of them, to weigh an evening against (tests/e2e/flowhealth.mjs NOKITCHEN=1))
+    if (import.meta.env.DEV && (window as unknown as { __noKitchen?: boolean }).__noKitchen) pool.splice(0, pool.length, ...pool.filter((x) => !KITCHEN_IDS.has(x.id)))
     const per = new Map<string, number>()
     const chosen = pool.filter((x) => {
       const n = per.get(x.id) ?? 0
@@ -2365,11 +2373,14 @@ export default function App() {
       const cur = m[d.id] ?? []
       const add = up.map((x) => {
         const item = findItem(d, x.id)!
-        const part = { id: x.id, dabs: x.dabs, name: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'zh', d.roast ? 'grill' : 'plain'),
-          ja: partName(item, d.roast?.names[x.id] ?? item.name, x.id, x.dabs, 'ja', d.roast ? 'grill' : 'plain') }
-        return { key: recipeKey(x.id, x.dabs), shop: d.id, name: part.name, ja: part.ja, price: menuPrice(d, part), parts: [part] }
-      }).filter((e) => !cur.some((c) => c.key === e.key))
-      return { ...m, [d.id]: [...cur, ...add].slice(0, MENU_MAX) }
+        // (its seasonings in their own order (item 470): miso and soy and soy and miso are the one dish, not two 味噌烤銀鱈 on the menu)
+        const dabs = signature(x.dabs)
+        const part = { id: x.id, dabs, name: partName(item, d.roast?.names[x.id] ?? item.name, x.id, dabs, 'zh', d.roast ? 'grill' : 'plain'),
+          ja: partName(item, d.roast?.names[x.id] ?? item.name, x.id, dabs, 'ja', d.roast ? 'grill' : 'plain') }
+        return { key: recipeKey(x.id, dabs), shop: d.id, name: part.name, ja: part.ja, price: menuPrice(d, part), parts: [part] }
+      }).filter((e, i, all) => !cur.some((c) => c.key === e.key) && all.findIndex((o) => o.key === e.key) === i)
+      // (listed in the menu's sections' order: 烤物, 炸物, 玉子・蛋料理, 飯物, 湯, 飲料)
+      return { ...m, [d.id]: entriesBySection([...cur, ...add]).slice(0, MENU_MAX) }
     })
     const who = cooks.length > 1 ? CHEF_TALK[lang].together(personName(cooks[0].c, lang), personName(cooks[1].c, lang)) : personName(cooks[0].c, lang)
     return { up, who }
@@ -2984,7 +2995,7 @@ export default function App() {
   /** the menu board while open: the dishes on the menu (soups and bowls among the dark tags), at their prices */
   const menuDish = (d: DishInfo): DishInfo => {
     const asItem = (e: Entry) => ({ ...(findItem(d, e.parts[0].id) as object), id: e.key, name: e.name, ja: e.ja,
-      en: e.parts.length === 1 ? partEn(findItem(d, e.parts[0].id)?.en, e.parts[0].dabs, d.roast ? 'grill' : 'plain') : undefined,
+      en: e.parts.length === 1 ? partEn(findItem(d, e.parts[0].id)?.en, e.parts[0].dabs, d.roast ? 'grill' : 'plain', e.parts[0].id) : undefined,
       price: e.price, icon: e.parts[0].id, includes: undefined, max: undefined })
     const isBase = (e: Entry) => d.bases.some((b) => b.id === e.parts[0].id)
     return { ...d, bases: entriesOf(d.id).filter(isBase).map(asItem) as DishInfo['bases'],
@@ -3795,7 +3806,7 @@ export default function App() {
     const key = ++feedSeq.current
     setFeed((fd) => [...fd.slice(-2), { key, id: e.key, guest }])
     // (in English, its name made the menu's way, from its parts: the entry carries only the Chinese and the Japanese)
-    const en = e.parts.map((pt) => partEn(findItem(d, pt.id)?.en, pt.dabs, d.roast ? 'grill' : 'plain') ?? pt.name).join(' & ')
+    const en = e.parts.map((pt) => partEn(findItem(d, pt.id)?.en, pt.dabs, d.roast ? 'grill' : 'plain', pt.id) ?? pt.name).join(' & ')
     sayOrder(guest, e.key, nameIn(lang, { ...e, en }))
     window.setTimeout(() => setFeed((fd) => fd.filter((x) => x.key !== key)), 3200)
     return true
@@ -4065,7 +4076,7 @@ export default function App() {
                   setMenuBy((m) => {
                     const cur = m[e.shop] ?? []
                     if (cur.length >= MENU_MAX || cur.some((x) => x.key === e.key)) return m
-                    return { ...m, [e.shop]: [...cur, e] }
+                    return { ...m, [e.shop]: entriesBySection([...cur, e]) }
                   })
                 }}
                 onUnpublish={(key) => setMenuBy((m) => ({ ...m, [dish.id]: (m[dish.id] ?? []).filter((x) => x.key !== key) }))}

@@ -1,4 +1,5 @@
 // Dishes and their menus. Each item `id` is the object-name prefix in that dish's .glb (see blender/*.py).
+import { KITCHEN_DISHES } from './kitchenDishes'
 export type MenuItem = {
   id: string
   name: string
@@ -202,6 +203,8 @@ export const DISHES: Dish[] = [
       { id: 'MisoSoup', name: '味噌湯', ja: '味噌汁', en: 'Miso Soup', price: 50, kcal: 40, max: 2 },
       // a tokkuri of warm sake with its cup, on a little tray in the row beside the soup
       { id: 'Sake', name: '清酒', ja: '日本酒', en: 'Sake', price: 280, kcal: 110, max: 1 },
+      // (the dishes made off the fire, at the stove, the fryer and the board (items 461, 469: data/kitchenDishes))
+      ...KITCHEN_DISHES.map(({ id, name, ja, en, price, kcal }) => ({ id, name, ja, en, price, kcal })),
     ],
     heat: 'fire',
     roast: {

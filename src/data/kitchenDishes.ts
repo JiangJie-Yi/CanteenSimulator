@@ -13,7 +13,8 @@ export type Cookware = 'fry' | 'square' | 'pot' | 'basket' | 'board'
 export type KitchenDish = MenuItem & {
   station: Station
   ware: Cookware
-  /** how long it takes at its station, the game's seconds (a middling cook's) */
+  /** how long it takes at its station, the game's seconds (a middling cook's; in the grill's time, as its fish are: the first evening's
+   * times, a real kitchen's, kept those waiting for one at their places long after their fish was eaten, the bench 4.3 deep) */
   cookS: number
   /** what it uses besides its own food, a portion each: eggs, frying oil (a portion's share of the fryer's), sheets of nori */
   eggs: number
@@ -23,15 +24,15 @@ export type KitchenDish = MenuItem & {
 
 export const KITCHEN_DISHES: KitchenDish[] = [
   // (玉子料理: the rolled omelette, three eggs beaten with dashi, rolled up layer on layer in the square pan)
-  { id: 'Tamagoyaki', name: '玉子燒', ja: '玉子焼き', en: 'Tamagoyaki', price: 120, kcal: 180, station: 'stove', ware: 'square', cookS: 45, eggs: 3, oil: 0, nori: 0 },
+  { id: 'Tamagoyaki', name: '玉子燒', ja: '玉子焼き', en: 'Tamagoyaki', price: 120, kcal: 180, station: 'stove', ware: 'square', cookS: 30, eggs: 3, oil: 0, nori: 0 },
   // (ご飯もの: omurice, the fried chicken rice wrapped in two eggs' omelette in the frying pan, ketchup over it; the hand roll at the board)
-  { id: 'Omurice', name: '蛋包飯', ja: 'オムライス', en: 'Omurice', price: 180, kcal: 650, station: 'stove', ware: 'fry', cookS: 55, eggs: 2, oil: 0, nori: 0 },
-  { id: 'HandRoll', name: '手卷', ja: '手巻き寿司', en: 'Hand Roll', price: 90, kcal: 200, station: 'board', ware: 'board', cookS: 20, eggs: 1, oil: 0, nori: 1 },
+  { id: 'Omurice', name: '蛋包飯', ja: 'オムライス', en: 'Omurice', price: 180, kcal: 650, station: 'stove', ware: 'fry', cookS: 35, eggs: 2, oil: 0, nori: 0 },
+  { id: 'HandRoll', name: '手卷', ja: '手巻き寿司', en: 'Hand Roll', price: 90, kcal: 200, station: 'board', ware: 'board', cookS: 12, eggs: 1, oil: 0, nori: 1 },
   // (汁物: egg-drop soup, dashi brought up in the little pot and an egg drizzled in)
-  { id: 'EggDropSoup', name: '蛋花湯', ja: 'かき玉汁', en: 'Egg-drop Soup', price: 60, kcal: 60, station: 'stove', ware: 'pot', cookS: 25, eggs: 1, oil: 0, nori: 0 },
+  { id: 'EggDropSoup', name: '蛋花湯', ja: 'かき玉汁', en: 'Egg-drop Soup', price: 60, kcal: 60, station: 'stove', ware: 'pot', cookS: 15, eggs: 1, oil: 0, nori: 0 },
   // (揚げ物: chips and tempura (prawns, sweet potato, shiso) in the fryer)
-  { id: 'Fries', name: '薯條', ja: 'フライドポテト', en: 'Fries', price: 80, kcal: 380, station: 'fryer', ware: 'basket', cookS: 35, eggs: 0, oil: 1, nori: 0 },
-  { id: 'Tempura', name: '天婦羅', ja: '天ぷら', en: 'Tempura', price: 220, kcal: 420, station: 'fryer', ware: 'basket', cookS: 45, eggs: 0, oil: 1, nori: 0 },
+  { id: 'Fries', name: '薯條', ja: 'フライドポテト', en: 'Fries', price: 80, kcal: 380, station: 'fryer', ware: 'basket', cookS: 24, eggs: 0, oil: 1, nori: 0 },
+  { id: 'Tempura', name: '天婦羅', ja: '天ぷら', en: 'Tempura', price: 220, kcal: 420, station: 'fryer', ware: 'basket', cookS: 30, eggs: 0, oil: 1, nori: 0 },
 ]
 export const KITCHEN_IDS: ReadonlySet<string> = new Set(KITCHEN_DISHES.map((d) => d.id))
 export const kitchenDish = (id: string) => KITCHEN_DISHES.find((d) => d.id === id)
@@ -57,6 +58,11 @@ export const sectionOf = (id: string): Section => SECTION_OF[id] ?? 'grill'
 /** ids put in the menu's order: section by section, each section's in the order they came */
 export const bySection = <T extends string>(ids: readonly T[]): T[] =>
   SECTIONS.flatMap((s) => ids.filter((id) => sectionOf(id) === s.id))
+/** a dish's section's place in the menu's order (for sorting what's listed) */
+export const sectionRank = (id: string) => SECTIONS.findIndex((s) => s.id === sectionOf(id))
+/** a menu's entries put in its sections' order, each section's as they were (by the first of each entry's parts) */
+export const entriesBySection = <E extends { parts: { id: string }[] }>(list: readonly E[]): E[] =>
+  list.map((e, i) => ({ e, i, r: sectionRank(e.parts[0]?.id ?? '') })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.e)
 export const sectionName = (s: Section, lang: Lang) => {
   const x = SECTIONS.find((v) => v.id === s)!
   return lang === 'ja' ? x.ja : lang === 'en' ? x.en : x.zh
