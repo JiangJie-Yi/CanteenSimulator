@@ -2869,8 +2869,11 @@ export default function App() {
   const lostTimer = useRef(0)
   // (brought back after it was lost: said so, once)
   useEffect(() => {
-    if (SAVED) window.setTimeout(() => say(tl(SAVED.lang ?? 'zh', '3D 畫面中斷後重新載入了，接著剛才的進度', '3D 画面が途切れたので読み込み直しました。続きからです',
+    if (!SAVED) return
+    const t = window.setTimeout(() => say(tl(SAVED.lang ?? 'zh', '3D 畫面中斷後重新載入了，接著剛才的進度', '3D 画面が途切れたので読み込み直しました。続きからです',
       'The 3D view was reloaded after it dropped out: carrying on where you were')), 1500)
+    // (its timer let go with the page: left running, it spoke twice where the effect's run twice (development))
+    return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // (the edit mode's panel speaks the game's language)
@@ -3340,11 +3343,14 @@ export default function App() {
     window.addEventListener('touchstart', start, { passive: true })
     window.addEventListener('touchmove', move, { passive: true })
     window.addEventListener('touchend', end)
-    window.addEventListener('touchcancel', () => { s = null; setPull(0) })
+    // (named, to be taken off with the rest: unnamed, it was left on the window)
+    const cancel = () => { s = null; setPull(0) }
+    window.addEventListener('touchcancel', cancel)
     return () => {
       window.removeEventListener('touchstart', start)
       window.removeEventListener('touchmove', move)
       window.removeEventListener('touchend', end)
+      window.removeEventListener('touchcancel', cancel)
     }
   }, [])
   // sold out: once there's nothing left to sell, no new customers can order; when the last one has finished, the
