@@ -132,6 +132,14 @@ M = {
     "navy": pbr("FolkNavy", lin("#1e2a44"), rough=0.5),
     "capblue": pbr("FolkCap", lin("#2e4a6e"), rough=0.6),
     "case": pbr("FolkCase", lin("#1c1c20"), rough=0.5),
+    # (item 464: the band man's guitar itself, not its black bag: a mahogany body, sides and neck, a spruce top, the rosette's cream ring and
+    # the sound hole, a rosewood bridge, fretboard and head plate, its strap woven red)
+    "gwood": pbr("FolkGuitarWood", lin("#7b3f22"), rough=0.5),
+    "gtop": pbr("FolkGuitarTop", lin("#e3b46e"), rough=0.5),
+    "gring": pbr("FolkGuitarRing", lin("#f1e4c2"), rough=0.5),
+    "ghole": pbr("FolkGuitarHole", lin("#1b120c"), rough=0.5),
+    "gboard": pbr("FolkGuitarBoard", lin("#33201a"), rough=0.5),
+    "gstrap": pbr("FolkGuitarStrap", lin("#a8322a"), rough=0.8),
     "canvas": pbr("FolkCanvas", lin("#d8cba8"), rough=0.9),
     "leek": pbr("FolkLeek", lin("#4a8a3a"), rough=0.6),
 }
@@ -1108,20 +1116,84 @@ _cp = lathe("cpd", [(C.y + 0.07, R + 0.048), (C.y + 0.2, R + 0.013), (C.y + 0.28
 _cv = lathe("cpv", [(C.y + 0.088, R + 0.044), (C.y + 0.072, R + 0.16)], M["capblue"], seg=6, a0=-0.75, a1=0.75, solid=0.012)
 _ct = sphere("cpt", Vector((0.0, C.y + 0.327, 0.0)), 0.02, M["capblue"], seg=6, rings=3, scale=(1, 0.6, 1))
 acc("cap", [_cp, _cv, _ct])
-# (the band man's guitar in its soft case on his back, a little to his right, its neck up past his head (behind it: the head's back and its
-# hair are 0.27 back there, the neck 0.31), its strap across his chest)
-GZ = -0.31
-_g1 = sphere("gtl", Vector((0.1, 0.3, GZ)), 0.13, M["case"], seg=8, rings=4, scale=(1, 1.15, 0.38))
-_g2 = sphere("gtu", Vector((0.12, 0.5, GZ)), 0.1, M["case"], seg=8, rings=4, scale=(1, 1.1, 0.42))
-_gn = []
-for _k, (_at, _sz) in enumerate((((0.14, 0.79, GZ), (0.07, 0.48, 0.05)), ((0.145, 1.05, GZ), (0.095, 0.07, 0.056)))):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=P(*_at))
-    _c = active()
-    _c.scale = (_sz[0], _sz[2], _sz[1])
-    bpy.ops.object.transform_apply(scale=True)
-    _gn.append(fin(_c, f"gtn{_k}", M["case"], smooth=False))
-_gs = tube("gts", [Vector((0.15, 0.6, -0.15)), on_body(0.11, 0.55, 0.006), on_body(-0.04, 0.4, 0.006), on_body(-0.19, 0.26, 0.006), Vector((-0.2, 0.22, -0.2))], 0.012, M["case"])
-acc("guitar", [_g1, _g2, _gs] + _gn)
+# (the band man's guitar on his back (item 464, the owner's 「吉他也太簡陋了」: it was its black bag, two black balls and a bar): an acoustic
+# guitar as a real one's made, slung across his back by its strap, its neck up past his head a little to the side (behind it: the head's back
+# and its hair are 0.27 back there, its neck 0.31), its top (the sound hole's side) out from his back. In its own frame: x across it, y up it
+# from the body's foot, z through it (out from his back less); tipped GT in its plane about GPV, its centre plane at GZ
+GZ, GT, GPV, GAT = -0.31, math.radians(-15), 0.5, Vector((0.08, 0.6, 0.0))
+GL, GD = 0.46, 0.07                                   # (the body's length and depth)
+
+
+def gpt(x, y, z):
+    """a point in the guitar's frame to the figure's (three's frame)"""
+    c_, s_ = math.cos(GT), math.sin(GT)
+    dy = y - GPV
+    return Vector((GAT.x + x * c_ - dy * s_, GAT.y + x * s_ + dy * c_, GZ + z))
+
+
+def gbox(name, lo, hi, mat):
+    """a box in the guitar's frame"""
+    bm = bmesh.new()
+    vs = [bm.verts.new(P(*gpt(x, y, z))) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+    for a, b, c, d in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+        bm.faces.new((vs[a], vs[b], vs[c], vs[d]))
+    return from_bm(name, bm, mat, smooth=False)
+
+
+def gslab(name, ring2d, z0, z1, mat):
+    """a slab in the guitar's frame between depths z0 and z1 on an outline (x, y) given round it, its faces laddered across (each point to
+    the one opposite: the outline's first point and the one half way round at its two ends), never fanned into a point"""
+    bm = bmesh.new()
+    fr = [bm.verts.new(P(*gpt(x, y, z0))) for x, y in ring2d]
+    bk = [bm.verts.new(P(*gpt(x, y, z1))) for x, y in ring2d]
+    ladder_fill(bm, fr)
+    ladder_fill(bm, [bk[0]] + bk[:0:-1])   # (turned the other way round, its foot still first: the same rungs)
+    n = len(ring2d)
+    for k in range(n):
+        bm.faces.new((fr[k], fr[(k + 1) % n], bk[(k + 1) % n], bk[k]))
+    return from_bm(name, bm, mat, smooth=False)
+
+
+# (the body's outline: its half width up it, the lower bout's round, the waist, the upper bout's, rounded in at both ends; 24 points round
+# it, from its foot up its one side, its top, down the other: so its faces ladder straight across it)
+GW = [(0.02, 0.06), (0.07, 0.104), (0.15, 0.127), (0.27, 0.136), (0.4, 0.124), (0.5, 0.1), (0.58, 0.09), (0.67, 0.098), (0.77, 0.104),
+      (0.87, 0.096), (0.95, 0.07)]
+
+
+def gring(inset):
+    lo, hi = inset / GL, 1 - inset / GL
+    side = [(max(0.004, w - inset), lo + t * (hi - lo)) for t, w in GW]
+    return [(0.0, lo * GL)] + [(-w, y * GL) for w, y in side] + [(0.0, hi * GL)] + [(w, y * GL) for w, y in side[::-1]]
+
+
+def gdisc(r, cy, n=10):
+    """a round at (0, cy) in the guitar's frame, n points from its foot round its one side up and down the other (laddered across)"""
+    return [(r * math.sin(2 * math.pi * k / n), cy - r * math.cos(2 * math.pi * k / n)) for k in range(n)]
+
+
+ZT = -GD / 2 - 0.0015                                 # (the top's face: a plate over the body's front, a little in from its edge)
+_gb = gslab("gtb", gring(0.0), -GD / 2, GD / 2, M["gwood"])
+_gp = gslab("gtp", gring(0.006), ZT, -GD / 2, M["gtop"])
+HOLE_Y = 0.62 * GL
+_gr = gslab("gtr", gdisc(0.052, HOLE_Y), ZT - 0.001, ZT, M["gring"])
+_gh = gslab("gth", gdisc(0.04, HOLE_Y), ZT - 0.002, ZT - 0.001, M["ghole"])
+_gbr = gbox("gtbr", (-0.046, 0.2 * GL - 0.009, ZT - 0.006), (0.046, 0.2 * GL + 0.009, ZT), M["gboard"])
+# (the neck from in the body's top to the head, its fretboard over it on out over the body to by the sound hole; the head a little set
+# back, its face plate, three gold tuners either side)
+NK0, NK1 = GL - 0.02, GL + 0.4
+_gnk = gbox("gtnk", (-0.025, NK0, -GD / 2 - 0.002), (0.025, NK1, -GD / 2 + 0.03), M["gwood"])
+_gfb = gbox("gtfb", (-0.023, HOLE_Y + 0.056, -GD / 2 - 0.007), (0.023, NK1, -GD / 2 - 0.002), M["gboard"])
+HD1 = NK1 + 0.14
+_ghd = gbox("gthd", (-0.036, NK1 - 0.004, -GD / 2 + 0.002), (0.036, HD1, -GD / 2 + 0.022), M["gwood"])
+_ghp = gbox("gthp", (-0.033, NK1 + 0.004, -GD / 2), (0.033, HD1 - 0.004, -GD / 2 + 0.002), M["gboard"])
+_gpg = [gbox(f"gtpg{k}", (sd * 0.036 if sd > 0 else -0.06, NK1 + 0.035 + 0.038 * j - 0.006, -GD / 2 + 0.006),
+             (0.06 if sd > 0 else -0.036, NK1 + 0.035 + 0.038 * j + 0.006, -GD / 2 + 0.018), M["gold"])
+        for k, (sd, j) in enumerate((s_, j_) for s_ in (-1, 1) for j_ in range(3))]
+# (its strap: from the neck's foot up over his shoulder, across his chest, round his far hip to the pin at the body's foot)
+_gs = tube("gts", [gpt(0.02, NK0 + 0.01, -GD / 2 + 0.03) + Vector((0.0, 0.0, 0.03)), Vector((0.15, 0.6, -0.17)), on_body(0.11, 0.55, 0.008),
+                   on_body(-0.04, 0.4, 0.008), on_body(-0.19, 0.26, 0.008), Vector((-0.21, 0.2, -0.2)), gpt(0.0, -0.004, 0.0)],
+           0.012, M["gstrap"], most=7)
+acc("guitar", [_gb, _gp, _gr, _gh, _gbr, _gnk, _gfb, _ghd, _ghp, _gs] + _gpg)
 # (the mother's shopping bag over her shoulder, at her side behind her hand, a leek out of its top: white, then green, two leaves)
 bpy.ops.mesh.primitive_cube_add(size=1, location=P(0.25, 0.25, -0.2))
 _eb = active()

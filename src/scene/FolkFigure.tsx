@@ -210,7 +210,7 @@ const WIPE_REACH_MS = 800
 export const FOLK_HEIGHT = 1.07
 /** parts with no ink line round them (by their material: the face's picture, the glasses' frames, gold, the little red ties and flowers; the
  * randoseru's piping, its silver and the light on it) */
-const UNINKED = /FolkFrame|FolkGold|FolkRed|FolkBagTrim|FolkSilver|FolkGloss/
+const UNINKED = /FolkFrame|FolkGold|FolkRed|FolkBagTrim|FolkSilver|FolkGloss|FolkGuitarTop|FolkGuitarRing|FolkGuitarHole|FolkGuitarBoard/
 /** parts drawn flat, unlit, as they're coloured (the light caught on the randoseru's leather: its gloss painted, the figure one toon material) */
 const FLAT = /FolkGloss/
 /** which picture a vertex is painted from (its `paint`'s z): its colour alone, the clothes', the face's strip over the skin's colour, the knit's */
