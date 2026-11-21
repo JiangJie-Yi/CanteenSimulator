@@ -9,7 +9,9 @@ to the doorway as it stands (within a percent).
 The two steps and the band over them (StoneStep1, StoneStep2, StoneStep0) are stones of their own now (item 424, the owner's, 2026-11-21:
 「這石階跟裡面比，不夠精緻，其次是可以加點青苔感。」), made as the genkan's floor is: each face that shows its own crazy paving of domed stones
 worn round at their edges, in a recessed pebble-wash, moss in their shaded corners (build_step, below); the footing's sides and the genkan's
-side by the wall (StoneSide, StoneFoot) are still the courses' picture.
+side and the footing's side by the steps (StoneSide, StoneFoot) in the steps' own stones too, cut stones in courses (item 496, the owner's,
+2026-11-21: 「這一片沒同步上」: they were still the courses' picture, small stones, beside the steps made over in item 485); the courses'
+picture (paving_atlas, slab) is no part's now.
 
 Run:
     blender -b --factory-startup --python blender/stonesteps.py -- <project path> [preview.png]
@@ -491,16 +493,19 @@ def stone(bm, L, poly, face, crown, tint, moss, rnd=S_ROUND, rings=S_RINGS, dome
     return len(sides) * 2 + sum(len(f.verts) - 2 for f in tops)
 
 
-def mortar(bm, L, lo, hi, moss, tile=0.25, cell=0.06):
+def mortar(bm, L, lo, hi, moss, tile=0.25, cell=0.06, shows_only=None):
     """the pebble-wash's block from lo to hi (the game's x, y, z), its faces' picture laid at world size; each face that shows a coarse grid
-    (`cell`), its points greened where moss is (the joints there mossy), the back and the foot one quad"""
+    (`cell`), its points greened where moss is (the joints there mossy), the back and the foot one quad (`shows_only`: the faces that show,
+    by name (front, back, top, foot, right, left), where it's not a step's)"""
     (x0, y0, z0), (x1, y1, z1) = lo, hi
     mid = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
     tris = 0
     # (each face: its fixed axis and value, its two axes across it, and whether it shows)
-    for ax, val, (ua, u0, u1), (va, v0, v1), shows in (("z", z1, ("x", x0, x1), ("y", y0, y1), True), ("z", z0, ("x", x0, x1), ("y", y0, y1), False),
-                                                       ("y", y1, ("x", x0, x1), ("z", z0, z1), True), ("y", y0, ("x", x0, x1), ("z", z0, z1), False),
-                                                       ("x", x1, ("z", z0, z1), ("y", y0, y1), True), ("x", x0, ("z", z0, z1), ("y", y0, y1), True)):
+    for name_, ax, val, (ua, u0, u1), (va, v0, v1), shows in (("front", "z", z1, ("x", x0, x1), ("y", y0, y1), True), ("back", "z", z0, ("x", x0, x1), ("y", y0, y1), False),
+                                                              ("top", "y", y1, ("x", x0, x1), ("z", z0, z1), True), ("foot", "y", y0, ("x", x0, x1), ("z", z0, z1), False),
+                                                              ("right", "x", x1, ("z", z0, z1), ("y", y0, y1), True), ("left", "x", x0, ("z", z0, z1), ("y", y0, y1), True)):
+        if shows_only is not None:
+            shows = name_ in shows_only
         nu = max(1, int(round((u1 - u0) / cell))) if shows else 1
         nv = max(1, int(round((v1 - v0) / cell))) if shows else 1
 
@@ -666,12 +671,99 @@ def build_step(name):
     return o
 
 
+def runs(D, avoid):
+    """a course's stones' runs along a face D long (item 496), from its front (the steps' corner) back: each 0.2 to 0.32 long, its joints
+    kept 5 cm off `avoid`'s (the course next to it: staggered), the last one to the back rather than a sliver"""
+    out, z = [], D / 2
+    while z > -D / 2 + 1e-6:
+        for _ in range(30):
+            nz = z - RS.uniform(0.2, 0.32)
+            if nz + D / 2 < 0.13:
+                nz = -D / 2
+            if nz <= -D / 2 + 1e-6 or all(abs(nz - a) > 0.05 for a in avoid):
+                break
+        out.append((max(nz, -D / 2), z))
+        z = nz
+    return out
+
+
+def inset_runs(course, D):
+    """each run half a joint in from its neighbours, flush at the face's two ends"""
+    return [(a0 + (SJ if a0 > -D / 2 + 1e-6 else 0.0), a1 - (SJ if a1 < D / 2 - 1e-6 else 0.0)) for a0, a1 in course]
+
+
+def build_foot():
+    """the genkan's footing (item 496, the owner's 「這一片沒同步上」: its side by the steps was still item 404's courses' picture, small
+    stones in dark joints, beside the steps made over in item 485): that side (its right, the street's corner; its left's against the shop's
+    base) in the steps' own stones, as big (0.24 apart), as domed, in the same pebble-wash; in two courses, the lower as high as the upper
+    step beside it (its joint level with the upper tread, as the upper step's end stones are that high), the upper as high as the band over
+    the steps; moss along its foot toward the steps, as theirs is along their ends' feet. Its front (behind the band and the steps), its top
+    (under the genkan's stone), its back and its left the pebble-wash's block, plain. One node, the steps' three materials."""
+    W, H, D = SLABS["StoneFoot"]
+    bm = bmesh.new()
+    L = {"uv": bm.loops.layers.uv.new("UVMap"), "col": bm.loops.layers.color.new("Col")}
+    # (no greening toward its sides as a step's ends have: its moss lines only)
+    moss = Mossy(W * 8)
+    tris = {"stone": 0, "mortar": 0, "moss": 0}
+    gnd, rise = -H / 2 - 0.008, H / 3
+    cush = [((W / 2, gnd, D / 2 - 0.34), (W / 2, gnd, D / 2 - 0.004), (0, 1, 0), (1, 0, 0), 0.013)]
+    for p0, p1, nf, nw, r in cush:
+        moss.lines.append((p0, p1, r))
+    # (cut stones in courses, as the steps' risers and ends are (a stone of a rectangle each, their joints upright), not crazy paving: its
+    # joints slanted every way read as a wall of rubble beside the steps' upright joints)
+    upper = runs(D, [])
+    for (y0, y1), course in (((-H / 2 + 2 * rise, H / 2), upper), ((-H / 2, -H / 2 + 2 * rise), runs(D, [a0 for a0, _ in upper]))):
+        for b0, b1 in inset_runs(course, D):
+            tris["stone"] += stone(bm, L, [(b0, y0 + SJ), (b1, y0 + SJ), (b1, y1 - SJ), (b0, y1 - SJ)], "right", W / 2, tint_of(), moss)
+    tris["mortar"] += mortar(bm, L, (-W / 2, -H / 2, -D / 2), (W / 2 - RECESS, H / 2, D / 2), moss, shows_only=("right",))
+    for p0, p1, nf, nw, r in cush:
+        tris["moss"] += cushion(bm, L, p0, p1, nf, nw, r * 1.2, RS.uniform(0.85, 1.0))
+    me = bpy.data.meshes.new("StoneFoot")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("StoneFoot", me)
+    bpy.context.collection.objects.link(o)
+    for m in STEP_M:
+        o.data.materials.append(m)
+    parts.append(o)
+    print("STEP424", "StoneFoot", tris)
+    return o, [a0 for a0, _ in upper]
+
+
+def build_side(avoid):
+    """the genkan's side (item 496): the low curb of stone along its open edge, from its stone up to the room's boards, over the footing's
+    side (it was the courses' picture still, a strip of small stones over the footing's new ones): one course of cut stones on each face
+    (it's seen from the street and from the genkan), their joints off the footing's upper course's under it, thin as the band's stones (it's
+    2 cm through), their rounded edges meeting along its top; its core the pebble-wash"""
+    W, H, D = SLABS["StoneSide"]
+    bm = bmesh.new()
+    L = {"uv": bm.loops.layers.uv.new("UVMap"), "col": bm.loops.layers.color.new("Col")}
+    moss = Mossy(W * 400)
+    tris = {"stone": 0, "mortar": 0}
+    course = runs(D, avoid)
+    for face in ("right", "left"):
+        for b0, b1 in inset_runs(course, D):
+            tris["stone"] += stone(bm, L, [(b0, -H / 2 + SJ), (b1, -H / 2 + SJ), (b1, H / 2 - SJ), (b0, H / 2 - SJ)], face, W / 2, tint_of(), moss,
+                                   rnd=0.005, rings=(0.0, 0.0015, 0.003, 0.005, 0.009), dome=0.002, thick=0.0094)
+    tris["mortar"] += mortar(bm, L, (-W / 2 + 0.004, -H / 2, -D / 2), (W / 2 - 0.004, H / 2 - 0.002, D / 2), moss, shows_only=("right", "left", "top"))
+    me = bpy.data.meshes.new("StoneSide")
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new("StoneSide", me)
+    bpy.context.collection.objects.link(o)
+    for m in STEP_M:
+        o.data.materials.append(m)
+    parts.append(o)
+    print("STEP424", "StoneSide", tris)
+    return o
+
+
 s1 = build_step("StoneStep1")
 s2 = build_step("StoneStep2")
 s0 = build_step("StoneStep0")
 
-ss = slab("StoneSide", *SLABS["StoneSide"], 0.0, ease=0.004)
-sf = slab("StoneFoot", *SLABS["StoneFoot"], 0.0, ease=0.003)
+sf, foot_joints = build_foot()
+ss = build_side(foot_joints)
 s2.location = P(0, 0, 0.5)   # (apart in the file; the game sets each where it stands)
 s0.location = P(0, 0, -0.5)
 ss.location = P(2, 0, 0)

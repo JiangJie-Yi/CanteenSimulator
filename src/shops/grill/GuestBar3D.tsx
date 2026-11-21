@@ -2834,7 +2834,7 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   const stone = useStoneParts(['StoneStep0', 'StoneStep1', 'StoneStep2', 'StoneFoot'])
   // (the two steps and the band over them, each laid where it stands, then folded together by material (item 424: each is its stones, its
   // pebble-wash and its moss now, three draws for all of them, not nine); copies of the parts, so it can be done again if the room's changed)
-  const [ga1, gy0, gy1] = [gal[1], gly[0], gly[1]]
+  const [ga0, ga1, gy0, gy1] = [gal[0], gal[1], gly[0], gly[1]]
   const steps = useMemo(() => {
     const g = new THREE.Group()
     const add = (o: THREE.Object3D, made: [number, number, number], lo: number[], hi: number[]) => {
@@ -2853,12 +2853,15 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
     // picture went on over it and the steps, its stones cut off wherever a face ended): from the upper step's tread up to the genkan's stone,
     // 1.5 mm proud of the footing's face, its foot a hair over the tread)
     add(stone.StoneStep0, STONE_MADE.StoneStep0, [-gy1, gTop - rise + 0.0005, ga1 + 0.0015], [-gy0, gTop, ga1 + 0.0135])
+    // (and the footing under the genkan, its side by the steps in their stones now (item 496, the owner's 「這一片沒同步上」): folded in with
+    // them, their three materials; it was a draw of its own in the courses' picture)
+    add(stone.StoneFoot, STONE_MADE.StoneFoot, [-gy1, gFoot, ga0], [-gy0, gTop, ga1])
     const shared = new Set<THREE.BufferGeometry>()
     g.traverse((o) => { if ((o as THREE.Mesh).isMesh) shared.add((o as THREE.Mesh).geometry) })
     mergeByMaterial(g)
     g.userData.shared = shared
     return g
-  }, [stone, gTop, rise, gFoot, ga1, gy0, gy1])
+  }, [stone, gTop, rise, gFoot, ga0, ga1, gy0, gy1])
   // (the folded meshes are its own: let them go when it's done again or goes)
   useEffect(() => () => {
     const shared = steps.userData.shared as Set<THREE.BufferGeometry>
@@ -2867,7 +2870,6 @@ function ShopBase({ rects, genkan, drop, step }: { rects: [[number, number], [nu
   return (
     <>
       {rects.flatMap(([al, ly], i) => layers(al, ly, `r${i}`))}
-      <primitive {...laid(stone.StoneFoot, STONE_MADE.StoneFoot, [-gly[1], gFoot, gal[0]], [-gly[0], gTop, gal[1]])} />
       <primitive object={steps} />
     </>
   )
