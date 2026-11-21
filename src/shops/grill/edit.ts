@@ -370,6 +370,8 @@ const RELAIDS: [string, string[]][] = [
   // (the drinks' stock moved into the stock room behind the side wall, the fridges set into the wall (items 430, 431, 2026-11-21): what was
   // held for them by hand let go, they stand where they're laid now)
   ['jgs-edit-relaid-38', ['crates', 'drinkfridge0', 'drinkfridge1']],
+  // (the first waiting bench where the owner moved it on, made its default (item 463))
+  ['jgs-edit-relaid-39', ['bench']],
 ]
 const relaidDue = RELAIDS.filter(([k]) => { try { return !localStorage.getItem(k) } catch { return false } })
 const relaid = !relaidDue.length
@@ -539,9 +541,10 @@ export const BASES: Record<string, V3> = {
   // (the free view's camera: moved X -0.45 along its own axes (object space), taken into its parent's (the world's) units; its turn of
   // Y 15° Z 5° is App's VIEWCAM_TURN)
   'viewcam-free': [0.0478, 0, 0.4475],
-  // (the waiting bench moved X 0.115 (item 302, the owner's, 2026-11-17: 「候位長凳 X: 0.115 然後Reset」): its panel axes turned 36.1 from its
-  // parent's (the room's), into its parent's units)
-  bench: [0.0929, 0, -0.0677],
+  // (the waiting bench moved X 0.115 (item 302, the owner's, 2026-11-17: 「候位長凳 X: 0.115 然後Reset」), then X -0.21 (item 463, the owner's,
+  // 2026-11-21: 「候位長凳第一張 位置X: -0.21 然後 Reset」, along the wall toward the second): its panel axes turned 36.1 from its parent's (the
+  // room's), into its parent's units)
+  bench: [-0.0768, 0, 0.056],
   // (the till's two stools moved X 0.25 together (item 309, the owner's, 2026-11-18: 「收銀機前的兩個凳子都幫我調整位置 X:0.25 然後 Reset」): the
   // high one's panel axes (its own, turned 36.1 from its parent's, as the room's are), into their parent's units; the same for both, as they
   // go when picked together)
