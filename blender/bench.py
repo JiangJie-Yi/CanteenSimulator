@@ -2,7 +2,11 @@
 their turn). Made over in bamboo (item 439, the owner's, 2026-11-21: 「候位長凳才是坐墊位置為竹蓆，也就是老闆後面那個小櫃原本的風格，骨架則是
 竹子」: a hinoki bench as a joiner makes one before): its seat a mat of split bamboo woven 網代 (the serving counter's own weave of items 254
 and 286), set in a frame of culms; four culm legs, culm stretchers low between them at the ends and along the back, a binding of rattan
-round each leg's head where it meets the frame. Its size as before (the sitters sit where they did); about 400 triangles.
+round each leg's head where it meets the frame. Its size as before (the sitters sit where they did). Braced as a long bench must be (item
+449, the owner's, 2026-11-21: 「你的等候椅底下太空了，會不會垮?」: four thin legs at its ends and the long middle bare under it): six
+legs, a pair at its middle as at its ends, the front three set in from the seat's front edge (clear of the sitters' calves), three
+bearers under the mat on them; under the frame a second rail along the front and the back from leg to leg, low down long stretchers (貫)
+front and back and three across lower still (as a joiner offsets them), thicker culms; about 800 triangles.
 
 The game's frame: y up from the floor, x along the bench, z across it; its middle at the origin; SEAT_H the seat's top, LENGTH long, DEPTH
 deep (the people's units: the game draws it at the people's scale, the same every way).
@@ -32,8 +36,8 @@ LENGTH, DEPTH, SEAT_H = 0.86, 0.24, 0.29
 BACK = -0.14
 MID = BACK + DEPTH / 2
 FR = 0.014                # the seat frame's culms' radius
-LR = 0.016                # the legs'
-SR = 0.010                # the stretchers' and the mat's bearers'
+LR = 0.018                # the legs'
+SR = 0.011                # the stretchers' and the mat's bearers'
 CULM_TILE = 0.3           # the culm's picture along a culm (two nodes to it)
 MAT_TILE = 0.24           # the mat's weave: twenty strips across the picture
 
@@ -157,20 +161,29 @@ for k, zz in enumerate((ZB, ZF)):
 for k, sx in enumerate((-1, 1)):
     culm_part(f"BenchEnd{k}", (sx * XE, YF, ZB + FR + 0.001), (sx * XE, YF, ZF - FR - 0.001), FR, turn=1.3 + k)
 slab("BenchSeat", -XE + FR + 0.001, XE - FR - 0.001, SEAT_H - 0.017, SEAT_H - 0.007, ZB + FR + 0.001, ZF - FR - 0.001, "mat", MAT_TILE)
-for k, sx in enumerate((-1, 1)):
-    culm_part(f"BenchBearer{k}", (sx * 0.2, SEAT_H - 0.017 - SR, ZB + FR), (sx * 0.2, SEAT_H - 0.017 - SR, ZF - FR), SR, turn=2.2 + k)
-# ---- the legs: under the frame's corners, a little in from its ends, up to its rails' feet
+# ---- the legs: three pairs, at its ends a little in and at its middle; the back three under the back rail, up to it; the front three
+# set in 3 cm from the seat's front edge (the sitters' calves hang there), up to the bearers; each one's head bound with rattan
 LX = LENGTH / 2 - 0.07
-legs_at = [(sx * LX, zz) for sx in (-1, 1) for zz in (ZB, ZF)]
-for k, (lx, lz) in enumerate(legs_at):
-    culm_part(f"BenchLeg{k}", (lx, 0.0, lz), (lx, YF - FR * 0.5, lz), LR, turn=0.7 * k + 0.3)
-    # (its head bound to the rail with rattan: a dark band round it just under the frame)
-    culm_part(f"BenchBind{k}", (lx, YF - FR - 0.022, lz), (lx, YF - FR - 0.006, lz), LR + 0.0025, segs=8, mat="rattan")
-# ---- the stretchers, low: across each end between its two legs, and along the back between the back legs
-SY = 0.075
-for k, sx in enumerate((-1, 1)):
-    culm_part(f"BenchStretch{k}", (sx * LX, SY, ZB + LR + 0.001), (sx * LX, SY, ZF - LR - 0.001), SR, turn=3.1 + k)
-culm_part("BenchStretchBack", (-LX + LR + 0.001, SY + 0.03, ZB), (LX - LR - 0.001, SY + 0.03, ZB), SR, turn=4.0)
+ZFL = ZF - 0.03
+ZBL = BACK + LR + 0.0026           # (the back three as near the wall as their bindings let them: none into it)
+YBR = SEAT_H - 0.017 - SR          # the bearers' middle, under the mat
+for k, lx in enumerate((-LX, 0.0, LX)):
+    culm_part(f"BenchBearer{k}", (lx, YBR, ZB + FR), (lx, YBR, ZF - FR), SR, segs=6, turn=2.2 + k)
+legs_at = [(lx, ZBL, YF - FR * 0.5) for lx in (-LX, 0.0, LX)] + [(lx, ZFL, YBR - SR * 0.5) for lx in (-LX, 0.0, LX)]
+for k, (lx, lz, top) in enumerate(legs_at):
+    culm_part(f"BenchLeg{k}", (lx, 0.0, lz), (lx, top, lz), LR, turn=0.7 * k + 0.3)
+    culm_part(f"BenchBind{k}", (lx, top - 0.04, lz), (lx, top - 0.024, lz), LR + 0.0025, segs=8, mat="rattan")
+# ---- a second rail under the frame, along the front and the back from end leg to end leg through the middle one
+YA = SEAT_H - 0.075
+for k, lz in enumerate((ZBL, ZFL)):
+    culm_part(f"BenchApron{k}", (-LX - LR, YA, lz), (LX + LR, YA, lz), SR, segs=6, turn=5.0 + k)
+# ---- the stretchers, low: along the front and the back (貫), and across each end and the middle a little lower (offset, as a joiner
+# makes them, so no two meet at one point)
+SY = 0.085
+for k, lz in enumerate((ZBL, ZFL)):
+    culm_part(f"BenchStretchLong{k}", (-LX - LR, SY, lz), (LX + LR, SY, lz), SR, segs=6, turn=4.0 + k)
+for k, lx in enumerate((-LX, 0.0, LX)):
+    culm_part(f"BenchStretch{k}", (lx, SY - 0.025, ZBL + LR + 0.001), (lx, SY - 0.025, ZFL - LR - 0.001), SR, segs=6, turn=3.1 + k)
 
 # (two nodes, as the game had them: the seat and the rest)
 bpy.ops.object.select_all(action="DESELECT")
