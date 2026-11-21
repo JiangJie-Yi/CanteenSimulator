@@ -2,7 +2,6 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { Look, Role } from '@/data/staff'
 import { commuteOf } from '@/game/commute'
 import { CLIMB_S, downBeat, downLength, dormDoing, upBeat, upstairs } from '@/game/dormLife'
@@ -134,6 +133,45 @@ const stepped = (k: number) => { const s = Math.max(0, Math.min(1, k)) * 6, f = 
 const AT = new THREE.Vector3(), DIR = new THREE.Vector3()
 
 /**
+ * The quilt over one asleep (item 474, the owner's 「棉被被拉開的時候破圖了」: it was a rounded box with the futon's picture laid whole on each
+ * of its faces, the white crosses drawn out into streaks down its sides and round its edges, popping in and out): a cover laid over the one
+ * under it, high over the chest, a little lower over the legs, rising again over the feet, falling at its sides over the futon's edges and
+ * tucked at the shoulders; the picture laid over it from above, as the cloth is, once across it, so nothing's drawn out. Its feet's end at
+ * its origin, the rest toward -z (the shoulders), so it gathers toward the feet as it's pushed back (QUILT_L long, QUILT_W wide)
+ */
+const QUILT_W = 1.04, QUILT_L = 1.25
+const QUILT_GEO = (() => {
+  const NX = 12, NZ = 14, pos: number[] = [], uv: number[] = [], idx: number[] = []
+  const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t) }
+  for (let j = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++) {
+    const u = (i / NX) * 2 - 1, v = j / NZ
+    // (across: full over the middle, down over the sides; along: the chest, the legs a little lower, the feet; down at both ends)
+    const across = Math.pow(Math.max(0, 1 - Math.pow(Math.abs(u), 3.2)), 0.5)
+    const body = v < 0.5 ? 1 : v < 0.82 ? 0.9 + 0.02 * Math.sin(((v - 0.5) / 0.32) * Math.PI) : 0.95
+    const ends = 0.35 + 0.65 * smooth(0, 0.08, v) * smooth(1, 0.94, v)
+    // (as high over the chest as the one under it (their apron's front came through at 0.26 over the futon))
+    pos.push(u * (QUILT_W / 2), -0.06 + 0.4 * across * body * ends, -QUILT_L + v * QUILT_L)
+    uv.push((u + 1) / 2, 1 - v)
+  }
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+    const a = j * (NX + 1) + i, b = a + 1, c = a + NX + 1, d = c + 1
+    idx.push(a, c, b, b, c, d)
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  g.setIndex(idx)
+  g.computeVertexNormals()
+  return g
+})()
+/** the quilt where one lies at `spot`, as far drawn up over them as `f` (0 gathered at the feet .. 1 up to the shoulders) */
+function quiltAt(q: THREE.Object3D, spot: THREE.Vector3, f: number) {
+  q.position.set(spot.x, spot.y + 0.02, spot.z + 0.25 + QUILT_L)
+  // (pushed back, folded over on itself at the feet: shorter, a little higher; not a sheet stood on end)
+  q.scale.set(1, 1 + 0.25 * (1 - f), 0.4 + 0.6 * f)
+}
+
+/**
  * One who lives in, up here as the clock and the shop have them (game/dormLife): coming up the stair and across to their place, sat at the
  * table or asleep in their futon under a quilt drawn up to the shoulders, or up and off down the stair as the shop opens.
  */
@@ -153,9 +191,8 @@ const DORM_SEEN: Record<number, unknown> = {}
 if (import.meta.env.DEV && typeof window !== 'undefined') Object.assign(window, { __dormSeen: DORM_SEEN })
 
 const Resident = memo(function Resident({ m, k, marks, open, quilt, off }: { m: Living; k: number; marks: Marks; open: boolean; quilt: THREE.Material | null; off: boolean }) {
-  const g = useRef<THREE.Group>(null), cover = useRef<THREE.Mesh>(null)
+  const g = useRef<THREE.Group>(null), cover = useRef<THREE.Group>(null)
   const [pose, setPose] = useState({ moving: false, seated: false, asleep: false })
-  const QUILT = useMemo(() => new RoundedBoxGeometry(0.92, 0.36, 1.25, 2, 0.12), [])
   /** (from one place to the other as the time of day turns (to bed at four in the morning, up at eleven): up off it, across, down onto the
    * other; the place they're going from and when they set off) */
   const move = useRef<{ was: boolean; from: THREE.Vector3; at: number } | null>(null)
@@ -185,10 +222,11 @@ const Resident = memo(function Resident({ m, k, marks, open, quilt, off }: { m: 
       else if (mvFor < 0.5 + mvLen) { AT.copy(mv.from).lerp(spot, (mvFor - 0.5) / mvLen); DIR.copy(spot).sub(mv.from); moving = true }
       else settled = (mvFor - 0.5 - mvLen) / 0.5
       if (mvFor < 0.5 && mv.was) {
-        // (getting up out of bed: the lying pose unwound where they lay)
+        // (getting up out of bed: the quilt pushed back to the feet first, the lying pose unwound where they lay)
         const e = THREE.MathUtils.smoothstep(settled, 0, 1), len = 0.95 * FIG_SCALE / 0.823
         o.position.set(mv.from.x, mv.from.y + 0.08 * e, mv.from.z + len * e)
         o.rotation.set(-Math.PI / 2 * e, e > 0.5 ? 0 : Math.PI, 0)
+        if (cover.current) { cover.current.visible = true; quiltAt(cover.current, mv.from, THREE.MathUtils.smoothstep(settled, 0.45, 1)) }
         BEDS_LAID[k] = true
         const want = { moving: false, seated: false, asleep: false }
         if (want.moving !== pose.moving || want.seated !== pose.seated || want.asleep !== pose.asleep) setPose(want)
@@ -233,7 +271,8 @@ const Resident = memo(function Resident({ m, k, marks, open, quilt, off }: { m: 
       const e = THREE.MathUtils.smoothstep(settled, 0, 1), len = 0.95 * FIG_SCALE / 0.823
       o.position.set(spot.x, spot.y + 0.08 * e, spot.z + len * e)
       o.rotation.set(-Math.PI / 2 * e, e > 0.5 ? 0 : Math.PI, 0)
-      if (cover.current) { cover.current.visible = e > 0.9; cover.current.position.set(spot.x, spot.y + 0.12, spot.z + 0.25 + 0.62) }
+      // (the quilt, gathered at their feet, drawn up over them as they settle)
+      if (cover.current) { cover.current.visible = e > 0.55; quiltAt(cover.current, spot, THREE.MathUtils.smoothstep(e, 0.55, 1)) }
     } else {
       // (sat on their cushion, turned to the table; settling onto it a moment)
       o.position.copy(spot)
@@ -250,7 +289,7 @@ const Resident = memo(function Resident({ m, k, marks, open, quilt, off }: { m: 
           <StaffFigure id={m.id} role={m.role} look={m.look} moving={pose.moving} seated={pose.seated} face={pose.asleep ? 'blink' : undefined} />
         </group>
       </group>
-      {quilt && <mesh ref={cover} geometry={QUILT} material={quilt} visible={false} raycast={() => {}} />}
+      {quilt && <group ref={cover} visible={false}><mesh geometry={QUILT_GEO} material={quilt} raycast={() => {}} /></group>}
     </>
   )
 })
@@ -379,10 +418,11 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       ALLEY.mat.uniforms.uCam.value.copy(ALLEY_CAM)
     }
     alleyTo()
-    const asleep = dormDoing(getClock().minute) === 'sleep'
     let anyone = false
     living.forEach((m, k) => {
-      const laid = asleep && BEDS_LAID[k] && upNow(m.id, open, CLIMB_S + 12, offToday(m.id)).here
+      // (laid while they lie in it, and while they're getting up out of it (item 474): the futon's put away, and the table brought out, once
+      // they're up, not the moment the clock turns with them still under the quilt)
+      const laid = BEDS_LAID[k] && upNow(m.id, open, CLIMB_S + 12, offToday(m.id)).here
       const bed = pieces[`DormBedding${k}`]
       if (bed) bed.visible = laid
       anyone ||= laid
