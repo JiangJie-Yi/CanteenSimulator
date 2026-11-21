@@ -177,6 +177,13 @@ function along(dir: THREE.Vector3, ref: THREE.Vector3, roll: number) {
  * turned toward the one filling as far as the counter's front leaves room (the gap between the cooker and the miso pot there is widest
  * nearer the front); clear of what stands beside it (W.keepOff) (item 253) */
 export function holderAt(W: FillAt) {
+  // (item 461: the cooker moved left up to the miso pot, the gas stove at its right: its sides taken. Behind it, toward its right back
+  // corner, against the counter's back: its far side from the one filling (W.face points away from them), clear of it by a hair)
+  {
+    const d = W.r + HOLDER_R + 0.004
+    const p = W.top.clone().add(W.face.clone().multiplyScalar(0.7).addScaledVector(W.right, 0.71).normalize().multiplyScalar(d)).setY(W.low)
+    if (!(W.keepOff ?? []).some((o) => Math.hypot(p.x - o.at.x, p.z - o.at.z) < o.r + HOLDER_R + 0.01)) return p
+  }
   const sd = W.put.clone().sub(W.top).dot(W.right) > 0 ? -1 : 1
   const side = W.right.clone().multiplyScalar(sd), toward = W.face.clone().negate()
   const d = W.r + HOLDER_R + 0.004

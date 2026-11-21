@@ -4,7 +4,7 @@
 // them like anything else (DECOR is their footprint, for its settle()).
 import { NO_RAY } from '@/scene/pickable'
 import { getLights } from '@/scene/lightsStore'
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject, Suspense } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -22,6 +22,7 @@ import { ironSkewer } from './skewerShape'
 import { FREEZER_DEFAULT, FREEZER_MAX, FREEZER_MIN, driftTemp, stepTemp } from '@/game/freezer'
 import { setTip } from '@/scene/hoverTip'
 import { Movable } from './Movable'
+import { GasStove } from './Stove'
 import { COOK_S, RICE_FULL, riceGoes, setOn } from '@/game/rice'
 import { HEAT_S, heatNow, nextHeat, setSoup, soupGoes, SOUP_BOWLS } from '@/game/soup'
 import { LowPlateRack, PlateRack } from './PlateRack'
@@ -1093,7 +1094,9 @@ useGLTF.preload(DENKI_URL)
 // (on the rice-ball counter (PREP_AT), at its sink end (its rice is washed there), larger (the owner's, 2026-11-11: the rice is taken from it))
 // (at the rice-ball counter's left end, beside the miso pot (the owner's, 2026-11-11), 1.1 from its middle: blender/warmer.py's board and
 // the rest moved right for it)
-const DENKI_AT = { along: 4.3, lay: 1.742 - 1.1 - 0.937 }
+// (moved left up to the miso pot, 5 cm clear of it (item 461, the owner's 「電鍋往左移，右邊加一個瓦斯爐灶」): its right freed for its rice
+// bowl's place and the gas stove (Stove.tsx); its paddle's holder behind it now (SideBowls' holderAt))
+const DENKI_AT = { along: 4.3, lay: 1.742 - 1.1 - 0.937 - 0.43 }
 const DENKI_SCALE = 1.45
 const DENKI_TOP = COUNTER_TOP
 const LAMP_OFF = new THREE.Color('#3a1a14'), LAMP_COOK = new THREE.Color('#ff3a20'), LAMP_WARM = new THREE.Color('#ffb030')
@@ -2111,6 +2114,7 @@ function DecorImpl({ held, lanternAt, fanAt }: { held: RefObject<Held>; lanternA
       <Movable id="prepcounter" label="料理台（飯糰）"><PrepCounter /></Movable>
       <Movable id="misopot" label="味噌湯鍋"><MisoPot /></Movable>
       <Movable id="denkinabe" label="電鍋"><DenkiNabe /></Movable>
+      <Movable id="gasstove" label="瓦斯爐"><Suspense fallback={null}><GasStove /></Suspense></Movable>
       <Movable id="knives" label="刀具組" blocks><KnifeSet /></Movable>
       <group position={[0, 0, 0]}><FridgeAt /><RackAt /><SinkAt /><SacksAt /><VegAt /><CharcoalSackAt /></group>
     </>
