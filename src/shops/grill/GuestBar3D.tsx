@@ -427,12 +427,14 @@ function OwnerWalkerImpl() {
 const STAFF_DOOR_AT = -3.55
 /** the koi print, moved (the owner's): on the toilets' wall past the drinks fridges, on the plain plaster there; once only, the same array
  * each time (the wall's memo compares it) */
-const koiHangs = new Map<string, { z: number; print: 'koi' | 'rainBridge' }[]>()
+const koiHangs = new Map<string, { z: number; print: 'koi' | 'fuji' }[]>()
 // (by the men's toilet now, on the wall between the drinks fridges and its doorway, over the supplies' stack (the owner's, 2026-11-11): it hung on
 // the fridges' other side)
-// (and the rain on the bridge (雨中橋) by the women's toilet, in the middle of the wall between its doorway and the corner (item 430, the
-// owner's 「原本的畫不見了，幫我搬到女廁旁」: it hung in the bay past the drinks fridges, and item 425's move of the toilets and the fridges by
-// 2.6 cm put that bay's place inside the 30 cm kept clear of them, and it was gone; the bay is the storeroom's way in now))
+// (and Mount Fuji (富士山) by the women's toilet, in the middle of the wall between its doorway and the corner (item 430, the owner's
+// 「原本的畫不見了，幫我搬到女廁旁」: it hung in the bay past the drinks fridges, on their left from the room (measured on the code before
+// item 425: koi on their right, Fuji on their left, nothing else on that wall), and item 425's move of the toilets and the fridges by 2.6 cm
+// put that bay's place inside the 30 cm kept clear of them, and it was gone; the bay is the storeroom's way in now. Item 430 hung the rain
+// on the bridge (雨中橋) there by mistake: item 468, the owner's 「原本的畫怎變了? 是在冷藏櫃左手邊的，不是長這樣」))
 function koiHang(clear: [number, number][], from: number, door?: number, to?: number) {
   const g0 = door === undefined ? undefined : door - WC_W - 0.12
   const below = g0 === undefined ? [] : clear.filter((r) => r[1] <= g0)
@@ -441,7 +443,7 @@ function koiHang(clear: [number, number][], from: number, door?: number, to?: nu
   const rain = door !== undefined && to !== undefined && to - (door + WC_W + 0.12) > 0.75 ? (door + WC_W + 0.12 + to) / 2 : null
   const key = `${z.toFixed(3)}|${rain?.toFixed(3) ?? ''}`
   let v = koiHangs.get(key)
-  if (!v) { v = [{ z, print: 'koi' as const }, ...(rain === null ? [] : [{ z: rain, print: 'rainBridge' as const }])]; koiHangs.set(key, v) }
+  if (!v) { v = [{ z, print: 'koi' as const }, ...(rain === null ? [] : [{ z: rain, print: 'fuji' as const }])]; koiHangs.set(key, v) }
   return v
 }
 /** a customer in the boss's style, drawn in the customers' frame (PEOPLE_SCALE): the staff's size */
