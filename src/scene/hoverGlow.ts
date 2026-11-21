@@ -34,6 +34,10 @@ function brighten(m: THREE.Material): THREE.Material {
   return c
 }
 
+/** a mesh's own material, as it is when it isn't lit by the pointer (a copy of something made while it's pointed at takes this, not the
+ * glowing one: the sponge taken up in hand came out lit white, item 458) */
+export const restingMaterial = (m: THREE.Mesh) => WAS.get(m) ?? m.material
+
 /** while edit mode is on, nothing in the room lights up under the pointer (edit.ts sets it) */
 export const HOVER = { paused: false }
 

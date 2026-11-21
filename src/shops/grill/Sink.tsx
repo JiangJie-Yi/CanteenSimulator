@@ -18,7 +18,7 @@ import { EMPTY_AT } from '@/game/bins'
 import { DRAIN, DRYER, HAND_WASH, IN_USE, POINTER_HINT, SINK, SINK_BIN, SUPPLIES, squeezeSoap, tipOver } from './bar'
 import { DISH_SOAP } from '@/game/household'
 import { basinSays, waterTick } from '@/game/sinkWater'
-import { GUIDE_OF, HAND_STEP_SAYS, WASH_FLOW_SAYS, WASH_WET, handStep, pumpSoap, soapWith, washTips } from '@/game/handWash'
+import { GUIDE_OF, HAND_STEP_SAYS, SOAP_X, WASH_FLOW_SAYS, WASH_WET, handStep, pumpSoap, soapWith, washTips } from '@/game/handWash'
 import { glowOff, glowOn } from '@/scene/hoverGlow'
 import { aimTip, setTip } from '@/scene/hoverTip'
 import { HOVER } from '@/scene/hoverGlow'
@@ -293,13 +293,13 @@ export function SinkModel() {
     const ph = dryerPhase(DRYER), n = DRYER.n
     if (ph === 'washing') return `洗碗中⋯⋯還要 ${Math.max(1, Math.ceil(DRYER.left ?? 0))} 秒`
     if (ph === 'clean') return `洗好了（${n} 個），外場會收回碗盤櫃｜點一下${DRYER.manual ? '關門' : '開門'}`
-    if (DRYER.manual) return n > 0 ? `裡面 ${n} 個髒盤｜點一下關門開始洗` : '點一下關門'
-    return `點一下打開機門${n ? `（裡面 ${n} 個）` : ''}`
+    if (DRYER.manual) return n > 0 ? `裡面 ${n} 個髒盤｜把髒盤子拖進來，點一下關門開始洗` : '把髒盤子拖進來｜點一下關門'
+    return `點一下打開機門${n ? `（裡面 ${n} 個）` : ''}，就能把髒盤子拖進去`
   }
   const rackSays = () => {
     if (!DRYER.manual && DRYER.open < 1) return '打開機門才放得進去'
     const k = playerLoad(SINK.dirty, DRYER)
-    if (k > 0) return `點一下把流理台的 ${k} 個髒盤放進來`
+    if (k > 0) return `把髒盤子一個一個拖進來｜點一下把流理台的 ${k} 個一次放進來`
     if (dryerPhase(DRYER) === 'clean') return '裡面是洗好的，要先拿出來'
     if (DRYER.n >= DRYER_CAP) return `放滿了（${DRYER_CAP} 個）`
     return '流理台沒有髒盤子'
@@ -417,15 +417,15 @@ export function SinkModel() {
   return (
     <group>
       {/* (the sink itself: pointed at, it says how much water's in its basin and whether the plug's in) */}
-      <group onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused || HAND_WASH.held) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: basinHint() }); if (SINK.dirty > 0) guideOn() }}
+      <group ref={(g) => { WASH_GUIDE.basin = g }} onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on || HOVER.paused || HAND_WASH.held) return; hov.current = 'basin'; aimTip(e); const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && SINK.dirty > 0) cur.style.cursor = 'pointer'; setTip({ title: '流理台', hint: basinHint() }); if (SINK.dirty > 0) guideOn() }}
         onPointerOut={(e) => { if (hov.current === 'basin') hov.current = null; const cur = e.nativeEvent?.target as HTMLElement | null; if (cur?.style && cur.style.cursor === 'pointer' && !POINTER_HINT.hand) cur.style.cursor = ''; if (!HOVER.paused) setTip(null); guideOff() }}
-        onPointerDown={(e) => { if (getEdit().on || HAND_WASH.held || e.nativeEvent.button !== 0) return; if (SINK.dirty > 0 && HAND_WASH.take?.(e.nativeEvent.clientX, e.nativeEvent.clientY)) e.stopPropagation() }}
+        onPointerDown={(e) => { if (getEdit().on || HAND_WASH.held || e.nativeEvent.button !== 0) return; if ((SINK.dirty > 0 || HAND_WASH.soaking) && HAND_WASH.take?.(e.nativeEvent.clientX, e.nativeEvent.clientY)) e.stopPropagation() }}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on || HAND_WASH.held) return; setTip({ title: '流理台', hint: basinHint() }); guideOn() }}>
         <primitive object={root} />
       </group>
       <primitive object={pool} />
       {/* (the plug: pointed at it lights and says so; clicked, it's pulled out and laid by the drain, or put back in) */}
-      <group ref={(g) => { WASH_GUIDE.plug = g }} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver('塞子', plugSays()).onPointerOver(e) }}
+      <group ref={(g) => { WASH_GUIDE.plug = g }} onPointerDown={stopPress} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver('塞子', plugSays()).onPointerOver(e) }}
         onPointerOut={(e) => { if (getEdit().on) return; tipOver('塞子', '').onPointerOut(e) }}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.plug = !SINK.plug; tapTurnSound(SINK.plug, 0.4); guideOff(); tipOver('塞子', plugSays()).onPointerOver(e) }}>
         <primitive object={plug} />
@@ -434,13 +434,13 @@ export function SinkModel() {
       </group>
       <primitive object={chain} />
       {/* (the washer's door: pointed at it lights and says what the washer's doing; clicked, down or up (not while it washes)) */}
-      <group onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; hov.current = 'door'; tipOver('洗碗機', doorSays()).onPointerOver(e) }}
+      <group ref={(g) => { WASH_GUIDE.door = g }} onPointerDown={stopPress} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; hov.current = 'door'; tipOver('洗碗機', doorSays()).onPointerOver(e) }}
         onPointerOut={(e) => { if (hov.current === 'door') hov.current = null; if (getEdit().on) return; tipOver('洗碗機', '').onPointerOut(e) }}
         onClick={doorClick}>
         <primitive object={door} />
       </group>
       {/* (its basket, behind the door: once the door's down, clicked, the sink's dirty plates put in it) */}
-      <group onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; hov.current = 'rack'; tipOver('洗碗籃', rackSays()).onPointerOver(e) }}
+      <group ref={(g) => { WASH_GUIDE.rack = g }} onPointerDown={stopPress} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; hov.current = 'rack'; tipOver('洗碗籃', rackSays()).onPointerOver(e) }}
         onPointerOut={(e) => { if (hov.current === 'rack') hov.current = null; if (getEdit().on) return; tipOver('洗碗籃', '').onPointerOut(e) }}
         onClick={rackClick}>
         <primitive object={rack} />
@@ -452,7 +452,7 @@ export function SinkModel() {
       {/* (the breath of steam out of its door as it finishes) */}
       <Steam position={[steamAt.x, steamAt.y, steamAt.z]} level={steam} width={0.36} height={0.42} opacity={0.42} layers={3} speed={0.1} />
       {/* (the tap, its handle and the rest of it: pointed at it lights and says so; clicked, the water's turned on, or off) */}
-      <group ref={(g) => { WASH_GUIDE.tap = g }} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver('水龍頭', says()).onPointerOver(e) }}
+      <group ref={(g) => { WASH_GUIDE.tap = g }} onPointerDown={stopPress} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver('水龍頭', says()).onPointerOver(e) }}
         onPointerOut={(e) => { if (getEdit().on) return; tipOver('水龍頭', '').onPointerOut(e) }}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; SINK.tap = !SINK.tap; guideOff(); tipOver('水龍頭', says()).onPointerOver(e) }}>
         <primitive object={handle} />
@@ -476,7 +476,8 @@ const STOP_AT = new THREE.Vector3()
 const handSink = () => ({ dirty: SINK.dirty, drain: DRAIN, plug: SINK.plug, water: SINK.water, soap: SINK.soap, sponge: SINK.sponge, tap: SINK.tap })
 /** what lights up as the next thing to click to wash up by hand (item 215): the plug, the tap, the washing-up liquid, the sponge, the
  * draining basket (each set as it's drawn); lit while the dirty plates or the basin are pointed at, put out as the pointer leaves */
-export const WASH_GUIDE: Record<'plug' | 'tap' | 'soap' | 'sponge' | 'basket', THREE.Object3D | null> = { plug: null, tap: null, soap: null, sponge: null, basket: null }
+// (and where a plate carried is let go (item 458): the basin, the washer's door and its basket (item 460))
+export const WASH_GUIDE: Record<'plug' | 'tap' | 'soap' | 'sponge' | 'basket' | 'basin' | 'door' | 'rack', THREE.Object3D | null> = { plug: null, tap: null, soap: null, sponge: null, basket: null, basin: null, door: null, rack: null }
 let guideLit: THREE.Object3D | null = null
 export function guideOn() {
   const want = GUIDE_OF[handStep(handSink())]
@@ -614,9 +615,10 @@ export function SinkPart({ node }: { node: string }) {
   const lift = useRef<THREE.Group>(null)
   useFrame(() => {
     if (!lift.current) return
-    lift.current.position.y += ((node === 'SinkSpongeSet' && SINK.sponge ? SPONGE_UP : 0) - lift.current.position.y) * 0.25
+    lift.current.position.y += ((node === 'SinkSpongeSet' && SINK.sponge && !HAND_WASH.spongeAt ? SPONGE_UP : 0) - lift.current.position.y) * 0.25
     // (taken up by the owner to wash with (item 174): his hand has it, drawn there)
-    lift.current.visible = !(node === 'SinkSpongeSet' && HAND_WASH.spongeHeld)
+    // (and in the player's hand over the water (item 458): GuestBar3D draws it there)
+    lift.current.visible = !(node === 'SinkSpongeSet' && (HAND_WASH.spongeHeld || (SINK.sponge && !!HAND_WASH.spongeAt)))
   })
   /** a drop of the washing-up liquid out of its pump's spout (item 289), as the pump's pressed, flung a little way: into the water if the
    * basin's filled, else onto the sponge (where it's lying, or held up); heard as it's pumped and as it lands */
@@ -625,7 +627,9 @@ export function SinkPart({ node }: { node: string }) {
     const box = solidBox(obj)
     const wet = SINK.water >= WASH_WET
     let to: THREE.Vector3 | null = null
-    if (wet) {
+    // (onto the sponge in the player's hand, over the water (item 458))
+    if (SINK.sponge && HAND_WASH.spongeAt) to = HAND_WASH.spongeAt.clone().add(new THREE.Vector3(0, 0.02, 0))
+    if (!to && wet) {
       const pool = obj.parent?.parent?.getObjectByName('SinkWater') ?? null
       if (pool) to = pool.getWorldPosition(new THREE.Vector3())
     }
@@ -643,7 +647,7 @@ export function SinkPart({ node }: { node: string }) {
   }
   // (the washing-up liquid squeezed into the water, the sponge taken up or put down: steps of washing up by hand (item 103), clicked)
   if (node === 'SinkDetergentSet' || node === 'SinkSpongeSet') return (
-    <group ref={(g) => { lift.current = g; WASH_GUIDE[node === 'SinkDetergentSet' ? 'soap' : 'sponge'] = g }} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver(name, partSays(node)).onPointerOver(e) }}
+    <group ref={(g) => { lift.current = g; WASH_GUIDE[node === 'SinkDetergentSet' ? 'soap' : 'sponge'] = g }} onPointerDown={stopPress} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver(name, partSays(node)).onPointerOver(e) }}
       onPointerOut={(e) => { if (getEdit().on) return; tipOver(name, '').onPointerOut(e) }}
       onClick={(e) => {
         e.stopPropagation(); if (getEdit().on) return
@@ -664,7 +668,7 @@ export function SinkPart({ node }: { node: string }) {
     return (
       <>
         {(['rubbish', 'recycle'] as const).map((kind) => (
-          <group key={kind} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver(BIN_NAME[kind], binSays(kind)).onPointerOver(e) }}
+          <group key={kind} onPointerDown={stopPress} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver(BIN_NAME[kind], binSays(kind)).onPointerOver(e) }}
             onPointerOut={(e) => { tipOver(BIN_NAME[kind], '').onPointerOut(e) }}
             onClick={(e) => {
               e.stopPropagation(); if (getEdit().on) return
@@ -681,7 +685,7 @@ export function SinkPart({ node }: { node: string }) {
   }
   if (node !== 'SinkBasketSet') return (
     // (the rest name themselves pointed at (the owner's, 2026-11-11: every one of them), the bin with how many sticks are in it)
-    <group onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: name, hint: partSays(node) }) }}
+    <group onPointerDown={stopPress} onPointerOver={(e) => { e.stopPropagation(); if (HOVER.paused) return; aimTip(e); setTip({ title: name, hint: partSays(node) }) }}
       onPointerOut={() => { if (!HOVER.paused) setTip(null) }}
       // (a click is theirs, to do nothing with but say what they are: it went on through the soap or the brush to the basin behind, and
       // washed a plate (the owner, 2026-11-15, item 166: "why does clicking the soap and the brush clean the plates?"))
@@ -691,13 +695,16 @@ export function SinkPart({ node }: { node: string }) {
   )
   return (
     // (clickable now (the player takes its dry plates back to the racks): the pointing hand and its glow, as everything that can be clicked)
-    <group ref={(g) => { WASH_GUIDE.basket = g }} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver('瀝水籃', drainSays(DRAIN)).onPointerOver(e) }}
+    <group ref={(g) => { WASH_GUIDE.basket = g }} onPointerDown={stopPress} onPointerOver={(e) => { if (getEdit().on || HAND_WASH.held) return; tipOver('瀝水籃', drainSays(DRAIN)).onPointerOver(e) }}
       onPointerOut={(e) => { if (getEdit().on) return; tipOver('瀝水籃', '').onPointerOut(e) }}
       onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; HAND_WASH.ask = 'take'; window.setTimeout(() => setTip({ title: '瀝水籃', hint: drainSays(DRAIN) }), 80) }}>
       <primitive object={obj} />
     </group>
   )
 }
+/** a press on one of the sink's own things is its own (item 458): it went on through it to the basin behind, and a dirty plate was taken up
+ * and let go into the water, as the liquid was squeezed */
+const stopPress = (e: { stopPropagation: () => void }) => e.stopPropagation()
 /** a thing's own box, its ink line and its unseen box to point at left out (both bigger than the thing: a drop aimed at a box's top with
  * them landed in the air over the sponge) */
 function solidBox(o: THREE.Object3D) {
@@ -720,8 +727,8 @@ function partSays(node: string) {
     case 'SinkBinSet': return `${BIN_NAME.rubbish} ${binSays('rubbish')}｜${BIN_NAME.recycle} ${binSays('recycle')}`
     // (the name's the tip's title already: not said again at the head of its hint)
     case 'SinkDetergentSet': return IN_USE.soap <= 0 && SUPPLIES.has(DISH_SOAP) === 0 ? '用完了，庫存也沒有：到庫存的耗材訂洗碗精'
-      : `點一下擠一點${SINK.water >= WASH_WET ? '到水裡' : '在菜瓜布上'}（夠洗 ${SINK.soap} 個；這瓶還能擠 ${IN_USE.soap} 次）`
-    case 'SinkSpongeSet': return SINK.sponge ? '拿著了，洗盤子刷得快一倍｜點一下放回去' : '黃的那面軟，綠的那面刷｜點一下拿起來，洗盤子刷得快'
+      : `點一下擠一點${SINK.sponge && HAND_WASH.spongeAt ? '在手上的菜瓜布' : SINK.water >= WASH_WET ? '到水裡' : '在菜瓜布上'}，刷得快 ×${SOAP_X}（夠洗 ${SINK.soap} 個；這瓶還能擠 ${IN_USE.soap} 次）`
+    case 'SinkSpongeSet': return SINK.sponge ? '拿在手上了：在泡著的盤子上按住來回刷｜點菜瓜布碟子放回去' : '黃的那面軟，綠的那面刷｜點一下拿起來，在泡著的盤子上按住來回刷'
     default: return ''
   }
 }

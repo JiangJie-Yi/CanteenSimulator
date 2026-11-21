@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 import { feature, scenario } from './bdd'
 import { DRAIN_CAP, DRAIN_MIN, drainSays, drainTick, handOne, handWashSays, unbasket, type Drain } from '@/game/plates'
 import { MINUTES_PER_SECOND } from '@/game/clock'
-import { NO_SOAP_SLOW, RINSE_RATE, SOAK_RATE, WASH_BEATS, beatLength, handClean, handSays, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
+import { HAND_RUB, NO_SOAP_SLOW, RINSE_RATE, SCRUB_RATE, SOAK_RATE, SOAP_X, WASH_BEATS, beatLength, handClean, handSays, handStops, scrubbed, washBeat, washPlateS } from '@/game/handWash'
 import { CLEAN_AT } from '@/game/plates'
 
 feature('玩家手動洗碗', () => {
@@ -92,10 +92,11 @@ feature('玩家自己拿盤子洗（第 224 項）', () => {
       expect(SOAK_RATE).toBeLessThan(RINSE_RATE)
     })
   })
+  // (item 458: the sponge only cleans as it's rubbed over the plate; held still it does nothing more than the water)
   scenario('菜瓜布加洗碗精洗得更快，來回刷再更快', ({ then, and }) => {
     const left = (o: { sponge: boolean; soap: boolean; scrub: number }) => 0.6 - handClean(0.6, 0.5, 'tap', o)
-    then('拿著菜瓜布比空手快', () => { expect(left({ ...bare, sponge: true })).toBeGreaterThan(left(bare)) })
-    and('加了洗碗精又更快', () => { expect(left({ ...bare, sponge: true, soap: true })).toBeGreaterThan(left({ ...bare, sponge: true })) })
+    then('拿著菜瓜布刷比空手搓快', () => { expect(left({ ...bare, sponge: true, scrub: 1 })).toBeGreaterThan(left({ ...bare, scrub: 1 })) })
+    and('加了洗碗精又更快', () => { expect(left({ sponge: true, soap: true, scrub: 1 })).toBeGreaterThan(left({ ...bare, sponge: true, scrub: 1 })) })
     and('來回刷再更快', () => { expect(left({ sponge: true, soap: true, scrub: 1 })).toBeGreaterThan(left({ ...bare, sponge: true, soap: true })) })
     and('菜瓜布、洗碗精、用力刷，一個中等髒的盤子不到一秒半就乾淨', () => {
       let d = 0.6, t = 0
@@ -110,5 +111,57 @@ feature('玩家自己拿盤子洗（第 224 項）', () => {
     and('拿著菜瓜布、有洗碗精：建議來回刷', () => { expect(handSays('tap', 0.5, { sponge: true, soap: true, basketFull: false })).toContain('來回刷') })
     and('乾淨了：放進瀝水籃', () => { expect(handSays('tap', 0, { sponge: true, soap: true, basketFull: false })).toContain('瀝水籃') })
     and('乾淨了但瀝水籃滿了：先收乾的', () => { expect(handSays('tap', 0, { sponge: true, soap: true, basketFull: true })).toContain('收回碗盤架') })
+  })
+})
+
+// (item 458, the owner's 「字太小，然後玩的模式不對，應該是拖曳過去，然後用菜瓜布刷，有用洗碗精會加成。」: the plate dragged into the water, the
+// sponge taken up and rubbed over it; the liquid a bonus on the rubbing)
+feature('拖過去泡著，用菜瓜布刷，洗碗精加成（第 458 項）', () => {
+  const still = { sponge: false, soap: false, scrub: 0 }
+  scenario('只泡著或沖著，會慢慢變乾淨，但很慢', ({ then, and }) => {
+    then('泡一秒只少 SOAK_RATE', () => { expect(handClean(0.6, 1, 'water', still)).toBeCloseTo(0.6 - SOAK_RATE) })
+    and('一個很髒的盤子只泡不刷，要十秒以上', () => {
+      let d = 1, t = 0
+      while (d > CLEAN_AT && t < 60) { d = handClean(d, 0.1, 'water', still); t += 0.1 }
+      expect(t).toBeGreaterThan(10)
+    })
+  })
+  scenario('拿著菜瓜布不刷，不會變快', ({ then }) => {
+    then('拿著不動跟沒拿一樣', () => { expect(handClean(0.6, 1, 'water', { ...still, sponge: true })).toBeCloseTo(handClean(0.6, 1, 'water', still)) })
+  })
+  // (how much a second comes off, from a quarter second's washing (a whole second takes a plate this dirty clean, and stops at clean))
+  const perS = (o: { sponge: boolean; soap: boolean; scrub: number }) => (0.9 - handClean(0.9, 0.25, 'water', o)) / 0.25
+  scenario('用菜瓜布刷是洗乾淨的主要方式', ({ then, and }) => {
+    then('用力刷，每秒比泡水多刷掉 SCRUB_RATE', () => {
+      expect(perS({ ...still, sponge: true, scrub: 1 })).toBeCloseTo(SOAK_RATE + SCRUB_RATE)
+    })
+    and('空手搓只有菜瓜布的 HAND_RUB', () => {
+      expect(perS({ ...still, scrub: 1 })).toBeCloseTo(SOAK_RATE + SCRUB_RATE * HAND_RUB)
+      expect(HAND_RUB).toBeLessThan(0.5)
+    })
+    and('一個很髒的盤子用菜瓜布用力刷，一秒半內乾淨', () => {
+      let d = 1, t = 0
+      while (d > CLEAN_AT && t < 10) { d = handClean(d, 0.05, 'water', { ...still, sponge: true, scrub: 1 }); t += 0.05 }
+      expect(t).toBeLessThan(1.5)
+    })
+  })
+  scenario('擠了洗碗精，刷的那部分加成 SOAP_X', ({ then }) => {
+    then('同樣用力刷，刷的那份變成 SOAP_X 倍', () => {
+      const plain = perS({ ...still, sponge: true, scrub: 1 }), soapy = perS({ sponge: true, soap: true, scrub: 1 })
+      expect(soapy - SOAK_RATE).toBeCloseTo((plain - SOAK_RATE) * SOAP_X)
+    })
+  })
+  scenario('拿著盤子、泡著、刷著，各說下一步', ({ then, and }) => {
+    then('拿著盤子：說拖到水裡，也能放進洗碗機', () => {
+      const s = handSays(null, 0.6, { sponge: false, soap: false, basketFull: false, held: true })
+      expect(s).toContain('水')
+      expect(s).toContain('洗碗機')
+    })
+    and('泡著、沒拿菜瓜布：說拿菜瓜布來刷', () => { expect(handSays('water', 0.6, { sponge: false, soap: false, basketFull: false })).toContain('菜瓜布') })
+    and('拿著菜瓜布、沒擠洗碗精：說擠洗碗精的加成', () => {
+      const s = handSays('water', 0.6, { sponge: true, soap: false, basketFull: false })
+      expect(s).toContain('洗碗精')
+      expect(s).toContain(`×${SOAP_X}`)
+    })
   })
 })

@@ -1203,8 +1203,9 @@ body.be-tool .app > :not(.canvas-layer):not(.axis-widget) { display: none; }
   white-space: nowrap;
 }
 
+/* (12 px, item 458, the owner's 「字太小」: at 10 the sink's steps were hard to read) */
 .tool-tag small {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--ink-soft);
 }
@@ -5234,7 +5235,7 @@ body.be-tool .axis-widget { left: calc(var(--bt-left) + 12px); bottom: calc(var(
      tag, never out past its edges (it ran out both sides of the drinks' storage's)) */
   /* (neat and small (the owner's): as wide as its words and no wider, 240 px at most, close padding, its lines close and centred) */
   width: max-content;
-  max-width: 240px;
+  max-width: 320px;
   padding: 6px 12px;
   box-sizing: border-box;
   white-space: normal;
@@ -5259,8 +5260,8 @@ body.be-tool .axis-widget { left: calc(var(--bt-left) + 12px); bottom: calc(var(
 }
 
 .hover-tip .tool-tag small.tip-act {
-  font-size: 9px;
-  opacity: 0.72;
+  font-size: 12px;
+  opacity: 0.85;
 }
 
 /* (a person's name (scene/FigureHit): the speech bubbles' dark glass, the name in their speakers' yellow) */
