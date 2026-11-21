@@ -1091,7 +1091,9 @@ export const HAND_WASH: { ask: 'wash' | 'take' | null; until: number; boss: bool
   take: ((x: number, y: number) => boolean) | null
   /** (item 458) a plate of the player's lying in the water to be rubbed (a press on the basin rubs it then); where the sponge in the player's
    * hand is, in the world, while it's over the water (the liquid's squeezed onto it there), or null */
-  soaking: boolean; spongeAt: THREE.Vector3 | null } = keep(import.meta.hot, 'HAND_WASH', { ask: null, until: 0, boss: false, spongeHeld: false, stream: null, held: false, take: null, soaking: false, spongeAt: null })
+  soaking: boolean; spongeAt: THREE.Vector3 | null
+  /** (item 459) where the sponge in hand is brought to, till when: under the washing-up liquid's spout as it's pressed, to catch it */
+  spongeTo: { at: THREE.Vector3; until: number } | null } = keep(import.meta.hot, 'HAND_WASH', { ask: null, until: 0, boss: false, spongeHeld: false, stream: null, held: false, take: null, soaking: false, spongeAt: null, spongeTo: null })
 /** where the shop's plates are just now, told over for the racks' and the basket's labels (the owner's: every plate counted): on the racks, in
  * the sink, in the washer, in the basket, and out (the plating place's stack, on their way, at the seats); GuestBar3D keeps it */
 export const PLATE_COUNT = keep(import.meta.hot, 'PLATE_COUNT', { rack: 0, low: 0, sink: 0, washer: 0, basket: 0, out: 0 })

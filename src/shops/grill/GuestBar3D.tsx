@@ -8957,8 +8957,10 @@ function GuestBar3DImpl({ guests, at, length = 3.6, drawCounter = true, lang, to
         const wt = f.localToWorld(HAND_TOP.copy(inBar('SinkWaterTop', endOf(1))))
         const rubbing = !!h && h.phase === 'soak' && h.rub
         const lvl = rubbing && o ? o.getWorldPosition(HAND_W).y + 0.03 : wt.y + 0.04
-        const p = pointerNow.current.x >= 0 ? pointerAtY(pointerNow.current.x, pointerNow.current.y, lvl) : null
-        const near = !!p && Math.hypot(p.x - wt.x, p.z - wt.z) < SPONGE_REACH
+        // (brought under the liquid's spout as it's pressed, to catch it (item 459), else after the pointer)
+        const to = HAND_WASH.spongeTo && now < HAND_WASH.spongeTo.until ? HAND_WASH.spongeTo.at : null
+        const p = to ?? (pointerNow.current.x >= 0 ? pointerAtY(pointerNow.current.x, pointerNow.current.y, lvl) : null)
+        const near = !!to || (!!p && Math.hypot(p.x - wt.x, p.z - wt.z) < SPONGE_REACH)
         w.g.visible = near
         if (p && near) {
           w.g.position.lerp(p, Math.min(1, step * 30))

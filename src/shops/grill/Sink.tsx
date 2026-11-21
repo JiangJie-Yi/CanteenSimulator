@@ -627,12 +627,19 @@ export function SinkPart({ node }: { node: string }) {
     const box = solidBox(obj)
     const wet = SINK.water >= WASH_WET
     let to: THREE.Vector3 | null = null
-    // (onto the sponge in the player's hand, over the water (item 458))
-    if (SINK.sponge && HAND_WASH.spongeAt) to = HAND_WASH.spongeAt.clone().add(new THREE.Vector3(0, 0.02, 0))
-    if (!to && wet) {
-      const pool = obj.parent?.parent?.getObjectByName('SinkWater') ?? null
-      if (pool) to = pool.getWorldPosition(new THREE.Vector3())
+    // (onto the sponge in the player's hand (item 458), brought under the spout to catch it (item 459: where the pointer was, on the bottle,
+    // it lay behind it, out of sight, and the liquid went up and back over the bottle's top to it): a hand's width out from the bottle toward
+    // the water, a little over the counter)
+    const pool = obj.parent?.parent?.getObjectByName('SinkWater') ?? null
+    if (SINK.sponge) {
+      const c0 = box.getCenter(new THREE.Vector3()), w = pool ? pool.getWorldPosition(new THREE.Vector3()).sub(c0).setY(0) : new THREE.Vector3(0, 0, 1)
+      if (w.lengthSq() < 1e-8) w.set(0, 0, 1)
+      const at = c0.clone().addScaledVector(w.normalize(), Math.max(box.getSize(new THREE.Vector3()).x, 0.05) * 0.9 + 0.03).setY(box.min.y + 0.05)
+      HAND_WASH.spongeTo = { at, until: performance.now() + 1100 }
+      // (onto the sponge's top: it's held about its middle, a couple of centimetres thick)
+      to = at.clone().add(new THREE.Vector3(0, 0.016, 0))
     }
+    if (!to && wet && pool) to = pool.getWorldPosition(new THREE.Vector3())
     if (!to && WASH_GUIDE.sponge) {
       const b = solidBox(WASH_GUIDE.sponge)
       to = b.getCenter(new THREE.Vector3()).setY(b.max.y + 0.002)
