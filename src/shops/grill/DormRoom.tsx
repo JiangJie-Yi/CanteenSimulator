@@ -10,6 +10,7 @@ import { SHOP } from '@/game/shopState'
 import { inkModel } from '@/scene/inkHull'
 import { mergeByMaterial } from '@/scene/StaticBatch'
 import { setTip } from '@/scene/hoverTip'
+import { SIGN_FONT, signTexture } from '@/scene/signFont'
 import { StaffFigure } from '@/scene/StaffFigure'
 import { getClock } from '@/ui/clockStore'
 import { DORM_LIFE } from './bar'
@@ -60,7 +61,32 @@ const STAIR = { x: 1.35, z: 0.625, w: 0.8, d: 1.4 }
 /** the bathroom's door (item 427, blender/dorm.py's DormBathDoor): the doorway's middle and size (the room's metres), how far the door
  * slides left into the wall's pocket, and how long it takes */
 const BATH = { x: 1.36, y: 1.01, z: -1.4, w: 0.72, h: 1.68, slide: 0.7, s: 0.5 }
-const BATH_TIP = (open: boolean) => ({ title: '浴室', hint: `住在樓上的員工用的浴室與廁所｜點一下${open ? '拉上' : '拉開'}` })
+const BATH_TIP = (open: boolean) => ({ title: '衛浴', hint: `住在樓上的員工用的浴室與廁所｜點一下${open ? '拉上' : '拉開'}` })
+/** the bath's half-noren over the way in from the room, as a house's changing room's is (item 447, the owner's 「衛浴設備是日式的哦！」;
+ * blender/dorm.py's BD0, BD1, BDH): its rod's place (the room's metres: 4 cm before the wall, just under the doorway's head), its width (the
+ * doorway's and its jambs') and its length (to over the work clothes' hooks on the door behind it) */
+const YU = { x: 1.36, top: 1.872, z: -1.31, w: 0.8, l: 0.4 }
+/** its cloth: persimmon-dyed (kakishibu), darker where it's sewn over the rod, a big white ゆ (the bath) across its two panels, a white line
+ * along its hem, the weave; the slit between the panels let through (alpha-tested, not blended) */
+const YU_TEX = signTexture(512, Math.round((512 * YU.l) / YU.w), (g, w, h) => {
+  g.fillStyle = '#7a3420'; g.fillRect(0, 0, w, h)
+  g.globalAlpha = 0.06
+  g.fillStyle = '#ffffff'
+  for (let x = 0; x < w; x += 3) g.fillRect(x, 0, 1, h)
+  g.fillStyle = '#000000'
+  for (let y = 0; y < h; y += 3) g.fillRect(0, y, w, 1)
+  g.globalAlpha = 1
+  const band = Math.round(h * 0.07)
+  g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, w, band)
+  g.fillStyle = '#efe9dc'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.font = `700 ${Math.round(h * 0.6)}px ${SIGN_FONT}`
+  g.fillText('ゆ', w / 2, band + (h - band) * 0.47)
+  g.fillRect(0, h - Math.round(h * 0.07), w, Math.max(2, Math.round(h * 0.012)))
+  g.clearRect(Math.round(w / 2 - w * 0.008), band, Math.round(w * 0.016), h - band)
+})
+const YU_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: YU_TEX, side: THREE.DoubleSide, alphaTest: 0.5 })
+const YU_ROD = new THREE.MeshToonMaterial({ color: '#d9b884' })
+const YU_BRACKET = new THREE.MeshToonMaterial({ color: '#3a2416' })
 /** (dev) the bathroom's door worked by hand */
 const BATH_STATE = { open: false, t0: -1, from: 0, cur: 0 }
 /** where the owner's clothes are kept, in the room's frame (blender/dorm.py): the closet's sliding doors (its front at the left wall,
@@ -295,9 +321,10 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     // wall's inner face's x (the piece's furthest in less its trims' 2.2 cm))
     const leftCut = r.getObjectByName('DormLeftCut') ?? new THREE.Group()
     const leftX = new THREE.Box3().setFromObject(leftCut).max.x - 0.022
-    // (and the bathroom's door, which slides (item 427); and the bathroom's right wall, its panels, its cap and what hangs on it (its
-    // DormBathCut), taken away as the left wall is while the view's turned round past it: the bathroom looked into from that side, not a
-    // blank wall as tall as the room; the wall's inner face's x (the piece's furthest out less the wall's 10 cm and its cap's 4 mm over))
+    // (and the bathroom's door, which slides (item 427); and the bathroom's right wall, its cap and what hangs on it, and the wall between
+    // its toilet and its bath with all on that (its DormBathCut, item 447), taken away as the left wall is while the view's turned round
+    // past it: the bathroom looked into from that side as one, not a blank wall as tall as the room; the right wall's inner face's x (the
+    // piece's furthest out less the wall's 10 cm and its cap's 4 mm over))
     const bathDoor = r.getObjectByName('DormBathDoor') ?? null
     const bathCut = r.getObjectByName('DormBathCut') ?? new THREE.Group()
     const bathCutX = new THREE.Box3().setFromObject(bathCut).max.x - 0.104
@@ -383,6 +410,19 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
         onPointerOver={(e) => { e.stopPropagation(); if (getEdit().on) return; document.body.style.cursor = 'pointer'; setTip(BATH_TIP(BATH_STATE.open)) }}
         onPointerOut={() => { document.body.style.cursor = ''; setTip(null) }}>
         <boxGeometry args={[BATH.w, BATH.h, 0.04]} />
+      </mesh>
+      {/* (the bath's half-noren of ゆ over the way in (item 447): its rod on two brackets off the wall, the cloth from it; a click goes
+          through it to the door behind) */}
+      <mesh position={[YU.x, YU.top, YU.z]} rotation-z={Math.PI / 2} material={YU_ROD} raycast={() => {}}>
+        <cylinderGeometry args={[0.008, 0.008, YU.w + 0.06, 10]} />
+      </mesh>
+      {[-1, 1].map((k) => (
+        <mesh key={k} position={[YU.x + k * (YU.w / 2 + 0.02), YU.top, YU.z - 0.014]} material={YU_BRACKET} raycast={() => {}}>
+          <boxGeometry args={[0.012, 0.012, 0.03]} />
+        </mesh>
+      ))}
+      <mesh position={[YU.x, YU.top - 0.008 - YU.l / 2, YU.z]} material={YU_MAT} raycast={() => {}}>
+        <planeGeometry args={[YU.w, YU.l]} />
       </mesh>
       {/* (the closet's doors and the chest: pointed at, named; clicked, the owner's clothes to choose (App's panel, as a click on him opens)) */}
       {WARDROBE.map((w) => (

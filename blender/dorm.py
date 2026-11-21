@@ -113,17 +113,22 @@ band = np.floor(u * 9)
 spine = np.stack([0.3 + 0.5 * ((band * 37) % 7) / 7, 0.25 + 0.4 * ((band * 53) % 5) / 5, 0.25 + 0.5 * ((band * 29) % 6) / 6], -1)
 spine = mix(spine, (0.92, 0.9, 0.84), ((v > 0.7) & (v < 0.78)).astype(np.float32))
 spine = spine * (1 - 0.6 * (np.abs(((u * 9) % 1) - 0.5) > 0.46))[..., None]
-# (the bathroom's pictures (item 427): its wall panels pale, a seam every 45 cm, a faint mottle; its floor pale grey, a grid of little
-# non-slip dimples; the door's frosted pane, milky, a faint vertical ripple)
+# (the bathroom's pictures (items 427, 447): its walls white glazed tiles, 10 cm (nine to its 0.9 m), a faint blue in the glaze, each a
+# shade of its own, grey grout; its floor little square mosaic tiles, 2.5 cm (twenty to its 0.5 m), pale blues and greys mixed, light
+# grout; the frosted panes, milky, a faint vertical ripple; hinoki, pale straw-gold, a fine straight grain along u, a few darker lines)
 NB = 256
 ub, vb = grid01(NB)
-bathwall = mix((0.90, 0.89, 0.86), (0.84, 0.84, 0.82), fbm(NB, 6, 6, 4))
-seam = smooth(0.006, 0.0, np.abs(((ub * 0.9) % 0.45) - 0.225) - 0.2195)
-bathwall = bathwall * (1 - 0.16 * seam)[..., None]
-bathfloor = mix((0.74, 0.74, 0.72), (0.68, 0.68, 0.67), fbm(NB, 8, 8, 3))
-dimple = smooth(0.35, 0.2, np.hypot(((ub * 0.5) % 0.025) / 0.025 - 0.5, ((vb * 0.5) % 0.025) / 0.025 - 0.5))
-bathfloor = bathfloor * (1 - 0.12 * dimple)[..., None]
+cell = ((np.floor(ub * 9) * 7 + np.floor(vb * 9) * 13) % 5) / 5
+bathwall = mix((0.90, 0.94, 0.94), (0.84, 0.90, 0.91), fbm(NB, 5, 5, 3)) * (0.96 + 0.05 * cell)[..., None]
+grout = ((np.abs(((ub * 9) % 1) - 0.5) > 0.465) | (np.abs(((vb * 9) % 1) - 0.5) > 0.465)).astype(np.float32)
+bathwall = mix(bathwall, (0.66, 0.69, 0.69), grout)
+cellf = ((np.floor(ub * 20) * 11 + np.floor(vb * 20) * 17) % 7) / 7
+bathfloor = mix((0.6, 0.71, 0.78), (0.76, 0.79, 0.8), cellf) * (0.96 + 0.06 * fbm(NB, 6, 6, 3))[..., None]
+groutf = ((np.abs(((ub * 20) % 1) - 0.5) > 0.43) | (np.abs(((vb * 20) % 1) - 0.5) > 0.43)).astype(np.float32)
+bathfloor = mix(bathfloor, (0.86, 0.86, 0.84), groutf)
 frost = mix((0.86, 0.88, 0.88), (0.80, 0.83, 0.84), fbm(NB, 3, 24, 4))
+hg = np.sin((vb * 60 + (fbm(NB, 2, 12, 3) - 0.5) * 1.6) * 2 * math.pi) * 0.5 + 0.5
+hinoki = mix((0.93, 0.83, 0.62), (0.84, 0.71, 0.5), smooth(0.65, 1.0, hg) * 0.55) * (0.95 + 0.07 * fbm(NB, 3, 3, 3))[..., None]
 M = {
     "tatami": pbr("DormTatami", (1, 1, 1), tex=image("dorm_tatami", np.clip(tatami, 0, 1).astype(np.float32)), rough=0.8),
     "heri": pbr("DormHeri", (1, 1, 1), tex=image("dorm_heri", np.clip(heri, 0, 1).astype(np.float32)), rough=0.8),
@@ -156,8 +161,8 @@ M = {
     "flask": pbr("DormFlask", lin("#c8463a"), rough=0.4),
     "clock": pbr("DormClockFace", lin("#f4f1ea"), rough=0.6),
     "box": pbr("DormBox", lin("#b8946a"), rough=0.9),
-    # (the bathroom (item 427): its panels, its floor's non-slip dimples, the tub's and the fittings' ivory FRP and china, the water, the
-    # chrome, the frosted door, the mirror, the mat, the towel, the curtain)
+    # (the bathroom (items 427, 447): its tiles, its mosaic, the fittings' ivory china, the water, the chrome, the frosted panes, the
+    # mirrors, the mat, the towel; the hinoki, the bucket's copper hoop, the toilet's slippers, the bottles)
     "bathwall": pbr("DormBathWall", (1, 1, 1), tex=image("dorm_bathwall", np.clip(bathwall, 0, 1).astype(np.float32)), rough=0.5),
     "bathfloor": pbr("DormBathFloor", (1, 1, 1), tex=image("dorm_bathfloor", np.clip(bathfloor, 0, 1).astype(np.float32)), rough=0.7),
     "frp": pbr("DormBathFRP", lin("#efeadd"), rough=0.35),
@@ -167,7 +172,10 @@ M = {
     "mirror": pbr("DormMirror", lin("#9fb0b8"), rough=0.05, metal=0.6),
     "bathmat": pbr("DormBathMat", lin("#4f7f9a"), rough=0.95),
     "towel": pbr("DormTowel", lin("#e8d6b8"), rough=0.95),
-    "curtain": pbr("DormCurtain", lin("#dfe6e8"), rough=0.8),
+    "hinoki": pbr("DormHinoki", (1, 1, 1), tex=image("dorm_hinoki", np.clip(hinoki, 0, 1).astype(np.float32)), rough=0.7),
+    "copper": pbr("DormCopper", lin("#b06a3c"), rough=0.35, metal=0.6),
+    "wcslipper": pbr("DormWcSlipper", lin("#6f8f6c"), rough=0.6),
+    "bottle_b": pbr("DormBottleB", lin("#9cc3cf"), rough=0.4),
     "bottle_g": pbr("DormBottleG", lin("#5f8f6a"), rough=0.4),
     "bottle_w": pbr("DormBottleW", lin("#f1efe8"), rough=0.4),
 }
@@ -241,16 +249,21 @@ def soft(name, lo, hi, mat, r=0.02, tile=1.0, group=None, segs=2, bulge=0.0):
     return _finish(bpy.data.objects.new(name, me), mat, tile, group, smooth_=True)
 
 
-def lathe(name, x, y, z, prof, mat, segs=16, group=None):
-    """turned round the upright through (x, y, z): `prof` (radius, height) from the foot up; its ends closed in a ladder, not a fan"""
+def lathe(name, x, y, z, prof, mat, segs=16, group=None, sx=1.0, sz=1.0, bands=None):
+    """turned round the upright through (x, y, z): `prof` (radius, height) from the foot up; its ends closed in a ladder, not a fan; `sx`,
+    `sz` its round drawn out across and along (an oval: a toilet's bowl); `bands` a material for each band between the profile's points
+    (a bucket's hoop), else `mat` for all"""
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new()
-    rings = [[bm.verts.new(P(x + r * math.cos(2 * math.pi * k / segs), y + h, z + r * math.sin(2 * math.pi * k / segs))) for k in range(segs)]
+    keys = list(dict.fromkeys(bands)) if bands else [mat]
+    rings = [[bm.verts.new(P(x + r * sx * math.cos(2 * math.pi * k / segs), y + h, z + r * sz * math.sin(2 * math.pi * k / segs))) for k in range(segs)]
              for r, h in prof]
     for i in range(len(rings) - 1):
         for k in range(segs):
             k2 = (k + 1) % segs
             f = bm.faces.new((rings[i][k], rings[i][k2], rings[i + 1][k2], rings[i + 1][k]))
+            if bands:
+                f.material_index = keys.index(bands[i])
             for loop, (uu, vv) in zip(f.loops, ((k / segs, i / len(rings)), ((k + 1) / segs, i / len(rings)),
                                                 ((k + 1) / segs, (i + 1) / len(rings)), (k / segs, (i + 1) / len(rings)))):
                 loop[uvl].uv = (uu, vv)
@@ -265,10 +278,36 @@ def lathe(name, x, y, z, prof, mat, segs=16, group=None):
     bm.free()
     o = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(o)
-    o.data.materials.append(M[mat])
+    for kk in keys:
+        o.data.materials.append(M[kk])
     for p_ in o.data.polygons:
         p_.use_smooth = len(p_.vertices) == 4
     (groups.setdefault(group, []) if group else parts).append(o)
+    return o
+
+
+def tube(name, x, y, z0, z1, r, mat, segs=10, group=None, axis="z"):
+    """a round lying along z from z0 to z1 about (x, y) (a roll of paper): its sides smooth, its ends flat (laid in a ladder on export);
+    `axis` "x": lying along x instead, from z0 to z1 there, about (y, z) = (y, x)"""
+    bm = bmesh.new()
+    if axis == "x":
+        rings = [[bm.verts.new(P(xx, y + r * math.sin(2 * math.pi * k / segs), x + r * math.cos(2 * math.pi * k / segs))) for k in range(segs)]
+                 for xx in (z0, z1)]
+    else:
+        rings = [[bm.verts.new(P(x + r * math.cos(2 * math.pi * k / segs), y + r * math.sin(2 * math.pi * k / segs), zz)) for k in range(segs)]
+                 for zz in (z0, z1)]
+    for k in range(segs):
+        k2 = (k + 1) % segs
+        bm.faces.new((rings[0][k], rings[0][k2], rings[1][k2], rings[1][k]))
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = _finish(bpy.data.objects.new(name, me), mat, 0.4, group)
+    for p_ in o.data.polygons:
+        p_.use_smooth = len(p_.vertices) == 4
     return o
 
 
@@ -482,78 +521,169 @@ for k, y in enumerate((LY - 0.005, LY + 0.275)):
 block("DormLampCord", (TCX - 0.005, LY + 0.29, TCZ - 0.005), (TCX + 0.005, H, TCZ + 0.005), "dark", 0.2)
 block("DormLampPull", (TCX + 0.1 - 0.003, LY - 0.3, TCZ - 0.003), (TCX + 0.1 + 0.003, LY, TCZ + 0.003), "dark", 0.2)
 
-# ---------------------------------------------------------------------------------------------------- the bathroom (item 427)
-# (behind the back wall's right stretch, over the stair's head: x from BX0 to BX1, z from BZ0 back to BZ1 at the wall's back; its floor a
-# step up (a unit bath's pan); its walls pale panels inside, plaster outside, as high as the room's; open to the sky)
-BX0, BX1 = 0.05, X1
+# ---------------------------------------------------------------------------------------------------- the bathroom (items 427, 447, 451)
+# (behind the back wall's right stretch, over the stair's head: x from BX0 to BX1, z from BZ0 back to BZ1 at the wall's back; plaster
+# outside, as high as the room's, open to the sky as it is. Its left wall clear of the window by 30 cm of the house's back wall (item 451,
+# the owner's 「窗台外看出去就是浴室?」: it stood against the window's edge, into it 5 cm). Japanese, as a house's is (item 447, the owner's
+# 「衛浴設備是日式的哦！」): in from the room, the changing room with the toilet and the basin (洗面所とトイレ: a board floor; the toilet at
+# its left end with its warm-water seat and its buttons, the basin on its cistern's lid, its paper, the slippers by the door; the basin's
+# cabinet at its right, its mirror cabinet over it); a wall across behind it, the bath's frosted door in it straight on from the way in;
+# behind that the bath (浴室) all across: white tiles, a mosaic floor a step down, the deep square hinoki tub at its left under its lid of
+# boards, the washing place at its right (slatted boards, the stool facing the tap and the shower low on the back wall, the mirror over them,
+# the three bottles on a rack by them, the bucket). Seen straight on through both doors; looked down on, the tub's open end and the tap;
+# turned to the stair's side, the right wall and the wall across taken away (the cut), all of it)
+BX0, BX1 = 0.4, X1
 BZ1 = Z0 - WALL
-BZ0 = BZ1 - 1.55
+BZ0 = BZ1 - 1.8
 BF = FLOOR + 0.12
-block("DormBathFloor", (BX0, 0.0, BZ0), (BX1, BF, BZ1), "bathfloor", 0.5)
-# (its right wall, its panels, its cap and what hangs on it: a piece of their own, for the game to take away while the view's turned round
-# to that side, as the room's left wall is (item 426): the bathroom looked into from the side, not a blank wall as tall as the room)
+BW = BF - 0.03
+# (the wall across: z from PZ0 to PZ1; the bath's doorway in it from DX0 to DX1, up to BDH2)
+PZ0, PZ1 = BZ0 + 1.0, BZ0 + 1.05
+DX0, DX1, BDH2 = 1.05, 1.63, BF + 1.8
+# (its right wall, its cap and what hangs on it, and the wall across with all on it: a piece of their own, for the game to take away while
+# the view's turned round to that side, as the room's left wall is (item 426); under the wall across a strip of the bath's floor)
 BATH_CUT = "DormBathCut"
-# (its walls: the back, the left, the right; each a slab, its inside face its panels (a thin skin 2 mm in front of the slab))
+block("DormBathFloor", (BX0, 0.0, BZ0), (BX1, BW, PZ0), "bathfloor", 0.5)
+block("DormBathMidFloor", (BX0, 0.0, PZ0), (BX1, BW, PZ1), "bathfloor", 0.5)
+block("DormWashFloor", (BX0, 0.0, PZ1), (BX1, BF, BZ1), "boards", 0.9)
+# (its walls: the back, the left, the right, each a slab of plaster; the wall across round the bath's doorway (its jambs 3 cm within))
 for nm, lo, hi in (("Back", (BX0 - WALL, 0.0, BZ0 - WALL), (BX1 + WALL, H, BZ0)), ("Left", (BX0 - WALL, 0.0, BZ0), (BX0, H, BZ1)),
                    ("Right", (BX1, 0.0, BZ0), (BX1 + WALL, H, BZ1))):
     block(f"DormBath{nm}Wall", lo, hi, "plaster", 1.2, group=BATH_CUT if nm == "Right" else None)
-block("DormBathSkinBack", (BX0, BF, BZ0), (BX1, H, BZ0 + 0.002), "bathwall", 0.9)
-block("DormBathSkinLeft", (BX0, BF, BZ0 + 0.002), (BX0 + 0.002, H, BZ1), "bathwall", 0.9)
-block("DormBathSkinRight", (BX1 - 0.002, BF, BZ0 + 0.002), (BX1, H, BZ1), "bathwall", 0.9, group=BATH_CUT)
-# (the room's back wall seen from inside: panelled too, round the doorway)
-block("DormBathSkinFrontL", (BX0 + 0.002, BF, BZ1 - 0.002), (BD0 - 0.04, H, BZ1), "bathwall", 0.9)
-block("DormBathSkinFrontR", (BD1 + 0.04, BF, BZ1 - 0.002), (BX1 - 0.002, H, BZ1), "bathwall", 0.9)
-block("DormBathSkinFrontT", (BD0 - 0.04, BDH + 0.05, BZ1 - 0.002), (BD1 + 0.04, H, BZ1), "bathwall", 0.9)
-# (the tops of its walls capped, as the room's are seen from above; the sides' from the back's inner edge on, their tops not over its)
+block("DormBathMidL", (BX0, 0.0, PZ0), (DX0 - 0.03, H, PZ1), "plaster", 1.2, group=BATH_CUT)
+block("DormBathMidR", (DX1 + 0.03, 0.0, PZ0), (BX1, H, PZ1), "plaster", 1.2, group=BATH_CUT)
+block("DormBathMidT", (DX0 - 0.03, BDH2 + 0.05, PZ0), (DX1 + 0.03, H, PZ1), "plaster", 1.2, group=BATH_CUT)
+# (the bath's walls tiled: a skin 2 mm in front of each slab: its back, its left, its right (away with the wall), the wall across's back)
+block("DormBathSkinBack", (BX0, BW, BZ0), (BX1, H, BZ0 + 0.002), "bathwall", 0.9)
+block("DormBathSkinLeft", (BX0, BW, BZ0 + 0.002), (BX0 + 0.002, H, PZ0), "bathwall", 0.9)
+block("DormBathSkinRight", (BX1 - 0.002, BW, BZ0 + 0.002), (BX1, H, PZ0), "bathwall", 0.9, group=BATH_CUT)
+block("DormBathSkinMidL", (BX0 + 0.002, BW, PZ0 - 0.002), (DX0 - 0.03, H, PZ0), "bathwall", 0.9, group=BATH_CUT)
+block("DormBathSkinMidR", (DX1 + 0.03, BW, PZ0 - 0.002), (BX1 - 0.002, H, PZ0), "bathwall", 0.9, group=BATH_CUT)
+block("DormBathSkinMidT", (DX0 - 0.03, BDH2 + 0.05, PZ0 - 0.002), (DX1 + 0.03, H, PZ0), "bathwall", 0.9, group=BATH_CUT)
+# (the tops of its walls capped, as the room's are seen from above; the sides' from the back's inner edge on, the wall across's between them)
 for nm, lo, hi in (("Back", (BX0 - WALL - 0.004, H, BZ0 - WALL - 0.004), (BX1 + WALL + 0.004, H + 0.03, BZ0 + 0.004)),
                    ("Left", (BX0 - WALL - 0.004, H, BZ0 + 0.004), (BX0 + 0.004, H + 0.03, BZ1)),
+                   ("Mid", (BX0 + 0.004, H, PZ0 - 0.004), (BX1 - 0.004, H + 0.03, PZ1 + 0.004)),
                    ("Right", (BX1 - 0.004, H, BZ0 + 0.004), (BX1 + WALL + 0.004, H + 0.03, BZ1))):
-    block(f"DormBathCap{nm}", lo, hi, "wood", 0.6, group=BATH_CUT if nm == "Right" else None)
-# (the doorway: dark jambs and head through the wall; its sill up to the bathroom's step)
+    block(f"DormBathCap{nm}", lo, hi, "wood", 0.6, group=BATH_CUT if nm in ("Right", "Mid") else None)
+# (the doorway from the room: dark jambs and head through the wall; its sill up to the board floor)
 for nm, lo, hi in (("L", (BD0 - 0.04, 0.0, Z0 - WALL - 0.004), (BD0, BDH, Z0 + 0.012)), ("R", (BD1, 0.0, Z0 - WALL - 0.004), (BD1 + 0.04, BDH, Z0 + 0.012)),
                    ("T", (BD0 - 0.04, BDH, Z0 - WALL - 0.004), (BD1 + 0.04, BDH + 0.05, Z0 + 0.012))):
     block(f"DormBathJamb{nm}", lo, hi, "lacquer", 0.5)
 block("DormBathSill", (BD0, 0.0, Z0 - WALL), (BD1, BF, Z0 + 0.01), "wood", 0.5)
-# (the tub along its back wall, on the left: ivory FRP, its rim round a sunk well, the water in it)
-TX0b, TX1b, TZ0b, TZ1b, TT = BX0 + 0.04, BX0 + 1.18, BZ0 + 0.03, BZ0 + 0.74, BF + 0.52
-# (a shell: its four sides round the well, the well's floor, the water a hand under the rim)
-TW = 0.07
-for nm, lo, hi in (("Front", (TX0b, BF, TZ1b - TW), (TX1b, TT, TZ1b)), ("Back", (TX0b, BF, TZ0b), (TX1b, TT, TZ0b + TW)),
-                   ("Left", (TX0b, BF, TZ0b + TW - 0.002), (TX0b + TW, TT, TZ1b - TW + 0.002)), ("Right", (TX1b - TW, BF, TZ0b + TW - 0.002), (TX1b, TT, TZ1b - TW + 0.002))):
-    soft(f"DormBathTub{nm}", lo, hi, "frp", r=0.025, tile=1.0)
-block("DormBathTubFloor", (TX0b + TW - 0.004, BF, TZ0b + TW - 0.004), (TX1b - TW + 0.004, BF + 0.1, TZ1b - TW + 0.004), "frp", 1.0)
-block("DormBathWater", (TX0b + TW + 0.002, TT - 0.14, TZ0b + TW + 0.002), (TX1b - TW - 0.002, TT - 0.138, TZ1b - TW - 0.002), "water", 1.0)
-# (its mixer on the back wall over the tub's middle, the shower on its rail at the left end, its hose; three bottles on the rim's corner)
-block("DormBathMixer", ((TX0b + TX1b) / 2 - 0.09, TT + 0.16, BZ0 + 0.002), ((TX0b + TX1b) / 2 + 0.09, TT + 0.22, BZ0 + 0.05), "chrome", 0.2)
-lathe("DormBathSpout", (TX0b + TX1b) / 2, TT + 0.1, BZ0 + 0.05, [(0.012, 0.0), (0.012, 0.07), (0.016, 0.08)], "chrome", 8)
-block("DormBathRail", (TX0b + 0.12, TT + 0.3, BZ0 + 0.002), (TX0b + 0.14, TT + 1.15, BZ0 + 0.03), "chrome", 0.2)
-lathe("DormBathShower", TX0b + 0.13, TT + 1.02, BZ0 + 0.075, [(0.0001, 0.0), (0.035, 0.012), (0.04, 0.03), (0.038, 0.04)], "chrome", 12)
-block("DormBathHose", (TX0b + 0.125, TT + 0.22, BZ0 + 0.04), (TX0b + 0.14, TT + 1.0, BZ0 + 0.055), "chrome", 0.2)
-for k, (dx, mat, h) in enumerate(((0.06, "bottle_g", 0.2), (0.14, "bottle_w", 0.18), (0.21, "bottle_g", 0.15))):
-    lathe(f"DormBathBottle{k}", TX1b - 0.03 - dx, TT + 0.002, TZ0b + 0.035, [(0.026, 0.0), (0.026, h * 0.82), (0.012, h * 0.92), (0.012, h)], mat, 10)
-# (its curtain on a rail along the tub's front, pushed back to the wall at the right end)
-block("DormBathCurtainRail", (TX0b, 2.02, TZ1b + 0.01), (TX1b + 0.04, 2.04, TZ1b + 0.03), "chrome", 0.2)
-soft("DormBathCurtain", (TX1b - 0.2, TT - 0.25, TZ1b + 0.0), (TX1b + 0.03, 2.0, TZ1b + 0.06), "curtain", r=0.02, tile=0.6, bulge=0.01)
-# (the toilet beside the tub, against the back wall, facing the door: its tank, its bowl, its seat and lid)
-WCX, WCZ = BX1 - 0.32, BZ0 + 0.03
-soft("DormBathTank", (WCX - 0.18, BF + 0.42, WCZ), (WCX + 0.18, BF + 0.78, WCZ + 0.17), "frp", r=0.025, tile=0.6)
-lathe("DormBathBowl", WCX, BF, WCZ + 0.38, [(0.13, 0.0), (0.12, 0.2), (0.17, 0.36), (0.18, 0.4)], "frp", 16)
-soft("DormBathSeat", (WCX - 0.19, BF + 0.4, WCZ + 0.17), (WCX + 0.19, BF + 0.44, WCZ + 0.62), "frp", r=0.02, tile=0.6)
-# (the little basin by the door against the right wall: on a pedestal of its own (it stays as the wall's taken away), its bowl sunk in its
-# rim, its tap on the rim's back with its spout over the bowl; the mirror over it with a shelf and a cup, on the wall (away with it))
-LBZ = BZ1 - 0.38
-LBX = BX1 - 0.23
-lathe("DormBathBasin", LBX, BF, LBZ, [(0.075, 0.0), (0.05, 0.08), (0.045, 0.55), (0.15, 0.7), (0.19, 0.8), (0.16, 0.8), (0.1, 0.74),
-                                      (0.04, 0.71)], "frp", 12)
-lathe("DormBathTap", LBX + 0.175, BF + 0.8, LBZ, [(0.014, 0.0), (0.012, 0.09), (0.016, 0.1)], "chrome", 8)
-block("DormBathTapSpout", (LBX + 0.095, BF + 0.875, LBZ - 0.01), (LBX + 0.175, BF + 0.895, LBZ + 0.01), "chrome", 0.2)
-block("DormBathMirror", (BX1 - 0.006, BF + 1.0, LBZ - 0.22), (BX1 - 0.002, BF + 1.5, LBZ + 0.22), "mirror", 0.6, group=BATH_CUT)
-block("DormBathMirrorShelf", (BX1 - 0.11, BF + 0.96, LBZ - 0.22), (BX1 - 0.002, BF + 0.98, LBZ + 0.22), "frp", 0.6, group=BATH_CUT)
-lathe("DormBathCup", BX1 - 0.06, BF + 0.98, LBZ + 0.12, [(0.028, 0.0), (0.032, 0.09), (0.03, 0.09)], "bottle_w", 10, group=BATH_CUT)
-# (a towel over a bar on the left wall by the door, and the mat on the floor before the tub)
-block("DormBathTowelBar", (BX0 + 0.002, BF + 1.1, BZ1 - 0.62), (BX0 + 0.05, BF + 1.12, BZ1 - 0.12), "chrome", 0.2)
-soft("DormBathTowel", (BX0 + 0.02, BF + 0.7, BZ1 - 0.58), (BX0 + 0.07, BF + 1.13, BZ1 - 0.16), "towel", r=0.012, tile=0.6)
-soft("DormBathMat", (0.35, BF + 0.001, TZ1b + 0.12), (0.95, BF + 0.012, TZ1b + 0.5), "bathmat", r=0.006, tile=0.6)
+# (the bath's doorway in the wall across: hinoki jambs and head lining it (away with the wall), a lip across its foot a little over the board
+# floor (it stays, the floor's))
+for nm, lo, hi in (("L", (DX0 - 0.03, 0.0, PZ0 - 0.004), (DX0, BDH2, PZ1 + 0.004)), ("R", (DX1, 0.0, PZ0 - 0.004), (DX1 + 0.03, BDH2, PZ1 + 0.004)),
+                   ("T", (DX0 - 0.03, BDH2, PZ0 - 0.004), (DX1 + 0.03, BDH2 + 0.05, PZ1 + 0.004))):
+    block(f"DormBathInJamb{nm}", lo, hi, "hinoki", 0.6, group=BATH_CUT)
+block("DormBathLip", (DX0, 0.0, PZ0), (DX1, BF + 0.012, PZ1 + 0.004), "hinoki", 0.6)
+# (its door, slid open to the left along the wall across on the changing room's side: a hinoki frame round a frosted pane, on its rail)
+DS0 = DX0 - 0.58
+block("DormBathInDoor", (DS0, BF + 0.01, PZ1 + 0.006), (DS0 + 0.6, BDH2 - 0.012, PZ1 + 0.026), "hinoki", 0.6, group=BATH_CUT)
+block("DormBathInPane", (DS0 + 0.06, BF + 0.09, PZ1 + 0.004), (DS0 + 0.54, BDH2 - 0.08, PZ1 + 0.028), "frost", 0.6, group=BATH_CUT)
+block("DormBathInRail", (DS0 - 0.02, BDH2 - 0.01, PZ1 + 0.004), (DX1 + 0.03, BDH2 + 0.02, PZ1 + 0.03), "chrome", 0.2, group=BATH_CUT)
+
+# (the tub: a deep square box of hinoki at the bath's left, its four boards' edges eased, a rim round its top a little proud of them; the
+# water a hand under the rim; its lid of three boards across it, two over its front and the third laid on them, its back left open)
+TX0, TX1, TZ0, TZ1 = BX0 + 0.03, BX0 + 0.73, BZ0 + 0.03, PZ0 - 0.03
+TT, TW, RO, RT = BW + 0.58, 0.045, 0.008, 0.022
+for nm, lo, hi in (("Front", (TX0, BW, TZ1 - TW), (TX1, TT, TZ1)), ("Back", (TX0, BW, TZ0), (TX1, TT, TZ0 + TW)),
+                   ("Left", (TX0, BW, TZ0 + TW - 0.002), (TX0 + TW, TT, TZ1 - TW + 0.002)),
+                   ("Right", (TX1 - TW, BW, TZ0 + TW - 0.002), (TX1, TT, TZ1 - TW + 0.002))):
+    soft(f"DormTub{nm}", lo, hi, "hinoki", r=0.01, tile=0.6)
+for nm, lo, hi in (("Front", (TX0 - RO, TT, TZ1 - TW - 0.004), (TX1 + RO, TT + RT, TZ1 + RO)),
+                   ("Back", (TX0 - RO, TT, TZ0 - RO), (TX1 + RO, TT + RT, TZ0 + TW + 0.004)),
+                   ("Left", (TX0 - RO, TT, TZ0 + TW + 0.004), (TX0 + TW + 0.004, TT + RT, TZ1 - TW - 0.004)),
+                   ("Right", (TX1 - TW - 0.004, TT, TZ0 + TW + 0.004), (TX1 + RO, TT + RT, TZ1 - TW - 0.004))):
+    block(f"DormTubRim{nm}", lo, hi, "hinoki", 0.6)
+block("DormBathWater", (TX0 + TW + 0.002, TT - 0.13, TZ0 + TW + 0.002), (TX1 - TW - 0.002, TT - 0.128, TZ1 - TW - 0.002), "water", 1.0)
+for k, (z1, y0) in enumerate(((TZ1 + RO, TT + RT), (TZ1 + RO - 0.3, TT + RT), (TZ1 + RO - 0.29, TT + RT + 0.022))):
+    block(f"DormTubLid{k}", (TX0 - RO, y0, z1 - 0.3), (TX1 + RO, y0 + 0.022, z1), "hinoki", 0.6)
+
+# (the washing place at the bath's right: slatted hinoki boards on two runners; the tap low on the back wall to sit at, its two knobs (the
+# left's red dot hot), its spout; the shower's rail at its left, the shower on it, its hose; the mirror over the tap; a rack at its right
+# with the three bottles; the stool facing the tap, the bucket by it)
+WX0, WX1 = TX1 + RO + 0.022, BX1 - 0.02
+for k, x0 in enumerate((WX0 + 0.06, WX1 - 0.1)):
+    block(f"DormSunokoRun{k}", (x0, BW, BZ0 + 0.05), (x0 + 0.04, BW + 0.02, PZ0 - 0.05), "hinoki", 0.6)
+SY = BW + 0.035
+for k in range(9):
+    z0 = BZ0 + 0.06 + k * 0.095
+    block(f"DormSunoko{k}", (WX0, BW + 0.02, z0), (WX1, SY, z0 + 0.065), "hinoki", 0.6)
+TAPX, WZ = (WX0 + WX1) / 2 + 0.03, BZ0 + 0.002
+block("DormTapBar", (TAPX - 0.13, BW + 0.53, WZ), (TAPX + 0.13, BW + 0.57, WZ + 0.04), "chrome", 0.2)
+for k, dx in enumerate((-0.15, 0.15)):
+    soft(f"DormTapKnob{k}", (TAPX + dx - 0.03, BW + 0.515, WZ + 0.004), (TAPX + dx + 0.03, BW + 0.585, WZ + 0.05), "chrome", r=0.012, tile=0.2)
+block("DormTapHot", (TAPX - 0.158, BW + 0.543, WZ + 0.05), (TAPX - 0.142, BW + 0.557, WZ + 0.053), "flask", 0.2)
+block("DormTapSpout", (TAPX - 0.015, BW + 0.535, WZ + 0.04), (TAPX + 0.015, BW + 0.553, WZ + 0.15), "chrome", 0.2)
+block("DormTapSpoutTip", (TAPX - 0.015, BW + 0.51, WZ + 0.13), (TAPX + 0.015, BW + 0.535, WZ + 0.15), "chrome", 0.2)
+SRX = TAPX - 0.26
+block("DormShowerRail", (SRX - 0.01, BW + 0.7, WZ), (SRX + 0.01, BW + 1.4, WZ + 0.02), "chrome", 0.2)
+soft("DormShowerHead", (SRX - 0.04, BW + 1.12, WZ + 0.02), (SRX + 0.04, BW + 1.32, WZ + 0.07), "chrome", r=0.015, tile=0.2)
+block("DormShowerHoseA", (TAPX - 0.096, BW + 0.3, WZ + 0.01), (TAPX - 0.08, BW + 0.53, WZ + 0.026), "chrome", 0.2)
+block("DormShowerHoseB", (SRX + 0.014, BW + 0.3, WZ + 0.01), (TAPX - 0.08, BW + 0.316, WZ + 0.026), "chrome", 0.2)
+block("DormShowerHoseC", (SRX + 0.014, BW + 0.316, WZ + 0.01), (SRX + 0.03, BW + 1.12, WZ + 0.026), "chrome", 0.2)
+block("DormBathMirror", (TAPX - 0.14, BW + 0.68, WZ), (TAPX + 0.14, BW + 1.1, WZ + 0.004), "mirror", 0.6)
+RKX0, RKX1, RKY = TAPX + 0.15, BX1 - 0.006, BW + 0.8
+block("DormBathRack", (RKX0, RKY, WZ), (RKX1, RKY + 0.012, WZ + 0.09), "chrome", 0.2)
+for k, mat in enumerate(("bottle_w", "bottle_g", "bottle_b")):
+    bx_, bz_ = RKX0 + 0.024 + k * 0.047, WZ + 0.045
+    lathe(f"DormBathBottle{k}", bx_, RKY + 0.012, bz_, [(0.021, 0.0), (0.022, 0.15), (0.012, 0.17), (0.009, 0.18)], mat, 8)
+    block(f"DormBathPump{k}", (bx_ - 0.005, RKY + 0.192, bz_ - 0.005), (bx_ + 0.005, RKY + 0.212, bz_ + 0.005), "bottle_w", 0.2)
+    block(f"DormBathPumpN{k}", (bx_ - 0.005, RKY + 0.204, bz_), (bx_ + 0.005, RKY + 0.212, bz_ + 0.03), "bottle_w", 0.2)
+STX, STZ = TAPX, BZ0 + 0.42
+for k, x0 in enumerate((STX - 0.12, STX + 0.095)):
+    block(f"DormStoolLeg{k}", (x0, SY, STZ - 0.09), (x0 + 0.025, SY + 0.2, STZ + 0.09), "hinoki", 0.6)
+soft("DormStoolSeat", (STX - 0.125, SY + 0.2, STZ - 0.1), (STX + 0.125, SY + 0.232, STZ + 0.1), "hinoki", r=0.008, tile=0.6, segs=1)
+lathe("DormBucket", WX1 - 0.13, SY, STZ + 0.3, [(0.095, 0.0), (0.1, 0.008), (0.1065, 0.058), (0.1085, 0.06), (0.11, 0.08), (0.1088, 0.082),
+                                                (0.112, 0.105), (0.103, 0.105), (0.09, 0.014), (0.03, 0.012)], "hinoki", 10,
+      bands=["hinoki", "hinoki", "copper", "copper", "copper", "hinoki", "hinoki", "hinoki", "hinoki"])
+
+# (the toilet at the changing room's left end, its cistern against the left wall, facing in toward the way in: the cistern with the basin on
+# its lid and the basin's tap (the water that fills it running over your hands first); its bowl, a long round; its seat and its lid shut;
+# the warm-water seat's works at its back, its buttons on an arm at its right (toward the room's wall))
+WCZ = (PZ1 + BZ1) / 2 - 0.03
+soft("DormWcTank", (BX0, BF + 0.36, WCZ - 0.2), (BX0 + 0.2, BF + 0.8, WCZ + 0.2), "frp", r=0.02, tile=0.6)
+lathe("DormWcHand", BX0 + 0.1, BF + 0.8, WCZ, [(0.07, 0.0), (0.088, 0.015), (0.097, 0.045), (0.087, 0.045), (0.06, 0.022), (0.02, 0.018)],
+      "frp", 12, sz=1.75)
+lathe("DormWcTap", BX0 + 0.022, BF + 0.8, WCZ, [(0.01, 0.0), (0.009, 0.09), (0.012, 0.1)], "chrome", 8)
+block("DormWcTapSpout", (BX0 + 0.02, BF + 0.885, WCZ - 0.009), (BX0 + 0.075, BF + 0.9, WCZ + 0.009), "chrome", 0.2)
+lathe("DormWcBowl", BX0 + 0.43, BF, WCZ, [(0.12, 0.0), (0.105, 0.16), (0.15, 0.33), (0.165, 0.37)], "frp", 16, sx=1.3)
+soft("DormWcBody", (BX0 + 0.2, BF + 0.37, WCZ - 0.17), (BX0 + 0.33, BF + 0.47, WCZ + 0.17), "frp", r=0.02, tile=0.6)
+soft("DormWcSeat", (BX0 + 0.33, BF + 0.37, WCZ - 0.18), (BX0 + 0.66, BF + 0.395, WCZ + 0.18), "frp", r=0.012, tile=0.6, segs=1)
+soft("DormWcLid", (BX0 + 0.335, BF + 0.395, WCZ - 0.172), (BX0 + 0.655, BF + 0.42, WCZ + 0.172), "frp", r=0.02, tile=0.6)
+block("DormWcPanel", (BX0 + 0.36, BF + 0.39, WCZ + 0.18), (BX0 + 0.56, BF + 0.43, WCZ + 0.235), "frp", 0.6)
+for k, (dx, mat) in enumerate(((0.39, "flask"), (0.44, "bathmat"), (0.49, "bathmat"))):
+    block(f"DormWcButton{k}", (BX0 + dx, BF + 0.43, WCZ + 0.195), (BX0 + dx + 0.025, BF + 0.436, WCZ + 0.22), mat, 0.2)
+# (the paper on the room's wall at its right, under its chrome cover; the slippers just in from the way in, toes to it, as they're left)
+PX_ = BX0 + 0.5
+block("DormWcPaperCover", (PX_ - 0.07, BF + 0.7, BZ1 - 0.13), (PX_ + 0.07, BF + 0.71, BZ1), "chrome", 0.2)
+block("DormWcPaperLip", (PX_ - 0.07, BF + 0.665, BZ1 - 0.13), (PX_ + 0.07, BF + 0.7, BZ1 - 0.12), "chrome", 0.2)
+for k, dx in enumerate((-0.065, 0.058)):
+    block(f"DormWcPaperArm{k}", (PX_ + dx, BF + 0.625, BZ1 - 0.075), (PX_ + dx + 0.007, BF + 0.665, BZ1), "chrome", 0.2)
+tube("DormWcPaper", BZ1 - 0.065, BF + 0.645, PX_ - 0.058, PX_ + 0.058, 0.052, "sheet", 10, axis="x")
+for sd in (-1, 1):
+    soft(f"DormWcSlipper{sd}", (BD0 + 0.08, BF, BZ1 - 0.21 + sd * 0.055 - 0.04), (BD0 + 0.3, BF + 0.025, BZ1 - 0.21 + sd * 0.055 + 0.04), "wcslipper",
+         r=0.012, segs=1)
+
+# (the basin at the changing room's right against the right wall: its cabinet on the floor (it stays as the wall's taken away), its two
+# doors, a white bowl on its top and the tap behind it; the mirror cabinet over it, on the wall (away with it))
+WZ0_, WZ1_ = BZ1 - 0.39, BZ1 - 0.05
+soft("DormWashCabinet", (BX1 - 0.32, BF, WZ0_), (BX1 - 0.002, BF + 0.78, WZ1_), "frp", r=0.012, tile=0.6, segs=1)
+block("DormWashSeam", (BX1 - 0.323, BF + 0.06, (WZ0_ + WZ1_) / 2 - 0.002), (BX1 - 0.32, BF + 0.7, (WZ0_ + WZ1_) / 2 + 0.002), "dark", 0.2)
+for k, dz in enumerate((-0.03, 0.022)):
+    block(f"DormWashPull{k}", (BX1 - 0.33, BF + 0.6, (WZ0_ + WZ1_) / 2 + dz), (BX1 - 0.32, BF + 0.68, (WZ0_ + WZ1_) / 2 + dz + 0.008), "chrome", 0.2)
+LX, LZ = BX1 - 0.17, (WZ0_ + WZ1_) / 2
+lathe("DormWashBowl", LX, BF + 0.78, LZ, [(0.05, 0.0), (0.1, 0.022), (0.125, 0.075), (0.116, 0.08), (0.085, 0.04), (0.035, 0.031)], "frp", 12)
+lathe("DormWashTap", BX1 - 0.025, BF + 0.78, LZ, [(0.016, 0.0), (0.013, 0.14), (0.016, 0.15)], "chrome", 8)
+block("DormWashSpout", (LX + 0.01, BF + 0.905, LZ - 0.01), (BX1 - 0.025, BF + 0.925, LZ + 0.01), "chrome", 0.2)
+block("DormWashLever", (BX1 - 0.04, BF + 0.93, LZ - 0.01), (BX1 - 0.01, BF + 0.945, LZ + 0.01), "chrome", 0.2)
+block("DormWashMirrorCab", (BX1 - 0.12, BF + 1.05, WZ0_), (BX1, BF + 1.72, WZ1_), "frp", 0.6, group=BATH_CUT)
+block("DormWashMirror", (BX1 - 0.124, BF + 1.1, WZ0_ + 0.03), (BX1 - 0.12, BF + 1.67, WZ1_ - 0.03), "mirror", 0.6, group=BATH_CUT)
+# (a hand towel on its ring by the bath's doorway, on the wall across at its right (away with it); the bath mat before the doorway)
+block("DormBathTowelBar", (DX1 + 0.05, BF + 1.15, PZ1), (BX1 - 0.02, BF + 1.17, PZ1 + 0.045), "chrome", 0.2, group=BATH_CUT)
+soft("DormBathTowel", (DX1 + 0.055, BF + 0.8, PZ1 + 0.012), (BX1 - 0.025, BF + 1.18, PZ1 + 0.05), "towel", r=0.012, tile=0.6, group=BATH_CUT)
+soft("DormBathMat", (DX0 + 0.03, BF, PZ1 + 0.03), (DX1 - 0.03, BF + 0.012, PZ1 + 0.35), "bathmat", r=0.006, tile=0.6)
 
 # ---------------------------------------------------------------------------------------------------- its door, sliding into the wall
 # (a frosted pane in a dark frame over a solid lower panel, in the wall's middle, sliding left into the wall's pocket; the work clothes on
