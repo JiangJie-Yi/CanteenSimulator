@@ -8833,7 +8833,10 @@ function LiquorShelf() {
     inkModel(r, (m) => !/LiquorWood|LiquorRod/.test((m.material as THREE.Material).name))
     return mergeByMaterial(r)
   }, [gltf])
-  return <group name="look-liquor" userData={{ fadeOccluder: 0.35 }}><primitive object={obj} /></group>
+  // (in the way of what's looked at (scene/OccluderFade), all but gone: at a third its dark boards and its bottles lay a veil over what's
+  // behind it, read as a shadow (item 478, the owner's 「有不明陰影 很不自然」: over the beckoning cats' stand from the room's height); its
+  // ink lines put away while it's faded, as every faded hanging's are)
+  return <group name="look-liquor" userData={{ fadeOccluder: 0.06 }}><primitive object={obj} /></group>
 }
 /**
  * The milk crates of cold drinks (item 437, the owner's, 2026-11-21: 「新整另一種籃子風格，裡面也是用來裝冷飲類」, after a pink milk crate):

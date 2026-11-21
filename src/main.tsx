@@ -1,5 +1,7 @@
 // (first of all, in development: every texture and shape noted as it's made, to let go of what a hot update leaves behind)
 import './scene/gpuSweep'
+// (the site's models and pictures fetched anew as they change: each one's address with its content's hash, item 478)
+import './scene/assetVersions'
 // (and a phone fetches none of the 3D shop: it draws it flat)
 import './scene/flatGate'
 // (the pictures the game paints, kept off the graphics card: they survive its resets)
