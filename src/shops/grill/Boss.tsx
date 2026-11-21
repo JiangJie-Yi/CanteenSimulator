@@ -10,7 +10,7 @@ import { airbrush, gradientMap } from '@/scene/Person3D'
 import { cloneFigure, paintable, releaseFigure, rigidFigure, type SkinPiece } from '@/scene/rigidSkin'
 import { getEdit } from './edit'
 import type { Lang } from '@/data/i18n'
-import { bedLineText, bossLineText, cashLineText, drinkLineText, munchLineText, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
+import { bedLineText, bossLineText, cashLineText, drinkLineText, lineIn, munchLineText, phoneLine, nextBossLine, tasteLineText, tasteVerdict, verdictLineText, type BossSituation } from '@/data/bossLines'
 import { bossSituation } from '@/game/talkTime'
 import { getClock } from '@/ui/clockStore'
 import { DrinkBottle } from './DiningRoom'
@@ -36,6 +36,7 @@ import { crewFaceSheet, crewFrame, faceRange, markFace, ownShape, setFace, squas
 import { faceNow, newFaceLife, type FaceLife } from '@/game/faceLife'
 import { turnEase } from './commuteWalk'
 import { NO_POINTER, zr } from '@/scene/htmlProps'
+import { warmLater } from '@/scene/Prewarm'
 
 /**
  * The owner (blender/boss.py): an Overcooked 2 cook (a big round head on a short plump body rounding off underneath, floating mitten
@@ -147,11 +148,12 @@ export function dressBoss(outfit: Outfit, regions: Pic | null) {
 
 /** where his hands hang at rest (as modelled, the node's own frame) */
 const REST = { L: new THREE.Vector3(-0.31, 0.26, 0.05), R: new THREE.Vector3(0.31, 0.26, 0.05) }
-type Phase = { act: 'tongs' | 'walk' | 'fan' | 'run' | 'wave' | 'idle'; len: number }
+type Phase = { act: 'tongs' | 'walk' | 'fan' | 'run' | 'wave' | 'idle' | 'phone'; len: number }
 /** his round of the day, in seconds: the fire fanned from his place, turned to it (item 203: he walked 1.7 off down the aisle and fanned the
  * air there, facing the way he faces at home); the run home kept, last, for after a taste or a drink taken down the aisle */
+// (and his phone a while, the shop shut and nothing to do (item 475, the owner's 「老闆也會滑手機，有生活感」))
 const ROUND: Phase[] = [
-  { act: 'tongs', len: 7 }, { act: 'fan', len: 5 }, { act: 'wave', len: 4 }, { act: 'idle', len: 4 }, { act: 'run', len: 0 },
+  { act: 'tongs', len: 7 }, { act: 'fan', len: 5 }, { act: 'wave', len: 4 }, { act: 'idle', len: 4 }, { act: 'phone', len: 9 }, { act: 'run', len: 0 },
 ]
 /** and while the shop's open, the head chef at his fire (his second cook at the board fetching and skewering): turning what's on it with
  * his tongs, a breath between; what he takes on and off it, and fans, is Roasting's (OWNER_GRILL) */
@@ -225,6 +227,45 @@ const TIP_LOCAL = new THREE.Vector3(0, 0, CHOP_LEN)
 const SHRUNK = 0.0001
 /** the drink in his hand: its foot a little under his fist, a touch forward of it (the body's frame); and a scratch vector for the hand */
 const DRINK_IN_PALM = new THREE.Vector3(0, -0.05, 0.015)
+/**
+ * His phone (item 475, the owner's 「老闆也會滑手機，有生活感」): a dark slab in his right hand before his chest, its screen tipped up to his eyes,
+ * lit (unlit: no lamp added); on it a feed of posts that goes up a post at each flick of his thumb. In the scene from the first, hidden: its
+ * programs made with the rest at loading (warmLater), so put away it isn't drawn. In the body's units, as the bowl is
+ */
+const PHONE_W = 0.08, PHONE_H = 0.15, PHONE_D = 0.012
+const PHONE_BODY_GEO = new THREE.BoxGeometry(PHONE_W, PHONE_H, PHONE_D)
+const PHONE_SCREEN_GEO = new THREE.PlaneGeometry(PHONE_W * 0.86, PHONE_H * 0.86)
+// (its case the shop's stamp red, so from before him (its back's what's seen) it reads as a phone against his white coat; the camera's square
+// up in a back corner, dark)
+const PHONE_BODY_MAT = new THREE.MeshToonMaterial({ color: '#c8432b' })
+const PHONE_LENS_GEO = new THREE.BoxGeometry(0.022, 0.022, 0.003)
+const PHONE_LENS_MAT = new THREE.MeshToonMaterial({ color: '#26262b' })
+/** the feed: rounded posts down a tall picture, each a picture's block and two lines of text under it, in the app's own colours; shown a
+ * screen's height of it at a time, moved up as he flicks */
+const PHONE_FEED = (() => {
+  if (typeof document === 'undefined') return null
+  const W = 64, H = 512, c = document.createElement('canvas')
+  c.width = W; c.height = H
+  const g = c.getContext('2d')!
+  g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, W, H)
+  const tones = ['#e8a87c', '#7fb3d5', '#a3d39c', '#f6c85f', '#c39bd3', '#f28b82', '#9ad0c2', '#f7b267']
+  for (let y = 4, k = 0; y < H - 4; y += 64, k++) {
+    g.fillStyle = '#ffffff'; g.fillRect(3, y, W - 6, 58)
+    g.fillStyle = tones[k % tones.length]; g.fillRect(6, y + 3, W - 12, 34)
+    g.fillStyle = '#b9b3a6'; g.fillRect(6, y + 41, W - 20, 4); g.fillRect(6, y + 49, W - 32, 4)
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(1, 0.25)
+  return t
+})()
+const PHONE_SCREEN_MAT = new THREE.MeshBasicMaterial({ color: '#ffffff', map: PHONE_FEED })
+if (typeof document !== 'undefined') { const g = new THREE.Group(); g.add(new THREE.Mesh(PHONE_BODY_GEO, PHONE_BODY_MAT), new THREE.Mesh(PHONE_SCREEN_GEO, PHONE_SCREEN_MAT), new THREE.Mesh(PHONE_LENS_GEO, PHONE_LENS_MAT)); warmLater(g) }
+/** where it sits in his palm (lifted off it along the screen's face toward him: the hand behind it, not through the screen), and how far it's
+ * tipped back to face him (turned half round first: he faces the body's +z, the screen its own +z) */
+const PHONE_IN_PALM = new THREE.Vector3(0, 0.06, -0.04)
+const PHONE_TIP = -0.55
 /** the tasting bowl in his left palm: its foot a little under it */
 const BOWL_IN_PALM = new THREE.Vector3(0, -0.03, 0.02)
 /** the chopsticks held in his right fist: from its middle, up through it */
@@ -411,6 +452,9 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
   // (a drink he's been handed, in his hand while he drinks it)
   const [drinkId, setDrinkId] = useState<DrinkId | null>(null)
   const drinkRef = useRef<THREE.Group>(null)
+  // (his phone (item 475): where its feed's got to, and when he last flicked it)
+  const phoneRef = useRef<THREE.Group>(null)
+  const feed = useRef<{ at: number; flick: number; face: CrewFace; faceTill: number; on: boolean }>({ at: 0, flick: 0, face: 'happy', faceTill: 0, on: false })
   const bowlRef = useRef<THREE.Group>(null)
   const chopsRef = useRef<THREE.Group>(null)
   useEffect(() => {
@@ -423,6 +467,8 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       if (STAFF_TALK.some((w) => (w.id === 'owner' || SPEAKERS.get(w.id) === SPEAKERS.get('owner')) && w.until > performance.now())) { h = window.setTimeout(next, 800); return }
       // (nothing muttered from under his quilt, or as he lays it down or folds it up (item 444))
       if (BOSS_BODY.bed !== 'off') { h = window.setTimeout(next, 1500); return }
+      // (nor over his phone (item 475): what he reads off it is what he says then)
+      if (feed.current.on) { h = window.setTimeout(next, 1500); return }
       const s = bossSituation(getClock().minute, open)
       const i = nextBossLine(s, last?.s === s ? last.i : null, Math.random())
       last = { s, i }
@@ -807,8 +853,16 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         turnTo(s, Math.atan2(dx, dz), dt, 9)
       }
     } else {
-      // (at a stop he turns back to face the fire)
-      turnTo(s, 0, dt, 5)
+      // (at a stop he turns back to face the fire; on his phone (item 475), round the other way, his back to the work, facing the room (and
+      // the player's views: from behind him the phone was hidden by him), a little slower, as one taking a break; and a moment into it,
+      // something on it read out, with a face to it)
+      const onPhone = act === 'phone'
+      turnTo(s, onPhone ? Math.PI : 0, dt, onPhone ? 3.5 : 5)
+      if (onPhone && s.t > 3.2 && s.t - dt <= 3.2) {
+        const l = phoneLine(Math.random())
+        setSay({ text: lineIn(l, lang), key: Date.now() })
+        feed.current.face = l.face; feed.current.faceTill = T + 2.2
+      }
       if (s.t > ph.len) { s.phase = (s.phase + 1) % ROUNDS.length; s.t = 0 }
     }
     if (edit) act = 'idle'
@@ -850,7 +904,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     // (and Overcooked's squash and stretch, as he starts to say something or his face changes (BOSS_FACE.at))
     const [jw, jh] = jelly((performance.now() - BOSS_FACE.at) / 1000)
     b.scale.set((2 - squash) * jw, squash * jh, (2 - squash) * jw)
-    const lean = moving ? (run ? 0.26 : 0.09) : act === 'hold' ? OWNER_GRILL.lean : act === 'fan' ? 0.06 : act === 'dab' ? 0.12 : act === 'pierce' ? 0.14 : 0
+    const lean = moving ? (run ? 0.26 : 0.09) : act === 'hold' ? OWNER_GRILL.lean : act === 'fan' ? 0.06 : act === 'dab' ? 0.12 : act === 'pierce' ? 0.14 : act === 'phone' ? 0.1 : 0
     b.rotation.x += (lean - b.rotation.x) * Math.min(1, dt * 8)
     b.rotation.z = moving ? Math.sin(step * Math.PI) * (run ? 0.13 : 0.09) : Math.sin(T * 0.7) * 0.025
     // (a little hop of joy as he waves)
@@ -919,6 +973,12 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
       const up = Math.min(1, u / 0.4) * (1 - Math.max(0, Math.min(1, (u - 3.4) / 0.6)))
       R.set(-0.05, 0.12 + up * 0.2, 0.2 - up * 0.04)
       L.set(0.04, 0.02, 0.1)
+    } else if (act === 'phone') {
+      // (item 475: the phone up before his chest in his right hand, his thumb flicking it up now and then (the hand nudged up as it goes),
+      // the left hand low under it)
+      const fl = Math.max(0, 1 - (T - feed.current.flick) / 0.25)
+      R.set(-0.06, 0.29 + fl * 0.012, 0.26)
+      L.set(0.05, 0.18, 0.22)
     } else if (act === 'wave') {
       const w = Math.sin(s.t * 9)
       R.set(0.02 + w * 0.04, 0.32, 0.06)
@@ -979,6 +1039,22 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
         dr.rotation.x = -up * 0.95
       }
     }
+    // (his phone in his right palm, tipped up to his eyes; a flick every second or so, the feed up a post, eased (item 475))
+    if (phoneRef.current) {
+      const ph = phoneRef.current
+      ph.visible = feed.current.on = act === 'phone'
+      if (act === 'phone') {
+        if (T - feed.current.flick > 1.1 + (Math.sin(T * 3.7) + 1) * 0.6) { feed.current.flick = T; feed.current.at += 0.125 }
+        if (PHONE_FEED && feed.current.at > 1 && PHONE_FEED.offset.y > 1) { feed.current.at -= 1; PHONE_FEED.offset.y -= 1 }
+        if (PHONE_FEED) PHONE_FEED.offset.y += (feed.current.at - PHONE_FEED.offset.y) * Math.min(1, dt * 9)
+        if (parts.handR && ph.parent) {
+          parts.handR.updateWorldMatrix(true, false)
+          palm.current ??= drawnCentre(root, parts.handR)
+          ph.position.copy(ph.parent.worldToLocal(parts.handR.localToWorld(HAND_AT.copy(palm.current)))).add(PHONE_IN_PALM)
+        } else ph.position.copy(hand).add(PHONE_IN_PALM)
+        ph.rotation.set(PHONE_TIP, Math.PI, 0, 'YXZ')
+      }
+    }
     // (tasting: the bowl in his left palm, the chopsticks in his right, their tips up toward his mouth; where the tips are, for what's held)
     {
       const tasting = act === 'taste' && !!parts.handR && !!parts.handL
@@ -1029,7 +1105,7 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
     const gape = talking && Math.sin(T * 17) + Math.sin(T * 7.3) * 0.6 > 0.2
     let face: CrewFace = act === 'fan' || act === 'tongs' || act === 'hold' || act === 'dab' ? 'focused' : act === 'taste' ? (Math.sin((T - BOSS_TASTE.since) * 7) > 0.3 ? 'drink' : 'happy')
       : act === 'drink' ? ((T - BOSS_DRINK.since) % 1.4 < 1 ? 'drink' : 'talk') : now - RUSH.at < 2500 ? 'panic' : now - BOSS_FX.joyAt < 2000 ? 'proud'
-      : act === 'wave' ? 'happy' : 'idle'
+      : act === 'wave' ? 'happy' : act === 'phone' ? (T < feed.current.faceTill ? feed.current.face : 'focused') : 'idle'
     if (BOSS_FACE.face && now < BOSS_FACE.until) face = BOSS_FACE.face
     // (item 444: asleep, his eyes shut; worn out, or getting up off his futon, tired)
     const bedPhase = bed.current.phase
@@ -1087,6 +1163,11 @@ export function Boss({ to = [0, 0], aisle, open = false, lang = 'zh', children }
           </Html>
         )}
         <group ref={drinkRef} name="boss-drink-held" visible={false}>{drinkId && <DrinkBottle id={drinkId} wet />}</group>
+        <group ref={phoneRef} name="boss-phone" visible={false}>
+          <mesh geometry={PHONE_BODY_GEO} material={PHONE_BODY_MAT} />
+          <mesh geometry={PHONE_SCREEN_GEO} material={PHONE_SCREEN_MAT} position-z={PHONE_D / 2 + 0.0008} />
+          <mesh geometry={PHONE_LENS_GEO} material={PHONE_LENS_MAT} position={[PHONE_W / 2 - 0.02, PHONE_H / 2 - 0.02, -PHONE_D / 2 - 0.0015]} />
+        </group>
         <group ref={bowlRef} name="boss-taste-bowl" scale={SHRUNK}>
           <mesh geometry={TASTE_BOWL_GEO} material={TASTE_BOWL_MAT} /><mesh geometry={TASTE_BAND_GEO} material={TASTE_BAND_MAT} />
         </group>

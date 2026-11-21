@@ -200,6 +200,16 @@ export const drinkLineText = (r: number, lang: Lang) => {
   const l = DRINK_LINES[Math.floor(r * DRINK_LINES.length) % DRINK_LINES.length]
   return lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh
 }
+/** what he reads off his phone, the shop shut, a moment into it (item 475, the owner's 「老闆也會滑手機，有生活感」), and the face he makes at it */
+export const PHONE_LINES: (Line & { face: 'surprised' | 'happy' | 'proud' | 'half' | 'mad' })[] = [
+  { zh: '哦，今天漁港的香魚很便宜。', ja: 'お、今日は港の鮎が安いな。', en: 'Oh, sweetfish is cheap at the port today.', face: 'surprised' },
+  { zh: '哈哈，這隻貓也太可愛了。', ja: 'はは、この猫かわいすぎる。', en: 'Ha, this cat is too cute.', face: 'happy' },
+  { zh: '有客人說我們的烤魚好吃耶！', ja: 'うちの焼き魚がうまいってさ！', en: 'Someone says our grilled fish is great!', face: 'proud' },
+  { zh: '明天會下雨啊……', ja: '明日は雨か……', en: 'Rain tomorrow, huh...', face: 'half' },
+  { zh: '什麼？炭又要漲價了？', ja: 'なに、炭がまた値上がり？', en: "What? Charcoal's going up again?", face: 'mad' },
+]
+export const phoneLine = (r: number) => PHONE_LINES[Math.floor(r * PHONE_LINES.length) % PHONE_LINES.length]
+export const lineIn = (l: Line, lang: Lang) => (lang === 'ja' ? l.ja : lang === 'en' ? l.en : l.zh)
 /** what the owner says, worn out, as he sets off to lay his futon down by the stair instead of going up it (item 444) */
 export const BED_LINES: Line[] = [
   { zh: '累壞了……今晚就睡這裡吧', ja: 'くたくただ……今夜はここで寝よう', en: "Worn out... I'll sleep down here tonight" },
