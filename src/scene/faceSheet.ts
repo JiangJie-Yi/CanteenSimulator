@@ -59,9 +59,10 @@ export type Look = {
  * keeper's the third; the women cooks' and servers' the first two of theirs); the customers one of their kind's, by who they are
  */
 export const LOOKS: Record<FaceKind, Look[]> = {
-  // (the master: round eyes (item 491, the owner's 「老闆眼睛改圓一點」: almonds a fifth lidded came out two dark slits behind his glasses), a
-  // little lidded under his glasses, bushy brows, the lines of his years at their corners)
-  boss: [{ eye: 'round', lid: 0.1, size: 1.05, brow: 'bushy', nose: 'plain', mouth: 1, marks: ['crowsfeet'] }],
+  // (the master: almond eyes a little lidded under his glasses, bushy brows, the lines of his years at their corners; item 491 made them
+  // round, and the owner had them back as they were (item 495: 「老闆的這眼睛不OK，換回上一個」), drawn as every almond is since item 486,
+  // its corners level)
+  boss: [{ eye: 'almond', lid: 0.2, size: 1, brow: 'bushy', nose: 'plain', mouth: 1, marks: ['crowsfeet'] }],
   male: [
     // (steady: almond eyes a little lidded, thick straight brows, a shadow under his nose)
     { eye: 'almond', lid: 0.14, size: 1, brow: 'thick', nose: 'shadow', mouth: 1, marks: [] },
