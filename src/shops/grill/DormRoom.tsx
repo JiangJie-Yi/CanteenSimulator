@@ -17,7 +17,7 @@ import { DORM_LIFE } from './bar'
 import { slideDoorSound } from './restroomSound'
 import { doorAlong } from './ServeCounter'
 import { getEdit } from './edit'
-import { drawStreetView, type Sky } from '@/scene/streetView'
+import { makeAlleyView, type AlleySky } from '@/scene/alleyView'
 
 /**
  * The staff room upstairs (二樓員工休息室兼宿舍, blender/dorm.py; item 325, the owner's, 2026-11-18: 「然後捏個2F小房間，會切換場景，可以上樓
@@ -29,27 +29,17 @@ import { drawStreetView, type Sky } from '@/scene/streetView'
  * stair step by step, across to their place; asleep under their quilt from four in the morning till eleven (the table folded away, the
  * futons laid), else sat on their cushion at the table; as the shop opens, up off it, over to the stair and down it (game/dormLife).
  */
-/** what's out of the window (found by the owner's eye at 10 in the morning: the model's one painted night, its roofs' windows lit, all day
- * long): the street's far side as the shop's doorway shows it (scene/streetView), its upper half, from up here; by the part of the day,
- * painted again as it turns */
-const DORM_VIEW = (() => {
-  if (typeof document === 'undefined') return null
-  const c = document.createElement('canvas')
-  c.width = 512; c.height = 1024
-  drawStreetView(c.getContext('2d')!, 512, 1024, 'day')
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-})()
-let dormSky = 'day'
-/** the window's picture to the part of the day (the page's data-sky), once each turn */
-function dormViewTo() {
+/** what's out of the window (item 452, the owner's 「2樓窗外景色?」: it was the shop's doorway's street, its upper half, a pale nothing by
+ * day): the view from up here over the back of the town, in depth (scene/alleyView: the neighbour's roof and the wires across, the town's
+ * roofs and a bathhouse's chimney, the sky), on a pane at the window's glass (blender/dorm.py's WX0..WX1, WY0..WY1, 8.7 cm into the wall);
+ * by the part of the day, painted again as it turns */
+const ALLEY = makeAlleyView()
+const ALLEY_AT = { x: -0.575, y: 1.22, z: -1.4375, w: 1.15, h: 0.88 }
+const ALLEY_CAM = new THREE.Vector3()
+/** the window's view to the part of the day (the page's data-sky) */
+function alleyTo() {
   const s = typeof document === 'undefined' ? 'day' : document.documentElement.dataset.sky ?? 'day'
-  if (s === dormSky || !DORM_VIEW) return
-  dormSky = s
-  const c = DORM_VIEW.image as HTMLCanvasElement
-  drawStreetView(c.getContext('2d')!, c.width, c.height, (['dawn', 'day', 'dusk', 'night'].includes(s) ? s : 'day') as Sky)
-  DORM_VIEW.needsUpdate = true
+  ALLEY?.paint((['dawn', 'day', 'dusk', 'night'].includes(s) ? s : 'day') as AlleySky)
 }
 const DORM_URL = import.meta.env.BASE_URL + 'models/dorm.glb'
 useGLTF.preload(DORM_URL)
@@ -287,10 +277,11 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       const src = m.material as THREE.MeshStandardMaterial
       let t = made.get(src)
       if (!t) {
-        // (the lamp's shade a warm glow of its own, the night through the window as it's painted (both unlit); the rest the room's toon, a
-        // little of the lamp's warmth on it (it's off the shop's lamps and its shadows: by night it went near black))
+        // (the lamp's shade a warm glow of its own (unlit); the model's painted night in the window not drawn (the view's its own pane now,
+        // item 452); the rest the room's toon, a little of the lamp's warmth on it (it's off the shop's lamps and its shadows: by night it
+        // went near black))
         t = src.name === 'DormLampShade' ? new THREE.MeshBasicMaterial({ color: '#ffe6b8' })
-          : src.name === 'DormNightView' ? new THREE.MeshBasicMaterial({ map: DORM_VIEW ?? src.map ?? null })
+          : src.name === 'DormNightView' ? new THREE.MeshBasicMaterial({ visible: false })
             : new THREE.MeshToonMaterial({ color: src.color.clone(), map: src.map ?? null, emissive: new THREE.Color('#2a1f14'), emissiveIntensity: 1 })
         t.name = src.name
         made.set(src, t)
@@ -302,20 +293,6 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
     // (the room's line, in its own metres: the dining room's 0.0016 a metre; none round the glow, the night, the screen)
     // (nor round the bathroom's water, its mirror, its frosted pane (item 427))
     inkModel(r, (m) => /DormLampShade|DormNightView|DormScreen|DormBathWater|DormMirror|DormFrosted/.test((m.material as THREE.Material).name), { width: 0.0016, weld: true })
-    // (the window's picture laid on its pane: the street's upper half (its sky and the houses' upper floors) across the pane's own UVs)
-    r.traverse((o) => {
-      const m = o as THREE.Mesh
-      if (!m.isMesh || (m.material as THREE.Material).name !== 'DormNightView' || !DORM_VIEW) return
-      const uv = m.geometry.attributes.uv
-      if (!uv) return
-      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity
-      for (let i = 0; i < uv.count; i++) { u0 = Math.min(u0, uv.getX(i)); u1 = Math.max(u1, uv.getX(i)); v0 = Math.min(v0, uv.getY(i)); v1 = Math.max(v1, uv.getY(i)) }
-      const g = m.geometry.clone()
-      const a = g.attributes.uv
-      for (let i = 0; i < a.count; i++) a.setXY(i, (a.getX(i) - u0) / (u1 - u0 || 1), 0.48 + 0.5 * ((a.getY(i) - v0) / (v1 - v0 || 1)))
-      a.needsUpdate = true
-      m.geometry = g
-    })
     // (the left wall, its trims and the closet's shell, a piece of their own (blender/dorm.py's DormLeftCut), not merged: the view turned round
     // to that side (item 426), they're taken away as a doll's house's near wall is, the closet's floor, shelf and what's in it left; the
     // wall's inner face's x (the piece's furthest in less its trims' 2.2 cm))
@@ -356,6 +333,7 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
   const offToday = (id: string) => !!working && !working.includes(id) && id !== fallback?.id
   // (the shop shut with one of them still not up the stair (cut short on their way out, or the shop shut by hand): up it now, from its foot)
   const wasOpen = useRef(open)
+  const alley = useRef<THREE.Mesh>(null)
   useEffect(() => {
     if (wasOpen.current && !open) for (const m of living) if (DORM_LIFE.downAt.has(m.id) && !DORM_LIFE.upAt.has(m.id)) { DORM_LIFE.upAt.set(m.id, performance.now()); DORM_LIFE.downAt.delete(m.id) }
     wasOpen.current = open
@@ -378,7 +356,12 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       bathDoor.position.x = bathX - BATH_STATE.cur
       if (p >= 1) BATH_STATE.t0 = -1
     }
-    dormViewTo()
+    // (the window's view: the camera in its pane's frame, for the depth through it; its picture to the part of the day)
+    if (alley.current && ALLEY) {
+      alley.current.worldToLocal(ALLEY_CAM.copy(camera.position))
+      ALLEY.mat.uniforms.uCam.value.copy(ALLEY_CAM)
+    }
+    alleyTo()
     const asleep = dormDoing(getClock().minute) === 'sleep'
     let anyone = false
     living.forEach((m, k) => {
@@ -397,6 +380,10 @@ export function DormRoom({ crew = [], open = false, fallback, working }: { crew?
       {living.map((m, k) => <Resident key={m.id} m={m} k={k} marks={marks} open={open} quilt={quilts[k % 2]} off={offToday(m.id)} />)}
       {/* (what the view 二樓 looks at: over the table; its +z the room's open front, which the view faces) */}
       <group name="look-dorm" position={look} />
+      {/* (the window's view, in depth (item 452)) */}
+      {ALLEY && <mesh ref={alley} position={[ALLEY_AT.x, ALLEY_AT.y, ALLEY_AT.z]} material={ALLEY.mat} raycast={() => {}}>
+        <planeGeometry args={[ALLEY_AT.w, ALLEY_AT.h]} />
+      </mesh>}
       {/* (the stair's well: pointed at, it says where it goes; clicked, down to the shop) */}
       <mesh position={[STAIR.x, 0.08, STAIR.z]} visible={false}
         onClick={(e) => { e.stopPropagation(); if (getEdit().on) return; setTip(null); askView('down') }}
