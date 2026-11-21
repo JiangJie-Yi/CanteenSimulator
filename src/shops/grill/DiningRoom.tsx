@@ -3365,7 +3365,7 @@ function storeNorenMat(wide: number) {
  * The stock room (items 430, 431, 437; the owner's, 2026-11-21: 「這邊挖空並加上掛簾，後面是小儲藏室，倉儲員工專用」「飲料可以從冷飲櫃後面直接
  * 補」): a narrow room behind the side wall, from the wall's start along behind the drinks fridges to the men's toilet's room, its way in a
  * doorway in the wall's stretch past the fridges, a noren over it; only the stocker goes in. Built as the toilets' rooms are (a wing of the
- * house: dark cedar to the waist outside, plaster over, a dark cap along the tops, a slatted ceiling seen from above; inside, cedar to the
+ * house: dark cedar to the waist outside, plaster over, a dark cap along the tops, open over (its slatted ceiling taken away, item 498); inside, cedar to the
  * waist and plaster, the floor's boards the toilets' hinoki), the fridges' backs in its front wall, the drinks' stock along its back wall
  * (ShopProps: the crates and the cartons, and the milk crates). In the wall's frame (x behind its face, y up, z along it).
  */
@@ -3426,8 +3426,7 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
         <WcWall len={dx} at={[(WALL_OUT + deep) / 2, 0, zE - 0.002]} yaw={Math.PI} top={top} />
         {/* outside: the short end's body past the men's room (its back open, item 482) */}
         <WcMass x={[WC_ROOM.D + WC_T + 0.002, deep]} y={[0, top]} z={[zE, zE + WC_T]} />
-        {/* the slatted ceiling on the caps */}
-        <WcSlats x={[WALL_OUT, deep]} z={[z0, zE]} y={top + WC_CAP + 0.011} />
+        {/* (no slatted ceiling on its caps (item 498, the owner's 「倉庫不用這個」): it's open over, the stock seen from above) */}
         {/* (a dark post at its far back corner, the open back's edge; the near one went with the near end) */}
         {[zE + WC_T].map((z) => (
           // (4 mm proud of the end walls' backs: not in one plane with them)
