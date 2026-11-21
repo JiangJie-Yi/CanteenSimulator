@@ -18,6 +18,68 @@ import { nameOver } from './bar'
 const URL = import.meta.env.BASE_URL + 'models/catclock.glb'
 useGLTF.preload(URL)
 
+/** the eyes' middles and their size on the face's square (px) */
+const EYES = [[86, 106], [170, 106]] as const, EYE_R = 37
+/**
+ * The face (a black cat's since item 483, the owner's 「貓咪時鐘要黑貓」; its eyes after the owner's picture since item 484: 「貓咪的眼睛掛鐘
+ * 可以參考這個」): its fur; two big round eyes, set in raised rims (a dark grey ring, lit along its top, shaded under), warm cream-yellow,
+ * their pupils tall dark ovals turned a little in, a glint on each; `lid` 0 open → 1 shut, the fur drawn down over them to a lid's edge; a
+ * pink nose, a little ω of a mouth in pale pink, cheeks a soft rose, three cream whiskers a side. On the picture's left half only.
+ */
+function paintFace(g: CanvasRenderingContext2D, lid: number) {
+  g.save()
+  g.lineCap = 'round'
+  g.lineJoin = 'round'
+  g.fillStyle = '#2b2727'; g.fillRect(0, 0, 256, 256)
+  g.fillStyle = '#6e3e46'
+  for (const x of [62, 194]) { g.beginPath(); g.ellipse(x, 160, 15, 9, 0, 0, Math.PI * 2); g.fill() }
+  EYES.forEach(([x, y], i) => {
+    // (the rim: raised, its top caught by the light, its foot in shade)
+    g.fillStyle = '#463d3d'
+    g.beginPath(); g.arc(x, y, EYE_R + 7, 0, Math.PI * 2); g.fill()
+    g.lineWidth = 3
+    g.strokeStyle = '#6f6464'
+    g.beginPath(); g.arc(x, y, EYE_R + 5, Math.PI * 1.05, Math.PI * 1.85); g.stroke()
+    g.strokeStyle = '#141010'
+    g.beginPath(); g.arc(x, y, EYE_R + 5, Math.PI * 0.1, Math.PI * 0.9); g.stroke()
+    // (the eye: cream-yellow, lighter toward its top left)
+    const shade = g.createRadialGradient(x - 11, y - 13, 3, x, y, EYE_R)
+    shade.addColorStop(0, '#fff7d2'); shade.addColorStop(0.65, '#f2db86'); shade.addColorStop(1, '#d9b554')
+    g.fillStyle = shade
+    g.beginPath(); g.arc(x, y, EYE_R, 0, Math.PI * 2); g.fill()
+    // (its pupil, tall, turned in toward the nose a little, and its glints)
+    const px = x + (i === 0 ? 4 : -4)
+    g.fillStyle = '#1d1512'
+    g.beginPath(); g.ellipse(px, y + 2, 12, 25, 0, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#ffffff'
+    g.beginPath(); g.arc(px - 5, y - 11, 5.5, 0, Math.PI * 2); g.fill()
+    g.beginPath(); g.arc(px + 5, y + 12, 2.4, 0, Math.PI * 2); g.fill()
+    // (the lid: the fur drawn down over it to a curved edge, its edge a dark line)
+    if (lid > 0.02) {
+      const edge = y - EYE_R + lid * EYE_R * 2
+      g.save()
+      g.beginPath(); g.arc(x, y, EYE_R + 1, 0, Math.PI * 2); g.clip()
+      g.fillStyle = '#2b2727'
+      g.beginPath(); g.moveTo(x - EYE_R - 2, y - EYE_R - 2); g.lineTo(x + EYE_R + 2, y - EYE_R - 2); g.lineTo(x + EYE_R + 2, edge)
+      g.quadraticCurveTo(x, edge + 9 * (1 - lid * 0.6), x - EYE_R - 2, edge); g.closePath(); g.fill()
+      g.restore()
+      g.strokeStyle = '#151010'; g.lineWidth = 3
+      const half = Math.sqrt(Math.max(0, EYE_R * EYE_R - (edge - y) ** 2))
+      if (lid < 0.95) { g.beginPath(); g.moveTo(x - half, edge); g.quadraticCurveTo(x, edge + 9 * (1 - lid * 0.6), x + half, edge); g.stroke() }
+      // (shut: the lid's line across the eye's middle, a soft curve down, so it reads as an eye shut, not an empty ring)
+      else { g.lineWidth = 3.5; g.beginPath(); g.moveTo(x - EYE_R * 0.78, y + 2); g.quadraticCurveTo(x, y + EYE_R * 0.5, x + EYE_R * 0.78, y + 2); g.stroke() }
+    }
+  })
+  g.fillStyle = '#ec8c94'
+  g.beginPath(); g.moveTo(118, 150); g.lineTo(138, 150); g.quadraticCurveTo(128, 166, 128, 164); g.closePath(); g.fill()
+  g.strokeStyle = '#e9b3ac'; g.lineWidth = 4
+  g.beginPath(); g.moveTo(128, 162); g.quadraticCurveTo(122, 178, 113, 172); g.moveTo(128, 162); g.quadraticCurveTo(134, 178, 143, 172); g.stroke()
+  g.strokeStyle = '#efe6d6'; g.lineWidth = 3
+  for (const [y0, y1] of [[152, 144], [161, 161], [170, 178]]) {
+    g.beginPath(); g.moveTo(50, y0); g.lineTo(6, y1); g.moveTo(206, y0); g.lineTo(250, y1); g.stroke()
+  }
+  g.restore()
+}
 /** the picture: the face on its left half (its square laid over the head's 17 cm), the dial on its right (over the dial's 14 cm) */
 function paintPrint() {
   const c = document.createElement('canvas')
@@ -26,21 +88,8 @@ function paintPrint() {
   const g = c.getContext('2d')!
   g.lineCap = 'round'
   g.lineJoin = 'round'
-  // ---- the face (a black cat's since item 483, the owner's 「貓咪時鐘要黑貓」): its fur, its eyes shut in a smile in gold (to be seen on the
-  // black), a pink nose, a little ω of a mouth in pale pink, cheeks a soft rose, three cream whiskers a side
-  g.fillStyle = '#2b2727'; g.fillRect(0, 0, 256, 256)
-  g.fillStyle = '#6e3e46'
-  for (const x of [72, 184]) { g.beginPath(); g.ellipse(x, 150, 17, 10, 0, 0, Math.PI * 2); g.fill() }
-  g.strokeStyle = '#f2c34e'; g.lineWidth = 8
-  for (const x of [90, 166]) { g.beginPath(); g.moveTo(x - 18, 126); g.quadraticCurveTo(x, 104, x + 18, 126); g.stroke() }
-  g.fillStyle = '#ec8c94'
-  g.beginPath(); g.moveTo(118, 136); g.lineTo(138, 136); g.quadraticCurveTo(128, 152, 128, 150); g.closePath(); g.fill()
-  g.strokeStyle = '#e9b3ac'; g.lineWidth = 4
-  g.beginPath(); g.moveTo(128, 148); g.quadraticCurveTo(122, 164, 113, 158); g.moveTo(128, 148); g.quadraticCurveTo(134, 164, 143, 158); g.stroke()
-  g.strokeStyle = '#efe6d6'; g.lineWidth = 3
-  for (const [y0, y1] of [[140, 132], [150, 150], [160, 168]]) {
-    g.beginPath(); g.moveTo(58, y0); g.lineTo(8, y1); g.moveTo(198, y0); g.lineTo(248, y1); g.stroke()
-  }
+  PRINT_CANVAS = c
+  paintFace(g, 0)
   // ---- the dial: cream, a ring near its edge, twelve ticks (the quarters bold), its quarters' numbers, a little grilled fish under its
   // middle (the shop's)
   const X = 384, Y = 128
@@ -70,6 +119,10 @@ function paintPrint() {
   return t
 }
 let PRINT: THREE.CanvasTexture | null = null
+/** the picture's own canvas (the texture's may be a smaller copy, scene/textureCap: painted here, copied over as it's marked changed) */
+let PRINT_CANVAS: HTMLCanvasElement | null = null
+/** how shut its eyes are drawn now, in steps (a blink's few pictures, painted only as it changes) */
+let LID_NOW = 0
 
 const SAYS = nameOver('【掛鐘】黑貓掛鐘', '尾巴當鐘擺左右搖，指針跟著店裡的時間走')
 /** the shortest way round from one angle to another */
@@ -106,7 +159,27 @@ export const CatClock = memo(function CatClock() {
     return { r, moving, hour, minute, tail }
   }, [gltf])
   const at = useRef({ h: NaN, m: NaN })
+  // (a blink now and then (item 484): every three to seven seconds, a fifth of them twice over; the lids down and up in a sixth of a second)
+  const blink = useRef({ next: 2 + Math.random() * 3, at: -1, twice: false })
   useFrame(({ clock }, dt) => {
+    const now = clock.elapsedTime, b = blink.current
+    if (b.at < 0 && now > b.next) { b.at = now; b.twice = Math.random() < 0.2 }
+    let lid = 0
+    if (b.at >= 0) {
+      const s = now - b.at, len = 0.17
+      if (s < len) lid = Math.sin((s / len) * Math.PI)
+      else if (b.twice && s > len + 0.08 && s < len * 2 + 0.08) lid = Math.sin(((s - len - 0.08) / len) * Math.PI)
+      else if (s >= (b.twice ? len * 2 + 0.08 : len)) { b.at = -1; b.next = now + 3 + Math.random() * 4 }
+    }
+    // (dev: the lids held where asked, to look at them: window.__catLid = 0 … 1)
+    if (import.meta.env.DEV) { const held = (window as unknown as { __catLid?: number }).__catLid; if (typeof held === 'number') lid = held }
+    const step = Math.round(lid * 4) / 4
+    if (import.meta.env.DEV) (window as unknown as { __catLidNow?: number }).__catLidNow = step
+    if (step !== LID_NOW && PRINT && PRINT_CANVAS) {
+      LID_NOW = step
+      paintFace(PRINT_CANVAS.getContext('2d')!, step)
+      PRINT.needsUpdate = true
+    }
     const min = getClock().minute
     const hTo = (((min / 60) % 12) / 12) * Math.PI * 2, mTo = ((min % 60) / 60) * Math.PI * 2
     const a = at.current
