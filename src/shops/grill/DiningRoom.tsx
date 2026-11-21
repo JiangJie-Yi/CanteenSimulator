@@ -8895,8 +8895,11 @@ const WILLOW_SAYS = nameOver('【觀賞盆栽】垂柳', '墨色粗陶盆裡的�
  * The premium liquor's hanging shelf over the bar (items 443, 450, the owner's, 2026-11-21: 「上面新增系統櫃壩台，專門放高級酒」, then
  * 「要做在燈的上面」, the cabinet over the kitchen crossed out and the L of the bar boxed): blender/liquorshelf.py, an open L of dark walnut
  * over the two counters from their corner out past their last seats, hung from the room's top on short rods, the bar's lamps hanging from
- * its foot; on it the shop's better bottles four to a bay, their labels to the customers, a warm LED strip under its top on their side
- * (its own light: no lamp added). Fades as the lamps do when it's between the camera and what it's looking at (OccluderFade).
+ * its foot; on it the shop's better bottles, their labels to the customers, a warm LED strip under its top on their side (its own light:
+ * no lamp added). Made over (item 504, the owner's 「酒櫃實在不好看，幫我美化並調整酒瓶位置，要美觀」): each bay backed by warm washi lit
+ * from behind, a fascia with a brass line hiding the strip, a lip along each foot; one kind to a bay, sake six, the others five, spread
+ * evenly, square to the customers, their glass mirrored about the bay's middle. Fades as the lamps do when it's between the camera and
+ * what it's looking at (OccluderFade).
  */
 const LIQUOR_URL = import.meta.env.BASE_URL + 'models/liquorshelf.glb'
 useGLTF.preload(LIQUOR_URL)
@@ -8906,8 +8909,9 @@ useGLTF.preload(LIQUOR_URL)
 const BAR_SHELF = { foot: 2.02 }
 const LAMP_DROP = 0.36
 type LabelStyle = { bg: string; ink: string; edge: string; seal?: string }
-/** the labels' cells, in blender/liquorshelf.py's order (bay by bay: the floor's four isshobin, the shelf's five): each its kind, its name
- * (made up, not any brewer's), what it is, and its colours */
+/** the labels' cells, in blender/liquorshelf.py's order (item 504: sixteen sake, six shochu, five whisky, five umeshu; each bottle the next
+ * of its kind's, so a bay of sake reads light and dark by turns): each its kind, its name (made up, not any brewer's), what it is, and its
+ * colours */
 const LIQUOR_LABELS: { kind: 'sake' | 'shochu' | 'whisky' | 'umeshu'; name: string; sub: string; st: LabelStyle }[] = (() => {
   const W: LabelStyle = { bg: '#f3ecdc', ink: '#1b1713', edge: '#8c1c16', seal: '#b3261e' }
   const K: LabelStyle = { bg: '#141210', ink: '#d9b25a', edge: '#d9b25a' }
@@ -8920,14 +8924,16 @@ const LIQUOR_LABELS: { kind: 'sake' | 'shochu' | 'whisky' | 'umeshu'; name: stri
   const sake = (name: string, sub: string, st: LabelStyle) => ({ kind: 'sake' as const, name, sub, st })
   const sho = (name: string) => ({ kind: 'shochu' as const, name, sub: '焼酎', st: D })
   const wh = (name: string, sub: string) => ({ kind: 'whisky' as const, name, sub, st: G })
-  const ume = () => ({ kind: 'umeshu' as const, name: '梅酒', sub: '', st: P })
+  const ume = (sub: string) => ({ kind: 'umeshu' as const, name: '梅酒', sub, st: P })
   return [
-    sake('雪月', '大吟醸', W), sake('凪', '純米', K), sake('鶴', '吟醸', W), sake('山廃', '純米', B),
-    sake('月', '吟醸', S), sho('芋'), wh('12', 'SINGLE MALT'), ume(), sake('雪', '純米', S),
-    sake('蔵', '大吟醸', K), sake('龍', '純米', W), sake('古酒', '', K), sake('原酒', '', R),
-    sho('麦'), sake('凪', '吟醸', S), ume(), wh('17', 'PURE MALT'), sho('芋'),
-    sake('雪', '大吟醸', W), sake('鶴', '純米', B), sake('月', '吟醸', K), sake('山廃', '', R),
-    sake('蔵', '吟醸', S), wh('21', 'BLENDED'), sake('龍', '純米', S), sho('麦'), ume(),
+    sake('雪月', '大吟醸', W), sake('凪', '純米', K), sake('鶴', '吟醸', S), sake('山廃', '純米', B),
+    sake('月', '吟醸', W), sake('原酒', '', R), sake('蔵', '大吟醸', K), sake('雪', '純米', S),
+    sake('龍', '純米', W), sake('澄', '吟醸', B), sake('古酒', '', K), sake('花', '純米', W),
+    sake('結', '吟醸', S), sake('粋', '', R), sake('光', '大吟醸', B), sake('和', '純米', K),
+    sho('芋'), sho('麦'), sho('黒'), sho('米'), sho('蕎麦'), sho('黒糖'),
+    // (the whiskies' in the order they stand along the bay: the oldest in its middle, 18 and 21 by it, 12 and 17 at its ends)
+    wh('17', 'PURE MALT'), wh('21', 'BLENDED'), wh('25', 'RESERVE'), wh('18', 'SINGLE CASK'), wh('12', 'SINGLE MALT'),
+    ume('紀州'), ume('熟成'), ume('完熟'), ume('本格'), ume('古酒'),
   ]
 })()
 /** the labels' picture: eight cells across, four down, each 128 x 192, every label drawn as a small brewer's would (a washi or a coloured
@@ -8971,14 +8977,17 @@ const liquorMatOf = (src: THREE.MeshStandardMaterial) => {
       LiquorGlass: glass,
       LiquorLED: new THREE.MeshBasicMaterial({ color: '#ffe2b4' }),
       LiquorRod: new THREE.MeshToonMaterial({ color: '#1c1c1f' }),
+      // (the fine brass line along the fascia under its top (item 504))
+      LiquorBrass: new THREE.MeshToonMaterial({ color: '#c49a48' }),
       LiquorLabel: new THREE.MeshToonMaterial({ color: '#ffffff', map: LIQUOR_LABEL_TEX }),
     }
   }
   let m = liquorMats[src.name]
   if (!m) {
-    // (the walnut, and the back washed warm under the strips: its own picture lifting it a little in the dark)
+    // (the walnut, and each bay's back (item 504): warm washi lit from behind, its own picture glowing in the dark so the bottles stand
+    // against it as silhouettes)
     m = src.name === 'LiquorBack'
-      ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, emissive: '#ffffff', emissiveMap: src.map ?? null, emissiveIntensity: 0.45 })
+      ? new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, emissive: '#ffffff', emissiveMap: src.map ?? null, emissiveIntensity: 0.7 })
       : new THREE.MeshToonMaterial({ color: '#ffffff', map: src.map ?? null, normalMap: src.normalMap ?? null })
     m.name = src.name
     liquorMats[src.name] = m

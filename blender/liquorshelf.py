@@ -9,7 +9,14 @@ sake, a shochu's stout bottle, a squared whisky, a round umeshu), their labels t
 whisky's four), its glass's colour and its cap's in its points' colour (one material); its label a band round the side it faces on its own
 cell of one picture the game paints (LIQUOR_LABELS in the game: the cells in the order of CELL_KINDS here, round again past the last).
 
-Nodes: "LiquorCabinet" (its boards LiquorWood, the strips LiquorLED, the rods LiquorRod), "LiquorBottles" (LiquorGlass, its colours in its
+Made over (item 504, the owner's 「酒櫃實在不好看，幫我美化並調整酒瓶位置，要美觀」: four bottles huddled in the middle of each wide bay, their
+heights, glass and turns at random, the kitchen's clutter seen between them, the LED a bare white line): each bay backed by a panel of warm
+washi lit from behind (LiquorBack: brightest behind the bottles' bodies, falling off to its edges, so they stand against it as silhouettes),
+a fascia under the top's front edge hiding the LED with a fine brass line along it (LiquorBrass), a low lip along each foot's front; one
+kind to a bay (sake six, shochu, whisky and umeshu five), spread evenly over the bay, all at one depth, square to the customers, their
+glass mirrored about the bay's middle.
+
+Nodes: "LiquorCabinet" (its boards LiquorWood, the strips LiquorLED, the rods LiquorRod, the backs LiquorBack, the line LiquorBrass), "LiquorBottles" (LiquorGlass, its colours in its
 points), "LiquorLabels" (LiquorLabel, the game's picture). The game's frame, in the bar's units: the corner (where the two counters' lamp
 lines meet) at the origin, y up from the shelf's foot; x along run A (the long counter's way out from the corner), z along run B (the side
 counter's); A's customers toward -z, B's toward -x. About 4,000 triangles all told.
@@ -59,8 +66,20 @@ wood = wood * (0.92 + 0.1 * fbm(N, 4, 24, 3))[..., None]
 WOOD_TEX = image("liquor_walnut", np.clip(wood, 0, 1).astype(np.float32))
 WOOD_NRM = image("liquor_walnut_nrm", to_normal(grain * 0.6 + fbm(N, 6, 30, 3) * 0.4, 1.0).astype(np.float32), data=True)
 
+# (item 504: the bays' backs, warm washi lit from behind: its fibres and a few long ones, warm cream at its middle where the bottles stand,
+# falling off to amber and dusk at its edges, a little more at its foot and its top; one bay's worth, each bay's back laid over all of it)
+bu, bv = grid01(256)
+# (washi: soft clouding, and its fibres short and fine, a few here and there, mostly up and down (long waving lines read as wood grain))
+fib = smooth(0.8, 0.9, vnoise(256, 90, 26)) * 0.07 + (fbm(256, 5, 4, 3) - 0.5) * 0.07
+glow = np.exp(-((bu - 0.5) / 0.36) ** 2) * np.exp(-((bv - 0.52) / 0.42) ** 2)
+back = mix((0.32, 0.17, 0.07), (1.0, 0.86, 0.62), np.clip(glow, 0, 1) ** 0.8)
+back = np.clip(back + fib[..., None], 0, 1)
+BACK_TEX = image("liquor_back", back.astype(np.float32))
+
 M = {
     "wood": pbr("LiquorWood", (1, 1, 1), tex=WOOD_TEX, nrm=WOOD_NRM, nrm_strength=0.5, rough=0.45),
+    "back": pbr("LiquorBack", (1, 1, 1), tex=BACK_TEX, rough=0.9),
+    "brass": pbr("LiquorBrass", (0.72, 0.57, 0.25), rough=0.35, metal=0.8),
     "led": pbr("LiquorLED", (1.0, 0.86, 0.62), rough=0.4, emit=(1.0, 0.86, 0.62), emit_strength=3.0),
     "rod": pbr("LiquorRod", (0.05, 0.05, 0.055), rough=0.35, metal=0.8),
     "glass": pbr("LiquorGlass", (1, 1, 1), rough=0.08),
@@ -78,7 +97,7 @@ def srgb(h):
 # ---------------------------------------------------------------- the shelf: its boards, its strips, its rail, its rods
 cab = bmesh.new()
 CL = {"uv": cab.loops.layers.uv.new("UVMap")}
-MAT = {"wood": 0, "led": 1, "rod": 2}
+MAT = {"wood": 0, "led": 1, "rod": 2, "back": 3, "brass": 4}
 
 
 def board(lo, hi, mat, grain_axis=0, tile=0.6):
@@ -102,6 +121,29 @@ def board(lo, hi, mat, grain_axis=0, tile=0.6):
             c = lp.vert.co
             g = (c.x, c.z, -c.y)
             lp[CL["uv"]].uv = (g[ua] / tile, g[va] / tile)
+
+
+def back_board(lo, hi, axis, sign):
+    """a bay's back (item 504): a box from lo to hi, its face toward the customers (normal along `axis`, `sign`) the warm washi over all of it
+    (u across the bay from the customers' left, v up), its other faces walnut"""
+    (x0, y0, z0), (x1, y1, z1) = lo, hi
+    board(lo, hi, MAT["wood"], 2 if axis == 0 else 0)
+    # (the last board's six faces: the one toward the customers turned to the washi)
+    cab.faces.ensure_lookup_table()
+    for f in list(cab.faces)[-6:]:
+        n_ = f.normal
+        g = (n_.x, n_.z, -n_.y)
+        if abs(g[axis] - sign) > 1e-3:
+            continue
+        f.material_index = MAT["back"]
+        for lp in f.loops:
+            c = lp.vert.co
+            gc = (c.x, c.z, -c.y)
+            if axis == 2:
+                uu = (gc[0] - x0) / (x1 - x0)
+            else:
+                uu = (z1 - gc[2]) / (z1 - z0)
+            lp[CL["uv"]].uv = (uu, (gc[1] - y0) / (y1 - y0))
 
 
 def rod(x, z, y0, y1):
@@ -150,10 +192,21 @@ for k in range(BAYS_B):
     if k:
         zd = zb0 + wb * k
         board((-D / 2 + 0.004, T, zd - T / 2), (D / 2 - 0.004, H - T, zd + T / 2), MAT["wood"], 1)
-# (a rail along the kitchen's side of each, at the bottles' shoulders, so none's knocked off from behind)
-board((D / 2, 0.075, D / 2 - 0.014), (A1 - T, 0.085, D / 2 - 0.004), MAT["wood"], 0)
-board((D / 2 - 0.014, 0.075, B0 + 0.002), (D / 2 - 0.004, 0.085, B1 - T), MAT["wood"], 2)
-# (the strips: under the top on the customers' side, their light their own)
+# (item 504: each bay's back, warm washi toward the customers (the rail that ran along the kitchen's side at the bottles' shoulders gone with
+# them: they keep the bottles now); a low lip along each foot's front; under the top's front edge a fascia hiding the strip, a fine brass
+# line along its face)
+for a, b in bays_a:
+    back_board((a, T, D / 2 - 0.008), (b, H - T, D / 2 - 0.002), 2, -1)
+for a, b in bays_b:
+    back_board((D / 2 - 0.008, T, a), (D / 2 - 0.002, H - T, b), 0, -1)
+board((A0 + T, T, -D / 2), (A1 - T, T + 0.014, -D / 2 + 0.006), MAT["wood"], 0)
+board((-D / 2, T, B0 + 0.006), (-D / 2 + 0.006, T + 0.014, B1 - T), MAT["wood"], 2)
+FASCIA = 0.02
+board((A0, H - T - FASCIA, -D / 2), (A1, H - T, -D / 2 + 0.008), MAT["wood"], 0)
+board((-D / 2, H - T - FASCIA, -D / 2 + 0.008), (-D / 2 + 0.008, H - T, B1), MAT["wood"], 2)
+board((A0 + 0.006, H - T - FASCIA * 0.55, -D / 2 - 0.0012), (A1 - 0.006, H - T - FASCIA * 0.4, -D / 2), MAT["brass"], 0)
+board((-D / 2 - 0.0012, H - T - FASCIA * 0.55, -D / 2 + 0.014), (-D / 2, H - T - FASCIA * 0.4, B1 - 0.006), MAT["brass"], 2)
+# (the strips: under the top on the customers' side, behind the fascia, their light their own)
 board((A0 + T + 0.01, H - T - 0.007, -D / 2 + 0.012), (A1 - T - 0.01, H - T, -D / 2 + 0.022), MAT["led"], 0)
 board((-D / 2 + 0.012, H - T - 0.007, B0 + 0.01), (-D / 2 + 0.022, H - T, B1 - T - 0.01), MAT["led"], 2)
 # (the rods up to the room's top: at the corner, over A's and B's middles and near their far ends)
@@ -164,7 +217,7 @@ cab.to_mesh(me)
 cab.free()
 cab_o = bpy.data.objects.new("LiquorCabinet", me)
 bpy.context.collection.objects.link(cab_o)
-for k in ("wood", "led", "rod"):
+for k in ("wood", "led", "rod", "back", "brass"):
     cab_o.data.materials.append(M[k])
 parts.append(cab_o)
 
@@ -181,10 +234,9 @@ KINDS = {
     "umeshu": {"prof": [(0.045, 0.0), (0.048, 0.14), (0.044, 0.2), (0.016, 0.242), (0.016, 0.264), (0.018, 0.272)], "glass": ["#d9a94e"], "cap": ["#c9a44c"],
                "label": (0.05, 0.13), "segs": 8},
 }
-# (the labels' cells in order, as the game's LIQUOR_LABELS: the cabinet's (item 443) nine a bay, its floor's four sake then five more; the
-# sake in four-go bottles now, as a premium sake's sold)
-CELL_KINDS = ["yongobin"] * 4 + ["yongobin", "shochu", "whisky", "umeshu", "yongobin"] + ["yongobin"] * 4 + ["shochu", "yongobin", "umeshu", "whisky", "shochu"] \
-    + ["yongobin"] * 4 + ["yongobin", "whisky", "yongobin", "shochu", "umeshu"]
+# (the labels' cells in order, as the game's LIQUOR_LABELS (item 504): sixteen sake, six shochu, five whisky, five umeshu)
+CELL_KINDS = ["yongobin"] * 16 + ["shochu"] * 6 + ["whisky"] * 5 + ["umeshu"] * 5
+CELLS_OF = {kd: [i for i, k_ in enumerate(CELL_KINDS) if k_ == kd] for kd in KINDS}
 bot = bmesh.new()
 BL = {"uv": bot.loops.layers.uv.new("UVMap"), "col": bot.loops.layers.color.new("Col")}
 lab = bmesh.new()
@@ -192,13 +244,12 @@ LL = {"uv": lab.loops.layers.uv.new("UVMap")}
 tris = {}
 
 
-def bottle(kind, cx, cz, y0, turn, cell, face):
+def bottle(kind, cx, cz, y0, turn, cell, face, glass_hex, cap_hex):
     """a bottle of `kind` standing at (cx, y0, cz), turned `turn` about its own upright; its label's band on picture cell `cell`, facing the
-    way `face` (its angle in the x-z plane: -pi/2 toward -z, pi toward -x)"""
+    way `face` (its angle in the x-z plane: -pi/2 toward -z, pi toward -x); its glass and its cap as given"""
     k = KINDS[kind]
     segs, prof = k["segs"], [(r * S, y * S) for r, y in k["prof"]]
-    glass = srgb(k["glass"][int(RS.integers(0, len(k["glass"])))])
-    cap = srgb(k["cap"][int(RS.integers(0, len(k["cap"])))])
+    glass, cap = srgb(glass_hex), srgb(cap_hex)
     off = math.pi / 4 if segs == 4 else 0.0
     sq = 1.0 / math.cos(math.pi / 4) if segs == 4 else 1.0
     rings = []
@@ -245,9 +296,11 @@ def bottle(kind, cx, cz, y0, turn, cell, face):
     pts = []
     for s in range(arc + 1):
         if segs == 4:
-            # (on the square's face toward `face`: flat)
+            # (on the square's face toward `face`: flat, a hair off it (item 504: at 0.0365 it was inside the glass, the face 0.054 out, and
+            # every whisky's label hidden; turned at random a corner of it showed now and then))
             w = (s / arc - 0.5) * 0.072 * S
-            pts.append((cx + nx * 0.0365 * S + tx * w, cz + nz * 0.0365 * S + tz * w))
+            r_face = max(r for r, y in prof) + 0.0015
+            pts.append((cx + nx * r_face + tx * w, cz + nz * r_face + tz * w))
         else:
             ang = face + span / 2 - span * s / arc
             pts.append((cx + r_body * math.cos(ang), cz + r_body * math.sin(ang)))
@@ -269,21 +322,41 @@ def bottle(kind, cx, cz, y0, turn, cell, face):
     return n_tri
 
 
-# (four to a bay, a hand apart, together in the bay's middle; A's from the corner out, then B's; the cells in order, round again past the
-# last; A's labels toward its customers (-z), B's toward its (-x))
+# (item 504: one kind to a bay, as a bar shows its shelf (they were four to a bay, huddled in its middle, every kind mixed, their heights,
+# glass and turns at random): the sake's six, the others' five, spread evenly over the bay with 7 cm left at its ends, all at one depth,
+# square to the customers, their glass in a pattern mirrored about the bay's middle; the runs alike, the whisky in the middle of the long
+# one; each bottle's label the next of its kind's cells, round again (a run's twin labels on the other run, far apart))
+BLUE, FROST, GREEN, BROWN, BLACK, AMBER, UME = "#21385c", "#cfd8d2", "#1d3a25", "#3a2410", "#1a1a1a", "#a8611c", "#d9a94e"
+GOLD, INK, RED = "#c9a44c", "#1a1a1a", "#8c1c16"
+CAP_OF = {BLUE: GOLD, FROST: RED, GREEN: GOLD, BROWN: INK}
+SAKE = [[BLUE, FROST, GREEN, GREEN, FROST, BLUE], [BROWN, FROST, BLUE, BLUE, FROST, BROWN], [GREEN, FROST, BROWN, BROWN, FROST, GREEN],
+        [BLUE, GREEN, FROST, FROST, GREEN, BLUE]]
+BAYS = {"A": ["yongobin", "shochu", "whisky", "umeshu", "yongobin"], "B": ["yongobin", "shochu", "whisky", "yongobin"]}
+next_cell = {kd: 0 for kd in KINDS}
+sake_bay = 0
 n = 0
-for (a, b), run in [(bay, "A") for bay in bays_a] + [(bay, "B") for bay in bays_b]:
-    mid = (a + b) / 2
-    for i in range(4):
-        along = mid + (i - 1.5) * 0.1 + RS.uniform(-0.006, 0.006)
-        across = -0.006 + RS.uniform(-0.006, 0.006)
-        cell = n % len(CELL_KINDS)
-        kind = CELL_KINDS[cell]
-        if run == "A":
-            tris[kind] = bottle(kind, along, across, T + 0.0015, RS.uniform(-0.15, 0.15), cell, -math.pi / 2)
+for run, spans in (("A", bays_a), ("B", bays_b)):
+    for (a, b), kind in zip(spans, BAYS[run]):
+        if kind == "yongobin":
+            looks = [(g_, CAP_OF[g_]) for g_ in SAKE[sake_bay % len(SAKE)]]
+            sake_bay += 1
+        elif kind == "shochu":
+            looks = [(BROWN if i % 2 == 0 else BLACK, INK if i % 2 == 0 else GOLD) for i in range(5)]
+        elif kind == "whisky":
+            looks = [(AMBER, INK if i % 2 == 0 else RED) for i in range(5)]
         else:
-            tris[kind] = bottle(kind, across, along, T + 0.0015, RS.uniform(-0.15, 0.15), cell, math.pi)
-        n += 1
+            looks = [(UME, GOLD)] * 5
+        m = 0.07
+        for i, (g_, c_) in enumerate(looks):
+            along = a + m + (b - a - 2 * m) * i / (len(looks) - 1)
+            cells = CELLS_OF[kind]
+            cell = cells[next_cell[kind] % len(cells)]
+            next_cell[kind] += 1
+            if run == "A":
+                tris[kind] = bottle(kind, along, -0.008, T + 0.0015, 0.0, cell, -math.pi / 2, g_, c_)
+            else:
+                tris[kind] = bottle(kind, -0.008, along, T + 0.0015, 0.0, cell, math.pi, g_, c_)
+            n += 1
 print("LIQUOR_BOTTLES", n, "BOTTLE_TRIS", tris)
 me = bpy.data.meshes.new("LiquorBottles")
 bot.to_mesh(me)
