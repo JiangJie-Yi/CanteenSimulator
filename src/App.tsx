@@ -124,6 +124,8 @@ import { boxesSound, coinSound, dayTurnSound, stampSound, usePanelSound } from '
 import { DaySummary } from '@/ui/DaySummary'
 import { ClosedDown } from '@/ui/ClosedDown'
 import { Glyph, StarIcon } from '@/ui/GameIcons'
+import { PullRefresh } from '@/ui/PullRefresh'
+import { pullNow, setPull } from '@/ui/pullStore'
 import { addDay, daySummary, soldBetween, type DayRecord, type DaySummary as DaySum } from '@/game/daySummary'
 import { NO_SCENE, noteDrawn } from '@/scene/Later'
 import { Prewarm } from '@/scene/Prewarm'
@@ -3298,7 +3300,7 @@ export default function App() {
   //  - one finger flicked left or right switches dishes
   //  - pulled down from the top half of the screen and let go, reloads the page, like other sites
   // A drag that picked up food or a tool (the page gets is-carrying) is neither.
-  const [pull, setPull] = useState(0)
+  // (how far it's pulled is ui/pullStore's, drawn by ui/PullRefresh alone: in this page's state, every move of the finger drew the page again)
   useEffect(() => {
     if (!IS_TOUCH) return
     let s: { x: number; y: number; t: number; carrying: boolean } | null = null
@@ -3328,10 +3330,9 @@ export default function App() {
     const end = (e: TouchEvent) => {
       const g = s
       s = null
-      setPull((v) => {
-        if (v >= 1 && g && !g.carrying) window.setTimeout(() => window.location.reload(), 120)
-        return v >= 1 ? 1 : 0
-      })
+      const v = pullNow()
+      if (v >= 1 && g && !g.carrying) window.setTimeout(() => window.location.reload(), 120)
+      setPull(v >= 1 ? 1 : 0)
       if (!g || g.carrying || e.changedTouches.length !== 1 || document.body.classList.contains('is-carrying')) return
       const p = e.changedTouches[0]
       const dx = p.clientX - g.x
@@ -4152,11 +4153,7 @@ export default function App() {
           </button>
         )}
         <p className={`notice${notice ? ' is-shown' : ''}`} role="status" aria-live="polite">{notice}</p>
-        {pull > 0 && (
-          <div className={`pull-refresh${pull >= 1 ? ' is-ready' : ''}`} style={{ '--pull': pull } as React.CSSProperties}>
-            <Glyph id="refresh" size="1em" />{pull >= 1 ? UI[lang].pullGo : UI[lang].pullMore}
-          </div>
-        )}
+        <PullRefresh lang={lang} />
       </div>
       {owner === null && (
         <Welcome lang={lang} capital={CAPITAL} shopCost={SHOP_COST} onStart={(name) => {
