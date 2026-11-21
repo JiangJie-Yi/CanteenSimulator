@@ -7,7 +7,7 @@ import { BambooHit, BambooModel } from './BarFurnish'
 import { doorClick, LOCK_TEX, ToiletLive, WashstandLive, WcBin, WcBrush, WcDryer, WcMarks, WcOtohime, WcPads, WcPaper, WcRemote, WcTowelBox } from './Restroom'
 import { blindSound, bottleClink, boxThud, canClatter, coolerDoorSound, glassShatter, latchSound, lightSwitchSound, slideDoorSound, throwWhoosh } from './restroomSound'
 import { landingOf } from '@/game/spills'
-import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { SWITCH_SPOT } from '@/game/shopState'
 import * as THREE from 'three'
@@ -3241,6 +3241,13 @@ const STORE_NOREN_MAT = new THREE.MeshToonMaterial({ color: '#ffffff', map: STOR
  * waist and plaster, the floor's boards the toilets' hinoki), the fridges' backs in its front wall, the drinks' stock along its back wall
  * (ShopProps: the crates and the cartons, and the milk crates). In the wall's frame (x behind its face, y up, z along it).
  */
+/** what's in a room with a ceiling takes none of the sun's shadows (item 476, the owner's 「有不明陰影」: the stock room's walls and slats
+ * cast nothing, so the sun went through them, and the fridges', the cartons' and even the men's toilet's next door shadows lay on its
+ * floor and walls in blots; a roof only the sun saw left the toilet's, its rays slanting in along the room past its end). Only a uniform
+ * changes (three's receiveShadow), no program */
+function useNoSun(ref: RefObject<THREE.Object3D | null>) {
+  useLayoutEffect(() => { ref.current?.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.receiveShadow) o.receiveShadow = false }) })
+}
 function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number, number]; deep: number; fridges: [number, number][] }) {
   const h = STORE.doorH, top = h + 0.3
   const [z0, z1] = room
@@ -3249,6 +3256,9 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
   const zE = z1 + 0.004
   const mid = (z0 + zE) / 2, len = zE - z0, dx = deep - WALL_OUT
   const noren = useRef<THREE.Group>(null)
+  // (none of the sun's shadows inside it (item 476))
+  const whole = useRef<THREE.Group>(null)
+  useNoSun(whole)
   useFrame((_, dt0) => {
     // (swung aside as the stocker goes through, back into the room the way he's going, and settling back after him: a spring, a little
     // overshoot, each panel a little behind the other)
@@ -3270,7 +3280,7 @@ function StoreRoom({ door, room, deep }: { door: [number, number]; room: [number
     }
   }, [])
   return (
-    <group>
+    <group ref={whole}>
       <EditBlock>
       <StaticBatch plain>
         {/* its floor, the toilets' hinoki boards, a hair over the shop's own floor run out behind the wall */}
@@ -9671,6 +9681,9 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
   // (their fronts toward the room's open side, where the camera is)
   const face = Math.atan2(-c0.lay.x, -c0.lay.z)
   const fr = useMemo(() => fridgesOf(counters), [counters])
+  // (the crates and cartons, in the stock room: none of the sun's shadows on them (item 476))
+  const cratesRef = useRef<THREE.Group>(null)
+  useNoSun(cratesRef)
   // (and the sake barrels, as drawn: the sake's stock)
   const sake = useRef<THREE.Group>(null)
   const sakeLit = () => sake.current
@@ -9746,7 +9759,7 @@ function ShopPropsImpl({ counters }: { counters: Counter[] }) {
       {/* (the premium liquor's shelf over the bar, the lamps under it (items 443, 450)) */}
       {barShelf && <Movable id="barshelf" label="高級酒吊棚"><group position={barShelf.p} rotation-y={barShelf.yaw}><Suspense fallback={null}><LiquorShelf /></Suspense></group></Movable>}
       {/* (the crates of red bottles and the cartons of cans, in the stock room behind the side wall now, along its back wall (item 430)) */}
-      {fr && <Movable id="crates" label="酒箱"><group><StaticBatch plain>
+      {fr && <Movable id="crates" label="酒箱"><group ref={cratesRef}><StaticBatch plain>
         <group position={crateAt} rotation-y={Math.atan2(counters[1].lay.x, counters[1].lay.z)}>
           <CrateBoxes />
         </group>
